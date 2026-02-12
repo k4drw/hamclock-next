@@ -56,6 +56,7 @@
 #include "ui/TimePanel.h"
 #include "ui/WeatherPanel.h"
 #include "ui/WidgetSelector.h"
+#include "ui/icon_png.h"
 
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
@@ -202,7 +203,8 @@ int main(int argc, char *argv[]) {
 
   // Set window icon
   {
-    SDL_Surface *iconSurface = IMG_Load("icon.png");
+    SDL_RWops *rw = SDL_RWFromMem((void *)icon_png, sizeof(icon_png));
+    SDL_Surface *iconSurface = IMG_Load_RW(rw, 1);
     if (iconSurface) {
       SDL_SetWindowIcon(window, iconSurface);
       SDL_FreeSurface(iconSurface);
@@ -469,7 +471,6 @@ int main(int argc, char *argv[]) {
 
       TextureManager texMgr;
       // Load global assets
-      texMgr.loadImage(renderer, "app_logo", "icon.png");
 
       FontCatalog fontCatalog(fontMgr);
       fontMgr.setCatalog(&fontCatalog);
