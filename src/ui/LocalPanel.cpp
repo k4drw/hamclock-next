@@ -1,5 +1,6 @@
 #include "LocalPanel.h"
 #include "../core/Astronomy.h"
+#include "../core/Theme.h"
 #include "FontCatalog.h"
 
 #include <algorithm>
@@ -99,8 +100,18 @@ void LocalPanel::render(SDL_Renderer *renderer) {
   SDL_Rect clip = {x_, y_, width_, height_};
   SDL_RenderSetClipRect(renderer, &clip);
 
+  ThemeColors themes = getThemeColors(theme_);
+
+  // Background
+  SDL_SetRenderDrawBlendMode(
+      renderer, (theme_ == "glass") ? SDL_BLENDMODE_BLEND : SDL_BLENDMODE_NONE);
+  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b,
+                         themes.bg.a);
+  SDL_RenderFillRect(renderer, &clip);
+
   // Draw pane border
-  SDL_SetRenderDrawColor(renderer, 80, 80, 80, 255);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
+                         themes.border.b, themes.border.a);
   SDL_RenderDrawRect(renderer, &clip);
 
   int pad = static_cast<int>(width_ * 0.06f);
@@ -165,12 +176,13 @@ void LocalPanel::onResize(int x, int y, int w, int h) {
   Widget::onResize(x, y, w, h);
   auto *cat = fontMgr_.catalog();
   int fast = cat->ptSize(FontStyle::Fast);
+  int fastBold = cat->ptSize(FontStyle::FastBold);
   int clockPt = std::clamp(h / 4, 6, cat->ptSize(FontStyle::SmallBold));
-  lineFontSize_[0] = fast;    // "DE:" label
-  lineFontSize_[1] = clockPt; // Local time (large)
-  lineFontSize_[2] = fast;    // Date
-  lineFontSize_[3] = fast;    // Grid/coords
-  lineFontSize_[4] = fast;    // Rise/set
-  secFontSize_ = fast;        // Seconds (smaller)
+  lineFontSize_[0] = fast;     // "DE:" label
+  lineFontSize_[1] = clockPt;  // Local time (large)
+  lineFontSize_[2] = fastBold; // Date
+  lineFontSize_[3] = fast;     // Grid/coords
+  lineFontSize_[4] = fast;     // Rise/set
+  secFontSize_ = fastBold;     // Seconds (smaller)
   destroyCache();
 }

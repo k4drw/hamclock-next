@@ -1,4 +1,5 @@
 #include "DXSatPane.h"
+#include "../core/Theme.h"
 #include "FontCatalog.h"
 
 #include <algorithm>
@@ -281,13 +282,19 @@ void DXSatPane::drawRadio(SDL_Renderer *renderer, int cx, int cy, int r,
 }
 
 void DXSatPane::renderMenu(SDL_Renderer *renderer) {
-  // Dark background
-  SDL_SetRenderDrawColor(renderer, 20, 20, 20, 255);
+  ThemeColors themes = getThemeColors(theme_);
+
+  // Background
+  SDL_SetRenderDrawBlendMode(
+      renderer, (theme_ == "glass") ? SDL_BLENDMODE_BLEND : SDL_BLENDMODE_NONE);
+  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b,
+                         themes.bg.a);
   SDL_Rect bg = {x_, y_, width_, height_};
   SDL_RenderFillRect(renderer, &bg);
 
   // Border
-  SDL_SetRenderDrawColor(renderer, 80, 80, 80, 255);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
+                         themes.border.b, themes.border.a);
   SDL_RenderDrawRect(renderer, &bg);
 
   SDL_RenderSetClipRect(renderer, &bg);
@@ -298,8 +305,8 @@ void DXSatPane::renderMenu(SDL_Renderer *renderer) {
   int textX = x_ + pad + radioR * 2 + pad;
   int maxVisible = (height_ - pad) / itemH;
 
-  SDL_Color white = {255, 255, 255, 255};
-  SDL_Color yellow = {255, 255, 0, 255};
+  SDL_Color white = themes.text;
+  SDL_Color yellow = themes.accent;
 
   for (int vi = 0; vi < maxVisible &&
                    (scrollOffset_ + vi) < static_cast<int>(menuItems_.size());

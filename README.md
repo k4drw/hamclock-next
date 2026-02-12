@@ -31,8 +31,8 @@ To compile HamClock-Next, you will need the following libraries and tools instal
 - **Threads**: POSIX threads (built-in on most Linux systems)
 
 ### Tools
-- **CMake**: Version 3.20 or higher
-- **C++20 Compiler**: e.g., GCC 15.2.1 or newer
+- **CMake**: Version 3.18 or higher (compatible with RPi OS Bookworm)
+- **C++20 Compiler**: e.g., GCC 12.2 (Pi OS 12) or newer
 - **Make/Ninja**: Build automation tools
 
 *Note: `nlohmann_json` and `libpredict` are automatically fetched and built via CMake during the first compilation.*
@@ -55,6 +55,29 @@ To compile HamClock-Next, you will need the following libraries and tools instal
    ```bash
    ./hamclock-next
    ```
+   *Optional: Use `-f` or `--fullscreen` to force start in fullscreen mode.*
+
+## 🛠️ Raspberry Pi & Console Mode (No X11)
+
+If you are running on a headless or console-only system (like Pi-Star or Raspbian Lite) without X11/Wayland, you may need to use the software renderer.
+
+### Running on Framebuffer (/dev/fb0)
+If you encounter `SDL_Init failed: No available video device`, ensure your user is in the `video` and `render` groups:
+```bash
+sudo usermod -aG video,render $USER
+```
+Then try:
+```bash
+# SDL_VIDEODRIVER=kmsdrm is the standard for RPi console mode
+sudo SDL_VIDEODRIVER=kmsdrm ./hamclock-next --fullscreen --software
+```
+
+*Note: On Raspberry Pi 3B, ensure `dtoverlay=vc4-kms-v3d` is NOT inside a `[pi4]` block in `/boot/config.txt`. It must be in the `[all]` section or at the top level to be active.*
+
+### Command Line Options
+- `-f, --fullscreen`: Launch in fullscreen mode.
+- `-s, --software`: Force software rendering (disables OpenGL/MSAA). Essential for environments without a functioning 3D setup or DRI access.
+- `-h, --help`: Show help message.
 
 ## 🗺️ Roadmap & Next Steps
 

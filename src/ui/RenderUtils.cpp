@@ -6,6 +6,7 @@ namespace RenderUtils {
 
 void drawThickLine(SDL_Renderer *renderer, float x1, float y1, float x2,
                    float y2, float thickness, SDL_Color color) {
+#if SDL_VERSION_ATLEAST(2, 0, 18)
   float dx = x2 - x1;
   float dy = y2 - y1;
   float length = std::sqrt(dx * dx + dy * dy);
@@ -21,8 +22,6 @@ void drawThickLine(SDL_Renderer *renderer, float x1, float y1, float x2,
     verts[i].tex_coord = {0, 0};
   }
 
-  // Use a slightly larger quad (half pixel) to help with anti-aliasing if MSAA
-  // is off? Actually, MSAA is on, so we just need precise coordinates.
   verts[0].position = {x1 + nx, y1 + ny};
   verts[1].position = {x1 - nx, y1 - ny};
   verts[2].position = {x2 + nx, y2 + ny};
@@ -34,6 +33,11 @@ void drawThickLine(SDL_Renderer *renderer, float x1, float y1, float x2,
   // Add rounded caps for smooth joins
   drawCircle(renderer, x1, y1, thickness / 2.0f, color);
   drawCircle(renderer, x2, y2, thickness / 2.0f, color);
+#else
+  // Fallback to simple line
+  SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a);
+  SDL_RenderDrawLineF(renderer, x1, y1, x2, y2);
+#endif
 }
 
 void drawCircle(SDL_Renderer *renderer, float x, float y, float radius,
@@ -41,6 +45,7 @@ void drawCircle(SDL_Renderer *renderer, float x, float y, float radius,
   if (radius <= 0)
     return;
 
+#if SDL_VERSION_ATLEAST(2, 0, 18)
   // Adaptive segments: more for larger circles
   int segments = static_cast<int>(3.14159f * radius * 1.5f);
   if (segments < 16)
@@ -78,10 +83,15 @@ void drawCircle(SDL_Renderer *renderer, float x, float y, float radius,
   SDL_RenderGeometry(renderer, nullptr, verts.data(),
                      static_cast<int>(verts.size()), indices.data(),
                      static_cast<int>(indices.size()));
+#else
+  // Fallback to simple outline or point circle (outline is easier)
+  drawCircleOutline(renderer, x, y, radius, color);
+#endif
 }
 
 void drawRect(SDL_Renderer *renderer, float x, float y, float w, float h,
               SDL_Color color) {
+#if SDL_VERSION_ATLEAST(2, 0, 18)
   SDL_Vertex verts[4];
   for (int i = 0; i < 4; ++i) {
     verts[i].color = color;
@@ -94,6 +104,12 @@ void drawRect(SDL_Renderer *renderer, float x, float y, float w, float h,
 
   int indices[] = {0, 1, 2, 1, 2, 3};
   SDL_RenderGeometry(renderer, nullptr, verts, 4, indices, 6);
+#else
+  SDL_Rect r = {static_cast<int>(x), static_cast<int>(y), static_cast<int>(w),
+                static_cast<int>(h)};
+  SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a);
+  SDL_RenderFillRect(renderer, &r);
+#endif
 }
 
 void drawRectOutline(SDL_Renderer *renderer, float x, float y, float w, float h,
@@ -132,6 +148,7 @@ void drawPolyline(SDL_Renderer *renderer, const SDL_FPoint *points, int count,
   if (count < 2)
     return;
 
+#if SDL_VERSION_ATLEAST(2, 0, 18)
   std::vector<SDL_Vertex> verts;
   std::vector<int> indices;
 
@@ -187,11 +204,19 @@ void drawPolyline(SDL_Renderer *renderer, const SDL_FPoint *points, int count,
   SDL_RenderGeometry(renderer, nullptr, verts.data(),
                      static_cast<int>(verts.size()), indices.data(),
                      static_cast<int>(indices.size()));
+#else
+  SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a);
+  for (int i = 0; i < (closed ? count : count - 1); ++i) {
+    SDL_RenderDrawLineF(renderer, points[i].x, points[i].y,
+                        points[(i + 1) % count].x, points[(i + 1) % count].y);
+  }
+#endif
 }
 
 void drawThickLineTextured(SDL_Renderer *renderer, SDL_Texture *tex, float x1,
                            float y1, float x2, float y2, float thickness,
                            SDL_Color color) {
+#if SDL_VERSION_ATLEAST(2, 0, 18)
   float dx = x2 - x1;
   float dy = y2 - y1;
   float length = std::sqrt(dx * dx + dy * dy);
@@ -217,11 +242,16 @@ void drawThickLineTextured(SDL_Renderer *renderer, SDL_Texture *tex, float x1,
 
   int indices[] = {0, 1, 2, 1, 2, 3};
   SDL_RenderGeometry(renderer, tex, verts, 4, indices, 6);
+#else
+  // Texture fallback: just draw flat line
+  drawThickLine(renderer, x1, y1, x2, y2, thickness, color);
+#endif
 }
 
 void drawPolylineTextured(SDL_Renderer *renderer, SDL_Texture *tex,
                           const SDL_FPoint *points, int count, float thickness,
                           SDL_Color color, bool closed) {
+#if SDL_VERSION_ATLEAST(2, 0, 18)
   if (count < 2)
     return;
 
@@ -255,6 +285,32 @@ void drawPolylineTextured(SDL_Renderer *renderer, SDL_Texture *tex,
     int indices[] = {0, 1, 2, 1, 2, 3};
     SDL_RenderGeometry(renderer, tex, v, 4, indices, 6);
   }
+#else
+  drawPolyline(renderer, points, count, thickness, color, closed);
+#endif
+}
+
+void drawGear(SDL_Renderer *renderer, float x, float y, float radius,
+              SDL_Color color, SDL_Color centerColor) {
+  float r = radius;
+  float toothLen = r * 0.3f;
+  float toothW = r * 0.4f;
+
+  // Draw 8 teeth
+  for (int i = 0; i < 8; ++i) {
+    float angle = i * 3.14159265f / 4.0f;
+    float x1 = x + (r - toothLen) * std::cos(angle);
+    float y1 = y + (r - toothLen) * std::sin(angle);
+    float x2 = x + (r + toothLen) * std::cos(angle);
+    float y2 = y + (r + toothLen) * std::sin(angle);
+    drawThickLine(renderer, x1, y1, x2, y2, toothW, color);
+  }
+
+  // Main body circle
+  drawCircle(renderer, x, y, r, color);
+
+  // Center hole
+  drawCircle(renderer, x, y, r * 0.35f, centerColor);
 }
 
 } // namespace RenderUtils

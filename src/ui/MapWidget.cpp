@@ -5,6 +5,7 @@
 #include "RenderUtils.h"
 
 #include <algorithm>
+
 #include <chrono>
 #include <cmath>
 #include <vector>
@@ -59,12 +60,19 @@ void MapWidget::update() {
                   "images/bmng/bmng-base/%s/world.2004%02d.3x5400x2700.jpg",
                   kMonthNames[month - 1], month);
 
+    std::fprintf(stderr, "MapWidget: starting async fetch for %s\n", url);
     netMgr_.fetchAsync(
         url,
-        [this](std::string data) {
+        [this, url_str = std::string(url)](std::string data) {
           if (!data.empty()) {
+            std::fprintf(stderr, "MapWidget: received %zu bytes for %s\n",
+                         data.size(),
+                         url_str.size() > 50 ? "NASA Map" : url_str.c_str());
             std::lock_guard<std::mutex> lock(mapDataMutex_);
             pendingMapData_ = std::move(data);
+          } else {
+            std::fprintf(stderr, "MapWidget: fetch failed or empty for %s\n",
+                         url_str.c_str());
           }
         },
         86400 * 30); // Cache for a month
@@ -171,7 +179,8 @@ void MapWidget::renderGreatCircle(SDL_Renderer *renderer) {
 }
 
 void MapWidget::renderNightOverlay(SDL_Renderer *renderer) {
-  auto terminator = Astronomy::calculateTerminator(sunLat_, sunLon_);
+  // Use higher point density for smoother fallback rendering
+  auto terminator = Astronomy::calculateTerminator(sunLat_, sunLon_, 720);
   int N = static_cast<int>(terminator.size());
   if (N < 2)
     return;
@@ -180,8 +189,12 @@ void MapWidget::renderNightOverlay(SDL_Renderer *renderer) {
   float edgeY = nightBelow ? static_cast<float>(mapRect_.y + mapRect_.h)
                            : static_cast<float>(mapRect_.y);
 
-  SDL_Color nightColor = {0, 8, 24, 180}; // Deep midnight blue, higher opacity
+  SDL_Color nightColor = {0, 8, 24, 180}; // Deep midnight blue
 
+  SDL_RenderSetClipRect(renderer, &mapRect_);
+  SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+
+#if SDL_VERSION_ATLEAST(2, 0, 18)
   std::vector<SDL_Vertex> verts(2 * N);
   for (int i = 0; i < N; ++i) {
     SDL_FPoint tp = latLonToScreen(terminator[i].lat, terminator[i].lon);
@@ -206,11 +219,46 @@ void MapWidget::renderNightOverlay(SDL_Renderer *renderer) {
     indices.push_back(br);
   }
 
-  SDL_RenderSetClipRect(renderer, &mapRect_);
-  SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
   SDL_RenderGeometry(renderer, nullptr, verts.data(),
                      static_cast<int>(verts.size()), indices.data(),
                      static_cast<int>(indices.size()));
+#else
+  // Fallback: draw vertical slices from terminator to edge using solid Rects
+  SDL_SetRenderDrawColor(renderer, nightColor.r, nightColor.g, nightColor.b,
+                         nightColor.a);
+  int iEdgeY = static_cast<int>(edgeY);
+  for (int i = 0; i < N - 1; ++i) {
+    SDL_FPoint p1 = latLonToScreen(terminator[i].lat, terminator[i].lon);
+    SDL_FPoint p2 =
+        latLonToScreen(terminator[i + 1].lat, terminator[i + 1].lon);
+
+    if (std::abs(p2.x - p1.x) > mapRect_.w / 2.0f)
+      continue;
+
+    int x1 = static_cast<int>(std::round(p1.x));
+    int x2 = static_cast<int>(std::round(p2.x));
+
+    int start = std::min(x1, x2);
+    int end = std::max(x1, x2);
+
+    for (int x = start; x <= end; ++x) {
+      float f = (x1 == x2) ? 0.0f : (float)(x - x1) / (x2 - x1);
+      int y = static_cast<int>(std::round(p1.y + f * (p2.y - p1.y)));
+
+      SDL_Rect r;
+      r.x = x;
+      r.w = 1;
+      if (y < iEdgeY) {
+        r.y = y;
+        r.h = iEdgeY - y;
+      } else {
+        r.y = iEdgeY;
+        r.h = y - iEdgeY;
+      }
+      SDL_RenderFillRect(renderer, &r);
+    }
+  }
+#endif
   SDL_RenderSetClipRect(renderer, nullptr);
 }
 
@@ -223,6 +271,9 @@ void MapWidget::render(SDL_Renderer *renderer) {
   {
     std::lock_guard<std::mutex> lock(mapDataMutex_);
     if (!pendingMapData_.empty()) {
+      // std::fprintf(stderr,
+      //              "MapWidget: applying pending map data (%zu bytes)...\n",
+      //              pendingMapData_.size());
       texMgr_.loadFromMemory(renderer, MAP_KEY, pendingMapData_);
       pendingMapData_.clear();
     }
@@ -258,6 +309,7 @@ void MapWidget::render(SDL_Renderer *renderer) {
 
   renderSatellite(renderer);
   renderSpotOverlay(renderer);
+  renderDXClusterSpots(renderer);
   renderMarker(renderer, sunLat_, sunLon_, 255, 255, 0, MarkerShape::Circle,
                true);
 
@@ -398,6 +450,24 @@ void MapWidget::renderSpotOverlay(SDL_Renderer *renderer) {
     }
     renderMarker(renderer, lat, lon, bc.r, bc.g, bc.b, MarkerShape::Square,
                  true);
+  }
+  SDL_RenderSetClipRect(renderer, nullptr);
+}
+
+void MapWidget::renderDXClusterSpots(SDL_Renderer *renderer) {
+  if (!dxcStore_)
+    return;
+  auto data = dxcStore_->get();
+  if (data.spots.empty())
+    return;
+
+  SDL_RenderSetClipRect(renderer, &mapRect_);
+  for (const auto &spot : data.spots) {
+    if (spot.txLat != 0.0 || spot.txLon != 0.0) {
+      // Plot transmitter as a small white/grey circle
+      renderMarker(renderer, spot.txLat, spot.txLon, 255, 255, 255,
+                   MarkerShape::Circle, true);
+    }
   }
   SDL_RenderSetClipRect(renderer, nullptr);
 }

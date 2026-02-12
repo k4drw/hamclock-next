@@ -1,4 +1,5 @@
 #include "LiveSpotPanel.h"
+#include "../core/Theme.h"
 #include "FontCatalog.h"
 
 #include <algorithm>
@@ -47,17 +48,26 @@ void LiveSpotPanel::render(SDL_Renderer *renderer) {
   if (!fontMgr_.ready())
     return;
 
+  ThemeColors themes = getThemeColors(theme_);
+  // Background
+  SDL_SetRenderDrawBlendMode(
+      renderer, (theme_ == "glass") ? SDL_BLENDMODE_BLEND : SDL_BLENDMODE_NONE);
+  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b,
+                         themes.bg.a);
+  SDL_Rect bgRect = {x_, y_, width_, height_};
+  SDL_RenderFillRect(renderer, &bgRect);
+
   // Draw pane border
-  SDL_SetRenderDrawColor(renderer, 80, 80, 80, 255);
-  SDL_Rect border = {x_, y_, width_, height_};
-  SDL_RenderDrawRect(renderer, &border);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
+                         themes.border.b, themes.border.a);
+  SDL_RenderDrawRect(renderer, &bgRect);
 
   bool titleFontChanged = (titleFontSize_ != lastTitleFontSize_);
   bool cellFontChanged = (cellFontSize_ != lastCellFontSize_);
 
-  SDL_Color white = {255, 255, 255, 255};
-  SDL_Color cyan = {0, 200, 255, 255};
-  SDL_Color blue = {100, 100, 255, 255};
+  SDL_Color white = themes.text;
+  SDL_Color cyan = themes.accent;
+  SDL_Color blue = themes.textDim;
 
   int pad = 2;
   int curY = y_ + pad;
@@ -197,9 +207,15 @@ void LiveSpotPanel::onResize(int x, int y, int w, int h) {
   Widget::onResize(x, y, w, h);
   auto *cat = fontMgr_.catalog();
   if (cat) {
-    // Title slightly larger than cell text
-    titleFontSize_ = std::max(8, cat->ptSize(FontStyle::Fast) + 4);
-    cellFontSize_ = cat->ptSize(FontStyle::Fast);
+    if (w < 100) {
+      // Very constrained (Fidelity Mode slot 4 is 62px)
+      titleFontSize_ = cat->ptSize(FontStyle::Fast);
+      cellFontSize_ = cat->ptSize(FontStyle::Micro);
+    } else {
+      // Title slightly larger than cell text
+      titleFontSize_ = std::max(8, cat->ptSize(FontStyle::Fast) + 4);
+      cellFontSize_ = cat->ptSize(FontStyle::Fast);
+    }
   }
   destroyCache();
 }

@@ -4,6 +4,7 @@
 
 #include <filesystem>
 #include <string>
+#include <vector>
 
 #include <SDL2/SDL.h>
 
@@ -19,13 +20,28 @@ struct AppConfig {
   std::string theme = "default";
 
   // Pane widget selection (top bar panes 1–3)
-  WidgetType pane1Widget = WidgetType::SOLAR;
-  WidgetType pane2Widget = WidgetType::DX_CLUSTER;
-  WidgetType pane3Widget = WidgetType::LIVE_SPOTS;
+  // Pane widget selection (rotation sets)
+  std::vector<WidgetType> pane1Rotation = {WidgetType::SOLAR};
+  std::vector<WidgetType> pane2Rotation = {WidgetType::DX_CLUSTER};
+  std::vector<WidgetType> pane3Rotation = {WidgetType::LIVE_SPOTS};
+  std::vector<WidgetType> pane4Rotation = {WidgetType::BAND_CONDITIONS};
+  int rotationIntervalS = 30;
 
   // Panel state
   std::string panelMode = "dx";  // "dx" or "sat"
   std::string selectedSatellite; // satellite name (empty = none)
+
+  // DX Cluster
+  bool dxClusterEnabled = true;
+  std::string dxClusterHost = "dxusa.net";
+  int dxClusterPort = 7300;
+  std::string dxClusterLogin = "";
+  bool dxClusterUseWSJTX = false; // If true, ignore host and use UDP port
+
+  // SDO Widget settings
+  std::string sdoWavelength = "0193";
+  bool sdoGrayline = false;
+  bool sdoShowMovie = false;
 };
 
 class ConfigManager {

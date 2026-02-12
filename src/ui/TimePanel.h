@@ -7,10 +7,12 @@
 #include <functional>
 #include <string>
 
+class TextureManager;
+
 class TimePanel : public Widget {
 public:
   TimePanel(int x, int y, int w, int h, FontManager &fontMgr,
-            const std::string &callsign);
+            TextureManager &texMgr, const std::string &callsign);
   ~TimePanel() override { destroyCache(); }
 
   void update() override;
@@ -20,6 +22,11 @@ public:
   bool onMouseUp(int mx, int my, Uint16 mod) override;
   bool onKeyDown(SDL_Keycode key, Uint16 mod) override;
   bool onTextInput(const char *text) override;
+
+  // Semantic Debug API
+  std::string getName() const override { return "TimePanel"; }
+  std::vector<std::string> getActions() const override;
+  SDL_Rect getActionRect(const std::string &action) const override;
 
   bool isEditing() const { return editing_; }
 
@@ -57,6 +64,7 @@ private:
   void stopEditing(bool apply);
 
   FontManager &fontMgr_;
+  TextureManager &texMgr_;
   std::string callsign_;
   SDL_Color callColor_ = {255, 165, 0, 255}; // default orange
 

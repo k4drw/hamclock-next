@@ -284,4 +284,31 @@ public:
     grid[6] = '\0';
     return grid;
   }
+
+  // Calculate Azimuth and Elevation for an observer at stationLoc
+  // given the sub-solar point (sunPos).
+  static void calculateAzEl(LatLon stationLoc, SubSolarPoint sunPos, double &az,
+                            double &el) {
+    double phi = stationLoc.lat * kDeg2Rad;
+    double lam = stationLoc.lon * kDeg2Rad;
+    double delta = sunPos.lat * kDeg2Rad;
+    double lamS = sunPos.lon * kDeg2Rad;
+
+    double ha = lam - lamS; // Hour angle
+    while (ha > kPi)
+      ha -= 2.0 * kPi;
+    while (ha < -kPi)
+      ha += 2.0 * kPi;
+
+    // Elevation
+    el = std::asin(std::sin(phi) * std::sin(delta) +
+                   std::cos(phi) * std::cos(delta) * std::cos(ha));
+
+    // Azimuth
+    double y = std::sin(ha);
+    double x = std::cos(ha) * std::sin(phi) - std::tan(delta) * std::cos(phi);
+    az = std::atan2(y, x) + kPi; // 0 is North, clockwise
+    az = std::fmod(az * kRad2Deg + 360.0, 360.0);
+    el *= kRad2Deg;
+  }
 };

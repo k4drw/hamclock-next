@@ -1,4 +1,5 @@
 #include "SpaceWeatherPanel.h"
+#include "../core/Theme.h"
 #include "FontCatalog.h"
 
 #include <algorithm>
@@ -13,6 +14,14 @@ SpaceWeatherPanel::SpaceWeatherPanel(int x, int y, int w, int h,
   items_[1].label = "SN";
   items_[2].label = "A";
   items_[3].label = "K";
+  items_[4].label = "Wind";
+  items_[5].label = "Dens";
+  items_[6].label = "Bz";
+  items_[7].label = "Bt";
+  items_[8].label = "DST";
+  items_[9].label = "Aurora";
+  items_[10].label = "-";
+  items_[11].label = "-";
 }
 
 SDL_Color SpaceWeatherPanel::colorForK(int k) {
@@ -69,83 +78,143 @@ void SpaceWeatherPanel::update() {
   std::snprintf(buf, sizeof(buf), "%d", data.k_index);
   items_[3].value = buf;
   items_[3].valueColor = colorForK(data.k_index);
+
+  std::snprintf(buf, sizeof(buf), "%.0f", data.solar_wind_speed);
+  items_[4].value = buf;
+  items_[4].valueColor = {255, 128, 0, 255};
+
+  std::snprintf(buf, sizeof(buf), "%.1f", data.solar_wind_density);
+  items_[5].value = buf;
+  items_[5].valueColor = {0, 200, 255, 255};
+
+  std::snprintf(buf, sizeof(buf), "%d", data.bz);
+  items_[6].value = buf;
+  items_[6].valueColor =
+      (data.bz < 0) ? SDL_Color{255, 50, 50, 255} : SDL_Color{0, 255, 0, 255};
+
+  std::snprintf(buf, sizeof(buf), "%d", data.bt);
+  items_[7].value = buf;
+  items_[7].valueColor = {255, 255, 255, 255};
+
+  std::snprintf(buf, sizeof(buf), "%d", data.dst);
+  items_[8].value = buf;
+  items_[8].valueColor = (data.dst < -50) ? SDL_Color{255, 50, 50, 255}
+                                          : SDL_Color{255, 255, 255, 255};
+
+  std::snprintf(buf, sizeof(buf), "%d", data.aurora);
+  items_[9].value = buf;
+  items_[9].valueColor = (data.aurora > 50) ? SDL_Color{255, 128, 0, 255}
+                                            : SDL_Color{0, 255, 255, 255};
+
+  items_[10].value = "-";
+  items_[11].value = "-";
 }
 
 void SpaceWeatherPanel::render(SDL_Renderer *renderer) {
   if (!fontMgr_.ready())
     return;
 
+  ThemeColors themes = getThemeColors(theme_);
+
+  // Cycle pages every 7 seconds
+  uint32_t now = SDL_GetTicks();
+  if (now - lastPageUpdate_ > 7000) {
+    currentPage_ = (currentPage_ + 1) % 3;
+    lastPageUpdate_ = now;
+    destroyCache(); // Force redraw of new page items
+  }
+
+  // Background
+  SDL_SetRenderDrawBlendMode(
+      renderer, (theme_ == "glass") ? SDL_BLENDMODE_BLEND : SDL_BLENDMODE_NONE);
+  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b,
+                         themes.bg.a);
+  SDL_Rect rect = {x_, y_, width_, height_};
+  SDL_RenderFillRect(renderer, &rect);
+
   // Draw pane border
-  SDL_SetRenderDrawColor(renderer, 80, 80, 80, 255);
-  SDL_Rect border = {x_, y_, width_, height_};
-  SDL_RenderDrawRect(renderer, &border);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
+                         themes.border.b, themes.border.a);
+  SDL_RenderDrawRect(renderer, &rect);
 
   if (!dataValid_) {
     fontMgr_.drawText(renderer, "Awaiting data...", x_ + 8,
-                      y_ + height_ / 2 - 8, {180, 180, 180, 255},
-                      labelFontSize_);
+                      y_ + height_ / 2 - 8, themes.textDim, labelFontSize_);
     return;
   }
 
   bool labelFontChanged = (labelFontSize_ != lastLabelFontSize_);
   bool valueFontChanged = (valueFontSize_ != lastValueFontSize_);
 
-  // 2x2 grid layout
+  // 2x2 grid layout for current page
   int cellW = width_ / 2;
   int cellH = height_ / 2;
-  int pad = std::max(2, static_cast<int>(cellW * 0.06f));
+  int pad = std::max(2, static_cast<int>(cellH * 0.1f));
 
-  SDL_Color labelColor = {140, 140, 140, 255};
+  SDL_Color labelColor = themes.textDim;
 
-  for (int i = 0; i < kNumItems; ++i) {
+  int startIdx = currentPage_ * kItemsPerPage;
+  for (int i = 0; i < kItemsPerPage; ++i) {
+    int itemIdx = startIdx + i;
     int col = i % 2;
     int row = i / 2;
     int cellX = x_ + col * cellW;
     int cellY = y_ + row * cellH;
 
     // Label (cached until font size changes)
-    if (labelFontChanged || !items_[i].labelTex) {
-      if (items_[i].labelTex) {
-        SDL_DestroyTexture(items_[i].labelTex);
-        items_[i].labelTex = nullptr;
+    if (labelFontChanged || !items_[itemIdx].labelTex) {
+      if (items_[itemIdx].labelTex) {
+        SDL_DestroyTexture(items_[itemIdx].labelTex);
+        items_[itemIdx].labelTex = nullptr;
       }
-      items_[i].labelTex = fontMgr_.renderText(
-          renderer, items_[i].label, labelColor, labelFontSize_,
-          &items_[i].labelW, &items_[i].labelH);
+      items_[itemIdx].labelTex = fontMgr_.renderText(
+          renderer, items_[itemIdx].label, labelColor, labelFontSize_,
+          &items_[itemIdx].labelW, &items_[itemIdx].labelH);
     }
 
     // Value (re-render on data or font change, or color change)
     bool colorChanged =
-        std::memcmp(&items_[i].valueColor, &items_[i].lastValueColor,
-                    sizeof(SDL_Color)) != 0;
-    if (items_[i].value != items_[i].lastValue || valueFontChanged ||
-        colorChanged) {
-      if (items_[i].valueTex) {
-        SDL_DestroyTexture(items_[i].valueTex);
-        items_[i].valueTex = nullptr;
+        std::memcmp(&items_[itemIdx].valueColor,
+                    &items_[itemIdx].lastValueColor, sizeof(SDL_Color)) != 0;
+    if (items_[itemIdx].value != items_[itemIdx].lastValue ||
+        valueFontChanged || colorChanged) {
+      if (items_[itemIdx].valueTex) {
+        SDL_DestroyTexture(items_[itemIdx].valueTex);
+        items_[itemIdx].valueTex = nullptr;
       }
-      items_[i].valueTex = fontMgr_.renderText(
-          renderer, items_[i].value, items_[i].valueColor, valueFontSize_,
-          &items_[i].valueW, &items_[i].valueH);
-      items_[i].lastValue = items_[i].value;
-      items_[i].lastValueColor = items_[i].valueColor;
+      items_[itemIdx].valueTex = fontMgr_.renderText(
+          renderer, items_[itemIdx].value, items_[itemIdx].valueColor,
+          valueFontSize_, &items_[itemIdx].valueW, &items_[itemIdx].valueH);
+      items_[itemIdx].lastValue = items_[itemIdx].value;
+      items_[itemIdx].lastValueColor = items_[itemIdx].valueColor;
     }
 
     // Draw label (top of cell, centered)
-    if (items_[i].labelTex) {
-      int lx = cellX + (cellW - items_[i].labelW) / 2;
+    if (items_[itemIdx].labelTex) {
+      int lx = cellX + (cellW - items_[itemIdx].labelW) / 2;
       int ly = cellY + pad;
-      SDL_Rect dst = {lx, ly, items_[i].labelW, items_[i].labelH};
-      SDL_RenderCopy(renderer, items_[i].labelTex, nullptr, &dst);
+      SDL_Rect dst = {lx, ly, items_[itemIdx].labelW, items_[itemIdx].labelH};
+      SDL_RenderCopy(renderer, items_[itemIdx].labelTex, nullptr, &dst);
     }
 
     // Draw value (below label, centered)
-    if (items_[i].valueTex) {
-      int vx = cellX + (cellW - items_[i].valueW) / 2;
-      int vy = cellY + pad + items_[i].labelH + pad / 2;
-      SDL_Rect dst = {vx, vy, items_[i].valueW, items_[i].valueH};
-      SDL_RenderCopy(renderer, items_[i].valueTex, nullptr, &dst);
+    if (items_[itemIdx].valueTex) {
+      int vx = cellX + (cellW - items_[itemIdx].valueW) / 2;
+      int vy = cellY + pad + items_[itemIdx].labelH;
+      SDL_Rect dst = {vx, vy, items_[itemIdx].valueW, items_[itemIdx].valueH};
+      SDL_RenderCopy(renderer, items_[itemIdx].valueTex, nullptr, &dst);
     }
+  }
+
+  // Draw pagination dots (bottom center)
+  for (int i = 0; i < 3; ++i) {
+    SDL_Rect dot = {x_ + width_ / 2 - 15 + i * 12, y_ + height_ - 8, 6, 6};
+    if (i == currentPage_) {
+      SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+    } else {
+      SDL_SetRenderDrawColor(renderer, 80, 80, 80, 255);
+    }
+    SDL_RenderFillRect(renderer, &dot);
   }
 
   lastLabelFontSize_ = labelFontSize_;

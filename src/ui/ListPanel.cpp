@@ -1,5 +1,7 @@
 #include "ListPanel.h"
+#include "../core/Theme.h"
 #include "FontCatalog.h"
+#include "RenderUtils.h"
 
 #include <algorithm>
 
@@ -31,10 +33,22 @@ void ListPanel::render(SDL_Renderer *renderer) {
   if (!fontMgr_.ready())
     return;
 
+  ThemeColors themes = getThemeColors(theme_);
+
+  // Background
+  SDL_SetRenderDrawBlendMode(
+      renderer, (theme_ == "glass") ? SDL_BLENDMODE_BLEND : SDL_BLENDMODE_NONE);
+  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b,
+                         themes.bg.a);
+  SDL_Rect bg = {x_, y_, width_, height_};
+  SDL_RenderFillRect(renderer, &bg);
+
   // Draw pane border
-  SDL_SetRenderDrawColor(renderer, 80, 80, 80, 255);
-  SDL_Rect border = {x_, y_, width_, height_};
-  SDL_RenderDrawRect(renderer, &border);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
+                         themes.border.b, themes.border.a);
+  SDL_Rect rect = {x_, y_, width_, height_}; // Renamed from 'rect' to 'bg' for
+                                             // fill, keeping 'rect' for border
+  SDL_RenderDrawRect(renderer, &rect);
 
   int pad = std::max(2, static_cast<int>(width_ * 0.03f));
   bool titleFontChanged = (titleFontSize_ != lastTitleFontSize_);
@@ -46,7 +60,7 @@ void ListPanel::render(SDL_Renderer *renderer) {
       SDL_DestroyTexture(titleTex_);
       titleTex_ = nullptr;
     }
-    SDL_Color cyan = {0, 200, 255, 255};
+    SDL_Color cyan = themes.accent;
     titleTex_ = fontMgr_.renderText(renderer, title_, cyan, titleFontSize_,
                                     &titleW_, &titleH_);
     lastTitleFontSize_ = titleFontSize_;
@@ -82,20 +96,17 @@ void ListPanel::render(SDL_Renderer *renderer) {
   int rowH =
       std::max(rowFontSize_ + 4, remaining / static_cast<int>(rows_.size()));
 
-  SDL_Color rowColor = {200, 200, 200, 255};
+  SDL_Color rowColor = themes.text;
   for (size_t i = 0; i < rows_.size(); ++i) {
     int rowY = curY + static_cast<int>(i) * rowH;
     if (rowY + rowH > y_ + height_)
       break;
 
     // Alternating stripe background
-    if (i % 2 == 0) {
-      SDL_SetRenderDrawColor(renderer, 30, 30, 30, 255);
-    } else {
-      SDL_SetRenderDrawColor(renderer, 15, 15, 15, 255);
-    }
-    SDL_Rect stripe = {x_ + 1, rowY, width_ - 2, rowH};
-    SDL_RenderFillRect(renderer, &stripe);
+    SDL_Color stripeColor =
+        (i % 2 == 0) ? themes.rowStripe1 : themes.rowStripe2;
+    RenderUtils::drawRect(renderer, x_ + 1, rowY, width_ - 2, rowH,
+                          stripeColor);
 
     // Render row text (cached)
     if (rows_[i] != rowCache_[i].text) {

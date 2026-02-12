@@ -124,12 +124,17 @@ public:
   // Convenience: render + draw at (x, y). Not cached — use for one-off draws
   // only.
   void drawText(SDL_Renderer *renderer, const std::string &text, int x, int y,
-                SDL_Color color, int ptSize = 0, bool bold = false) {
+                SDL_Color color, int ptSize = 0, bool bold = false,
+                bool centered = false) {
     int w = 0, h = 0;
     SDL_Texture *tex = renderText(renderer, text, color, ptSize, &w, &h, bold);
     if (!tex)
       return;
     SDL_Rect dst = {x, y, w, h};
+    if (centered) {
+      dst.x -= w / 2;
+      dst.y -= h / 2;
+    }
     SDL_RenderCopy(renderer, tex, nullptr, &dst);
     SDL_DestroyTexture(tex);
   }

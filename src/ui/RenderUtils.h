@@ -38,4 +38,8 @@ void drawPolylineTextured(SDL_Renderer *renderer, SDL_Texture *tex,
                           const SDL_FPoint *points, int count, float thickness,
                           SDL_Color color, bool closed = false);
 
+// Draw a procedural gear icon.
+void drawGear(SDL_Renderer *renderer, float x, float y, float radius,
+              SDL_Color color, SDL_Color centerColor);
+
 } // namespace RenderUtils

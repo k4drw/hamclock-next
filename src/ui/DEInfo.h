@@ -33,6 +33,6 @@ private:
   std::string lineText_[kNumLines];
   std::string lastLineText_[kNumLines];
 
-  int lineFontSize_[kNumLines] = {11, 18, 11, 11};
+  int lineFontSize_[kNumLines] = {14, 20, 14, 14};
   int lastLineFontSize_[kNumLines] = {};
 };

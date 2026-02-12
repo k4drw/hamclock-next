@@ -78,19 +78,74 @@ public:
     }
 
     SDL_RWops *rw = SDL_RWFromConstMem(data, static_cast<int>(size));
-    if (!rw)
-      return nullptr;
-
-    SDL_Surface *surface = IMG_Load_RW(rw, 1); // 1 = auto-close rw
-    if (!surface) {
-      std::fprintf(stderr, "TextureManager: failed to load from memory: %s\n",
-                   IMG_GetError());
+    if (!rw) {
+      std::fprintf(stderr, "TextureManager: SDL_RWFromConstMem failed\n");
       return nullptr;
     }
-    SDL_Texture *texture = SDL_CreateTextureFromSurface(renderer, surface);
+
+    // std::fprintf(stderr, "TextureManager: decoding %s (%u bytes)...\n",
+    //              key.c_str(), size);
+    SDL_Surface *surface = IMG_Load_RW(rw, 1); // 1 = auto-close rw
+    if (!surface) {
+      std::fprintf(stderr, "TextureManager: IMG_Load_RW failed for %s: %s\n",
+                   key.c_str(), IMG_GetError());
+      return nullptr;
+    }
+
+    // std::fprintf(stderr, "TextureManager: decoded %s surface: %dx%d\n",
+    //              key.c_str(), surface->w, surface->h);
+
+    // Hardware Limit Check: Downscale if surface exceeds GPU's max texture size
+    SDL_RendererInfo info;
+    SDL_Surface *finalSurface = surface;
+    bool mustFreeFinal = false;
+
+    if (SDL_GetRendererInfo(renderer, &info) == 0) {
+      if (info.max_texture_width > 0 && info.max_texture_height > 0 &&
+          (surface->w > info.max_texture_width ||
+           surface->h > info.max_texture_height)) {
+        float scaleW = (float)info.max_texture_width / (float)surface->w;
+        float scaleH = (float)info.max_texture_height / (float)surface->h;
+        float scale = std::min(scaleW, scaleH);
+
+        int newW = (int)(surface->w * scale);
+        int newH = (int)(surface->h * scale);
+
+        std::fprintf(stderr,
+                     "TextureManager: image exceeds max texture size (%dx%d). "
+                     "Downscaling to %dx%d...\n",
+                     info.max_texture_width, info.max_texture_height, newW,
+                     newH);
+
+        finalSurface = SDL_CreateRGBSurfaceWithFormat(0, newW, newH, 32,
+                                                      surface->format->format);
+        if (finalSurface) {
+          SDL_BlitScaled(surface, nullptr, finalSurface, nullptr);
+          mustFreeFinal = true;
+        } else {
+          std::fprintf(stderr, "TextureManager: downscaling failed!\n");
+          finalSurface = surface;
+        }
+      }
+    }
+
+    SDL_Texture *texture = SDL_CreateTextureFromSurface(renderer, finalSurface);
+    if (mustFreeFinal)
+      SDL_FreeSurface(finalSurface);
     SDL_FreeSurface(surface);
-    if (texture)
-      cache_[key] = texture;
+
+    if (!texture) {
+      std::fprintf(
+          stderr,
+          "TextureManager: SDL_CreateTextureFromSurface failed for %s: %s\n",
+          key.c_str(), SDL_GetError());
+      return nullptr;
+    }
+
+    std::fprintf(stderr,
+                 "TextureManager: successfully created texture for %s\n",
+                 key.c_str());
+    cache_[key] = texture;
     return texture;
   }
 

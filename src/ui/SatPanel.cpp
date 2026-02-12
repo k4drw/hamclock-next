@@ -1,4 +1,5 @@
 #include "SatPanel.h"
+#include "../core/Theme.h"
 #include "FontCatalog.h"
 #include "RenderUtils.h"
 
@@ -131,8 +132,18 @@ void SatPanel::render(SDL_Renderer *renderer) {
   SDL_Rect clip = {x_, y_, width_, height_};
   SDL_RenderSetClipRect(renderer, &clip);
 
+  ThemeColors themes = getThemeColors(theme_);
+
+  // Background
+  SDL_SetRenderDrawBlendMode(
+      renderer, (theme_ == "glass") ? SDL_BLENDMODE_BLEND : SDL_BLENDMODE_NONE);
+  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b,
+                         themes.bg.a);
+  SDL_RenderFillRect(renderer, &clip);
+
   // Draw pane border
-  SDL_SetRenderDrawColor(renderer, 80, 80, 80, 255);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
+                         themes.border.b, themes.border.a);
   SDL_RenderDrawRect(renderer, &clip);
 
   int pad = 2;

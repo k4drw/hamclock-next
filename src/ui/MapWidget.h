@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../core/DXClusterData.h"
 #include "../core/HamClockState.h"
 #include "../core/LiveSpotData.h"
 #include "../core/OrbitPredictor.h"
@@ -36,6 +37,10 @@ public:
     spotStore_ = std::move(store);
   }
 
+  void setDXClusterStore(std::shared_ptr<DXClusterDataStore> store) {
+    dxcStore_ = std::move(store);
+  }
+
 private:
   SDL_FPoint latLonToScreen(double lat, double lon) const;
   void recalcMapRect();
@@ -50,11 +55,13 @@ private:
                           double footprintKm);
   void renderSatGroundTrack(SDL_Renderer *renderer);
   void renderSpotOverlay(SDL_Renderer *renderer);
+  void renderDXClusterSpots(SDL_Renderer *renderer);
 
   TextureManager &texMgr_;
   NetworkManager &netMgr_;
   std::shared_ptr<HamClockState> state_;
   std::shared_ptr<LiveSpotDataStore> spotStore_;
+  std::shared_ptr<DXClusterDataStore> dxcStore_;
   OrbitPredictor *predictor_ = nullptr;
 
   SDL_Rect mapRect_ = {};

@@ -1,82 +1,74 @@
 #include "RSSBanner.h"
+#include "../core/Theme.h"
 #include "FontCatalog.h"
 
-#include <algorithm>
 #include <cstdio>
 
 RSSBanner::RSSBanner(int x, int y, int w, int h, FontManager &fontMgr,
                      std::shared_ptr<RSSDataStore> store)
     : Widget(x, y, w, h), fontMgr_(fontMgr), store_(std::move(store)),
-      lastTick_(SDL_GetTicks()) {
+      lastRotateMs_(SDL_GetTicks()) {
   auto *cat = fontMgr_.catalog();
   if (cat)
     fontSize_ = cat->ptSize(FontStyle::SmallRegular);
 }
 
 void RSSBanner::update() {
+  auto data = store_->get();
+  if (data.valid && data.headlines != lastHeadlines_) {
+    lastHeadlines_ = data.headlines;
+    currentIdx_ = 0;
+    lastRotateMs_ = SDL_GetTicks();
+    rebuildTextures(nullptr); // Initial trigger will happen in render
+  }
+
   Uint32 now = SDL_GetTicks();
-  Uint32 dt = now - lastTick_;
-  lastTick_ = now;
-
-  scrollOffset_ += kScrollSpeed * (static_cast<float>(dt) / 1000.0f);
-
-  // Wrap when the first copy has scrolled fully off-screen
-  if (totalWidth_ > 0 && scrollOffset_ >= static_cast<float>(totalWidth_)) {
-    scrollOffset_ -= static_cast<float>(totalWidth_);
+  if (now - lastRotateMs_ >= kRotateIntervalMs) {
+    lastRotateMs_ = now;
+    if (!lastHeadlines_.empty()) {
+      currentIdx_ = (currentIdx_ + 1) % lastHeadlines_.size();
+      rebuildTextures(nullptr); // Will be rebuilt in next render pass
+    }
   }
 }
 
 void RSSBanner::render(SDL_Renderer *renderer) {
-  // Check if headlines changed
-  auto data = store_->get();
-  if (data.valid && data.headlines != lastHeadlines_) {
-    lastHeadlines_ = data.headlines;
+  // If we need to rebuild textures for the current headline
+  if (currentLines_.empty() && !lastHeadlines_.empty()) {
     rebuildTextures(renderer);
   }
 
-  // Semi-transparent black background
-  SDL_Rect bgRect = {x_, y_, width_, height_};
-  SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-  SDL_SetRenderDrawColor(renderer, 0, 0, 0, 180);
-  SDL_RenderFillRect(renderer, &bgRect);
-
-  if (entries_.empty() || totalWidth_ <= 0)
+  if (currentLines_.empty())
     return;
+
+  ThemeColors themes = getThemeColors(theme_);
+
+  // Background
+  SDL_SetRenderDrawBlendMode(
+      renderer, (theme_ == "glass") ? SDL_BLENDMODE_BLEND : SDL_BLENDMODE_NONE);
+  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b,
+                         themes.bg.a);
+  SDL_Rect rect = {x_, y_, width_, height_};
+  SDL_RenderFillRect(renderer, &rect);
+
+  // Draw pane border
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
+                         themes.border.b, themes.border.a);
+  SDL_RenderDrawRect(renderer, &rect);
 
   // Clip to banner bounds
   SDL_Rect clipRect = {x_, y_, width_, height_};
   SDL_RenderSetClipRect(renderer, &clipRect);
 
-  int textY = y_ + (height_ - maxHeight_) / 2;
-  int offset = static_cast<int>(scrollOffset_);
+  int startY = y_ + (height_ - totalLineHeight_) / 2;
+  int curY = startY;
 
-  // Draw two copies of the full entry chain for seamless wrapping.
-  // The clip rect culls anything outside the banner bounds.
-  // Draw enough copies to fill the width (usually 2, maybe 3 if very wide)
-  // Seamless wrapping logic:
-  // cx starts at x_ - scrollOffset_
-  // We must draw copies until we cover the range [x_, x_ + width_]
-
-  // 1. Calculate safe start copy index to ensure we don't draw way to the left
-  // We want (copy * totalWidth_) > scrollOffset_ - width_ (roughly)
-  // Actually, just looping 0..2 is usually enough unless width > 2*totalWidth
-  int numCopies = 2 + (width_ / (totalWidth_ > 0 ? totalWidth_ : 1));
-
-  for (int copy = 0; copy < numCopies; ++copy) {
-    int copyStartX = x_ - offset + copy * totalWidth_;
-
-    // Optimization: Skip valid check if fully outside
-    if (copyStartX + totalWidth_ < x_ || copyStartX > x_ + width_)
-      continue;
-
-    int cx = copyStartX;
-    for (const auto &e : entries_) {
-      // Draw if this segment overlaps the visible banner area [x_, x_+width_]
-      if (e.tex && cx + e.w > x_ && cx < x_ + width_) {
-        SDL_Rect dst = {cx, textY, e.w, e.h};
-        SDL_RenderCopy(renderer, e.tex, nullptr, &dst);
-      }
-      cx += e.w;
+  for (const auto &line : currentLines_) {
+    if (line.tex) {
+      int curX = x_ + (width_ - line.w) / 2;
+      SDL_Rect dst = {curX, curY, line.w, line.h};
+      SDL_RenderCopy(renderer, line.tex, nullptr, &dst);
+      curY += line.h;
     }
   }
 
@@ -92,65 +84,75 @@ void RSSBanner::onResize(int x, int y, int w, int h) {
 }
 
 void RSSBanner::destroyCache() {
-  for (auto &e : entries_) {
-    if (e.tex)
-      SDL_DestroyTexture(e.tex);
+  for (auto &line : currentLines_) {
+    if (line.tex)
+      SDL_DestroyTexture(line.tex);
   }
-  entries_.clear();
-  totalWidth_ = 0;
-  maxHeight_ = 0;
-  lastHeadlines_.clear();
+  currentLines_.clear();
+  totalLineHeight_ = 0;
 }
 
 void RSSBanner::rebuildTextures(SDL_Renderer *renderer) {
-  for (auto &e : entries_) {
-    if (e.tex)
-      SDL_DestroyTexture(e.tex);
+  if (!renderer) {
+    // Only clear, letting render() rebuild
+    destroyCache();
+    return;
   }
-  entries_.clear();
-  totalWidth_ = 0;
-  maxHeight_ = 0;
 
-  if (lastHeadlines_.empty())
+  destroyCache();
+  if (lastHeadlines_.empty() || currentIdx_ >= (int)lastHeadlines_.size())
     return;
 
-  SDL_Color white = {255, 255, 255, 255};
+  std::string fullText = lastHeadlines_[currentIdx_];
+  ThemeColors themes = getThemeColors(theme_);
+  SDL_Color textColor = themes.accent;
 
-  // Create a separator texture once
-  // Create a separator texture once
-  int sepW = 0, sepH = 0;
-  SDL_Texture *sepTex =
-      fontMgr_.renderText(renderer, kSeparator, white, fontSize_, &sepW, &sepH);
+  // 1. Try single line
+  int w = 0, h = 0;
+  SDL_Texture *tex =
+      fontMgr_.renderText(renderer, fullText, textColor, fontSize_, &w, &h);
 
-  for (size_t i = 0; i < lastHeadlines_.size(); ++i) {
-    // Headline texture
-    Entry e;
-    e.tex = fontMgr_.renderText(renderer, lastHeadlines_[i], white, fontSize_,
-                                &e.w, &e.h);
-    if (e.tex) {
-      totalWidth_ += e.w;
-      maxHeight_ = std::max(maxHeight_, e.h);
-      entries_.push_back(e);
+  if (tex && w <= width_ - 20) {
+    currentLines_.push_back({tex, w, h});
+    totalLineHeight_ = h;
+  } else {
+    // 2. Wrap to 2 lines if possible
+    if (tex)
+      SDL_DestroyTexture(tex);
+
+    // Naive word wrap for 2 lines
+    size_t mid = fullText.length() / 2;
+    size_t split = fullText.find_last_of(" \t\r\n", mid);
+    if (split == std::string::npos)
+      split = fullText.find_first_of(" \t\r\n", mid);
+
+    std::string l1, l2;
+    if (split != std::string::npos) {
+      l1 = fullText.substr(0, split);
+      l2 = fullText.substr(split + 1);
+    } else {
+      l1 = fullText;
     }
 
-    // Separator texture (after every headline including last, for wrap)
-    if (sepTex) {
-      // Re-render separate texture for each use
-      Entry sepEntry;
-      sepEntry.tex = fontMgr_.renderText(renderer, kSeparator, white, fontSize_,
-                                         &sepEntry.w, &sepEntry.h);
-      if (sepEntry.tex) {
-        totalWidth_ += sepEntry.w;
-        maxHeight_ = std::max(maxHeight_, sepEntry.h);
-        entries_.push_back(sepEntry);
+    // Use smaller font for 2 lines if needed
+    int wrapFontSize = (fontSize_ > 20) ? fontSize_ * 0.7 : fontSize_;
+
+    int w1 = 0, h1 = 0;
+    SDL_Texture *t1 =
+        fontMgr_.renderText(renderer, l1, textColor, wrapFontSize, &w1, &h1);
+    if (t1) {
+      currentLines_.push_back({t1, w1, h1});
+      totalLineHeight_ += h1;
+    }
+
+    if (!l2.empty()) {
+      int w2 = 0, h2 = 0;
+      SDL_Texture *t2 =
+          fontMgr_.renderText(renderer, l2, textColor, wrapFontSize, &w2, &h2);
+      if (t2) {
+        currentLines_.push_back({t2, w2, h2});
+        totalLineHeight_ += h2;
       }
     }
   }
-
-  // Clean up the first separator texture (we created individual copies above)
-  if (sepTex)
-    SDL_DestroyTexture(sepTex);
-
-  std::fprintf(stderr, "RSSBanner: %zu headlines, %zu entries, totalWidth=%d\n",
-               lastHeadlines_.size(), entries_.size(), totalWidth_);
 }

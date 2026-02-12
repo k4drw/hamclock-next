@@ -13,7 +13,18 @@
 //   SmallRegular / SmallBold → general UI text (~43px line height at 800x480)
 //   LargeBold               → clock digits    (~80px line height at 800x480)
 //   Fast                    → compact/debug   (~15px line height at 800x480)
-enum class FontStyle { SmallRegular, SmallBold, LargeBold, Fast, Count_ };
+//   FastBold                → compact/debug   (~15px line height at 800x480)
+enum class FontStyle {
+  Micro,
+  SmallRegular,
+  SmallBold,
+  MediumRegular,
+  MediumBold,
+  LargeBold,
+  Fast,
+  FastBold,
+  Count_
+};
 
 class FontCatalog {
 public:
@@ -23,10 +34,14 @@ public:
   // Call once at startup and on every resize.
   void recalculate(int /*winW*/, int winH) {
     float scale = static_cast<float>(winH) / kLogicalH;
+    scaledPt_[idx(FontStyle::Micro)] = clampPt(kMicroBasePt * scale);
     scaledPt_[idx(FontStyle::SmallRegular)] = clampPt(kSmallBasePt * scale);
     scaledPt_[idx(FontStyle::SmallBold)] = clampPt(kSmallBasePt * scale);
+    scaledPt_[idx(FontStyle::MediumRegular)] = clampPt(kMediumBasePt * scale);
+    scaledPt_[idx(FontStyle::MediumBold)] = clampPt(kMediumBasePt * scale);
     scaledPt_[idx(FontStyle::LargeBold)] = clampPt(kLargeBasePt * scale);
     scaledPt_[idx(FontStyle::Fast)] = clampPt(kFastBasePt * scale);
+    scaledPt_[idx(FontStyle::FastBold)] = clampPt(kFastBasePt * scale);
   }
 
   // Current scaled point size for a style.
@@ -34,7 +49,8 @@ public:
 
   // Whether the style requests bold rendering.
   static bool isBold(FontStyle style) {
-    return style == FontStyle::SmallBold || style == FontStyle::LargeBold;
+    return style == FontStyle::SmallBold || style == FontStyle::MediumBold ||
+           style == FontStyle::LargeBold || style == FontStyle::FastBold;
   }
 
   // Render text with the named style (handles bold via TTF_SetFontStyle).
@@ -83,6 +99,7 @@ public:
         {FontStyle::SmallBold, "SmallBold", kSmallTargetH, kSmallBasePt},
         {FontStyle::LargeBold, "LargeBold", kLargeTargetH, kLargeBasePt},
         {FontStyle::Fast, "Fast", kFastTargetH, kFastBasePt},
+        {FontStyle::FastBold, "FastBold", kFastTargetH, kFastBasePt},
     };
     std::vector<CalibEntry> entries;
     for (const auto &i : infos) {
@@ -95,7 +112,9 @@ public:
   }
 
   // Target line heights in the 800x480 logical space.
-  static constexpr int kSmallTargetH = 43;
+  static constexpr int kMicroTargetH = 12;
+  static constexpr int kSmallTargetH = 18;
+  static constexpr int kMediumTargetH = 28;
   static constexpr int kLargeTargetH = 80;
   static constexpr int kFastTargetH = 15;
   static constexpr int kLogicalH = 480;
@@ -105,9 +124,11 @@ private:
 
   // Base point sizes at 800x480.  Tuned so TTF_FontHeight ≈ target.
   // Adjust these constants if the embedded font changes.
-  static constexpr int kSmallBasePt = 33;
+  static constexpr int kMicroBasePt = 10;
+  static constexpr int kSmallBasePt = 14;
+  static constexpr int kMediumBasePt = 24;
   static constexpr int kLargeBasePt = 60;
-  static constexpr int kFastBasePt = 11;
+  static constexpr int kFastBasePt = 12;
 
   static int idx(FontStyle s) { return static_cast<int>(s); }
   static int clampPt(float v) {

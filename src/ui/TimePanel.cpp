@@ -1,10 +1,11 @@
 #include "TimePanel.h"
+#include "../core/Theme.h"
 #include "FontCatalog.h"
 #include "RenderUtils.h"
+#include "TextureManager.h"
 
 #include <algorithm>
 #include <chrono>
-#include <cmath>
 #include <cstdio>
 #include <cstring>
 #include <ctime>
@@ -88,8 +89,9 @@ std::string getLocalIP() {
 } // namespace
 
 TimePanel::TimePanel(int x, int y, int w, int h, FontManager &fontMgr,
-                     const std::string &callsign)
-    : Widget(x, y, w, h), fontMgr_(fontMgr), callsign_(callsign) {}
+                     TextureManager &texMgr, const std::string &callsign)
+    : Widget(x, y, w, h), fontMgr_(fontMgr), texMgr_(texMgr),
+      callsign_(callsign) {}
 
 void TimePanel::destroyCache() {
   if (callTex_) {
@@ -155,10 +157,20 @@ void TimePanel::render(SDL_Renderer *renderer) {
   if (!fontMgr_.ready())
     return;
 
+  ThemeColors themes = getThemeColors(theme_);
+
+  // Background
+  SDL_SetRenderDrawBlendMode(
+      renderer, (theme_ == "glass") ? SDL_BLENDMODE_BLEND : SDL_BLENDMODE_NONE);
+  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b,
+                         themes.bg.a);
+  SDL_Rect rect = {x_, y_, width_, height_};
+  SDL_RenderFillRect(renderer, &rect);
+
   // Draw pane border
-  SDL_SetRenderDrawColor(renderer, 80, 80, 80, 255);
-  SDL_Rect border = {x_, y_, width_, height_};
-  SDL_RenderDrawRect(renderer, &border);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
+                         themes.border.b, themes.border.a);
+  SDL_RenderDrawRect(renderer, &rect);
 
   int pad = std::max(4, static_cast<int>(width_ * 0.03f));
 
@@ -199,29 +211,12 @@ void TimePanel::render(SDL_Renderer *renderer) {
     float r = gearSize_ / 2.0f;
     SDL_Color gearColor = {140, 140, 140, 255};
     SDL_Color bgColor = {10, 10, 20, 255};
-
-    // Draw 8 teeth
-    float toothLen = r * 0.3f;
-    float toothW = r * 0.4f;
-    for (int i = 0; i < 8; ++i) {
-      float angle = i * 3.14159265f / 4.0f;
-      float x1 = gcx + (r - toothLen) * std::cos(angle);
-      float y1 = gcy + (r - toothLen) * std::sin(angle);
-      float x2 = gcx + (r + toothLen) * std::cos(angle);
-      float y2 = gcy + (r + toothLen) * std::sin(angle);
-      RenderUtils::drawThickLine(renderer, x1, y1, x2, y2, toothW, gearColor);
-    }
-
-    // Main body circle
-    RenderUtils::drawCircle(renderer, gcx, gcy, r, gearColor);
-
-    // Center hole
-    RenderUtils::drawCircle(renderer, gcx, gcy, r * 0.35f, bgColor);
+    RenderUtils::drawGear(renderer, gcx, gcy, r, gearColor, bgColor);
   }
 
   // --- Info bar: uptime (left), rotating center, version (right) ---
   {
-    SDL_Color gray = {160, 160, 160, 255};
+    SDL_Color gray = themes.textDim;
     int infoY = infoBaseY + (infoRowH - infoFontSize_) / 2;
     TTF_Font *infoFont = fontMgr_.getFont(infoFontSize_);
     if (infoFont) {
@@ -261,7 +256,7 @@ void TimePanel::render(SDL_Renderer *renderer) {
       SDL_DestroyTexture(secTex_);
       secTex_ = nullptr;
     }
-    SDL_Color gray = {180, 180, 180, 255};
+    SDL_Color gray = themes.textDim;
     secTex_ = fontMgr_.renderText(renderer, currentSec_, gray, secFontSize_,
                                   &secW_, &secH_);
     lastSec_ = currentSec_;
@@ -308,7 +303,7 @@ void TimePanel::render(SDL_Renderer *renderer) {
 void TimePanel::onResize(int x, int y, int w, int h) {
   Widget::onResize(x, y, w, h);
   auto *cat = fontMgr_.catalog();
-  callFontSize_ = cat->ptSize(FontStyle::SmallBold);
+  callFontSize_ = static_cast<int>(cat->ptSize(FontStyle::MediumBold) * 1.4f);
   hmFontSize_ = cat->ptSize(FontStyle::LargeBold);
   secFontSize_ = cat->ptSize(FontStyle::SmallRegular);
   dateFontSize_ = cat->ptSize(FontStyle::Fast);
@@ -351,8 +346,15 @@ void TimePanel::stopEditing(bool apply) {
 
 bool TimePanel::onMouseUp(int mx, int my, Uint16 /*mod*/) {
   // Gear icon click → request setup
-  if (!editing_ && mx >= gearRect_.x && mx < gearRect_.x + gearRect_.w &&
-      my >= gearRect_.y && my < gearRect_.y + gearRect_.h) {
+  SDL_Rect hit = gearRect_;
+  int margin = 5;
+  hit.x -= margin;
+  hit.y -= margin;
+  hit.w += margin * 2;
+  hit.h += margin * 2;
+
+  if (!editing_ && mx >= hit.x && mx < hit.x + hit.w && my >= hit.y &&
+      my < hit.y + hit.h) {
     setupRequested_ = true;
     return true;
   }
@@ -544,4 +546,51 @@ void TimePanel::renderEditOverlay(SDL_Renderer *renderer) {
   }
 
   SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+}
+
+std::vector<std::string> TimePanel::getActions() const {
+  std::vector<std::string> actions = {"setup", "edit_callsign"};
+  if (editing_) {
+    actions.push_back("ok");
+    actions.push_back("cancel");
+    for (int i = 0; i < kNumColors; ++i) {
+      actions.push_back("color_" + std::to_string(i));
+    }
+  }
+  return actions;
+}
+
+SDL_Rect TimePanel::getActionRect(const std::string &action) const {
+  if (action == "setup") {
+    return gearRect_;
+  }
+  if (action == "edit_callsign") {
+    int callRowH = height_ * 42 / 148;
+    return {x_, y_, width_, callRowH};
+  }
+
+  if (editing_) {
+    int pad = std::max(4, static_cast<int>(width_ * 0.03f));
+    int editorFontSize = std::clamp(static_cast<int>(height_ * 0.18f), 12, 36);
+    int textFieldH = editorFontSize + 12;
+
+    if (action == "ok" || action == "cancel") {
+      // For now, return the text field area as a general "interact" area
+      return {x_ + pad, y_ + pad, width_ - 2 * pad, textFieldH};
+    }
+
+    if (action.find("color_") == 0) {
+      int idx = std::stoi(action.substr(6));
+      int paletteY = y_ + pad + textFieldH + pad;
+      int swatchSize = std::clamp(static_cast<int>(width_ * 0.08f), 16, 32);
+      int gap = std::max(2, swatchSize / 6);
+      int cols = 6;
+      int col = idx % cols;
+      int row = idx / cols;
+      return {x_ + pad + col * (swatchSize + gap),
+              paletteY + row * (swatchSize + gap), swatchSize, swatchSize};
+    }
+  }
+
+  return {0, 0, 0, 0};
 }

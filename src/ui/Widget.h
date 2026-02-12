@@ -1,6 +1,8 @@
 #pragma once
 
 #include <SDL2/SDL.h>
+#include <string>
+#include <vector>
 
 class Widget {
 public:
@@ -45,9 +47,23 @@ public:
     return false;
   }
 
+  virtual void setTheme(const std::string &theme) { theme_ = theme; }
+
+  virtual bool isModalActive() const { return false; }
+  virtual void renderModal(SDL_Renderer *renderer) { (void)renderer; }
+
+  // Semantic Debug API
+  virtual std::string getName() const { return "Widget"; }
+  virtual std::vector<std::string> getActions() const { return {}; }
+  virtual SDL_Rect getActionRect(const std::string &action) const {
+    (void)action;
+    return {0, 0, 0, 0};
+  }
+
 protected:
   int x_;
   int y_;
   int width_;
   int height_;
+  std::string theme_ = "default";
 };

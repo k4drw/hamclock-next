@@ -50,6 +50,12 @@ public:
   bool onKeyDown(SDL_Keycode key, Uint16 mod) override;
   bool onMouseWheel(int scrollY) override;
 
+  void setTheme(const std::string &theme) override {
+    Widget::setTheme(theme);
+    dxPanel_.setTheme(theme);
+    satPanel_.setTheme(theme);
+  }
+
 private:
   // Menu has two views: the SAT options menu and the satellite list
   enum class MenuState { Closed, SatOptions, SatList };

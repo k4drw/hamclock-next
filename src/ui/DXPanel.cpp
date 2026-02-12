@@ -1,5 +1,6 @@
 #include "DXPanel.h"
 #include "../core/Astronomy.h"
+#include "../core/Theme.h"
 #include "FontCatalog.h"
 
 #include <cmath>
@@ -63,10 +64,20 @@ void DXPanel::render(SDL_Renderer *renderer) {
   if (!fontMgr_.ready())
     return;
 
+  ThemeColors themes = getThemeColors(theme_);
+
+  // Background
+  SDL_SetRenderDrawBlendMode(
+      renderer, (theme_ == "glass") ? SDL_BLENDMODE_BLEND : SDL_BLENDMODE_NONE);
+  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b,
+                         themes.bg.a);
+  SDL_Rect rect = {x_, y_, width_, height_};
+  SDL_RenderFillRect(renderer, &rect);
+
   // Draw pane border
-  SDL_SetRenderDrawColor(renderer, 80, 80, 80, 255);
-  SDL_Rect border = {x_, y_, width_, height_};
-  SDL_RenderDrawRect(renderer, &border);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
+                         themes.border.b, themes.border.a);
+  SDL_RenderDrawRect(renderer, &rect);
 
   int pad = static_cast<int>(width_ * 0.06f);
 
