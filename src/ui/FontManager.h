@@ -107,6 +107,10 @@ public:
       return nullptr;
 
     SDL_Texture *texture = SDL_CreateTextureFromSurface(renderer, surface);
+    if (!texture) {
+      SDL_FreeSurface(surface);
+      return nullptr;
+    }
 
     // Logical dimensions
     if (outW)

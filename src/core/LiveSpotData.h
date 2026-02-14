@@ -77,6 +77,23 @@ public:
     std::memcpy(data_.selectedBands, saved, sizeof(saved));
   }
 
+  void setSelectedBandsMask(uint32_t mask) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    for (int i = 0; i < kNumBands; ++i) {
+      data_.selectedBands[i] = (mask & (1 << i)) != 0;
+    }
+  }
+
+  uint32_t getSelectedBandsMask() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    uint32_t mask = 0;
+    for (int i = 0; i < kNumBands; ++i) {
+      if (data_.selectedBands[i])
+        mask |= (1 << i);
+    }
+    return mask;
+  }
+
   void toggleBand(int idx) {
     std::lock_guard<std::mutex> lock(mutex_);
     if (idx >= 0 && idx < kNumBands)

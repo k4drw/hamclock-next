@@ -37,6 +37,7 @@ docker run --rm -v "$(pwd)":/work -w /work $IMAGE bash -c "
         -DSDL_X11=OFF \
         -DSDL_WAYLAND=OFF \
         -DSDL_KMSDRM=ON \
+        -DSDL_RPI=OFF \
         -DSDL_OPENGL=OFF \
         -DSDL_GLES=ON \
         -DSDL2IMAGE_VENDORED=ON \

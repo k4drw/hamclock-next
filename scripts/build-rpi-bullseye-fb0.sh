@@ -21,7 +21,7 @@ docker run --rm -v "$(pwd)":/work -w /work $IMAGE bash -c "
         build-essential cmake git gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf pkg-config ca-certificates \
         libatomic1-armhf-cross \
         libdrm-dev:armhf libgbm-dev:armhf libegl-dev:armhf libgles-dev:armhf \
-        libdbus-1-dev:armhf libudev-dev:armhf libasound2-dev:armhf && \
+        libdbus-1-dev:armhf libudev-dev:armhf libasound2-dev:armhf python3 && \
     export PKG_CONFIG_PATH=/usr/lib/arm-linux-gnueabihf/pkgconfig && \
     export PKG_CONFIG_LIBDIR=/usr/lib/arm-linux-gnueabihf/pkgconfig && \
     cmake -Bbuild-rpi-bullseye-fb0 -H. \
@@ -38,6 +38,7 @@ docker run --rm -v "$(pwd)":/work -w /work $IMAGE bash -c "
         -DSDL_X11=OFF \
         -DSDL_WAYLAND=OFF \
         -DSDL_KMSDRM=ON \
+        -DSDL_RPI=OFF \
         -DSDL_OPENGL=OFF \
         -DSDL_GLES=ON \
         -DSDL2IMAGE_VENDORED=ON \

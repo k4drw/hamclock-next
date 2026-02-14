@@ -284,6 +284,54 @@ void WebServer::run() {
     res.set_content("ok", "text/plain");
   });
 
+  svr.Get("/screen",
+          [this](const httplib::Request &req, httplib::Response &res) {
+            if (req.has_param("blank")) {
+              int blank = std::stoi(req.get_param_value("blank"));
+              if (blank) {
+                SDL_EnableScreenSaver();
+#ifdef __linux__
+                // Try RPi specific display power off
+                (void)system("vcgencmd display_power 0 > /dev/null 2>&1");
+                // Try X11 standard
+                (void)system("xset dpms force off > /dev/null 2>&1");
+#endif
+                LOG_I("WebServer", "Screen blanking requested");
+              } else {
+                SDL_DisableScreenSaver();
+#ifdef __linux__
+                // Try RPi specific display power on
+                (void)system("vcgencmd display_power 1 > /dev/null 2>&1");
+                // Try X11 standard
+                (void)system("xset dpms force on > /dev/null 2>&1");
+#endif
+                LOG_I("WebServer", "Screen unblanking requested");
+              }
+              res.set_content("ok", "text/plain");
+              return;
+            }
+
+            if (req.has_param("prevent")) {
+              bool prevent = (req.get_param_value("prevent") == "1" ||
+                              req.get_param_value("prevent") == "on");
+              cfg_->preventSleep = prevent;
+              if (prevent)
+                SDL_DisableScreenSaver();
+              else
+                SDL_EnableScreenSaver();
+              if (cfgMgr_)
+                cfgMgr_->save(*cfg_);
+              res.set_content("ok", "text/plain");
+              return;
+            }
+
+            // Default status
+            nlohmann::json j;
+            j["prevent_sleep"] = cfg_->preventSleep;
+            j["saver_enabled"] = SDL_IsScreenSaverEnabled() == SDL_TRUE;
+            res.set_content(j.dump(2), "application/json");
+          });
+
 #ifdef ENABLE_DEBUG_API
   svr.Get("/debug/widgets",
           [](const httplib::Request &, httplib::Response &res) {
@@ -382,16 +430,16 @@ void WebServer::run() {
             res.set_content(out, "text/plain");
           });
 
-  svr.Get("/get_time.txt",
-          [](const httplib::Request &, httplib::Response &res) {
-            auto now = std::chrono::system_clock::now();
-            std::tm utc{};
-            Astronomy::portable_gmtime(&t, &utc);
-            char buf[64];
-            std::strftime(buf, sizeof(buf),
-                          "Clock_UTC %Y-%02d-%02dT%02d:%02d:%02d Z\n", &utc);
-            res.set_content(buf, "text/plain");
-          });
+  svr.Get("/get_time.txt", [](const httplib::Request &,
+                              httplib::Response &res) {
+    auto now = std::chrono::system_clock::now();
+    std::time_t t = std::chrono::system_clock::to_time_t(now);
+    std::tm utc{};
+    Astronomy::portable_gmtime(&t, &utc);
+    char buf[64];
+    std::strftime(buf, sizeof(buf), "Clock_UTC %Y-%m-%dT%H:%M:%S Z\n", &utc);
+    res.set_content(buf, "text/plain");
+  });
 
   svr.Get(
       "/get_de.txt", [this](const httplib::Request &, httplib::Response &res) {

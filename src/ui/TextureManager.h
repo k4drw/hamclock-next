@@ -103,16 +103,31 @@ public:
     }
     surface = rgbaSurface;
 
-    // Specialized Logic: If this is the night map, generate an alpha channel
-    // from pixel brightness.
-    if (key == "night_map") {
+    // Specialized Logic: Generate alpha channel from pixel brightness for
+    // certain textures.
+    if (key == "night_map" || key == "nasa_moon" || key == "sdo_latest") {
       uint32_t *pix = (uint32_t *)surface->pixels;
       int count = surface->w * surface->h;
       for (int i = 0; i < count; ++i) {
         uint32_t p = pix[i];
         uint8_t r, g, b, a;
         SDL_GetRGBA(p, surface->format, &r, &g, &b, &a);
+
+        // Calculate brightness
         uint8_t br = std::max({r, g, b});
+
+        // For the moon, we want to be more aggressive with black to avoid JPEG
+        // artifacts around the edges showing up on non-black backgrounds.
+        if (key == "nasa_moon") {
+          if (br < 20)
+            br = 0;
+          else if (br < 100) {
+            // Smooth transition but faster than linear
+            float f = (br - 20) / 80.0f;
+            br = static_cast<uint8_t>(f * br);
+          }
+        }
+
         pix[i] = SDL_MapRGBA(surface->format, r, g, b, br);
       }
       LOG_I("TextureManager", "Generated alpha channel from brightness for {}",
@@ -136,9 +151,17 @@ public:
         finalSurface = SDL_CreateRGBSurfaceWithFormat(0, newW, newH, 32,
                                                       surface->format->format);
         if (finalSurface) {
-          SDL_BlitScaled(surface, nullptr, finalSurface, nullptr);
-          mustFreeFinal = true;
+          if (SDL_BlitScaled(surface, nullptr, finalSurface, nullptr) != 0) {
+            LOG_E("TextureManager", "SDL_BlitScaled failed: {}",
+                  SDL_GetError());
+            SDL_FreeSurface(finalSurface);
+            finalSurface = surface;
+          } else {
+            mustFreeFinal = true;
+          }
         } else {
+          LOG_E("TextureManager", "Failed to create surface for scale: {}",
+                SDL_GetError());
           finalSurface = surface;
         }
       }

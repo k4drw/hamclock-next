@@ -148,6 +148,9 @@ int main(int argc, char *argv[]) {
     activeSetup = SetupMode::Main;
   }
 
+  // Handle screen blanking prevention (persistent setting)
+  bool preventSleep = appCfg.preventSleep;
+
   // --- Init SDL2 ---
   int numDrivers = SDL_GetNumVideoDrivers();
   std::fprintf(stderr, "SDL Video Drivers available: ");
@@ -195,6 +198,14 @@ int main(int argc, char *argv[]) {
   const char *activeDriver = SDL_GetCurrentVideoDriver();
   if (activeDriver) {
     std::fprintf(stderr, "SDL Video Driver in use: %s\n", activeDriver);
+  }
+
+  if (preventSleep) {
+    SDL_DisableScreenSaver();
+    LOG_I("Main", "Screen saver disabled (kiosk mode)");
+  } else {
+    SDL_EnableScreenSaver();
+    LOG_I("Main", "Screen saver enabled");
   }
 
   if (forceSoftware) {
@@ -409,6 +420,7 @@ int main(int argc, char *argv[]) {
   auto rssStore = std::make_shared<RSSDataStore>();
   auto watchlistHitStore = std::make_shared<WatchlistHitStore>();
   auto spotStore = std::make_shared<LiveSpotDataStore>();
+  spotStore->setSelectedBandsMask(appCfg.pskBands);
   auto activityStore = std::make_shared<ActivityDataStore>();
   auto dxcStore = std::make_shared<DXClusterDataStore>();
   auto bandStore = std::make_shared<BandConditionsStore>();

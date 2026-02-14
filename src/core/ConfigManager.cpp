@@ -132,7 +132,7 @@ bool ConfigManager::load(AppConfig &config) const {
     config.selectedSatellite = pn.value("satellite", "");
   }
 
-  // DX Cluster & PSK Reporter
+  // DX Cluster
   if (json.contains("dx_cluster")) {
     auto &dxc = json["dx_cluster"];
     config.dxClusterEnabled = dxc.value("enabled", true);
@@ -142,11 +142,19 @@ bool ConfigManager::load(AppConfig &config) const {
     config.dxClusterUseWSJTX = dxc.value("use_wsjtx", false);
   }
 
+  // PSK Reporter
   if (json.contains("psk_reporter")) {
     auto &psk = json["psk_reporter"];
-    config.pskOfDe = psk.value("of_de", true);
-    config.pskUseCall = psk.value("use_call", true);
+    config.pskOfDe = psk.value("of_de", false);
+    config.pskUseCall = psk.value("use_call", false);
     config.pskMaxAge = psk.value("max_age", 30);
+    config.pskBands = psk.value("bands_mask", 0xFFF);
+  }
+
+  // Power
+  if (json.contains("power")) {
+    auto &p = json["power"];
+    config.preventSleep = p.value("prevent_sleep", true);
   }
 
   // Require at least a callsign to consider config valid
@@ -177,6 +185,8 @@ bool ConfigManager::save(const AppConfig &config) const {
   json["appearance"]["map_night_lights"] = config.mapNightLights;
   json["appearance"]["use_metric"] = config.useMetric;
 
+  json["power"]["prevent_sleep"] = config.preventSleep;
+
   auto saveRotation = [&](const std::string &key,
                           const std::vector<WidgetType> &vec) {
     auto arr = nlohmann::json::array();
@@ -204,6 +214,7 @@ bool ConfigManager::save(const AppConfig &config) const {
   json["psk_reporter"]["of_de"] = config.pskOfDe;
   json["psk_reporter"]["use_call"] = config.pskUseCall;
   json["psk_reporter"]["max_age"] = config.pskMaxAge;
+  json["psk_reporter"]["bands_mask"] = config.pskBands;
 
   std::ofstream ofs(configPath_);
   if (!ofs) {

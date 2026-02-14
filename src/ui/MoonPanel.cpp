@@ -51,8 +51,11 @@ void MoonPanel::drawMoon(SDL_Renderer *renderer, int cx, int cy, int r) {
     // Actually, Dial-a-Moon 'su_image' is 'south up'. 'image' is 'north up'.
     // We used 'image', which is north up.
 
-    SDL_RenderCopyEx(renderer, tex, nullptr, &dst, -currentData_.posangle,
-                     nullptr, SDL_FLIP_NONE);
+    double angle = currentData_.posangle;
+    if (!std::isfinite(angle))
+      angle = 0.0;
+    SDL_RenderCopyEx(renderer, tex, nullptr, &dst, -angle, nullptr,
+                     SDL_FLIP_NONE);
   } else {
     // Fallback procedural
     SDL_SetRenderDrawColor(renderer, 30, 30, 45, 255);

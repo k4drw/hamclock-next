@@ -26,45 +26,52 @@ endif()
 # --- Dependencies (FetchContent - The "Universal Build" Strategy) ---
 include(FetchContent)
 
-# 1. SDL2 (Base)
-set(SDL_STATIC ON CACHE BOOL "Build static SDL library")
-set(SDL_SHARED OFF CACHE BOOL "Build shared SDL library")
-set(SDL_TEST OFF CACHE BOOL "Disable SDL tests")
-set(SDL_JOYSTICK OFF CACHE BOOL "Disable SDL joystick")
-set(SDL_HAPTIC OFF CACHE BOOL "Disable SDL haptic")
-set(SDL_SENSOR OFF CACHE BOOL "Disable SDL sensor")
+# 1. SDL2 (Base) - Always build from source for consistency and static linking
+if(TRUE) # Force FetchContent
+    set(SDL_STATIC ON CACHE BOOL "Build static SDL library")
+    # ...
+    set(SDL_SHARED OFF CACHE BOOL "Build shared SDL library")
+    set(SDL_TEST OFF CACHE BOOL "Disable SDL tests")
+    set(SDL_JOYSTICK OFF CACHE BOOL "Disable SDL joystick")
+    set(SDL_HAPTIC OFF CACHE BOOL "Disable SDL haptic")
+    set(SDL_SENSOR OFF CACHE BOOL "Disable SDL sensor")
 
-set(SDL_PIPEWIRE OFF CACHE BOOL "Disable SDL PipeWire audio")
+    set(SDL_PIPEWIRE OFF CACHE BOOL "Disable SDL PipeWire audio")
 
-FetchContent_Declare(
-    SDL2
-    GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
-    GIT_TAG        release-2.30.2
-    GIT_SHALLOW    TRUE
-)
+    FetchContent_Declare(
+        SDL2
+        GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
+        GIT_TAG        release-2.30.2
+        GIT_SHALLOW    TRUE
+    )
+endif()
 
-# 2. SDL2_ttf
-set(SDL2TTF_VENDORED ON CACHE BOOL "Use vendored dependencies for SDL2_ttf")
-FetchContent_Declare(
-    SDL2_ttf
-    GIT_REPOSITORY https://github.com/libsdl-org/SDL_ttf.git
-    GIT_TAG        release-2.22.x
-    GIT_SHALLOW    TRUE
-)
+# 2. SDL2_ttf - Always build from source
+if(TRUE)
+    set(SDL2TTF_VENDORED ON CACHE BOOL "Use vendored dependencies for SDL2_ttf")
+    FetchContent_Declare(
+        SDL2_ttf
+        GIT_REPOSITORY https://github.com/libsdl-org/SDL_ttf.git
+        GIT_TAG        release-2.22.0
+        GIT_SHALLOW    TRUE
+    )
+endif()
 
-# 3. SDL2_image
-set(SDL2IMAGE_VENDORED ON CACHE BOOL "Use vendored dependencies for SDL2_image")
-set(SDL2IMAGE_SAMPLES OFF CACHE BOOL "Disable SDL2_image samples")
-set(SDL2IMAGE_WEBP OFF CACHE BOOL "Disable WebP to avoid MinGW link errors")
-set(SDL2IMAGE_TIF OFF CACHE BOOL "Disable TIFF - not used")
-set(SDL2IMAGE_JXL OFF CACHE BOOL "Disable JXL - not used")
-set(SDL2IMAGE_AVIF OFF CACHE BOOL "Disable AVIF - not used")
-FetchContent_Declare(
-    SDL2_image
-    GIT_REPOSITORY https://github.com/libsdl-org/SDL_image.git
-    GIT_TAG        release-2.8.x
-    GIT_SHALLOW    TRUE
-)
+# 3. SDL2_image - Always build from source
+if(TRUE)
+    set(SDL2IMAGE_VENDORED ON CACHE BOOL "Use vendored dependencies for SDL2_image")
+    set(SDL2IMAGE_SAMPLES OFF CACHE BOOL "Disable SDL2_image samples")
+    set(SDL2IMAGE_WEBP OFF CACHE BOOL "Disable WebP to avoid MinGW link errors")
+    set(SDL2IMAGE_TIF OFF CACHE BOOL "Disable TIFF - not used")
+    set(SDL2IMAGE_JXL OFF CACHE BOOL "Disable JXL - not used")
+    set(SDL2IMAGE_AVIF OFF CACHE BOOL "Disable AVIF - not used")
+    FetchContent_Declare(
+        SDL2_image
+        GIT_REPOSITORY https://github.com/libsdl-org/SDL_image.git
+        GIT_TAG        release-2.8.2
+        GIT_SHALLOW    TRUE
+    )
+endif()
 
 # 4. mbedtls (for static SSL on Linux/RPi)
 if(NOT WIN32)
@@ -129,34 +136,117 @@ FetchContent_Declare(
     URL https://www.sqlite.org/2024/sqlite-amalgamation-3470000.zip
 )
 
-# 6. JSON / Predict / HTTP / Log
-FetchContent_Declare(
-    nlohmann_json
-    GIT_REPOSITORY https://github.com/nlohmann/json.git
-    GIT_TAG        v3.11.3
-)
-FetchContent_Declare(
-    libpredict
-    GIT_REPOSITORY https://github.com/la1k/libpredict.git
-    GIT_TAG        v2.0.0
-)
-FetchContent_Declare(
-    httplib
-    GIT_REPOSITORY https://github.com/yhirose/cpp-httplib.git
-    GIT_TAG        v0.14.3
-)
-FetchContent_Declare(
-    spdlog
-    GIT_REPOSITORY https://github.com/gabime/spdlog.git
-    GIT_TAG        v1.12.0
-)
+# 6. JSON
+find_package(nlohmann_json QUIET)
+if(NOT nlohmann_json_FOUND)
+    FetchContent_Declare(
+        nlohmann_json
+        URL https://github.com/nlohmann/json/archive/refs/tags/v3.11.3.zip
+    )
+endif()
+
+# 7. Predict
+find_package(libpredict QUIET)
+if(NOT libpredict_FOUND)
+    FetchContent_Declare(
+        libpredict
+        GIT_REPOSITORY https://github.com/la1k/libpredict.git
+        GIT_TAG        v2.0.0
+    )
+endif()
+
+# 8. HTTP / Log
+find_package(httplib QUIET)
+if(NOT httplib_FOUND)
+    FetchContent_Declare(
+        httplib
+        GIT_REPOSITORY https://github.com/yhirose/cpp-httplib.git
+        GIT_TAG        v0.14.3
+    )
+endif()
+
+find_package(spdlog QUIET)
+if(NOT spdlog_FOUND)
+    FetchContent_Declare(
+        spdlog
+        GIT_REPOSITORY https://github.com/gabime/spdlog.git
+        GIT_TAG        v1.12.0
+    )
+endif()
 
 # Order matters: SDL must be available before extensions
+# Common dependencies
+if(NOT nlohmann_json_FOUND)
+    FetchContent_MakeAvailable(nlohmann_json)
+endif()
+
+if(NOT httplib_FOUND)
+    FetchContent_MakeAvailable(httplib)
+    if(NOT TARGET httplib)
+        add_library(httplib ALIAS cpp-httplib::cpp-httplib)
+    endif()
+else()
+    if(NOT TARGET httplib)
+        add_library(httplib ALIAS cpp-httplib::cpp-httplib)
+    endif()
+endif()
+
+if(NOT spdlog_FOUND)
+    FetchContent_MakeAvailable(spdlog)
+endif()
+
+if(NOT SDL2_FOUND)
+    FetchContent_MakeAvailable(SDL2)
+endif()
+
+FetchContent_MakeAvailable(sqlite3_amalgamation)
+
+# libpredict is special because it forces -Werror and adds tests unconditionally.
+# We use Populate + add_subdirectory with EXCLUDE_FROM_ALL to isolate it.
+if(NOT libpredict_FOUND)
+    FetchContent_GetProperties(libpredict)
+    if(NOT libpredict_POPULATED)
+        FetchContent_Populate(libpredict)
+        add_subdirectory(${libpredict_SOURCE_DIR} ${libpredict_BINARY_DIR} EXCLUDE_FROM_ALL)
+    endif()
+endif()
+
 if(USE_SYSTEM_CURL)
-    FetchContent_MakeAvailable(SDL2 sqlite3_amalgamation nlohmann_json httplib spdlog)
     add_library(libcurl ALIAS CURL::libcurl)
 else()
-    FetchContent_MakeAvailable(SDL2 CURL sqlite3_amalgamation nlohmann_json httplib spdlog)
+    FetchContent_MakeAvailable(CURL)
+endif()
+
+# Define SDL2 Aliases EARLY so extensions (image/ttf) can find them
+if(NOT TARGET SDL2::SDL2)
+    if(TARGET SDL2)
+        add_library(SDL2::SDL2 ALIAS SDL2)
+    elseif(TARGET SDL2-static)
+        add_library(SDL2::SDL2 ALIAS SDL2-static)
+    endif()
+endif()
+
+if(NOT TARGET SDL2::SDL2-static)
+    if(TARGET SDL2-static)
+        add_library(SDL2::SDL2-static ALIAS SDL2-static)
+    elseif(TARGET SDL2)
+        add_library(SDL2::SDL2-static ALIAS SDL2)
+    endif()
+endif()
+
+# Prevent SDL2 extensions from trying to find_package(SDL2) again if we just built it
+# AND explicitly set variables that older FindSDL2.cmake modules (used by extensions) might need.
+if(NOT SDL2_FOUND AND TARGET SDL2::SDL2)
+    set(SDL2_FOUND TRUE CACHE BOOL "SDL2 found" FORCE)
+    
+    # Get include dirs from the target we just aliased
+    get_target_property(_sdl2_include_dirs SDL2::SDL2 INTERFACE_INCLUDE_DIRECTORIES)
+    set(SDL2_INCLUDE_DIR ${_sdl2_include_dirs} CACHE PATH "SDL2 include dir" FORCE)
+    set(SDL2_INCLUDE_DIRS ${_sdl2_include_dirs} CACHE PATH "SDL2 include dirs" FORCE)
+    
+    # Set libraries to the alias target
+    set(SDL2_LIBRARIES SDL2::SDL2 CACHE STRING "SDL2 libraries" FORCE)
+    set(SDL2_LIBRARY SDL2::SDL2 CACHE STRING "SDL2 library" FORCE)
 endif()
 
 # Since the amalgamation ZIP doesn't have a CMakeLists.txt, we define the target here
@@ -171,12 +261,44 @@ if(NOT TARGET sqlite3)
     endif()
 endif()
 
-# SDL Extensions need SDL2 targets to be defined
-FetchContent_MakeAvailable(SDL2_ttf SDL2_image)
+# SDL Extensions (Now safe to load, as SDL2::SDL2 is defined)
+if(NOT SDL2_ttf_FOUND)
+    FetchContent_MakeAvailable(SDL2_ttf)
+endif()
+if(NOT SDL2_image_FOUND)
+    FetchContent_MakeAvailable(SDL2_image)
+endif()
+
+# Create ALIAS targets for Extensions (for consistency)
+if(NOT TARGET SDL2_ttf::SDL2_ttf)
+    if(TARGET SDL2_ttf)
+        add_library(SDL2_ttf::SDL2_ttf ALIAS SDL2_ttf)
+    endif()
+endif()
+if(NOT TARGET SDL2_ttf::SDL2_ttf-static)
+    if(TARGET SDL2_ttf)
+        add_library(SDL2_ttf::SDL2_ttf-static ALIAS SDL2_ttf)
+    endif()
+endif()
+
+if(NOT TARGET SDL2_image::SDL2_image)
+    if(TARGET SDL2_image)
+        add_library(SDL2_image::SDL2_image ALIAS SDL2_image)
+    endif()
+endif()
+if(NOT TARGET SDL2_image::SDL2_image-static)
+    if(TARGET SDL2_image)
+        add_library(SDL2_image::SDL2_image-static ALIAS SDL2_image)
+    endif()
+endif()
 
 # Special handling for libpredict (skipping tests)
 FetchContent_GetProperties(libpredict)
 if(NOT libpredict_POPULATED)
+    if(APPLE)
+        # macOS ld doesn't support --version-script used by libpredict shared build
+        set(PREDICT_SHARED OFF CACHE BOOL "Force static libpredict on macOS" FORCE)
+    endif()
     FetchContent_Populate(libpredict)
     include(GNUInstallDirs)
     set(LIBPREDICT_INCLUDE_DIR ${libpredict_BINARY_DIR}/include)
@@ -191,7 +313,7 @@ set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 
 # On some platforms (like RPi 32-bit), we need to explicitly link atomic for C++20
-if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm" OR CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND (CMAKE_SYSTEM_PROCESSOR MATCHES "arm" OR CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64"))
     link_libraries(atomic)
 endif()
 
@@ -272,6 +394,7 @@ add_executable(hamclock-next ${HC_WIN32_FLAG}
 
 target_include_directories(hamclock-next PRIVATE
     ${CMAKE_SOURCE_DIR}/include
+    ${libpredict_BINARY_DIR}/include
 )
 
 target_link_libraries(hamclock-next PRIVATE
@@ -289,9 +412,15 @@ target_link_libraries(hamclock-next PRIVATE
 
 if(WIN32)
     target_link_libraries(hamclock-next PRIVATE ws2_32)
-else()
-    # On Linux, link libstdc++ and libgcc statically for better portability
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    # On Linux with GCC, link libstdc++ and libgcc statically for better portability
     target_link_options(hamclock-next PRIVATE -static-libstdc++ -static-libgcc)
+endif()
+
+if(APPLE)
+    # Clean up any leaked flags from dependencies that might have touched global linker flags
+    string(REPLACE "-static-libgcc" "" CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS}")
+    string(REPLACE "-static-libstdc++" "" CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS}")
 endif()
 
 # --- Custom targets for data updates ---

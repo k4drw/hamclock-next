@@ -1,8 +1,6 @@
 #include "LiveSpotPanel.h"
 #include "../core/Theme.h"
-#include "FontCatalog.h"
 
-#include <algorithm>
 #include <cstring>
 
 LiveSpotPanel::LiveSpotPanel(int x, int y, int w, int h, FontManager &fontMgr,
@@ -10,7 +8,10 @@ LiveSpotPanel::LiveSpotPanel(int x, int y, int w, int h, FontManager &fontMgr,
                              std::shared_ptr<LiveSpotDataStore> store,
                              AppConfig &config, ConfigManager &cfgMgr)
     : Widget(x, y, w, h), fontMgr_(fontMgr), provider_(provider),
-      store_(std::move(store)), config_(config), cfgMgr_(cfgMgr) {}
+      store_(std::move(store)), config_(config), cfgMgr_(cfgMgr) {
+  // Initialize store with saved selection
+  store_->setSelectedBandsMask(config_.pskBands);
+}
 
 void LiveSpotPanel::update() {
   uint32_t now = SDL_GetTicks();
@@ -156,17 +157,16 @@ void LiveSpotPanel::render(SDL_Renderer *renderer) {
     int cx = x_ + pad + col * colW;
     int cy = curY + row * cellH;
 
-    // Colored background
+    // Background: colored only if selected for display (map plotting)
     const auto &bd = kBands[i];
-    SDL_SetRenderDrawColor(renderer, bd.color.r, bd.color.g, bd.color.b, 255);
+    if (lastSelected_[i]) {
+      SDL_SetRenderDrawColor(renderer, bd.color.r, bd.color.g, bd.color.b, 255);
+    } else {
+      // Dark background for unselected bands
+      SDL_SetRenderDrawColor(renderer, 25, 25, 30, 255);
+    }
     SDL_Rect cellRect = {cx + gap, cy + gap, colW - 2 * gap, cellH - 2 * gap};
     SDL_RenderFillRect(renderer, &cellRect);
-
-    // White border on selected bands (toggled for map plotting)
-    if (lastSelected_[i]) {
-      SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
-      SDL_RenderDrawRect(renderer, &cellRect);
-    }
 
     // Band label (left-aligned, cached)
     if (!bandCache_[i].labelTex) {
@@ -369,6 +369,9 @@ bool LiveSpotPanel::onMouseUp(int mx, int my, Uint16 /*mod*/) {
     return false;
 
   store_->toggleBand(bandIdx);
+  // Persist the change
+  config_.pskBands = store_->getSelectedBandsMask();
+  cfgMgr_.save(config_);
   return true;
 }
 

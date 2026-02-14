@@ -172,12 +172,13 @@ void LocalPanel::render(SDL_Renderer *renderer) {
           }
           SDL_Color secColor = colors[1];
           secTex_ = fontMgr_.renderText(renderer, currentSec_, secColor,
-                                        secFontSize_, &secW_, &secH_);
+                                        secFontSize_, &secW_, &secH_, true);
           lastSec_ = currentSec_;
           lastSecFontSize_ = secFontSize_;
         }
         if (secTex_) {
-          SDL_Rect secDst = {x_ + pad + lineW_[i] + 2, curY, secW_, secH_};
+          int secY = curY + (lineH_[i] * 0.12f);
+          SDL_Rect secDst = {x_ + pad + lineW_[i] + 2, secY, secW_, secH_};
           SDL_RenderCopy(renderer, secTex_, nullptr, &secDst);
         }
       }

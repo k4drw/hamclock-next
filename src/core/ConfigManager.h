@@ -49,6 +49,10 @@ struct AppConfig {
   bool pskOfDe = true;    // true if spots OF de (de is sender), false if BY de
   bool pskUseCall = true; // true if filter by callsign, false if by grid
   int pskMaxAge = 30;     // minutes
+  uint32_t pskBands = 0xFFF; // Bitmask of selected bands (lower 12 bits)
+
+  // Power / Screen
+  bool preventSleep = true; // true to call SDL_DisableScreenSaver()
 };
 
 class ConfigManager {

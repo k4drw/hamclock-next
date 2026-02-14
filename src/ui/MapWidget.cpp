@@ -709,15 +709,34 @@ void MapWidget::renderSpotOverlay(SDL_Renderer *renderer) {
   LatLon de = state_->deLocation;
   SDL_Texture *lineTex = texMgr_.get(LINE_AA_KEY);
 
+  int renderedCount = 0;
+  const int MAX_MAP_SPOTS = 500;
+
   for (const auto &spot : data.spots) {
+    if (renderedCount >= MAX_MAP_SPOTS) {
+      static uint32_t lastWarn = 0;
+      if (SDL_GetTicks() - lastWarn > 60000) {
+        LOG_W(
+            "MapWidget",
+            "Too many spots ({}). Truncating map display to {} for stability.",
+            data.spots.size(), MAX_MAP_SPOTS);
+        lastWarn = SDL_GetTicks();
+      }
+      break;
+    }
+
     int bandIdx = freqToBandIndex(spot.freqKhz);
     if (bandIdx < 0 || !data.selectedBands[bandIdx])
       continue;
     double lat, lon;
     if (!Astronomy::gridToLatLon(spot.receiverGrid, lat, lon))
       continue;
+
+    renderedCount++;
     const auto &bc = kBands[bandIdx].color;
-    auto path = Astronomy::calculateGreatCirclePath(de, {lat, lon}, 100);
+    // Reduce segments to 30 for performance; 100 is overkill for small map
+    // lines.
+    auto path = Astronomy::calculateGreatCirclePath(de, {lat, lon}, 30);
     SDL_Color color = {bc.r, bc.g, bc.b, 180};
     std::vector<SDL_FPoint> segment;
     for (size_t i = 0; i < path.size(); ++i) {

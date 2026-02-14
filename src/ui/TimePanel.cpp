@@ -276,9 +276,9 @@ void TimePanel::render(SDL_Renderer *renderer) {
       SDL_DestroyTexture(secTex_);
       secTex_ = nullptr;
     }
-    SDL_Color gray = themes.textDim;
-    secTex_ = fontMgr_.renderText(renderer, currentSec_, gray, secFontSize_,
-                                  &secW_, &secH_);
+    SDL_Color white = {255, 255, 255, 255};
+    secTex_ = fontMgr_.renderText(renderer, currentSec_, white, secFontSize_,
+                                  &secW_, &secH_, true);
     lastSec_ = currentSec_;
     lastSecFontSize_ = secFontSize_;
   }
@@ -287,9 +287,12 @@ void TimePanel::render(SDL_Renderer *renderer) {
     SDL_Rect dst = {x_ + pad, dy, hmW_, hmH_};
     SDL_RenderCopy(renderer, hmTex_, nullptr, &dst);
 
-    // SS superscript (top-aligned with HH:MM)
+    // SS superscript (aligned with top of HH:MM characters)
     if (secTex_) {
-      SDL_Rect secDst = {x_ + pad + hmW_ + 2, dy, secW_, secH_};
+      // Large fonts have significant internal leading (top padding).
+      // Nudge seconds down so their top is visually even with the big digits.
+      int secY = dy + (hmH_ * 0.12f);
+      SDL_Rect secDst = {x_ + pad + hmW_ + 2, secY, secW_, secH_};
       SDL_RenderCopy(renderer, secTex_, nullptr, &secDst);
     }
   }
