@@ -1,0 +1,27 @@
+# Build artifacts
+build*/
+*.db
+*.log
+.cache/
+
+# Editor/IDE files
+.vscode/
+.idea/
+*.swp
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Dependencies
+lib/
+include/spdlog/
+include/nlohmann/
+
+# Working Documentation
+working_docs/
+hamclock-original
+
+# Docker
+docker-build/

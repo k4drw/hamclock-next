@@ -1,0 +1,14 @@
+{
+    "name": "hamclock-next",
+    "version-string": "0.5B",
+    "dependencies": [
+        "sdl2",
+        "sdl2-ttf",
+        "sdl2-image",
+        "curl",
+        "sqlite3",
+        "nlohmann-json",
+        "cpp-httplib",
+        "spdlog"
+    ]
+}

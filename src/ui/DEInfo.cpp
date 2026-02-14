@@ -22,7 +22,7 @@ void DEInfo::update() {
   auto now = std::chrono::system_clock::now();
   std::time_t t = std::chrono::system_clock::to_time_t(now);
   std::tm utc{};
-  gmtime_r(&t, &utc);
+  Astronomy::portable_gmtime(&t, &utc);
   int utcOffset = static_cast<int>(lon_ / 15.0);
   int localHour = (utc.tm_hour + utcOffset + 24) % 24;
 

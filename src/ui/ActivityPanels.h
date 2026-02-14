@@ -2,7 +2,7 @@
 
 #include "../services/ActivityProvider.h"
 #include "ListPanel.h"
-#include <SDL2/SDL.h>
+#include <SDL.h>
 #include <chrono>
 #include <memory>
 

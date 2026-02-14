@@ -1,28 +1,32 @@
-# HamClock-Next
+# HamClock-Next (v0.5B)
 
 HamClock-Next is a modern, SDL2-based reconstruction of the classic HamClock. It focuses on visual fidelity, high-DPI support, and a smooth user experience while maintaining the essential functionality loved by amateur radio operators.
 
-## 🚀 Key Accomplishments
+## Key Accomplishments
 
 ### Visuals & Rendering
-- **High-Fidelity Rendering**: Implemented text super-sampling and logical scaling for crisp 4K/Retina display.
-- **Dynamic Seasonal Maps**: Automatically downloads high-resolution NASA Blue Marble backgrounds based on the current month, with a vector grid fallback for offline use.
+- **High-Fidelity Rendering**: Implemented text super-sampling and logical scaling for crisp 4K/Retina display. Includes specialized compatibility paths for artifact-free rendering on Raspberry Pi (KMSDRM).
+- **Dynamic Seasonal Maps**: Automatically downloads high-resolution NASA Blue Marble backgrounds based on the current month.
+- **Night Lights & Shadows**: Integrated NASA Black Marble city lights with additive blending and persistent vertex-shaded terminator overlays.
+- **NASA Dial-a-Moon**: Real-time lunar phase imagery directly from NASA SVS, corrected for North-Up orientation.
 - **Zero-Asset Binary**: Essential assets (fonts, icons) are embedded directly into the executable, creating a self-contained single-file deployment.
 - **Graphics Smoothing**: Hardware-accelerated anti-aliasing (4x MSAA) and ribbon-path primitives for smooth great circles and satellite tracks.
-- **Advanced Caching**: Implemented a "lean" caching system using HTTP HEAD validation (`Last-Modified`/`ETag`) to save bandwidth by avoiding redundant downloads.
+- **Advanced Caching**: Implemented a "lean" caching system using HTTP HEAD validation (`Last-Modified`/`ETag`) to save bandwidth.
 
 ### Features
 - **Global Map**: Interactive map with day/night terminator, great circle paths, and real-time overlays.
 - **Live Spots**: Real-time band activity visualization using PSK Reporter data, with map plotting for selected bands.
+- **DX Cluster**: Integrated Telnet-based DX Cluster management with interactive spot lists, age tracking, and prefix-resolved map plotting.
+- **On-The-Air Widget**: Real-time monitoring of POTA, SOTA, and DXPedition activity with seamless JSON/HTML aggregation.
 - **Satellite Tracking**: Comprehensive satellite tracking with a high-fidelity polar plot, rise/set predictions, and map footprints.
 - **Space Weather**: Integrated Space Weather data visualization including:
-  - **Aurora Graph**: 24-hour history graph showing Aurora percentage trends
-  - **DRAP Panel**: D-Region Absorption Prediction with color-coded severity indicators
-  - Solar flux, sunspot numbers, K-index, and more
+  - **Aurora Graph & Map**: 24-hour history graph and real-time forecast overlays.
+  - **DRAP Panel**: D-Region Absorption Prediction with color-coded severity indicators.
+  - **Propagation Model**: Solar flux, sunspot numbers, and band-specific condition estimates.
 - **Smart Setup**: Easy configuration of callsign and location via Maidenhead grid squares or direct map interaction (Shift-Click to set DE).
 - **RSS News Banner**: Smoothly scrolling news ticker aggregating multiple amateur radio news feeds.
 
-## 🛠️ Requirements & Dependencies
+## Requirements & Dependencies
 
 To compile HamClock-Next, you will need the following libraries and tools installed on your system:
 
@@ -42,7 +46,7 @@ To compile HamClock-Next, you will need the following libraries and tools instal
 
 *Note: `nlohmann_json`, `libpredict`, `cpp-httplib`, and `spdlog` are automatically fetched and built via CMake during the first compilation.*
 
-## 🏗️ Build Instructions
+## Build Instructions
 
 1. **Install dependencies** (Example for Ubuntu/Debian):
    ```bash
@@ -64,7 +68,7 @@ To compile HamClock-Next, you will need the following libraries and tools instal
    ```
    *Optional: Use `-f` or `--fullscreen` to force start in fullscreen mode.*
 
-### 🔧 Building on Raspberry Pi
+### Building on Raspberry Pi
 
 HamClock-Next builds natively on all Raspberry Pi models. For best results on memory-constrained devices:
 
@@ -110,7 +114,7 @@ For detailed optimization strategies and troubleshooting, see:
 **Note**: The web server live view is optimized for headless operation (1 FPS refresh) to reduce CPU usage (~50-60% vs ~100%). See DEBUG_API.md for customization options.
 
 
-## 🛠️ Raspberry Pi & Console Mode (No X11)
+## Raspberry Pi & Console Mode (No X11)
 
 If you are running on a headless or console-only system (like Pi-Star or Raspbian Lite) without X11/Wayland, you may need to use the software renderer.
 
@@ -132,15 +136,23 @@ sudo SDL_VIDEODRIVER=kmsdrm ./hamclock-next --fullscreen --software
 - `-s, --software`: Force software rendering (disables OpenGL/MSAA). Essential for environments without a functioning 3D setup or DRI access.
 - `-h, --help`: Show help message.
 
-## 🗺️ Roadmap & Next Steps
+## Data & Configuration Locations
+
+HamClock-Next stores configuration (`config.json`), database (`hamclock.db`), and cached assets (maps, satellite data) in standard platform-specific locations:
+
+- **Linux / Raspberry Pi**: `~/.local/share/HamClock/HamClock-Next/`
+- **Windows**: `%APPDATA%\HamClock\HamClock-Next\`
+- **macOS**: `~/Library/Application Support/HamClock/HamClock-Next/`
+
+*Note: If you are upgrading from an older version, your previous configuration files at `~/.config/hamclock/` may need to be moved manually.*
+
+## Roadmap & Next Steps
 
 Based on the [PROJECT_STATUS.md](PROJECT_STATUS.md), the following features are planned:
 
-- [ ] **Phase 13.3: DX Cluster Integration** — Real-time Telnet/UDP DX Cluster spot management and display.
-- [ ] **Propogation Panel** — Band conditions and signal modeling.
-- [ ] **Contest Widget** — Upcoming ham radio contest tracking.
-- [ ] **On-The-Air Widget** — Monitoring POTA/SOTA/IOTA activity.
-- [ ] **Enhanced Map Layers** — Weather, gray line optimizations, and more interactive spot filtering.
+- [ ] **Phase 6: Hardware Control** — Rotator control (Hamlib/Rigctl) and BME280 environment sensor integration.
+- [ ] **World Map Overlays** — Gray line optimizations, CQ/ITU Zones, and Prefix overlays.
+- [ ] **Multi-Instance Sync** — Sharing state between multiple clocks on the same network.
 
 ---
-*Created with ❤️ by the HamClock-Next team.*
+*Created by the HamClock-Next team.*

@@ -1,4 +1,5 @@
 #include "MoonProvider.h"
+#include "../core/Astronomy.h"
 #include "../core/Logger.h"
 #include <ctime>
 #include <iomanip>
@@ -22,7 +23,7 @@ void MoonProvider::update(double lat, double lon) {
   auto now = std::chrono::system_clock::now();
   std::time_t now_c = std::chrono::system_clock::to_time_t(now);
   std::tm utc{};
-  gmtime_r(&now_c, &utc);
+  Astronomy::portable_gmtime(&now_c, &utc);
 
   // NASA Dial-a-Moon API prefers YYYY-MM-DDTHH:00
   std::stringstream ss;

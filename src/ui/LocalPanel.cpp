@@ -31,7 +31,7 @@ void LocalPanel::update() {
   auto now = std::chrono::system_clock::now();
   std::time_t t = std::chrono::system_clock::to_time_t(now);
   std::tm utc{};
-  gmtime_r(&t, &utc);
+  Astronomy::portable_gmtime(&t, &utc);
 
   // Crude local time offset from longitude (truncate toward zero)
   double lon = state_->deLocation.lon;

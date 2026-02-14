@@ -385,9 +385,8 @@ void WebServer::run() {
   svr.Get("/get_time.txt",
           [](const httplib::Request &, httplib::Response &res) {
             auto now = std::chrono::system_clock::now();
-            std::time_t t = std::chrono::system_clock::to_time_t(now);
             std::tm utc{};
-            gmtime_r(&t, &utc);
+            Astronomy::portable_gmtime(&t, &utc);
             char buf[64];
             std::strftime(buf, sizeof(buf),
                           "Clock_UTC %Y-%02d-%02dT%02d:%02d:%02d Z\n", &utc);
@@ -613,8 +612,10 @@ void WebServer::run() {
       s["lastError"] = status.lastError;
       if (status.lastSuccess.time_since_epoch().count() > 0) {
         auto t = std::chrono::system_clock::to_time_t(status.lastSuccess);
+        std::tm tm_utc{};
+        Astronomy::portable_gmtime(&t, &tm_utc);
         std::stringstream ss;
-        ss << std::put_time(std::gmtime(&t), "%Y-%m-%d %H:%M:%S");
+        ss << std::put_time(&tm_utc, "%Y-%m-%d %H:%M:%S");
         s["lastSuccess"] = ss.str();
       }
       j[name] = s;

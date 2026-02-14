@@ -157,3 +157,14 @@ void DXClusterDataStore::pruneOldSpots() {
       "DELETE FROM dx_spots WHERE spotted_at <= " + std::to_string(cutoffTs);
   DatabaseManager::instance().exec(sql);
 }
+
+void DXClusterDataStore::selectSpot(const DXClusterSpot &spot) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  data_.hasSelection = true;
+  data_.selectedSpot = spot;
+}
+
+void DXClusterDataStore::clearSelection() {
+  std::lock_guard<std::mutex> lock(mutex_);
+  data_.hasSelection = false;
+}

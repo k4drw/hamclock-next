@@ -9,6 +9,10 @@
 struct HistoryPoint {
   std::chrono::system_clock::time_point time;
   float value;
+
+  HistoryPoint() : value(0) {}
+  HistoryPoint(std::chrono::system_clock::time_point t, float v)
+      : time(t), value(v) {}
 };
 
 struct HistorySeries {

@@ -1,0 +1,179 @@
+name: Release Builds
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build-win64:
+    name: Windows x64 (Static)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Build Windows Executable
+        run: |
+          chmod +x scripts/build-win64.sh
+          ./scripts/build-win64.sh
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hamclock-win64
+          path: |
+            build-win64/hamclock-next.exe
+            build-win64/HamClock-Next-Setup.exe
+
+  build-rpi:
+    name: Raspberry Pi 3B+ (Bullseye/FB0)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Build RPi Binary
+        run: |
+          chmod +x scripts/build-rpi-bullseye-fb0.sh
+          ./scripts/build-rpi-bullseye-fb0.sh
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hamclock-rpi-bullseye-fb0
+          path: |
+            build-rpi-bullseye-fb0/hamclock-next
+            build-rpi-bullseye-fb0/*.deb
+
+  build-opi:
+    name: Orange Pi Zero 2W (Trixie/FB0)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Build OPi Binary
+        run: |
+          chmod +x scripts/build-opi-trixie-fb0.sh
+          ./scripts/build-opi-trixie-fb0.sh
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hamclock-opi-trixie-fb0
+          path: |
+            build-opi-trixie-fb0/hamclock-next
+            build-opi-trixie-fb0/*.deb
+
+  build-opi-bookworm:
+    name: Orange Pi Zero 2W (Bookworm/FB0)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Build OPi Binary
+        run: |
+          chmod +x scripts/build-opi-bookworm-fb0.sh
+          ./scripts/build-opi-bookworm-fb0.sh
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hamclock-opi-bookworm-fb0
+          path: |
+            build-opi-bookworm-fb0/hamclock-next
+            build-opi-bookworm-fb0/*.deb
+
+  build-rpi-bullseye-x11:
+    name: Raspberry Pi X11 (Bullseye)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Build RPi X11 Binary
+        run: |
+          chmod +x scripts/build-rpi-bullseye-x11.sh
+          ./scripts/build-rpi-bullseye-x11.sh
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hamclock-rpi-bullseye-x11
+          path: |
+            build-rpi-bullseye-x11/hamclock-next
+            build-rpi-bullseye-x11/*.deb
+
+  build-rpi-bookworm-x11:
+    name: Raspberry Pi X11 (Bookworm)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Build RPi X11 Binary
+        run: |
+          chmod +x scripts/build-rpi-bookworm-x11.sh
+          ./scripts/build-rpi-bookworm-x11.sh
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hamclock-rpi-bookworm-x11
+          path: |
+            build-rpi-bookworm-x11/hamclock-next
+            build-rpi-bookworm-x11/*.deb
+
+  build-rpi-trixie-x11:
+    name: Raspberry Pi X11 (Trixie)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Build RPi X11 Binary
+        run: |
+          chmod +x scripts/build-rpi-trixie-x11.sh
+          ./scripts/build-rpi-trixie-x11.sh
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hamclock-rpi-trixie-x11
+          path: |
+            build-rpi-trixie-x11/hamclock-next
+            build-rpi-trixie-x11/*.deb
+
+  build-macos:
+    name: MacOS (Universal)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Dependencies
+        run: |
+          brew install sdl2 sdl2_image sdl2_ttf curl
+
+      - name: Build MacOS Binary
+        run: |
+          chmod +x scripts/build-macos.sh
+          ./scripts/build-macos.sh
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hamclock-macos
+          path: |
+            build-macos/hamclock-next

@@ -164,11 +164,29 @@ void SetupScreen::render(SDL_Renderer *renderer) {
     break;
   }
 
-  y = y_ + height_ - pad - hintSize_ * 2;
-  fontMgr_.drawText(
-      renderer,
-      "Click tabs to switch    Tab = next field    Enter = save & start", cx, y,
-      gray, hintSize_, false, true);
+  y = y_ + height_ - pad - 40;
+  int btnW = 100;
+  int btnH = 34;
+
+  // Cancel Button
+  SDL_Rect cancelBtn = {cx - btnW - 20, y, btnW, btnH};
+  SDL_SetRenderDrawColor(renderer, 60, 20, 20, 255);
+  SDL_RenderFillRect(renderer, &cancelBtn);
+  SDL_SetRenderDrawColor(renderer, 150, 50, 50, 255);
+  SDL_RenderDrawRect(renderer, &cancelBtn);
+  fontMgr_.drawText(renderer, "Cancel", cancelBtn.x + btnW / 2,
+                    cancelBtn.y + btnH / 2, white, labelSize_, false, true);
+  cancelBtnRect_ = cancelBtn;
+
+  // Done Button
+  SDL_Rect okBtn = {cx + 20, y, btnW, btnH};
+  SDL_SetRenderDrawColor(renderer, 20, 60, 20, 255);
+  SDL_RenderFillRect(renderer, &okBtn);
+  SDL_SetRenderDrawColor(renderer, 50, 150, 50, 255);
+  SDL_RenderDrawRect(renderer, &okBtn);
+  fontMgr_.drawText(renderer, "Done", okBtn.x + btnW / 2, okBtn.y + btnH / 2,
+                    white, labelSize_, false, true);
+  okBtnRect_ = okBtn;
 }
 
 void SetupScreen::renderTabIdentity(SDL_Renderer *renderer, int, int pad,
@@ -297,44 +315,6 @@ void SetupScreen::renderTabDXCluster(SDL_Renderer *renderer, int cx, int pad,
                     white, labelSize_);
   toggleRect_ = toggle;
   y += 30;
-
-  // --- PSK REPORTER SECTION ---
-  fontMgr_.drawText(renderer, "--- PSK Reporter ---", cx, y, cyan, labelSize_,
-                    true, true);
-  y += labelSize_ + vSpace;
-
-  // PSK Mode Toggle (DE/DX)
-  SDL_Rect pskDeToggle = {fieldX, y, 20, 20};
-  SDL_SetRenderDrawColor(renderer, 50, 50, 60, 255);
-  SDL_RenderFillRect(renderer, &pskDeToggle);
-  SDL_SetRenderDrawColor(renderer, 100, 100, 120, 255);
-  SDL_RenderDrawRect(renderer, &pskDeToggle);
-  if (pskOfDe_) { // OF DE = Mapping Receivers hearing US
-    SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
-    SDL_Rect check = {fieldX + 4, y + 4, 12, 12};
-    SDL_RenderFillRect(renderer, &check);
-  }
-  fontMgr_.drawText(renderer,
-                    pskOfDe_ ? "Mode: DE (Map receivers hearing Me)"
-                             : "Mode: DX (Map senders I hear)",
-                    fieldX + 30, y + 2, white, labelSize_);
-  pskOfDeRect_ = pskDeToggle;
-  y += 24;
-
-  // PSK Filter Toggle (Call/Grid)
-  SDL_Rect pskCallToggle = {fieldX, y, 20, 20};
-  SDL_SetRenderDrawColor(renderer, 50, 50, 60, 255);
-  SDL_RenderFillRect(renderer, &pskCallToggle);
-  SDL_SetRenderDrawColor(renderer, 100, 100, 120, 255);
-  SDL_RenderDrawRect(renderer, &pskCallToggle);
-  if (pskUseCall_) {
-    SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
-    SDL_Rect check = {fieldX + 4, y + 4, 12, 12};
-    SDL_RenderFillRect(renderer, &check);
-  }
-  fontMgr_.drawText(renderer, pskUseCall_ ? "Filter: Callsign" : "Filter: Grid",
-                    fieldX + 30, y + 2, white, labelSize_);
-  pskUseCallRect_ = pskCallToggle;
 }
 
 void SetupScreen::renderTabAppearance(SDL_Renderer *renderer, int, int pad,
@@ -498,6 +478,22 @@ bool SetupScreen::onMouseUp(int mx, int my, Uint16) {
   int fieldH = fieldSize_ + 14;
   int y = y_ + titleSize_ + 2 * pad;
 
+  // Check Footer Buttons
+  if (mx >= cancelBtnRect_.x && mx <= cancelBtnRect_.x + cancelBtnRect_.w &&
+      my >= cancelBtnRect_.y && my <= cancelBtnRect_.y + cancelBtnRect_.h) {
+    complete_ = true;
+    cancelled_ = true;
+    return true;
+  }
+
+  if (mx >= okBtnRect_.x && mx <= okBtnRect_.x + okBtnRect_.w &&
+      my >= okBtnRect_.y && my <= okBtnRect_.y + okBtnRect_.h) {
+    if (!callsignText_.empty() && gridValid_) {
+      complete_ = true;
+    }
+    return true;
+  }
+
   int numTabs = 4;
   int tabW = fieldW / numTabs;
   if (my >= y && my <= y + fieldH) {
@@ -522,18 +518,6 @@ bool SetupScreen::onMouseUp(int mx, int my, Uint16) {
     if (mx >= toggleRect_.x && mx <= toggleRect_.x + toggleRect_.w &&
         my >= toggleRect_.y && my <= toggleRect_.y + toggleRect_.h) {
       clusterWSJTX_ = !clusterWSJTX_;
-      return true;
-    }
-    if (mx >= pskOfDeRect_.x && mx <= pskOfDeRect_.x + pskOfDeRect_.w &&
-        my >= pskOfDeRect_.y && my <= pskOfDeRect_.y + pskOfDeRect_.h) {
-      pskOfDe_ = !pskOfDe_;
-      return true;
-    }
-    if (mx >= pskUseCallRect_.x &&
-        mx <= pskUseCallRect_.x + pskUseCallRect_.w &&
-        my >= pskUseCallRect_.y &&
-        my <= pskUseCallRect_.y + pskUseCallRect_.h) {
-      pskUseCall_ = !pskUseCall_;
       return true;
     }
   }
@@ -871,7 +855,7 @@ std::vector<std::string> SetupScreen::getActions() const {
   return {"tab_identity", "tab_dxcluster", "tab_appearance",
           "tab_widgets",  "field_0",       "field_1",
           "field_2",      "field_3",       "toggle_night_lights",
-          "done"};
+          "done",         "cancel"};
 }
 
 SDL_Rect SetupScreen::getActionRect(const std::string &action) const {
@@ -905,8 +889,10 @@ SDL_Rect SetupScreen::getActionRect(const std::string &action) const {
   }
 
   if (action == "done") {
-    // Hint text area at bottom
-    return {x_, y_ + height_ - 2 * pad, width_, 2 * pad};
+    return okBtnRect_;
+  }
+  if (action == "cancel") {
+    return cancelBtnRect_;
   }
 
   return {0, 0, 0, 0};

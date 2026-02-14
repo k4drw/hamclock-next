@@ -12,7 +12,8 @@ class LiveSpotPanel : public Widget {
 public:
   LiveSpotPanel(int x, int y, int w, int h, FontManager &fontMgr,
                 LiveSpotProvider &provider,
-                std::shared_ptr<LiveSpotDataStore> store);
+                std::shared_ptr<LiveSpotDataStore> store, AppConfig &config,
+                ConfigManager &cfgMgr);
   ~LiveSpotPanel() override { destroyCache(); }
 
   void update() override;
@@ -21,17 +22,30 @@ public:
   bool onMouseUp(int mx, int my, Uint16 mod) override;
 
 private:
+  void renderSetup(SDL_Renderer *renderer);
+  bool handleSetupClick(int mx, int my);
   void destroyCache();
 
   FontManager &fontMgr_;
   LiveSpotProvider &provider_;
   std::shared_ptr<LiveSpotDataStore> store_;
+  AppConfig &config_;
+  ConfigManager &cfgMgr_;
 
   // Snapshot of last-rendered data (to detect changes)
   int lastCounts_[kNumBands] = {};
   bool lastSelected_[kNumBands] = {};
   bool dataValid_ = false;
   uint32_t lastFetch_ = 0;
+
+  // Setup Overlay State
+  bool showSetup_ = false;
+  bool pendingOfDe_ = false;
+  bool pendingUseCall_ = false;
+  SDL_Rect modeCheckRect_ = {};
+  SDL_Rect filterCheckRect_ = {};
+  SDL_Rect cancelBtnRect_ = {};
+  SDL_Rect doneBtnRect_ = {};
 
   // Cached textures
   SDL_Texture *titleTex_ = nullptr;
@@ -64,4 +78,5 @@ private:
   int gridCellH_ = 0;
   int gridColW_ = 0;
   int gridPad_ = 2;
+  SDL_Rect footerRect_ = {};
 };

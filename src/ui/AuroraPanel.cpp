@@ -1,6 +1,6 @@
 #include "AuroraPanel.h"
 #include "../core/Theme.h"
-#include <SDL2/SDL.h>
+#include <SDL.h>
 #include <mutex>
 
 static std::mutex auroraMutex;

@@ -1,4 +1,5 @@
 #include "CallsignClock.h"
+#include "../core/Astronomy.h"
 
 #include <algorithm>
 #include <chrono>
@@ -24,7 +25,7 @@ void CallsignClock::update() {
   auto now = std::chrono::system_clock::now();
   std::time_t t = std::chrono::system_clock::to_time_t(now);
   std::tm utc{};
-  gmtime_r(&t, &utc);
+  Astronomy::portable_gmtime(&t, &utc);
 
   char buf[32];
   std::snprintf(buf, sizeof(buf), "%02d:%02d:%02d UTC", utc.tm_hour, utc.tm_min,

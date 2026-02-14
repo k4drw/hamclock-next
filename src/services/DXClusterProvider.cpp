@@ -1,14 +1,21 @@
 #include "DXClusterProvider.h"
+#include "../core/Astronomy.h"
 #include "../core/HamClockState.h"
 #include "../core/Logger.h"
 #include "../core/PrefixManager.h"
+#ifdef _WIN32
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#define close closesocket
+#else
 #include <arpa/inet.h>
-#include <cstring>
 #include <fcntl.h>
 #include <netdb.h>
 #include <poll.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#endif
+#include <cstring>
 
 DXClusterProvider::DXClusterProvider(std::shared_ptr<DXClusterDataStore> store,
                                      PrefixManager &pm,
@@ -99,8 +106,12 @@ void DXClusterProvider::runTelnet(const std::string &host, int port,
     return;
   }
 
-  // Set non-blocking for read
+#ifdef _WIN32
+  unsigned long mode = 1;
+  ioctlsocket(sock, FIONBIO, &mode);
+#else
   fcntl(sock, F_SETFL, O_NONBLOCK);
+#endif
 
   LOG_I("DXCluster", "Connected to {}", host);
   if (state_)
@@ -122,11 +133,17 @@ void DXClusterProvider::runTelnet(const std::string &host, int port,
   }
 
   while (!stopClicked_) {
+#ifdef _WIN32
+    WSAPOLLFD pfd{};
+    pfd.fd = sock;
+    pfd.events = POLLIN;
+    int ret = WSAPoll(&pfd, 1, 500);
+#else
     struct pollfd pfd{};
     pfd.fd = sock;
     pfd.events = POLLIN;
-
     int ret = poll(&pfd, 1, 500); // 500ms timeout
+#endif
     if (ret < 0)
       break;
 
@@ -234,15 +251,26 @@ void DXClusterProvider::runUDP(int port) {
     return;
   }
 
+#ifdef _WIN32
+  unsigned long mode = 1;
+  ioctlsocket(sock, FIONBIO, &mode);
+#else
   fcntl(sock, F_SETFL, O_NONBLOCK);
+#endif
   store_->setConnected(true, "Listening UDP on port " + std::to_string(port));
 
   while (!stopClicked_) {
+#ifdef _WIN32
+    WSAPOLLFD pfd{};
+    pfd.fd = sock;
+    pfd.events = POLLIN;
+    int ret = WSAPoll(&pfd, 1, 500);
+#else
     struct pollfd pfd{};
     pfd.fd = sock;
     pfd.events = POLLIN;
-
     int ret = poll(&pfd, 1, 500);
+#endif
     if (ret < 0)
       break;
 
@@ -294,13 +322,14 @@ void DXClusterProvider::processLine(const std::string &line) {
           if (sscanf(line.c_str() + 70, "%2d%2d", &hr, &mn) == 2) {
             auto now = std::chrono::system_clock::now();
             std::time_t now_c = std::chrono::system_clock::to_time_t(now);
-            std::tm *tm = std::gmtime(&now_c);
+            struct tm tm_buf{};
+            struct tm *tm = Astronomy::portable_gmtime(&now_c, &tm_buf);
             tm->tm_hour = hr;
             tm->tm_min = mn;
             tm->tm_sec = 0;
             // Handle day wrap if needed (if hr:mn is in the future compared to
             // now, it's likely yesterday)
-            std::time_t spot_c = timegm(tm);
+            std::time_t spot_c = Astronomy::portable_timegm(tm);
             if (spot_c > now_c)
               spot_c -= 86400;
             spot.spottedAt = std::chrono::system_clock::from_time_t(spot_c);

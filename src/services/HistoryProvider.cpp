@@ -1,4 +1,5 @@
 #include "HistoryProvider.h"
+#include "../core/Astronomy.h"
 #include <algorithm>
 #include <sstream>
 
@@ -46,8 +47,9 @@ void HistoryProvider::processFlux(const std::string &body) {
       t.tm_year = y - 1900;
       t.tm_mon = m - 1;
       t.tm_mday = d;
-      points.push_back(
-          {std::chrono::system_clock::from_time_t(timegm(&t)), (float)flux});
+      points.push_back(HistoryPoint(std::chrono::system_clock::from_time_t(
+                                        Astronomy::portable_timegm(&t)),
+                                    (float)flux));
     }
   }
 
@@ -87,8 +89,9 @@ void HistoryProvider::processSSN(const std::string &body) {
       t.tm_year = y - 1900;
       t.tm_mon = m - 1;
       t.tm_mday = d;
-      points.push_back(
-          {std::chrono::system_clock::from_time_t(timegm(&t)), (float)ssn});
+      points.push_back(HistoryPoint(std::chrono::system_clock::from_time_t(
+                                        Astronomy::portable_timegm(&t)),
+                                    (float)ssn));
     }
   }
 
@@ -127,8 +130,9 @@ void HistoryProvider::processKp(const std::string &body) {
       t.tm_year = y - 1900;
       t.tm_mon = m - 1;
       t.tm_mday = d;
-      points.push_back(
-          {std::chrono::system_clock::from_time_t(timegm(&t)), (float)kIndex});
+      points.push_back(HistoryPoint(std::chrono::system_clock::from_time_t(
+                                        Astronomy::portable_timegm(&t)),
+                                    (float)kIndex));
     }
   }
 

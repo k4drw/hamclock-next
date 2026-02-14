@@ -1,4 +1,5 @@
 #include "DstProvider.h"
+#include "../core/Astronomy.h"
 #include <algorithm>
 #include <chrono>
 #include <ctime>
@@ -40,9 +41,17 @@ void DstProvider::fetch() {
           val = row[1].get<float>();
 
         // Parse YYYY-MM-DD HH:MM:SS
-        struct tm t;
-        if (strptime(time_str.c_str(), "%Y-%m-%d %H:%M:%S", &t)) {
-          time_t ts = timegm(&t);
+        struct tm t = {0};
+        int y, mon, day, hr, min, sec;
+        if (std::sscanf(time_str.c_str(), "%d-%d-%d %d:%d:%d", &y, &mon, &day,
+                        &hr, &min, &sec) == 6) {
+          t.tm_year = y - 1900;
+          t.tm_mon = mon - 1;
+          t.tm_mday = day;
+          t.tm_hour = hr;
+          t.tm_min = min;
+          t.tm_sec = sec;
+          time_t ts = Astronomy::portable_timegm(&t);
           float age_hrs = (ts - now_t) / 3600.0f;
 
           // Keep last 48 hours

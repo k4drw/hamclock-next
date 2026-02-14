@@ -75,9 +75,9 @@
 #include "ui/icon_png.h"
 
 #include "core/Logger.h"
-#include <SDL2/SDL.h>
-#include <SDL2/SDL_image.h>
-#include <SDL2/SDL_ttf.h>
+#include <SDL.h>
+#include <SDL_image.h>
+#include <SDL_ttf.h>
 #include <curl/curl.h>
 #include <nlohmann/json.hpp>
 
@@ -86,7 +86,9 @@
 #include <cstdlib>
 #include <filesystem>
 #include <memory>
+#ifdef __linux__
 #include <unistd.h>
+#endif
 #include <vector>
 
 static constexpr int INITIAL_WIDTH = 800;
@@ -100,6 +102,11 @@ static constexpr bool FIDELITY_MODE = true;
 static constexpr int FONT_SIZE = 24;
 
 int main(int argc, char *argv[]) {
+#ifndef _WIN32
+  SDL_SetMainReady();
+#endif
+  curl_global_init(CURL_GLOBAL_ALL);
+
   // --- Load config via ConfigManager ---
   ConfigManager cfgMgr;
   cfgMgr.init(); // Resolve paths for logging and config
@@ -160,8 +167,8 @@ int main(int argc, char *argv[]) {
     if (numDrivers == 0) {
       LOG_ERROR("Error: No video drivers compiled into SDL2.");
     } else {
-      bool hasDRI = (access("/dev/dri/card0", F_OK) == 0);
-      if (!hasDRI) {
+#ifdef __linux__
+      if (access("/dev/dri/card0", F_OK) != 0) {
         LOG_ERROR("Error: /dev/dri/card0 not found. KMSDRM requires the modern "
                   "DRM/KMS driver.");
         LOG_ERROR("Hint: Enable 'dtoverlay=vc4-kms-v3d' in /boot/config.txt "
@@ -171,6 +178,9 @@ int main(int argc, char *argv[]) {
                   "to /dev/dri/card0");
         LOG_ERROR("      Try: sudo usermod -aG video,render $USER");
       }
+#else
+      LOG_ERROR("Hint: Check graphics drivers installation.");
+#endif
     }
     return EXIT_FAILURE;
   }
@@ -191,9 +201,24 @@ int main(int argc, char *argv[]) {
     SDL_SetHint(SDL_HINT_RENDER_DRIVER, "software");
   } else {
     SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "best");
-    // Set MSAA attributes BEFORE creating the window
-    SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
-    SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 4);
+    // MSAA can cause "Couldn't find matching EGL config" on RPi and some other
+    // platforms. Disabling by default for maximum compatibility.
+    SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 0);
+    SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 0);
+#if defined(__arm__) || defined(__aarch64__)
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+#endif
+    // Disable Depth/Stencil to help EGL config finding on limited VRAM/Drivers
+    SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 0);
+    SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 0);
+
+    // Explicitly request 8-bit color depth to help Mali drivers match a config
+    SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 8);
+    SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 8);
+    SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, 8);
+    SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE, 0);
   }
 
   Uint32 windowFlags = SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE;
@@ -221,6 +246,29 @@ int main(int argc, char *argv[]) {
   SDL_Window *window =
       SDL_CreateWindow("HamClock-Next", SDL_WINDOWPOS_CENTERED,
                        SDL_WINDOWPOS_CENTERED, winW, winH, windowFlags);
+
+  if (!window) {
+    if (!forceSoftware) {
+      std::fprintf(stderr,
+                   "SDL_CreateWindow failed with HW accel: %s. Retrying with "
+                   "Software Renderer...\n",
+                   SDL_GetError());
+
+      // Fallback: Clear OpenGL flag, force software hint
+      windowFlags &= ~SDL_WINDOW_OPENGL;
+      SDL_SetHint(SDL_HINT_RENDER_DRIVER, "software");
+
+      window =
+          SDL_CreateWindow("HamClock-Next", SDL_WINDOWPOS_CENTERED,
+                           SDL_WINDOWPOS_CENTERED, winW, winH, windowFlags);
+      if (window) {
+        forceSoftware = true; // Update state so renderer creation knows
+        std::fprintf(stderr,
+                     "Success: Fallback to software rendering worked.\n");
+      }
+    }
+  }
+
   if (!window) {
     std::fprintf(stderr, "SDL_CreateWindow failed: %s\n", SDL_GetError());
     if (activeDriver &&
@@ -635,7 +683,7 @@ int main(int argc, char *argv[]) {
           break;
         case WidgetType::LIVE_SPOTS:
           widgetPool[type] = std::make_unique<LiveSpotPanel>(
-              0, 0, 0, 0, fontMgr, spotProvider, spotStore);
+              0, 0, 0, 0, fontMgr, spotProvider, spotStore, appCfg, cfgMgr);
           break;
         case WidgetType::BAND_CONDITIONS:
           widgetPool[type] = std::make_unique<BandConditionsPanel>(
@@ -1275,3 +1323,9 @@ int main(int argc, char *argv[]) {
 
   return EXIT_SUCCESS;
 }
+#ifdef _WIN32
+#include <windows.h>
+int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrev, LPSTR szCmdLine, int sw) {
+  return main(__argc, __argv);
+}
+#endif

@@ -7,9 +7,10 @@
 
 LiveSpotPanel::LiveSpotPanel(int x, int y, int w, int h, FontManager &fontMgr,
                              LiveSpotProvider &provider,
-                             std::shared_ptr<LiveSpotDataStore> store)
+                             std::shared_ptr<LiveSpotDataStore> store,
+                             AppConfig &config, ConfigManager &cfgMgr)
     : Widget(x, y, w, h), fontMgr_(fontMgr), provider_(provider),
-      store_(std::move(store)) {}
+      store_(std::move(store)), config_(config), cfgMgr_(cfgMgr) {}
 
 void LiveSpotPanel::update() {
   uint32_t now = SDL_GetTicks();
@@ -55,6 +56,11 @@ void LiveSpotPanel::update() {
 void LiveSpotPanel::render(SDL_Renderer *renderer) {
   if (!fontMgr_.ready())
     return;
+
+  if (showSetup_) {
+    renderSetup(renderer);
+    return;
+  }
 
   ThemeColors themes = getThemeColors(theme_);
   // Background
@@ -206,31 +212,141 @@ void LiveSpotPanel::render(SDL_Renderer *renderer) {
   }
   if (footerTex_) {
     int fy = gridBottom + (footerH - footerH_) / 2;
-    SDL_Rect dst = {x_ + (width_ - footerW_) / 2, fy, footerW_, footerH_};
-    SDL_RenderCopy(renderer, footerTex_, nullptr, &dst);
+    footerRect_ = {x_ + (width_ - footerW_) / 2, fy, footerW_, footerH_};
+    SDL_RenderCopy(renderer, footerTex_, nullptr, &footerRect_);
   }
 }
 
-void LiveSpotPanel::onResize(int x, int y, int w, int h) {
-  Widget::onResize(x, y, w, h);
-  auto *cat = fontMgr_.catalog();
-  if (cat) {
-    if (w < 100) {
-      // Very constrained (Fidelity Mode slot 4 is 62px)
-      titleFontSize_ = cat->ptSize(FontStyle::Fast);
-      cellFontSize_ = cat->ptSize(FontStyle::Micro);
-    } else {
-      // Title slightly larger than cell text
-      titleFontSize_ = std::max(8, cat->ptSize(FontStyle::Fast) + 4);
-      cellFontSize_ = cat->ptSize(FontStyle::Fast);
-    }
+void LiveSpotPanel::renderSetup(SDL_Renderer *renderer) {
+  // Clear bg
+  SDL_SetRenderDrawColor(renderer, 20, 20, 30, 255);
+  SDL_Rect bg = {x_, y_, width_, height_};
+  SDL_RenderFillRect(renderer, &bg);
+  SDL_SetRenderDrawColor(renderer, 100, 100, 100, 255);
+  SDL_RenderDrawRect(renderer, &bg);
+
+  SDL_Color cyan = {0, 200, 255, 255};
+  SDL_Color white = {255, 255, 255, 255};
+  SDL_Color red = {150, 50, 50, 255};
+  SDL_Color green = {50, 150, 50, 255};
+
+  int y = y_ + 10;
+  int cx = x_ + width_ / 2;
+
+  // Title
+  int tw, th;
+  SDL_Texture *t = fontMgr_.renderText(renderer, "--- PSK Reporter ---", cyan,
+                                       titleFontSize_, &tw, &th);
+  if (t) {
+    SDL_Rect tr = {cx - tw / 2, y, tw, th};
+    SDL_RenderCopy(renderer, t, nullptr, &tr);
+    SDL_DestroyTexture(t);
   }
-  destroyCache();
+  y += th + 10;
+
+  int lx = x_ + 10;
+
+  // Mode: DE/DX
+  SDL_Rect box = {lx, y, 16, 16};
+  SDL_SetRenderDrawColor(renderer, 50, 50, 60, 255);
+  SDL_RenderFillRect(renderer, &box);
+  SDL_SetRenderDrawColor(renderer, 100, 100, 120, 255);
+  SDL_RenderDrawRect(renderer, &box);
+  if (pendingOfDe_) {
+    SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
+    SDL_Rect inner = {lx + 3, y + 3, 10, 10};
+    SDL_RenderFillRect(renderer, &inner);
+  }
+  modeCheckRect_ = {lx, y, width_ - 20, 16};
+
+  t = fontMgr_.renderText(renderer, "Mode: DE (Map receivers hearing Me)",
+                          pendingOfDe_ ? white : white, cellFontSize_, &tw,
+                          &th);
+  // If not DE, it's DX
+  if (!pendingOfDe_) {
+    SDL_DestroyTexture(t);
+    t = fontMgr_.renderText(renderer, "Mode: DX (Map senders I hear)", white,
+                            cellFontSize_, &tw, &th);
+  }
+  if (t) {
+    SDL_Rect tr = {lx + 24, y + (16 - th) / 2, tw, th};
+    SDL_RenderCopy(renderer, t, nullptr, &tr);
+    SDL_DestroyTexture(t);
+  }
+  y += 24;
+
+  // Filter: Call/Grid
+  box = {lx, y, 16, 16};
+  SDL_SetRenderDrawColor(renderer, 50, 50, 60, 255);
+  SDL_RenderFillRect(renderer, &box);
+  SDL_SetRenderDrawColor(renderer, 100, 100, 120, 255);
+  SDL_RenderDrawRect(renderer, &box);
+  if (pendingUseCall_) {
+    SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
+    SDL_Rect inner = {lx + 3, y + 3, 10, 10};
+    SDL_RenderFillRect(renderer, &inner);
+  }
+  filterCheckRect_ = {lx, y, width_ - 20, 16};
+
+  t = fontMgr_.renderText(renderer,
+                          pendingUseCall_ ? "Filter: Callsign" : "Filter: Grid",
+                          white, cellFontSize_, &tw, &th);
+  if (t) {
+    SDL_Rect tr = {lx + 24, y + (16 - th) / 2, tw, th};
+    SDL_RenderCopy(renderer, t, nullptr, &tr);
+    SDL_DestroyTexture(t);
+  }
+
+  // Buttons at bottom
+  int btnW = 60;
+  int btnH = 24;
+  int btnY = y_ + height_ - btnH - 6;
+
+  // Cancel
+  cancelBtnRect_ = {cx - btnW - 10, btnY, btnW, btnH};
+  SDL_SetRenderDrawColor(renderer, 60, 20, 20, 255);
+  SDL_RenderFillRect(renderer, &cancelBtnRect_);
+  SDL_SetRenderDrawColor(renderer, 150, 50, 50, 255);
+  SDL_RenderDrawRect(renderer, &cancelBtnRect_);
+  t = fontMgr_.renderText(renderer, "Cancel", white, cellFontSize_, &tw, &th);
+  if (t) {
+    SDL_Rect tr = {cancelBtnRect_.x + (btnW - tw) / 2,
+                   cancelBtnRect_.y + (btnH - th) / 2, tw, th};
+    SDL_RenderCopy(renderer, t, nullptr, &tr);
+    SDL_DestroyTexture(t);
+  }
+
+  // Done
+  doneBtnRect_ = {cx + 10, btnY, btnW, btnH};
+  SDL_SetRenderDrawColor(renderer, 20, 60, 20, 255);
+  SDL_RenderFillRect(renderer, &doneBtnRect_);
+  SDL_SetRenderDrawColor(renderer, 50, 150, 50, 255);
+  SDL_RenderDrawRect(renderer, &doneBtnRect_);
+  t = fontMgr_.renderText(renderer, "Done", white, cellFontSize_, &tw, &th);
+  if (t) {
+    SDL_Rect tr = {doneBtnRect_.x + (btnW - tw) / 2,
+                   doneBtnRect_.y + (btnH - th) / 2, tw, th};
+    SDL_RenderCopy(renderer, t, nullptr, &tr);
+    SDL_DestroyTexture(t);
+  }
 }
 
 bool LiveSpotPanel::onMouseUp(int mx, int my, Uint16 /*mod*/) {
   if (mx < x_ || mx >= x_ + width_ || my < y_ || my >= y_ + height_)
     return false;
+
+  if (showSetup_) {
+    return handleSetupClick(mx, my);
+  }
+
+  // Check footer click -> Open setup
+  if (mx >= footerRect_.x && mx <= footerRect_.x + footerRect_.w &&
+      my >= footerRect_.y && my <= footerRect_.y + footerRect_.h) {
+    showSetup_ = true;
+    pendingOfDe_ = config_.pskOfDe;
+    pendingUseCall_ = config_.pskUseCall;
+    return true;
+  }
 
   // Use cached grid geometry from last render() call
   if (gridCellH_ <= 0 || gridColW_ <= 0)
@@ -253,6 +369,38 @@ bool LiveSpotPanel::onMouseUp(int mx, int my, Uint16 /*mod*/) {
     return false;
 
   store_->toggleBand(bandIdx);
+  return true;
+}
+
+bool LiveSpotPanel::handleSetupClick(int mx, int my) {
+  if (mx >= modeCheckRect_.x && mx <= modeCheckRect_.x + modeCheckRect_.w &&
+      my >= modeCheckRect_.y && my <= modeCheckRect_.y + modeCheckRect_.h) {
+    pendingOfDe_ = !pendingOfDe_;
+    return true;
+  }
+  if (mx >= filterCheckRect_.x &&
+      mx <= filterCheckRect_.x + filterCheckRect_.w &&
+      my >= filterCheckRect_.y &&
+      my <= filterCheckRect_.y + filterCheckRect_.h) {
+    pendingUseCall_ = !pendingUseCall_;
+    return true;
+  }
+  if (mx >= cancelBtnRect_.x && mx <= cancelBtnRect_.x + cancelBtnRect_.w &&
+      my >= cancelBtnRect_.y && my <= cancelBtnRect_.y + cancelBtnRect_.h) {
+    showSetup_ = false;
+    return true;
+  }
+  if (mx >= doneBtnRect_.x && mx <= doneBtnRect_.x + doneBtnRect_.w &&
+      my >= doneBtnRect_.y && my <= doneBtnRect_.y + doneBtnRect_.h) {
+    // Save
+    config_.pskOfDe = pendingOfDe_;
+    config_.pskUseCall = pendingUseCall_;
+    cfgMgr_.save(config_);
+    provider_.updateConfig(config_);
+    provider_.fetch(); // Force refresh with new settings
+    showSetup_ = false;
+    return true;
+  }
   return true;
 }
 
@@ -283,4 +431,9 @@ void LiveSpotPanel::destroyCache() {
   lastTitleFontSize_ = 0;
   lastCellFontSize_ = 0;
   lastSubtitle_.clear();
+}
+
+void LiveSpotPanel::onResize(int x, int y, int w, int h) {
+  Widget::onResize(x, y, w, h);
+  destroyCache();
 }

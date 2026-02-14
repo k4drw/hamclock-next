@@ -88,6 +88,21 @@ void NetworkManager::fetchAsync(const std::string &url,
     curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, headerCallback);
     curl_easy_setopt(curl, CURLOPT_HEADERDATA, &headers);
 
+// On Linux with static mbedTLS, we often need to point CURL to the CA
+// bundle. However, for system libcurl (dynamic), this is usually automatic.
+// We remove the hardcoded path to let libcurl decide.
+#ifdef __linux__
+    if (std::filesystem::exists("/etc/ssl/certs/ca-certificates.crt")) {
+      curl_easy_setopt(curl, CURLOPT_CAINFO,
+                       "/etc/ssl/certs/ca-certificates.crt");
+    } else if (std::filesystem::exists("/etc/pki/tls/certs/ca-bundle.crt")) {
+      curl_easy_setopt(curl, CURLOPT_CAINFO,
+                       "/etc/pki/tls/certs/ca-bundle.crt");
+    } else if (std::filesystem::exists("/etc/ssl/ca-bundle.pem")) {
+      curl_easy_setopt(curl, CURLOPT_CAINFO, "/etc/ssl/ca-bundle.pem");
+    }
+#endif
+
     // If we have cache, do a HEAD request first to verify
     if (hasCache && !cached.lastModified.empty()) {
       curl_easy_setopt(curl, CURLOPT_NOBODY, 1L);

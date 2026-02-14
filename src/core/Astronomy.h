@@ -35,11 +35,44 @@ class Astronomy {
   static constexpr double kEarthR = 6371.0; // km
 
 public:
+  // Portable gmtime_r wrapper
+  static struct tm *portable_gmtime(const std::time_t *t, struct tm *result) {
+#ifdef _WIN32
+    // Windows gmtime_s has different argument order and return type
+    if (gmtime_s(result, t) == 0)
+      return result;
+    return nullptr;
+#else
+    return gmtime_r(t, result);
+#endif
+  }
+
+  // Portable localtime_r wrapper
+  static struct tm *portable_localtime(const std::time_t *t,
+                                       struct tm *result) {
+#ifdef _WIN32
+    if (localtime_s(result, t) == 0)
+      return result;
+    return nullptr;
+#else
+    return localtime_r(t, result);
+#endif
+  }
+
+  // Portable timegm wrapper
+  static std::time_t portable_timegm(struct tm *tm) {
+#ifdef _WIN32
+    return _mkgmtime(tm);
+#else
+    return timegm(tm);
+#endif
+  }
+
   // Calculate the sub-solar point for a given UTC time.
   static SubSolarPoint sunPosition(std::chrono::system_clock::time_point tp) {
     std::time_t t = std::chrono::system_clock::to_time_t(tp);
     std::tm utc{};
-    gmtime_r(&t, &utc);
+    portable_gmtime(&t, &utc);
 
     int doy = utc.tm_yday + 1;
     double hours = utc.tm_hour + utc.tm_min / 60.0 + utc.tm_sec / 3600.0;

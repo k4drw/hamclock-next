@@ -1,6 +1,6 @@
 #pragma once
 
-#include <SDL2/SDL.h>
+#include <SDL.h>
 
 // SDL_RenderGeometry was added in 2.0.18.
 // We provide a compatibility layer for older versions (like those on some RPi

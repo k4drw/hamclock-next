@@ -1,4 +1,5 @@
 #include "TimePanel.h"
+#include "../core/Astronomy.h"
 #include "../core/Theme.h"
 #include "FontCatalog.h"
 #include "RenderUtils.h"
@@ -10,10 +11,12 @@
 #include <cstring>
 #include <ctime>
 
+#ifndef _WIN32
 #include <arpa/inet.h>
 #include <ifaddrs.h>
 #include <netinet/in.h>
 #include <sys/statvfs.h>
+#endif
 
 namespace {
 
@@ -21,6 +24,10 @@ static constexpr const char *kVersion = "V" HAMCLOCK_VERSION;
 static constexpr Uint32 kInfoRotateMs = 3000;
 
 std::string getSystemUptime() {
+#ifdef _WIN32
+  // TODO: GetTickCount64() logic for Windows
+  return "Up --";
+#else
   std::FILE *f = std::fopen("/proc/uptime", "r");
   if (!f)
     return "Up ?";
@@ -39,9 +46,13 @@ std::string getSystemUptime() {
   else
     std::snprintf(buf, sizeof(buf), "Up  %dm", mins);
   return buf;
+#endif
 }
 
 std::string getCpuTemp() {
+#ifdef _WIN32
+  return "CPU --";
+#else
   std::FILE *f = std::fopen("/sys/class/thermal/thermal_zone0/temp", "r");
   if (!f)
     return "CPU --";
@@ -52,9 +63,13 @@ std::string getCpuTemp() {
   char buf[32];
   std::snprintf(buf, sizeof(buf), "CPU %.0fC", milliC / 1000.0);
   return buf;
+#endif
 }
 
 std::string getDiskUsage() {
+#ifdef _WIN32
+  return "Disk --";
+#else
   struct statvfs stat;
   if (statvfs("/", &stat) != 0)
     return "Disk --";
@@ -64,9 +79,13 @@ std::string getDiskUsage() {
   char buf[32];
   std::snprintf(buf, sizeof(buf), "Disk %d%%", pct);
   return buf;
+#endif
 }
 
 std::string getLocalIP() {
+#ifdef _WIN32
+  return "L-IP --";
+#else
   struct ifaddrs *addrs = nullptr;
   if (getifaddrs(&addrs) != 0)
     return "--";
@@ -84,6 +103,7 @@ std::string getLocalIP() {
   }
   freeifaddrs(addrs);
   return result;
+#endif
 }
 
 } // namespace
@@ -116,7 +136,7 @@ void TimePanel::update() {
   auto now = std::chrono::system_clock::now();
   std::time_t t = std::chrono::system_clock::to_time_t(now);
   std::tm utc{};
-  gmtime_r(&t, &utc);
+  Astronomy::portable_gmtime(&t, &utc);
 
   char buf[32];
   std::snprintf(buf, sizeof(buf), "%02d:%02d", utc.tm_hour, utc.tm_min);

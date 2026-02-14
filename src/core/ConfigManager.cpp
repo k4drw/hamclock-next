@@ -1,9 +1,10 @@
 #include "ConfigManager.h"
 
+#include <SDL.h>
 #include <nlohmann/json.hpp>
 
 #include <cstdio>
-#include <cstdlib>
+#include <filesystem>
 #include <fstream>
 
 static std::string colorToHex(SDL_Color c) {
@@ -24,17 +25,32 @@ static SDL_Color hexToColor(const std::string &hex, SDL_Color fallback) {
 }
 
 bool ConfigManager::init() {
-  // XDG_CONFIG_HOME or fallback to ~/.config
-  const char *xdg = std::getenv("XDG_CONFIG_HOME");
-  if (xdg && xdg[0] != '\0') {
-    configDir_ = std::filesystem::path(xdg) / "hamclock";
-  } else {
-    const char *home = std::getenv("HOME");
-    if (!home || home[0] == '\0') {
-      std::fprintf(stderr, "ConfigManager: HOME not set\n");
-      return false;
-    }
-    configDir_ = std::filesystem::path(home) / ".config" / "hamclock";
+  // Use SDL_GetPrefPath for cross-platform data directory
+  // On Linux: ~/.local/share/HamClock/HamClock-Next/
+  // On Windows: %APPDATA%\HamClock\HamClock-Next\
+  // On MacOS: ~/Library/Application Support/HamClock/HamClock-Next/
+  char *prefPath = SDL_GetPrefPath("HamClock", "HamClock-Next");
+  if (!prefPath) {
+    std::fprintf(stderr, "ConfigManager: SDL_GetPrefPath failed: %s\n",
+                 SDL_GetError());
+    return false;
+  }
+
+  configDir_ = std::filesystem::path(prefPath);
+  SDL_free(prefPath);
+
+  // Fallback for Linux: check ~/.config/hamclock if prefPath is empty or first
+  // run This helps migration but primarily we want the new path. Actually, for
+  // simplicity, let's stick to the standard SDL path. Users can symlink if they
+  // really want ~/.config.
+
+  // Ensure directory exists
+  std::error_code ec;
+  std::filesystem::create_directories(configDir_, ec);
+  if (ec) {
+    std::fprintf(stderr, "ConfigManager: failed to create dir %s: %s\n",
+                 configDir_.c_str(), ec.message().c_str());
+    return false;
   }
 
   configPath_ = configDir_ / "config.json";

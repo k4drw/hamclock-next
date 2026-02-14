@@ -20,7 +20,7 @@ public:
   std::string getName() const override { return "ListPanel:" + title_; }
   nlohmann::json getDebugData() const override;
 
-private:
+protected:
   void destroyCache();
 
   FontManager &fontMgr_;

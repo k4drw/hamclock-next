@@ -122,7 +122,7 @@ void LiveSpotProvider::fetch() {
   }
 
   std::string url = fmt::format("https://retrieve.pskreporter.info/"
-                                "query?{}{}&&flowStartSeconds={}&rronly=1",
+                                "query?{}{}&flowStartSeconds={}&rronly=1",
                                 param, target, windowStart);
 
   LOG_I("LiveSpot", "Fetching {}", url);

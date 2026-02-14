@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 
-#include <SDL2/SDL.h>
+#include <SDL.h>
 
 // Ham radio band definitions for spot aggregation.
 struct BandDef {

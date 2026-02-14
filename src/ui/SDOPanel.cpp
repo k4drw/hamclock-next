@@ -3,7 +3,7 @@
 #include "../core/Theme.h"
 #include "FontCatalog.h"
 #include "RenderUtils.h"
-#include <SDL2/SDL.h>
+#include <SDL.h>
 #include <algorithm>
 #include <cstdio>
 #include <mutex>
@@ -121,7 +121,7 @@ void SDOPanel::renderOverlays(SDL_Renderer *renderer,
   // R@HH:MM (Rise/Set)
   time_t t0 = std::chrono::system_clock::to_time_t(now);
   struct tm localTM;
-  localtime_r(&t0, &localTM);
+  Astronomy::portable_localtime(&t0, &localTM);
   int doy = localTM.tm_yday + 1;
   auto st = Astronomy::calculateSunTimes(obsLat_, obsLon_, doy);
 

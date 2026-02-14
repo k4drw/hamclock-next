@@ -41,8 +41,8 @@ void Log::init(const std::string &fallbackDir) {
 
   s_Logger =
       std::make_shared<spdlog::logger>("HAMCLOCK", sinks.begin(), sinks.end());
-  s_Logger->set_level(spdlog::level::trace);
-  spdlog::flush_on(spdlog::level::trace);
+  s_Logger->set_level(spdlog::level::info);
+  spdlog::flush_on(spdlog::level::info);
 
   LOG_INFO("Logger initialized with {} sinks", sinks.size());
   std::fprintf(stderr, "spdlog initialized successfully.\n");

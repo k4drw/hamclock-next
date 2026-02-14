@@ -33,6 +33,9 @@ struct DXClusterData {
   bool connected = false;
   std::string statusMsg;
   std::chrono::system_clock::time_point lastUpdate;
+
+  bool hasSelection = false;
+  DXClusterSpot selectedSpot;
 };
 
 class DXClusterDataStore {
@@ -45,6 +48,9 @@ public:
   void addSpot(const DXClusterSpot &spot);
   void setConnected(bool connected, const std::string &status = "");
   void clear();
+
+  void selectSpot(const DXClusterSpot &spot);
+  void clearSelection();
 
   // Load persisted spots from DB.
   void loadPersisted();

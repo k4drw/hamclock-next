@@ -1,5 +1,6 @@
 #include "NOAAProvider.h"
 
+#include "../core/Astronomy.h"
 #include "../core/HamClockState.h"
 #include "../core/Logger.h"
 #include <chrono>
@@ -111,7 +112,8 @@ void NOAAProvider::fetchSN() {
       // Get current time string YYYY-MM
       auto now = std::chrono::system_clock::now();
       std::time_t t_c = std::chrono::system_clock::to_time_t(now);
-      std::tm tm = *std::localtime(&t_c);
+      std::tm tm{};
+      Astronomy::portable_localtime(&t_c, &tm);
       char buffer[8];
       std::strftime(buffer, sizeof(buffer), "%Y-%m", &tm);
       std::string current_month(buffer);

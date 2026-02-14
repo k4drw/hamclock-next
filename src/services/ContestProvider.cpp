@@ -1,4 +1,5 @@
 #include "ContestProvider.h"
+#include "../core/Astronomy.h"
 #include <chrono>
 #include <cstdio>
 #include <ctime>
@@ -24,7 +25,8 @@ void ContestProvider::processData(const std::string &body) {
   // Get current year from system clock
   auto now = std::chrono::system_clock::now();
   std::time_t now_c = std::chrono::system_clock::to_time_t(now);
-  struct tm *now_tm = std::gmtime(&now_c);
+  struct tm now_tm_buf{};
+  struct tm *now_tm = Astronomy::portable_gmtime(&now_c, &now_tm_buf);
   int currentYear = now_tm->tm_year + 1900;
 
   static const char *MONTHS[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun",
@@ -65,7 +67,8 @@ void ContestProvider::processData(const std::string &body) {
         t.tm_hour = std::stoi(timeStr.substr(0, 2));
         t.tm_min = std::stoi(timeStr.substr(2, 2));
         t.tm_isdst = 0;
-        return std::chrono::system_clock::from_time_t(timegm(&t));
+        return std::chrono::system_clock::from_time_t(
+            Astronomy::portable_timegm(&t));
       };
 
       try {

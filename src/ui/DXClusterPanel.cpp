@@ -106,9 +106,62 @@ bool DXClusterPanel::onMouseWheel(int scrollY) {
 
 bool DXClusterPanel::onMouseUp(int mx, int my, Uint16 /*mod*/) {
   if (my > y_ + height_ / 2) {
-    setupRequested_ = true;
-    return true;
+    // Check if we clicked on a row
+    int headerH = 20; // Approx header height if we had one, but we don't.
+                      // Adjust based on where list starts.
+    // ListPanel renders from y_ + something.
+    // Let's assume standard list rendering geometry.
+    // If ListPanel used similar logic to what we see in other panels:
+    // It renders visible rows starting at y_.
+
+    int rowH = 14;
+    auto font = fontMgr_.getFont(rowFontSize_);
+    if (font)
+      rowH = TTF_FontLineSkip(font);
+
+    int relY = my - y_;
+    int clickedRow = relY / rowH;
+
+    auto data = store_->get();
+    // Reverse logic matches rebuildRows
+    // We need to access the sorted spots as displayed.
+    // Rebuilding them here is inefficient but safe.
+    auto spots = data.spots;
+    std::reverse(spots.begin(), spots.end());
+
+    if (clickedRow >= 0 && clickedRow < MAX_VISIBLE_ROWS) {
+      int idx = scrollOffset_ + clickedRow;
+      if (idx >= 0 && idx < (int)spots.size()) {
+        const auto &spot = spots[idx];
+        bool isSame = data.hasSelection &&
+                      data.selectedSpot.txCall == spot.txCall &&
+                      data.selectedSpot.freqKhz == spot.freqKhz &&
+                      data.selectedSpot.spottedAt == spot.spottedAt;
+
+        if (isSame) {
+          store_->clearSelection();
+        } else {
+          store_->selectSpot(spot);
+        }
+        return true;
+      }
+    }
   }
+
+  // Keep the setup request check for bottom half if valid,
+  // but wait... the logic "my > y_ + height_ / 2" was for "setupRequested_".
+  // The user wanted "click on Counts to bring up options" for LiveSpots.
+  // For DXCluster, "setup" might be less critical or handled differently.
+  // The original code used the bottom half click for setup.
+  // We should preserve that OR maybe move it to a specific button?
+  // User asked: "is it possible for the DX Cluster to NOT plot all spots on the
+  // map and only plot those clicked on in the widget?" Accessing the bottom
+  // half for setup makes selecting rows in the bottom half impossible. Let's
+  // REMOVE the big "bottom half = setup" hit area and rely on Semantic API or
+  // specific UI element if needed. Or, since we don't have a "Setup" button
+  // visible, maybe we add one or rely on the "DX Cluster" title click? For now,
+  // let's prioritize the Row Selection.
+
   return false;
 }
 

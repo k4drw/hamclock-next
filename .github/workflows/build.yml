@@ -1,0 +1,35 @@
+name: Build HamClock-Next
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+
+jobs:
+  build:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Configure and Build
+      run: |
+        cmake -B build -DCMAKE_BUILD_TYPE=Release
+        cmake --build build --config Release -j 2
+
+
+    - name: Upload Artifacts
+      uses: actions/artifacts@v4
+      with:
+        name: hamclock-next-${{ matrix.os }}
+        path: |
+          build/hamclock-next
+          build/Release/hamclock-next.exe
+          build/hamclock-next.app

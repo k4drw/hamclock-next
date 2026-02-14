@@ -324,7 +324,7 @@ void MapWidget::renderGreatCircle(SDL_Renderer *renderer) {
         if (segment.size() >= 2) {
           RenderUtils::drawPolylineTextured(renderer, lineTex, segment.data(),
                                             static_cast<int>(segment.size()),
-                                            2.5f, color);
+                                            1.2f, color);
         }
         segment.clear();
       }
@@ -333,7 +333,7 @@ void MapWidget::renderGreatCircle(SDL_Renderer *renderer) {
   }
   if (segment.size() >= 2) {
     RenderUtils::drawPolylineTextured(renderer, lineTex, segment.data(),
-                                      static_cast<int>(segment.size()), 2.5f,
+                                      static_cast<int>(segment.size()), 1.2f,
                                       color);
   }
 }
@@ -350,207 +350,189 @@ void MapWidget::renderNightOverlay(SDL_Renderer *renderer) {
   const float stepY = static_cast<float>(mapRect_.h) / gridH;
 
   // Constants matching original HamClock: 12 deg grayline, 0.75 power curve
-  constexpr float GRAYLINE_COS = -0.208f; // cos(90+12)
-  constexpr float GRAYLINE_POW = 0.75f;   // matches earthmap.cpp
+  constexpr float GRAYLINE_COS = -0.21f; // ~cos(90+12)
+  constexpr float GRAYLINE_POW = 0.8f;   // Slightly steeper for deeper night
 
   SDL_Rect clip = mapRect_;
   SDL_RenderSetClipRect(renderer, &clip);
 
+  // Ensure robust geometry helper textures exist
+  texMgr_.generateWhiteTexture(renderer);
+  texMgr_.generateBlackTexture(renderer);
+
 #if SDL_VERSION_ATLEAST(2, 0, 18)
-  if (!useCompatibilityRenderPath_) {
-    // -------------------------------------------------------------------------
-    // High-Fidelity Path (SDL 2.0.18+ on non-KMSDRM drivers)
-    // -------------------------------------------------------------------------
-    std::vector<SDL_Vertex> shadowVerts;
-    std::vector<SDL_Vertex> lightVerts;
-    shadowVerts.reserve((gridW + 1) * (gridH + 1));
-    lightVerts.reserve((gridW + 1) * (gridH + 1));
+  // -------------------------------------------------------------------------
+  // High-Fidelity Path (SDL 2.0.18+)
+  // -------------------------------------------------------------------------
 
-    for (int j = 0; j <= gridH; ++j) {
-      float sy = mapRect_.y + j * stepY;
-      for (int i = 0; i <= gridW; ++i) {
-        float sx = mapRect_.x + i * stepX;
-        double lat, lon;
-        if (screenToLatLon((int)sx, (int)sy, lat, lon)) {
-          double latRad = lat * M_PI / 180.0;
-          double dLonRad = (lon * M_PI / 180.0) - sLonRad;
-          double cosZ = sinSLat * std::sin(latRad) +
-                        cosSLat * std::cos(latRad) * std::cos(dLonRad);
-          float fd =
-              (cosZ > 0)
-                  ? 1.0f
-                  : (cosZ > GRAYLINE_COS
-                         ? 1.0f - std::pow(cosZ / GRAYLINE_COS, GRAYLINE_POW)
-                         : 0.0f);
-          float nf = 1.0f - fd;
-          float u = (float)i / gridW;
-          float v = (float)j / gridH;
-          shadowVerts.push_back(
-              {{sx, sy}, {0, 0, 0, (Uint8)(nf * 255)}, {0, 0}});
-          lightVerts.push_back(
-              {{sx, sy}, {255, 255, 255, (Uint8)(nf * 255)}, {u, v}});
-        } else {
-          shadowVerts.push_back({{sx, sy}, {0, 0, 0, 0}, {0, 0}});
-          lightVerts.push_back({{sx, sy}, {0, 0, 0, 0}, {0, 0}});
-        }
-      }
-    }
+  // Force blend mode for geometry shading
+  SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
 
-    std::vector<int> indices;
-    indices.reserve(gridW * gridH * 6);
-    for (int j = 0; j < gridH; ++j) {
-      for (int i = 0; i < gridW; ++i) {
-        int p0 = j * (gridW + 1) + i;
-        int p1 = p0 + 1;
-        int p2 = (j + 1) * (gridW + 1) + i;
-        int p3 = p2 + 1;
-        indices.push_back(p0);
-        indices.push_back(p1);
-        indices.push_back(p2);
-        indices.push_back(p2);
-        indices.push_back(p1);
-        indices.push_back(p3);
-      }
-    }
+  std::vector<SDL_Vertex> shadowVerts;
+  std::vector<SDL_Vertex> lightVerts;
+  shadowVerts.reserve((gridW + 1) * (gridH + 1));
+  lightVerts.reserve((gridW + 1) * (gridH + 1));
 
-    // Enable alpha blending for shadow overlay
-    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-    SDL_RenderGeometry(renderer, nullptr, shadowVerts.data(),
-                       (int)shadowVerts.size(), indices.data(),
-                       (int)indices.size());
-    if (config_.mapNightLights) {
-      SDL_Texture *nightTex = texMgr_.get(NIGHT_MAP_KEY);
-      if (nightTex) {
-        SDL_SetTextureColorMod(nightTex, 150, 150, 150);
-        SDL_SetTextureBlendMode(nightTex, SDL_BLENDMODE_ADD);
-        SDL_RenderGeometry(renderer, nightTex, lightVerts.data(),
-                           (int)lightVerts.size(), indices.data(),
-                           (int)indices.size());
-      }
-    }
-  } else
-#endif
-  {
-    // -------------------------------------------------------------------------
-    // Compatibility Path (KMSDRM or SDL < 2.0.18)
-    // -------------------------------------------------------------------------
-
-    if (!renderer)
-      return;
-
-    // Higher resolution for smoothness on RPi
-    constexpr int compatW = 256;
-    constexpr int compatH = 128;
-
-    if (!nightOverlayTexture_) {
-      LOG_D("MapWidget", "Creating shadow texture ({}x{})...", compatW,
-            compatH);
-      nightOverlayTexture_ =
-          SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888,
-                            SDL_TEXTUREACCESS_STATIC, compatW, compatH);
-      if (nightOverlayTexture_) {
-        SDL_SetTextureBlendMode(nightOverlayTexture_, SDL_BLENDMODE_BLEND);
-#if SDL_VERSION_ATLEAST(2, 0, 12)
-        SDL_SetTextureScaleMode(nightOverlayTexture_, SDL_ScaleModeLinear);
-#endif
-        lastUpdateSunLat_ = -999.0;
-        LOG_D("MapWidget", "Shadow texture created successfully.");
+  for (int j = 0; j <= gridH; ++j) {
+    float sy = mapRect_.y + j * stepY;
+    for (int i = 0; i <= gridW; ++i) {
+      float sx = mapRect_.x + i * stepX;
+      double lat, lon;
+      if (screenToLatLon((int)sx, (int)sy, lat, lon)) {
+        double latRad = lat * M_PI / 180.0;
+        double dLonRad = (lon * M_PI / 180.0) - sLonRad;
+        double cosZ = sinSLat * std::sin(latRad) +
+                      cosSLat * std::cos(latRad) * std::cos(dLonRad);
+        float fd =
+            (cosZ > 0)
+                ? 1.0f
+                : (cosZ > GRAYLINE_COS
+                       ? 1.0f - std::pow(cosZ / GRAYLINE_COS, GRAYLINE_POW)
+                       : 0.0f);
+        float nf = 1.0f - fd;
+        float u = (float)i / gridW;
+        float v = (float)j / gridH;
+        // Optimization for Red-tint issues:
+        // Use a BLACK 1x1 texture and WHITE vertex colors.
+        // This forces the hardware to use Black * Alpha instead of
+        // possibly misinterpreting 0,0,0,Alpha as a color key or byte-swapped
+        // Red.
+        shadowVerts.push_back(
+            {{sx, sy}, {255, 255, 255, (Uint8)(nf * 255)}, {0, 0}});
+        lightVerts.push_back(
+            {{sx, sy}, {255, 255, 255, (Uint8)(nf * 255)}, {u, v}});
       } else {
-        LOG_E("MapWidget", "Failed to create shadow texture: {}",
-              SDL_GetError());
+        shadowVerts.push_back({{sx, sy}, {0, 0, 0, 0}, {0, 0}});
+        lightVerts.push_back({{sx, sy}, {0, 0, 0, 0}, {0, 0}});
       }
     }
+  }
 
-    if (nightOverlayTexture_) {
-      if (std::abs(lastUpdateSunLat_ - sunLat_) > 0.05 ||
-          std::abs(lastUpdateSunLon_ - sunLon_) > 0.1) {
+  std::vector<int> indices;
+  indices.reserve(gridW * gridH * 6);
+  for (int j = 0; j < gridH; ++j) {
+    for (int i = 0; i < gridW; ++i) {
+      int p0 = j * (gridW + 1) + i;
+      int p1 = p0 + 1;
+      int p2 = (j + 1) * (gridW + 1) + i;
+      int p3 = p2 + 1;
+      indices.push_back(p0);
+      indices.push_back(p1);
+      indices.push_back(p2);
+      indices.push_back(p2);
+      indices.push_back(p1);
+      indices.push_back(p3);
+    }
+  }
 
-        LOG_T("MapWidget", "Updating shadow texture for Sun: {}, {}", sunLat_,
-              sunLon_);
-
-        std::vector<uint32_t> pixels(compatW * compatH);
-
-        for (int j = 0; j < compatH; ++j) {
-          uint32_t *row = &pixels[j * compatW];
-          double lat = 90.0 - (j + 0.5) * (180.0 / compatH);
-          double latRad = lat * M_PI / 180.0;
-          double sinLat = std::sin(latRad);
-          double cosLat = std::cos(latRad);
-          double term1 = double(sinSLat) * sinLat;
-          double term2Scale = double(cosSLat) * cosLat;
-
-          for (int i = 0; i < compatW; ++i) {
-            double lon = (i + 0.5) * (360.0 / compatW) - 180.0;
-            double dLonRad = (lon * M_PI / 180.0) - sLonRad;
-            double cosZ = term1 + term2Scale * std::cos(dLonRad);
-            float fd = (cosZ > 0)
-                           ? 1.0f
-                           : (cosZ > GRAYLINE_COS
-                                  ? 1.0f - std::pow(float(cosZ / GRAYLINE_COS),
-                                                    GRAYLINE_POW)
-                                  : 0.0f);
-            uint8_t alpha = (uint8_t)((1.0f - fd) * 255);
-#if SDL_BYTEORDER == SDL_BIG_ENDIAN
-            row[i] = (uint32_t)alpha;
+  // Draw shaded overlay using a BLACK texture and WHITE vertex colors
+  // This is the most bulletproof way to get alpha-blended black shading.
+  SDL_RenderGeometry(renderer, texMgr_.get("black"), shadowVerts.data(),
+                     (int)shadowVerts.size(), indices.data(),
+                     (int)indices.size());
+  if (config_.mapNightLights) {
+    SDL_Texture *nightTex = texMgr_.get(NIGHT_MAP_KEY);
+    if (nightTex) {
+      SDL_SetTextureColorMod(nightTex, 255, 255, 255);
+      SDL_SetTextureBlendMode(nightTex, SDL_BLENDMODE_BLEND);
+      SDL_RenderGeometry(renderer, nightTex, lightVerts.data(),
+                         (int)lightVerts.size(), indices.data(),
+                         (int)indices.size());
+    }
+  }
 #else
-            row[i] = (uint32_t)alpha << 24;
-#endif
-          }
-        }
+  // -------------------------------------------------------------------------
+  // Compatibility Path (SDL < 2.0.18)
+  // -------------------------------------------------------------------------
+  SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
 
-        SDL_UpdateTexture(nightOverlayTexture_, nullptr, pixels.data(),
-                          compatW * sizeof(uint32_t));
-        lastUpdateSunLat_ = sunLat_;
-        lastUpdateSunLon_ = sunLon_;
-        LOG_T("MapWidget", "Shadow texture update complete.");
-      }
-      LOG_T("MapWidget", "Rendering shadow copy...");
-      SDL_RenderCopy(renderer, nightOverlayTexture_, nullptr, &mapRect_);
-      LOG_T("MapWidget", "Shadow render copy done.");
-    }
-
-    if (config_.mapNightLights) {
-      SDL_Texture *nightTex = texMgr_.get(NIGHT_MAP_KEY);
-      if (nightTex) {
-        SDL_SetTextureColorMod(nightTex, 150, 150, 150);
-        SDL_SetTextureBlendMode(nightTex, SDL_BLENDMODE_ADD);
-        // Fallback for night lights also needs to avoid RenderGeometry
-        int tW, tH;
-        SDL_QueryTexture(nightTex, NULL, NULL, &tW, &tH);
-        for (int j = 0; j < gridH; ++j) {
-          for (int i = 0; i < gridW; ++i) {
-            float sx = mapRect_.x + i * stepX;
-            float sy = mapRect_.y + j * stepY;
-            double lat, lon;
-            if (screenToLatLon((int)(sx + stepX / 2), (int)(sy + stepY / 2),
-                               lat, lon)) {
-              double latRad = lat * M_PI / 180.0;
-              double dLonRad = (lon * M_PI / 180.0) - sLonRad;
-              double cosZ = sinSLat * std::sin(latRad) +
-                            cosSLat * std::cos(latRad) * std::cos(dLonRad);
-              float fd = (cosZ > 0)
-                             ? 1.0f
-                             : (cosZ > GRAYLINE_COS
-                                    ? 1.0f - std::pow(cosZ / GRAYLINE_COS,
-                                                      GRAYLINE_POW)
-                                    : 0.0f);
-              float nf = 1.0f - fd;
-              if (nf > 0.05f) {
-                SDL_SetTextureAlphaMod(nightTex, (Uint8)(nf * 255));
-                SDL_Rect src = {(int)(i * (tW / (float)gridW)),
-                                (int)(j * (tH / (float)gridH)),
-                                (int)(tW / (float)gridW) + 1,
-                                (int)(tH / (float)gridH) + 1};
-                SDL_Rect dst = {(int)sx, (int)sy, (int)std::ceil(stepX),
-                                (int)std::ceil(stepY)};
-                SDL_RenderCopy(renderer, nightTex, &src, &dst);
-              }
-            }
-          }
+  // 1. Draw shading
+  for (int j = 0; j < gridH; ++j) {
+    for (int i = 0; i < gridW; ++i) {
+      float sx = mapRect_.x + i * stepX;
+      float sy = mapRect_.y + j * stepY;
+      double lat, lon;
+      if (screenToLatLon((int)(sx + stepX * 0.5f), (int)(sy + stepY * 0.5f),
+                         lat, lon)) {
+        double latRad = lat * M_PI / 180.0;
+        double dLonRad = (lon * M_PI / 180.0) - sLonRad;
+        double cosZ = sinSLat * std::sin(latRad) +
+                      cosSLat * std::cos(latRad) * std::cos(dLonRad);
+        float fd =
+            (cosZ > 0)
+                ? 1.0f
+                : (cosZ > GRAYLINE_COS
+                       ? 1.0f - std::pow(cosZ / GRAYLINE_COS, GRAYLINE_POW)
+                       : 0.0f);
+        float darkness = 1.0f - fd;
+        if (darkness > 0) {
+          SDL_SetRenderDrawColor(renderer, 0, 0, 0, (Uint8)(darkness * 255));
+          SDL_Rect r = {(int)sx, (int)sy,
+                        (int)(mapRect_.x + (i + 1) * stepX) - (int)sx,
+                        (int)(mapRect_.y + (j + 1) * stepY) - (int)sy};
+          SDL_RenderFillRect(renderer, &r);
         }
       }
     }
   }
+
+  // 2. Draw night lights
+  if (config_.mapNightLights) {
+    SDL_Texture *nightTex = texMgr_.get(NIGHT_MAP_KEY);
+    if (nightTex) {
+      SDL_SetTextureColorMod(nightTex, 255, 255, 255);
+      SDL_SetTextureBlendMode(nightTex, SDL_BLENDMODE_BLEND);
+
+      int tW, tH;
+      SDL_QueryTexture(nightTex, nullptr, nullptr, &tW, &tH);
+      float srcStepX = (float)tW / gridW;
+      float srcStepY = (float)tH / gridH;
+
+      for (int j = 0; j < gridH; ++j) {
+        float sy = mapRect_.y + j * stepY;
+        for (int i = 0; i < gridW; ++i) {
+          float sx = mapRect_.x + i * stepX;
+
+          // Darkness factor at center of cell
+          float fd = 1.0f;
+          double lat, lon;
+          if (screenToLatLon((int)(sx + stepX * 0.5f), (int)(sy + stepY * 0.5f),
+                             lat, lon)) {
+            double latRad = lat * M_PI / 180.0;
+            double dLonRad = (lon * M_PI / 180.0) - sLonRad;
+            double cosZ = sinSLat * std::sin(latRad) +
+                          cosSLat * std::cos(latRad) * std::cos(dLonRad);
+            fd = (cosZ > 0)
+                     ? 1.0f
+                     : (cosZ > GRAYLINE_COS
+                            ? 1.0f - std::pow(cosZ / GRAYLINE_COS, GRAYLINE_POW)
+                            : 0.0f);
+          }
+
+          float darkness = 1.0f - fd;
+          if (darkness > 0.05f) {
+            SDL_SetTextureAlphaMod(nightTex, (Uint8)(darkness * 255));
+            SDL_Rect src = {(int)(i * srcStepX), (int)(j * srcStepY),
+                            (int)((i + 1) * srcStepX) - (int)(i * srcStepX),
+                            (int)((j + 1) * srcStepY) - (int)(j * srcStepY)};
+
+            SDL_Rect dst = {(int)sx, (int)sy,
+                            (int)(mapRect_.x + (i + 1) * stepX) - (int)sx,
+                            (int)(mapRect_.y + (j + 1) * stepY) - (int)sy};
+
+            SDL_RenderCopy(renderer, nightTex, &src, &dst);
+          }
+        }
+      }
+    } else {
+      static uint32_t lastLog = 0;
+      if (SDL_GetTicks() - lastLog > 10000) {
+        LOG_W("MapWidget", "Night Lights texture not yet loaded");
+        lastLog = SDL_GetTicks();
+      }
+    }
+  }
+#endif
   SDL_RenderSetClipRect(renderer, nullptr);
 }
 
@@ -770,7 +752,18 @@ void MapWidget::renderDXClusterSpots(SDL_Renderer *renderer) {
   SDL_RenderSetClipRect(renderer, &mapRect_);
   SDL_Texture *lineTex = texMgr_.get(LINE_AA_KEY);
 
-  for (const auto &spot : data.spots) {
+  // Filter spots to render
+  std::vector<DXClusterSpot> spotsToRender;
+  if (data.hasSelection) {
+    spotsToRender.push_back(data.selectedSpot);
+  } else {
+    // Default: Show None
+    // If user wanted Show All, we'd copy all.
+    // But user asked: "NOT plot all spots on the map and only plot those
+    // clicked on" So default is empty.
+  }
+
+  for (const auto &spot : spotsToRender) {
     if (spot.txLat == 0.0 && spot.txLon == 0.0)
       continue;
 
@@ -797,7 +790,7 @@ void MapWidget::renderDXClusterSpots(SDL_Renderer *renderer) {
           if (segment.size() >= 2) {
             RenderUtils::drawPolylineTextured(renderer, lineTex, segment.data(),
                                               static_cast<int>(segment.size()),
-                                              1.5f, lineColor);
+                                              1.0f, lineColor);
           }
           segment.clear();
         }
@@ -806,7 +799,7 @@ void MapWidget::renderDXClusterSpots(SDL_Renderer *renderer) {
       if (segment.size() >= 2) {
         RenderUtils::drawPolylineTextured(renderer, lineTex, segment.data(),
                                           static_cast<int>(segment.size()),
-                                          1.5f, lineColor);
+                                          1.0f, lineColor);
       }
     }
 

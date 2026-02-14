@@ -1,7 +1,7 @@
 #include "HistoryPanel.h"
 #include "../core/Theme.h"
 #include "RenderUtils.h"
-#include <SDL2/SDL.h>
+#include <SDL.h>
 #include <algorithm>
 #include <vector>
 

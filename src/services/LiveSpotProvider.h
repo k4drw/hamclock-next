@@ -18,6 +18,7 @@ public:
                    const AppConfig &config, HamClockState *state = nullptr);
 
   void fetch();
+  void updateConfig(const AppConfig &config) { config_ = config; }
   nlohmann::json getDebugData() const;
 
 private:

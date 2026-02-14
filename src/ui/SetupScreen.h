@@ -107,11 +107,11 @@ private:
   int hintSize_ = 14;
   SDL_Rect toggleRect_ = {0, 0, 0, 0};
   SDL_Rect clusterToggleRect_ = {0, 0, 0, 0};
-  SDL_Rect pskOfDeRect_ = {0, 0, 0, 0};
-  SDL_Rect pskUseCallRect_ = {0, 0, 0, 0};
   SDL_Rect themeRect_ = {0, 0, 0, 0};
   SDL_Rect nightLightsRect_ = {0, 0, 0, 0};
   SDL_Rect metricToggleRect_ = {0, 0, 0, 0};
+  SDL_Rect okBtnRect_ = {0, 0, 0, 0};
+  SDL_Rect cancelBtnRect_ = {0, 0, 0, 0};
 
   // Row of widget rects for current pane
   struct WidgetClickRect {

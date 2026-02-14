@@ -1,4 +1,6 @@
 #include "CountdownPanel.h"
+#include "../core/Astronomy.h"
+
 #include <cstdio>
 #include <ctime>
 
@@ -11,7 +13,8 @@ CountdownPanel::CountdownPanel(int x, int y, int w, int h, FontManager &fontMgr)
   t.tm_mon = 5; // June
   t.tm_mday = 27;
   t.tm_hour = 18;
-  targetTime_ = std::chrono::system_clock::from_time_t(timegm(&t));
+  targetTime_ =
+      std::chrono::system_clock::from_time_t(Astronomy::portable_timegm(&t));
 }
 
 void CountdownPanel::update() {}

@@ -1,9 +1,10 @@
 #pragma once
 
 #include "../core/Logger.h"
-#include <SDL2/SDL.h>
-#include <SDL2/SDL_image.h>
+#include <SDL.h>
+#include <SDL_image.h>
 
+#include <algorithm>
 #include <cmath>
 #include <map>
 #include <string>
@@ -74,13 +75,7 @@ public:
       return nullptr;
     }
 
-    // std::fprintf(stderr, "TextureManager: decoding %s (%u bytes)...\n",
-    //              key.c_str(), size);
-    // Try auto-detection first
-    SDL_Surface *surface = IMG_Load_RW(rw, 0); // 0 = don't close rw yet
-
-    // If auto-detection fails, try explicit formats common for our data
-    // providers
+    SDL_Surface *surface = IMG_Load_RW(rw, 0);
     if (!surface) {
       SDL_RWseek(rw, 0, RW_SEEK_SET);
       surface = IMG_LoadTyped_RW(rw, 0, "PNG");
@@ -89,14 +84,39 @@ public:
       SDL_RWseek(rw, 0, RW_SEEK_SET);
       surface = IMG_LoadTyped_RW(rw, 0, "JPG");
     }
-
-    // Close RWops now that we are done
     SDL_RWclose(rw);
 
     if (!surface) {
-      LOG_E("TextureManager", "IMG_Load_RW/Typed failed for {}: {}", key,
+      LOG_E("TextureManager", "IMG_Load failed for {}: {}", key,
             IMG_GetError());
       return nullptr;
+    }
+
+    // Always convert to a consistent 32-bit format (RGBA32) to ensure
+    // AlphaMod and BlendMode support across all drivers.
+    SDL_Surface *rgbaSurface =
+        SDL_ConvertSurfaceFormat(surface, SDL_PIXELFORMAT_RGBA32, 0);
+    SDL_FreeSurface(surface);
+    if (!rgbaSurface) {
+      LOG_E("TextureManager", "SDL_ConvertSurfaceFormat failed for {}", key);
+      return nullptr;
+    }
+    surface = rgbaSurface;
+
+    // Specialized Logic: If this is the night map, generate an alpha channel
+    // from pixel brightness.
+    if (key == "night_map") {
+      uint32_t *pix = (uint32_t *)surface->pixels;
+      int count = surface->w * surface->h;
+      for (int i = 0; i < count; ++i) {
+        uint32_t p = pix[i];
+        uint8_t r, g, b, a;
+        SDL_GetRGBA(p, surface->format, &r, &g, &b, &a);
+        uint8_t br = std::max({r, g, b});
+        pix[i] = SDL_MapRGBA(surface->format, r, g, b, br);
+      }
+      LOG_I("TextureManager", "Generated alpha channel from brightness for {}",
+            key);
     }
 
     // Hardware Limit Check: Downscale if surface exceeds GPU's max texture size
@@ -108,24 +128,17 @@ public:
       if (info.max_texture_width > 0 && info.max_texture_height > 0 &&
           (surface->w > info.max_texture_width ||
            surface->h > info.max_texture_height)) {
-        float scaleW = (float)info.max_texture_width / (float)surface->w;
-        float scaleH = (float)info.max_texture_height / (float)surface->h;
-        float scale = std::min(scaleW, scaleH);
-
+        float scale = std::min((float)info.max_texture_width / surface->w,
+                               (float)info.max_texture_height / surface->h);
         int newW = (int)(surface->w * scale);
         int newH = (int)(surface->h * scale);
-
-        LOG_W("TextureManager",
-              "Image exceeds max texture size ({}x{}). Downscaling to {}x{}...",
-              info.max_texture_width, info.max_texture_height, newW, newH);
-
+        LOG_W("TextureManager", "Downscaling {} to {}x{}", key, newW, newH);
         finalSurface = SDL_CreateRGBSurfaceWithFormat(0, newW, newH, 32,
                                                       surface->format->format);
         if (finalSurface) {
           SDL_BlitScaled(surface, nullptr, finalSurface, nullptr);
           mustFreeFinal = true;
         } else {
-          LOG_E("TextureManager", "Downscaling failed!");
           finalSurface = surface;
         }
       }
@@ -137,45 +150,35 @@ public:
     SDL_FreeSurface(surface);
 
     if (!texture) {
-      LOG_E("TextureManager", "SDL_CreateTextureFromSurface failed for {}: {}",
-            key, SDL_GetError());
+      LOG_E("TextureManager", "SDL_CreateTextureFromSurface failed for {}",
+            key);
       return nullptr;
     }
 
-    // Successfully loaded new texture, now safely replace cache
+    SDL_SetTextureBlendMode(texture, SDL_BLENDMODE_BLEND);
+
     auto it = cache_.find(key);
     if (it != cache_.end()) {
       SDL_DestroyTexture(it->second);
-      cache_.erase(it);
     }
-
-    LOG_D("TextureManager", "Successfully created texture for {}", key);
     cache_[key] = texture;
+    LOG_I("TextureManager", "Created texture for {}", key);
     return texture;
   }
 
-  // Generate a procedural equirectangular Earth fallback (dark blue + grid
-  // lines).
+  // Generate a procedural equirectangular Earth fallback.
   SDL_Texture *generateEarthFallback(SDL_Renderer *renderer,
                                      const std::string &key, int width,
                                      int height) {
-    auto it = cache_.find(key);
-    if (it != cache_.end())
-      return it->second;
-
     SDL_Texture *texture =
-        SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888,
+        SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32,
                           SDL_TEXTUREACCESS_TARGET, width, height);
     if (!texture)
       return nullptr;
 
     SDL_SetRenderTarget(renderer, texture);
-
-    // Dark blue ocean
     SDL_SetRenderDrawColor(renderer, 10, 20, 60, 255);
     SDL_RenderClear(renderer);
-
-    // Grid lines every 30 degrees
     SDL_SetRenderDrawColor(renderer, 40, 60, 100, 255);
     for (int lonDeg = -180; lonDeg <= 180; lonDeg += 30) {
       int px = static_cast<int>((lonDeg + 180.0) / 360.0 * width);
@@ -185,110 +188,120 @@ public:
       int py = static_cast<int>((90.0 - latDeg) / 180.0 * height);
       SDL_RenderDrawLine(renderer, 0, py, width, py);
     }
-
-    // Equator in slightly brighter color
-    SDL_SetRenderDrawColor(renderer, 60, 90, 140, 255);
-    int eqY = height / 2;
-    SDL_RenderDrawLine(renderer, 0, eqY, width, eqY);
-
-    // Prime meridian
-    int pmX = width / 2;
-    SDL_RenderDrawLine(renderer, pmX, 0, pmX, height);
-
     SDL_SetRenderTarget(renderer, nullptr);
     cache_[key] = texture;
     return texture;
   }
 
-  // Generate a 1x64 texture with a central alpha peak for anti-aliased lines.
+  // Generate a procedural 1x64 texture for anti-aliased lines.
   SDL_Texture *generateLineTexture(SDL_Renderer *renderer,
                                    const std::string &key) {
-    auto it = cache_.find(key);
-    if (it != cache_.end())
-      return it->second;
-
     constexpr int h = 64;
-    SDL_Texture *texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888,
-                                             SDL_TEXTUREACCESS_STATIC, 1, h);
-    if (!texture)
+    SDL_Surface *surf =
+        SDL_CreateRGBSurfaceWithFormat(0, 1, h, 32, SDL_PIXELFORMAT_RGBA32);
+    if (!surf)
       return nullptr;
-
-    uint32_t pixels[h];
+    uint32_t *pix = (uint32_t *)surf->pixels;
     for (int i = 0; i < h; ++i) {
-      float y = (static_cast<float>(i) / (h - 1)) * 2.0f - 1.0f; // -1 to 1
-      float alpha = std::exp(-y * y * 8.0f); // Gaussian falloff
-      if (alpha < 1e-3f)
+      float y = (static_cast<float>(i) / (h - 1)) * 2.0f - 1.0f;
+      float alpha = std::exp(-y * y * 8.0f);
+      if (alpha < 0.001f)
         alpha = 0;
-      uint8_t a = static_cast<uint8_t>(alpha * 255.0f);
-      // RGBA8888: [R, G, B, A] in memory? SDL_BYTEORDER check would be better
-      // but usually 0xRRGGBBAA or 0xAABBGGRR.
-      // Let's use SDL_MapRGBA to be safe if we had a surface, but here we
-      // just want white.
-      pixels[i] = (0xFF << 24) | (0xFF << 16) | (0xFF << 8) | a;
+      pix[i] =
+          SDL_MapRGBA(surf->format, 255, 255, 255, (uint8_t)(alpha * 255.0f));
     }
-
-    SDL_UpdateTexture(texture, nullptr, pixels, 1 * sizeof(uint32_t));
-    SDL_SetTextureBlendMode(texture, SDL_BLENDMODE_BLEND);
-    cache_[key] = texture;
-    return texture;
+    SDL_Texture *tex = SDL_CreateTextureFromSurface(renderer, surf);
+    SDL_FreeSurface(surf);
+    if (tex) {
+      SDL_SetTextureBlendMode(tex, SDL_BLENDMODE_BLEND);
+      cache_[key] = tex;
+    }
+    return tex;
   }
 
-  // Generate textures for markers (circle and square) with anti-aliased edges.
+  // Generate circle and square markers.
   void generateMarkerTextures(SDL_Renderer *renderer) {
-    if (cache_.count("marker_circle") && cache_.count("marker_square"))
-      return;
-
     constexpr int sz = 64;
     constexpr int center = sz / 2;
     constexpr float r = sz / 2.0f - 2.0f;
 
-    // 1. Circle Marker
-    SDL_Texture *circle = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888,
-                                            SDL_TEXTUREACCESS_STATIC, sz, sz);
-    uint32_t *cPixels = new uint32_t[sz * sz];
+    SDL_Surface *cSurf =
+        SDL_CreateRGBSurfaceWithFormat(0, sz, sz, 32, SDL_PIXELFORMAT_RGBA32);
+    SDL_Surface *sSurf =
+        SDL_CreateRGBSurfaceWithFormat(0, sz, sz, 32, SDL_PIXELFORMAT_RGBA32);
+    if (!cSurf || !sSurf) {
+      if (cSurf)
+        SDL_FreeSurface(cSurf);
+      if (sSurf)
+        SDL_FreeSurface(sSurf);
+      return;
+    }
+
+    uint32_t *cPix = (uint32_t *)cSurf->pixels;
+    uint32_t *sPix = (uint32_t *)sSurf->pixels;
+
     for (int y = 0; y < sz; ++y) {
       for (int x = 0; x < sz; ++x) {
         float dx = x - center + 0.5f;
         float dy = y - center + 0.5f;
         float dist = std::sqrt(dx * dx + dy * dy);
-        float alpha = 0.0f;
-        if (dist < r - 1.0f)
-          alpha = 1.0f;
-        else if (dist < r + 1.0f)
-          alpha = 1.0f - (dist - (r - 1.0f)) / 2.0f;
+        float cA =
+            (dist < r - 1.0f)
+                ? 1.0f
+                : (dist < r + 1.0f ? 1.0f - (dist - (r - 1.0f)) / 2.0f : 0.0f);
+        float d = std::max(std::abs(dx), std::abs(dy));
+        float sA = (d < r - 1.0f)
+                       ? 1.0f
+                       : (d < r + 1.0f ? 1.0f - (d - (r - 1.0f)) / 2.0f : 0.0f);
 
-        uint8_t a = static_cast<uint8_t>(alpha * 255.0f);
-        cPixels[y * sz + x] = (0xFF << 24) | (0xFF << 16) | (0xFF << 8) | a;
+        cPix[y * sz + x] =
+            SDL_MapRGBA(cSurf->format, 255, 255, 255, (uint8_t)(cA * 255));
+        sPix[y * sz + x] =
+            SDL_MapRGBA(sSurf->format, 255, 255, 255, (uint8_t)(sA * 255));
       }
     }
-    SDL_UpdateTexture(circle, nullptr, cPixels, sz * sizeof(uint32_t));
-    SDL_SetTextureBlendMode(circle, SDL_BLENDMODE_BLEND);
-    cache_["marker_circle"] = circle;
-    delete[] cPixels;
 
-    // 2. Square Marker
-    SDL_Texture *square = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888,
-                                            SDL_TEXTUREACCESS_STATIC, sz, sz);
-    uint32_t *sPixels = new uint32_t[sz * sz];
-    for (int y = 0; y < sz; ++y) {
-      for (int x = 0; x < sz; ++x) {
-        float dx = std::abs(x - center + 0.5f);
-        float dy = std::abs(y - center + 0.5f);
-        float d = std::max(dx, dy);
-        float alpha = 0.0f;
-        if (d < r - 1.0f)
-          alpha = 1.0f;
-        else if (d < r + 1.0f)
-          alpha = 1.0f - (d - (r - 1.0f)) / 2.0f;
-
-        uint8_t a = static_cast<uint8_t>(alpha * 255.0f);
-        sPixels[y * sz + x] = (0xFF << 24) | (0xFF << 16) | (0xFF << 8) | a;
-      }
+    SDL_Texture *ct = SDL_CreateTextureFromSurface(renderer, cSurf);
+    SDL_Texture *st = SDL_CreateTextureFromSurface(renderer, sSurf);
+    if (ct) {
+      SDL_SetTextureBlendMode(ct, SDL_BLENDMODE_BLEND);
+      cache_["marker_circle"] = ct;
     }
-    SDL_UpdateTexture(square, nullptr, sPixels, sz * sizeof(uint32_t));
-    SDL_SetTextureBlendMode(square, SDL_BLENDMODE_BLEND);
-    cache_["marker_square"] = square;
-    delete[] sPixels;
+    if (st) {
+      SDL_SetTextureBlendMode(st, SDL_BLENDMODE_BLEND);
+      cache_["marker_square"] = st;
+    }
+    SDL_FreeSurface(cSurf);
+    SDL_FreeSurface(sSurf);
+  }
+
+  void generateWhiteTexture(SDL_Renderer *renderer) {
+    if (cache_.count("white"))
+      return;
+    uint8_t pix[4] = {255, 255, 255, 255};
+    SDL_Surface *s =
+        SDL_CreateRGBSurfaceWithFormat(0, 1, 1, 32, SDL_PIXELFORMAT_RGBA32);
+    *(uint32_t *)s->pixels = SDL_MapRGBA(s->format, 255, 255, 255, 255);
+    SDL_Texture *t = SDL_CreateTextureFromSurface(renderer, s);
+    SDL_FreeSurface(s);
+    if (t) {
+      SDL_SetTextureBlendMode(t, SDL_BLENDMODE_BLEND);
+      cache_["white"] = t;
+    }
+  }
+
+  void generateBlackTexture(SDL_Renderer *renderer) {
+    if (cache_.count("black"))
+      return;
+    SDL_Surface *s =
+        SDL_CreateRGBSurfaceWithFormat(0, 1, 1, 32, SDL_PIXELFORMAT_RGBA32);
+    *(uint32_t *)s->pixels = SDL_MapRGBA(s->format, 0, 0, 0, 255);
+    SDL_Texture *t = SDL_CreateTextureFromSurface(renderer, s);
+    SDL_FreeSurface(s);
+    if (t) {
+      SDL_SetTextureBlendMode(t, SDL_BLENDMODE_BLEND);
+      cache_["black"] = t;
+    }
   }
 
   SDL_Texture *get(const std::string &key) const {

@@ -1,6 +1,6 @@
 #include "DstPanel.h"
 #include "../core/Theme.h"
-#include <SDL2/SDL.h>
+#include <SDL.h>
 #include <cstdio>
 
 DstPanel::DstPanel(int x, int y, int w, int h, FontManager &fontMgr,

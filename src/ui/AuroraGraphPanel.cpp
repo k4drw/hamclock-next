@@ -1,7 +1,7 @@
 #include "AuroraGraphPanel.h"
 #include "../core/Theme.h"
 
-#include <SDL2/SDL.h>
+#include <SDL.h>
 #include <algorithm>
 #include <cmath>
 #include <cstdio>

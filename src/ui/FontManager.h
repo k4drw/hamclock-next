@@ -1,7 +1,7 @@
 #pragma once
 
-#include <SDL2/SDL.h>
-#include <SDL2/SDL_ttf.h>
+#include <SDL.h>
+#include <SDL_ttf.h>
 
 #include <algorithm>
 #include <cstdio>
@@ -96,7 +96,7 @@ public:
       TTF_SetFontStyle(font, prevStyle | TTF_STYLE_BOLD);
     }
 
-    SDL_Surface *surface = TTF_RenderText_Blended(font, text.c_str(), color);
+    SDL_Surface *surface = TTF_RenderUTF8_Blended(font, text.c_str(), color);
 
     // Restore previous style
     if (bold) {
