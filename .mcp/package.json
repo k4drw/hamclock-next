@@ -1,0 +1,22 @@
+{
+  "name": "hamclock-feature-bridge",
+  "version": "0.1.0",
+  "description": "MCP server for HamClock feature mapping between original and next codebases",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsc --watch"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "glob": "^11.0.0",
+    "marked": "^17.0.2"
+  },
+  "devDependencies": {
+    "@types/marked": "^5.0.2",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0"
+  }
+}
