@@ -1,0 +1,1922 @@
+{
+  "version": "1.0",
+  "updated_at": "2026-02-13T15:43:29.625Z",
+  "features": [
+    {
+      "feature_id": "clock_callsign",
+      "name": "Clock & Callsign Display",
+      "category": "core_ui",
+      "description": "Main clock face showing UTC/local time and the operator's callsign. Includes analog/digital modes, date display, stopwatch, and auxiliary time zone.",
+      "original": {
+        "files": [
+          "clocks.cpp",
+          "callsign.cpp",
+          "stopwatch.cpp"
+        ],
+        "symbols": [
+          "drawMainPageStopwatch",
+          "updateClocks",
+          "drawCalTimeStamp",
+          "checkStopwatchTouch",
+          "NV_DE_CALL"
+        ],
+        "notes": "clocks.cpp is 47K lines and handles all clock modes. stopwatch.cpp is 97K — very feature-rich with lap timer, countdown, etc."
+      },
+      "next": {
+        "files": [
+          "src/ui/CallsignClock.cpp",
+          "src/ui/CallsignClock.h",
+          "src/ui/TimePanel.cpp",
+          "src/ui/TimePanel.h",
+          "src/ui/ClockAuxPanel.cpp",
+          "src/ui/ClockAuxPanel.h"
+        ],
+        "symbols": [
+          "CallsignClock",
+          "TimePanel",
+          "ClockAuxPanel"
+        ],
+        "notes": "Split into separate widgets for callsign, main time, and aux time. Stopwatch functionality is in CountdownPanel."
+      },
+      "status": "implemented",
+      "acceptance": [
+        "Callsign displayed prominently in top-left",
+        "UTC time displayed with seconds",
+        "Date or secondary timezone shown below clock",
+        "Clicking callsign area opens setup"
+      ]
+    },
+    {
+      "feature_id": "world_map",
+      "name": "World Map",
+      "category": "map",
+      "description": "Interactive azimuthal equidistant or Mercator projection world map with day/night terminator, great circle paths, grid overlays, and city markers.",
+      "original": {
+        "files": [
+          "earthmap.cpp",
+          "mapmanage.cpp",
+          "grayline.cpp",
+          "robinson.cpp",
+          "sphere.cpp",
+          "plotmap.cpp"
+        ],
+        "symbols": [
+          "drawEarth",
+          "drawDayNight",
+          "updateEarthMap",
+          "drawGreatCircle",
+          "mapmanage",
+          "updateGrayline"
+        ],
+        "notes": "earthmap.cpp (50K) handles core map rendering. mapmanage.cpp (52K) manages map state, projections, overlays. Multiple projection types available."
+      },
+      "next": {
+        "files": [
+          "src/ui/MapWidget.cpp",
+          "src/ui/MapWidget.h"
+        ],
+        "symbols": [
+          "MapWidget"
+        ],
+        "notes": "Single MapWidget handles azimuthal projection, day/night terminator with NASA Black Marble night lights, great circles, and NASA Blue Marble backgrounds. Missing: Robinson projection, Mercator, full overlay system."
+      },
+      "status": "implemented",
+      "acceptance": [
+        "Azimuthal equidistant projection centered on DE location",
+        "Day/night terminator with smooth gradient",
+        "Great circle path from DE to DX",
+        "Grid overlay (Maidenhead or lat/lon)",
+        "City markers for major cities",
+        "Map background images (NASA Blue Marble)",
+        "Night lights overlay (NASA Black Marble 2012)",
+        "Click to set DX location"
+      ],
+      "notes": "MapWidget enhanced with Phase 4 Interactive Map Enhancements:\n- **Tooltips**: Priority-based hit-testing for DE/DX markers, sun, satellite, DX cluster spots with auto-positioning and 3s fade-out.\n- **Mouse Motion**: Integrated onMouseMove() for real-time cursor tracking and tooltip updates.\n- **Enriched Debug Data**: getDebugData() now reports DE/DX positions, distance/bearing, sun position, satellite info, spot counts, and current tooltip.\n- **API Endpoints**: Added GET /get_dx.txt (DX location + distance/bearing) and GET /set_mappos (programmatic DE/DX setting).\n- **Helper Functions**: screenToLatLon() inverse projection for reusable coordinate conversion.\n- **FontManager Integration**: Tooltips rendered with proper font scaling.\n\nPhase 26: High-Fidelity Map Visuals:\n- **Night Lights**: Integrated NASA Black Marble 卫星 imagery for realistic city lights at night.\n- **Grid Mesh Rendering**: Shifted to hardware-accelerated triangle strips for smoother transitions and projection accuracy.\n\nRemaining items for future phases:\n- Robinson projection\n- Mercator projection\n- Full grid overlay system (Maidenhead/lat-lon toggle)\n- City markers\n- Additional semantic actions (zoom, projection switching)"
+    },
+    {
+      "feature_id": "de_info",
+      "name": "DE (Home Station) Info Panel",
+      "category": "core_ui",
+      "description": "Side panel showing DE station info: callsign, grid square, latitude/longitude, sunrise/sunset times, and prefix.",
+      "original": {
+        "files": [
+          "ESPHamClock.cpp"
+        ],
+        "symbols": [
+          "drawDEInfo",
+          "updateDEInfo",
+          "de_ll",
+          "de_info_b"
+        ],
+        "notes": "DE info is drawn within the main loop in ESPHamClock.cpp. Uses global de_ll for lat/lon."
+      },
+      "next": {
+        "files": [
+          "src/ui/DEInfo.cpp",
+          "src/ui/DEInfo.h"
+        ],
+        "symbols": [
+          "DEInfo"
+        ],
+        "notes": "Dedicated DEInfo widget. Shows grid, lat/lon, sunrise/sunset."
+      },
+      "status": "implemented",
+      "acceptance": [
+        "Shows DE callsign and grid square",
+        "Shows latitude and longitude",
+        "Shows sunrise/sunset times",
+        "Clicking opens location setup"
+      ]
+    },
+    {
+      "feature_id": "dx_info",
+      "name": "DX (Target Station) Info Panel",
+      "category": "core_ui",
+      "description": "Side panel showing DX target info: callsign, grid, distance, bearing, and path details.",
+      "original": {
+        "files": [
+          "ESPHamClock.cpp"
+        ],
+        "symbols": [
+          "drawDXInfo",
+          "updateDXInfo",
+          "dx_ll",
+          "dx_info_b"
+        ],
+        "notes": "DX info rendered in ESPHamClock.cpp main draw routines."
+      },
+      "next": {
+        "files": [
+          "src/ui/DXPanel.cpp",
+          "src/ui/DXPanel.h"
+        ],
+        "symbols": [
+          "DXPanel"
+        ],
+        "notes": "Dedicated DXPanel widget showing target info."
+      },
+      "status": "implemented",
+      "acceptance": [
+        "Shows DX callsign, grid, location",
+        "Shows distance and bearing from DE",
+        "Shows sunrise/sunset at DX location",
+        "Path info (short/long path)"
+      ]
+    },
+    {
+      "feature_id": "satellite_tracking",
+      "name": "Satellite Tracking",
+      "category": "data_panel",
+      "description": "Real-time satellite tracking with TLE data, polar plot, rise/set predictions, footprint on map, and pass scheduling.",
+      "original": {
+        "files": [
+          "earthsat.cpp",
+          "P13.cpp",
+          "P13.h",
+          "sattool.cpp"
+        ],
+        "symbols": [
+          "updateSatellite",
+          "drawSatOrbit",
+          "findNextPass",
+          "satSchedule",
+          "SAT_NAME"
+        ],
+        "notes": "earthsat.cpp is 76K — comprehensive satellite tracking. P13.cpp implements Plan 13 orbit propagation. sattool.cpp provides the satellite selection tool."
+      },
+      "next": {
+        "files": [
+          "src/core/SatelliteManager.cpp",
+          "src/core/SatelliteManager.h",
+          "src/ui/SatPanel.cpp",
+          "src/ui/SatPanel.h",
+          "src/ui/DXSatPane.cpp",
+          "src/ui/DXSatPane.h",
+          "src/core/OrbitPredictor.cpp",
+          "src/core/OrbitPredictor.h"
+        ],
+        "symbols": [
+          "SatelliteManager",
+          "SatPanel",
+          "DXSatPane",
+          "OrbitPredictor"
+        ],
+        "notes": "Uses libpredict instead of P13 for orbit propagation. SatelliteManager handles TLE fetching and prediction. SatPanel shows polar plot and pass info."
+      },
+      "status": "partial",
+      "acceptance": [
+        "Satellite selection from TLE catalog",
+        "Real-time position tracking on map",
+        "Polar plot showing current pass",
+        "Rise/set time predictions",
+        "Satellite footprint on map",
+        "Next-pass scheduling"
+      ],
+      "notes": "hamclock-next uses libpredict v2 instead of Plan 13. The core orbit math is different but the UI should match."
+    },
+    {
+      "feature_id": "dx_cluster",
+      "name": "DX Cluster",
+      "category": "data_panel",
+      "description": "Real-time DX Cluster spot display via Telnet connection to cluster nodes. Shows spotted callsigns, frequencies, and times. Spots can overlay on the map.",
+      "original": {
+        "files": [
+          "dxcluster.cpp"
+        ],
+        "symbols": [
+          "updateDXCluster",
+          "checkDXCluster",
+          "connectDXCluster",
+          "drawDXClusterSpots",
+          "parseDXClusterSpot"
+        ],
+        "notes": "dxcluster.cpp (40K) handles Telnet connections, spot parsing, display rendering, and map overlay. Supports multiple cluster node addresses."
+      },
+      "next": {
+        "files": [
+          "src/services/DXClusterProvider.cpp",
+          "src/services/DXClusterProvider.h",
+          "src/ui/DXClusterPanel.cpp",
+          "src/ui/DXClusterPanel.h",
+          "src/ui/DXClusterSetup.cpp",
+          "src/ui/DXClusterSetup.h",
+          "src/core/DXClusterData.h"
+        ],
+        "symbols": [
+          "DXClusterProvider",
+          "DXClusterPanel",
+          "DXClusterSetup",
+          "DXClusterData"
+        ],
+        "notes": "Structure exists with separate provider, panel, and setup components. Needs review for completeness of Telnet integration and map overlay."
+      },
+      "status": "partial",
+      "acceptance": [
+        "Connect to DX Cluster node via Telnet",
+        "Parse and display DX spots in scrollable list",
+        "Show spot frequency, callsign, spotter, time",
+        "Spots plotted on map with bearing lines",
+        "Cluster node configuration (host/port/login)",
+        "Auto-reconnect on disconnect"
+      ]
+    },
+    {
+      "feature_id": "live_spots",
+      "name": "Live Spots (PSK Reporter / WSPR)",
+      "category": "data_panel",
+      "description": "Real-time band activity from PSK Reporter and WSPR networks. Shows spots on map with band-colored markers and provides a list view.",
+      "original": {
+        "files": [
+          "pskreporter.cpp",
+          "spots.cpp",
+          "parsespot.cpp"
+        ],
+        "symbols": [
+          "updatePSKReporter",
+          "drawPSKSpots",
+          "checkPSK",
+          "parseSpot"
+        ],
+        "notes": "pskreporter.cpp (41K) handles API queries, spot management, and rendering. spots.cpp manages spot storage. parsespot.cpp parses various spot formats."
+      },
+      "next": {
+        "files": [
+          "src/services/LiveSpotProvider.cpp",
+          "src/services/LiveSpotProvider.h",
+          "src/ui/LiveSpotPanel.cpp",
+          "src/ui/LiveSpotPanel.h",
+          "src/core/LiveSpotData.h",
+          "src/ui/MapWidget.cpp"
+        ],
+        "symbols": [
+          "LiveSpotProvider",
+          "LiveSpotPanel",
+          "LiveSpotData"
+        ],
+        "notes": "Confirmed working per README. Uses PSK Reporter API for real-time band activity."
+      },
+      "status": "implemented",
+      "acceptance": [
+        "Fetch spots from PSK Reporter API",
+        "Display spots on map with band-colored markers",
+        "Band filter selection",
+        "Scrollable spot list with callsign, frequency, SNR",
+        "Auto-refresh on configurable interval"
+      ],
+      "notes": "Enhanced map rendering for live spots is complete. Band-coded Great Circle paths are now drawn.\nAPI endpoint `/debug/widgets` confirms `MapWidget` has spot stores wired up.\nReady for Phase 4 interactive map tasks.\n"
+    },
+    {
+      "feature_id": "solar_flux",
+      "name": "Solar Flux (SFI) Plot",
+      "category": "data_panel",
+      "description": "Historical 10.7cm solar flux index chart showing recent SFI values as a time-series plot.",
+      "original": {
+        "files": [
+          "spacewx.cpp"
+        ],
+        "symbols": [
+          "updateSolarFlux",
+          "drawSolarFlux",
+          "PLOT_CH_FLUX"
+        ],
+        "notes": "Part of the large spacewx.cpp (63K) which handles all space weather data fetching and plotting."
+      },
+      "next": {
+        "files": [
+          "src/ui/SolarPanel.cpp",
+          "src/ui/SolarPanel.h",
+          "src/core/SolarData.h"
+        ],
+        "symbols": [
+          "SolarPanel",
+          "SolarData"
+        ],
+        "notes": "SolarPanel exists. Unclear if it implements the full time-series plot or just current values."
+      },
+      "status": "partial",
+      "acceptance": [
+        "Fetch SFI data from NOAA/SWPC",
+        "Display as time-series plot (30-day history)",
+        "Show current value prominently",
+        "Color coding for conditions (good/fair/poor)"
+      ]
+    },
+    {
+      "feature_id": "kp_index",
+      "name": "Planetary K-Index Plot",
+      "category": "data_panel",
+      "description": "Planetary K-index (Kp) bar chart showing recent geomagnetic activity levels.",
+      "original": {
+        "files": [
+          "spacewx.cpp"
+        ],
+        "symbols": [
+          "updateKp",
+          "drawKp",
+          "PLOT_CH_KP"
+        ],
+        "notes": "Part of spacewx.cpp. Kp displayed as color-coded bar chart."
+      },
+      "next": {
+        "files": [
+          "src/ui/SpaceWeatherPanel.cpp",
+          "src/ui/SpaceWeatherPanel.h"
+        ],
+        "symbols": [
+          "SpaceWeatherPanel"
+        ],
+        "notes": "SpaceWeatherPanel may handle Kp along with other space weather metrics."
+      },
+      "status": "partial",
+      "acceptance": [
+        "Fetch Kp data from NOAA/SWPC",
+        "Display as color-coded bar chart",
+        "Show current Kp value",
+        "Storm-level indicators (G1-G5)"
+      ]
+    },
+    {
+      "feature_id": "sunspot_number",
+      "name": "Sunspot Number (SSN) Plot",
+      "category": "data_panel",
+      "description": "Sunspot number history chart showing recent SSN values.",
+      "original": {
+        "files": [
+          "spacewx.cpp"
+        ],
+        "symbols": [
+          "updateSSN",
+          "drawSSN",
+          "PLOT_CH_SSN"
+        ],
+        "notes": "Part of spacewx.cpp."
+      },
+      "next": {
+        "files": [
+          "src/ui/SpaceWeatherPanel.cpp",
+          "src/ui/SpaceWeatherPanel.h"
+        ],
+        "symbols": [
+          "SpaceWeatherPanel"
+        ],
+        "notes": "May be combined with other space weather displays."
+      },
+      "status": "partial",
+      "acceptance": [
+        "Fetch SSN data from NOAA/SWPC",
+        "Display as time-series plot",
+        "Show current SSN value"
+      ]
+    },
+    {
+      "feature_id": "xray_flux",
+      "name": "X-Ray Flux Plot",
+      "category": "data_panel",
+      "description": "Solar X-ray flux chart from GOES satellite data, showing flare activity.",
+      "original": {
+        "files": [
+          "spacewx.cpp"
+        ],
+        "symbols": [
+          "updateXRay",
+          "drawXRay",
+          "PLOT_CH_XRAY"
+        ],
+        "notes": "Part of spacewx.cpp. Shows GOES X-ray data with flare class indicators (C/M/X)."
+      },
+      "next": {
+        "files": [
+          "src/ui/SpaceWeatherPanel.cpp",
+          "src/ui/SpaceWeatherPanel.h"
+        ],
+        "symbols": [
+          "SpaceWeatherPanel"
+        ],
+        "notes": "May be combined with other space weather displays."
+      },
+      "status": "partial",
+      "acceptance": [
+        "Fetch GOES X-ray data from NOAA/SWPC",
+        "Display as time-series plot",
+        "Flare class indicators (C/M/X)",
+        "Current flux level prominently shown"
+      ]
+    },
+    {
+      "feature_id": "solar_wind",
+      "name": "Solar Wind Plot",
+      "category": "data_panel",
+      "description": "Solar wind speed and density chart from ACE/DSCOVR satellite data.",
+      "original": {
+        "files": [
+          "spacewx.cpp"
+        ],
+        "symbols": [
+          "updateSolarWind",
+          "drawSolarWind",
+          "PLOT_CH_SOLWIND"
+        ],
+        "notes": "Part of spacewx.cpp."
+      },
+      "next": {
+        "files": [
+          "src/ui/SpaceWeatherPanel.cpp",
+          "src/ui/SpaceWeatherPanel.h"
+        ],
+        "symbols": [
+          "SpaceWeatherPanel"
+        ]
+      },
+      "status": "partial",
+      "acceptance": [
+        "Fetch solar wind data from NOAA/SWPC",
+        "Display speed and density as time-series",
+        "Show current values"
+      ]
+    },
+    {
+      "feature_id": "bz_bt",
+      "name": "Bz/Bt (Interplanetary Magnetic Field)",
+      "category": "data_panel",
+      "description": "Interplanetary magnetic field Bz and Bt components chart.",
+      "original": {
+        "files": [
+          "spacewx.cpp"
+        ],
+        "symbols": [
+          "updateBzBt",
+          "drawBzBt",
+          "PLOT_CH_BZBT"
+        ],
+        "notes": "Part of spacewx.cpp."
+      },
+      "next": {
+        "files": [
+          "src/ui/SpaceWeatherPanel.cpp",
+          "src/ui/SpaceWeatherPanel.h"
+        ],
+        "symbols": [
+          "SpaceWeatherPanel"
+        ]
+      },
+      "status": "partial",
+      "acceptance": [
+        "Fetch IMF data from NOAA/SWPC",
+        "Display Bz and Bt as time-series",
+        "Southward Bz highlighted (geomagnetic storm indicator)"
+      ]
+    },
+    {
+      "feature_id": "noaa_space_weather",
+      "name": "NOAA Space Weather Scales",
+      "category": "data_panel",
+      "description": "NOAA Space Weather scales display showing current R (radio blackout), S (solar radiation), and G (geomagnetic storm) levels.",
+      "original": {
+        "files": [
+          "spacewx.cpp"
+        ],
+        "symbols": [
+          "updateNOAASW",
+          "drawNOAASW",
+          "PLOT_CH_NOAASPW"
+        ],
+        "notes": "Part of spacewx.cpp. Shows the 3-tier NOAA scale system."
+      },
+      "next": {
+        "files": [
+          "src/services/NOAAProvider.cpp",
+          "src/services/NOAAProvider.h",
+          "src/ui/SpaceWeatherPanel.cpp"
+        ],
+        "symbols": [
+          "NOAAProvider",
+          "SpaceWeatherPanel"
+        ],
+        "notes": "NOAAProvider fetches NOAA data. SpaceWeatherPanel likely renders it."
+      },
+      "status": "partial",
+      "acceptance": [
+        "Fetch NOAA space weather scales",
+        "Display R, S, G levels with color coding",
+        "Show current alert status"
+      ]
+    },
+    {
+      "feature_id": "dst_index",
+      "name": "Geomagnetic Disturbance (Dst)",
+      "category": "data_panel",
+      "description": "Dst index plot showing geomagnetic disturbance levels, useful for HF propagation assessment.",
+      "original": {
+        "files": [
+          "spacewx.cpp"
+        ],
+        "symbols": [
+          "updateDst",
+          "drawDst",
+          "PLOT_CH_DST"
+        ],
+        "notes": "Part of spacewx.cpp."
+      },
+      "next": {
+        "files": [
+          "src/ui/DstPanel.cpp",
+          "src/ui/DstPanel.h",
+          "src/core/DstStore.h"
+        ],
+        "symbols": [
+          "DstPanel",
+          "DstStore"
+        ]
+      },
+      "status": "implemented",
+      "acceptance": [
+        "Fetch Dst data from NOAA SWPC",
+        "Display as time-series plot in separate panel",
+        "Show current Dst value"
+      ]
+    },
+    {
+      "feature_id": "band_conditions",
+      "name": "Band Conditions (VOACAP)",
+      "category": "data_panel",
+      "description": "VOACAP-based band condition predictions showing propagation reliability for each amateur band between DE and DX locations.",
+      "original": {
+        "files": [
+          "bands.cpp"
+        ],
+        "symbols": [
+          "updateBandConditions",
+          "drawBandConditions",
+          "PLOT_CH_BC"
+        ],
+        "notes": "bands.cpp (7K) fetches VOACAP predictions and renders band condition bars."
+      },
+      "next": {
+        "files": [
+          "src/services/BandConditionsProvider.cpp",
+          "src/services/BandConditionsProvider.h",
+          "src/ui/BandConditionsPanel.cpp",
+          "src/ui/BandConditionsPanel.h",
+          "src/core/BandConditionsData.h"
+        ],
+        "symbols": [
+          "BandConditionsProvider",
+          "BandConditionsPanel",
+          "BandConditionsData"
+        ],
+        "notes": "Structure exists. Needs review for completeness."
+      },
+      "status": "partial",
+      "acceptance": [
+        "Fetch VOACAP predictions for DE-DX path",
+        "Display per-band reliability (160m through 6m)",
+        "Color-coded bars (green/yellow/red)",
+        "Update when DX location changes"
+      ]
+    },
+    {
+      "feature_id": "moon",
+      "name": "Moon Phase & Position",
+      "category": "data_panel",
+      "description": "Moon phase display showing current illumination, elevation, azimuth, and rise/set times. Includes EME (Earth-Moon-Earth) path info.",
+      "original": {
+        "files": [
+          "moonpane.cpp",
+          "astro.cpp"
+        ],
+        "symbols": [
+          "drawMoonPane",
+          "updateMoon",
+          "PLOT_CH_MOON"
+        ],
+        "notes": "moonpane.cpp (4K) renders the moon pane. astro.cpp (31K) provides astronomical calculations."
+      },
+      "next": {
+        "files": [
+          "src/services/MoonProvider.cpp",
+          "src/services/MoonProvider.h",
+          "src/ui/MoonPanel.cpp",
+          "src/ui/MoonPanel.h",
+          "src/core/MoonData.h"
+        ],
+        "symbols": [
+          "MoonProvider",
+          "MoonPanel",
+          "MoonData"
+        ]
+      },
+      "status": "implemented",
+      "acceptance": [
+        "Moon phase visualization",
+        "Current elevation and azimuth",
+        "Moonrise/moonset times",
+        "EME path loss calculation"
+      ]
+    },
+    {
+      "feature_id": "weather_de",
+      "name": "Weather at DE Location",
+      "category": "data_panel",
+      "description": "Current weather conditions at the DE (home) location.",
+      "original": {
+        "files": [
+          "wx.cpp"
+        ],
+        "symbols": [
+          "updateWx",
+          "drawDEWx",
+          "PLOT_CH_DEWX"
+        ],
+        "notes": "wx.cpp (30K) handles weather data for both DE and DX locations."
+      },
+      "next": {
+        "files": [
+          "src/services/WeatherProvider.cpp",
+          "src/services/WeatherProvider.h",
+          "src/ui/WeatherPanel.cpp",
+          "src/ui/WeatherPanel.h",
+          "src/core/WeatherData.h"
+        ],
+        "symbols": [
+          "WeatherProvider",
+          "WeatherPanel",
+          "WeatherData"
+        ],
+        "notes": "Weather infrastructure exists but completeness unclear."
+      },
+      "status": "partial",
+      "acceptance": [
+        "Fetch weather data for DE location",
+        "Display temperature, humidity, wind, conditions",
+        "Weather icon or description",
+        "Auto-update periodically"
+      ]
+    },
+    {
+      "feature_id": "weather_dx",
+      "name": "Weather at DX Location",
+      "category": "data_panel",
+      "description": "Current weather conditions at the DX (target) location.",
+      "original": {
+        "files": [
+          "wx.cpp"
+        ],
+        "symbols": [
+          "drawDXWx",
+          "PLOT_CH_DXWX"
+        ],
+        "notes": "Part of wx.cpp, same data source as DE weather."
+      },
+      "next": {
+        "files": [
+          "src/services/WeatherProvider.cpp",
+          "src/ui/WeatherPanel.cpp",
+          "src/ui/DXSatPane.h",
+          "src/ui/DXSatPane.cpp",
+          "src/ui/DXPanel.h",
+          "src/ui/DXPanel.cpp",
+          "src/main.cpp",
+          "src/ui/MapWidget.cpp"
+        ],
+        "symbols": [
+          "WeatherProvider",
+          "WeatherPanel",
+          "DXPanel::getDebugData",
+          "DXSatPane::getDebugData",
+          "MapWidget::renderDXClusterSpots"
+        ],
+        "notes": "May share provider with DE weather, differentiated by target."
+      },
+      "status": "implemented",
+      "acceptance": [
+        "Fetch weather for DX location",
+        "Display same metrics as DE weather",
+        "Update when DX location changes"
+      ],
+      "notes": "Implemented `weather_dx` specifically as part of `DXPanel`, mirroring `LocalPanel`'s `WeatherStore` usage.\n- Integrated `dxWeatherStore` into `DXSatPane` (and `DXPanel`).\n- `DXPanel` now renders 2 extra lines for DX weather (Temp/Hum, Pressure/Wind).\n- `DXPanel` and `DXSatPane` now expose this via `getDebugData` in the API.\n- Also enhanced `MapWidget` spot plotting (renderDXClusterSpots) with Great Circle paths and band-coded colors as part of this work block.\n"
+    },
+    {
+      "feature_id": "sdo_images",
+      "name": "SDO Solar Images",
+      "category": "data_panel",
+      "description": "Solar Dynamics Observatory images showing the sun in various wavelengths.",
+      "original": {
+        "files": [
+          "sdo.cpp"
+        ],
+        "symbols": [
+          "updateSDO",
+          "drawSDO",
+          "PLOT_CH_SDO"
+        ],
+        "notes": "sdo.cpp (13K) fetches and displays SDO images. Multiple wavelength options."
+      },
+      "next": {
+        "files": [
+          "src/services/SDOProvider.cpp",
+          "src/services/SDOProvider.h",
+          "src/ui/SDOPanel.cpp",
+          "src/ui/SDOPanel.h"
+        ],
+        "symbols": [
+          "SDOProvider",
+          "SDOPanel"
+        ]
+      },
+      "status": "implemented",
+      "acceptance": [
+        "Fetch SDO images from NASA",
+        "Display solar image in panel",
+        "Multiple wavelength/channel selection",
+        "Auto-refresh"
+      ]
+    },
+    {
+      "feature_id": "drap",
+      "name": "D-Region Absorption Predictions",
+      "category": "data_panel",
+      "description": "DRAP map showing D-region absorption predictions affecting HF radio propagation.",
+      "original": {
+        "files": [
+          "spacewx.cpp"
+        ],
+        "symbols": [
+          "updateDRAP",
+          "drawDRAP",
+          "PLOT_CH_DRAP"
+        ],
+        "notes": "Part of spacewx.cpp. Fetches DRAP image from NOAA."
+      },
+      "next": {
+        "files": [
+          "src/services/DRAPProvider.cpp",
+          "src/services/DRAPProvider.h",
+          "src/ui/DRAPPanel.cpp",
+          "src/ui/DRAPPanel.h"
+        ],
+        "symbols": [
+          "DRAPProvider",
+          "DRAPPanel"
+        ]
+      },
+      "status": "implemented",
+      "acceptance": [
+        "Fetch DRAP data/image from NOAA",
+        "Display absorption map",
+        "Color-coded absorption levels"
+      ]
+    },
+    {
+      "feature_id": "aurora",
+      "name": "Aurora Forecast",
+      "category": "data_panel",
+      "description": "Aurora oval forecast map showing expected auroral activity.",
+      "original": {
+        "files": [
+          "spacewx.cpp"
+        ],
+        "symbols": [
+          "updateAurora",
+          "drawAurora",
+          "PLOT_CH_AURORA"
+        ],
+        "notes": "Part of spacewx.cpp."
+      },
+      "next": {
+        "files": [
+          "src/services/AuroraProvider.cpp",
+          "src/services/AuroraProvider.h",
+          "src/ui/AuroraPanel.cpp",
+          "src/ui/AuroraPanel.h"
+        ],
+        "symbols": [
+          "AuroraProvider",
+          "AuroraPanel"
+        ]
+      },
+      "status": "implemented",
+      "acceptance": [
+        "Fetch aurora forecast from NOAA OVATION",
+        "Display aurora oval on panel",
+        "Show probability at DE location"
+      ]
+    },
+    {
+      "feature_id": "contests",
+      "name": "Contest Calendar",
+      "category": "data_panel",
+      "description": "List of current and upcoming amateur radio contests with dates, modes, and links.",
+      "original": {
+        "files": [
+          "contests.cpp"
+        ],
+        "symbols": [
+          "updateContests",
+          "drawContests",
+          "checkContestTouch",
+          "PLOT_CH_CONTESTS"
+        ],
+        "notes": "contests.cpp (22K) handles contest data fetching, parsing, and display."
+      },
+      "next": {
+        "files": [
+          "src/services/ContestProvider.cpp",
+          "src/services/ContestProvider.h",
+          "src/ui/ContestPanel.cpp",
+          "src/ui/ContestPanel.h",
+          "src/core/ContestData.h"
+        ],
+        "symbols": [
+          "ContestProvider",
+          "ContestPanel",
+          "ContestData"
+        ]
+      },
+      "status": "partial",
+      "acceptance": [
+        "Fetch contest calendar data",
+        "Display scrollable list of contests",
+        "Show contest name, dates, mode, bands",
+        "Highlight active contests",
+        "Tappable for details"
+      ]
+    },
+    {
+      "feature_id": "on_the_air",
+      "name": "On The Air (POTA/SOTA)",
+      "category": "data_panel",
+      "description": "Parks on the Air (POTA) and Summits on the Air (SOTA) activator spotting. Shows current activators with park/summit reference and frequency.",
+      "original": {
+        "files": [
+          "ontheair.cpp"
+        ],
+        "symbols": [
+          "updateOnTheAir",
+          "drawOnTheAir",
+          "checkOnTheAirTouch",
+          "PLOT_CH_ONTA"
+        ],
+        "notes": "ontheair.cpp (27K) handles both POTA and SOTA data fetching and display."
+      },
+      "next": {
+        "files": [
+          "src/services/ActivityProvider.cpp",
+          "src/services/ActivityProvider.h",
+          "src/ui/ActivityPanels.cpp",
+          "src/ui/ActivityPanels.h",
+          "src/core/ActivityData.h"
+        ],
+        "symbols": [
+          "ActivityProvider",
+          "ActivityPanels",
+          "ActivityData"
+        ],
+        "notes": "Named 'Activity' in the next codebase. Structure exists."
+      },
+      "status": "partial",
+      "acceptance": [
+        "Fetch POTA activator data from API",
+        "Fetch SOTA activator data from API",
+        "Display scrollable list of activators",
+        "Show callsign, reference, frequency, mode",
+        "Spots on map",
+        "Toggle between POTA and SOTA views"
+      ]
+    },
+    {
+      "feature_id": "adif",
+      "name": "ADIF Log Viewer",
+      "category": "data_panel",
+      "description": "Visualizer for ADIF (Amateur Data Interchange Format) log files. Shows QSO history on map and in list form.",
+      "original": {
+        "files": [
+          "adif.cpp",
+          "adif_parser.cpp"
+        ],
+        "symbols": [
+          "updateADIF",
+          "drawADIF",
+          "parseADIF",
+          "PLOT_CH_ADIF"
+        ],
+        "notes": "adif.cpp (16K) handles display and map overlay. adif_parser.cpp (24K) parses ADIF files."
+      },
+      "next": {
+        "files": [
+          "src/services/ADIFProvider.cpp",
+          "src/services/ADIFProvider.h",
+          "src/ui/ADIFPanel.cpp",
+          "src/ui/ADIFPanel.h"
+        ],
+        "symbols": [
+          "ADIFProvider",
+          "ADIFPanel"
+        ],
+        "notes": "Structure exists but completeness unclear."
+      },
+      "status": "partial",
+      "acceptance": [
+        "Parse ADIF log files",
+        "Display QSO list with callsign, date, band, mode",
+        "Plot QSO locations on map",
+        "Filter by band, mode, or date range",
+        "ADIF file selection/loading"
+      ]
+    },
+    {
+      "feature_id": "rss_banner",
+      "name": "RSS News Banner",
+      "category": "core_ui",
+      "description": "Scrolling news ticker at bottom of map area showing headlines from amateur radio RSS feeds.",
+      "original": {
+        "files": [
+          "rss.cpp"
+        ],
+        "symbols": [
+          "updateRSS",
+          "drawRSSBanner",
+          "scrollRSS"
+        ],
+        "notes": "rss.cpp (16K) handles RSS feed fetching, parsing, and smooth scrolling display."
+      },
+      "next": {
+        "files": [
+          "src/services/RSSProvider.cpp",
+          "src/services/RSSProvider.h",
+          "src/ui/RSSBanner.cpp",
+          "src/ui/RSSBanner.h",
+          "src/core/RSSData.h"
+        ],
+        "symbols": [
+          "RSSProvider",
+          "RSSBanner",
+          "RSSData"
+        ]
+      },
+      "status": "implemented",
+      "acceptance": [
+        "Fetch RSS feeds from multiple ham radio news sources",
+        "Smooth scrolling text banner at map bottom",
+        "Clickable headlines (open URL)",
+        "Configurable feed list"
+      ]
+    },
+    {
+      "feature_id": "ncdxf_beacons",
+      "name": "NCDXF Beacon Monitor",
+      "category": "data_panel",
+      "description": "NCDXF/IARU International Beacon Project monitor showing which beacon is currently transmitting on which band.",
+      "original": {
+        "files": [
+          "ncdxf.cpp"
+        ],
+        "symbols": [
+          "updateBeacons",
+          "drawBeaconBox",
+          "BRB_SHOW_BEACONS"
+        ],
+        "notes": "ncdxf.cpp (10K) shows the beacon transmission schedule in the NCDXF box area."
+      },
+      "next": {
+        "files": [
+          "src/services/BeaconProvider.h",
+          "src/ui/BeaconPanel.cpp",
+          "src/ui/BeaconPanel.h",
+          "src/core/BeaconData.h"
+        ],
+        "symbols": [
+          "BeaconProvider",
+          "BeaconPanel",
+          "BeaconData"
+        ],
+        "notes": "BeaconProvider.h exists but no .cpp — may be header-only or incomplete."
+      },
+      "status": "partial",
+      "acceptance": [
+        "Show NCDXF beacon transmission schedule",
+        "Highlight currently transmitting beacon",
+        "Show beacon location on map",
+        "Cycle through bands (14-28 MHz)"
+      ]
+    },
+    {
+      "feature_id": "countdown_timer",
+      "name": "Countdown Timer",
+      "category": "data_panel",
+      "description": "User-configurable countdown timer with alarm. Can count down to a contest start, satellite pass, or custom event.",
+      "original": {
+        "files": [
+          "stopwatch.cpp"
+        ],
+        "symbols": [
+          "drawCountdown",
+          "updateCountdown",
+          "PLOT_CH_COUNTDOWN"
+        ],
+        "notes": "Countdown is part of the massive stopwatch.cpp (97K). Includes lap timer, countdown, and alarm features."
+      },
+      "next": {
+        "files": [
+          "src/ui/CountdownPanel.cpp",
+          "src/ui/CountdownPanel.h"
+        ],
+        "symbols": [
+          "CountdownPanel"
+        ],
+        "notes": "Dedicated CountdownPanel exists."
+      },
+      "status": "partial",
+      "acceptance": [
+        "Set target date/time for countdown",
+        "Display remaining time (days, hours, minutes, seconds)",
+        "Visual or audio alarm when countdown reaches zero",
+        "Configurable event name"
+      ]
+    },
+    {
+      "feature_id": "rotator_gimbal",
+      "name": "Rotator/Gimbal Control",
+      "category": "hardware",
+      "description": "Antenna rotator control and position display. Shows current azimuth and allows rotation to target bearing.",
+      "original": {
+        "files": [
+          "gimbal.cpp"
+        ],
+        "symbols": [
+          "updateGimbal",
+          "drawGimbal",
+          "checkGimbalTouch",
+          "PLOT_CH_GIMBAL"
+        ],
+        "notes": "gimbal.cpp (36K) handles rotator communication and UI."
+      },
+      "next": {
+        "files": [
+          "src/ui/GimbalPanel.cpp",
+          "src/ui/GimbalPanel.h"
+        ],
+        "symbols": [
+          "GimbalPanel"
+        ],
+        "notes": "GimbalPanel UI exists. Hardware integration status unclear."
+      },
+      "status": "partial",
+      "acceptance": [
+        "Display current rotator position (azimuth)",
+        "Rotate to target bearing",
+        "Visual compass display",
+        "Support common rotator protocols (Yaesu GS-232, etc.)"
+      ]
+    },
+    {
+      "feature_id": "setup_config",
+      "name": "Setup & Configuration",
+      "category": "infrastructure",
+      "description": "Configuration screen for callsign, location, WiFi, cluster settings, and all application preferences.",
+      "original": {
+        "files": [
+          "setup.cpp",
+          "configs.cpp",
+          "nvram.cpp"
+        ],
+        "symbols": [
+          "initSetup",
+          "runSetup",
+          "readCalLocation",
+          "NVReadString",
+          "NVWriteString"
+        ],
+        "notes": "setup.cpp is 207K — the largest file in the original. configs.cpp (28K) manages config persistence. nvram.cpp (20K) provides NV storage abstraction."
+      },
+      "next": {
+        "files": [
+          "src/core/ConfigManager.cpp",
+          "src/core/ConfigManager.h",
+          "src/ui/SetupScreen.cpp",
+          "src/ui/SetupScreen.h"
+        ],
+        "symbols": [
+          "ConfigManager",
+          "SetupScreen"
+        ],
+        "notes": "ConfigManager handles JSON-based config persistence. SetupScreen provides the setup UI. Much simpler than the original's 207K setup.cpp."
+      },
+      "status": "partial",
+      "acceptance": [
+        "Callsign entry",
+        "Location setting (grid square or lat/lon or map click)",
+        "DX Cluster configuration",
+        "Display preferences (theme, brightness)",
+        "Configuration persisted to disk"
+      ]
+    },
+    {
+      "feature_id": "web_server",
+      "name": "Embedded Web Server",
+      "category": "infrastructure",
+      "description": "HTTP web server providing live view, remote control, REST API, and debug endpoints.",
+      "original": {
+        "files": [
+          "webserver.cpp",
+          "liveweb.cpp",
+          "liveweb-html.cpp"
+        ],
+        "symbols": [
+          "checkWebServer",
+          "handleWebRequest"
+        ],
+        "notes": "webserver.cpp (142K) is the second-largest file. liveweb.cpp (32K) provides the live web view."
+      },
+      "next": {
+        "files": [
+          "src/network/WebServer.cpp",
+          "src/network/WebServer.h"
+        ],
+        "symbols": [
+          "WebServer"
+        ],
+        "notes": "Confirmed working per API.md. Provides /live.jpg, /debug/widgets, /debug/click, /set_touch, /set_char, etc."
+      },
+      "status": "implemented",
+      "acceptance": [
+        "HTTP server on configurable port",
+        "Live JPEG screenshot endpoint",
+        "Remote touch/keyboard input",
+        "Debug widget introspection",
+        "Config reporting endpoints"
+      ],
+      "notes": "WebServer enhanced with Phase 4 API endpoints:\n- **GET /get_dx.txt**: Reports DX grid, lat/lon, distance (km), and bearing (degrees).\n- **GET /set_mappos?lat=F&lon=F&target=de|dx**: Programmatically sets DE or DX location on the map, returns JSON with computed Maidenhead grid.\n- Both endpoints integrate with Astronomy utilities for distance/bearing calculations and grid conversion.\n\nAll acceptance criteria met. Full API documented in API.md."
+    },
+    {
+      "feature_id": "network_manager",
+      "name": "Network Manager",
+      "category": "infrastructure",
+      "description": "HTTP client for fetching external data. Handles caching, retries, and connection management.",
+      "original": {
+        "files": [
+          "wifi.cpp"
+        ],
+        "symbols": [
+          "httpGET",
+          "wifiOk",
+          "initWiFi"
+        ],
+        "notes": "wifi.cpp (78K) handles all network operations including WiFi management (for ESP32), HTTP requests, and connection status."
+      },
+      "next": {
+        "files": [
+          "src/network/NetworkManager.cpp",
+          "src/network/NetworkManager.h"
+        ],
+        "symbols": [
+          "NetworkManager"
+        ],
+        "notes": "Uses libcurl. Implements lean caching with HTTP HEAD validation (ETag/Last-Modified)."
+      },
+      "status": "implemented",
+      "acceptance": [
+        "HTTP GET/POST via libcurl",
+        "Response caching with validation",
+        "Connection status reporting",
+        "Timeout and retry handling"
+      ]
+    },
+    {
+      "feature_id": "widget_selector",
+      "name": "Widget/Pane Selector Menu",
+      "category": "core_ui",
+      "description": "Menu system for selecting which widget to display in each configurable pane slot. Long-press or tap on a pane to open the selector.",
+      "original": {
+        "files": [
+          "menu.cpp",
+          "plotmgmnt.cpp"
+        ],
+        "symbols": [
+          "runMenu",
+          "drawMenu",
+          "plotmgmnt",
+          "insureCountdownPaneSensible"
+        ],
+        "notes": "menu.cpp (31K) provides the selection menu. plotmgmnt.cpp (23K) manages pane assignments and constraints."
+      },
+      "next": {
+        "files": [
+          "src/ui/WidgetSelector.cpp",
+          "src/ui/WidgetSelector.h",
+          "src/core/WidgetType.h",
+          "src/core/UIRegistry.h"
+        ],
+        "symbols": [
+          "WidgetSelector",
+          "WidgetType",
+          "UIRegistry"
+        ],
+        "notes": "WidgetSelector handles pane assignment. WidgetType.h defines available types. UIRegistry tracks active widgets."
+      },
+      "status": "partial",
+      "acceptance": [
+        "Long-press/tap on pane opens widget selector",
+        "List all available widgets for that pane slot",
+        "Selecting a widget replaces the current one",
+        "Remember pane assignments across restarts"
+      ]
+    },
+    {
+      "feature_id": "prefix_lookup",
+      "name": "Callsign Prefix Lookup",
+      "category": "utility",
+      "description": "DXCC entity lookup from callsign prefix. Maps callsigns to countries, CQ/ITU zones, and coordinates.",
+      "original": {
+        "files": [
+          "prefixes.cpp",
+          "callsign.cpp"
+        ],
+        "symbols": [
+          "findCallPrefix",
+          "lookupCallsign",
+          "dxcc_t"
+        ],
+        "notes": "prefixes.cpp (41K) contains the prefix database. callsign.cpp (20K) handles callsign parsing and DXCC lookup."
+      },
+      "next": {
+        "files": [
+          "src/core/PrefixManager.cpp",
+          "src/core/PrefixManager.h"
+        ],
+        "symbols": [
+          "PrefixManager"
+        ],
+        "notes": "PrefixManager exists for callsign-to-DXCC mapping."
+      },
+      "status": "partial",
+      "acceptance": [
+        "Look up DXCC entity from callsign",
+        "Return country name, CQ zone, ITU zone",
+        "Return approximate coordinates for prefix",
+        "Handle special prefixes and suffixes"
+      ]
+    },
+    {
+      "feature_id": "maidenhead",
+      "name": "Maidenhead Grid System",
+      "category": "utility",
+      "description": "Maidenhead grid square conversion, display, and map overlay. Converts between grid squares and lat/lon.",
+      "original": {
+        "files": [
+          "maidenhead.cpp"
+        ],
+        "symbols": [
+          "ll2maidenhead",
+          "maidenhead2ll",
+          "drawMaidenhead"
+        ],
+        "notes": "maidenhead.cpp (4K) provides grid square conversion utilities."
+      },
+      "next": {
+        "files": [],
+        "symbols": [],
+        "notes": "Grid square conversion may be inline in other components (SetupScreen, DEInfo). No dedicated module."
+      },
+      "status": "partial",
+      "acceptance": [
+        "Convert lat/lon to Maidenhead grid",
+        "Convert Maidenhead grid to lat/lon",
+        "Grid square labels on map edges",
+        "Grid input in setup screen"
+      ],
+      "notes": "The conversion functions may already exist embedded in other files. Check SetupScreen and DEInfo."
+    },
+    {
+      "feature_id": "dxpeditions",
+      "name": "DXpedition Tracker",
+      "category": "data_panel",
+      "description": "List of active and upcoming DXpeditions with location, dates, and frequencies.",
+      "original": {
+        "files": [
+          "dxpeds.cpp",
+          "dxpeds_hide.cpp"
+        ],
+        "symbols": [
+          "updateDXPeds",
+          "drawDXPeds",
+          "PLOT_CH_DXPEDS"
+        ],
+        "notes": "dxpeds.cpp (39K) handles DXpedition data. dxpeds_hide.cpp (5K) manages the hide/show list."
+      },
+      "next": {
+        "files": [],
+        "symbols": []
+      },
+      "status": "implemented",
+      "acceptance": [
+        "Fetch DXpedition data from source",
+        "Display list of active/upcoming DXpeditions",
+        "Show entity, callsign, dates, bands/modes",
+        "Location on map",
+        "Hide/show individual entries"
+      ],
+      "notes": "Already implemented as DXPedPanel in src/ui/ActivityPanels.{h,cpp}"
+    },
+    {
+      "feature_id": "watchlist",
+      "name": "Callsign Watchlist",
+      "category": "utility",
+      "description": "User-maintained watchlist of callsigns to highlight when they appear in DX Cluster or Live Spots.",
+      "original": {
+        "files": [
+          "watchlist.cpp"
+        ],
+        "symbols": [
+          "checkWatchList",
+          "updateWatchList",
+          "drawWatchList"
+        ],
+        "notes": "watchlist.cpp (23K) manages the watchlist and provides alerts."
+      },
+      "next": {
+        "files": [
+          "src/ui/WatchlistPanel.cpp",
+          "src/ui/WatchlistPanel.h",
+          "src/core/WatchlistStore.h",
+          "src/core/WatchlistHitStore.h"
+        ],
+        "symbols": [
+          "WatchlistPanel",
+          "WatchlistStore",
+          "WatchlistHitStore"
+        ]
+      },
+      "status": "implemented",
+      "acceptance": [
+        "Add/remove callsigns to watchlist",
+        "Alert and log when watched callsign appears in spots",
+        "Dedicated panel showing recent hits",
+        "Persist watchlist to config"
+      ]
+    },
+    {
+      "feature_id": "brightness_control",
+      "name": "Brightness Control",
+      "category": "hardware",
+      "description": "Screen brightness adjustment with day/night schedules and photocell support.",
+      "original": {
+        "files": [
+          "brightness.cpp"
+        ],
+        "symbols": [
+          "updateBrightness",
+          "drawBrightness",
+          "setupBrightness"
+        ],
+        "notes": "brightness.cpp (38K) handles brightness control, schedules, and photocell input."
+      },
+      "next": {
+        "files": [],
+        "symbols": []
+      },
+      "status": "missing",
+      "acceptance": [
+        "Manual brightness adjustment",
+        "Day/night brightness schedule",
+        "Smooth brightness transitions"
+      ],
+      "notes": "Some brightness features (photocell, hardware PWM) are ESP32-specific and may not apply to the SDL2 desktop version."
+    },
+    {
+      "feature_id": "radio_control",
+      "name": "Radio CAT Control",
+      "category": "hardware",
+      "description": "Computer Aided Transceiver (CAT) control for setting radio frequency and mode based on DX cluster spots.",
+      "original": {
+        "files": [
+          "radio.cpp"
+        ],
+        "symbols": [
+          "updateRadio",
+          "setRadioFreq",
+          "checkRadioTouch"
+        ],
+        "notes": "radio.cpp (21K) implements CAT control for various radios."
+      },
+      "next": {
+        "files": [],
+        "symbols": []
+      },
+      "status": "missing",
+      "acceptance": [
+        "Connect to radio via serial/network",
+        "Set frequency from DX spot",
+        "Display current radio frequency",
+        "Support common protocols (CI-V, Kenwood, Yaesu)"
+      ]
+    },
+    {
+      "feature_id": "eme_tool",
+      "name": "EME (Moonbounce) Tool",
+      "category": "utility",
+      "description": "Earth-Moon-Earth communication planning tool showing moon position, path loss, and degradation factors.",
+      "original": {
+        "files": [
+          "emetool.cpp",
+          "astro.cpp"
+        ],
+        "symbols": [
+          "updateEMETool",
+          "drawEMETool"
+        ],
+        "notes": "emetool.cpp (18K) provides the EME planning interface."
+      },
+      "next": {
+        "files": [
+          "src/ui/EMEToolPanel.cpp",
+          "src/ui/EMEToolPanel.h",
+          "src/core/MoonData.h"
+        ],
+        "symbols": [
+          "EMEToolPanel"
+        ]
+      },
+      "status": "implemented",
+      "acceptance": [
+        "Show moon position for DE and DX locations",
+        "Calculate EME path loss dynamically",
+        "Show mutual moon window status",
+        "Real-time degradation and distance display"
+      ]
+    },
+    {
+      "feature_id": "gps_nmea",
+      "name": "GPS/NMEA Integration",
+      "category": "hardware",
+      "description": "GPS receiver integration via NMEA sentences for automatic location and time synchronization.",
+      "original": {
+        "files": [
+          "nmea.cpp",
+          "gpsd.cpp"
+        ],
+        "symbols": [
+          "checkNMEA",
+          "readNMEA",
+          "checkGPSD"
+        ],
+        "notes": "nmea.cpp (15K) parses NMEA sentences. gpsd.cpp (7K) interfaces with gpsd daemon."
+      },
+      "next": {
+        "files": [],
+        "symbols": []
+      },
+      "status": "missing",
+      "acceptance": [
+        "Read GPS position from serial NMEA",
+        "Read GPS via gpsd daemon",
+        "Auto-set DE location from GPS",
+        "Time sync from GPS PPS"
+      ],
+      "notes": "Lower priority for desktop version. More relevant for Raspberry Pi deployments."
+    },
+    {
+      "feature_id": "bme280_sensor",
+      "name": "BME280 Environmental Sensor",
+      "category": "hardware",
+      "description": "Temperature, pressure, humidity, and dew point readings from I2C BME280 sensor.",
+      "original": {
+        "files": [
+          "BME280.cpp"
+        ],
+        "symbols": [
+          "readBME280",
+          "drawBME280",
+          "PLOT_CH_TEMPERATURE",
+          "PLOT_CH_PRESSURE",
+          "PLOT_CH_HUMIDITY",
+          "PLOT_CH_DEWPOINT"
+        ],
+        "notes": "BME280.cpp (16K) handles I2C communication and data display for environmental sensing."
+      },
+      "next": {
+        "files": [],
+        "symbols": []
+      },
+      "status": "missing",
+      "acceptance": [
+        "Read BME280 sensor via I2C",
+        "Display temperature, pressure, humidity",
+        "Calculate dew point",
+        "Historical plots"
+      ],
+      "notes": "Hardware-specific feature. Only relevant for Raspberry Pi with I2C sensor attached."
+    },
+    {
+      "feature_id": "robinson_projection",
+      "name": "Robinson Map Projection",
+      "category": "map",
+      "description": "Robinson map projection as an alternative to azimuthal equidistant.",
+      "original": {
+        "files": [
+          "robinson.cpp"
+        ],
+        "symbols": [
+          "drawRobinson",
+          "robinson"
+        ],
+        "notes": "robinson.cpp (5K) implements the Robinson projection math."
+      },
+      "next": {
+        "files": [],
+        "symbols": []
+      },
+      "status": "missing",
+      "acceptance": [
+        "Robinson projection rendering",
+        "Proper aspect ratio and distortion",
+        "Day/night overlay on Robinson projection",
+        "Toggle between projections"
+      ]
+    },
+    {
+      "feature_id": "santa_tracker",
+      "name": "Santa Tracker",
+      "category": "utility",
+      "description": "Seasonal Santa Claus tracker overlay on the map during December.",
+      "original": {
+        "files": [
+          "santa.cpp"
+        ],
+        "symbols": [
+          "updateSanta",
+          "drawSanta"
+        ],
+        "notes": "santa.cpp (17K) provides the seasonal Santa tracking feature."
+      },
+      "next": {
+        "files": [
+          "src/core/SantaStore.h",
+          "src/ui/MapWidget.cpp"
+        ],
+        "symbols": [
+          "SantaStore"
+        ]
+      },
+      "status": "implemented",
+      "acceptance": [
+        "Calculates Santa position based on date/time (active Dec 24/25)",
+        "Santa position overlay on MapWidget",
+        "Status tracking via SantaStore"
+      ],
+      "notes": "Fun seasonal feature. Implementation complete."
+    },
+    {
+      "feature_id": "qrz_lookup",
+      "name": "QRZ.com Callsign Lookup",
+      "category": "utility",
+      "description": "Online callsign lookup via QRZ.com API for detailed station information.",
+      "original": {
+        "files": [
+          "qrz.cpp"
+        ],
+        "symbols": [
+          "queryQRZ",
+          "checkQRZ"
+        ],
+        "notes": "qrz.cpp (2K) provides QRZ.com API integration."
+      },
+      "next": {
+        "files": [],
+        "symbols": []
+      },
+      "status": "missing",
+      "acceptance": [
+        "Query QRZ.com API for callsign details",
+        "Display name, address, QSL info",
+        "Requires QRZ.com subscription key"
+      ]
+    },
+    {
+      "feature_id": "password_auth",
+      "name": "Web Server Authentication",
+      "category": "infrastructure",
+      "description": "Password protection for the embedded web server's remote control features.",
+      "original": {
+        "files": [
+          "passwd.cpp"
+        ],
+        "symbols": [
+          "checkPassword",
+          "setPassword"
+        ],
+        "notes": "passwd.cpp (9K) handles web authentication."
+      },
+      "next": {
+        "files": [],
+        "symbols": [],
+        "notes": "API.md mentions future token-based auth but nothing implemented yet."
+      },
+      "status": "missing",
+      "acceptance": [
+        "Password/token protection for web API",
+        "At minimum protect control endpoints (set_touch, set_char)",
+        "Read-only endpoints optionally unprotected"
+      ]
+    },
+    {
+      "feature_id": "history_panel",
+      "name": "History Panel",
+      "category": "data_panel",
+      "description": "History log of recent DX spots, contacts, or events.",
+      "original": {
+        "files": [],
+        "symbols": [],
+        "notes": "No direct equivalent in original. This appears to be a hamclock-next addition."
+      },
+      "next": {
+        "files": [
+          "src/services/HistoryProvider.cpp",
+          "src/services/HistoryProvider.h",
+          "src/ui/HistoryPanel.cpp",
+          "src/ui/HistoryPanel.h",
+          "src/core/HistoryData.h"
+        ],
+        "symbols": [
+          "HistoryProvider",
+          "HistoryPanel",
+          "HistoryData"
+        ]
+      },
+      "status": "implemented",
+      "acceptance": [
+        "Log recent events/spots",
+        "Scrollable history list",
+        "Timestamped entries"
+      ],
+      "notes": "New feature in hamclock-next, not present in original."
+    },
+    {
+      "feature_id": "local_panel",
+      "name": "Local Info Panel",
+      "category": "data_panel",
+      "description": "Local station information panel (hamclock-next specific).",
+      "original": {
+        "files": [],
+        "symbols": [],
+        "notes": "New in hamclock-next."
+      },
+      "next": {
+        "files": [
+          "src/ui/LocalPanel.cpp",
+          "src/ui/LocalPanel.h"
+        ],
+        "symbols": [
+          "LocalPanel"
+        ]
+      },
+      "status": "implemented",
+      "acceptance": [
+        "Display local station info"
+      ],
+      "notes": "hamclock-next specific feature."
+    },
+    {
+      "feature_id": "list_panel",
+      "name": "Generic List Panel",
+      "category": "infrastructure",
+      "description": "Reusable scrollable list panel component used by multiple data panels.",
+      "original": {
+        "files": [
+          "scrollbar.cpp",
+          "scrollstate.cpp"
+        ],
+        "symbols": [
+          "drawScrollbar",
+          "ScrollState"
+        ],
+        "notes": "Original has scrollbar and scroll state utilities."
+      },
+      "next": {
+        "files": [
+          "src/ui/ListPanel.cpp",
+          "src/ui/ListPanel.h"
+        ],
+        "symbols": [
+          "ListPanel"
+        ]
+      },
+      "status": "implemented",
+      "acceptance": [
+        "Scrollable list with variable-height items",
+        "Touch/mouse scroll support",
+        "Scroll indicator"
+      ]
+    },
+    {
+      "feature_id": "pane_container",
+      "name": "Pane Container / Layout",
+      "category": "infrastructure",
+      "description": "Container system for managing the configurable pane slots and their layout.",
+      "original": {
+        "files": [
+          "plotmgmnt.cpp",
+          "plot.cpp"
+        ],
+        "symbols": [
+          "plotmgmnt",
+          "drawPlot",
+          "plot_b"
+        ],
+        "notes": "plot.cpp (28K) renders plot borders and backgrounds. plotmgmnt.cpp (23K) manages pane assignments."
+      },
+      "next": {
+        "files": [
+          "src/ui/PaneContainer.cpp",
+          "src/ui/PaneContainer.h",
+          "src/ui/LayoutManager.h"
+        ],
+        "symbols": [
+          "PaneContainer",
+          "LayoutManager"
+        ],
+        "notes": "Responsive/fluid layout system. Not fixed 800x480."
+      },
+      "status": "implemented",
+      "acceptance": [
+        "Configurable pane slots (top row + side panel)",
+        "Widget assignment per pane",
+        "Responsive sizing",
+        "Proper borders and spacing"
+      ]
+    },
+    {
+      "feature_id": "debug_overlay",
+      "name": "Debug Overlay",
+      "category": "infrastructure",
+      "description": "Debug information overlay showing widget boundaries, FPS, and diagnostic info.",
+      "original": {
+        "files": [
+          "debug.cpp"
+        ],
+        "symbols": [
+          "drawDebug"
+        ],
+        "notes": "debug.cpp (2K) is minimal."
+      },
+      "next": {
+        "files": [
+          "src/ui/DebugOverlay.h"
+        ],
+        "symbols": [
+          "DebugOverlay"
+        ],
+        "notes": "Header-only debug overlay for development use."
+      },
+      "status": "implemented",
+      "acceptance": [
+        "Toggle-able debug overlay",
+        "Show widget boundaries",
+        "Show FPS and frame timing"
+      ]
+    },
+    {
+      "feature_id": "color_theme",
+      "name": "Color Theme System",
+      "category": "infrastructure",
+      "description": "Color theme/palette system for consistent UI colors across all widgets.",
+      "original": {
+        "files": [
+          "color.cpp"
+        ],
+        "symbols": [
+          "RGB565",
+          "CSMapColor"
+        ],
+        "notes": "color.cpp (3K) defines color constants and conversion utilities. Uses RGB565 format (framebuffer)."
+      },
+      "next": {
+        "files": [
+          "src/core/Theme.h"
+        ],
+        "symbols": [
+          "Theme"
+        ],
+        "notes": "Theme.h defines the color palette. Uses full RGBA (SDL2)."
+      },
+      "status": "implemented",
+      "acceptance": [
+        "Consistent color palette across UI",
+        "Named color constants",
+        "Theme applied to all widgets"
+      ]
+    },
+    {
+      "feature_id": "seven_segment",
+      "name": "Seven-Segment Display Renderer",
+      "category": "utility",
+      "description": "Custom seven-segment display rendering for digital clock and numeric displays.",
+      "original": {
+        "files": [
+          "sevenseg.cpp"
+        ],
+        "symbols": [
+          "drawSevenSeg",
+          "drawDigit"
+        ],
+        "notes": "sevenseg.cpp (11K) renders seven-segment style digits."
+      },
+      "next": {
+        "files": [],
+        "symbols": [],
+        "notes": "hamclock-next uses SDL_ttf fonts instead of custom seven-segment rendering."
+      },
+      "status": "not_needed",
+      "acceptance": [],
+      "notes": "Replaced by proper font rendering in SDL2/TTF. Not needed unless the exact aesthetic is desired."
+    },
+    {
+      "feature_id": "ota_update",
+      "name": "Over-The-Air Update",
+      "category": "infrastructure",
+      "description": "Automatic software update checking and installation.",
+      "original": {
+        "files": [
+          "OTAupdate.cpp"
+        ],
+        "symbols": [
+          "checkOTAUpdate",
+          "doOTAUpdate"
+        ],
+        "notes": "OTAupdate.cpp (14K) handles update checking and flashing (ESP32-specific)."
+      },
+      "next": {
+        "files": [],
+        "symbols": []
+      },
+      "status": "not_needed",
+      "acceptance": [],
+      "notes": "ESP32-specific feature. Desktop version would use package manager or manual update."
+    },
+    {
+      "feature_id": "cpu_temp",
+      "name": "CPU Temperature Monitor",
+      "category": "hardware",
+      "description": "CPU temperature monitoring and display.",
+      "original": {
+        "files": [
+          "cputemp.cpp"
+        ],
+        "symbols": [
+          "readCPUtemp",
+          "drawCPUtemp"
+        ],
+        "notes": "cputemp.cpp (11K) reads CPU temperature via sysfs."
+      },
+      "next": {
+        "files": [],
+        "symbols": []
+      },
+      "status": "missing",
+      "acceptance": [
+        "Read CPU temperature from /sys/class/thermal",
+        "Display current temperature"
+      ],
+      "notes": "Useful for Raspberry Pi deployments. Low priority for desktop."
+    }
+  ]
+}

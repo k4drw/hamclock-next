@@ -22,6 +22,7 @@ include/nlohmann/
 # Working Documentation
 working_docs/
 hamclock-original
+.claude
 
 # Docker
 docker-build/

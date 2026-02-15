@@ -2,6 +2,9 @@
 
 HamClock-Next is a modern, SDL2-based reconstruction of the classic HamClock. It focuses on visual fidelity, high-DPI support, and a smooth user experience while maintaining the essential functionality loved by amateur radio operators.
 
+> [!WARNING]
+> **BETA RELEASE NOTICE**: This is a Beta release (**v0.5B**). While functional, it is still under active development and contains known bugs. Breaking changes and refinements are ongoing. Please report issues on GitHub.
+
 ## Key Accomplishments
 
 ### Visuals & Rendering
@@ -25,6 +28,8 @@ HamClock-Next is a modern, SDL2-based reconstruction of the classic HamClock. It
   - **Propagation Model**: Solar flux, sunspot numbers, and band-specific condition estimates.
 - **Smart Setup**: Easy configuration of callsign and location via Maidenhead grid squares or direct map interaction (Shift-Click to set DE).
 - **RSS News Banner**: Smoothly scrolling news ticker aggregating multiple amateur radio news feeds.
+
+For a detailed guide on how to navigate the new interface and use keyboard shortcuts, see **[USAGE.md](USAGE.md)**.
 
 ## Requirements & Dependencies
 
@@ -105,13 +110,13 @@ cmake --build . -j1
 ```
 With ccache, incremental builds take only **30-60 seconds**!
 
-For detailed optimization strategies and troubleshooting, see:
-- **[RPI_BUILD_SUCCESS.md](RPI_BUILD_SUCCESS.md)** - Raspberry Pi build guide
-- **[BUILD_OPTIMIZATION.md](BUILD_OPTIMIZATION.md)** - Memory optimization strategies
-- **[SDL2_COMPATIBILITY.md](SDL2_COMPATIBILITY.md)** - SDL2 version compatibility
-- **[DEBUG_API.md](DEBUG_API.md)** - Web server performance optimization
+For detailed technical references and remote control info, see:
+- **[API.md](API.md)** - Remote control and debugging API reference
+- **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** - Solutions for common build and runtime issues
+- **[DATA_SOURCES.md](original-analysis/DATA_SOURCES.md)** - List of live data providers
+- **[USAGE.md](USAGE.md)** - Interface navigation and keyboard shortcuts
 
-**Note**: The web server live view is optimized for headless operation (1 FPS refresh) to reduce CPU usage (~50-60% vs ~100%). See DEBUG_API.md for customization options.
+**Note**: The web server live view is optimized for headless operation (1 FPS refresh) to reduce CPU usage (~50-60% vs ~100%). See **[API.md](API.md)** for customization options.
 
 
 ## Raspberry Pi & Console Mode (No X11)
@@ -142,13 +147,24 @@ HamClock-Next stores configuration (`config.json`), database (`hamclock.db`), an
 
 - **Linux / Raspberry Pi**: `~/.local/share/HamClock/HamClock-Next/`
 - **Windows**: `%APPDATA%\HamClock\HamClock-Next\`
-- **macOS**: `~/Library/Application Support/HamClock/HamClock-Next/`
+- **macOS (Apple Silicon Only)**: `~/Library/Application Support/HamClock/HamClock-Next/`
 
 *Note: If you are upgrading from an older version, your previous configuration files at `~/.config/hamclock/` may need to be moved manually.*
 
+## Contributing & AI Assistance (MCP)
+
+HamClock-Next is designed for AI-assisted development using the **Model Context Protocol (MCP)**. We provide a specialized "HamClock Bridge" server that allows AI assistants (like Claude and Gemini) to:
+
+-   **Compare Codebases**: Check feature parity between this project and the original HamClock.
+-   **Trace Logic**: Find specific pointers to original implementation files.
+-   **Automated Scaffolding**: Automatically generate C++ boilerplate for new panels and providers.
+-   **Plan Work**: Generate implementation tickets with pre-analyzed technical context.
+
+To get started with AI-assisted contributions, see the **[MCP_GUIDE.md](MCP_GUIDE.md)** for setup and usage instructions.
+
 ## Roadmap & Next Steps
 
-Based on the [PROJECT_STATUS.md](PROJECT_STATUS.md), the following features are planned:
+The following features are planned:
 
 - [ ] **Phase 6: Hardware Control** — Rotator control (Hamlib/Rigctl) and BME280 environment sensor integration.
 - [ ] **World Map Overlays** — Gray line optimizations, CQ/ITU Zones, and Prefix overlays.
