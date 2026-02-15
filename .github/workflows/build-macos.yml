@@ -6,6 +6,9 @@ on:
       - 'v*'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build-macos:
     name: MacOS
@@ -29,4 +32,11 @@ jobs:
         with:
           name: hamclock-macos
           path: |
+            build-macos/hamclock-next
+
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
             build-macos/hamclock-next
