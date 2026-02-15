@@ -216,7 +216,7 @@ int main(int argc, char *argv[]) {
     // platforms. Disabling by default for maximum compatibility.
     SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 0);
     SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 0);
-#if defined(__arm__) || defined(__aarch64__)
+#if (defined(__arm__) || defined(__aarch64__)) && !defined(__APPLE__)
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);

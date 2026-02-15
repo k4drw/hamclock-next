@@ -32,7 +32,7 @@ echo "Configuring CMake..."
 cmake -B build-macos -S . \
     -DCMAKE_BUILD_TYPE=Release \
     -DENABLE_DEBUG_API=OFF \
-    -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
+    -DCMAKE_OSX_ARCHITECTURES="arm64"
 
 echo "Building..."
 cmake --build build-macos -j$(sysctl -n hw.ncpu)
