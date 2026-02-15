@@ -6,6 +6,9 @@ on:
       - 'v*'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build-rpi:
     name: Raspberry Pi 3B+ (Bullseye/FB0)
@@ -25,6 +28,14 @@ jobs:
         with:
           name: hamclock-rpi-bullseye-fb0
           path: |
+            build-rpi-bullseye-fb0/hamclock-next
+            build-rpi-bullseye-fb0/*.deb
+
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
             build-rpi-bullseye-fb0/hamclock-next
             build-rpi-bullseye-fb0/*.deb
 
@@ -49,6 +60,14 @@ jobs:
             build-rpi-bullseye-x11/hamclock-next
             build-rpi-bullseye-x11/*.deb
 
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            build-rpi-bullseye-x11/hamclock-next
+            build-rpi-bullseye-x11/*.deb
+
   build-rpi-bookworm-x11:
     name: Raspberry Pi X11 (Bookworm)
     runs-on: ubuntu-latest
@@ -70,6 +89,14 @@ jobs:
             build-rpi-bookworm-x11/hamclock-next
             build-rpi-bookworm-x11/*.deb
 
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            build-rpi-bookworm-x11/hamclock-next
+            build-rpi-bookworm-x11/*.deb
+
   build-rpi-trixie-x11:
     name: Raspberry Pi X11 (Trixie)
     runs-on: ubuntu-latest
@@ -88,5 +115,13 @@ jobs:
         with:
           name: hamclock-rpi-trixie-x11
           path: |
+            build-rpi-trixie-x11/hamclock-next
+            build-rpi-trixie-x11/*.deb
+
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
             build-rpi-trixie-x11/hamclock-next
             build-rpi-trixie-x11/*.deb

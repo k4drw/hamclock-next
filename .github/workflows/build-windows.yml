@@ -6,6 +6,9 @@ on:
       - 'v*'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build-win64:
     name: Windows x64 (Static)
@@ -25,5 +28,13 @@ jobs:
         with:
           name: hamclock-win64
           path: |
+            build-win64/hamclock-next.exe
+            build-win64/HamClock-Next-Setup.exe
+
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
             build-win64/hamclock-next.exe
             build-win64/HamClock-Next-Setup.exe
