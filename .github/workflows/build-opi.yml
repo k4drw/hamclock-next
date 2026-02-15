@@ -6,6 +6,9 @@ on:
       - 'v*'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build-opi:
     name: Orange Pi Zero 2W (Trixie/FB0)
@@ -20,12 +23,23 @@ jobs:
           chmod +x scripts/build-opi-trixie-fb0.sh
           ./scripts/build-opi-trixie-fb0.sh
 
+      - name: Rename Binary
+        run: mv build-opi-trixie-fb0/hamclock-next build-opi-trixie-fb0/hamclock-next-opi-trixie-fb0
+
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: hamclock-opi-trixie-fb0
           path: |
-            build-opi-trixie-fb0/hamclock-next
+            build-opi-trixie-fb0/hamclock-next-opi-trixie-fb0
+            build-opi-trixie-fb0/*.deb
+
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            build-opi-trixie-fb0/hamclock-next-opi-trixie-fb0
             build-opi-trixie-fb0/*.deb
 
   build-opi-bookworm:
@@ -41,10 +55,21 @@ jobs:
           chmod +x scripts/build-opi-bookworm-fb0.sh
           ./scripts/build-opi-bookworm-fb0.sh
 
+      - name: Rename Binary
+        run: mv build-opi-bookworm-fb0/hamclock-next build-opi-bookworm-fb0/hamclock-next-opi-bookworm-fb0
+
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: hamclock-opi-bookworm-fb0
           path: |
-            build-opi-bookworm-fb0/hamclock-next
+            build-opi-bookworm-fb0/hamclock-next-opi-bookworm-fb0
+            build-opi-bookworm-fb0/*.deb
+
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            build-opi-bookworm-fb0/hamclock-next-opi-bookworm-fb0
             build-opi-bookworm-fb0/*.deb
