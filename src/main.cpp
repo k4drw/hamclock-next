@@ -1,17 +1,23 @@
 #include "core/AuroraHistoryStore.h"
+#include "core/BrightnessManager.h"
+#include "core/CPUMonitor.h"
 #include "core/CitiesManager.h"
 #include "core/ConfigManager.h"
 #include "core/DXClusterData.h"
 #include "core/DatabaseManager.h"
+#include "core/DisplayPower.h"
 #include "core/HamClockState.h"
 #include "core/LiveSpotData.h"
 #include "core/PrefixManager.h"
 #include "core/RSSData.h"
+#include "core/RigData.h"
+#include "core/RotatorData.h"
 #include "core/SatelliteManager.h"
 #include "core/SolarData.h"
 #ifdef ENABLE_DEBUG_API
 #include "core/UIRegistry.h"
 #endif
+#include "core/MemoryMonitor.h"
 #include "core/WidgetType.h"
 
 #include "network/NetworkManager.h"
@@ -30,6 +36,8 @@
 #include "services/MoonProvider.h"
 #include "services/NOAAProvider.h"
 #include "services/RSSProvider.h"
+#include "services/RigService.h"
+#include "services/RotatorService.h"
 #include "services/SDOProvider.h"
 #include "services/SantaProvider.h"
 #include "services/WeatherProvider.h"
@@ -39,6 +47,7 @@
 #include "ui/AuroraPanel.h"
 #include "ui/BandConditionsPanel.h"
 #include "ui/BeaconPanel.h"
+#include "ui/CPUTempPanel.h"
 #include "ui/CallbookPanel.h"
 #include "ui/ClockAuxPanel.h"
 #include "ui/ContestPanel.h"
@@ -74,11 +83,13 @@
 #include "ui/WidgetSelector.h"
 #include "ui/icon_png.h"
 
+#include "core/Constants.h"
 #include "core/Logger.h"
 #include <SDL.h>
 #include <SDL_image.h>
 #include <SDL_ttf.h>
 #include <curl/curl.h>
+#include <fcntl.h>
 #include <nlohmann/json.hpp>
 
 #include <cmath>
@@ -91,15 +102,30 @@
 #endif
 #include <vector>
 
-static constexpr int INITIAL_WIDTH = 800;
-static constexpr int INITIAL_HEIGHT = 480;
-static constexpr int LOGICAL_WIDTH = 800;
-static constexpr int LOGICAL_HEIGHT = 480;
-static constexpr int FRAME_DELAY_MS =
-    33; // ~30 FPS is plenty and saves CPU on Pi
-static constexpr bool FIDELITY_MODE = true;
+using namespace HamClock;
 
-static constexpr int FONT_SIZE = 24;
+// Helper to disable screen blanking on RPi
+static void preventRPiSleep(bool prevent, DisplayPower *dp = nullptr) {
+#ifdef __linux__
+  if (prevent) {
+    if (dp) {
+      dp->setPower(true);
+    } else {
+      (void)system("vcgencmd display_power 1 > /dev/null 2>&1");
+    }
+
+    // Disable console blanking via escape sequences (framebuffer fallback)
+    int fd = open("/dev/tty1", O_WRONLY);
+    if (fd >= 0) {
+      const char *disableBlank = "\033[9;0]";
+      const char *forceUnblank = "\033[14]";
+      (void)write(fd, disableBlank, 6);
+      (void)write(fd, forceUnblank, 4);
+      close(fd);
+    }
+  }
+#endif
+}
 
 int main(int argc, char *argv[]) {
 #ifndef _WIN32
@@ -115,26 +141,53 @@ int main(int argc, char *argv[]) {
   if (!DatabaseManager::instance().init(cfgMgr.configDir() / "hamclock.db")) {
     LOG_E("Main", "Failed to initialize database");
   }
-  LOG_INFO("Starting HamClock-Next v{}...", HAMCLOCK_VERSION);
 
+  auto displayPower = std::make_shared<DisplayPower>();
+  displayPower->init();
+
+  // Parse command-line arguments BEFORE starting logging
   bool forceFullscreen = false;
   bool forceSoftware = false;
+  std::string logLevel = "warn"; // Default to WARN
+
   for (int i = 1; i < argc; ++i) {
     std::string arg = argv[i];
     if (arg == "-f" || arg == "--fullscreen") {
       forceFullscreen = true;
     } else if (arg == "-s" || arg == "--software") {
       forceSoftware = true;
+    } else if (arg == "--log-level" && i + 1 < argc) {
+      logLevel = argv[++i];
     } else if (arg == "-h" || arg == "--help") {
       std::printf("Usage: hamclock-next [options]\n");
       std::printf("Options:\n");
-      std::printf("  -f, --fullscreen  Force fullscreen mode\n");
-      std::printf(
-          "  -s, --software    Force software rendering (no OpenGL/MSAA)\n");
-      std::printf("  -h, --help        Show this help message\n");
+      std::printf("  -f, --fullscreen      Force fullscreen mode\n");
+      std::printf("  -s, --software        Force software rendering (no "
+                  "OpenGL/MSAA)\n");
+      std::printf("  --log-level <level>   Set log level: "
+                  "debug|info|warn|error (default: warn)\n");
+      std::printf("  -h, --help            Show this help message\n");
       return EXIT_SUCCESS;
     }
   }
+
+  // Set log level based on command-line argument
+  if (logLevel == "debug" || logLevel == "DEBUG") {
+    Log::setLevel(spdlog::level::debug);
+  } else if (logLevel == "info" || logLevel == "INFO") {
+    Log::setLevel(spdlog::level::info);
+  } else if (logLevel == "warn" || logLevel == "WARN") {
+    Log::setLevel(spdlog::level::warn);
+  } else if (logLevel == "error" || logLevel == "ERROR") {
+    Log::setLevel(spdlog::level::err);
+  } else {
+    std::fprintf(stderr,
+                 "Warning: Invalid log level '%s', defaulting to WARN\n",
+                 logLevel.c_str());
+    Log::setLevel(spdlog::level::warn);
+  }
+
+  LOG_INFO("Starting HamClock-Next v{}...", HAMCLOCK_VERSION);
 
   AppConfig appCfg;
   enum class SetupMode { None, Main, DXCluster };
@@ -202,7 +255,8 @@ int main(int argc, char *argv[]) {
 
   if (preventSleep) {
     SDL_DisableScreenSaver();
-    LOG_I("Main", "Screen saver disabled (kiosk mode)");
+    preventRPiSleep(true, displayPower.get());
+    LOG_I("Main", "Screen blanking prevention enabled (kiosk mode)");
   } else {
     SDL_EnableScreenSaver();
     LOG_I("Main", "Screen saver enabled");
@@ -433,7 +487,20 @@ int main(int argc, char *argv[]) {
   auto dstStore = std::make_shared<DstStore>();
   auto adifStore = std::make_shared<ADIFStore>();
   auto santaStore = std::make_shared<SantaStore>();
+  auto rotatorStore = std::make_shared<RotatorDataStore>();
+  auto rigStore = std::make_shared<RigDataStore>();
   auto state = std::make_shared<HamClockState>();
+
+  // CPU and Brightness monitoring
+  auto cpuMonitor = std::make_shared<CPUMonitor>();
+  cpuMonitor->init();
+
+  auto brightnessMgr = std::make_shared<BrightnessManager>();
+  brightnessMgr->init();
+  brightnessMgr->setBrightness(appCfg.brightness);
+  brightnessMgr->setScheduleEnabled(appCfg.brightnessSchedule);
+  brightnessMgr->setDimTime(appCfg.dimHour, appCfg.dimMinute);
+  brightnessMgr->setBrightTime(appCfg.brightHour, appCfg.brightMinute);
 
   // Pre-populate watchlist with defaults if empty
   if (watchlistStore->getAll().empty()) {
@@ -442,29 +509,36 @@ int main(int argc, char *argv[]) {
   }
 
   // --- Web Server (Persistent) ---
-  WebServer webServer(renderer, appCfg, *state, cfgMgr, watchlistStore,
-                      solarStore, 8080);
+  WebServer webServer(renderer, appCfg, *state, cfgMgr, displayPower,
+                      watchlistStore, solarStore, DEFAULT_WEB_SERVER_PORT);
   webServer.start();
 
   bool appRunning = true;
   while (appRunning) {
     // --- Run setup screen if needed (first run or gear icon click) ---
     if (activeSetup != SetupMode::None) {
+      // Ensure layout metrics are current before creating setup screen
+      // This fixes issues when setup is opened after window resize
+      updateLayoutMetrics(window, renderer);
+
       FontManager setupFontMgr;
       setupFontMgr.loadFromMemory(assets_font_ttf, assets_font_ttf_len,
-                                  FONT_SIZE);
+                                  DEFAULT_FONT_SIZE);
+      if (FIDELITY_MODE) {
+        setupFontMgr.setRenderScale(layScale);
+      }
 
       int setupW = LOGICAL_WIDTH;
       int setupH = LOGICAL_HEIGHT;
 
-      // Setup starts centered in logical space if fidelity mode is on
-      int setupX = layLogicalOffX;
-      int setupY = layLogicalOffY;
+      // Setup should always fill entire logical space, not offset
+      int setupX = 0;
+      int setupY = 0;
 
       std::unique_ptr<Widget> setupWidget;
       if (activeSetup == SetupMode::Main) {
         auto s = std::make_unique<SetupScreen>(setupX, setupY, setupW, setupH,
-                                               setupFontMgr);
+                                               setupFontMgr, *brightnessMgr);
         s->setConfig(appCfg);
         setupWidget = std::move(s);
       } else if (activeSetup == SetupMode::DXCluster) {
@@ -519,8 +593,7 @@ int main(int argc, char *argv[]) {
           case SDL_WINDOWEVENT:
             if (event.window.event == SDL_WINDOWEVENT_SIZE_CHANGED) {
               updateLayoutMetrics(window, renderer);
-              setupWidget->onResize(layLogicalOffX, layLogicalOffY,
-                                    LOGICAL_WIDTH, LOGICAL_HEIGHT);
+              setupWidget->onResize(0, 0, LOGICAL_WIDTH, LOGICAL_HEIGHT);
               renderSetup();
             } else if (event.window.event == SDL_WINDOWEVENT_EXPOSED) {
               renderSetup();
@@ -576,6 +649,9 @@ int main(int argc, char *argv[]) {
         cfgMgr.save(appCfg);
       }
       activeSetup = SetupMode::None;
+
+      // Ensure main loop fontMgr is also updated if needed (re-entering)
+      // Actually fontMgr is local to the block below, so it's fine.
     }
 
     // --- Update global state from config (in case changed in setup) ---
@@ -588,7 +664,7 @@ int main(int argc, char *argv[]) {
     {
       FontManager fontMgr;
       if (!fontMgr.loadFromMemory(assets_font_ttf, assets_font_ttf_len,
-                                  FONT_SIZE)) {
+                                  DEFAULT_FONT_SIZE)) {
         std::fprintf(stderr, "Warning: text rendering disabled\n");
       }
 
@@ -620,8 +696,17 @@ int main(int argc, char *argv[]) {
       LiveSpotProvider spotProvider(netManager, spotStore, appCfg, state.get());
       spotProvider.fetch();
 
+      // Initialize services before SatelliteManager
+      RotatorService rotatorService(rotatorStore, appCfg, state.get());
+      rotatorService.start(); // Start background polling if configured
+
+      RigService rigService(rigStore, appCfg, state.get());
+      rigService.start(); // Start command queue worker if configured
+
       SatelliteManager satMgr(netManager);
       satMgr.fetch();
+      satMgr.setRotatorService(&rotatorService);
+      satMgr.setObserver(appCfg.lat, appCfg.lon);
 
       ActivityProvider activityProvider(netManager, activityStore);
       activityProvider.fetch();
@@ -690,8 +775,8 @@ int main(int argc, char *argv[]) {
               0, 0, 0, 0, fontMgr, solarStore);
           break;
         case WidgetType::DX_CLUSTER:
-          widgetPool[type] =
-              std::make_unique<DXClusterPanel>(0, 0, 0, 0, fontMgr, dxcStore);
+          widgetPool[type] = std::make_unique<DXClusterPanel>(
+              0, 0, 0, 0, fontMgr, dxcStore, &rigService, &appCfg);
           break;
         case WidgetType::LIVE_SPOTS:
           widgetPool[type] = std::make_unique<LiveSpotPanel>(
@@ -734,7 +819,8 @@ int main(int argc, char *argv[]) {
               0, 0, 0, 0, fontMgr, activityProvider, activityStore);
           break;
         case WidgetType::GIMBAL:
-          widgetPool[type] = std::make_unique<GimbalPanel>(0, 0, 0, 0, fontMgr);
+          widgetPool[type] =
+              std::make_unique<GimbalPanel>(0, 0, 0, 0, fontMgr, rotatorStore);
           break;
         case WidgetType::MOON:
           widgetPool[type] = std::make_unique<MoonPanel>(
@@ -774,7 +860,7 @@ int main(int argc, char *argv[]) {
           break;
         case WidgetType::COUNTDOWN:
           widgetPool[type] =
-              std::make_unique<CountdownPanel>(0, 0, 0, 0, fontMgr);
+              std::make_unique<CountdownPanel>(0, 0, 0, 0, fontMgr, appCfg);
           break;
         case WidgetType::DE_WEATHER:
           widgetPool[type] = std::make_unique<WeatherPanel>(
@@ -791,6 +877,10 @@ int main(int argc, char *argv[]) {
           widgetPool[type] = std::make_unique<SDOPanel>(0, 0, 0, 0, fontMgr,
                                                         texMgr, sdoProvider);
           break;
+        case WidgetType::CPU_TEMP:
+          widgetPool[type] = std::make_unique<CPUTempPanel>(
+              0, 0, 0, 0, fontMgr, cpuMonitor, appCfg.useMetric);
+          break;
         default:
           widgetPool[type] = std::make_unique<PlaceholderWidget>(
               0, 0, 0, 0, fontMgr, widgetTypeDisplayName(type), cyan);
@@ -800,17 +890,20 @@ int main(int argc, char *argv[]) {
 
       // Populate pool with all types
       std::vector<WidgetType> allTypes = {
-          WidgetType::SOLAR,        WidgetType::DX_CLUSTER,
-          WidgetType::LIVE_SPOTS,   WidgetType::BAND_CONDITIONS,
-          WidgetType::CONTESTS,     WidgetType::ON_THE_AIR,
-          WidgetType::GIMBAL,       WidgetType::MOON,
-          WidgetType::CLOCK_AUX,    WidgetType::DX_PEDITIONS,
-          WidgetType::DE_WEATHER,   WidgetType::DX_WEATHER,
-          WidgetType::NCDXF,        WidgetType::SDO,
-          WidgetType::HISTORY_FLUX, WidgetType::HISTORY_KP,
-          WidgetType::HISTORY_SSN,  WidgetType::DRAP,
-          WidgetType::AURORA,       WidgetType::AURORA_GRAPH,
-          WidgetType::ADIF,         WidgetType::COUNTDOWN};
+          WidgetType::SOLAR,         WidgetType::DX_CLUSTER,
+          WidgetType::LIVE_SPOTS,    WidgetType::BAND_CONDITIONS,
+          WidgetType::CONTESTS,      WidgetType::ON_THE_AIR,
+          WidgetType::GIMBAL,        WidgetType::MOON,
+          WidgetType::CLOCK_AUX,     WidgetType::DX_PEDITIONS,
+          WidgetType::DE_WEATHER,    WidgetType::DX_WEATHER,
+          WidgetType::NCDXF,         WidgetType::SDO,
+          WidgetType::HISTORY_FLUX,  WidgetType::HISTORY_KP,
+          WidgetType::HISTORY_SSN,   WidgetType::DRAP,
+          WidgetType::AURORA,        WidgetType::AURORA_GRAPH,
+          WidgetType::ADIF,          WidgetType::COUNTDOWN,
+          WidgetType::CALLBOOK,      WidgetType::DST_INDEX,
+          WidgetType::WATCHLIST,     WidgetType::EME_TOOL,
+          WidgetType::SANTA_TRACKER, WidgetType::CPU_TEMP};
       for (auto t : allTypes)
         addToPool(t);
 
@@ -881,6 +974,7 @@ int main(int argc, char *argv[]) {
 
       // --- Main Stage ---
       MapWidget mapArea(0, 0, 0, 0, texMgr, fontMgr, netManager, state, appCfg);
+      mapArea.setOnConfigChanged([&appCfg, &cfgMgr] { cfgMgr.save(appCfg); });
       mapArea.setSpotStore(spotStore);
       mapArea.setDXClusterStore(dxcStore);
       mapArea.setAuroraStore(auroraHistoryStore);
@@ -926,8 +1020,16 @@ int main(int argc, char *argv[]) {
 
       layout.addWidget(Zone::MainStage, &mapArea);
 
+      // Register low-memory callback: if texture allocation fails, flush font
+      // cache
+      texMgr.setLowMemCallback([&fontMgr]() {
+        LOG_W("Main", "Low memory signal: flushing FontManager cache");
+        fontMgr.clearCache();
+      });
+
       // Helper to update all UI positions with current logical offsets
       auto recalculateUI = [&]() {
+        fontMgr.clearCache(); // ✅ Clear cached textures for new layout
         fontCatalog.recalculate(LOGICAL_WIDTH, LOGICAL_HEIGHT);
         layout.recalculate(LOGICAL_WIDTH, LOGICAL_HEIGHT, layLogicalOffX,
                            layLogicalOffY);
@@ -1124,6 +1226,30 @@ int main(int argc, char *argv[]) {
             }
             break;
           }
+          case SDL_FINGERDOWN:
+          case SDL_MOUSEBUTTONDOWN:
+            lastMouseMotionMs = SDL_GetTicks();
+            if (!cursorVisible) {
+              SDL_ShowCursor(SDL_ENABLE);
+              cursorVisible = true;
+              if (appCfg.preventSleep)
+                preventRPiSleep(true, displayPower.get());
+            }
+            break;
+          case SDL_USEREVENT:
+            if (event.user.code == SDL_USER_EVENT_BLOCK_SLEEP) {
+              bool prevent = (event.user.data1 != nullptr);
+              if (prevent) {
+                SDL_DisableScreenSaver();
+                preventRPiSleep(true, displayPower.get());
+              } else {
+                SDL_EnableScreenSaver();
+                if (displayPower) {
+                  displayPower->setPower(false);
+                }
+              }
+            }
+            break;
           case SDL_WINDOWEVENT:
             if (event.window.event == SDL_WINDOWEVENT_SIZE_CHANGED) {
               updateLayoutMetrics(window, renderer);
@@ -1280,14 +1406,23 @@ int main(int argc, char *argv[]) {
           }
         }
 
-        // Hide cursor if inactive for 10 seconds
         if (cursorVisible && (SDL_GetTicks() - lastMouseMotionMs > 10000)) {
           SDL_ShowCursor(SDL_DISABLE);
           cursorVisible = false;
         }
 
+        // Periodically re-assert sleep prevention on RPi (every 30 seconds)
+        static uint32_t lastSleepAssert = 0;
+        if (appCfg.preventSleep && (now - lastSleepAssert > 30000)) {
+          preventRPiSleep(true);
+          lastSleepAssert = now;
+        }
+
         for (auto *w : widgets)
           w->update();
+
+        satMgr.update();
+        brightnessMgr->update();
 
 #ifdef ENABLE_DEBUG_API
         // Update Semantic Debug Registry
@@ -1320,6 +1455,13 @@ int main(int argc, char *argv[]) {
           state->fps = frames * 1000.0f / (nowMs - lastFpsUpdate);
           frames = 0;
           lastFpsUpdate = nowMs;
+
+          // Log memory stats every 10 seconds
+          static uint32_t lastMemLog = 0;
+          if (nowMs - lastMemLog > 10000) {
+            MemoryMonitor::getInstance().logStats("MainLoop");
+            lastMemLog = nowMs;
+          }
         }
 
         SDL_Delay(FRAME_DELAY_MS);

@@ -54,12 +54,27 @@ if [ $? -eq 0 ]; then
     echo "--------------------------------------------------"
     echo "SUCCESS: Raspberry Pi Bullseye-FB0 build finished!"
     echo "Binary: build-rpi-bullseye-fb0/hamclock-next"
-    
+
     # Create Debian Package
     echo "Packaging..."
     chmod +x packaging/linux/create_deb.sh
     ./packaging/linux/create_deb.sh "build-rpi-bullseye-fb0/hamclock-next" "armhf" "bullseye" "fb0" "build-rpi-bullseye-fb0"
-    
+
+    # Create release directory and copy artifacts
+    echo "Copying artifacts to release/..."
+    mkdir -p release
+    VERSION="${VERSION:-0.5B}"
+
+    # Copy .deb package
+    cp "build-rpi-bullseye-fb0/hamclock-next_${VERSION}_bullseye_fb0_armhf.deb" "release/"
+
+    # Copy binary with consistent naming
+    cp "build-rpi-bullseye-fb0/hamclock-next" "release/hamclock-next-bullseye-fb0-armhf"
+
+    echo "--------------------------------------------------"
+    echo "Release artifacts:"
+    echo "  - release/hamclock-next_${VERSION}_bullseye_fb0_armhf.deb"
+    echo "  - release/hamclock-next-bullseye-fb0-armhf"
     echo "--------------------------------------------------"
 else
     echo "ERROR: Build failed!"

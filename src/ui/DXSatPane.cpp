@@ -1,4 +1,5 @@
 #include "DXSatPane.h"
+#include "../core/MemoryMonitor.h"
 #include "../core/Theme.h"
 #include "FontCatalog.h"
 
@@ -82,6 +83,19 @@ void DXSatPane::render(SDL_Renderer *renderer) {
   } else {
     satPanel_.render(renderer);
   }
+
+  if (mode_ == Mode::SAT) {
+    int headerH = std::max(1, height_ / 10);
+    trackButtonRect_ = {x_ + width_ - headerH, y_, headerH, headerH};
+    SDL_Color color = (satMgr_.getTrackedSatellite() == selectedSatName_)
+                          ? SDL_Color{0, 255, 0, 255}
+                          : SDL_Color{100, 100, 100, 255};
+    SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a);
+    SDL_RenderDrawRect(renderer, &trackButtonRect_);
+    fontMgr_.drawText(
+        renderer, "Track", trackButtonRect_.x + trackButtonRect_.w / 2,
+        trackButtonRect_.y + trackButtonRect_.h / 2, color, 10, false, true);
+  }
 }
 
 void DXSatPane::onResize(int x, int y, int w, int h) {
@@ -107,6 +121,20 @@ bool DXSatPane::onMouseUp(int mx, int my, Uint16 mod) {
   // Hit test
   if (mx < x_ || mx >= x_ + width_ || my < y_ || my >= y_ + height_)
     return false;
+
+  if (mode_ == Mode::SAT) {
+    if (mx >= trackButtonRect_.x &&
+        mx <= trackButtonRect_.x + trackButtonRect_.w &&
+        my >= trackButtonRect_.y &&
+        my <= trackButtonRect_.y + trackButtonRect_.h) {
+      if (satMgr_.getTrackedSatellite() == selectedSatName_) {
+        satMgr_.trackSatellite("");
+      } else {
+        satMgr_.trackSatellite(selectedSatName_);
+      }
+      return true;
+    }
+  }
 
   // Upper 10% → open menu
   int headerH = std::max(1, height_ / 10);
@@ -204,8 +232,7 @@ void DXSatPane::populateMenu() {
 void DXSatPane::destroyMenuTextures() {
   for (auto &item : menuItems_) {
     if (item.tex) {
-      SDL_DestroyTexture(item.tex);
-      item.tex = nullptr;
+      MemoryMonitor::getInstance().destroyTexture(item.tex);
     }
   }
 }
@@ -342,6 +369,9 @@ void DXSatPane::renderMenu(SDL_Renderer *renderer) {
 
 std::vector<std::string> DXSatPane::getActions() const {
   if (menuState_ == MenuState::Closed) {
+    if (mode_ == Mode::SAT) {
+      return {"open_menu", "track"};
+    }
     return {"open_menu"};
   }
   return {};
@@ -352,6 +382,9 @@ SDL_Rect DXSatPane::getActionRect(const std::string &action) const {
     // Upper 10%
     int headerH = std::max(1, height_ / 10);
     return {x_, y_, width_, headerH};
+  }
+  if (action == "track") {
+    return trackButtonRect_;
   }
   return {0, 0, 0, 0};
 }

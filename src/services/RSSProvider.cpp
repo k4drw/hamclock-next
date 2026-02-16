@@ -1,11 +1,6 @@
 #include "RSSProvider.h"
 #include "../core/Logger.h"
 
-#include <chrono>
-#include <mutex>
-#include <string>
-#include <vector>
-
 namespace {
 
 struct FeedInfo {
@@ -32,20 +27,74 @@ std::string stripCDATA(const std::string &s) {
 }
 
 // Remove HTML/XML tags from a string.
+// Replaces tags with spaces to prevent text concatenation.
 std::string stripTags(const std::string &s) {
   std::string result;
   bool inTag = false;
+  bool needSpace = false;
+
   for (char c : s) {
     if (c == '<') {
+      // Entering a tag - mark that we might need a space after
+      if (!inTag && !result.empty() && result.back() != ' ') {
+        needSpace = true;
+      }
       inTag = true;
       continue;
     }
     if (c == '>') {
+      // Exiting a tag
       inTag = false;
+      if (needSpace) {
+        result += ' ';
+        needSpace = false;
+      }
       continue;
     }
-    if (!inTag)
+    if (!inTag) {
       result += c;
+      needSpace = false; // Reset if we have actual content
+    }
+  }
+  return result;
+}
+
+// Decode common HTML entities
+std::string decodeEntities(const std::string &s) {
+  std::string result;
+  result.reserve(s.size());
+
+  for (size_t i = 0; i < s.size(); ++i) {
+    if (s[i] == '&' && i + 1 < s.size()) {
+      // Find the semicolon
+      size_t end = s.find(';', i + 1);
+      if (end != std::string::npos && end - i <= 10) {
+        std::string entity = s.substr(i + 1, end - i - 1);
+
+        // Common HTML entities
+        if (entity == "amp") {
+          result += '&';
+        } else if (entity == "lt") {
+          result += '<';
+        } else if (entity == "gt") {
+          result += '>';
+        } else if (entity == "quot") {
+          result += '"';
+        } else if (entity == "apos" || entity == "#39") {
+          result += '\'';
+        } else if (entity == "nbsp" || entity == "#160") {
+          result += ' ';
+        } else {
+          // Unknown entity - keep as is
+          result += s.substr(i, end - i + 1);
+        }
+        i = end; // Skip past the semicolon (loop will increment)
+      } else {
+        result += s[i];
+      }
+    } else {
+      result += s[i];
+    }
   }
   return result;
 }
@@ -97,6 +146,7 @@ std::vector<std::string> extractTitles(const std::string &body,
         std::string t = body.substr(titleStart, titleEnd - titleStart);
         t = stripCDATA(t);
         t = stripTags(t);
+        t = decodeEntities(t);
         t = collapse(t);
         if (!t.empty())
           titles.push_back(t);
@@ -136,6 +186,7 @@ std::vector<std::string> parseNG3K(const std::string &body) {
 
     std::string rowContent = body.substr(tagEnd + 1, rowEnd - tagEnd - 1);
     std::string text = stripTags(rowContent);
+    text = decodeEntities(text);
     text = collapse(text);
 
     // Keep rows with enough substance (skip headers / empty rows)

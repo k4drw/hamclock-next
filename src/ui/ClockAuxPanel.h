@@ -3,6 +3,8 @@
 #include "FontManager.h"
 #include "Widget.h"
 
+struct SDL_Renderer;
+
 class ClockAuxPanel : public Widget {
 public:
   ClockAuxPanel(int x, int y, int w, int h, FontManager &fontMgr);

@@ -10,6 +10,7 @@
 #include "TextureManager.h"
 #include "Widget.h"
 
+#include <SDL.h>
 #include <functional>
 #include <memory>
 #include <string>
@@ -111,4 +112,5 @@ private:
 
   ModeChangedCb onModeChanged_;
   std::string pendingSatRestore_; // satellite name to restore when data arrives
+  SDL_Rect trackButtonRect_ = {0, 0, 0, 0};
 };

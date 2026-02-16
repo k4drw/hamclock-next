@@ -1,5 +1,6 @@
 #include "SDOPanel.h"
 #include "../core/Astronomy.h"
+#include "../core/Constants.h"
 #include "../core/Theme.h"
 #include "FontCatalog.h"
 #include "RenderUtils.h"
@@ -7,6 +8,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <mutex>
+#include <nlohmann/json.hpp>
 
 static std::mutex sdoMutex;
 static std::string sdoPendingData;
@@ -21,6 +23,7 @@ SDOPanel::SDOPanel(int x, int y, int w, int h, FontManager &fontMgr,
 
 void SDOPanel::update() {
   uint32_t now = SDL_GetTicks();
+  // Hourly fetch or on ID change
 
   // Hourly fetch or on ID change
   if (now - lastFetch_ > 60 * 60 * 1000 || lastFetch_ == 0) {
@@ -241,7 +244,8 @@ void SDOPanel::recalcMenuLayout() {
   // Global centered popup (relative to 800x480 space)
   int mW = 280;
   int mH = 400;
-  menuRect_ = {(800 - mW) / 2, (480 - mH) / 2, mW, mH};
+  menuRect_ = {(HamClock::LOGICAL_WIDTH - mW) / 2,
+               (HamClock::LOGICAL_HEIGHT - mH) / 2, mW, mH};
 
   int curY = menuRect_.y + 25;
   itemH_ = 28;
@@ -344,4 +348,44 @@ bool SDOPanel::onKeyDown(SDL_Keycode key, Uint16 /*mod*/) {
     return true; // Eat all keys when modal
   }
   return false;
+}
+
+std::vector<std::string> SDOPanel::getActions() const {
+  return {"cycle_wavelength"};
+}
+
+SDL_Rect SDOPanel::getActionRect(const std::string &action) const {
+  (void)action; // All actions use the full widget rect
+  return {x_, y_, width_, height_};
+}
+
+nlohmann::json SDOPanel::getDebugData() const {
+  nlohmann::json data;
+
+  // Find the current wavelength name
+  const char *currentName = "Unknown";
+  for (const auto &w : wavelengths_) {
+    if (currentId_ == w.id) {
+      currentName = w.name;
+      break;
+    }
+  }
+
+  data["current_wavelength"] = currentName;
+  data["current_id"] = currentId_;
+  data["rotating"] = rotating_;
+  data["image_ready"] = imageReady_;
+
+  // Available wavelengths
+  nlohmann::json wavelengths = nlohmann::json::array();
+  for (const auto &w : wavelengths_) {
+    nlohmann::json wl;
+    wl["name"] = w.name;
+    wl["id"] = w.id;
+    wl["active"] = (currentId_ == w.id);
+    wavelengths.push_back(wl);
+  }
+  data["available_wavelengths"] = wavelengths;
+
+  return data;
 }

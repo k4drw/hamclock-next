@@ -8,6 +8,7 @@
 #include "../core/OrbitPredictor.h"
 #include "../network/NetworkManager.h"
 #include "FontManager.h"
+#include "MapViewMenu.h"
 #include "TextureManager.h"
 #include "Widget.h"
 
@@ -21,7 +22,7 @@ class MapWidget : public Widget {
 public:
   MapWidget(int x, int y, int w, int h, TextureManager &texMgr,
             FontManager &fontMgr, NetworkManager &netMgr,
-            std::shared_ptr<HamClockState> state, const AppConfig &config);
+            std::shared_ptr<HamClockState> state, AppConfig &config);
 
   ~MapWidget() override;
 
@@ -48,6 +49,12 @@ public:
     auroraStore_ = std::move(store);
   }
 
+  void setOnConfigChanged(std::function<void()> cb) { onConfigChanged_ = cb; }
+
+  // Modal interface for MapViewMenu
+  bool isModalActive() const override;
+  void renderModal(SDL_Renderer *renderer) override;
+
   // Semantic Debug API
   std::string getName() const override;
   std::vector<std::string> getActions() const override;
@@ -59,6 +66,7 @@ private:
   bool screenToLatLon(int sx, int sy, double &lat, double &lon) const;
   void recalcMapRect();
   void renderNightOverlay(SDL_Renderer *renderer);
+  void renderGridOverlay(SDL_Renderer *renderer);
   void renderGreatCircle(SDL_Renderer *renderer);
   enum class MarkerShape { Circle, Square };
   void renderMarker(SDL_Renderer *renderer, double lat, double lon, Uint8 r,
@@ -81,6 +89,8 @@ private:
   std::shared_ptr<AuroraHistoryStore> auroraStore_;
   OrbitPredictor *predictor_ = nullptr;
 
+  std::unique_ptr<MapViewMenu> mapViewMenu_;
+
   SDL_Rect mapRect_ = {};
   bool mapLoaded_ = false;
   int currentMonth_ = 0; // 1-12
@@ -95,6 +105,17 @@ private:
 
   // Math caches to save CPU
   std::vector<LatLon> cachedGreatCircle_;
+  std::vector<SDL_Vertex> shadowVerts_;
+  std::vector<SDL_Vertex> lightVerts_;
+  std::vector<int> nightIndices_;
+
+  // Buffers for batching spots
+  std::vector<SDL_Vertex> spotVerts_;
+  std::vector<int> spotIndices_;
+  std::vector<SDL_Vertex> mapVerts_;
+  std::vector<SDL_Vertex> markerVerts_;
+  std::vector<int> markerIndices_;
+
   LatLon lastDE_ = {0, 0};
   LatLon lastDX_ = {0, 0};
 
@@ -105,10 +126,19 @@ private:
     int x = 0;
     int y = 0;
     uint32_t timestamp = 0;
+    // Cached texture to avoid per-frame creation/destruction
+    SDL_Texture *cachedTexture = nullptr;
+    std::string cachedText;
+    int cachedW = 0;
+    int cachedH = 0;
   } tooltip_;
 
   void renderTooltip(SDL_Renderer *renderer);
-  const AppConfig &config_;
+  void renderProjectionSelect(SDL_Renderer *renderer);
+
+  AppConfig &config_;
+  std::function<void()> onConfigChanged_;
+  SDL_Rect projRect_ = {};
   bool useCompatibilityRenderPath_ = false;
   SDL_Texture *nightOverlayTexture_ = nullptr;
   double lastUpdateSunLat_ = -999.0;

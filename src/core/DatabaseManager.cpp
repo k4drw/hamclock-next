@@ -1,6 +1,5 @@
 #include "DatabaseManager.h"
 #include "Logger.h"
-#include <iostream>
 
 DatabaseManager &DatabaseManager::instance() {
   static DatabaseManager instance;

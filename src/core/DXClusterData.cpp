@@ -3,7 +3,6 @@
 #include "Logger.h"
 #include <algorithm>
 #include <chrono>
-#include <cmath>
 #include <sstream>
 
 namespace {
@@ -20,7 +19,10 @@ std::string sqlEscape(const std::string &s) {
 }
 } // namespace
 
-DXClusterDataStore::DXClusterDataStore() { loadPersisted(); }
+DXClusterDataStore::DXClusterDataStore()
+    : data_(std::make_shared<DXClusterData>()) {
+  loadPersisted();
+}
 
 DXClusterDataStore::~DXClusterDataStore() {}
 
@@ -38,9 +40,10 @@ void DXClusterDataStore::loadPersisted() {
       std::to_string(cutoffTs);
 
   std::lock_guard<std::mutex> lock(mutex_);
-  data_.spots.clear();
+  auto newData = std::make_shared<DXClusterData>(*data_);
+  newData->spots.clear();
 
-  db.query(sql, [this](const DatabaseManager::Row &row) {
+  db.query(sql, [this, &newData](const DatabaseManager::Row &row) {
     if (row.size() < 12)
       return true;
     DXClusterSpot s;
@@ -62,21 +65,22 @@ void DXClusterDataStore::loadPersisted() {
     } catch (...) {
       return true; // convert error, skip
     }
-    data_.spots.push_back(s);
+    newData->spots.push_back(s);
     return true;
   });
 
-  LOG_I("DXClusterDataStore", "Loaded {} persisted spots", data_.spots.size());
+  data_ = newData;
+  LOG_I("DXClusterDataStore", "Loaded {} persisted spots", data_->spots.size());
 }
 
-DXClusterData DXClusterDataStore::get() const {
+std::shared_ptr<const DXClusterData> DXClusterDataStore::snapshot() const {
   std::lock_guard<std::mutex> lock(mutex_);
   return data_;
 }
 
 void DXClusterDataStore::set(const DXClusterData &data) {
   std::lock_guard<std::mutex> lock(mutex_);
-  data_ = data;
+  data_ = std::make_shared<DXClusterData>(data);
   // TODO: Full replace in DB? Usually we just add spots incrementally.
 }
 
@@ -98,8 +102,10 @@ void DXClusterDataStore::addSpot(const DXClusterSpot &spot) {
   }
 
   // Add to memory
-  data_.spots.push_back(s);
-  data_.lastUpdate = std::chrono::system_clock::now();
+  auto newData = std::make_shared<DXClusterData>(*data_);
+  newData->spots.push_back(s);
+  newData->lastUpdate = std::chrono::system_clock::now();
+  data_ = newData;
 
   // Persist to DB
   auto &db = DatabaseManager::instance();
@@ -125,15 +131,19 @@ void DXClusterDataStore::addSpot(const DXClusterSpot &spot) {
 void DXClusterDataStore::setConnected(bool connected,
                                       const std::string &status) {
   std::lock_guard<std::mutex> lock(mutex_);
-  data_.connected = connected;
-  data_.statusMsg = status;
-  data_.lastUpdate = std::chrono::system_clock::now();
+  auto newData = std::make_shared<DXClusterData>(*data_);
+  newData->connected = connected;
+  newData->statusMsg = status;
+  newData->lastUpdate = std::chrono::system_clock::now();
+  data_ = newData;
 }
 
 void DXClusterDataStore::clear() {
   std::lock_guard<std::mutex> lock(mutex_);
-  data_.spots.clear();
-  data_.lastUpdate = std::chrono::system_clock::now();
+  auto newData = std::make_shared<DXClusterData>(*data_);
+  newData->spots.clear();
+  newData->lastUpdate = std::chrono::system_clock::now();
+  data_ = newData;
   DatabaseManager::instance().exec("DELETE FROM dx_spots");
 }
 
@@ -142,11 +152,14 @@ void DXClusterDataStore::pruneOldSpots() {
   auto maxAge = std::chrono::minutes(60); // Default 60 mins
 
   // Prune memory
-  data_.spots.erase(std::remove_if(data_.spots.begin(), data_.spots.end(),
-                                   [&](const DXClusterSpot &s) {
-                                     return (now - s.spottedAt) > maxAge;
-                                   }),
-                    data_.spots.end());
+  auto newData = std::make_shared<DXClusterData>(*data_);
+  newData->spots.erase(std::remove_if(newData->spots.begin(),
+                                      newData->spots.end(),
+                                      [&](const DXClusterSpot &s) {
+                                        return (now - s.spottedAt) > maxAge;
+                                      }),
+                       newData->spots.end());
+  data_ = newData;
 
   // Prune DB (occasionally? or every time? Let's do it every time for correct
   // sync)
@@ -160,11 +173,15 @@ void DXClusterDataStore::pruneOldSpots() {
 
 void DXClusterDataStore::selectSpot(const DXClusterSpot &spot) {
   std::lock_guard<std::mutex> lock(mutex_);
-  data_.hasSelection = true;
-  data_.selectedSpot = spot;
+  auto newData = std::make_shared<DXClusterData>(*data_);
+  newData->hasSelection = true;
+  newData->selectedSpot = spot;
+  data_ = newData;
 }
 
 void DXClusterDataStore::clearSelection() {
   std::lock_guard<std::mutex> lock(mutex_);
-  data_.hasSelection = false;
+  auto newData = std::make_shared<DXClusterData>(*data_);
+  newData->hasSelection = false;
+  data_ = newData;
 }

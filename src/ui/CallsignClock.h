@@ -5,6 +5,9 @@
 
 #include <string>
 
+struct SDL_Renderer;
+struct SDL_Texture;
+
 class CallsignClock : public Widget {
 public:
     CallsignClock(int x, int y, int w, int h,

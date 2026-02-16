@@ -5,6 +5,8 @@
 #include "TextureManager.h"
 #include "Widget.h"
 
+struct SDL_Renderer;
+
 class AuroraPanel : public Widget {
 public:
   AuroraPanel(int x, int y, int w, int h, FontManager &fontMgr,

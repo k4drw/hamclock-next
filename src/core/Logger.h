@@ -12,6 +12,13 @@ public:
 
   static std::shared_ptr<spdlog::logger> &get() { return s_Logger; }
 
+  // Set log level at runtime
+  static void setLevel(spdlog::level::level_enum level) {
+    if (s_Logger) {
+      s_Logger->set_level(level);
+    }
+  }
+
   // High-level macros for simple logging
 #define LOG_TRACE(...) ::Log::get()->trace(__VA_ARGS__)
 #define LOG_DEBUG(...) ::Log::get()->debug(__VA_ARGS__)

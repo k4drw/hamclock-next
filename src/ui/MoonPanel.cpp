@@ -1,5 +1,6 @@
 #include "MoonPanel.h"
 #include "FontCatalog.h"
+#include "RenderUtils.h"
 #include <cmath>
 #include <cstdio>
 
@@ -57,26 +58,9 @@ void MoonPanel::drawMoon(SDL_Renderer *renderer, int cx, int cy, int r) {
     SDL_RenderCopyEx(renderer, tex, nullptr, &dst, -angle, nullptr,
                      SDL_FLIP_NONE);
   } else {
-    // Fallback procedural
-    SDL_SetRenderDrawColor(renderer, 30, 30, 45, 255);
-    for (int dy = -r; dy <= r; ++dy) {
-      int dx = static_cast<int>(std::sqrt(r * r - dy * dy));
-      SDL_RenderDrawLine(renderer, cx - dx, cy + dy, cx + dx, cy + dy);
-    }
-    SDL_SetRenderDrawColor(renderer, 180, 180, 150, 255);
-    double s = 2.0 * currentData_.phase;
-    for (int dy = -r; dy <= r; ++dy) {
-      double dx = std::sqrt(r * r - dy * dy);
-      if (s <= 1.0) {
-        double term = (1.0 - 2.0 * s) * dx;
-        SDL_RenderDrawLine(renderer, cx + (int)term, cy + dy, cx + (int)dx,
-                           cy + dy);
-      } else {
-        double term = (3.0 - 2.0 * s) * dx;
-        SDL_RenderDrawLine(renderer, cx - (int)dx, cy + dy, cx + (int)term,
-                           cy + dy);
-      }
-    }
+    // Show a simple dark disk while loading NASA imagery
+    RenderUtils::drawCircle(renderer, (float)cx, (float)cy, (float)r,
+                            {30, 30, 45, 255});
   }
 }
 

@@ -1,4 +1,5 @@
 #include "SatPanel.h"
+#include "../core/MemoryMonitor.h"
 #include "../core/Theme.h"
 #include "FontCatalog.h"
 #include "RenderUtils.h"
@@ -7,6 +8,7 @@
 #include <cmath>
 #include <cstdio>
 #include <ctime>
+#include <nlohmann/json.hpp>
 #include <vector>
 
 static constexpr double kPi = 3.14159265358979323846;
@@ -21,18 +23,12 @@ SatPanel::SatPanel(int x, int y, int w, int h, FontManager &fontMgr,
 
 void SatPanel::destroyCache() {
   for (int i = 0; i < kNumLines; ++i) {
-    if (lineTex_[i]) {
-      SDL_DestroyTexture(lineTex_[i]);
-      lineTex_[i] = nullptr;
-    }
+    MemoryMonitor::getInstance().destroyTexture(lineTex_[i]);
     lastLineText_[i].clear();
     lastLineFontSize_[i] = 0;
   }
   for (int i = 0; i < kNumCompass; ++i) {
-    if (compassTex_[i]) {
-      SDL_DestroyTexture(compassTex_[i]);
-      compassTex_[i] = nullptr;
-    }
+    MemoryMonitor::getInstance().destroyTexture(compassTex_[i]);
   }
   lastCompassFontSize_ = 0;
 }
@@ -169,10 +165,7 @@ void SatPanel::render(SDL_Renderer *renderer) {
     bool needRedraw = !lineTex_[i] || (lineText_[i] != lastLineText_[i]) ||
                       (lineFontSize_[i] != lastLineFontSize_[i]);
     if (needRedraw) {
-      if (lineTex_[i]) {
-        SDL_DestroyTexture(lineTex_[i]);
-        lineTex_[i] = nullptr;
-      }
+      MemoryMonitor::getInstance().destroyTexture(lineTex_[i]);
       SDL_Color c = (i == 0) ? white : gray; // name white, rest gray
       lineTex_[i] = fontMgr_.renderText(
           renderer, lineText_[i], c, lineFontSize_[i], &lineW_[i], &lineH_[i]);
@@ -204,15 +197,69 @@ void SatPanel::render(SDL_Renderer *renderer) {
   SDL_RenderSetClipRect(renderer, nullptr);
 }
 
+std::vector<std::string> SatPanel::getActions() const {
+  if (!hasPredictor())
+    return {};
+  return {"next_sat", "prev_sat"};
+}
+
+SDL_Rect SatPanel::getActionRect(const std::string &action) const {
+  (void)action; // All actions use the full widget rect
+  return {x_, y_, width_, height_};
+}
+
+nlohmann::json SatPanel::getDebugData() const {
+  nlohmann::json data;
+
+  if (!hasPredictor()) {
+    data["satellite"] = "none";
+    data["status"] = "no satellite selected";
+    return data;
+  }
+
+  data["satellite"] = predictor_->satName();
+  data["above_horizon"] = satAboveHorizon_;
+  data["azimuth"] = currentPos_.az;
+  data["elevation"] = currentPos_.el;
+
+  // Get next pass info
+  SatPass pass = predictor_->nextPass();
+  if (pass.aosTime > 0) {
+    std::time_t now = std::time(nullptr);
+    if (satAboveHorizon_) {
+      // Currently up
+      data["status"] = "overhead";
+      data["los_time"] = static_cast<long>(pass.losTime);
+      data["los_in_seconds"] = static_cast<long>(pass.losTime - now);
+      data["los_azimuth"] = pass.losAz;
+    } else {
+      // Below horizon
+      data["status"] = "below_horizon";
+      data["aos_time"] = static_cast<long>(pass.aosTime);
+      data["aos_in_seconds"] = static_cast<long>(pass.aosTime - now);
+      data["aos_azimuth"] = pass.aosAz;
+      data["los_time"] = static_cast<long>(pass.losTime);
+      data["max_elevation"] = pass.maxEl;
+    }
+  } else {
+    data["status"] = "no_pass_found";
+  }
+
+  // TLE age
+  double tleAge = predictor_->tleAgeDays();
+  if (tleAge >= 0.0) {
+    data["tle_age_days"] = tleAge;
+  }
+
+  return data;
+}
+
 void SatPanel::renderPolarPlot(SDL_Renderer *renderer, float cx, float cy,
                                int radius) {
   // --- Compass labels (outside the circle) ---
   if (compassFontSize_ != lastCompassFontSize_) {
     for (int i = 0; i < kNumCompass; ++i) {
-      if (compassTex_[i]) {
-        SDL_DestroyTexture(compassTex_[i]);
-        compassTex_[i] = nullptr;
-      }
+      MemoryMonitor::getInstance().destroyTexture(compassTex_[i]);
     }
     lastCompassFontSize_ = compassFontSize_;
   }

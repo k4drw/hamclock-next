@@ -1,5 +1,6 @@
 #include "LocalPanel.h"
 #include "../core/Astronomy.h"
+#include "../core/MemoryMonitor.h"
 #include "../core/Theme.h"
 #include "FontCatalog.h"
 
@@ -16,15 +17,9 @@ LocalPanel::LocalPanel(int x, int y, int w, int h, FontManager &fontMgr,
 
 void LocalPanel::destroyCache() {
   for (int i = 0; i < kNumLines; ++i) {
-    if (lineTex_[i]) {
-      SDL_DestroyTexture(lineTex_[i]);
-      lineTex_[i] = nullptr;
-    }
+    MemoryMonitor::getInstance().destroyTexture(lineTex_[i]);
   }
-  if (secTex_) {
-    SDL_DestroyTexture(secTex_);
-    secTex_ = nullptr;
-  }
+  MemoryMonitor::getInstance().destroyTexture(secTex_);
 }
 
 void LocalPanel::update() {
@@ -147,10 +142,7 @@ void LocalPanel::render(SDL_Renderer *renderer) {
     bool needRedraw = !lineTex_[i] || (lineText_[i] != lastLineText_[i]) ||
                       (lineFontSize_[i] != lastLineFontSize_[i]);
     if (needRedraw) {
-      if (lineTex_[i]) {
-        SDL_DestroyTexture(lineTex_[i]);
-        lineTex_[i] = nullptr;
-      }
+      MemoryMonitor::getInstance().destroyTexture(lineTex_[i]);
       lineTex_[i] =
           fontMgr_.renderText(renderer, lineText_[i], colors[i],
                               lineFontSize_[i], &lineW_[i], &lineH_[i]);
@@ -166,10 +158,7 @@ void LocalPanel::render(SDL_Renderer *renderer) {
         bool needSecRedraw = !secTex_ || (currentSec_ != lastSec_) ||
                              (secFontSize_ != lastSecFontSize_);
         if (needSecRedraw) {
-          if (secTex_) {
-            SDL_DestroyTexture(secTex_);
-            secTex_ = nullptr;
-          }
+          MemoryMonitor::getInstance().destroyTexture(secTex_);
           SDL_Color secColor = colors[1];
           secTex_ = fontMgr_.renderText(renderer, currentSec_, secColor,
                                         secFontSize_, &secW_, &secH_, true);

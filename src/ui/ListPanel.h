@@ -6,6 +6,9 @@
 #include <string>
 #include <vector>
 
+struct SDL_Renderer;
+struct SDL_Texture;
+
 class ListPanel : public Widget {
 public:
   ListPanel(int x, int y, int w, int h, FontManager &fontMgr,

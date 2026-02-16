@@ -1,4 +1,5 @@
 #include "RSSBanner.h"
+#include "../core/MemoryMonitor.h"
 #include "../core/Theme.h"
 #include "FontCatalog.h"
 
@@ -86,7 +87,7 @@ void RSSBanner::onResize(int x, int y, int w, int h) {
 void RSSBanner::destroyCache() {
   for (auto &line : currentLines_) {
     if (line.tex)
-      SDL_DestroyTexture(line.tex);
+      MemoryMonitor::getInstance().destroyTexture(line.tex);
   }
   currentLines_.clear();
   totalLineHeight_ = 0;
@@ -107,18 +108,35 @@ void RSSBanner::rebuildTextures(SDL_Renderer *renderer) {
   ThemeColors themes = getThemeColors(theme_);
   SDL_Color textColor = themes.accent;
 
+  // CRITICAL: Limit text to prevent texture creation failures on RPi
+  // Maximum texture dimension on KMSDRM is 2048px
+  static constexpr int kMaxTextureWidth = 2048;
+  static constexpr int kMaxCharWidth = 20; // Approximate max pixels per char
+
+  // Estimate maximum safe character length
+  int maxChars = (kMaxTextureWidth - 100) / kMaxCharWidth; // Leave margin
+
+  if (fullText.size() > maxChars) {
+    fullText = fullText.substr(0, maxChars - 3) + "...";
+  }
+
   // 1. Try single line
   int w = 0, h = 0;
   SDL_Texture *tex =
       fontMgr_.renderText(renderer, fullText, textColor, fontSize_, &w, &h);
 
-  if (tex && w <= width_ - 20) {
+  if (tex && w <= width_ - 20 && w < kMaxTextureWidth) {
     currentLines_.push_back({tex, w, h});
     totalLineHeight_ = h;
   } else {
     // 2. Wrap to 2 lines if possible
     if (tex)
-      SDL_DestroyTexture(tex);
+      MemoryMonitor::getInstance().destroyTexture(tex);
+
+    // If texture was too wide, further truncate for wrapping
+    if (w >= kMaxTextureWidth && fullText.size() > 60) {
+      fullText = fullText.substr(0, 60) + "...";
+    }
 
     // Naive word wrap for 2 lines
     size_t mid = fullText.length() / 2;
@@ -134,24 +152,39 @@ void RSSBanner::rebuildTextures(SDL_Renderer *renderer) {
       l1 = fullText;
     }
 
+    // Truncate individual lines if still too long
+    int perLineMaxChars = maxChars / 2;
+    if (l1.size() > perLineMaxChars) {
+      l1 = l1.substr(0, perLineMaxChars - 3) + "...";
+    }
+    if (l2.size() > perLineMaxChars) {
+      l2 = l2.substr(0, perLineMaxChars - 3) + "...";
+    }
+
     // Use smaller font for 2 lines if needed
     int wrapFontSize = (fontSize_ > 20) ? fontSize_ * 0.7 : fontSize_;
 
     int w1 = 0, h1 = 0;
     SDL_Texture *t1 =
         fontMgr_.renderText(renderer, l1, textColor, wrapFontSize, &w1, &h1);
-    if (t1) {
+    if (t1 && w1 < kMaxTextureWidth) {
       currentLines_.push_back({t1, w1, h1});
       totalLineHeight_ += h1;
+    } else if (t1) {
+      MemoryMonitor::getInstance().destroyTexture(
+          t1); // Texture still too wide, discard
     }
 
     if (!l2.empty()) {
       int w2 = 0, h2 = 0;
       SDL_Texture *t2 =
           fontMgr_.renderText(renderer, l2, textColor, wrapFontSize, &w2, &h2);
-      if (t2) {
+      if (t2 && w2 < kMaxTextureWidth) {
         currentLines_.push_back({t2, w2, h2});
         totalLineHeight_ += h2;
+      } else if (t2) {
+        MemoryMonitor::getInstance().destroyTexture(
+            t2); // Texture still too wide, discard
       }
     }
   }

@@ -2,6 +2,7 @@
 
 #include "FontCatalog.h"
 #include "FontManager.h"
+#include "../core/Constants.h"
 
 #include <SDL.h>
 #include <SDL_ttf.h>
@@ -16,9 +17,6 @@ struct SpecRect {
     const char* name;
     int x, y, w, h;
 };
-
-static constexpr int kLogicalW = 800;
-static constexpr int kLogicalH = 480;
 
 // All major zones from hamclock_layout.md.
 static const SpecRect kSpecRects[] = {
@@ -58,8 +56,8 @@ public:
 
         SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
 
-        float sx = static_cast<float>(winW) / kLogicalW;
-        float sy = static_cast<float>(winH) / kLogicalH;
+        float sx = static_cast<float>(winW) / HamClock::LOGICAL_WIDTH;
+        float sy = static_cast<float>(winH) / HamClock::LOGICAL_HEIGHT;
 
         // --- Spec rects: yellow double outline ---
         for (int i = 0; i < kNumSpecRects; ++i) {
@@ -133,8 +131,8 @@ public:
     void dumpReport(int winW, int winH,
                     const std::vector<WidgetRect>& actuals) const
     {
-        float sx = static_cast<float>(winW) / kLogicalW;
-        float sy = static_cast<float>(winH) / kLogicalH;
+        float sx = static_cast<float>(winW) / HamClock::LOGICAL_WIDTH;
+        float sy = static_cast<float>(winH) / HamClock::LOGICAL_HEIGHT;
 
         std::fprintf(stderr,
             "\n========== LAYOUT DELTA REPORT (window %dx%d) ==========\n\n",
