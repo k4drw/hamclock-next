@@ -28,7 +28,7 @@ rm -rf build-macos
 mkdir -p build-macos
 
 # Generate .icns icon if it doesn't exist
-if [ ! -f "assets/macos/HamClockNext.icns" ]; then
+if [ ! -f "packaging/macos/HamClockNext.icns" ]; then
     echo "Generating macOS icon..."
     ./scripts/create-macos-icon.sh
 fi

@@ -453,18 +453,18 @@ if(APPLE)
         MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
         MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
         MACOSX_BUNDLE_ICON_FILE "HamClockNext"
-        MACOSX_BUNDLE_INFO_PLIST "${CMAKE_SOURCE_DIR}/assets/macos/Info.plist.in"
+        MACOSX_BUNDLE_INFO_PLIST "${CMAKE_SOURCE_DIR}/packaging/macos/Info.plist.in"
     )
 
     # Copy icon into bundle
     set_source_files_properties(
-        "${CMAKE_SOURCE_DIR}/assets/macos/HamClockNext.icns"
+        "${CMAKE_SOURCE_DIR}/packaging/macos/HamClockNext.icns"
         PROPERTIES
         MACOSX_PACKAGE_LOCATION "Resources"
     )
 
     target_sources(hamclock-next PRIVATE
-        "${CMAKE_SOURCE_DIR}/assets/macos/HamClockNext.icns"
+        "${CMAKE_SOURCE_DIR}/packaging/macos/HamClockNext.icns"
     )
 endif()
 
