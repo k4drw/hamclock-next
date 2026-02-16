@@ -1,5 +1,6 @@
 #include "DEInfo.h"
 #include "../core/Astronomy.h"
+#include "../core/MemoryMonitor.h"
 #include "FontCatalog.h"
 
 #include <algorithm>
@@ -40,8 +41,7 @@ void DEInfo::update() {
 void DEInfo::destroyCache() {
   for (int i = 0; i < kNumLines; ++i) {
     if (lineTex_[i]) {
-      SDL_DestroyTexture(lineTex_[i]);
-      lineTex_[i] = nullptr;
+      MemoryMonitor::getInstance().destroyTexture(lineTex_[i]);
     }
   }
 }
@@ -72,8 +72,7 @@ void DEInfo::render(SDL_Renderer *renderer) {
                       (lineFontSize_[i] != lastLineFontSize_[i]);
     if (needRedraw) {
       if (lineTex_[i]) {
-        SDL_DestroyTexture(lineTex_[i]);
-        lineTex_[i] = nullptr;
+        MemoryMonitor::getInstance().destroyTexture(lineTex_[i]);
       }
       lineTex_[i] =
           fontMgr_.renderText(renderer, lineText_[i], colors[i],

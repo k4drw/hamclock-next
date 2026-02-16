@@ -7,6 +7,8 @@
 #include <memory>
 #include <string>
 
+struct SDL_Renderer;
+
 class HistoryPanel : public Widget {
 public:
   HistoryPanel(int x, int y, int w, int h, FontManager &fontMgr,

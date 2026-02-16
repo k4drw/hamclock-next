@@ -3,7 +3,9 @@
 #include <SDL.h>
 #include <SDL_ttf.h>
 
+#include "../core/MemoryMonitor.h"
 #include <algorithm>
+#include <cstdint>
 #include <cstdio>
 #include <map>
 #include <string>
@@ -13,7 +15,10 @@ class FontCatalog; // forward declaration
 class FontManager {
 public:
   FontManager() = default;
-  ~FontManager() { closeAll(); }
+  ~FontManager() {
+    closeAll();
+    clearCache();
+  }
 
   void setCatalog(FontCatalog *cat) { catalog_ = cat; }
   FontCatalog *catalog() const { return catalog_; }
@@ -106,44 +111,193 @@ public:
     if (!surface)
       return nullptr;
 
+    // Hardware Limit Check: Sanity check dimensions before trying to allocate
+    // GPU memory. RPi KMSDRM has a 2048px effective reliable limit.
+    if (maxW_ == 0 || maxH_ == 0) {
+      SDL_RendererInfo info;
+      if (SDL_GetRendererInfo(renderer, &info) == 0) {
+        maxW_ = info.max_texture_width;
+        maxH_ = info.max_texture_height;
+#if defined(__linux__) || defined(__arm__) || defined(__aarch64__)
+        if (maxW_ > 2048)
+          maxW_ = 2048;
+        if (maxH_ > 2048)
+          maxH_ = 2048;
+#endif
+      }
+    }
+
+    if (maxW_ > 0 && maxH_ > 0 && (surface->w > maxW_ || surface->h > maxH_)) {
+      std::fprintf(stderr,
+                   "FontManager: surface too large for GPU (%dx%d > %dx%d), "
+                   "clipping. Text='%s'\n",
+                   surface->w, surface->h, maxW_, maxH_,
+                   text.substr(0, 40).c_str());
+    }
+
     SDL_Texture *texture = SDL_CreateTextureFromSurface(renderer, surface);
     if (!texture) {
+      // Log detailed error - this may indicate GPU memory exhaustion
+      std::fprintf(stderr,
+                   "FontManager: SDL_CreateTextureFromSurface failed "
+                   "(text='%s', size=%dx%d): %s\n",
+                   text.substr(0, 40).c_str(), surface->w, surface->h,
+                   SDL_GetError());
       SDL_FreeSurface(surface);
       return nullptr;
     }
 
-    // Logical dimensions
+    // VRAM accounting (w, h are already physical pixels)
+    int64_t bytes = static_cast<int64_t>(surface->w) * surface->h * 4;
+    MemoryMonitor::getInstance().addVram(bytes);
+
+    // Logical dimensions for caller
     if (outW)
       *outW = static_cast<int>(surface->w / renderScale_);
     if (outH)
       *outH = static_cast<int>(surface->h / renderScale_);
 
-    // Enable linear filtering for smooth scaling if needed
+    // Enable linear filtering for smooth scaling
     SDL_SetTextureScaleMode(texture, SDL_ScaleModeBest);
 
     SDL_FreeSurface(surface);
     return texture;
   }
 
-  // Convenience: render + draw at (x, y). Not cached — use for one-off draws
-  // only.
+  // Convenience: render + draw at (x, y). Internal cache prevents per-frame
+  // texture churn, dramatic optimization for embedded devices.
   void drawText(SDL_Renderer *renderer, const std::string &text, int x, int y,
                 SDL_Color color, int ptSize = 0, bool bold = false,
-                bool centered = false) {
+                bool centered = false, bool forceVolatile = false) {
+    if (text.empty())
+      return;
+
+    int basePt = ptSize > 0 ? ptSize : defaultSize_;
+    TextCacheKey key{text, color, basePt, bold};
+
+    // Check cache
+    auto it = textCache_.find(key);
+    if (it != textCache_.end()) {
+      it->second.lastUsed = SDL_GetTicks();
+      SDL_Rect dst = {x, y, it->second.w, it->second.h};
+      if (centered) {
+        dst.x -= it->second.w / 2;
+        dst.y -= it->second.h / 2;
+      }
+      SDL_RenderCopy(renderer, it->second.texture, nullptr, &dst);
+      return;
+    }
+
+    // Heuristic: If string contains moving time (HH:MM:SS) or countdown
+    // markers, don't cache to prevent rapid VRAM growth. Render every frame
+    // instead.
+    bool volatileText =
+        forceVolatile ||
+        (text.length() >= 5 && (text.find(':') != std::string::npos ||
+                                text.find("Up ") != std::string::npos ||
+                                (text.find('s') != std::string::npos &&
+                                 text.find('m') != std::string::npos)));
+
+    // Not in cache - render new texture
     int w = 0, h = 0;
     SDL_Texture *tex = renderText(renderer, text, color, ptSize, &w, &h, bold);
     if (!tex)
       return;
+
+    if (!volatileText) {
+      // Prune cache if it gets too large
+      if (textCache_.size() > 300) {
+        pruneCache();
+      }
+      // Add to cache
+      textCache_[key] = {tex, w, h, SDL_GetTicks()};
+    }
+
     SDL_Rect dst = {x, y, w, h};
     if (centered) {
       dst.x -= w / 2;
       dst.y -= h / 2;
     }
     SDL_RenderCopy(renderer, tex, nullptr, &dst);
-    SDL_DestroyTexture(tex);
+
+    if (volatileText) {
+      // Destroy temporary volatile texture
+      MemoryMonitor::getInstance().destroyTexture(tex);
+    }
+  }
+
+  // Returns the width of the text in logical units.
+  // Correctly accounts for renderScale_ and super-sampling.
+  int getLogicalWidth(const std::string &text, int ptSize = 0,
+                      bool bold = false) {
+    if (text.empty())
+      return 0;
+    int basePt = ptSize > 0 ? ptSize : defaultSize_;
+    int renderPt = basePt;
+    if (renderScale_ > 1.01f) {
+      renderPt = std::clamp(static_cast<int>(basePt * renderScale_), 8, 600);
+    }
+    TTF_Font *font = getFont(renderPt);
+    if (!font)
+      return 0;
+
+    int prevStyle = TTF_GetFontStyle(font);
+    if (bold) {
+      TTF_SetFontStyle(font, prevStyle | TTF_STYLE_BOLD);
+    }
+    int w = 0, h = 0;
+    TTF_SizeText(font, text.c_str(), &w, &h);
+    if (bold) {
+      TTF_SetFontStyle(font, prevStyle);
+    }
+
+    return static_cast<int>(w / renderScale_);
+  }
+
+  void clearCache() {
+    for (auto &[key, val] : textCache_) {
+      MemoryMonitor::getInstance().destroyTexture(val.texture);
+    }
+    textCache_.clear();
   }
 
 private:
+  struct TextCacheKey {
+    std::string text;
+    SDL_Color color;
+    int ptSize;
+    bool bold;
+
+    bool operator<(const TextCacheKey &other) const {
+      if (text != other.text)
+        return text < other.text;
+      if (ptSize != other.ptSize)
+        return ptSize < other.ptSize;
+      if (bold != other.bold)
+        return bold < other.bold;
+      if (color.r != other.color.r)
+        return color.r < other.color.r;
+      if (color.g != other.color.g)
+        return color.g < other.color.g;
+      if (color.b != other.color.b)
+        return color.b < other.color.b;
+      return color.a < other.color.a;
+    }
+  };
+
+  struct CachedTexture {
+    SDL_Texture *texture;
+    int w, h;
+    uint32_t lastUsed;
+  };
+
+  void pruneCache() {
+    // Very simple: just clear everything if we hit the limit to keep it fast.
+    // Most UI text is stable, so this only happens if there's massive churn
+    // (like a log view).
+    clearCache();
+  }
+
   void closeAll() {
     for (auto &[size, font] : cache_) {
       TTF_CloseFont(font);
@@ -156,5 +310,8 @@ private:
   int defaultSize_ = 24;
   float renderScale_ = 1.0f;
   std::map<int, TTF_Font *> cache_;
+  std::map<TextCacheKey, CachedTexture> textCache_;
   FontCatalog *catalog_ = nullptr;
+  int maxW_ = 0;
+  int maxH_ = 0;
 };

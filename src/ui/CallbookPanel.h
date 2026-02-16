@@ -5,6 +5,8 @@
 #include "Widget.h"
 #include <memory>
 
+struct SDL_Renderer;
+
 class CallbookPanel : public Widget {
 public:
   CallbookPanel(int x, int y, int w, int h, FontManager &fontMgr,

@@ -27,6 +27,12 @@ echo "Cleaning build directory..."
 rm -rf build-macos
 mkdir -p build-macos
 
+# Generate .icns icon if it doesn't exist
+if [ ! -f "packaging/macos/HamClockNext.icns" ]; then
+    echo "Generating macOS icon..."
+    ./scripts/create-macos-icon.sh
+fi
+
 echo "Configuring CMake..."
 # We use standard build, maybe bundle it later.
 cmake -B build-macos -S . \
@@ -39,13 +45,46 @@ cmake --build build-macos -j$(sysctl -n hw.ncpu)
 
 if [ $? -eq 0 ]; then
     echo "--------------------------------------------------"
-    echo "SUCCESS: MacOS build finished!"
-    echo "Binary: build-macos/hamclock-next"
+    echo "SUCCESS: MacOS .app bundle created!"
+    echo "Bundle: build-macos/hamclock-next.app"
     echo "--------------------------------------------------"
-    
-    # Optional: simple bundling
-    # We could make a .app bundle here effectively manually or via CPack
-    # For now, just the binary is a good start.
+
+    # Create DMG for distribution
+    echo "Creating DMG installer..."
+    APP_NAME="HamClock-Next"
+    ARCH=$(uname -m)
+    DMG_NAME="hamclock-next-macos-${ARCH}.dmg"
+
+    # Clean up any existing DMG
+    rm -f "build-macos/$DMG_NAME"
+
+    # Create temporary DMG staging directory
+    mkdir -p "build-macos/dmg-staging"
+    cp -R "build-macos/hamclock-next.app" "build-macos/dmg-staging/"
+
+    # Create symlink to Applications folder for drag-and-drop install
+    ln -s /Applications "build-macos/dmg-staging/Applications"
+
+    # Create DMG using hdiutil
+    hdiutil create -volname "$APP_NAME" \
+        -srcfolder "build-macos/dmg-staging" \
+        -ov -format UDZO \
+        "build-macos/$DMG_NAME"
+
+    # Clean up staging
+    rm -rf "build-macos/dmg-staging"
+
+    # Also create ZIP for alternative distribution
+    echo "Creating ZIP archive..."
+    cd build-macos
+    zip -r "hamclock-next-macos-${ARCH}.zip" hamclock-next.app
+    cd ..
+
+    echo "--------------------------------------------------"
+    echo "Distribution files created:"
+    echo "  DMG: build-macos/$DMG_NAME"
+    echo "  ZIP: build-macos/hamclock-next-macos-${ARCH}.zip"
+    echo "--------------------------------------------------"
 else
     echo "ERROR: Build failed!"
     exit 1

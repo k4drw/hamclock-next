@@ -3,6 +3,7 @@
 #include "../core/ConfigManager.h"
 #include "FontManager.h"
 #include "Widget.h"
+#include <SDL.h>
 #include <string>
 
 class DXClusterSetup : public Widget {

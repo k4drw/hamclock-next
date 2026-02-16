@@ -17,13 +17,11 @@ void ListPanel::setRows(const std::vector<std::string> &rows) {
 
 void ListPanel::destroyCache() {
   if (titleTex_) {
-    SDL_DestroyTexture(titleTex_);
-    titleTex_ = nullptr;
+    MemoryMonitor::getInstance().destroyTexture(titleTex_);
   }
   for (auto &rc : rowCache_) {
     if (rc.tex) {
-      SDL_DestroyTexture(rc.tex);
-      rc.tex = nullptr;
+      MemoryMonitor::getInstance().destroyTexture(rc.tex);
     }
   }
   rowCache_.clear();
@@ -57,8 +55,7 @@ void ListPanel::render(SDL_Renderer *renderer) {
   // Title (centered, cyan)
   if (titleFontChanged || !titleTex_) {
     if (titleTex_) {
-      SDL_DestroyTexture(titleTex_);
-      titleTex_ = nullptr;
+      MemoryMonitor::getInstance().destroyTexture(titleTex_);
     }
     SDL_Color cyan = themes.accent;
     titleTex_ = fontMgr_.renderText(renderer, title_, cyan, titleFontSize_,
@@ -78,8 +75,7 @@ void ListPanel::render(SDL_Renderer *renderer) {
   if (rowCache_.size() != rows_.size() || rowFontChanged) {
     for (auto &rc : rowCache_) {
       if (rc.tex) {
-        SDL_DestroyTexture(rc.tex);
-        rc.tex = nullptr;
+        MemoryMonitor::getInstance().destroyTexture(rc.tex);
       }
     }
     rowCache_.resize(rows_.size());
@@ -111,8 +107,7 @@ void ListPanel::render(SDL_Renderer *renderer) {
     // Render row text (cached)
     if (rows_[i] != rowCache_[i].text) {
       if (rowCache_[i].tex) {
-        SDL_DestroyTexture(rowCache_[i].tex);
-        rowCache_[i].tex = nullptr;
+        MemoryMonitor::getInstance().destroyTexture(rowCache_[i].tex);
       }
       rowCache_[i].tex =
           fontMgr_.renderText(renderer, rows_[i], rowColor, rowFontSize_,

@@ -9,6 +9,8 @@
 #include <mutex>
 #include <string>
 
+struct SDL_Renderer;
+
 class MoonPanel : public Widget {
 public:
   MoonPanel(int x, int y, int w, int h, FontManager &fontMgr,

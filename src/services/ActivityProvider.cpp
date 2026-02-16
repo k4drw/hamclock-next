@@ -1,5 +1,5 @@
 #include "ActivityProvider.h"
-#include <iostream>
+#include "../core/Logger.h"
 #include <nlohmann/json.hpp>
 
 using json = nlohmann::json;
@@ -17,7 +17,7 @@ void ActivityProvider::fetch() {
 void ActivityProvider::fetchDXPeds() {
   net_.fetchAsync(DX_PEDS_URL, [this](std::string data) {
     if (data.empty()) {
-      std::cerr << "Failed to fetch DXPeditions from NG3K" << std::endl;
+      LOG_E("ActivityProvider", "Failed to fetch DXPeditions from NG3K");
       return;
     }
 

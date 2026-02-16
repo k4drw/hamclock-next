@@ -6,6 +6,8 @@
 #include <memory>
 #include <string>
 
+struct SDL_Renderer;
+
 class WeatherPanel : public Widget {
 public:
   WeatherPanel(int x, int y, int w, int h, FontManager &fontMgr,

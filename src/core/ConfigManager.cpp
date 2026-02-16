@@ -91,6 +91,25 @@ bool ConfigManager::load(AppConfig &config) const {
     config.theme = ap.value("theme", "default");
     config.mapNightLights = ap.value("map_night_lights", true);
     config.useMetric = ap.value("use_metric", true);
+    config.projection = ap.value("projection", "equirectangular");
+    config.mapStyle = ap.value("map_style", "nasa");
+    config.showGrid = ap.value("show_grid", false);
+    config.gridType = ap.value("grid_type", "latlon");
+    config.qrzUsername = ap.value("qrz_username", "");
+    config.qrzPassword = ap.value("qrz_password", "");
+    config.countdownLabel = ap.value("countdown_label", "");
+    config.countdownTime = ap.value("countdown_time", "");
+  }
+
+  // Brightness
+  if (json.contains("brightness")) {
+    auto &br = json["brightness"];
+    config.brightness = br.value("level", 100);
+    config.brightnessSchedule = br.value("schedule", false);
+    config.dimHour = br.value("dim_hour", 22);
+    config.dimMinute = br.value("dim_minute", 0);
+    config.brightHour = br.value("bright_hour", 6);
+    config.brightMinute = br.value("bright_minute", 0);
   }
 
   // Pane widget selection
@@ -157,6 +176,22 @@ bool ConfigManager::load(AppConfig &config) const {
     config.preventSleep = p.value("prevent_sleep", true);
   }
 
+  // Rotator (Hamlib rotctld)
+  if (json.contains("rotator")) {
+    auto &r = json["rotator"];
+    config.rotatorHost = r.value("host", "");
+    config.rotatorPort = r.value("port", 4533);
+    config.rotatorAutoTrack = r.value("auto_track", false);
+  }
+
+  // Rig (Hamlib rigctld)
+  if (json.contains("rig")) {
+    auto &r = json["rig"];
+    config.rigHost = r.value("host", "");
+    config.rigPort = r.value("port", 4532);
+    config.rigAutoTune = r.value("auto_tune", true);
+  }
+
   // Require at least a callsign to consider config valid
   return !config.callsign.empty();
 }
@@ -184,8 +219,31 @@ bool ConfigManager::save(const AppConfig &config) const {
   json["appearance"]["theme"] = config.theme;
   json["appearance"]["map_night_lights"] = config.mapNightLights;
   json["appearance"]["use_metric"] = config.useMetric;
+  json["appearance"]["projection"] = config.projection;
+  json["appearance"]["map_style"] = config.mapStyle;
+  json["appearance"]["show_grid"] = config.showGrid;
+  json["appearance"]["grid_type"] = config.gridType;
+  json["appearance"]["qrz_username"] = config.qrzUsername;
+  json["appearance"]["qrz_password"] = config.qrzPassword;
+  json["appearance"]["countdown_label"] = config.countdownLabel;
+  json["appearance"]["countdown_time"] = config.countdownTime;
+
+  json["brightness"]["level"] = config.brightness;
+  json["brightness"]["schedule"] = config.brightnessSchedule;
+  json["brightness"]["dim_hour"] = config.dimHour;
+  json["brightness"]["dim_minute"] = config.dimMinute;
+  json["brightness"]["bright_hour"] = config.brightHour;
+  json["brightness"]["bright_minute"] = config.brightMinute;
 
   json["power"]["prevent_sleep"] = config.preventSleep;
+
+  json["rotator"]["host"] = config.rotatorHost;
+  json["rotator"]["port"] = config.rotatorPort;
+  json["rotator"]["auto_track"] = config.rotatorAutoTrack;
+
+  json["rig"]["host"] = config.rigHost;
+  json["rig"]["port"] = config.rigPort;
+  json["rig"]["auto_tune"] = config.rigAutoTune;
 
   auto saveRotation = [&](const std::string &key,
                           const std::vector<WidgetType> &vec) {

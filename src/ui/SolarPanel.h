@@ -7,6 +7,9 @@
 #include <memory>
 #include <string>
 
+struct SDL_Renderer;
+struct SDL_Texture;
+
 class SolarPanel : public Widget {
 public:
   SolarPanel(int x, int y, int w, int h, FontManager &fontMgr,
@@ -22,8 +25,7 @@ public:
 private:
   void destroyCache() {
     if (cached_) {
-      SDL_DestroyTexture(cached_);
-      cached_ = nullptr;
+      MemoryMonitor::getInstance().destroyTexture(cached_);
     }
   }
 

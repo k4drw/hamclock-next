@@ -1,5 +1,6 @@
 #include "TimePanel.h"
 #include "../core/Astronomy.h"
+#include "../core/MemoryMonitor.h"
 #include "../core/Theme.h"
 #include "FontCatalog.h"
 #include "RenderUtils.h"
@@ -114,22 +115,10 @@ TimePanel::TimePanel(int x, int y, int w, int h, FontManager &fontMgr,
       callsign_(callsign) {}
 
 void TimePanel::destroyCache() {
-  if (callTex_) {
-    SDL_DestroyTexture(callTex_);
-    callTex_ = nullptr;
-  }
-  if (hmTex_) {
-    SDL_DestroyTexture(hmTex_);
-    hmTex_ = nullptr;
-  }
-  if (secTex_) {
-    SDL_DestroyTexture(secTex_);
-    secTex_ = nullptr;
-  }
-  if (dateTex_) {
-    SDL_DestroyTexture(dateTex_);
-    dateTex_ = nullptr;
-  }
+  MemoryMonitor::getInstance().destroyTexture(callTex_);
+  MemoryMonitor::getInstance().destroyTexture(hmTex_);
+  MemoryMonitor::getInstance().destroyTexture(secTex_);
+  MemoryMonitor::getInstance().destroyTexture(dateTex_);
 }
 
 void TimePanel::update() {
@@ -209,10 +198,7 @@ void TimePanel::render(SDL_Renderer *renderer) {
   // --- Callsign (large, user-selected color, centered) ---
   // --- Callsign (large, user-selected color, centered) ---
   if (callFontSize_ != lastCallFontSize_ || !callTex_) {
-    if (callTex_) {
-      SDL_DestroyTexture(callTex_);
-      callTex_ = nullptr;
-    }
+    MemoryMonitor::getInstance().destroyTexture(callTex_);
     callTex_ = fontMgr_.renderText(renderer, callsign_, callColor_,
                                    callFontSize_, &callW_, &callH_, true);
     lastCallFontSize_ = callFontSize_;
@@ -261,10 +247,7 @@ void TimePanel::render(SDL_Renderer *renderer) {
 
   // --- Time: HH:MM (large, white) + SS (superscript, gray) ---
   if (!hmTex_ || currentHM_ != lastHM_ || hmFontSize_ != lastHmFontSize_) {
-    if (hmTex_) {
-      SDL_DestroyTexture(hmTex_);
-      hmTex_ = nullptr;
-    }
+    MemoryMonitor::getInstance().destroyTexture(hmTex_);
     SDL_Color white = {255, 255, 255, 255};
     hmTex_ = fontMgr_.renderText(renderer, currentHM_, white, hmFontSize_,
                                  &hmW_, &hmH_);
@@ -272,10 +255,7 @@ void TimePanel::render(SDL_Renderer *renderer) {
     lastHmFontSize_ = hmFontSize_;
   }
   if (!secTex_ || currentSec_ != lastSec_ || secFontSize_ != lastSecFontSize_) {
-    if (secTex_) {
-      SDL_DestroyTexture(secTex_);
-      secTex_ = nullptr;
-    }
+    MemoryMonitor::getInstance().destroyTexture(secTex_);
     SDL_Color white = {255, 255, 255, 255};
     secTex_ = fontMgr_.renderText(renderer, currentSec_, white, secFontSize_,
                                   &secW_, &secH_, true);
@@ -300,10 +280,7 @@ void TimePanel::render(SDL_Renderer *renderer) {
   // --- Date (cyan, centered) ---
   if (!dateTex_ || currentDate_ != lastDate_ ||
       dateFontSize_ != lastDateFontSize_) {
-    if (dateTex_) {
-      SDL_DestroyTexture(dateTex_);
-      dateTex_ = nullptr;
-    }
+    MemoryMonitor::getInstance().destroyTexture(dateTex_);
     SDL_Color cyan = {0, 200, 255, 255};
     dateTex_ = fontMgr_.renderText(renderer, currentDate_, cyan, dateFontSize_,
                                    &dateW_, &dateH_);
@@ -355,8 +332,7 @@ void TimePanel::stopEditing(bool apply) {
     callColor_ = kPalette[selectedColorIdx_];
     // Force callsign texture rebuild
     if (callTex_) {
-      SDL_DestroyTexture(callTex_);
-      callTex_ = nullptr;
+      MemoryMonitor::getInstance().destroyTexture(callTex_);
     }
     // Persist change
     if (onConfigChanged_) {

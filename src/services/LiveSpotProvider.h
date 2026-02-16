@@ -7,7 +7,6 @@
 #include <memory>
 #include <nlohmann/json.hpp>
 #include <spdlog/fmt/fmt.h>
-#include <string>
 
 struct HamClockState;
 

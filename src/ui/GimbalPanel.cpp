@@ -7,18 +7,43 @@
 #define M_PI 3.14159265358979323846
 #endif
 
-GimbalPanel::GimbalPanel(int x, int y, int w, int h, FontManager &fontMgr)
-    : Widget(x, y, w, h), fontMgr_(fontMgr) {}
+GimbalPanel::GimbalPanel(int x, int y, int w, int h, FontManager &fontMgr,
+                         std::shared_ptr<RotatorDataStore> rotatorStore)
+    : Widget(x, y, w, h), fontMgr_(fontMgr),
+      rotatorStore_(std::move(rotatorStore)) {}
 
 void GimbalPanel::update() {
+  // Update satellite prediction
   if (predictor_) {
     predictor_->setObserver(obsLat_, obsLon_);
     auto pos = predictor_->observe();
-    az_ = pos.azimuth;
-    el_ = pos.elevation;
+    satAz_ = pos.azimuth;
+    satEl_ = pos.elevation;
     hasSat_ = true;
   } else {
     hasSat_ = false;
+  }
+
+  // Update rotator position (real hardware data)
+  if (rotatorStore_) {
+    RotatorData rotData = rotatorStore_->get();
+    hasRotator_ = rotData.valid;
+    rotatorConnected_ = rotData.connected;
+
+    // If we have real rotator data, use it for display
+    // Otherwise fall back to satellite prediction
+    if (hasRotator_) {
+      az_ = rotData.azimuth;
+      el_ = rotData.elevation;
+    } else if (hasSat_) {
+      // Fall back to satellite prediction
+      az_ = satAz_;
+      el_ = satEl_;
+    }
+  } else if (hasSat_) {
+    // No rotator configured, use satellite prediction
+    az_ = satAz_;
+    el_ = satEl_;
   }
 }
 
@@ -33,26 +58,61 @@ void GimbalPanel::render(SDL_Renderer *renderer) {
   SDL_SetRenderDrawColor(renderer, 80, 80, 80, 255);
   SDL_RenderDrawRect(renderer, &rect);
 
-  if (!hasSat_) {
-    fontMgr_.drawText(renderer, "No Sat Active", x_ + width_ / 2,
-                      y_ + height_ / 2, {150, 150, 150, 255}, labelFontSize_,
-                      false, true);
+  // Display status line (Rotator status or Sat name)
+  if (hasRotator_) {
+    // Show rotator status
+    SDL_Color statusColor = rotatorConnected_ ? SDL_Color{0, 255, 0, 255}
+                                               : SDL_Color{255, 128, 0, 255};
+    const char *statusText =
+        rotatorConnected_ ? "ROTATOR CONNECTED" : "ROTATOR OFFLINE";
+    fontMgr_.drawText(renderer, statusText, x_ + width_ / 2, y_ + 10,
+                      statusColor, labelFontSize_, true, true);
+  } else if (hasSat_) {
+    // Show satellite name (prediction mode)
+    fontMgr_.drawText(renderer, predictor_->satName(), x_ + width_ / 2, y_ + 10,
+                      {0, 255, 0, 255}, labelFontSize_, true, true);
+  } else {
+    // No data available
+    fontMgr_.drawText(renderer, "No Data", x_ + width_ / 2, y_ + height_ / 2,
+                      {150, 150, 150, 255}, labelFontSize_, false, true);
     return;
   }
 
-  // Draw Sat Name
-  fontMgr_.drawText(renderer, predictor_->satName(), x_ + width_ / 2, y_ + 10,
-                    {0, 255, 0, 255}, labelFontSize_, true, true);
-
   // Draw Az/El values
-  char buf[32];
-  std::snprintf(buf, sizeof(buf), "AZ: %.1f", az_);
+  char buf[64];
+  std::snprintf(buf, sizeof(buf), "AZ: %.1f%c", az_,
+                hasRotator_ ? '\xb0' : ' ');
   fontMgr_.drawText(renderer, buf, 15 + x_, y_ + 35, {255, 255, 255, 255},
                     valueFontSize_);
 
-  std::snprintf(buf, sizeof(buf), "EL: %.1f", el_);
-  fontMgr_.drawText(renderer, buf, 15 + x_, y_ + 65, {255, 255, 255, 255},
+  std::snprintf(buf, sizeof(buf), "EL: %.1f%c", el_,
+                hasRotator_ ? '\xb0' : ' ');
+  fontMgr_.drawText(renderer, buf, 15 + x_, y_ + 60, {255, 255, 255, 255},
                     valueFontSize_);
+
+  // Show data source indicator
+  const char *sourceText =
+      hasRotator_ ? "Live" : (hasSat_ ? "Predicted" : "---");
+  SDL_Color sourceColor =
+      hasRotator_ ? SDL_Color{0, 255, 255, 255} : SDL_Color{128, 128, 128, 255};
+  fontMgr_.drawText(renderer, sourceText, 15 + x_, y_ + 85, sourceColor,
+                    labelFontSize_);
+
+  // If we have both rotator and satellite, show the difference
+  if (hasRotator_ && hasSat_) {
+    double azDiff = satAz_ - az_;
+    double elDiff = satEl_ - el_;
+
+    // Normalize azimuth difference to [-180, 180]
+    while (azDiff > 180)
+      azDiff -= 360;
+    while (azDiff < -180)
+      azDiff += 360;
+
+    std::snprintf(buf, sizeof(buf), "Err: Az%.0f El%.0f", azDiff, elDiff);
+    fontMgr_.drawText(renderer, buf, 15 + x_, y_ + 105,
+                      {255, 200, 0, 255}, labelFontSize_ - 2);
+  }
 
   // Graphical indicator (Mechanical Crosshair) - Center-aligned in the
   // remaining space

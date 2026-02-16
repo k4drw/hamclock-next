@@ -5,6 +5,7 @@
 #include "FontManager.h"
 #include "Widget.h"
 
+#include <SDL.h>
 #include <memory>
 #include <string>
 

@@ -22,6 +22,9 @@ SpaceWeatherPanel::SpaceWeatherPanel(int x, int y, int w, int h,
   items_[9].label = "Aurora";
   items_[10].label = "DRAP";
   items_[11].label = "-";
+  items_[12].label = "R-Scale";
+  items_[13].label = "S-Scale";
+  items_[14].label = "G-Scale";
 }
 
 SDL_Color SpaceWeatherPanel::colorForK(int k) {
@@ -40,15 +43,25 @@ SDL_Color SpaceWeatherPanel::colorForSFI(int sfi) {
   return {255, 50, 50, 255};   // Red
 }
 
+SDL_Color SpaceWeatherPanel::colorForNOAAScale(int scale) {
+  // NOAA scales: 0 = no event, 1-2 = minor/moderate (green/yellow),
+  // 3-4 = strong/severe (yellow/red), 5 = extreme (red)
+  if (scale == 0)
+    return {100, 200, 100, 255}; // Dim green (no event)
+  if (scale <= 2)
+    return {0, 255, 0, 255}; // Green (minor/moderate)
+  if (scale <= 3)
+    return {255, 255, 0, 255}; // Yellow (strong)
+  return {255, 50, 50, 255};   // Red (severe/extreme)
+}
+
 void SpaceWeatherPanel::destroyCache() {
   for (auto &item : items_) {
     if (item.labelTex) {
-      SDL_DestroyTexture(item.labelTex);
-      item.labelTex = nullptr;
+      MemoryMonitor::getInstance().destroyTexture(item.labelTex);
     }
     if (item.valueTex) {
-      SDL_DestroyTexture(item.valueTex);
-      item.valueTex = nullptr;
+      MemoryMonitor::getInstance().destroyTexture(item.valueTex);
     }
     item.lastValue.clear();
     item.lastValueColor = {0, 0, 0, 0};
@@ -113,6 +126,21 @@ void SpaceWeatherPanel::update() {
   items_[10].valueColor = {0, 255, 255, 255};
 
   items_[11].value = "-";
+
+  // NOAA R-Scale (Radio Blackouts)
+  std::snprintf(buf, sizeof(buf), "R%d", data.noaa_r_scale);
+  items_[12].value = buf;
+  items_[12].valueColor = colorForNOAAScale(data.noaa_r_scale);
+
+  // NOAA S-Scale (Solar Radiation Storms)
+  std::snprintf(buf, sizeof(buf), "S%d", data.noaa_s_scale);
+  items_[13].value = buf;
+  items_[13].valueColor = colorForNOAAScale(data.noaa_s_scale);
+
+  // NOAA G-Scale (Geomagnetic Storms)
+  std::snprintf(buf, sizeof(buf), "G%d", data.noaa_g_scale);
+  items_[14].value = buf;
+  items_[14].valueColor = colorForNOAAScale(data.noaa_g_scale);
 }
 
 void SpaceWeatherPanel::render(SDL_Renderer *renderer) {
@@ -124,7 +152,7 @@ void SpaceWeatherPanel::render(SDL_Renderer *renderer) {
   // Cycle pages every 7 seconds
   uint32_t now = SDL_GetTicks();
   if (now - lastPageUpdate_ > 7000) {
-    currentPage_ = (currentPage_ + 1) % 3;
+    currentPage_ = (currentPage_ + 1) % 4;
     lastPageUpdate_ = now;
     destroyCache(); // Force redraw of new page items
   }
@@ -161,6 +189,11 @@ void SpaceWeatherPanel::render(SDL_Renderer *renderer) {
   int startIdx = currentPage_ * kItemsPerPage;
   for (int i = 0; i < kItemsPerPage; ++i) {
     int itemIdx = startIdx + i;
+
+    // Bounds check - skip if we've exceeded the number of items
+    if (itemIdx >= kNumItems)
+      continue;
+
     int col = i % 2;
     int row = i / 2;
     int cellX = x_ + col * cellW;
@@ -169,12 +202,11 @@ void SpaceWeatherPanel::render(SDL_Renderer *renderer) {
     // Label (cached until font size changes)
     if (labelFontChanged || !items_[itemIdx].labelTex) {
       if (items_[itemIdx].labelTex) {
-        SDL_DestroyTexture(items_[itemIdx].labelTex);
-        items_[itemIdx].labelTex = nullptr;
+        MemoryMonitor::getInstance().destroyTexture(items_[itemIdx].labelTex);
       }
       items_[itemIdx].labelTex = fontMgr_.renderText(
           renderer, items_[itemIdx].label, labelColor, labelFontSize_,
-          &items_[itemIdx].labelW, &items_[itemIdx].labelH);
+          &items_[itemIdx].labelW, &items_[itemIdx].labelH, false);
     }
 
     // Value (re-render on data or font change, or color change)
@@ -184,12 +216,12 @@ void SpaceWeatherPanel::render(SDL_Renderer *renderer) {
     if (items_[itemIdx].value != items_[itemIdx].lastValue ||
         valueFontChanged || colorChanged) {
       if (items_[itemIdx].valueTex) {
-        SDL_DestroyTexture(items_[itemIdx].valueTex);
-        items_[itemIdx].valueTex = nullptr;
+        MemoryMonitor::getInstance().destroyTexture(items_[itemIdx].valueTex);
       }
       items_[itemIdx].valueTex = fontMgr_.renderText(
           renderer, items_[itemIdx].value, items_[itemIdx].valueColor,
-          valueFontSize_, &items_[itemIdx].valueW, &items_[itemIdx].valueH);
+          valueFontSize_, &items_[itemIdx].valueW, &items_[itemIdx].valueH,
+          true); // SmallBold uses bold=true
       items_[itemIdx].lastValue = items_[itemIdx].value;
       items_[itemIdx].lastValueColor = items_[itemIdx].valueColor;
     }
@@ -212,8 +244,8 @@ void SpaceWeatherPanel::render(SDL_Renderer *renderer) {
   }
 
   // Draw pagination dots (bottom center)
-  for (int i = 0; i < 3; ++i) {
-    SDL_Rect dot = {x_ + width_ / 2 - 15 + i * 12, y_ + height_ - 8, 6, 6};
+  for (int i = 0; i < 4; ++i) {
+    SDL_Rect dot = {x_ + width_ / 2 - 20 + i * 12, y_ + height_ - 8, 6, 6};
     if (i == currentPage_) {
       SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
     } else {
@@ -238,7 +270,7 @@ bool SpaceWeatherPanel::onMouseUp(int mx, int my, Uint16 mod) {
   (void)mx;
   (void)my;
   (void)mod;
-  currentPage_ = (currentPage_ + 1) % 3;
+  currentPage_ = (currentPage_ + 1) % 4;
   lastPageUpdate_ = SDL_GetTicks();
   destroyCache();
   return true;

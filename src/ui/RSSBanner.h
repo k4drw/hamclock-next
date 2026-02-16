@@ -8,6 +8,9 @@
 #include <string>
 #include <vector>
 
+struct SDL_Renderer;
+struct SDL_Texture;
+
 class RSSBanner : public Widget {
 public:
   RSSBanner(int x, int y, int w, int h, FontManager &fontMgr,

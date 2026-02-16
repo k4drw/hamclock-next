@@ -27,18 +27,28 @@ jobs:
           chmod +x scripts/build-macos.sh
           ./scripts/build-macos.sh
 
-      - name: Rename Binary
-        run: mv build-macos/hamclock-next build-macos/hamclock-next-macos
+      - name: Create Distribution Packages
+        run: |
+          # DMG and ZIP are created by build-macos.sh
+          echo "Distribution packages created:"
+          ls -lh build-macos/*.dmg build-macos/*.zip
 
-      - name: Upload Artifact
+      - name: Upload DMG Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: hamclock-macos
-          path: build-macos/hamclock-next-macos
+          name: hamclock-macos-dmg
+          path: build-macos/*.dmg
+
+      - name: Upload ZIP Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hamclock-macos-zip
+          path: build-macos/*.zip
 
       - name: Release
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: |
-            build-macos/hamclock-next-macos
+            build-macos/*.dmg
+            build-macos/*.zip

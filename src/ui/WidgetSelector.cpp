@@ -1,9 +1,11 @@
 #include "WidgetSelector.h"
+#include "../core/Constants.h"
 #include "../core/Theme.h"
 #include <algorithm>
 
 WidgetSelector::WidgetSelector(FontManager &fontMgr)
-    : Widget(0, 0, 800, 480), fontMgr_(fontMgr) {}
+    : Widget(0, 0, HamClock::LOGICAL_WIDTH, HamClock::LOGICAL_HEIGHT),
+      fontMgr_(fontMgr) {}
 
 void WidgetSelector::show(
     int paneIndex, const std::vector<WidgetType> &available,
@@ -19,16 +21,22 @@ void WidgetSelector::show(
   focusedIdx_ = 0;
 
   // Center the menu
-  int numCols = (paneIndex_ < 3) ? 2 : 1;
+  int numCols = 3; // Use 3 columns to handle more widgets
   int itemH = 34;
-  int baseW = 260;
+  int baseW = 180; // Narrower columns for 3-column layout
   int menuW = baseW * numCols;
   int footerH = 50;
 
   int numRows = (static_cast<int>(available_.size()) + numCols - 1) / numCols;
   int menuH = numRows * itemH + footerH + 10;
 
-  menuRect_ = {400 - menuW / 2, 240 - menuH / 2, menuW, menuH};
+  // Max height clamp to prevent overflowing screen
+  if (menuH > HamClock::LOGICAL_HEIGHT - 20) {
+    menuH = HamClock::LOGICAL_HEIGHT - 20;
+  }
+
+  menuRect_ = {HamClock::LOGICAL_WIDTH / 2 - menuW / 2,
+               HamClock::LOGICAL_HEIGHT / 2 - menuH / 2, menuW, menuH};
 
   itemRects_.clear();
   int colW = menuW / numCols;
@@ -60,7 +68,7 @@ void WidgetSelector::render(SDL_Renderer *renderer) {
   // Dim background
   SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
   SDL_SetRenderDrawColor(renderer, 0, 0, 0, 150);
-  SDL_Rect screen = {0, 0, 800, 480};
+  SDL_Rect screen = {0, 0, HamClock::LOGICAL_WIDTH, HamClock::LOGICAL_HEIGHT};
   SDL_RenderFillRect(renderer, &screen);
 
   // Menu background
@@ -82,6 +90,15 @@ void WidgetSelector::render(SDL_Renderer *renderer) {
     bool isSelected =
         std::find(selection_.begin(), selection_.end(), t) != selection_.end();
 
+    // Draw focus indicator BEFORE text so it doesn't cover the text
+    if (visible_ && static_cast<int>(i) == focusedIdx_) {
+      SDL_SetRenderDrawColor(renderer, 0, 150, 255, 100);
+      SDL_Rect focusRect = itemRects_[i];
+      focusRect.x += 5;
+      focusRect.w -= 10;
+      SDL_RenderFillRect(renderer, &focusRect);
+    }
+
     SDL_Color textColor = themes.text;
     if (isForbidden) {
       textColor = {80, 80, 90, 255};
@@ -94,17 +111,8 @@ void WidgetSelector::render(SDL_Renderer *renderer) {
                       itemRects_[i].y + itemRects_[i].h / 2, textColor, 18,
                       false, true); // bold=false, centered=true
 
-    // Draw focus indicator
-    if (visible_ && static_cast<int>(i) == focusedIdx_) {
-      SDL_SetRenderDrawColor(renderer, 0, 150, 255, 100);
-      SDL_Rect focusRect = itemRects_[i];
-      focusRect.x += 5;
-      focusRect.w -= 10;
-      SDL_RenderFillRect(renderer, &focusRect);
-    }
-
     // Draw separator (if not last row)
-    int numCols = (paneIndex_ < 3) ? 2 : 1;
+    int numCols = 3;
     int row = static_cast<int>(i) / numCols;
     int numRows = (static_cast<int>(available_.size()) + numCols - 1) / numCols;
     if (row < numRows - 1) {
@@ -208,7 +216,7 @@ bool WidgetSelector::onKeyDown(SDL_Keycode key, Uint16 /*mod*/) {
   }
 
   // Navigation
-  int numCols = (paneIndex_ < 3) ? 2 : 1;
+  int numCols = 3;
   if (key == SDLK_UP) {
     if (focusedIdx_ >= numCols)
       focusedIdx_ -= numCols;

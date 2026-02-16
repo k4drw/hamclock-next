@@ -1,4 +1,5 @@
 #include "PrefixManager.h"
+#include "DXCCData.h"
 #include "Logger.h"
 #include "PrefixData.h"
 #include <algorithm>
@@ -71,4 +72,67 @@ bool PrefixManager::findLocation(const std::string &call, LatLong &ll) {
   }
 
   return false;
+}
+
+int PrefixManager::findDXCC(const std::string &call) {
+  if (call.empty())
+    return -1;
+
+  std::string upperCall = call;
+  for (auto &c : upperCall)
+    c = std::toupper(static_cast<unsigned char>(c));
+
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (!entries_.empty()) {
+      PrefixEntry searchKey;
+      searchKey.call = upperCall;
+
+      auto it =
+          std::upper_bound(entries_.begin(), entries_.end(), searchKey,
+                           [](const PrefixEntry &a, const PrefixEntry &b) {
+                             return a.call < b.call;
+                           });
+
+      while (it != entries_.begin()) {
+        --it;
+        const std::string &entCall = it->call;
+
+        if (entCall.length() > upperCall.length()) {
+          if (entCall[0] != upperCall[0])
+            break;
+          continue;
+        }
+
+        if (upperCall.compare(0, entCall.length(), entCall) == 0) {
+          return it->dxcc;
+        }
+
+        if (!entCall.empty() && entCall[0] != upperCall[0])
+          break;
+      }
+    }
+  }
+
+  return -1;
+}
+
+std::string PrefixManager::getCountryName(int dxcc) {
+  const DXCCEntity *entity = findDXCCEntity(dxcc);
+  return entity ? std::string(entity->name) : "";
+}
+
+std::string PrefixManager::getContinent(int dxcc) {
+  const DXCCEntity *entity = findDXCCEntity(dxcc);
+  return entity ? std::string(entity->continent) : "";
+}
+
+int PrefixManager::getCQZone(int dxcc) {
+  const DXCCEntity *entity = findDXCCEntity(dxcc);
+  return entity ? entity->cqZone : -1;
+}
+
+int PrefixManager::getITUZone(int dxcc) {
+  const DXCCEntity *entity = findDXCCEntity(dxcc);
+  return entity ? entity->ituZone : -1;
 }
