@@ -4,14 +4,14 @@ cmake_minimum_required(VERSION 3.18)
 set(CMAKE_POLICY_VERSION_MINIMUM 3.5 CACHE STRING "Compat for old FetchContent deps")
 
 project(HamClock-Next
-    VERSION 0.5.0
+    VERSION 0.6.0
     LANGUAGES C CXX
 )
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-add_compile_definitions(HAMCLOCK_VERSION="v0.5B")
+add_compile_definitions(HAMCLOCK_VERSION="0.6B")
 
 # Force static builds globally for all FetchContent dependencies
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build static libs" FORCE)

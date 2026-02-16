@@ -63,7 +63,7 @@ if [ $? -eq 0 ]; then
     # Create release directory and copy artifacts
     echo "Copying artifacts to release/..."
     mkdir -p release
-    VERSION="${VERSION:-0.5B}"
+    VERSION="${VERSION:-0.6B}"
 
     # Copy .deb package
     cp "build-rpi-bullseye-fb0/hamclock-next_${VERSION}_bullseye_fb0_armhf.deb" "release/"
