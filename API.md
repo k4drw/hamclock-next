@@ -28,6 +28,16 @@ Simulates a keyboard event.
   - `Delete`, `Home`, `End`, `F11`
 - **Example**: `GET /set_char?k=Enter`
 
+### `POST /api/display/power`
+Turns the display on or off.
+- **Request (JSON)**: `{"state": "on"}` or `{"state": "off"}`
+- **Fallback**: Also supports `GET /api/display/power?state=on`
+- **Returns**: JSON with success status and method used.
+
+### `GET /api/display/status`
+Returns the current display power state and the control methodology being used (e.g., `vcgencmd`, `bl_power`).
+- **Returns**: JSON with `power` ("on"/"off") and `method`.
+
 ---
 
 ## Reporting API

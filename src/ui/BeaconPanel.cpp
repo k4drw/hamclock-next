@@ -1,15 +1,61 @@
 #include "BeaconPanel.h"
 #include "../core/BeaconData.h"
+#include "../core/Logger.h"
+#include "../core/MemoryMonitor.h"
 #include "../core/Theme.h"
 #include "FontCatalog.h"
 #include "RenderUtils.h"
+#include <cstdio>
 
 BeaconPanel::BeaconPanel(int x, int y, int w, int h, FontManager &fontMgr)
     : Widget(x, y, w, h), fontMgr_(fontMgr) {}
 
+BeaconPanel::~BeaconPanel() { clearTextCache(); }
+
+void BeaconPanel::clearTextCache() {
+  for (auto &[key, cached] : textCache_) {
+    if (cached.texture) {
+      MemoryMonitor::getInstance().destroyTexture(cached.texture);
+    }
+  }
+  textCache_.clear();
+}
+
+BeaconPanel::CachedText &BeaconPanel::getCachedText(SDL_Renderer *renderer,
+                                                    const std::string &key,
+                                                    const std::string &text,
+                                                    SDL_Color color,
+                                                    int fontSize, bool bold) {
+  // Check if already cached
+  auto it = textCache_.find(key);
+  if (it != textCache_.end() && it->second.texture) {
+    return it->second;
+  }
+
+  // Create new texture
+  CachedText &cached = textCache_[key];
+  cached.texture = fontMgr_.renderText(renderer, text, color, fontSize,
+                                       &cached.w, &cached.h, bold);
+
+  if (!cached.texture) {
+    LOG_E("BeaconPanel", "Failed to create cached texture for: {}", text);
+  }
+
+  return cached;
+}
+
 void BeaconPanel::update() {
   active_ = provider_.getActiveBeacons();
   progress_ = provider_.getSlotProgress();
+
+  // Debug logging for slot changes
+  int currentSlot = provider_.getCurrentSlot();
+  if (currentSlot != lastSlot_) {
+    auto debugInfo = provider_.getDebugInfo();
+    LOG_D("BeaconPanel", "Slot {}: Active beacons: {}", currentSlot,
+          debugInfo["active_beacons"].dump());
+    lastSlot_ = currentSlot;
+  }
 }
 
 void BeaconPanel::render(SDL_Renderer *renderer) {
@@ -39,9 +85,18 @@ void BeaconPanel::render(SDL_Renderer *renderer) {
     int centerX = x_ + width_ / 2;
     int curY = y_ + pad;
 
-    // Title
-    fontMgr_.drawText(renderer, "NCDXF", centerX, curY + labelFontSize_ / 2,
-                      themes.text, labelFontSize_, false, true);
+    // Title - Use cached texture
+    char titleKey[64];
+    snprintf(titleKey, sizeof(titleKey), "NCDXF_%d_%d_%d_%d_1", themes.text.r,
+             themes.text.g, themes.text.b, labelFontSize_);
+    auto &titleCache = getCachedText(renderer, titleKey, "NCDXF", themes.text,
+                                     labelFontSize_, true);
+    if (titleCache.texture) {
+      SDL_Rect titleDst = {centerX - titleCache.w / 2,
+                           curY + labelFontSize_ / 2 - titleCache.h / 2,
+                           titleCache.w, titleCache.h};
+      SDL_RenderCopy(renderer, titleCache.texture, nullptr, &titleDst);
+    }
     curY += labelFontSize_ + 4;
 
     // Band colors (approx based on screenshot)
@@ -70,12 +125,18 @@ void BeaconPanel::render(SDL_Renderer *renderer) {
           (float)iconX + triSize, (float)iconY + triSize * 0.5f, (float)iconX,
           (float)iconY - triSize * 0.5f, c);
 
-      // Frequency
-      fontMgr_.drawText(renderer, freqs[i], x_ + 20, ry + rowH / 2,
-                        bandColors[i], callfontSize_, false, false);
-
-      // Progress bar if this band is being "displayed" (active for any beacon)
-      // Actually, let's just draw the progress for the whole slot at the bottom
+      // Frequency - Use cached texture
+      char freqKey[64];
+      snprintf(freqKey, sizeof(freqKey), "%s_%d_%d_%d_%d_0", freqs[i],
+               bandColors[i].r, bandColors[i].g, bandColors[i].b,
+               callfontSize_);
+      auto &freqCache = getCachedText(renderer, freqKey, freqs[i],
+                                      bandColors[i], callfontSize_, false);
+      if (freqCache.texture) {
+        SDL_Rect freqDst = {x_ + 20, ry + rowH / 2 - freqCache.h / 2,
+                            freqCache.w, freqCache.h};
+        SDL_RenderCopy(renderer, freqCache.texture, nullptr, &freqDst);
+      }
     }
 
     // Progress bar at the bottom
@@ -96,21 +157,41 @@ void BeaconPanel::render(SDL_Renderer *renderer) {
   if (rowHeight < 2)
     rowHeight = 2;
 
-  // Headers
+  // Headers - Use cached textures
   int curX = x_ + pad + callWidth;
   const char *bands[] = {"20", "17", "15", "12", "10"};
   for (int i = 0; i < 5; ++i) {
-    fontMgr_.drawText(renderer, bands[i], curX + bandWidth / 2, y_ + pad,
-                      themes.textDim, labelFontSize_, false, true);
+    char bandKey[64];
+    snprintf(bandKey, sizeof(bandKey), "band_%s_%d_%d_%d_%d_0", bands[i],
+             themes.textDim.r, themes.textDim.g, themes.textDim.b,
+             labelFontSize_);
+    auto &bandCache = getCachedText(renderer, bandKey, bands[i], themes.textDim,
+                                    labelFontSize_, false);
+    if (bandCache.texture) {
+      SDL_Rect bandDst = {curX + bandWidth / 2 - bandCache.w / 2,
+                          y_ + pad - bandCache.h / 2, bandCache.w, bandCache.h};
+      SDL_RenderCopy(renderer, bandCache.texture, nullptr, &bandDst);
+    }
     curX += bandWidth;
   }
 
-  // Rows
+  // Rows - Use cached textures for callsigns
   int startY = y_ + pad + labelFontSize_ + 2;
   for (int i = 0; i < 18; ++i) {
     int rowY = startY + i * rowHeight;
-    fontMgr_.drawText(renderer, NCDXF_BEACONS[i].callsign, x_ + pad, rowY,
-                      themes.textDim, callfontSize_);
+
+    // Cache beacon callsign
+    char callKey[128];
+    const std::string &callsign = NCDXF_BEACONS[i].callsign;
+    snprintf(callKey, sizeof(callKey), "call_%s_%d_%d_%d_%d_0",
+             callsign.c_str(), themes.textDim.r, themes.textDim.g,
+             themes.textDim.b, callfontSize_);
+    auto &callCache = getCachedText(renderer, callKey, callsign, themes.textDim,
+                                    callfontSize_, false);
+    if (callCache.texture) {
+      SDL_Rect callDst = {x_ + pad, rowY, callCache.w, callCache.h};
+      SDL_RenderCopy(renderer, callCache.texture, nullptr, &callDst);
+    }
 
     for (const auto &a : active_) {
       if (a.index == i) {
@@ -132,6 +213,14 @@ void BeaconPanel::render(SDL_Renderer *renderer) {
 
 void BeaconPanel::onResize(int x, int y, int w, int h) {
   Widget::onResize(x, y, w, h);
+
+  // Clear texture cache if dimensions changed (font sizes will change)
+  if (w != lastWidth_ || h != lastHeight_) {
+    clearTextCache();
+    lastWidth_ = w;
+    lastHeight_ = h;
+  }
+
   auto *cat = fontMgr_.catalog();
   labelFontSize_ = cat->ptSize(FontStyle::FastBold);
   callfontSize_ = cat->ptSize(FontStyle::MediumBold);

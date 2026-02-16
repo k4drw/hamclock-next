@@ -5,6 +5,8 @@
 #include "Widget.h"
 #include <memory>
 
+struct SDL_Renderer;
+
 class ContestPanel : public Widget {
 public:
   ContestPanel(int x, int y, int w, int h, FontManager &fontMgr,

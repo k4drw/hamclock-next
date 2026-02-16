@@ -25,6 +25,8 @@ private:
   void fetchDST();
   void fetchAurora();
   void fetchDRAP();
+  void fetchXRay();
+  void fetchProtonFlux();
 
   static constexpr const char *K_INDEX_URL =
       "https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json";
@@ -43,6 +45,11 @@ private:
       "https://services.swpc.noaa.gov/json/ovation_aurora_latest.json";
   static constexpr const char *DRAP_URL =
       "https://services.swpc.noaa.gov/text/drap_global_frequencies.txt";
+  static constexpr const char *XRAY_URL =
+      "https://services.swpc.noaa.gov/json/goes/primary/xrays-6-hour.json";
+  static constexpr const char *PROTON_URL =
+      "https://services.swpc.noaa.gov/json/goes/primary/"
+      "integral-protons-6-hour.json";
 
   NetworkManager &net_;
   std::shared_ptr<SolarDataStore> store_;

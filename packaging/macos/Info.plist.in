@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleName</key>
+    <string>HamClock-Next</string>
+    <key>CFBundleDisplayName</key>
+    <string>HamClock-Next</string>
+    <key>CFBundleIdentifier</key>
+    <string>com.hamclock.next</string>
+    <key>CFBundleVersion</key>
+    <string>@HAMCLOCK_VERSION@</string>
+    <key>CFBundleShortVersionString</key>
+    <string>@HAMCLOCK_VERSION@</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleSignature</key>
+    <string>HMNX</string>
+    <key>CFBundleExecutable</key>
+    <string>hamclock-next</string>
+    <key>CFBundleIconFile</key>
+    <string>HamClockNext</string>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>LSMinimumSystemVersion</key>
+    <string>10.15</string>
+    <key>NSHumanReadableCopyright</key>
+    <string>Copyright © 2024-2026 HamClock-Next Contributors</string>
+</dict>
+</plist>

@@ -4,6 +4,7 @@
 #include "FontManager.h"
 #include "Widget.h"
 
+#include <SDL.h>
 #include <memory>
 #include <string>
 
@@ -27,11 +28,12 @@ private:
   void destroyCache();
   static SDL_Color colorForK(int k);
   static SDL_Color colorForSFI(int sfi);
+  static SDL_Color colorForNOAAScale(int scale);
 
   FontManager &fontMgr_;
   std::shared_ptr<SolarDataStore> store_;
 
-  static constexpr int kNumItems = 12;
+  static constexpr int kNumItems = 15;
   static constexpr int kItemsPerPage = 4;
   struct Item {
     std::string label;

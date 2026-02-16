@@ -66,9 +66,18 @@ void NetworkManager::fetchAsync(const std::string &url,
   if (hasCache && !force) {
     std::time_t now = std::time(nullptr);
     if (now - cached.timestamp < cacheAgeSeconds) {
-      LOG_T("NetworkManager", "Memory cache hit for {}", url);
-      callback(cached.data);
-      return;
+      if (!cached.data.empty()) {
+        LOG_T("NetworkManager", "Memory cache hit for {}", url);
+        callback(cached.data);
+        return;
+      } else {
+        LOG_T(
+            "NetworkManager",
+            "Memory record found but no data (too large), checking disk for {}",
+            url);
+        // Data was too large for RAM cache, check disk.
+        // For simplicity, we just let the thread handle it.
+      }
     }
   }
 
@@ -118,7 +127,7 @@ void NetworkManager::fetchAsync(const std::string &url,
             {
               std::lock_guard<std::mutex> lock(cacheMutex_);
               cache_[url].timestamp = std::time(nullptr);
-              saveToDisk(url, cache_[url]);
+              saveToDisk(url, cache_[url], cached.data);
             }
             curl_easy_cleanup(curl);
             callback(cached.data);
@@ -159,16 +168,26 @@ void NetworkManager::fetchAsync(const std::string &url,
       std::lock_guard<std::mutex> lock(cacheMutex_);
       std::time_t now = std::time(nullptr);
       CacheEntry entry;
-      entry.data = response;
       entry.timestamp = now;
       if (headers.count("last-modified"))
         entry.lastModified = headers.at("last-modified");
       if (headers.count("etag"))
         entry.etag = headers.at("etag");
 
+      // Memory-Optimization: Only store small data in RAM cache.
+      // Large maps (50MB+) should only live on disk.
+      bool isLarge = response.size() > 512 * 1024; // 512 KB
+      if (!isLarge) {
+        entry.data = response;
+      } else {
+        LOG_D("NetworkManager",
+              "Data for {} is large ({:.1f} MB), skipping RAM cache", url,
+              response.size() / 1024.0 / 1024.0);
+      }
+
       cache_[url] = entry;
       if (!cacheDir_.empty()) {
-        saveToDisk(url, entry);
+        saveToDisk(url, entry, response);
       }
     }
 
@@ -200,9 +219,13 @@ std::string NetworkManager::hashUrl(const std::string &url) {
   return ss.str();
 }
 
-void NetworkManager::saveToDisk(const std::string &url,
-                                const CacheEntry &entry) {
+void NetworkManager::saveToDisk(const std::string &url, const CacheEntry &entry,
+                                const std::string &data) {
   if (cacheDir_.empty())
+    return;
+
+  const std::string &fullData = data.empty() ? entry.data : data;
+  if (fullData.empty())
     return;
 
   std::string filename = hashUrl(url);
@@ -215,7 +238,7 @@ void NetworkManager::saveToDisk(const std::string &url,
     ofs << url << "\n";
     ofs << entry.lastModified << "\n";
     ofs << entry.etag << "\n";
-    ofs << entry.data;
+    ofs << fullData;
   }
 }
 

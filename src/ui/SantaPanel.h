@@ -5,6 +5,8 @@
 #include "Widget.h"
 #include <memory>
 
+struct SDL_Renderer;
+
 class SantaPanel : public Widget {
 public:
   SantaPanel(int x, int y, int w, int h, FontManager &fontMgr,

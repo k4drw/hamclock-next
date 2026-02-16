@@ -3,6 +3,7 @@ build*/
 *.db
 *.log
 .cache/
+release/
 
 # Editor/IDE files
 .vscode/

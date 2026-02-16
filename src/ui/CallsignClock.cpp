@@ -8,16 +8,13 @@
 
 void CallsignClock::destroyCache() {
   if (callTex_) {
-    SDL_DestroyTexture(callTex_);
-    callTex_ = nullptr;
+    MemoryMonitor::getInstance().destroyTexture(callTex_);
   }
   if (timeTex_) {
-    SDL_DestroyTexture(timeTex_);
-    timeTex_ = nullptr;
+    MemoryMonitor::getInstance().destroyTexture(timeTex_);
   }
   if (dateTex_) {
-    SDL_DestroyTexture(dateTex_);
-    dateTex_ = nullptr;
+    MemoryMonitor::getInstance().destroyTexture(dateTex_);
   }
 }
 
@@ -60,8 +57,7 @@ void CallsignClock::render(SDL_Renderer *renderer) {
   // Callsign (large, colored)
   if (callFontSize_ != lastCallFontSize_) {
     if (callTex_) {
-      SDL_DestroyTexture(callTex_);
-      callTex_ = nullptr;
+      MemoryMonitor::getInstance().destroyTexture(callTex_);
     }
     SDL_Color orange = {255, 165, 0, 255};
     callTex_ = fontMgr_.renderText(renderer, callsign_, orange, callFontSize_,
@@ -77,8 +73,7 @@ void CallsignClock::render(SDL_Renderer *renderer) {
   // Time
   if (currentTime_ != lastTime_ || timeFontSize_ != lastTimeFontSize_) {
     if (timeTex_) {
-      SDL_DestroyTexture(timeTex_);
-      timeTex_ = nullptr;
+      MemoryMonitor::getInstance().destroyTexture(timeTex_);
     }
     SDL_Color white = {255, 255, 255, 255};
     timeTex_ = fontMgr_.renderText(renderer, currentTime_, white, timeFontSize_,
@@ -95,8 +90,7 @@ void CallsignClock::render(SDL_Renderer *renderer) {
   // Date
   if (currentDate_ != lastDate_ || dateFontSize_ != lastDateFontSize_) {
     if (dateTex_) {
-      SDL_DestroyTexture(dateTex_);
-      dateTex_ = nullptr;
+      MemoryMonitor::getInstance().destroyTexture(dateTex_);
     }
     SDL_Color cyan = {0, 200, 255, 255};
     dateTex_ = fontMgr_.renderText(renderer, currentDate_, cyan, dateFontSize_,

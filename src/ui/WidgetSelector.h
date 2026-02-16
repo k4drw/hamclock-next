@@ -3,6 +3,7 @@
 #include "../core/WidgetType.h"
 #include "FontManager.h"
 #include "Widget.h"
+#include <SDL.h>
 #include <functional>
 #include <vector>
 

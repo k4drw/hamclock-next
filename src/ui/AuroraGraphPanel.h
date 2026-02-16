@@ -6,6 +6,8 @@
 
 #include <memory>
 
+struct SDL_Renderer;
+
 class AuroraGraphPanel : public Widget {
 public:
   AuroraGraphPanel(int x, int y, int w, int h, FontManager &fontMgr,

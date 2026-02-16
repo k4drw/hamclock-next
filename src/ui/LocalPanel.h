@@ -7,6 +7,9 @@
 #include <memory>
 #include <string>
 
+struct SDL_Renderer;
+struct SDL_Texture;
+
 class LocalPanel : public Widget {
 public:
   LocalPanel(int x, int y, int w, int h, FontManager &fontMgr,

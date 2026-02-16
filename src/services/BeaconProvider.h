@@ -1,37 +1,53 @@
 #pragma once
 
 #include <chrono>
+#include <string>
 #include <vector>
 
+#include <nlohmann/json.hpp>
+
 struct ActiveBeacon {
-  int index;
-  int bandIndex;
+  int index;     // Beacon index (0-17)
+  int bandIndex; // Band index (0-4)
 };
 
+struct BeaconScheduleInfo {
+  std::string callsign;
+  std::string location;
+  double lat = 0.0;
+  double lon = 0.0;
+  int frequencyKhz = 0;
+  int beaconIndex = 0;
+  int bandIndex = 0;
+  bool isActive = false;
+  int secondsUntilTransmit = 0;
+};
+
+// NCDXF/IARU International Beacon Project
+// 18 beacons transmitting on 5 bands in a coordinated 3-minute cycle
+// Each beacon transmits for 10 seconds on each band in sequence
 class BeaconProvider {
 public:
-  std::vector<ActiveBeacon> getActiveBeacons() const {
-    auto now = std::chrono::system_clock::now();
-    std::time_t now_c = std::chrono::system_clock::to_time_t(now);
-    struct tm *gmt = std::gmtime(&now_c);
+  BeaconProvider();
 
-    int totalSecs = gmt->tm_hour * 3600 + gmt->tm_min * 60 + gmt->tm_sec;
-    int slot = (totalSecs % 180) / 10;
+  // Get currently active beacons (one per band)
+  std::vector<ActiveBeacon> getActiveBeacons() const;
 
-    std::vector<ActiveBeacon> active;
-    for (int band = 0; band < 5; ++band) {
-      // Beacon b is on band f if (b + f) % 18 == slot
-      // => b = (slot - f) % 18
-      int b = (slot - band + 18) % 18;
-      active.push_back({b, band});
-    }
-    return active;
-  }
+  // Get progress within current 10-second slot (0.0 to 1.0)
+  float getSlotProgress() const;
 
-  // Returns 0.0 to 1.0 for progress within current 10s slot
-  float getSlotProgress() const {
-    auto now = std::chrono::system_clock::now();
-    std::time_t now_c = std::chrono::system_clock::to_time_t(now);
-    return (float)(now_c % 10) / 10.0f;
-  }
+  // Get current slot number (0-17)
+  int getCurrentSlot() const;
+
+  // Get seconds remaining until next slot
+  int getSecondsUntilNextSlot() const;
+
+  // Get detailed schedule info for a specific beacon/band combination
+  BeaconScheduleInfo getScheduleInfo(int beaconIndex, int bandIndex) const;
+
+  // Get upcoming beacon transmissions
+  std::vector<BeaconScheduleInfo> getUpcomingBeacons(int count = 6) const;
+
+  // Debug information for MCP/API
+  nlohmann::json getDebugInfo() const;
 };

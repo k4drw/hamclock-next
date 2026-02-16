@@ -7,6 +7,8 @@
 
 #include <string>
 
+struct SDL_Renderer;
+
 class DRAPPanel : public Widget {
 public:
   DRAPPanel(int x, int y, int w, int h, FontManager &fontMgr,

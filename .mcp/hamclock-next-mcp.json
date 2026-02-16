@@ -1,8 +1,7 @@
 {
   "mcp_version": "2.0",
   "project": "hamclock-next",
-  "updated_at": "2026-02-15T00:00:00.000Z",
-
+  "updated_at": "2026-02-16T06:00:00.000Z",
   "project_context": {
     "title": "HamClock Next — SDL2 Rewrite",
     "callsign": "K4DRW",
@@ -32,7 +31,6 @@
       "language": "C++17"
     }
   },
-
   "source_layout": {
     "description": "Directory structure of the hamclock-next codebase. Every directory has a clear single responsibility.",
     "tree": {
@@ -50,7 +48,6 @@
       "original_vs_next": "Original used flat .cpp files with global functions. Next uses classes. Example: original updateDXCluster() global → next DXClusterProvider::update() + DXClusterPanel::render()."
     }
   },
-
   "widget_scaffolding": {
     "description": "The fastest way to add a new widget or complete a partial one. Follow these steps and fill in the domain-specific logic.",
     "steps": [
@@ -75,18 +72,45 @@
       "The WebServer debug endpoint /debug/widgets calls getDebugData() on all registered panels — always implement it."
     ]
   },
-
   "api_reference": {
     "description": "The embedded WebServer exposes a REST API. Full docs in API.md in the repo root. Key endpoints for contributor awareness:",
     "base_url": "http://localhost:{port}",
     "endpoints": [
-      { "method": "GET", "path": "/live.jpg", "description": "JPEG screenshot of current display. Used by remote clients." },
-      { "method": "GET", "path": "/debug/widgets", "description": "JSON dump of all registered widgets and their getDebugData() output." },
-      { "method": "GET", "path": "/debug/click", "description": "Simulates a touch event at x,y. Params: ?x=N&y=N" },
-      { "method": "GET", "path": "/set_touch", "description": "Inject touch event. Params: ?x=N&y=N" },
-      { "method": "GET", "path": "/set_char", "description": "Inject keyboard character. Params: ?c=X" },
-      { "method": "GET", "path": "/get_dx.txt", "description": "Returns DX location: grid, lat, lon, distance (km), bearing (degrees)." },
-      { "method": "GET", "path": "/set_mappos", "description": "Programmatically set DE or DX position. Params: ?lat=F&lon=F&target=de|dx — returns JSON with computed Maidenhead grid." }
+      {
+        "method": "GET",
+        "path": "/live.jpg",
+        "description": "JPEG screenshot of current display. Used by remote clients."
+      },
+      {
+        "method": "GET",
+        "path": "/debug/widgets",
+        "description": "JSON dump of all registered widgets and their getDebugData() output."
+      },
+      {
+        "method": "GET",
+        "path": "/debug/click",
+        "description": "Simulates a touch event at x,y. Params: ?x=N&y=N"
+      },
+      {
+        "method": "GET",
+        "path": "/set_touch",
+        "description": "Inject touch event. Params: ?x=N&y=N"
+      },
+      {
+        "method": "GET",
+        "path": "/set_char",
+        "description": "Inject keyboard character. Params: ?c=X"
+      },
+      {
+        "method": "GET",
+        "path": "/get_dx.txt",
+        "description": "Returns DX location: grid, lat, lon, distance (km), bearing (degrees)."
+      },
+      {
+        "method": "GET",
+        "path": "/set_mappos",
+        "description": "Programmatically set DE or DX position. Params: ?lat=F&lon=F&target=de|dx — returns JSON with computed Maidenhead grid."
+      }
     ],
     "conventions": [
       "All write endpoints should eventually be protected by token auth (password_auth feature — currently missing).",
@@ -94,7 +118,6 @@
       "New endpoints should follow the existing naming pattern and be documented in API.md."
     ]
   },
-
   "original_vs_next": {
     "description": "Key architectural differences between Elwood's original and hamclock-next. Essential context for anyone touching both codebases.",
     "differences": [
@@ -150,50 +173,272 @@
       }
     ]
   },
-
   "feature_status_summary": {
     "total": 55,
-    "implemented": 24,
-    "partial": 21,
-    "missing": 8,
+    "implemented": 29,
+    "partial": 17,
+    "missing": 7,
     "not_needed": 2,
-    "percent_done": "~72% (implemented + not_needed / total)"
+    "percent_done": "~80% (implemented + not_needed / total)"
   },
-
   "implemented_features": [
-    { "feature_id": "clock_callsign", "name": "Clock & Callsign Display", "next_files": ["src/ui/CallsignClock.cpp", "src/ui/TimePanel.cpp", "src/ui/ClockAuxPanel.cpp"], "notes": "Split into 3 widgets. Stopwatch is in CountdownPanel." },
-    { "feature_id": "world_map", "name": "World Map", "next_files": ["src/ui/MapWidget.cpp", "src/ui/MapWidget.h"], "notes": "Phase 26 complete: azimuthal projection, NASA Blue Marble + Black Marble night lights, day/night terminator, great circles, tooltips, DE/DX markers. Missing: Robinson, Mercator projections." },
-    { "feature_id": "de_info", "name": "DE Info Panel", "next_files": ["src/ui/DEInfo.cpp", "src/ui/DEInfo.h"] },
-    { "feature_id": "dx_info", "name": "DX Info Panel", "next_files": ["src/ui/DXPanel.cpp", "src/ui/DXPanel.h"] },
-    { "feature_id": "live_spots", "name": "Live Spots (PSK Reporter/WSPR)", "next_files": ["src/services/LiveSpotProvider.cpp", "src/ui/LiveSpotPanel.cpp"], "notes": "Band-coded Great Circle paths on map. PSK Reporter API working." },
-    { "feature_id": "dst_index", "name": "Geomagnetic Disturbance (Dst)", "next_files": ["src/ui/DstPanel.cpp", "src/core/DstStore.h"] },
-    { "feature_id": "moon", "name": "Moon Phase & Position", "next_files": ["src/services/MoonProvider.cpp", "src/ui/MoonPanel.cpp"], "notes": "Includes EME path loss." },
-    { "feature_id": "weather_dx", "name": "Weather at DX Location", "next_files": ["src/ui/DXPanel.cpp", "src/ui/DXSatPane.cpp"], "notes": "Integrated into DXPanel. Temp/Hum/Pressure/Wind displayed." },
-    { "feature_id": "sdo_images", "name": "SDO Solar Images", "next_files": ["src/services/SDOProvider.cpp", "src/ui/SDOPanel.cpp"] },
-    { "feature_id": "drap", "name": "D-Region Absorption Predictions", "next_files": ["src/services/DRAPProvider.cpp", "src/ui/DRAPPanel.cpp"] },
-    { "feature_id": "aurora", "name": "Aurora Forecast", "next_files": ["src/services/AuroraProvider.cpp", "src/ui/AuroraPanel.cpp"] },
-    { "feature_id": "rss_banner", "name": "RSS News Banner", "next_files": ["src/services/RSSProvider.cpp", "src/ui/RSSBanner.cpp"] },
-    { "feature_id": "web_server", "name": "Embedded Web Server", "next_files": ["src/network/WebServer.cpp", "src/network/WebServer.h"], "notes": "Full API in API.md. Phase 4 endpoints added: /get_dx.txt, /set_mappos." },
-    { "feature_id": "network_manager", "name": "Network Manager", "next_files": ["src/network/NetworkManager.cpp", "src/network/NetworkManager.h"], "notes": "libcurl + ETag/Last-Modified caching." },
-    { "feature_id": "dxpeditions", "name": "DXpedition Tracker", "next_files": ["src/ui/ActivityPanels.cpp", "src/ui/ActivityPanels.h"], "notes": "Implemented as DXPedPanel inside ActivityPanels." },
-    { "feature_id": "watchlist", "name": "Callsign Watchlist", "next_files": ["src/ui/WatchlistPanel.cpp", "src/core/WatchlistStore.h", "src/core/WatchlistHitStore.h"] },
-    { "feature_id": "eme_tool", "name": "EME Tool", "next_files": ["src/ui/EMEToolPanel.cpp", "src/core/MoonData.h"] },
-    { "feature_id": "santa_tracker", "name": "Santa Tracker", "next_files": ["src/core/SantaStore.h", "src/ui/MapWidget.cpp"], "notes": "Active Dec 24/25. Overlay on MapWidget." },
-    { "feature_id": "history_panel", "name": "History Panel", "next_files": ["src/services/HistoryProvider.cpp", "src/ui/HistoryPanel.cpp"], "notes": "New in hamclock-next. No original equivalent." },
-    { "feature_id": "local_panel", "name": "Local Info Panel", "next_files": ["src/ui/LocalPanel.cpp"], "notes": "New in hamclock-next." },
-    { "feature_id": "list_panel", "name": "Generic List Panel (infrastructure)", "next_files": ["src/ui/ListPanel.cpp"] },
-    { "feature_id": "pane_container", "name": "Pane Container / Layout", "next_files": ["src/ui/PaneContainer.cpp", "src/ui/LayoutManager.h"] },
-    { "feature_id": "debug_overlay", "name": "Debug Overlay", "next_files": ["src/ui/DebugOverlay.h"] },
-    { "feature_id": "color_theme", "name": "Color Theme System", "next_files": ["src/core/Theme.h"], "notes": "Use Theme:: constants. Never hardcode SDL_Color." }
+    {
+      "feature_id": "radio_control",
+      "name": "Radio CAT Control",
+      "next_files": [
+        "src/services/RigService.cpp",
+        "src/core/RigData.h"
+      ],
+      "notes": "Hamlib rigctld integration."
+    },
+    {
+      "feature_id": "rotator_gimbal",
+      "name": "Rotator/Gimbal Control",
+      "next_files": [
+        "src/services/RotatorService.cpp",
+        "src/ui/GimbalPanel.cpp"
+      ],
+      "notes": "Hamlib rotctld integration."
+    },
+    {
+      "feature_id": "brightness_control",
+      "name": "Brightness/Dimming",
+      "next_files": [
+        "src/core/BrightnessManager.cpp",
+        "src/core/DisplayPower.cpp"
+      ],
+      "notes": "Sysfs based for RPi/x86."
+    },
+    {
+      "feature_id": "cpu_temp",
+      "name": "CPU Monitoring",
+      "next_files": [
+        "src/core/CPUMonitor.cpp",
+        "src/ui/CPUTempPanel.cpp"
+      ]
+    },
+    {
+      "feature_id": "qrz_lookup",
+      "name": "QRZ.com Lookup",
+      "next_files": [
+        "src/services/QRZProvider.cpp"
+      ]
+    },
+    {
+      "feature_id": "clock_callsign",
+      "name": "Clock & Callsign Display",
+      "next_files": [
+        "src/ui/CallsignClock.cpp",
+        "src/ui/TimePanel.cpp",
+        "src/ui/ClockAuxPanel.cpp"
+      ],
+      "notes": "Split into 3 widgets. Stopwatch is in CountdownPanel."
+    },
+    {
+      "feature_id": "world_map",
+      "name": "World Map",
+      "next_files": [
+        "src/ui/MapWidget.cpp",
+        "src/ui/MapWidget.h"
+      ],
+      "notes": "Phase 26 complete: azimuthal projection, NASA Blue Marble + Black Marble night lights, day/night terminator, great circles, tooltips, DE/DX markers. Missing: Robinson, Mercator projections."
+    },
+    {
+      "feature_id": "de_info",
+      "name": "DE Info Panel",
+      "next_files": [
+        "src/ui/DEInfo.cpp",
+        "src/ui/DEInfo.h"
+      ]
+    },
+    {
+      "feature_id": "dx_info",
+      "name": "DX Info Panel",
+      "next_files": [
+        "src/ui/DXPanel.cpp",
+        "src/ui/DXPanel.h"
+      ]
+    },
+    {
+      "feature_id": "live_spots",
+      "name": "Live Spots (PSK Reporter/WSPR)",
+      "next_files": [
+        "src/services/LiveSpotProvider.cpp",
+        "src/ui/LiveSpotPanel.cpp"
+      ],
+      "notes": "Band-coded Great Circle paths on map. PSK Reporter API working."
+    },
+    {
+      "feature_id": "dst_index",
+      "name": "Geomagnetic Disturbance (Dst)",
+      "next_files": [
+        "src/ui/DstPanel.cpp",
+        "src/core/DstStore.h"
+      ]
+    },
+    {
+      "feature_id": "moon",
+      "name": "Moon Phase & Position",
+      "next_files": [
+        "src/services/MoonProvider.cpp",
+        "src/ui/MoonPanel.cpp"
+      ],
+      "notes": "Includes EME path loss."
+    },
+    {
+      "feature_id": "weather_dx",
+      "name": "Weather at DX Location",
+      "next_files": [
+        "src/ui/DXPanel.cpp",
+        "src/ui/DXSatPane.cpp"
+      ],
+      "notes": "Integrated into DXPanel. Temp/Hum/Pressure/Wind displayed."
+    },
+    {
+      "feature_id": "sdo_images",
+      "name": "SDO Solar Images",
+      "next_files": [
+        "src/services/SDOProvider.cpp",
+        "src/ui/SDOPanel.cpp"
+      ]
+    },
+    {
+      "feature_id": "drap",
+      "name": "D-Region Absorption Predictions",
+      "next_files": [
+        "src/services/DRAPProvider.cpp",
+        "src/ui/DRAPPanel.cpp"
+      ]
+    },
+    {
+      "feature_id": "aurora",
+      "name": "Aurora Forecast",
+      "next_files": [
+        "src/services/AuroraProvider.cpp",
+        "src/ui/AuroraPanel.cpp"
+      ]
+    },
+    {
+      "feature_id": "rss_banner",
+      "name": "RSS News Banner",
+      "next_files": [
+        "src/services/RSSProvider.cpp",
+        "src/ui/RSSBanner.cpp"
+      ]
+    },
+    {
+      "feature_id": "web_server",
+      "name": "Embedded Web Server",
+      "next_files": [
+        "src/network/WebServer.cpp",
+        "src/network/WebServer.h"
+      ],
+      "notes": "Full API in API.md. Phase 4 endpoints added: /get_dx.txt, /set_mappos."
+    },
+    {
+      "feature_id": "network_manager",
+      "name": "Network Manager",
+      "next_files": [
+        "src/network/NetworkManager.cpp",
+        "src/network/NetworkManager.h"
+      ],
+      "notes": "libcurl + ETag/Last-Modified caching."
+    },
+    {
+      "feature_id": "dxpeditions",
+      "name": "DXpedition Tracker",
+      "next_files": [
+        "src/ui/ActivityPanels.cpp",
+        "src/ui/ActivityPanels.h"
+      ],
+      "notes": "Implemented as DXPedPanel inside ActivityPanels."
+    },
+    {
+      "feature_id": "watchlist",
+      "name": "Callsign Watchlist",
+      "next_files": [
+        "src/ui/WatchlistPanel.cpp",
+        "src/core/WatchlistStore.h",
+        "src/core/WatchlistHitStore.h"
+      ]
+    },
+    {
+      "feature_id": "eme_tool",
+      "name": "EME Tool",
+      "next_files": [
+        "src/ui/EMEToolPanel.cpp",
+        "src/core/MoonData.h"
+      ]
+    },
+    {
+      "feature_id": "santa_tracker",
+      "name": "Santa Tracker",
+      "next_files": [
+        "src/core/SantaStore.h",
+        "src/ui/MapWidget.cpp"
+      ],
+      "notes": "Active Dec 24/25. Overlay on MapWidget."
+    },
+    {
+      "feature_id": "history_panel",
+      "name": "History Panel",
+      "next_files": [
+        "src/services/HistoryProvider.cpp",
+        "src/ui/HistoryPanel.cpp"
+      ],
+      "notes": "New in hamclock-next. No original equivalent."
+    },
+    {
+      "feature_id": "local_panel",
+      "name": "Local Info Panel",
+      "next_files": [
+        "src/ui/LocalPanel.cpp"
+      ],
+      "notes": "New in hamclock-next."
+    },
+    {
+      "feature_id": "list_panel",
+      "name": "Generic List Panel (infrastructure)",
+      "next_files": [
+        "src/ui/ListPanel.cpp"
+      ]
+    },
+    {
+      "feature_id": "pane_container",
+      "name": "Pane Container / Layout",
+      "next_files": [
+        "src/ui/PaneContainer.cpp",
+        "src/ui/LayoutManager.h"
+      ]
+    },
+    {
+      "feature_id": "debug_overlay",
+      "name": "Debug Overlay",
+      "next_files": [
+        "src/ui/DebugOverlay.h"
+      ]
+    },
+    {
+      "feature_id": "color_theme",
+      "name": "Color Theme System",
+      "next_files": [
+        "src/core/Theme.h"
+      ],
+      "notes": "Use Theme:: constants. Never hardcode SDL_Color."
+    }
   ],
-
   "partial_features": {
     "description": "These features have scaffolding in place but do NOT yet meet all acceptance criteria. These are the primary TODO items for contributors.",
     "items": [
       {
         "feature_id": "satellite_tracking",
         "name": "Satellite Tracking",
-        "next_files": ["src/core/SatelliteManager.cpp", "src/ui/SatPanel.cpp", "src/ui/DXSatPane.cpp", "src/core/OrbitPredictor.cpp"],
+        "next_files": [
+          "src/core/SatelliteManager.cpp",
+          "src/ui/SatPanel.cpp",
+          "src/ui/DXSatPane.cpp",
+          "src/core/OrbitPredictor.cpp"
+        ],
         "original_reference": "earthsat.cpp (76K), P13.cpp, sattool.cpp",
         "what_exists": "SatelliteManager, SatPanel, DXSatPane, OrbitPredictor classes exist. libpredict v2 used instead of P13.",
         "what_is_needed": "Verify TLE fetching and update cycle. Complete polar plot rendering in SatPanel. Satellite footprint overlay on MapWidget. Rise/set prediction display. Satellite selection UI (sattool equivalent).",
@@ -209,7 +454,12 @@
       {
         "feature_id": "dx_cluster",
         "name": "DX Cluster",
-        "next_files": ["src/services/DXClusterProvider.cpp", "src/ui/DXClusterPanel.cpp", "src/ui/DXClusterSetup.cpp", "src/core/DXClusterData.h"],
+        "next_files": [
+          "src/services/DXClusterProvider.cpp",
+          "src/ui/DXClusterPanel.cpp",
+          "src/ui/DXClusterSetup.cpp",
+          "src/core/DXClusterData.h"
+        ],
         "original_reference": "dxcluster.cpp (40K)",
         "what_exists": "Provider, Panel, Setup, and Data classes exist.",
         "what_is_needed": "Verify Telnet connection to cluster nodes. Spot parsing (DX de spotter freq comment). Map overlay with bearing lines. Auto-reconnect logic. Cluster node config UI.",
@@ -224,7 +474,10 @@
       {
         "feature_id": "solar_flux",
         "name": "Solar Flux (SFI) Plot",
-        "next_files": ["src/ui/SolarPanel.cpp", "src/core/SolarData.h"],
+        "next_files": [
+          "src/ui/SolarPanel.cpp",
+          "src/core/SolarData.h"
+        ],
         "original_reference": "spacewx.cpp (63K), symbol PLOT_CH_FLUX",
         "what_is_needed": "Verify SolarPanel implements full 30-day time-series plot, not just current value. NOAA/SWPC data source.",
         "acceptance_criteria": [
@@ -236,7 +489,9 @@
       {
         "feature_id": "kp_index",
         "name": "Planetary K-Index",
-        "next_files": ["src/ui/SpaceWeatherPanel.cpp"],
+        "next_files": [
+          "src/ui/SpaceWeatherPanel.cpp"
+        ],
         "original_reference": "spacewx.cpp, symbol PLOT_CH_KP",
         "what_is_needed": "Confirm SpaceWeatherPanel renders Kp bar chart. Storm level indicators G1-G5. NOAA/SWPC data source.",
         "acceptance_criteria": [
@@ -248,7 +503,9 @@
       {
         "feature_id": "sunspot_number",
         "name": "Sunspot Number (SSN)",
-        "next_files": ["src/ui/SpaceWeatherPanel.cpp"],
+        "next_files": [
+          "src/ui/SpaceWeatherPanel.cpp"
+        ],
         "original_reference": "spacewx.cpp, symbol PLOT_CH_SSN",
         "what_is_needed": "Confirm SSN is rendered (may share SpaceWeatherPanel with Kp). NOAA/SWPC data.",
         "acceptance_criteria": [
@@ -259,7 +516,9 @@
       {
         "feature_id": "xray_flux",
         "name": "X-Ray Flux",
-        "next_files": ["src/ui/SpaceWeatherPanel.cpp"],
+        "next_files": [
+          "src/ui/SpaceWeatherPanel.cpp"
+        ],
         "original_reference": "spacewx.cpp, symbol PLOT_CH_XRAY",
         "what_is_needed": "GOES X-ray data from NOAA/SWPC. Flare class indicators (C/M/X class flares). Time-series plot.",
         "acceptance_criteria": [
@@ -271,7 +530,9 @@
       {
         "feature_id": "solar_wind",
         "name": "Solar Wind",
-        "next_files": ["src/ui/SpaceWeatherPanel.cpp"],
+        "next_files": [
+          "src/ui/SpaceWeatherPanel.cpp"
+        ],
         "original_reference": "spacewx.cpp, symbol PLOT_CH_SOLWIND",
         "what_is_needed": "DSCOVR/ACE solar wind data. Speed and density time-series.",
         "acceptance_criteria": [
@@ -282,7 +543,9 @@
       {
         "feature_id": "bz_bt",
         "name": "Bz/Bt Interplanetary Magnetic Field",
-        "next_files": ["src/ui/SpaceWeatherPanel.cpp"],
+        "next_files": [
+          "src/ui/SpaceWeatherPanel.cpp"
+        ],
         "original_reference": "spacewx.cpp, symbol PLOT_CH_BZBT",
         "what_is_needed": "IMF Bz and Bt from NOAA/SWPC. Southward Bz (negative) is the key geomagnetic storm driver — highlight it.",
         "acceptance_criteria": [
@@ -293,7 +556,10 @@
       {
         "feature_id": "noaa_space_weather",
         "name": "NOAA Space Weather Scales",
-        "next_files": ["src/services/NOAAProvider.cpp", "src/ui/SpaceWeatherPanel.cpp"],
+        "next_files": [
+          "src/services/NOAAProvider.cpp",
+          "src/ui/SpaceWeatherPanel.cpp"
+        ],
         "original_reference": "spacewx.cpp, symbol PLOT_CH_NOAASPW",
         "what_is_needed": "NOAAProvider fetches R/S/G scales. SpaceWeatherPanel renders color-coded current levels.",
         "acceptance_criteria": [
@@ -304,7 +570,11 @@
       {
         "feature_id": "band_conditions",
         "name": "Band Conditions (VOACAP)",
-        "next_files": ["src/services/BandConditionsProvider.cpp", "src/ui/BandConditionsPanel.cpp", "src/core/BandConditionsData.h"],
+        "next_files": [
+          "src/services/BandConditionsProvider.cpp",
+          "src/ui/BandConditionsPanel.cpp",
+          "src/core/BandConditionsData.h"
+        ],
         "original_reference": "bands.cpp (7K), symbol PLOT_CH_BC",
         "what_is_needed": "VOACAP API query for DE-DX path. Per-band reliability bars (160m–6m). Update when DX location changes.",
         "acceptance_criteria": [
@@ -316,7 +586,10 @@
       {
         "feature_id": "weather_de",
         "name": "Weather at DE Location",
-        "next_files": ["src/services/WeatherProvider.cpp", "src/ui/WeatherPanel.cpp"],
+        "next_files": [
+          "src/services/WeatherProvider.cpp",
+          "src/ui/WeatherPanel.cpp"
+        ],
         "original_reference": "wx.cpp (30K), symbol PLOT_CH_DEWX",
         "what_is_needed": "WeatherProvider completeness unclear. Verify temperature, humidity, wind, conditions display. Auto-update interval.",
         "acceptance_criteria": [
@@ -327,7 +600,11 @@
       {
         "feature_id": "contests",
         "name": "Contest Calendar",
-        "next_files": ["src/services/ContestProvider.cpp", "src/ui/ContestPanel.cpp", "src/core/ContestData.h"],
+        "next_files": [
+          "src/services/ContestProvider.cpp",
+          "src/ui/ContestPanel.cpp",
+          "src/core/ContestData.h"
+        ],
         "original_reference": "contests.cpp (22K), symbol PLOT_CH_CONTESTS",
         "what_is_needed": "Contest data source/API. Scrollable list with name, dates, mode, bands. Highlight active contests.",
         "acceptance_criteria": [
@@ -339,7 +616,11 @@
       {
         "feature_id": "on_the_air",
         "name": "On The Air (POTA/SOTA)",
-        "next_files": ["src/services/ActivityProvider.cpp", "src/ui/ActivityPanels.cpp", "src/core/ActivityData.h"],
+        "next_files": [
+          "src/services/ActivityProvider.cpp",
+          "src/ui/ActivityPanels.cpp",
+          "src/core/ActivityData.h"
+        ],
         "original_reference": "ontheair.cpp (27K), symbol PLOT_CH_ONTA",
         "what_is_needed": "POTA and SOTA APIs. Activator list with callsign, reference, frequency, mode. Map spots. Toggle between POTA and SOTA.",
         "acceptance_criteria": [
@@ -352,7 +633,10 @@
       {
         "feature_id": "adif",
         "name": "ADIF Log Viewer",
-        "next_files": ["src/services/ADIFProvider.cpp", "src/ui/ADIFPanel.cpp"],
+        "next_files": [
+          "src/services/ADIFProvider.cpp",
+          "src/ui/ADIFPanel.cpp"
+        ],
         "original_reference": "adif.cpp (16K) + adif_parser.cpp (24K), symbol PLOT_CH_ADIF",
         "what_is_needed": "ADIF file parsing (the format is well-documented). QSO list with callsign/date/band/mode. Map overlay of QSO locations. File selection dialog.",
         "acceptance_criteria": [
@@ -365,7 +649,11 @@
       {
         "feature_id": "ncdxf_beacons",
         "name": "NCDXF Beacon Monitor",
-        "next_files": ["src/services/BeaconProvider.h", "src/ui/BeaconPanel.cpp", "src/core/BeaconData.h"],
+        "next_files": [
+          "src/services/BeaconProvider.h",
+          "src/ui/BeaconPanel.cpp",
+          "src/core/BeaconData.h"
+        ],
         "original_reference": "ncdxf.cpp (10K), symbol BRB_SHOW_BEACONS",
         "what_is_needed": "BeaconProvider.h exists but no .cpp — likely incomplete. NCDXF beacon schedule is published and deterministic (time-based, no API needed). Implement schedule logic. Highlight currently transmitting beacon.",
         "acceptance_criteria": [
@@ -378,7 +666,9 @@
       {
         "feature_id": "countdown_timer",
         "name": "Countdown Timer",
-        "next_files": ["src/ui/CountdownPanel.cpp"],
+        "next_files": [
+          "src/ui/CountdownPanel.cpp"
+        ],
         "original_reference": "stopwatch.cpp (97K), symbol PLOT_CH_COUNTDOWN",
         "what_is_needed": "Target date/time input. Remaining time display (d/h/m/s). Visual/audio alarm at zero. Event name label.",
         "acceptance_criteria": [
@@ -391,7 +681,9 @@
       {
         "feature_id": "rotator_gimbal",
         "name": "Rotator/Gimbal Control",
-        "next_files": ["src/ui/GimbalPanel.cpp"],
+        "next_files": [
+          "src/ui/GimbalPanel.cpp"
+        ],
         "original_reference": "gimbal.cpp (36K), symbol PLOT_CH_GIMBAL",
         "what_is_needed": "GimbalPanel UI exists. Need hardware serial integration for rotator protocols (Yaesu GS-232, Easycomm). Compass display. Rotate-to-bearing command.",
         "acceptance_criteria": [
@@ -404,7 +696,10 @@
       {
         "feature_id": "setup_config",
         "name": "Setup & Configuration",
-        "next_files": ["src/core/ConfigManager.cpp", "src/ui/SetupScreen.cpp"],
+        "next_files": [
+          "src/core/ConfigManager.cpp",
+          "src/ui/SetupScreen.cpp"
+        ],
         "original_reference": "setup.cpp (207K), configs.cpp (28K), nvram.cpp (20K)",
         "what_is_needed": "SetupScreen completeness unclear. Verify all config items: callsign, location (grid/lat-lon/map-click), DX Cluster host/port, display preferences. Config persistence via ConfigManager.",
         "acceptance_criteria": [
@@ -418,7 +713,11 @@
       {
         "feature_id": "widget_selector",
         "name": "Widget/Pane Selector",
-        "next_files": ["src/ui/WidgetSelector.cpp", "src/core/WidgetType.h", "src/core/UIRegistry.h"],
+        "next_files": [
+          "src/ui/WidgetSelector.cpp",
+          "src/core/WidgetType.h",
+          "src/core/UIRegistry.h"
+        ],
         "original_reference": "menu.cpp (31K), plotmgmnt.cpp (23K)",
         "what_is_needed": "Long-press/tap on pane opens selector. List available widgets. Assign widget to pane. Persist pane assignments.",
         "acceptance_criteria": [
@@ -431,7 +730,9 @@
       {
         "feature_id": "prefix_lookup",
         "name": "Callsign Prefix Lookup",
-        "next_files": ["src/core/PrefixManager.cpp"],
+        "next_files": [
+          "src/core/PrefixManager.cpp"
+        ],
         "original_reference": "prefixes.cpp (41K) + callsign.cpp (20K)",
         "what_is_needed": "PrefixManager exists. Verify DXCC database is complete and returns country, CQ zone, ITU zone, and coordinates for callsign prefixes.",
         "acceptance_criteria": [
@@ -455,7 +756,6 @@
       }
     ]
   },
-
   "missing_features": {
     "description": "These features exist in the original but have NO scaffolding in hamclock-next. Prioritize based on deployment target (desktop vs Raspberry Pi).",
     "items": [
@@ -559,7 +859,6 @@
       }
     ]
   },
-
   "not_needed_features": {
     "description": "These original features are explicitly NOT being ported. Document for contributor clarity.",
     "items": [
@@ -575,7 +874,6 @@
       }
     ]
   },
-
   "contribution_guide": {
     "for_new_contributors": [
       "Read this MCP and the API.md in the repo root before touching any code.",
@@ -605,7 +903,6 @@
       "No raw owning pointers — use std::unique_ptr or std::shared_ptr."
     ]
   },
-
   "feature_map_maintenance": {
     "description": "How to keep the MCP current as development progresses.",
     "instructions": [
@@ -617,7 +914,74 @@
       "This file (hamclock-next-mcp.json) lives in the repo root and is the first thing AI assistants and new contributors should read."
     ]
   },
-
+  "recent_phases": {
+    "description": "Completed development phases in chronological order. Most recent first.",
+    "phase_37": {
+      "name": "Raspberry Pi Memory Optimization & Segfault Prevention",
+      "completed": "2026-02-16",
+      "summary": "Resolved critical 'Cannot allocate memory' errors and subsequent segfaults on Raspberry Pi KMSDRM backend through tooltip texture caching, robust NULL checks, and low-memory rendering modes.",
+      "problem": "Frequent texture allocation/deallocation (180 creates per 3 seconds for tooltips) exhausted DRM descriptor pool on RPi. Unchecked NULL pointers cascaded into segfaults. Heavy SDL_RenderGeometry usage (96×48 grids = 4608 vertices) triggered internal buffer reallocations.",
+      "solutions": [
+        "Tooltip texture caching: Textures now cached per tooltip text, only regenerated on text change (99% reduction: 180→1-2 allocations)",
+        "Robust NULL checks: Added checks after all SDL_CreateTexture, fontMgr_.renderText(), and texMgr_.get() calls with SDL_GetError() logging",
+        "Low-memory mode: Automatic 75% mesh density reduction for KMSDRM (96×48→48×24 grids for night overlay and Robinson projection)",
+        "Reduced geometry complexity: Great circle paths 250→100 segments, satellite footprint 72→36 segments",
+        "Enhanced diagnostics: SDL_GetError() messages with context (surface dimensions, texture keys, byte counts)"
+      ],
+      "key_changes": [
+        "MapWidget.h: Added Tooltip::cachedTexture, cachedText, cachedW, cachedH fields",
+        "MapWidget.cpp: renderTooltip() only creates textures on text change, cleanup in destructor and on hide",
+        "MapWidget.cpp: Dynamic mesh density based on useCompatibilityRenderPath_ flag",
+        "TextureManager.h: Enhanced error logging with SDL_GetError()",
+        "FontManager.h: Added detailed error logging with surface dimensions and text context"
+      ],
+      "files_modified": [
+        "src/ui/MapWidget.h",
+        "src/ui/MapWidget.cpp",
+        "src/ui/TextureManager.h",
+        "src/ui/FontManager.h"
+      ],
+      "automatic_activation": "Low-memory optimizations automatically activate when SDL_GetCurrentVideoDriver() returns 'kmsdrm'. No configuration required.",
+      "testing_required": [
+        "RPi KMSDRM runtime verification with tooltip stress test (5+ minutes continuous hover)",
+        "Memory monitoring during normal operation: watch -n 1 'cat /proc/meminfo | grep -E \"MemAvailable|Dirty\"'",
+        "Visual quality verification: reduced mesh density should be imperceptible at 800×480",
+        "FPS stability check: should remain above 50 FPS during heavy map interaction"
+      ],
+      "documentation": "MEMORY_FIX_SUMMARY.md",
+      "validation": "Longest stable run on RPi without errors to date (user confirmed)"
+    }
+  },
+  "platform_specific": {
+    "description": "Platform-specific optimizations and considerations",
+    "raspberry_pi": {
+      "kmsdrm_backend": {
+        "description": "Kernel Mode Setting Direct Rendering Manager - modern display backend for RPi",
+        "detection": "SDL_GetCurrentVideoDriver() == 'kmsdrm'",
+        "compatibility_mode_trigger": "useCompatibilityRenderPath_ flag set in MapWidget constructor",
+        "memory_optimizations": {
+          "night_overlay_grid": "96×48 (4608 vertices) → 48×24 (1152 vertices) = 75% reduction",
+          "robinson_projection_grid": "96×48 → 48×24",
+          "spot_limit": "200 → 100 max rendered spots",
+          "great_circle_segments": "250 → 100",
+          "satellite_footprint_segments": "72 → 36",
+          "tooltip_texture_caching": "Per-frame create/destroy → cached until text changes"
+        },
+        "known_issues_resolved": [
+          "Cannot allocate memory errors (Phase 37)",
+          "Cascade segfaults from NULL texture pointers (Phase 37)",
+          "Night overlay banding/artifacts (Phase 32)",
+          "Colorful noise on night side (Phase 31)"
+        ]
+      },
+      "hardware_features": {
+        "display_power": "vcgencmd display_power (HDMI) or sysfs bl_power (DSI)",
+        "cpu_temperature": "/sys/class/thermal/thermal_zone0/temp",
+        "brightness_control": "sysfs backlight control via BrightnessManager",
+        "i2c_sensors": "BME280 support planned (low priority)"
+      }
+    }
+  },
   "decisions": {
     "description": "Architectural decisions and their rationale. This section explains WHY key choices were made, not just what they are.",
     "entries": [
@@ -626,85 +990,155 @@
         "topic": "Rendering backend architecture",
         "decision": "Use SDL2 with RGBA rendering instead of custom framebuffer abstraction with RGB565",
         "rationale": "SDL2 provides cross-platform window management, HiDPI scaling, and hardware-accelerated rendering out of the box. The original's custom framebuffer abstraction required separate implementations for ESP32 TFT, X11, and framebuffer devices. SDL2 handles resize events natively, supports multiple displays, and provides consistent behavior across Linux, macOS, and Windows. RGB565 was chosen for the original to minimize ESP32 memory usage (2 bytes per pixel vs 4), but modern desktops have abundant RAM where RGBA's alpha channel enables proper compositing and transparency effects.",
-        "alternatives_considered": ["Qt (too heavy, 50MB+ dependency)", "SFML (less mature than SDL2)", "Direct X11/Wayland (Linux-only, low-level complexity)", "Keep custom framebuffer (unmaintainable across platforms)"],
+        "alternatives_considered": [
+          "Qt (too heavy, 50MB+ dependency)",
+          "SFML (less mature than SDL2)",
+          "Direct X11/Wayland (Linux-only, low-level complexity)",
+          "Keep custom framebuffer (unmaintainable across platforms)"
+        ],
         "tradeoffs": "SDL2 adds ~1MB dependency vs custom framebuffer's zero-dependency approach. RGBA uses 2x memory per pixel vs RGB565, but this is negligible on desktop (800x480x4 = 1.5MB). Benefit: HiDPI, window resizing, and cross-platform support are handled by SDL2 instead of manual reimplementation.",
-        "files": ["src/main.cpp", "src/ui/Widget.h"]
+        "files": [
+          "src/main.cpp",
+          "src/ui/Widget.h"
+        ]
       },
       {
         "id": "libpredict_over_plan13",
         "topic": "Satellite orbit propagation library",
         "decision": "Use libpredict v2 instead of porting P13.cpp",
         "rationale": "Plan 13 is a classic 1983 algorithm implemented in the original as P13.cpp. libpredict v2 is the modern C library successor to Plan 13, actively maintained by the satellite tracking community. It provides the same SGP4 propagation math with a clean RAII-compatible API, proper TLE parsing, and extensive testing. Porting P13.cpp would mean maintaining ~500 lines of orbital mechanics code with no test coverage, while libpredict is battle-tested and used by dozens of satellite tracking applications.",
-        "alternatives_considered": ["Port P13.cpp directly (maintenance burden)", "Use PyEphem via Python bindings (adds Python dependency)", "gpredict codebase (GPL license incompatible)", "Write SGP4 from scratch (weeks of work, high bug risk)"],
+        "alternatives_considered": [
+          "Port P13.cpp directly (maintenance burden)",
+          "Use PyEphem via Python bindings (adds Python dependency)",
+          "gpredict codebase (GPL license incompatible)",
+          "Write SGP4 from scratch (weeks of work, high bug risk)"
+        ],
         "tradeoffs": "libpredict is an external dependency (~50KB) that must be installed via package manager or built from source. Benefit: professionally maintained, accurate, and well-documented. The API is C-based but wraps cleanly into OrbitPredictor RAII class.",
-        "files": ["src/core/OrbitPredictor.h", "src/core/OrbitPredictor.cpp", "CMakeLists.txt"]
+        "files": [
+          "src/core/OrbitPredictor.h",
+          "src/core/OrbitPredictor.cpp",
+          "CMakeLists.txt"
+        ]
       },
       {
         "id": "libcurl_over_custom_wifi",
         "topic": "HTTP networking stack",
         "decision": "Use libcurl via NetworkManager instead of custom wifi.cpp HTTP implementation",
         "rationale": "The original's wifi.cpp (78K lines) implemented HTTP/1.1 from scratch to support ESP32 WiFi management and connection pooling. On desktop Linux, WiFi is managed by NetworkManager/wpa_supplicant at the OS level. libcurl handles HTTP/2, TLS 1.3, automatic redirects, cookie jars, compression, and connection pooling with a mature, audited codebase. ETag and Last-Modified caching are built into NetworkManager wrapper to minimize bandwidth for NOAA/API polling.",
-        "alternatives_considered": ["Port wifi.cpp (ESP32-specific, 78K lines to maintain)", "cpp-httplib (header-only, but no caching)", "Boost.Beast (heavyweight dependency)", "Raw sockets (reinventing the wheel)"],
+        "alternatives_considered": [
+          "Port wifi.cpp (ESP32-specific, 78K lines to maintain)",
+          "cpp-httplib (header-only, but no caching)",
+          "Boost.Beast (heavyweight dependency)",
+          "Raw sockets (reinventing the wheel)"
+        ],
         "tradeoffs": "libcurl is ~500KB dependency. Benefit: TLS certificate validation, HTTP/2 multiplexing, and proxy support are all handled. NetworkManager adds ETag/Last-Modified caching layer to avoid redundant API calls.",
-        "files": ["src/network/NetworkManager.h", "src/network/NetworkManager.cpp"]
+        "files": [
+          "src/network/NetworkManager.h",
+          "src/network/NetworkManager.cpp"
+        ]
       },
       {
         "id": "json_config_over_nvram",
         "topic": "Configuration persistence",
         "decision": "Use JSON file on disk (ConfigManager) instead of ESP32 NVRAM/Preferences",
         "rationale": "The original used nvram.cpp to abstract ESP32 Preferences (key-value flash storage) and Linux flat files. JSON provides human-readable config, version control compatibility, and easy backup/restore. ConfigManager loads config.json from ~/.hamclock/ (XDG-compliant path) and writes atomically to prevent corruption. JSON Schema validation could be added later for config migration.",
-        "alternatives_considered": ["SQLite (overkill for <100 settings)", "INI file (no nested structures)", "Binary format (not human-editable)", "Keep NVRAM abstraction (ESP32-specific)"],
+        "alternatives_considered": [
+          "SQLite (overkill for <100 settings)",
+          "INI file (no nested structures)",
+          "Binary format (not human-editable)",
+          "Keep NVRAM abstraction (ESP32-specific)"
+        ],
         "tradeoffs": "JSON is slightly slower to parse than binary, but config is only loaded once at startup (~5ms for typical config). Benefit: users can edit config.json in a text editor, check it into git, or script config changes.",
-        "files": ["src/core/ConfigManager.h", "src/core/ConfigManager.cpp"]
+        "files": [
+          "src/core/ConfigManager.h",
+          "src/core/ConfigManager.cpp"
+        ]
       },
       {
         "id": "widget_separation",
         "topic": "Provider/Panel/Data architecture pattern",
         "decision": "Separate data fetching (Provider), rendering (Panel), and storage (Data) into distinct classes instead of monolithic feature files",
         "rationale": "The original had monolithic files like dxcluster.cpp (40K) mixing Telnet I/O, spot parsing, UI rendering, and touch handling. The rewrite separates concerns: DXClusterProvider handles Telnet, DXClusterData stores spots, DXClusterPanel renders UI. This enables: (1) unit testing providers without SDL, (2) swapping UI without touching network code, (3) multiple panels sharing the same provider, (4) background data fetching on worker threads while rendering stays on main thread.",
-        "alternatives_considered": ["Keep monolithic files (unmaintainable)", "Single Widget class per feature (mixes concerns)", "Full MVC framework (too heavyweight)"],
+        "alternatives_considered": [
+          "Keep monolithic files (unmaintainable)",
+          "Single Widget class per feature (mixes concerns)",
+          "Full MVC framework (too heavyweight)"
+        ],
         "tradeoffs": "More files per feature (3-4 instead of 1), but each file is focused and <300 lines. Benefit: thread safety is explicit (providers have mutexes, panels only read), testability improves, and new contributors can understand one class at a time.",
-        "files": ["src/ui/Widget.h", "src/services/DXClusterProvider.cpp", "src/ui/DXClusterPanel.cpp"]
+        "files": [
+          "src/ui/Widget.h",
+          "src/services/DXClusterProvider.cpp",
+          "src/ui/DXClusterPanel.cpp"
+        ]
       },
       {
         "id": "responsive_layout",
         "topic": "Layout management system",
         "decision": "Use LayoutManager with proportional zones instead of hardcoded 800x480 pixel coordinates",
         "rationale": "The original assumed 800x480 display (ESP32 3.5-inch TFT) with magic number pixel positions throughout the codebase. LayoutManager divides the screen into TopBar, SidePanel, and MainStage zones, then distributes widgets proportionally by weight. When window resizes, widgets get new bounds via onResize(). Fidelity mode locks to canonical 800x480 for pixel-perfect reproduction of original layout. Responsive mode scales to any window size (tested 1920x1080, 1024x600, 800x480).",
-        "alternatives_considered": ["Keep 800x480 hardcoded (breaks on modern displays)", "CSS-style flexbox (no C++ library available)", "Dear ImGui (different paradigm, heavier)", "Qt Layouts (Qt dependency)"],
+        "alternatives_considered": [
+          "Keep 800x480 hardcoded (breaks on modern displays)",
+          "CSS-style flexbox (no C++ library available)",
+          "Dear ImGui (different paradigm, heavier)",
+          "Qt Layouts (Qt dependency)"
+        ],
         "tradeoffs": "Widgets must implement onResize() instead of assuming fixed bounds. Benefit: HamClock runs fullscreen on 1080p monitors, windowed on laptops, and letterboxed on 800x480 Pi displays without code changes.",
-        "files": ["src/ui/LayoutManager.h", "src/ui/PaneContainer.h"]
+        "files": [
+          "src/ui/LayoutManager.h",
+          "src/ui/PaneContainer.h"
+        ]
       },
       {
         "id": "sdl_ttf_over_sevenseg",
         "topic": "Font rendering system",
         "decision": "Use SDL_ttf for all text instead of custom seven-segment renderer",
         "rationale": "The original's sevenseg.cpp rendered bitmap seven-segment digits for clock display. SDL_ttf provides TrueType font rendering with kerning, anti-aliasing, and Unicode support. FontManager caches rendered glyphs as SDL_Textures to avoid re-rendering on every frame. The seven-segment aesthetic can be replicated with a TTF font (e.g., DSEG) if desired, but the custom bitmap renderer is unnecessary complexity.",
-        "alternatives_considered": ["Port sevenseg.cpp (9K lines, no anti-aliasing)", "FreeType directly (SDL_ttf wraps it cleanly)", "stb_truetype (header-only, but no caching)"],
+        "alternatives_considered": [
+          "Port sevenseg.cpp (9K lines, no anti-aliasing)",
+          "FreeType directly (SDL_ttf wraps it cleanly)",
+          "stb_truetype (header-only, but no caching)"
+        ],
         "tradeoffs": "SDL_ttf is ~100KB dependency. Benefit: professional typography, Unicode callsigns (Japanese hams!), and consistent text rendering across widgets.",
-        "files": ["src/ui/FontManager.h", "src/ui/FontManager.cpp"]
+        "files": [
+          "src/ui/FontManager.h",
+          "src/ui/FontManager.cpp"
+        ]
       },
       {
         "id": "hono_over_express",
         "topic": "MCP server framework",
         "decision": "Use Hono instead of Express for the MCP bridge server",
         "rationale": "The MCP server (Model Context Protocol bridge) runs in Node.js to expose hamclock-next project context to AI assistants. Hono is a lightweight, edge-first framework (3KB vs Express 200KB) with better TypeScript support and modern async/await patterns. The MCP server only handles ~10 simple GET endpoints, so Express's middleware ecosystem is overkill. Hono compiles to a single-file ESM bundle that starts in <50ms.",
-        "alternatives_considered": ["Express (most popular, but heavyweight)", "Fastify (faster than Express, but still 500KB)", "Raw Node http module (too low-level)"],
+        "alternatives_considered": [
+          "Express (most popular, but heavyweight)",
+          "Fastify (faster than Express, but still 500KB)",
+          "Raw Node http module (too low-level)"
+        ],
         "tradeoffs": "Hono has smaller ecosystem than Express, but MCP server needs zero middleware. Benefit: faster cold starts, smaller bundle size, better TypeScript inference.",
-        "files": [".mcp/package.json", ".mcp/src/index.ts"]
+        "files": [
+          ".mcp/package.json",
+          ".mcp/src/index.ts"
+        ]
       },
       {
         "id": "password_auth_not_needed",
         "topic": "Web API authentication decision",
         "decision": "Explicitly defer password authentication to post-v1.0 instead of implementing upfront",
         "rationale": "The original had passwd.cpp (9K) for HTTP Basic Auth to protect control endpoints. In development, the web server runs on localhost:8080 and is not exposed to the internet. For production deployments, reverse proxies (nginx, Caddy) handle TLS and auth more robustly than embedding it in the app. WebServer.h documents that control endpoints (/set_touch, /set_mappos, /set_char) should be protected before public deployment, but this is a deployment concern, not a v1.0 blocker.",
-        "alternatives_considered": ["Implement HTTP Basic Auth (insecure without TLS)", "Bearer tokens (requires token management UI)", "OAuth2 (massive overkill)", "Client certificates (complex setup)"],
+        "alternatives_considered": [
+          "Implement HTTP Basic Auth (insecure without TLS)",
+          "Bearer tokens (requires token management UI)",
+          "OAuth2 (massive overkill)",
+          "Client certificates (complex setup)"
+        ],
         "tradeoffs": "Current WebServer is INSECURE for public internet exposure. Benefit: development velocity is higher without auth complexity. Production deployments should use nginx with Basic Auth or Tailscale for zero-trust networking.",
-        "files": ["src/network/WebServer.h", "src/network/WebServer.cpp"]
+        "files": [
+          "src/network/WebServer.h",
+          "src/network/WebServer.cpp"
+        ]
       }
     ]
   },
-
   "gotchas": {
     "description": "Hard-won debugging knowledge. These are non-obvious behaviors, footguns, and initialization order dependencies that will cost you hours if you don't know about them.",
     "entries": [
@@ -715,7 +1149,10 @@
         "symptom": "Clicking on widgets registers at wrong coordinates, or rendering appears shifted/clipped on some systems (especially remote X11 or non-standard DPI)",
         "cause": "SDL_RenderSetViewport() is buggy/flaky on some GL/X11 setups. The viewport transform doesn't always apply correctly to SDL_RenderReadPixels (used for /live.jpg capture) or mouse event coordinates. Instead of trusting SDL viewports, we manually calculate logical origin offsets and shift widget bounds.",
         "fix": "Do NOT use SDL_RenderSetViewport(). Instead, LayoutManager calculates offX/offY based on window size vs logical 800x480 canvas, then passes these offsets to recalculateFidelity(). All widgets receive bounds already offset. See src/main.cpp:343-345 for the viewport avoidance pattern.",
-        "files": ["src/main.cpp", "src/ui/LayoutManager.h"]
+        "files": [
+          "src/main.cpp",
+          "src/ui/LayoutManager.h"
+        ]
       },
       {
         "id": "sdl_ttf_init_order",
@@ -724,7 +1161,10 @@
         "symptom": "Segfault or 'TTF_OpenFont failed' on startup",
         "cause": "SDL_ttf must be initialized AFTER SDL_Init() but BEFORE any TTF_OpenFont() calls. If FontManager tries to load fonts before TTF_Init(), you get a segfault. If you forget TTF_Quit() before SDL_Quit(), you may leak font handles.",
         "fix": "Call TTF_Init() immediately after SDL_Init(SDL_INIT_VIDEO). Call TTF_Quit() before SDL_Quit(). FontManager constructor should check TTF_WasInit() and error gracefully if not initialized. See src/main.cpp initialization sequence.",
-        "files": ["src/main.cpp", "src/ui/FontManager.cpp"]
+        "files": [
+          "src/main.cpp",
+          "src/ui/FontManager.cpp"
+        ]
       },
       {
         "id": "render_thread_safety",
@@ -733,7 +1173,11 @@
         "symptom": "Random crashes, texture corruption, or 'OpenGL context not current' errors",
         "cause": "SDL2 rendering (SDL_Renderer, SDL_Texture, SDL_Surface) is NOT thread-safe. All render() calls must happen on the main thread where the window was created. Providers run on background threads (via std::thread or NetworkManager async callbacks) and cannot touch SDL directly.",
         "fix": "Providers store data in plain structs (SolarData, DXClusterData, etc.) protected by std::mutex. Panels read this data on the main thread during render(). NEVER create SDL_Texture or call SDL_RenderDrawLine from a Provider. If you need to pass images from provider to panel, use raw pixel buffers and create the texture in Panel::render().",
-        "files": ["src/services/NOAAProvider.cpp", "src/ui/SpaceWeatherPanel.cpp", "src/core/SolarData.h"]
+        "files": [
+          "src/services/NOAAProvider.cpp",
+          "src/ui/SpaceWeatherPanel.cpp",
+          "src/core/SolarData.h"
+        ]
       },
       {
         "id": "networkmanager_cache",
@@ -742,7 +1186,10 @@
         "symptom": "API data appears stale or doesn't update even after cache expiry",
         "cause": "NetworkManager caches HTTP responses with ETag/Last-Modified headers. If the API server returns '304 Not Modified', NetworkManager serves the cached response even if you passed force=true. Some APIs (e.g., NOAA SWPC) return 304 aggressively even when data has changed.",
         "fix": "For APIs that don't respect cache headers correctly, set a short cacheAgeSeconds (e.g., 300) and pass force=true when you need fresh data. Alternatively, append a cache-busting query parameter like ?t={timestamp}. See DXClusterProvider for an example of force=true usage on reconnect.",
-        "files": ["src/network/NetworkManager.cpp", "src/services/DXClusterProvider.cpp"]
+        "files": [
+          "src/network/NetworkManager.cpp",
+          "src/services/DXClusterProvider.cpp"
+        ]
       },
       {
         "id": "libpredict_observer_required",
@@ -751,7 +1198,10 @@
         "symptom": "OrbitPredictor::observe() returns all zeros or crashes",
         "cause": "libpredict requires both an observer location AND orbital elements to be set before any observation or pass prediction. If you call observe() without calling setObserver() and loadTLE() first, libpredict returns invalid data or segfaults.",
         "fix": "Always check OrbitPredictor::isReady() before calling observe(), nextPass(), or groundTrack(). isReady() returns true only if both observer and TLE are loaded. Set observer location early (in main.cpp after loading config) so all predictors share the same QTH.",
-        "files": ["src/core/OrbitPredictor.cpp", "src/ui/SatPanel.cpp"]
+        "files": [
+          "src/core/OrbitPredictor.cpp",
+          "src/ui/SatPanel.cpp"
+        ]
       },
       {
         "id": "config_manager_init",
@@ -760,7 +1210,10 @@
         "symptom": "Config not persisted, or config file created in wrong directory (e.g., /tmp instead of ~/.hamclock/)",
         "cause": "ConfigManager::init() must be called before load() or save(). init() resolves the XDG config directory path and creates ~/.hamclock/ if it doesn't exist. If you skip init(), save() will fail silently or write to a temporary directory.",
         "fix": "Call configMgr.init() at the top of main() before ANY config access. Check the return value — if false, the config directory couldn't be created (permissions issue). Log configMgr.configPath() during startup to verify the correct path.",
-        "files": ["src/core/ConfigManager.cpp", "src/main.cpp"]
+        "files": [
+          "src/core/ConfigManager.cpp",
+          "src/main.cpp"
+        ]
       },
       {
         "id": "wsjt_x_not_implemented",
@@ -769,7 +1222,9 @@
         "symptom": "WSJT-X UDP mode doesn't work, spots not appearing",
         "cause": "DXClusterProvider has a TODO for WSJT-X UDP parsing (line 285). The provider detects WSJT-X magic bytes (0xADBCCBDA) but doesn't parse the binary format yet. This is a partial feature.",
         "fix": "Either implement WSJT-X binary parsing (see WSJT-X NetworkMessage.hpp for format) or set dxClusterUseWSJTX=false in config and use Telnet cluster instead. WSJT-X integration is tracked as a future enhancement.",
-        "files": ["src/services/DXClusterProvider.cpp"]
+        "files": [
+          "src/services/DXClusterProvider.cpp"
+        ]
       },
       {
         "id": "aurora_data_sharing",
@@ -778,7 +1233,11 @@
         "symptom": "Aurora overlay on map doesn't appear even though AuroraProvider is fetching data",
         "cause": "MapWidget has TODO to share aurora JSON from NOAAProvider (line 985). Currently, MapWidget would re-fetch aurora data itself, but the integration isn't complete. AuroraProvider fetches the data but MapWidget doesn't know how to access it.",
         "fix": "Pass std::shared_ptr<AuroraHistoryStore> to MapWidget constructor so it can read aurora data from the shared store. Update MapWidget::renderAuroraOverlay() to use the store instead of re-fetching. This is a known integration gap.",
-        "files": ["src/ui/MapWidget.cpp", "src/services/NOAAProvider.cpp", "src/core/AuroraHistoryStore.h"]
+        "files": [
+          "src/ui/MapWidget.cpp",
+          "src/services/NOAAProvider.cpp",
+          "src/core/AuroraHistoryStore.h"
+        ]
       },
       {
         "id": "windows_uptime_not_implemented",
@@ -787,7 +1246,9 @@
         "symptom": "TimePanel shows 'Up --' on Windows instead of system uptime",
         "cause": "getSystemUptime() in TimePanel.cpp has a TODO for Windows implementation (line 28). Linux uses /proc/uptime, macOS uses sysctl, but Windows equivalent (GetTickCount64) isn't implemented yet.",
         "fix": "Add Windows-specific code using GetTickCount64() and convert to days/hours/minutes format. This is a cosmetic feature with low priority.",
-        "files": ["src/ui/TimePanel.cpp"]
+        "files": [
+          "src/ui/TimePanel.cpp"
+        ]
       },
       {
         "id": "debug_api_ifdef",
@@ -796,11 +1257,13 @@
         "symptom": "/debug/* endpoints return 404 even though code exists",
         "cause": "All debug endpoints in WebServer.cpp are wrapped in #ifdef ENABLE_DEBUG_API. This is OFF by default in release builds for security (debug endpoints allow state injection and widget introspection).",
         "fix": "To enable debug API, add -DENABLE_DEBUG_API to CMake flags or set ENABLE_DEBUG_API=1 in your build environment. For development builds, this is recommended. For production, keep it disabled to prevent information disclosure.",
-        "files": ["src/network/WebServer.cpp", "CMakeLists.txt"]
+        "files": [
+          "src/network/WebServer.cpp",
+          "CMakeLists.txt"
+        ]
       }
     ]
   },
-
   "api_examples": {
     "description": "Working curl commands for every WebServer endpoint. Base URL is http://localhost:8080 by default (configurable port).",
     "categories": {

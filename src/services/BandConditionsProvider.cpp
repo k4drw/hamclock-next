@@ -16,6 +16,10 @@ void BandConditionsProvider::update() {
   static const std::vector<std::string> bands = {"80m", "40m", "20m", "15m",
                                                  "10m"};
 
+  // Store the solar data used for calculations
+  data.sfi = solar.sfi;
+  data.k_index = solar.k_index;
+
   for (const auto &b : bands) {
     BandStatus status;
     status.band = b;

@@ -1,28 +1,13 @@
 #include "LiveSpotProvider.h"
 #include "../core/HamClockState.h"
 #include "../core/Logger.h"
+#include "../core/StringUtils.h"
 
 #include <chrono>
 #include <cstdlib>
 #include <ctime>
-#include <nlohmann/json.hpp>
-#include <spdlog/fmt/fmt.h>
-#include <string>
 
 namespace {
-
-// Extract an XML attribute value: finds attr="value" and returns value.
-std::string extractAttr(const std::string &tag, const char *attr) {
-  std::string needle = std::string(attr) + "=\"";
-  auto pos = tag.find(needle);
-  if (pos == std::string::npos)
-    return {};
-  pos += needle.size();
-  auto end = tag.find('"', pos);
-  if (end == std::string::npos)
-    return {};
-  return tag.substr(pos, end - pos);
-}
 
 // Parse PSK Reporter XML response, aggregating spot counts per band
 // and collecting individual spot records for map plotting.
@@ -46,7 +31,7 @@ void parsePSKReporter(const std::string &body, LiveSpotData &data,
 
     std::string tag = body.substr(tagStart, tagEnd - tagStart);
 
-    std::string freqStr = extractAttr(tag, "frequency");
+    std::string freqStr = StringUtils::extractAttr(tag, "frequency");
     if (!freqStr.empty()) {
       long long freqHz = std::atoll(freqStr.c_str());
       double freqKhz = static_cast<double>(freqHz) / 1000.0;
@@ -60,17 +45,21 @@ void parsePSKReporter(const std::string &body, LiveSpotData &data,
 
         if (plotReceivers) {
           // We are the sender. Map the receiver.
-          grid = extractAttr(tag, "receiverLocator");
-          call = extractAttr(tag, "receiverCallsign");
+          grid = StringUtils::extractAttr(tag, "receiverLocator");
+          call = StringUtils::extractAttr(tag, "receiverCallsign");
         } else {
           // We are the receiver. Map the sender.
-          grid = extractAttr(tag, "senderLocator");
-          call = extractAttr(tag, "senderCallsign");
+          grid = StringUtils::extractAttr(tag, "senderLocator");
+          call = StringUtils::extractAttr(tag, "senderCallsign");
         }
 
         if (grid.size() >= 4) {
           // Store in generic fields (SpotRecord uses receiverGrid for location)
           data.spots.push_back({freqKhz, grid, call});
+          if (data.spots.size() >= 500) {
+            LOG_W("LiveSpot", "Too many spots in response, capped at 500");
+            break;
+          }
         }
       }
     }

@@ -1,5 +1,8 @@
 #include "SatelliteManager.h"
 #include "Logger.h"
+#include "OrbitPredictor.h"
+#include "../services/RotatorService.h"
+#include <cmath>
 
 #include <algorithm>
 #include <cctype>
@@ -37,6 +40,46 @@ void SatelliteManager::fetch(bool force) {
         parse(response);
       },
       86400); // 24 hour cache age
+}
+
+void SatelliteManager::update() {
+  if (trackedSatName_.empty() || !rotator_) {
+    return;
+  }
+
+  const SatelliteTLE *tle = findByName(trackedSatName_);
+  if (!tle) {
+    return;
+  }
+
+  OrbitPredictor predictor;
+  predictor.setObserver(obsLat_, obsLon_);
+  if (!predictor.loadTLE(*tle)) {
+    return;
+  }
+
+  SatObservation obs = predictor.observe();
+  if (obs.elevation < 0) {
+    return; // sat is below horizon
+  }
+
+  RotatorData currentPos = rotator_->getPosition();
+  double az_error = std::abs(obs.azimuth - currentPos.azimuth);
+  double el_error = std::abs(obs.elevation - currentPos.elevation);
+
+  if (az_error > 2.0 || el_error > 2.0) {
+    rotator_->setPosition(obs.azimuth, obs.elevation);
+  }
+}
+
+void SatelliteManager::trackSatellite(const std::string &satName) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  trackedSatName_ = satName;
+}
+
+std::string SatelliteManager::getTrackedSatellite() const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  return trackedSatName_;
 }
 
 void SatelliteManager::parse(const std::string &raw) {

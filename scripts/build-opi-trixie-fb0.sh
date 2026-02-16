@@ -53,12 +53,27 @@ if [ $? -eq 0 ]; then
     echo "--------------------------------------------------"
     echo "SUCCESS: Orange Pi Zero 2W Trixie-FB0 build finished!"
     echo "Binary: build-opi-trixie-fb0/hamclock-next"
-    
-     # Create Debian Package
+
+    # Create Debian Package
     echo "Packaging..."
     chmod +x packaging/linux/create_deb.sh
     ./packaging/linux/create_deb.sh "build-opi-trixie-fb0/hamclock-next" "arm64" "trixie" "fb0" "build-opi-trixie-fb0"
-    
+
+    # Create release directory and copy artifacts
+    echo "Copying artifacts to release/..."
+    mkdir -p release
+    VERSION="${VERSION:-0.6B}"
+
+    # Copy .deb package
+    cp "build-opi-trixie-fb0/hamclock-next_${VERSION}_trixie_fb0_arm64.deb" "release/"
+
+    # Copy binary with consistent naming
+    cp "build-opi-trixie-fb0/hamclock-next" "release/hamclock-next-trixie-fb0-arm64"
+
+    echo "--------------------------------------------------"
+    echo "Release artifacts:"
+    echo "  - release/hamclock-next_${VERSION}_trixie_fb0_arm64.deb"
+    echo "  - release/hamclock-next-trixie-fb0-arm64"
     echo "--------------------------------------------------"
 else
     echo "ERROR: Build failed!"
