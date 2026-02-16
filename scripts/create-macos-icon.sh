@@ -6,9 +6,9 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-SOURCE_ICON="$PROJECT_ROOT/assets/macos/icon-source.png"
-ICONSET_DIR="$PROJECT_ROOT/assets/macos/HamClockNext.iconset"
-OUTPUT_ICNS="$PROJECT_ROOT/assets/macos/HamClockNext.icns"
+SOURCE_ICON="$PROJECT_ROOT/packaging/icon.png"
+ICONSET_DIR="$PROJECT_ROOT/packaging/macos/HamClockNext.iconset"
+OUTPUT_ICNS="$PROJECT_ROOT/packaging/macos/HamClockNext.icns"
 
 # Check if running on macOS
 if [[ "$OSTYPE" != "darwin"* ]]; then
