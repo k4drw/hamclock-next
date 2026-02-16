@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <cstring>
+#include <memory>
 #include <mutex>
 #include <string>
 #include <vector>
@@ -63,7 +64,9 @@ struct LiveSpotData {
 
 class LiveSpotDataStore {
 public:
-  LiveSpotData get() const {
+  LiveSpotDataStore() : data_(std::make_shared<LiveSpotData>()) {}
+
+  std::shared_ptr<const LiveSpotData> snapshot() const {
     std::lock_guard<std::mutex> lock(mutex_);
     return data_;
   }
@@ -71,24 +74,27 @@ public:
   // Set provider data, preserving UI-driven selectedBands state.
   void set(const LiveSpotData &data) {
     std::lock_guard<std::mutex> lock(mutex_);
-    bool saved[kNumBands];
-    std::memcpy(saved, data_.selectedBands, sizeof(saved));
-    data_ = data;
-    std::memcpy(data_.selectedBands, saved, sizeof(saved));
+    auto newData = std::make_shared<LiveSpotData>(data);
+    // Preserve UI state
+    std::memcpy(newData->selectedBands, data_->selectedBands,
+                sizeof(newData->selectedBands));
+    data_ = newData;
   }
 
   void setSelectedBandsMask(uint32_t mask) {
     std::lock_guard<std::mutex> lock(mutex_);
+    auto newData = std::make_shared<LiveSpotData>(*data_);
     for (int i = 0; i < kNumBands; ++i) {
-      data_.selectedBands[i] = (mask & (1 << i)) != 0;
+      newData->selectedBands[i] = (mask & (1 << i)) != 0;
     }
+    data_ = newData;
   }
 
   uint32_t getSelectedBandsMask() const {
     std::lock_guard<std::mutex> lock(mutex_);
     uint32_t mask = 0;
     for (int i = 0; i < kNumBands; ++i) {
-      if (data_.selectedBands[i])
+      if (data_->selectedBands[i])
         mask |= (1 << i);
     }
     return mask;
@@ -96,11 +102,14 @@ public:
 
   void toggleBand(int idx) {
     std::lock_guard<std::mutex> lock(mutex_);
-    if (idx >= 0 && idx < kNumBands)
-      data_.selectedBands[idx] = !data_.selectedBands[idx];
+    if (idx >= 0 && idx < kNumBands) {
+      auto newData = std::make_shared<LiveSpotData>(*data_);
+      newData->selectedBands[idx] = !newData->selectedBands[idx];
+      data_ = newData;
+    }
   }
 
 private:
   mutable std::mutex mutex_;
-  LiveSpotData data_;
+  std::shared_ptr<LiveSpotData> data_;
 };

@@ -1,7 +1,6 @@
 #pragma once
 
 #include <chrono>
-#include <cstdlib>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -43,7 +42,7 @@ public:
   DXClusterDataStore();
   ~DXClusterDataStore();
 
-  DXClusterData get() const;
+  std::shared_ptr<const DXClusterData> snapshot() const;
   void set(const DXClusterData &data);
   void addSpot(const DXClusterSpot &spot);
   void setConnected(bool connected, const std::string &status = "");
@@ -60,5 +59,5 @@ private:
   // We'll keep DB interaction strictly inside implementation for now.
 
   mutable std::mutex mutex_;
-  DXClusterData data_;
+  std::shared_ptr<DXClusterData> data_;
 };

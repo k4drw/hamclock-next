@@ -1,8 +1,10 @@
 #pragma once
 
+#include "../core/MemoryMonitor.h"
 #include "FontManager.h"
 #include "Widget.h"
 
+#include <SDL.h>
 #include <array>
 #include <functional>
 #include <string>
@@ -42,10 +44,7 @@ public:
         break;
       }
     }
-    if (callTex_) {
-      SDL_DestroyTexture(callTex_);
-      callTex_ = nullptr;
-    }
+    MemoryMonitor::getInstance().destroyTexture(callTex_);
   }
 
   bool isSetupRequested() const { return setupRequested_; }

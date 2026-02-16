@@ -20,6 +20,10 @@ struct AppConfig {
   std::string theme = "default";
   bool mapNightLights = true;
   bool useMetric = true;
+  std::string projection = "equirectangular"; // or "robinson"
+  std::string mapStyle = "nasa";  // "nasa", "terrain", "countries"
+  bool showGrid = false;
+  std::string gridType = "latlon";  // "latlon" or "maidenhead"
 
   // Pane widget selection (top bar panes 1–3)
   // Pane widget selection (rotation sets)
@@ -53,6 +57,32 @@ struct AppConfig {
 
   // Power / Screen
   bool preventSleep = true; // true to call SDL_DisableScreenSaver()
+
+  // Rotator (Hamlib rotctld)
+  std::string rotatorHost = "";  // Empty = disabled
+  int rotatorPort = 4533;        // Default Hamlib rotctld port
+  bool rotatorAutoTrack = false; // Auto-track satellite when enabled
+
+  // Rig (Hamlib rigctld)
+  std::string rigHost = ""; // Empty = disabled
+  int rigPort = 4532;       // Default Hamlib rigctld port
+  bool rigAutoTune = true;  // Auto-tune when clicking DX spots
+
+  // QRZ
+  std::string qrzUsername;
+  std::string qrzPassword;
+
+  // Countdown
+  std::string countdownLabel;
+  std::string countdownTime;
+
+  // Brightness
+  int brightness = 100;
+  bool brightnessSchedule = false;
+  int dimHour = 22;
+  int dimMinute = 0;
+  int brightHour = 6;
+  int brightMinute = 0;
 };
 
 class ConfigManager {

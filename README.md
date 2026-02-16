@@ -100,6 +100,36 @@ cmake --build . -j1
 - **Pi 4 (4GB)**: ~10-15 minutes
 - **Pi 5 (8GB)**: ~5-8 minutes
 
+### Building on macOS
+
+HamClock-Next builds natively on macOS (Intel and Apple Silicon):
+
+```bash
+# Install dependencies via Homebrew
+brew install cmake sdl2 sdl2_image sdl2_ttf curl
+
+# Clone the repository
+git clone https://github.com/USER/hamclock-next.git
+cd hamclock-next
+
+# Build .app bundle
+./scripts/build-macos.sh
+
+# The application bundle will be at:
+#   build-macos/hamclock-next.app
+#
+# Distribution packages:
+#   build-macos/hamclock-next-macos-arm64.dmg  (or x86_64)
+#   build-macos/hamclock-next-macos-arm64.zip
+
+# To install: Open the DMG and drag HamClock-Next.app to Applications
+# Or: Unzip and copy hamclock-next.app to /Applications
+```
+
+**Build times:**
+- **M1/M2/M3 Mac**: ~2-5 minutes (first build)
+- **Intel Mac**: ~5-10 minutes
+
 **Speed up rebuilds with ccache:**
 ```bash
 sudo apt-get install ccache
@@ -134,7 +164,17 @@ Then try:
 sudo SDL_VIDEODRIVER=kmsdrm ./hamclock-next --fullscreen --software
 ```
 
-*Note: On Raspberry Pi 3B, ensure `dtoverlay=vc4-kms-v3d` is NOT inside a `[pi4]` block in `/boot/config.txt`. It must be in the `[all]` section or at the top level to be active.*
+### Preventing Screen Blanking
+In console mode (no X11), the Linux kernel defaults to blanking the screen after 10 minutes of inactivity. To prevent this for fixed-display kiosks:
+
+1. Edit `/boot/cmdline.txt` (or `/boot/firmware/cmdline.txt` on Bookworm):
+   ```bash
+   sudo nano /boot/cmdline.txt
+   ```
+2. Append `consoleblank=0` to the end of the line (all parameters must be on a single line).
+3. Save and reboot: `sudo reboot`
+
+HamClock-Next also attempts to disable this at runtime, but the kernel parameter is the most reliable method.
 
 ### Command Line Options
 - `-f, --fullscreen`: Launch in fullscreen mode.

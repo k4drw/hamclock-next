@@ -1,7 +1,8 @@
 #pragma once
 
+#include "../core/Constants.h"
+#include "../core/MemoryMonitor.h"
 #include "FontManager.h"
-
 #include <SDL.h>
 #include <SDL_ttf.h>
 
@@ -33,15 +34,28 @@ public:
   // Recalculate scaled point sizes for the given window dimensions.
   // Call once at startup and on every resize.
   void recalculate(int /*winW*/, int winH) {
-    float scale = static_cast<float>(winH) / kLogicalH;
-    scaledPt_[idx(FontStyle::Micro)] = clampPt(kMicroBasePt * scale);
-    scaledPt_[idx(FontStyle::SmallRegular)] = clampPt(kSmallBasePt * scale);
-    scaledPt_[idx(FontStyle::SmallBold)] = clampPt(kSmallBasePt * scale);
-    scaledPt_[idx(FontStyle::MediumRegular)] = clampPt(kMediumBasePt * scale);
-    scaledPt_[idx(FontStyle::MediumBold)] = clampPt(kMediumBasePt * scale);
-    scaledPt_[idx(FontStyle::LargeBold)] = clampPt(kLargeBasePt * scale);
-    scaledPt_[idx(FontStyle::Fast)] = clampPt(kFastBasePt * scale);
-    scaledPt_[idx(FontStyle::FastBold)] = clampPt(kFastBasePt * scale);
+    if (HamClock::FIDELITY_MODE) {
+      // In Fidelity Mode, keep pt sizes logical (800x480).
+      // FontManager handles super-sampling via renderScale_.
+      scaledPt_[idx(FontStyle::Micro)] = kMicroBasePt;
+      scaledPt_[idx(FontStyle::SmallRegular)] = kSmallBasePt;
+      scaledPt_[idx(FontStyle::SmallBold)] = kSmallBasePt;
+      scaledPt_[idx(FontStyle::MediumRegular)] = kMediumBasePt;
+      scaledPt_[idx(FontStyle::MediumBold)] = kMediumBasePt;
+      scaledPt_[idx(FontStyle::LargeBold)] = kLargeBasePt;
+      scaledPt_[idx(FontStyle::Fast)] = kFastBasePt;
+      scaledPt_[idx(FontStyle::FastBold)] = kFastBasePt;
+    } else {
+      float scale = static_cast<float>(winH) / HamClock::LOGICAL_HEIGHT;
+      scaledPt_[idx(FontStyle::Micro)] = clampPt(kMicroBasePt * scale);
+      scaledPt_[idx(FontStyle::SmallRegular)] = clampPt(kSmallBasePt * scale);
+      scaledPt_[idx(FontStyle::SmallBold)] = clampPt(kSmallBasePt * scale);
+      scaledPt_[idx(FontStyle::MediumRegular)] = clampPt(kMediumBasePt * scale);
+      scaledPt_[idx(FontStyle::MediumBold)] = clampPt(kMediumBasePt * scale);
+      scaledPt_[idx(FontStyle::LargeBold)] = clampPt(kLargeBasePt * scale);
+      scaledPt_[idx(FontStyle::Fast)] = clampPt(kFastBasePt * scale);
+      scaledPt_[idx(FontStyle::FastBold)] = clampPt(kFastBasePt * scale);
+    }
   }
 
   // Current scaled point size for a style.
@@ -73,7 +87,17 @@ public:
     SDL_QueryTexture(tex, nullptr, nullptr, &w, &h);
     SDL_Rect dst = {x, y, w, h};
     SDL_RenderCopy(renderer, tex, nullptr, &dst);
-    SDL_DestroyTexture(tex);
+    destroyTexture(tex);
+  }
+
+  void destroyTexture(SDL_Texture *tex) {
+    if (tex) {
+      int w, h;
+      SDL_QueryTexture(tex, nullptr, nullptr, &w, &h);
+      MemoryMonitor::getInstance().markVramDestroyed(static_cast<int64_t>(w) *
+                                                     h * 4);
+      SDL_DestroyTexture(tex);
+    }
   }
 
   // ---- Calibration ----
@@ -117,7 +141,6 @@ public:
   static constexpr int kMediumTargetH = 28;
   static constexpr int kLargeTargetH = 80;
   static constexpr int kFastTargetH = 15;
-  static constexpr int kLogicalH = 480;
 
 private:
   static constexpr int kStyleCount = static_cast<int>(FontStyle::Count_);

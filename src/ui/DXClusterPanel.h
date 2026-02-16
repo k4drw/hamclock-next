@@ -2,13 +2,20 @@
 
 #include "../core/DXClusterData.h"
 #include "ListPanel.h"
+#include <SDL.h>
 #include <chrono>
 #include <memory>
+
+// Forward declarations
+class RigService;
+class AppConfig;
 
 class DXClusterPanel : public ListPanel {
 public:
   DXClusterPanel(int x, int y, int w, int h, FontManager &fontMgr,
-                 std::shared_ptr<DXClusterDataStore> store);
+                 std::shared_ptr<DXClusterDataStore> store,
+                 RigService *rigService = nullptr,
+                 const AppConfig *config = nullptr);
 
   void update() override;
   bool onMouseUp(int mx, int my, Uint16 mod) override;
@@ -28,6 +35,8 @@ private:
   formatAge(const std::chrono::system_clock::time_point &spottedAt) const;
 
   std::shared_ptr<DXClusterDataStore> store_;
+  RigService *rigService_;
+  const AppConfig *config_;
   std::chrono::system_clock::time_point lastUpdate_{};
   bool setupRequested_ = false;
 

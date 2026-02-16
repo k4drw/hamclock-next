@@ -1,6 +1,7 @@
 #include "BandConditionsPanel.h"
 #include "../core/Theme.h"
 #include "FontCatalog.h"
+#include <nlohmann/json.hpp>
 
 BandConditionsPanel::BandConditionsPanel(
     int x, int y, int w, int h, FontManager &fontMgr,
@@ -28,7 +29,7 @@ SDL_Color BandConditionsPanel::colorForCondition(BandCondition cond) {
 }
 
 const char *BandConditionsPanel::stringForCondition(BandCondition cond,
-                                                    bool shortForm) {
+                                                    bool shortForm) const {
   if (shortForm) {
     switch (cond) {
     case BandCondition::EXCELLENT:
@@ -147,4 +148,35 @@ void BandConditionsPanel::onResize(int x, int y, int w, int h) {
   } else {
     tableFontSize_ = cat->ptSize(FontStyle::SmallRegular);
   }
+}
+
+SDL_Rect BandConditionsPanel::getActionRect(const std::string &action) const {
+  (void)action; // No actions for this panel
+  return {x_, y_, width_, height_};
+}
+
+nlohmann::json BandConditionsPanel::getDebugData() const {
+  nlohmann::json data;
+
+  if (!dataValid_) {
+    data["status"] = "no_data";
+    return data;
+  }
+
+  data["status"] = "valid";
+  data["sfi"] = currentData_.sfi;
+  data["k_index"] = currentData_.k_index;
+
+  // Band conditions
+  nlohmann::json bands = nlohmann::json::array();
+  for (const auto &status : currentData_.statuses) {
+    nlohmann::json band;
+    band["band"] = status.band;
+    band["day"] = stringForCondition(status.day);
+    band["night"] = stringForCondition(status.night);
+    bands.push_back(band);
+  }
+  data["bands"] = bands;
+
+  return data;
 }

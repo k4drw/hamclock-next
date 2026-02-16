@@ -1,18 +1,26 @@
 #include "DXClusterPanel.h"
+#include "../core/ConfigManager.h"
+#include "../core/Logger.h"
+#include "../services/RigService.h"
+
+#include <algorithm>
 #include <iomanip>
 #include <sstream>
 
 DXClusterPanel::DXClusterPanel(int x, int y, int w, int h, FontManager &fontMgr,
-                               std::shared_ptr<DXClusterDataStore> store)
-    : ListPanel(x, y, w, h, fontMgr, "DX Cluster", {}), store_(store) {}
+                               std::shared_ptr<DXClusterDataStore> store,
+                               RigService *rigService,
+                               const AppConfig *config)
+    : ListPanel(x, y, w, h, fontMgr, "DX Cluster", {}), store_(store),
+      rigService_(rigService), config_(config) {}
 
 void DXClusterPanel::update() {
-  auto data = store_->get();
-  bool dataChanged = (data.lastUpdate != lastUpdate_);
+  auto data = store_->snapshot();
+  bool dataChanged = (data->lastUpdate != lastUpdate_);
 
   if (dataChanged) {
-    rebuildRows(data);
-    lastUpdate_ = data.lastUpdate;
+    rebuildRows(*data);
+    lastUpdate_ = data->lastUpdate;
   }
 
   // Re-render visible rows if data changed or scrolled (though ListPanel
@@ -30,9 +38,9 @@ void DXClusterPanel::update() {
     std::vector<std::string> visible;
     if (allRows_.empty()) {
       visible.push_back(
-          data.connected
+          data->connected
               ? "Waiting for spots..."
-              : (data.statusMsg.empty() ? "Disconnected" : data.statusMsg));
+              : (data->statusMsg.empty() ? "Disconnected" : data->statusMsg));
     } else {
       for (int i = 0; i < MAX_VISIBLE_ROWS; ++i) {
         if (scrollOffset_ + i < (int)allRows_.size()) {
@@ -122,26 +130,40 @@ bool DXClusterPanel::onMouseUp(int mx, int my, Uint16 /*mod*/) {
     int relY = my - y_;
     int clickedRow = relY / rowH;
 
-    auto data = store_->get();
+    auto data = store_->snapshot();
     // Reverse logic matches rebuildRows
     // We need to access the sorted spots as displayed.
     // Rebuilding them here is inefficient but safe.
-    auto spots = data.spots;
+    auto spots = data->spots;
     std::reverse(spots.begin(), spots.end());
 
     if (clickedRow >= 0 && clickedRow < MAX_VISIBLE_ROWS) {
       int idx = scrollOffset_ + clickedRow;
       if (idx >= 0 && idx < (int)spots.size()) {
         const auto &spot = spots[idx];
-        bool isSame = data.hasSelection &&
-                      data.selectedSpot.txCall == spot.txCall &&
-                      data.selectedSpot.freqKhz == spot.freqKhz &&
-                      data.selectedSpot.spottedAt == spot.spottedAt;
+        bool isSame = data->hasSelection &&
+                      data->selectedSpot.txCall == spot.txCall &&
+                      data->selectedSpot.freqKhz == spot.freqKhz &&
+                      data->selectedSpot.spottedAt == spot.spottedAt;
 
         if (isSame) {
           store_->clearSelection();
         } else {
           store_->selectSpot(spot);
+
+          // Auto-tune rig to spot frequency if enabled and service available
+          if (rigService_ && config_ && config_->rigAutoTune) {
+            // Convert kHz to Hz
+            long long freqHz = static_cast<long long>(spot.freqKhz * 1000.0);
+
+            if (rigService_->setFrequency(freqHz)) {
+              LOG_I("DXCluster", "Tuning rig to {:.1f} kHz ({} - {})",
+                    spot.freqKhz, spot.txCall, spot.mode);
+            } else {
+              LOG_W("DXCluster", "Failed to tune rig to {:.1f} kHz",
+                    spot.freqKhz);
+            }
+          }
         }
         return true;
       }
@@ -179,13 +201,13 @@ SDL_Rect DXClusterPanel::getActionRect(const std::string &action) const {
 
 nlohmann::json DXClusterPanel::getDebugData() const {
   nlohmann::json j;
-  auto data = store_->get();
-  j["connected"] = data.connected;
-  j["spotCount"] = data.spots.size();
+  auto data = store_->snapshot();
+  j["connected"] = data->connected;
+  j["spotCount"] = data->spots.size();
   j["scrollOffset"] = scrollOffset_;
-  if (!data.spots.empty()) {
-    j["lastSpotFreq"] = data.spots.back().freqKhz;
-    j["lastSpotCall"] = data.spots.back().txCall;
+  if (!data->spots.empty()) {
+    j["lastSpotFreq"] = data->spots.back().freqKhz;
+    j["lastSpotCall"] = data->spots.back().txCall;
   }
   return j;
 }

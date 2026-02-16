@@ -13,6 +13,16 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 add_compile_definitions(HAMCLOCK_VERSION="v0.5B")
 
+# Force static builds globally for all FetchContent dependencies
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build static libs" FORCE)
+set(SDL_SHARED OFF CACHE BOOL "Build shared SDL library" FORCE)
+set(SDL_STATIC ON CACHE BOOL "Build static SDL library" FORCE)
+set(SDL2_SHARED OFF CACHE BOOL "Build shared SDL library" FORCE)
+set(SDL2_STATIC ON CACHE BOOL "Build static SDL library" FORCE)
+set(SDL2TTF_BUILD_SHARED_LIBS OFF CACHE BOOL "Build shared SDL2_ttf library" FORCE)
+set(SDL2IMAGE_BUILD_SHARED_LIBS OFF CACHE BOOL "Build shared SDL2_image library" FORCE)
+
+
 # --- Build Options ---
 option(ENABLE_DEBUG_API "Enable debug API endpoints and live view (increases CPU usage)" OFF)
 
@@ -29,8 +39,10 @@ include(FetchContent)
 # 1. SDL2 (Base) - Always build from source for consistency and static linking
 if(TRUE) # Force FetchContent
     set(SDL_STATIC ON CACHE BOOL "Build static SDL library")
-    # ...
     set(SDL_SHARED OFF CACHE BOOL "Build shared SDL library")
+    set(SDL2_SHARED OFF CACHE BOOL "Build shared SDL library" FORCE)
+    set(SDL2_STATIC ON CACHE BOOL "Build static SDL library" FORCE)
+    # ...
     set(SDL_TEST OFF CACHE BOOL "Disable SDL tests")
     set(SDL_JOYSTICK OFF CACHE BOOL "Disable SDL joystick")
     set(SDL_HAPTIC OFF CACHE BOOL "Disable SDL haptic")
@@ -49,6 +61,7 @@ endif()
 # 2. SDL2_ttf - Always build from source
 if(TRUE)
     set(SDL2TTF_VENDORED ON CACHE BOOL "Use vendored dependencies for SDL2_ttf")
+    set(SDL2TTF_BUILD_SHARED_LIBS OFF CACHE BOOL "Build shared SDL2_ttf library")
     FetchContent_Declare(
         SDL2_ttf
         GIT_REPOSITORY https://github.com/libsdl-org/SDL_ttf.git
@@ -61,7 +74,9 @@ endif()
 if(TRUE)
     set(SDL2IMAGE_VENDORED ON CACHE BOOL "Use vendored dependencies for SDL2_image")
     set(SDL2IMAGE_SAMPLES OFF CACHE BOOL "Disable SDL2_image samples")
+    set(SDL2IMAGE_BUILD_SHARED_LIBS OFF CACHE BOOL "Build shared SDL2_image library")
     set(SDL2IMAGE_WEBP OFF CACHE BOOL "Disable WebP to avoid MinGW link errors")
+
     set(SDL2IMAGE_TIF OFF CACHE BOOL "Disable TIFF - not used")
     set(SDL2IMAGE_JXL OFF CACHE BOOL "Disable JXL - not used")
     set(SDL2IMAGE_AVIF OFF CACHE BOOL "Disable AVIF - not used")
@@ -111,7 +126,7 @@ endif()
 if(NOT USE_SYSTEM_CURL)
     set(CURL_DISABLE_INSTALL ON CACHE BOOL "Disable curl installation")
     set(BUILD_CURL_EXE OFF CACHE BOOL "Disable curl executable")
-    set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build static libs")
+    set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build static libs" FORCE)
     set(HTTP_ONLY ON CACHE BOOL "Build HTTP-only curl")
     if(WIN32)
         set(CURL_USE_OPENSSL OFF CACHE BOOL "Disable OpenSSL on Windows (use Schannel)")
@@ -174,11 +189,43 @@ if(NOT spdlog_FOUND)
     )
 endif()
 
-# Order matters: SDL must be available before extensions
-# Common dependencies
+# --- Make Available (Order carefully) ---
+# 1. Base dependencies
+FetchContent_MakeAvailable(SDL2)
+FetchContent_MakeAvailable(sqlite3_amalgamation)
+
 if(NOT nlohmann_json_FOUND)
     FetchContent_MakeAvailable(nlohmann_json)
 endif()
+
+if(NOT spdlog_FOUND)
+    FetchContent_MakeAvailable(spdlog)
+endif()
+
+# 2. SDL Extensions (Must come AFTER SDL2 is made available)
+FetchContent_MakeAvailable(SDL2_ttf)
+FetchContent_MakeAvailable(SDL2_image)
+
+# Define SDL2 Aliases if missing
+if(NOT TARGET SDL2::SDL2)
+    if(TARGET SDL2-static)
+        add_library(SDL2::SDL2 ALIAS SDL2-static)
+    endif()
+endif()
+if(NOT TARGET SDL2::SDL2-static)
+    if(TARGET SDL2-static)
+        add_library(SDL2::SDL2-static ALIAS SDL2-static)
+    endif()
+endif()
+if(NOT TARGET SDL2::SDL2main)
+    if(TARGET SDL2main)
+        add_library(SDL2::SDL2main ALIAS SDL2main)
+    endif()
+endif()
+
+# Propagate include dirs
+get_target_property(SDL2_INCLUDE_DIRS SDL2-static INTERFACE_INCLUDE_DIRECTORIES)
+set(SDL2_INCLUDE_DIR ${SDL2_INCLUDE_DIRS} CACHE PATH "SDL2 include dir" FORCE)
 
 if(NOT httplib_FOUND)
     FetchContent_MakeAvailable(httplib)
@@ -191,16 +238,6 @@ else()
     endif()
 endif()
 
-if(NOT spdlog_FOUND)
-    FetchContent_MakeAvailable(spdlog)
-endif()
-
-if(NOT SDL2_FOUND)
-    FetchContent_MakeAvailable(SDL2)
-endif()
-
-FetchContent_MakeAvailable(sqlite3_amalgamation)
-
 # libpredict is special because it forces -Werror and adds tests unconditionally.
 # We use Populate + add_subdirectory with EXCLUDE_FROM_ALL to isolate it.
 if(NOT libpredict_FOUND)
@@ -211,42 +248,15 @@ if(NOT libpredict_FOUND)
     endif()
 endif()
 
-if(USE_SYSTEM_CURL)
-    add_library(libcurl ALIAS CURL::libcurl)
-else()
+if(NOT USE_SYSTEM_CURL)
     FetchContent_MakeAvailable(CURL)
-endif()
-
-# Define SDL2 Aliases EARLY so extensions (image/ttf) can find them
-if(NOT TARGET SDL2::SDL2)
-    if(TARGET SDL2)
-        add_library(SDL2::SDL2 ALIAS SDL2)
-    elseif(TARGET SDL2-static)
-        add_library(SDL2::SDL2 ALIAS SDL2-static)
+    if(NOT TARGET libcurl)
+        add_library(libcurl ALIAS CURL::libcurl)
     endif()
-endif()
-
-if(NOT TARGET SDL2::SDL2-static)
-    if(TARGET SDL2-static)
-        add_library(SDL2::SDL2-static ALIAS SDL2-static)
-    elseif(TARGET SDL2)
-        add_library(SDL2::SDL2-static ALIAS SDL2)
+else()
+    if(NOT TARGET libcurl)
+        add_library(libcurl ALIAS CURL::libcurl)
     endif()
-endif()
-
-# Prevent SDL2 extensions from trying to find_package(SDL2) again if we just built it
-# AND explicitly set variables that older FindSDL2.cmake modules (used by extensions) might need.
-if(NOT SDL2_FOUND AND TARGET SDL2::SDL2)
-    set(SDL2_FOUND TRUE CACHE BOOL "SDL2 found" FORCE)
-    
-    # Get include dirs from the target we just aliased
-    get_target_property(_sdl2_include_dirs SDL2::SDL2 INTERFACE_INCLUDE_DIRECTORIES)
-    set(SDL2_INCLUDE_DIR ${_sdl2_include_dirs} CACHE PATH "SDL2 include dir" FORCE)
-    set(SDL2_INCLUDE_DIRS ${_sdl2_include_dirs} CACHE PATH "SDL2 include dirs" FORCE)
-    
-    # Set libraries to the alias target
-    set(SDL2_LIBRARIES SDL2::SDL2 CACHE STRING "SDL2 libraries" FORCE)
-    set(SDL2_LIBRARY SDL2::SDL2 CACHE STRING "SDL2 library" FORCE)
 endif()
 
 # Since the amalgamation ZIP doesn't have a CMakeLists.txt, we define the target here
@@ -260,6 +270,7 @@ if(NOT TARGET sqlite3)
         target_link_libraries(sqlite3 PRIVATE m dl)
     endif()
 endif()
+
 
 # SDL Extensions (Now safe to load, as SDL2::SDL2 is defined)
 if(NOT SDL2_ttf_FOUND)
@@ -331,9 +342,13 @@ add_executable(hamclock-next ${HC_WIN32_FLAG}
     src/core/DatabaseManager.cpp
     src/core/OrbitPredictor.cpp
     src/core/DXClusterData.cpp
+    src/core/DisplayPower.cpp
+    src/core/BrightnessManager.cpp
+    src/core/CPUMonitor.cpp
     src/core/SatelliteManager.cpp
     src/core/PrefixManager.cpp
     src/core/CitiesManager.cpp
+    src/core/StringUtils.cpp
     src/network/NetworkManager.cpp
     src/network/WebServer.cpp
     src/services/NOAAProvider.cpp
@@ -346,6 +361,7 @@ add_executable(hamclock-next ${HC_WIN32_FLAG}
     src/services/AuroraProvider.cpp
     src/services/HistoryProvider.cpp
     src/services/BandConditionsProvider.cpp
+    src/services/BeaconProvider.cpp
     src/services/ContestProvider.cpp
     src/services/MoonProvider.cpp
     src/services/SDOProvider.cpp
@@ -353,6 +369,9 @@ add_executable(hamclock-next ${HC_WIN32_FLAG}
     src/services/CallbookProvider.cpp
     src/services/DstProvider.cpp
     src/services/SantaProvider.cpp
+    src/services/RotatorService.cpp
+    src/services/RigService.cpp
+    src/services/QRZProvider.cpp
     src/ui/ActivityPanels.cpp
     src/ui/ADIFPanel.cpp
     src/ui/AuroraPanel.cpp
@@ -363,6 +382,7 @@ add_executable(hamclock-next ${HC_WIN32_FLAG}
     src/ui/BeaconPanel.cpp
     src/ui/ContestPanel.cpp
     src/ui/CountdownPanel.cpp
+    src/ui/CPUTempPanel.cpp
     src/ui/DRAPPanel.cpp
     src/ui/GimbalPanel.cpp
     src/ui/HistoryPanel.cpp
@@ -376,6 +396,7 @@ add_executable(hamclock-next ${HC_WIN32_FLAG}
     src/ui/LiveSpotPanel.cpp
     src/ui/LocalPanel.cpp
     src/ui/MapWidget.cpp
+    src/ui/MapViewMenu.cpp
     src/ui/PaneContainer.cpp
     src/ui/PlaceholderWidget.cpp
     src/ui/RenderUtils.cpp
@@ -395,12 +416,14 @@ add_executable(hamclock-next ${HC_WIN32_FLAG}
 target_include_directories(hamclock-next PRIVATE
     ${CMAKE_SOURCE_DIR}/include
     ${libpredict_BINARY_DIR}/include
+    ${SDL2_INCLUDE_DIRS}
 )
 
 target_link_libraries(hamclock-next PRIVATE
-    SDL2::SDL2-static
-    SDL2_ttf::SDL2_ttf-static
-    SDL2_image::SDL2_image-static
+    SDL2::SDL2
+    SDL2::SDL2main
+    SDL2_ttf
+    SDL2_image
     libcurl
     sqlite3
     nlohmann_json::nlohmann_json
@@ -421,6 +444,28 @@ if(APPLE)
     # Clean up any leaked flags from dependencies that might have touched global linker flags
     string(REPLACE "-static-libgcc" "" CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS}")
     string(REPLACE "-static-libstdc++" "" CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS}")
+
+    # macOS App Bundle Configuration
+    set_target_properties(hamclock-next PROPERTIES
+        MACOSX_BUNDLE TRUE
+        MACOSX_BUNDLE_GUI_IDENTIFIER com.hamclock.next
+        MACOSX_BUNDLE_BUNDLE_NAME "HamClock-Next"
+        MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
+        MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
+        MACOSX_BUNDLE_ICON_FILE "HamClockNext"
+        MACOSX_BUNDLE_INFO_PLIST "${CMAKE_SOURCE_DIR}/assets/macos/Info.plist.in"
+    )
+
+    # Copy icon into bundle
+    set_source_files_properties(
+        "${CMAKE_SOURCE_DIR}/assets/macos/HamClockNext.icns"
+        PROPERTIES
+        MACOSX_PACKAGE_LOCATION "Resources"
+    )
+
+    target_sources(hamclock-next PRIVATE
+        "${CMAKE_SOURCE_DIR}/assets/macos/HamClockNext.icns"
+    )
 endif()
 
 # --- Custom targets for data updates ---

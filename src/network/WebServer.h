@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../core/Constants.h"
 #include <SDL.h>
 #include <atomic>
 #include <memory>
@@ -12,13 +13,15 @@ struct HamClockState;
 class ConfigManager;
 class WatchlistStore;
 class SolarDataStore;
+class DisplayPower;
 
 class WebServer {
 public:
   WebServer(SDL_Renderer *renderer, AppConfig &cfg, HamClockState &state,
-            ConfigManager &cfgMgr,
+            ConfigManager &cfgMgr, std::shared_ptr<DisplayPower> displayPower,
             std::shared_ptr<WatchlistStore> watchlist = nullptr,
-            std::shared_ptr<SolarDataStore> solar = nullptr, int port = 8080);
+            std::shared_ptr<SolarDataStore> solar = nullptr,
+            int port = HamClock::DEFAULT_WEB_SERVER_PORT);
   ~WebServer();
 
   void start();
@@ -36,6 +39,7 @@ private:
   ConfigManager *cfgMgr_;
   std::shared_ptr<WatchlistStore> watchlist_;
   std::shared_ptr<SolarDataStore> solar_;
+  std::shared_ptr<DisplayPower> displayPower_;
   int port_;
   std::thread thread_;
   std::atomic<bool> running_{false};

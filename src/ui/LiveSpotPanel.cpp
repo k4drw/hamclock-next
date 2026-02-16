@@ -1,4 +1,6 @@
 #include "LiveSpotPanel.h"
+#include "../core/ConfigManager.h"
+#include "../core/MemoryMonitor.h"
 #include "../core/Theme.h"
 
 #include <cstring>
@@ -20,34 +22,32 @@ void LiveSpotPanel::update() {
     provider_.fetch();
   }
 
-  auto data = store_->get();
-  if (!data.valid)
+  auto data = store_->snapshot();
+  if (!data->valid)
     return;
 
   // Track selected bands (for visual highlight, no texture rebuild needed)
-  std::memcpy(lastSelected_, data.selectedBands, sizeof(lastSelected_));
+  std::memcpy(lastSelected_, data->selectedBands, sizeof(lastSelected_));
 
   // Check if counts changed
-  bool changed = !dataValid_ || std::memcmp(data.bandCounts, lastCounts_,
+  bool changed = !dataValid_ || std::memcmp(data->bandCounts, lastCounts_,
                                             sizeof(lastCounts_)) != 0;
   if (changed) {
-    std::memcpy(lastCounts_, data.bandCounts, sizeof(lastCounts_));
+    std::memcpy(lastCounts_, data->bandCounts, sizeof(lastCounts_));
     dataValid_ = true;
     // Count textures will be rebuilt in render()
     for (auto &bc : bandCache_) {
       if (bc.countTex) {
-        SDL_DestroyTexture(bc.countTex);
-        bc.countTex = nullptr;
+        MemoryMonitor::getInstance().destroyTexture(bc.countTex);
       }
       bc.lastCount = -1;
     }
     // Rebuild subtitle if grid changed
-    std::string sub = "of " + data.grid + " - PSK " +
-                      std::to_string(data.windowMinutes) + " mins";
+    std::string sub = "of " + data->grid + " - PSK " +
+                      std::to_string(data->windowMinutes) + " mins";
     if (sub != lastSubtitle_) {
       if (subtitleTex_) {
-        SDL_DestroyTexture(subtitleTex_);
-        subtitleTex_ = nullptr;
+        MemoryMonitor::getInstance().destroyTexture(subtitleTex_);
       }
       lastSubtitle_ = sub;
     }
@@ -90,8 +90,7 @@ void LiveSpotPanel::render(SDL_Renderer *renderer) {
   // --- Title: "Live Spots" (centered, blue) ---
   if (titleFontChanged || !titleTex_) {
     if (titleTex_) {
-      SDL_DestroyTexture(titleTex_);
-      titleTex_ = nullptr;
+      MemoryMonitor::getInstance().destroyTexture(titleTex_);
     }
     titleTex_ = fontMgr_.renderText(renderer, "Live Spots", cyan,
                                     titleFontSize_, &titleW_, &titleH_);
@@ -139,12 +138,10 @@ void LiveSpotPanel::render(SDL_Renderer *renderer) {
     // Rebuild all band label textures
     for (int i = 0; i < kNumBands; ++i) {
       if (bandCache_[i].labelTex) {
-        SDL_DestroyTexture(bandCache_[i].labelTex);
-        bandCache_[i].labelTex = nullptr;
+        MemoryMonitor::getInstance().destroyTexture(bandCache_[i].labelTex);
       }
       if (bandCache_[i].countTex) {
-        SDL_DestroyTexture(bandCache_[i].countTex);
-        bandCache_[i].countTex = nullptr;
+        MemoryMonitor::getInstance().destroyTexture(bandCache_[i].countTex);
       }
       bandCache_[i].lastCount = -1;
     }
@@ -185,8 +182,7 @@ void LiveSpotPanel::render(SDL_Renderer *renderer) {
     int count = lastCounts_[i];
     if (bandCache_[i].lastCount != count) {
       if (bandCache_[i].countTex) {
-        SDL_DestroyTexture(bandCache_[i].countTex);
-        bandCache_[i].countTex = nullptr;
+        MemoryMonitor::getInstance().destroyTexture(bandCache_[i].countTex);
       }
       bandCache_[i].countTex = fontMgr_.renderText(
           renderer, std::to_string(count), white, cellFontSize_,
@@ -204,8 +200,7 @@ void LiveSpotPanel::render(SDL_Renderer *renderer) {
   // --- Footer: "Counts" (centered, white) ---
   if (!footerTex_ || cellFontChanged) {
     if (footerTex_) {
-      SDL_DestroyTexture(footerTex_);
-      footerTex_ = nullptr;
+      MemoryMonitor::getInstance().destroyTexture(footerTex_);
     }
     footerTex_ = fontMgr_.renderText(renderer, "Counts", white, cellFontSize_,
                                      &footerW_, &footerH_);
@@ -240,7 +235,7 @@ void LiveSpotPanel::renderSetup(SDL_Renderer *renderer) {
   if (t) {
     SDL_Rect tr = {cx - tw / 2, y, tw, th};
     SDL_RenderCopy(renderer, t, nullptr, &tr);
-    SDL_DestroyTexture(t);
+    MemoryMonitor::getInstance().destroyTexture(t);
   }
   y += th + 10;
 
@@ -264,14 +259,14 @@ void LiveSpotPanel::renderSetup(SDL_Renderer *renderer) {
                           &th);
   // If not DE, it's DX
   if (!pendingOfDe_) {
-    SDL_DestroyTexture(t);
+    MemoryMonitor::getInstance().destroyTexture(t);
     t = fontMgr_.renderText(renderer, "Mode: DX (Map senders I hear)", white,
                             cellFontSize_, &tw, &th);
   }
   if (t) {
     SDL_Rect tr = {lx + 24, y + (16 - th) / 2, tw, th};
     SDL_RenderCopy(renderer, t, nullptr, &tr);
-    SDL_DestroyTexture(t);
+    MemoryMonitor::getInstance().destroyTexture(t);
   }
   y += 24;
 
@@ -294,7 +289,7 @@ void LiveSpotPanel::renderSetup(SDL_Renderer *renderer) {
   if (t) {
     SDL_Rect tr = {lx + 24, y + (16 - th) / 2, tw, th};
     SDL_RenderCopy(renderer, t, nullptr, &tr);
-    SDL_DestroyTexture(t);
+    MemoryMonitor::getInstance().destroyTexture(t);
   }
 
   // Buttons at bottom
@@ -313,7 +308,7 @@ void LiveSpotPanel::renderSetup(SDL_Renderer *renderer) {
     SDL_Rect tr = {cancelBtnRect_.x + (btnW - tw) / 2,
                    cancelBtnRect_.y + (btnH - th) / 2, tw, th};
     SDL_RenderCopy(renderer, t, nullptr, &tr);
-    SDL_DestroyTexture(t);
+    MemoryMonitor::getInstance().destroyTexture(t);
   }
 
   // Done
@@ -327,7 +322,7 @@ void LiveSpotPanel::renderSetup(SDL_Renderer *renderer) {
     SDL_Rect tr = {doneBtnRect_.x + (btnW - tw) / 2,
                    doneBtnRect_.y + (btnH - th) / 2, tw, th};
     SDL_RenderCopy(renderer, t, nullptr, &tr);
-    SDL_DestroyTexture(t);
+    MemoryMonitor::getInstance().destroyTexture(t);
   }
 }
 
@@ -409,26 +404,17 @@ bool LiveSpotPanel::handleSetupClick(int mx, int my) {
 
 void LiveSpotPanel::destroyCache() {
   if (titleTex_) {
-    SDL_DestroyTexture(titleTex_);
-    titleTex_ = nullptr;
+    MemoryMonitor::getInstance().destroyTexture(titleTex_);
   }
   if (subtitleTex_) {
-    SDL_DestroyTexture(subtitleTex_);
-    subtitleTex_ = nullptr;
+    MemoryMonitor::getInstance().destroyTexture(subtitleTex_);
   }
   if (footerTex_) {
-    SDL_DestroyTexture(footerTex_);
-    footerTex_ = nullptr;
+    MemoryMonitor::getInstance().destroyTexture(footerTex_);
   }
   for (auto &bc : bandCache_) {
-    if (bc.labelTex) {
-      SDL_DestroyTexture(bc.labelTex);
-      bc.labelTex = nullptr;
-    }
-    if (bc.countTex) {
-      SDL_DestroyTexture(bc.countTex);
-      bc.countTex = nullptr;
-    }
+    MemoryMonitor::getInstance().destroyTexture(bc.labelTex);
+    MemoryMonitor::getInstance().destroyTexture(bc.countTex);
     bc.lastCount = -1;
   }
   lastTitleFontSize_ = 0;

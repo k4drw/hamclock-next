@@ -1,5 +1,6 @@
 #include "SetupScreen.h"
 #include "../core/Astronomy.h"
+#include "../core/Logger.h"
 
 #include <algorithm>
 #include <cmath>
@@ -7,9 +8,14 @@
 #include <cstdlib>
 #include <cstring>
 
-SetupScreen::SetupScreen(int x, int y, int w, int h, FontManager &fontMgr)
-    : Widget(x, y, w, h), fontMgr_(fontMgr) {
+SetupScreen::SetupScreen(int x, int y, int w, int h, FontManager &fontMgr,
+                         BrightnessManager &brightnessMgr)
+    : Widget(x, y, w, h), fontMgr_(fontMgr), brightnessMgr_(brightnessMgr) {
+  LOG_D("SetupScreen", "Constructor: x={}, y={}, w={}, h={}", x, y, w, h);
   recalcLayout();
+  LOG_D("SetupScreen",
+        "After recalcLayout: titleSize={}, labelSize={}, fieldSize={}",
+        titleSize_, labelSize_, fieldSize_);
 }
 
 void SetupScreen::recalcLayout() {
@@ -46,6 +52,96 @@ void SetupScreen::autoPopulateLatLon() {
   }
 }
 
+std::string *SetupScreen::getActiveFieldText() {
+  if (activeTab_ == Tab::Identity) {
+    switch (activeField_) {
+    case 0:
+      return &callsignText_;
+    case 1:
+      return &gridText_;
+    case 2:
+      return &latText_;
+    case 3:
+      return &lonText_;
+    }
+  } else if (activeTab_ == Tab::Spotting) {
+    switch (activeField_) {
+    case 0:
+      return &clusterHost_;
+    case 1:
+      return &clusterPort_;
+    case 2:
+      return &clusterLogin_;
+    }
+  } else if (activeTab_ == Tab::Services) {
+    switch (activeField_) {
+    case 0:
+      return &qrzUsername_;
+    case 1:
+      return &qrzPassword_;
+    case 2:
+      return &countdownLabel_;
+    case 3:
+      return &countdownTime_;
+    }
+  } else if (activeTab_ == Tab::Display) {
+    switch (activeField_) {
+    case 0:
+      return &dimTime_;
+    case 1:
+      return &brightTime_;
+    }
+  } else if (activeTab_ == Tab::Rig) {
+    switch (activeField_) {
+    case 0:
+      return &rigHost_;
+    case 1:
+      return &rigPort_;
+    }
+  }
+  return nullptr;
+}
+
+int SetupScreen::calculateCursorPosFromClick(int clickX, int fieldStartX,
+                                             const std::string &text,
+                                             int fontSize) {
+  if (text.empty())
+    return 0;
+
+  int relativeX = clickX - fieldStartX;
+  if (relativeX <= 0)
+    return 0; // Clicked before text start
+
+  // Measure full text width first
+  int fullWidth = fontMgr_.getLogicalWidth(text, fontSize);
+
+  // If clicked past end of text, return end position
+  if (relativeX >= fullWidth) {
+    return text.size();
+  }
+
+  // Find character closest to click position
+  int bestPos = 0;
+  int bestDist = std::abs(relativeX); // Distance to position 0
+
+  for (size_t i = 1; i <= text.size(); ++i) {
+    std::string substr = text.substr(0, i);
+    int w = fontMgr_.getLogicalWidth(substr, fontSize);
+
+    // Check if click is closer to this position than previous best
+    int dist = std::abs(relativeX - w);
+    if (dist < bestDist) {
+      bestDist = dist;
+      bestPos = static_cast<int>(i);
+    } else {
+      // Distances are increasing, we've found the closest
+      break;
+    }
+  }
+
+  return bestPos;
+}
+
 void SetupScreen::update() {
   autoPopulateLatLon();
 
@@ -77,6 +173,10 @@ static void renderField(SDL_Renderer *renderer, FontManager &fontMgr,
   SDL_SetRenderDrawColor(renderer, border.r, border.g, border.b, 255);
   SDL_RenderDrawRect(renderer, &rect);
 
+  // Set clipping rectangle to prevent text overflow
+  SDL_Rect clipRect = {fieldX + 2, y + 2, fieldW - 4, fieldH - 4};
+  SDL_RenderSetClipRect(renderer, &clipRect);
+
   if (!text.empty()) {
     SDL_Color color = valid ? validColor : textColor;
     fontMgr.drawText(renderer, text, fieldX + textPad, y + textPad, color,
@@ -86,16 +186,15 @@ static void renderField(SDL_Renderer *renderer, FontManager &fontMgr,
                      placeholderColor, fieldSize);
   }
 
+  // Reset clipping
+  SDL_RenderSetClipRect(renderer, nullptr);
+
   if (active) {
     int cursorX = fieldX + textPad;
     if (cursorPos > 0 && !text.empty()) {
-      TTF_Font *font = fontMgr.getFont(fieldSize);
-      if (font) {
-        std::string before = text.substr(0, cursorPos);
-        int tw = 0, th = 0;
-        TTF_SizeText(font, before.c_str(), &tw, &th);
-        cursorX += tw;
-      }
+      std::string before = text.substr(0, cursorPos);
+      // Use logical width from font manager
+      cursorX += fontMgr.getLogicalWidth(before, fieldSize);
     }
     if ((SDL_GetTicks() / 500) % 2 == 0) {
       SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
@@ -110,6 +209,21 @@ void SetupScreen::render(SDL_Renderer *renderer) {
   if (!fontMgr_.ready())
     return;
 
+  LOG_D("SetupScreen", "render(): width={}, height={}, last=({},{})", width_,
+        height_, lastRenderWidth_, lastRenderHeight_);
+
+  // Ensure layout is up-to-date if dimensions changed
+  // Fixes case where setup is launched after window resize
+  if (width_ != lastRenderWidth_ || height_ != lastRenderHeight_) {
+    LOG_D("SetupScreen", "Dimensions changed, recalculating layout");
+    recalcLayout();
+    LOG_D("SetupScreen",
+          "After recalc: titleSize={}, labelSize={}, fieldSize={}", titleSize_,
+          labelSize_, fieldSize_);
+    lastRenderWidth_ = width_;
+    lastRenderHeight_ = height_;
+  }
+
   SDL_SetRenderDrawColor(renderer, 15, 15, 25, 255);
   SDL_Rect bg = {x_, y_, width_, height_};
   SDL_RenderFillRect(renderer, &bg);
@@ -121,6 +235,9 @@ void SetupScreen::render(SDL_Renderer *renderer) {
   int fieldH = fieldSize_ + 14;
   int textPad = 7;
 
+  LOG_D("SetupScreen", "Layout: pad={}, fieldW={}, fieldX={}, fieldH={}", pad,
+        fieldW, fieldX, fieldH);
+
   SDL_Color white = {255, 255, 255, 255};
   SDL_Color cyan = {0, 200, 255, 255};
   SDL_Color gray = {120, 120, 120, 255};
@@ -131,9 +248,30 @@ void SetupScreen::render(SDL_Renderer *renderer) {
                     true, true);
   y += titleSize_ + pad;
 
-  const char *tabs[] = {"Identity", "DX Cluster", "Appearance", "Widgets"};
-  int numTabs = 4;
+  const char *tabs[] = {"Identity", "Spotting", "Appearance", "Display",
+                        "Rig",      "Services", "Widgets"};
+  int numTabs = 7;
   int tabW = fieldW / numTabs;
+
+  // Calculate safe font size for tabs to prevent overflow
+  // Longest label is "Appearance" (10 chars)
+  int tabTextPad = 4; // Padding on each side
+  int maxTabTextWidth = tabW - (tabTextPad * 2);
+  int tabFontSize = labelSize_;
+
+  // Reduce font size if labels won't fit
+  // Measure all labels using logical width helper
+  int longestWidth = 0;
+  for (int i = 0; i < numTabs; ++i) {
+    int w = fontMgr_.getLogicalWidth(tabs[i], tabFontSize);
+    if (w > longestWidth)
+      longestWidth = w;
+  }
+  // If too wide, scale down font
+  if (longestWidth > maxTabTextWidth) {
+    tabFontSize = std::max(10, (tabFontSize * maxTabTextWidth) / longestWidth);
+  }
+
   for (int i = 0; i < numTabs; ++i) {
     SDL_Rect tr = {fieldX + i * tabW, y, tabW, fieldH};
     bool active = (int)activeTab_ == i;
@@ -144,7 +282,7 @@ void SetupScreen::render(SDL_Renderer *renderer) {
                            active ? 255 : 80, 255);
     SDL_RenderDrawRect(renderer, &tr);
     fontMgr_.drawText(renderer, tabs[i], tr.x + tabW / 2, tr.y + fieldH / 2,
-                      active ? white : gray, labelSize_, false, true);
+                      active ? white : gray, tabFontSize, false, true);
   }
   y += fieldH + pad / 2;
   int contentY = y;
@@ -158,6 +296,15 @@ void SetupScreen::render(SDL_Renderer *renderer) {
     break;
   case Tab::Appearance:
     renderTabAppearance(renderer, cx, pad, fieldW, fieldH, fieldX, textPad);
+    break;
+  case Tab::Display:
+    renderTabDisplay(renderer, cx, pad, fieldW, fieldH, fieldX, textPad);
+    break;
+  case Tab::Rig:
+    renderTabRig(renderer, cx, pad, fieldW, fieldH, fieldX, textPad);
+    break;
+  case Tab::Services:
+    renderTabServices(renderer, cx, pad, fieldW, fieldH, fieldX, textPad);
     break;
   case Tab::Widgets:
     renderTabWidgets(renderer, cx, pad, fieldW, fieldH, fieldX, textPad);
@@ -387,6 +534,157 @@ void SetupScreen::renderTabAppearance(SDL_Renderer *renderer, int, int pad,
                     gray, hintSize_);
 }
 
+void SetupScreen::renderTabDisplay(SDL_Renderer *renderer, int, int pad,
+                                   int fieldW, int fieldH, int fieldX,
+                                   int textPad) {
+  int y = (y_ + titleSize_ + 2 * pad + fieldH + pad / 2);
+  int vSpace = pad / 2;
+  SDL_Color white = {255, 255, 255, 255};
+  SDL_Color gray = {140, 140, 140, 255};
+
+  // Brightness Slider
+  fontMgr_.drawText(renderer, "Brightness:", fieldX, y, white, labelSize_,
+                    true);
+  y += labelSize_ + 4;
+  brightnessSliderRect_ = {fieldX, y, fieldW, fieldH};
+  SDL_SetRenderDrawColor(renderer, 30, 30, 40, 255);
+  SDL_RenderFillRect(renderer, &brightnessSliderRect_);
+  int brightness = brightnessMgr_.getBrightness();
+  int brightW = (fieldW * brightness) / 100;
+  SDL_Rect brightRect = {fieldX, y, brightW, fieldH};
+  SDL_SetRenderDrawColor(renderer, 80, 80, 180, 255);
+  SDL_RenderFillRect(renderer, &brightRect);
+  SDL_SetRenderDrawColor(renderer, 150, 150, 220, 255);
+  SDL_RenderDrawRect(renderer, &brightnessSliderRect_);
+  std::string brightText = std::to_string(brightness) + "%";
+  fontMgr_.drawText(renderer, brightText, fieldX + fieldW / 2, y + fieldH / 2,
+                    white, fieldSize_, false, true);
+  y += fieldH + pad;
+
+  // Schedule Toggle
+  scheduleToggleRect_ = {fieldX, y, 20, 20};
+  SDL_SetRenderDrawColor(renderer, 50, 50, 60, 255);
+  SDL_RenderFillRect(renderer, &scheduleToggleRect_);
+  SDL_SetRenderDrawColor(renderer, 100, 100, 120, 255);
+  SDL_RenderDrawRect(renderer, &scheduleToggleRect_);
+  if (brightnessMgr_.isScheduleEnabled()) {
+    SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
+    SDL_Rect check = {fieldX + 4, y + 4, 12, 12};
+    SDL_RenderFillRect(renderer, &check);
+  }
+  fontMgr_.drawText(renderer, "Enable Dim/Bright Schedule", fieldX + 30, y + 2,
+                    white, labelSize_);
+  y += 24 + pad;
+
+  if (brightnessMgr_.isScheduleEnabled()) {
+    fontMgr_.drawText(renderer, "Dim Time:", fieldX, y, white, labelSize_);
+    fontMgr_.drawText(renderer, "Bright Time:", fieldX + fieldW / 2 + pad, y,
+                      white, labelSize_);
+    y += labelSize_ + 4;
+    int halfW = (fieldW - pad) / 2;
+    renderField(renderer, fontMgr_, dimTime_, "HH:MM", fieldX, y, halfW, fieldH,
+                fieldSize_, textPad, activeField_ == 0, true, cursorPos_, white,
+                gray, white, white, gray);
+    int y_bright =
+        y - fieldH; // renderField advances y, we want them side-by-side
+    renderField(renderer, fontMgr_, brightTime_, "HH:MM", fieldX + halfW + pad,
+                y_bright, halfW, fieldH, fieldSize_, textPad, activeField_ == 1,
+                true, cursorPos_, white, gray, white, white, gray);
+    y += vSpace;
+  }
+}
+
+void SetupScreen::renderTabServices(SDL_Renderer *renderer, int, int pad,
+                                    int fieldW, int fieldH, int fieldX,
+                                    int textPad) {
+  int y = (y_ + titleSize_ + 2 * pad + fieldH + pad / 2);
+  int vSpace = pad / 2;
+  SDL_Color white = {255, 255, 255, 255};
+  SDL_Color orange = {255, 165, 0, 255};
+  SDL_Color gray = {140, 140, 140, 255};
+
+  fontMgr_.drawText(renderer, "QRZ Username:", fieldX, y, white, labelSize_,
+                    true);
+  y += labelSize_ + 4;
+  renderField(renderer, fontMgr_, qrzUsername_, "e.g. K4DRW", fieldX, y, fieldW,
+              fieldH, fieldSize_, textPad, activeField_ == 0, true, cursorPos_,
+              orange, gray, white, white, gray);
+  y += vSpace;
+
+  fontMgr_.drawText(renderer, "QRZ Password:", fieldX, y, white, labelSize_,
+                    true);
+  y += labelSize_ + 4;
+  std::string passMask(qrzPassword_.length(), '*');
+  renderField(renderer, fontMgr_, passMask, "********", fieldX, y, fieldW,
+              fieldH, fieldSize_, textPad, activeField_ == 1, true, cursorPos_,
+              orange, gray, white, white, gray);
+  y += vSpace;
+
+  fontMgr_.drawText(renderer, "Countdown Label:", fieldX, y, white, labelSize_,
+                    true);
+  y += labelSize_ + 4;
+  renderField(renderer, fontMgr_, countdownLabel_, "e.g. Contest Start", fieldX,
+              y, fieldW, fieldH, fieldSize_, textPad, activeField_ == 2, true,
+              cursorPos_, orange, gray, white, white, gray);
+  y += vSpace;
+
+  fontMgr_.drawText(renderer, "Countdown Target (YYYY-MM-DD HH:MM):", fieldX, y,
+                    white, labelSize_, true);
+  y += labelSize_ + 4;
+  renderField(renderer, fontMgr_, countdownTime_, "e.g. 2024-11-28 18:00",
+              fieldX, y, fieldW, fieldH, fieldSize_, textPad, activeField_ == 3,
+              true, cursorPos_, orange, gray, white, white, gray);
+  y += vSpace;
+}
+
+void SetupScreen::renderTabRig(SDL_Renderer *renderer, int cx, int pad,
+                               int fieldW, int fieldH, int fieldX,
+                               int textPad) {
+  int y = (y_ + titleSize_ + 2 * pad + fieldH + pad / 2);
+  int vSpace = pad / 2;
+  SDL_Color white = {255, 255, 255, 255};
+  SDL_Color orange = {255, 165, 0, 255};
+  SDL_Color gray = {140, 140, 140, 255};
+
+  fontMgr_.drawText(renderer, "Rig / CAT Control:", fieldX, y, white,
+                    labelSize_, true);
+  y += labelSize_ + pad;
+
+  fontMgr_.drawText(renderer, "rigctld Host (IP or Name):", fieldX, y, white,
+                    labelSize_);
+  y += labelSize_ + 4;
+  renderField(renderer, fontMgr_, rigHost_, "e.g. localhost", fieldX, y, fieldW,
+              fieldH, fieldSize_, textPad, activeField_ == 0, true, cursorPos_,
+              orange, gray, white, white, gray);
+  y += vSpace;
+
+  fontMgr_.drawText(renderer, "rigctld Port:", fieldX, y, white, labelSize_);
+  y += labelSize_ + 4;
+  renderField(renderer, fontMgr_, rigPort_, "4532", fieldX, y, fieldW, fieldH,
+              fieldSize_, textPad, activeField_ == 1, true, cursorPos_, orange,
+              gray, white, white, gray);
+  y += vSpace;
+
+  // Auto-tune Toggle
+  toggleRect_ = {fieldX, y, 20, 20};
+  SDL_SetRenderDrawColor(renderer, 50, 50, 60, 255);
+  SDL_RenderFillRect(renderer, &toggleRect_);
+  SDL_SetRenderDrawColor(renderer, 100, 100, 120, 255);
+  SDL_RenderDrawRect(renderer, &toggleRect_);
+  if (rigAutoTune_) {
+    SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
+    SDL_Rect check = {fieldX + 4, y + 4, 12, 12};
+    SDL_RenderFillRect(renderer, &check);
+  }
+  fontMgr_.drawText(renderer, "Enable Auto-Tune on DX Spot click", fieldX + 30,
+                    y + 2, white, labelSize_);
+  y += 24 + pad;
+
+  fontMgr_.drawText(renderer,
+                    "Rig control requires 'rigctld' (Hamlib) running.", fieldX,
+                    y, gray, hintSize_);
+}
+
 void SetupScreen::renderTabWidgets(SDL_Renderer *renderer, int cx, int pad,
                                    int fieldW, int fieldH, int fieldX,
                                    int textPad) {
@@ -416,23 +714,26 @@ void SetupScreen::renderTabWidgets(SDL_Renderer *renderer, int cx, int pad,
   y += 35;
 
   widgetRects_.clear();
-  int colW = fieldW / 2;
+  int colW = fieldW / 3; // 3 columns
   int curX = fieldX;
   int startY = y;
-  int rowH = hintSize_ + 6;
+  int rowH = hintSize_ + 4; // Tighter vertical spacing
 
   WidgetType allTypes[] = {
-      WidgetType::SOLAR,        WidgetType::DX_CLUSTER,
-      WidgetType::LIVE_SPOTS,   WidgetType::BAND_CONDITIONS,
-      WidgetType::CONTESTS,     WidgetType::ON_THE_AIR,
-      WidgetType::GIMBAL,       WidgetType::MOON,
-      WidgetType::CLOCK_AUX,    WidgetType::DX_PEDITIONS,
-      WidgetType::DE_WEATHER,   WidgetType::DX_WEATHER,
-      WidgetType::NCDXF,        WidgetType::SDO,
-      WidgetType::HISTORY_FLUX, WidgetType::HISTORY_KP,
-      WidgetType::HISTORY_SSN,  WidgetType::DRAP,
-      WidgetType::AURORA,       WidgetType::ADIF,
-      WidgetType::COUNTDOWN};
+      WidgetType::SOLAR,         WidgetType::DX_CLUSTER,
+      WidgetType::LIVE_SPOTS,    WidgetType::BAND_CONDITIONS,
+      WidgetType::CONTESTS,      WidgetType::ON_THE_AIR,
+      WidgetType::GIMBAL,        WidgetType::MOON,
+      WidgetType::CLOCK_AUX,     WidgetType::DX_PEDITIONS,
+      WidgetType::DE_WEATHER,    WidgetType::DX_WEATHER,
+      WidgetType::NCDXF,         WidgetType::SDO,
+      WidgetType::HISTORY_FLUX,  WidgetType::HISTORY_KP,
+      WidgetType::HISTORY_SSN,   WidgetType::DRAP,
+      WidgetType::AURORA,        WidgetType::AURORA_GRAPH,
+      WidgetType::ADIF,          WidgetType::COUNTDOWN,
+      WidgetType::CALLBOOK,      WidgetType::DST_INDEX,
+      WidgetType::WATCHLIST,     WidgetType::EME_TOOL,
+      WidgetType::SANTA_TRACKER, WidgetType::CPU_TEMP};
 
   const auto &currentPane = paneRotations_[activePane_];
 
@@ -458,7 +759,8 @@ void SetupScreen::renderTabWidgets(SDL_Renderer *renderer, int cx, int pad,
     widgetRects_.push_back({t, r});
 
     y += rowH;
-    if (i == 10) {
+    // Break into columns every 10 items
+    if ((i + 1) % 10 == 0) {
       y = startY;
       curX += colW;
     }
@@ -494,7 +796,7 @@ bool SetupScreen::onMouseUp(int mx, int my, Uint16) {
     return true;
   }
 
-  int numTabs = 4;
+  int numTabs = 7;
   int tabW = fieldW / numTabs;
   if (my >= y && my <= y + fieldH) {
     for (int i = 0; i < numTabs; ++i) {
@@ -549,6 +851,33 @@ bool SetupScreen::onMouseUp(int mx, int my, Uint16) {
     }
   }
 
+  if (activeTab_ == Tab::Display) {
+    if (mx >= brightnessSliderRect_.x &&
+        mx <= brightnessSliderRect_.x + brightnessSliderRect_.w &&
+        my >= brightnessSliderRect_.y &&
+        my <= brightnessSliderRect_.y + brightnessSliderRect_.h) {
+      int newBrightness =
+          (mx - brightnessSliderRect_.x) * 100 / brightnessSliderRect_.w;
+      brightnessMgr_.setBrightness(newBrightness);
+      return true;
+    }
+    if (mx >= scheduleToggleRect_.x &&
+        mx <= scheduleToggleRect_.x + scheduleToggleRect_.w &&
+        my >= scheduleToggleRect_.y &&
+        my <= scheduleToggleRect_.y + scheduleToggleRect_.h) {
+      brightnessMgr_.setScheduleEnabled(!brightnessMgr_.isScheduleEnabled());
+      return true;
+    }
+  }
+
+  if (activeTab_ == Tab::Rig) {
+    if (mx >= toggleRect_.x && mx <= toggleRect_.x + toggleRect_.w &&
+        my >= toggleRect_.y && my <= toggleRect_.y + toggleRect_.h) {
+      rigAutoTune_ = !rigAutoTune_;
+      return true;
+    }
+  }
+
   if (activeTab_ == Tab::Widgets) {
     int yTabBase = y_ + titleSize_ + 2 * pad + fieldH + pad / 2;
     int ySelector = yTabBase + labelSize_ + pad / 2;
@@ -587,33 +916,64 @@ bool SetupScreen::onMouseUp(int mx, int my, Uint16) {
     nFields = 3;
   else if (activeTab_ == Tab::Appearance)
     nFields = 1;
+  else if (activeTab_ == Tab::Display)
+    nFields = 2;
+  else if (activeTab_ == Tab::Rig)
+    nFields = 2;
+  else if (activeTab_ == Tab::Services)
+    nFields = 4;
 
   for (int i = 0; i < nFields; ++i) {
     int fy = yStart;
     int fx = fieldX;
     int fw = fieldW;
+    int vSpace = pad / 2;
 
     if (activeTab_ == Tab::Identity) {
       if (i < 2) {
-        fy = yStart + i * (labelSize_ + 4 + fieldH + pad / 2);
-      } else {
-        fy = yStart + 2 * (labelSize_ + 4 + fieldH + pad / 2);
-        int halfW = (fieldW - pad) / 2;
-        if (i == 2) {
-          fw = halfW;
-        } else {
-          fx = fieldX + halfW + pad;
-          fw = halfW;
+        fy += i * (labelSize_ + 4 + fieldH + vSpace);
+      } else { // lat/lon row
+        fy += 2 * (labelSize_ + 4 + fieldH + vSpace);
+        fw = (fieldW - pad) / 2;
+        if (i == 3) { // lon
+          fx += fw + pad;
         }
       }
-    } else {
-      fy = yStart + i * (labelSize_ + 4 + fieldH + pad / 2);
+    } else if (activeTab_ == Tab::Display) {
+      if (i == 0 || i == 1) {
+        fy += (labelSize_ + 4 + fieldH + pad) + (24 + pad);
+        fw = (fieldW - pad) / 2;
+        if (i == 1)
+          fx += fw + pad;
+      }
+    } else { // All other tabs with simple vertical field lists
+      fy += i * (labelSize_ + 4 + fieldH + vSpace);
     }
 
-    if (mx >= fx && mx < fx + fw && my >= fy + labelSize_ &&
-        my < fy + labelSize_ + fieldH) {
+    if (mx >= fx && mx < fx + fw && my >= fy && my < fy + labelSize_ + fieldH) {
+      int textPad = 7;
+      int oldField = activeField_;
       activeField_ = i;
-      cursorPos_ = 0;
+
+      // Calculate cursor position from click if clicking in same field
+      if (oldField == i) {
+        std::string *fieldText = getActiveFieldText();
+        if (fieldText && !fieldText->empty()) {
+          cursorPos_ = calculateCursorPosFromClick(mx, fx + textPad, *fieldText,
+                                                   fieldSize_);
+        } else {
+          cursorPos_ = 0;
+        }
+      } else {
+        // New field - position at end of text
+        std::string *fieldText = getActiveFieldText();
+        if (fieldText) {
+          cursorPos_ = fieldText->size();
+        } else {
+          cursorPos_ = 0;
+        }
+      }
+
       return true;
     }
   }
@@ -656,6 +1016,42 @@ bool SetupScreen::onKeyDown(SDL_Keycode key, Uint16) {
     }
   } else if (activeTab_ == Tab::Appearance) {
     nFields = 1;
+  } else if (activeTab_ == Tab::Services) {
+    nFields = 4;
+    switch (activeField_) {
+    case 0:
+      text = &qrzUsername_;
+      break;
+    case 1:
+      text = &qrzPassword_;
+      break;
+    case 2:
+      text = &countdownLabel_;
+      break;
+    case 3:
+      text = &countdownTime_;
+      break;
+    }
+  } else if (activeTab_ == Tab::Display) {
+    nFields = 2;
+    switch (activeField_) {
+    case 0:
+      text = &dimTime_;
+      break;
+    case 1:
+      text = &brightTime_;
+      break;
+    }
+  } else if (activeTab_ == Tab::Rig) {
+    nFields = 2;
+    switch (activeField_) {
+    case 0:
+      text = &rigHost_;
+      break;
+    case 1:
+      text = &rigPort_;
+      break;
+    }
   }
 
   switch (key) {
@@ -759,6 +1155,41 @@ bool SetupScreen::onTextInput(const char *inputText) {
       }
       return true;
     }
+  } else if (activeTab_ == Tab::Services) {
+    switch (activeField_) {
+    case 0:
+      field = &qrzUsername_;
+      maxLen = 32;
+      break;
+    case 1:
+      field = &qrzPassword_;
+      maxLen = 32;
+      break;
+    case 2:
+      field = &countdownLabel_;
+      maxLen = 64;
+      break;
+    case 3:
+      field = &countdownTime_;
+      maxLen = 16;
+      break;
+    }
+  } else if (activeTab_ == Tab::Display) {
+    maxLen = 5;
+    switch (activeField_) {
+    case 0:
+      field = &dimTime_;
+      break;
+    case 1:
+      field = &brightTime_;
+      break;
+    }
+
+    // Auto-insert colon if user types digits
+    if (field && field->size() == 2 && inputText[0] != ':') {
+      field->append(":");
+      cursorPos_ = 3;
+    }
   }
 
   if (!field)
@@ -766,6 +1197,68 @@ bool SetupScreen::onTextInput(const char *inputText) {
   if (static_cast<int>(field->size()) >= maxLen)
     return true;
 
+  // === CALLSIGN VALIDATION (Identity Tab, Field 0) ===
+  if (activeTab_ == Tab::Identity && activeField_ == 0) {
+    // Validate: alphanumeric + forward slash only
+    for (const char *p = inputText; *p; ++p) {
+      if (!((*p >= 'A' && *p <= 'Z') || (*p >= 'a' && *p <= 'z') ||
+            (*p >= '0' && *p <= '9') || *p == '/')) {
+        return true; // Reject invalid character
+      }
+    }
+    // Auto-uppercase
+    std::string upper = inputText;
+    std::transform(upper.begin(), upper.end(), upper.begin(), ::toupper);
+    field->insert(cursorPos_, upper);
+    cursorPos_ += upper.size();
+    return true;
+  }
+
+  // === GRID SQUARE VALIDATION (Identity Tab, Field 1) ===
+  if (activeTab_ == Tab::Identity && activeField_ == 1) {
+    // Format: AA00aa (2 letters + 2 digits + optional 2 letters)
+    for (const char *p = inputText; *p; ++p) {
+      int pos = field->size();
+      if (pos >= 6) {
+        return true; // Max 6 characters
+      }
+
+      if (pos < 2) {
+        // First 2: must be letter A-R
+        if (!((*p >= 'A' && *p <= 'R') || (*p >= 'a' && *p <= 'r'))) {
+          return true; // Reject
+        }
+      } else if (pos < 4) {
+        // Next 2: must be digit
+        if (!(*p >= '0' && *p <= '9')) {
+          return true; // Reject
+        }
+      } else {
+        // Optional last 2: must be letter A-X
+        if (!((*p >= 'A' && *p <= 'X') || (*p >= 'a' && *p <= 'x'))) {
+          return true; // Reject
+        }
+      }
+    }
+
+    // Auto-format: Uppercase first 2, lowercase last 2
+    std::string formatted = inputText;
+    for (size_t i = 0; i < formatted.size(); ++i) {
+      int pos = field->size() + i;
+      if (pos < 2) {
+        formatted[i] = std::toupper(formatted[i]);
+      } else if (pos >= 4) {
+        formatted[i] = std::tolower(formatted[i]);
+      }
+    }
+
+    field->insert(cursorPos_, formatted);
+    cursorPos_ += formatted.size();
+    latLonManual_ = false;
+    return true;
+  }
+
+  // === LAT/LON VALIDATION (Identity Tab, Fields 2 & 3) ===
   if (activeTab_ == Tab::Identity && (activeField_ == 2 || activeField_ == 3)) {
     for (const char *p = inputText; *p; ++p) {
       if ((*p >= '0' && *p <= '9') || *p == '-' || *p == '.')
@@ -775,6 +1268,25 @@ bool SetupScreen::onTextInput(const char *inputText) {
     latLonManual_ = true;
   }
 
+  // === PORT VALIDATION (Spotting Tab, Field 1) ===
+  if (activeTab_ == Tab::Spotting && activeField_ == 1) {
+    // Port: digits only, validate 1-65535
+    for (const char *p = inputText; *p; ++p) {
+      if (!(*p >= '0' && *p <= '9')) {
+        return true; // Reject non-digit
+      }
+    }
+
+    // Check range (validate resulting value doesn't exceed 65535)
+    std::string testValue = *field;
+    testValue.insert(cursorPos_, inputText);
+    int port = std::atoi(testValue.c_str());
+    if (port > 65535 || port == 0) {
+      return true; // Reject if out of range
+    }
+  }
+
+  // === DEFAULT INSERTION ===
   field->insert(cursorPos_, inputText);
   cursorPos_ += static_cast<int>(std::strlen(inputText));
   if (activeTab_ == Tab::Identity && activeField_ == 1)
@@ -810,6 +1322,28 @@ void SetupScreen::setConfig(const AppConfig &cfg) {
   panelMode_ = cfg.panelMode;
   selectedSatellite_ = cfg.selectedSatellite;
 
+  qrzUsername_ = cfg.qrzUsername;
+  qrzPassword_ = cfg.qrzPassword;
+  countdownLabel_ = cfg.countdownLabel;
+  countdownTime_ = cfg.countdownTime;
+
+  brightnessMgr_.setBrightness(cfg.brightness);
+  brightnessMgr_.setScheduleEnabled(cfg.brightnessSchedule);
+  brightnessMgr_.setDimTime(cfg.dimHour, cfg.dimMinute);
+  brightnessMgr_.setBrightTime(cfg.brightHour, cfg.brightMinute);
+
+  char timeBuf[16];
+  std::snprintf(timeBuf, sizeof(timeBuf), "%02d:%02d", cfg.dimHour,
+                cfg.dimMinute);
+  dimTime_ = timeBuf;
+  std::snprintf(timeBuf, sizeof(timeBuf), "%02d:%02d", cfg.brightHour,
+                cfg.brightMinute);
+  brightTime_ = timeBuf;
+
+  rigHost_ = cfg.rigHost;
+  rigPort_ = std::to_string(cfg.rigPort);
+  rigAutoTune_ = cfg.rigAutoTune;
+
   paneRotations_[0] = cfg.pane1Rotation;
   paneRotations_[1] = cfg.pane2Rotation;
   paneRotations_[2] = cfg.pane3Rotation;
@@ -843,10 +1377,34 @@ AppConfig SetupScreen::getConfig() const {
   cfg.panelMode = panelMode_;
   cfg.selectedSatellite = selectedSatellite_;
 
+  cfg.qrzUsername = qrzUsername_;
+  cfg.qrzPassword = qrzPassword_;
+  cfg.countdownLabel = countdownLabel_;
+  cfg.countdownTime = countdownTime_;
+
+  cfg.brightness = brightnessMgr_.getBrightness();
+  cfg.brightnessSchedule = brightnessMgr_.isScheduleEnabled();
+
+  int dh, dm, bh, bm;
+  if (std::sscanf(dimTime_.c_str(), "%d:%d", &dh, &dm) == 2) {
+    cfg.dimHour = dh;
+    cfg.dimMinute = dm;
+  }
+  if (std::sscanf(brightTime_.c_str(), "%d:%d", &bh, &bm) == 2) {
+    cfg.brightHour = bh;
+    cfg.brightMinute = bm;
+  }
+
   cfg.pane1Rotation = paneRotations_[0];
   cfg.pane2Rotation = paneRotations_[1];
   cfg.pane3Rotation = paneRotations_[2];
   cfg.pane4Rotation = paneRotations_[3];
+
+  cfg.rigHost = rigHost_;
+  cfg.rigPort = std::atoi(rigPort_.c_str());
+  if (cfg.rigPort == 0)
+    cfg.rigPort = 4532;
+  cfg.rigAutoTune = rigAutoTune_;
 
   return cfg;
 }
@@ -865,7 +1423,8 @@ SDL_Rect SetupScreen::getActionRect(const std::string &action) const {
   int fieldX = cx - fieldW / 2;
   int fieldH = fieldSize_ + 14;
   int tabY = y_ + titleSize_ + 2 * pad;
-  int tabW = fieldW / 4;
+  int numTabs = 7;
+  int tabW = fieldW / numTabs;
 
   if (action == "tab_identity")
     return {fieldX, tabY, tabW, fieldH};
@@ -873,8 +1432,14 @@ SDL_Rect SetupScreen::getActionRect(const std::string &action) const {
     return {fieldX + tabW, tabY, tabW, fieldH};
   if (action == "tab_appearance")
     return {fieldX + 2 * tabW, tabY, tabW, fieldH};
-  if (action == "tab_widgets")
+  if (action == "tab_display")
     return {fieldX + 3 * tabW, tabY, tabW, fieldH};
+  if (action == "tab_rig")
+    return {fieldX + 4 * tabW, tabY, tabW, fieldH};
+  if (action == "tab_services")
+    return {fieldX + 5 * tabW, tabY, tabW, fieldH};
+  if (action == "tab_widgets")
+    return {fieldX + 6 * tabW, tabY, tabW, fieldH};
 
   // Fields (approximate positions)
   int yStart = y_ + titleSize_ + 3 * pad + fieldH;

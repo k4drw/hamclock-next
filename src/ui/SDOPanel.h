@@ -4,6 +4,7 @@
 #include "FontManager.h"
 #include "TextureManager.h"
 #include "Widget.h"
+#include <SDL.h>
 #include <string>
 
 class SDOPanel : public Widget {
@@ -22,7 +23,12 @@ public:
   bool onMouseUp(int mx, int my, Uint16 mod) override;
   bool onKeyDown(SDL_Keycode key, Uint16 mod) override;
 
+  // Semantic Debug API
   std::string getName() const override { return "SDOPanel"; }
+  std::vector<std::string> getActions() const override;
+  SDL_Rect getActionRect(const std::string &action) const override;
+  nlohmann::json getDebugData() const override;
+
   bool isModalActive() const override { return menuVisible_; }
   void renderModal(SDL_Renderer *renderer) override;
 

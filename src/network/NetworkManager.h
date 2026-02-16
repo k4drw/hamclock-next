@@ -37,5 +37,6 @@ private:
   // Helper to compute safe filename for a URL (e.g. simple hash)
   std::string hashUrl(const std::string &url);
   void loadCache();
-  void saveToDisk(const std::string &url, const CacheEntry &entry);
+  void saveToDisk(const std::string &url, const CacheEntry &entry,
+                  const std::string &data = "");
 };

@@ -183,8 +183,11 @@ void drawPolyline(SDL_Renderer *renderer, const SDL_FPoint *points, int count,
   std::vector<int> indices;
 
   float r = thickness / 2.0f;
+  int segments = closed ? count : count - 1;
+  verts.reserve(segments * 4);
+  indices.reserve(segments * 6);
 
-  for (int i = 0; i < (closed ? count : count - 1); ++i) {
+  for (int i = 0; i < segments; ++i) {
     int i1 = i;
     int i2 = (i + 1) % count;
 
@@ -221,7 +224,8 @@ void drawPolyline(SDL_Renderer *renderer, const SDL_FPoint *points, int count,
     indices.push_back(base + 2);
     indices.push_back(base + 3);
 
-    // Draw caps at joints
+    // Caps are separate draw calls, still expensive but better than nothing.
+    // For extreme optimization, caps should also be batched.
     drawCircle(renderer, points[i1].x, points[i1].y, r, color);
     if (!closed && i == count - 2) {
       drawCircle(renderer, points[i2].x, points[i2].y, r, color);
@@ -285,8 +289,15 @@ void drawPolylineTextured(SDL_Renderer *renderer, SDL_Texture *tex,
   if (count < 2)
     return;
 
+  std::vector<SDL_Vertex> verts;
+  std::vector<int> indices;
+
   float r = thickness / 2.0f;
-  for (int i = 0; i < (closed ? count : count - 1); ++i) {
+  int numSegments = (closed ? count : count - 1);
+  verts.reserve(numSegments * 4);
+  indices.reserve(numSegments * 6);
+
+  for (int i = 0; i < numSegments; ++i) {
     int i1 = i;
     int i2 = (i + 1) % count;
 
@@ -299,6 +310,7 @@ void drawPolylineTextured(SDL_Renderer *renderer, SDL_Texture *tex,
     float nx = -dy / len * r;
     float ny = dx / len * r;
 
+    int base = static_cast<int>(verts.size());
     SDL_Vertex v[4];
     for (int j = 0; j < 4; ++j)
       v[j].color = color;
@@ -312,9 +324,25 @@ void drawPolylineTextured(SDL_Renderer *renderer, SDL_Texture *tex,
     v[3].position = {points[i2].x - nx, points[i2].y - ny};
     v[3].tex_coord = {1, 1};
 
-    int indices[] = {0, 1, 2, 1, 2, 3};
-    SDL_RenderGeometry(renderer, tex, v, 4, indices, 6);
+    verts.push_back(v[0]);
+    verts.push_back(v[1]);
+    verts.push_back(v[2]);
+    verts.push_back(v[3]);
+
+    indices.push_back(base + 0);
+    indices.push_back(base + 1);
+    indices.push_back(base + 2);
+    indices.push_back(base + 1);
+    indices.push_back(base + 2);
+    indices.push_back(base + 3);
   }
+
+  if (verts.empty())
+    return;
+
+  SDL_RenderGeometry(renderer, tex, verts.data(),
+                     static_cast<int>(verts.size()), indices.data(),
+                     static_cast<int>(indices.size()));
 #else
   drawPolyline(renderer, points, count, thickness, color, closed);
 #endif

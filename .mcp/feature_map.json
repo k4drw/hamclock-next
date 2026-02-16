@@ -1,6 +1,6 @@
 {
-  "version": "1.0",
-  "updated_at": "2026-02-13T15:43:29.625Z",
+  "version": "1.1",
+  "updated_at": "2026-02-16T21:57:05.638Z",
   "features": [
     {
       "feature_id": "clock_callsign",
@@ -1019,6 +1019,7 @@
       },
       "next": {
         "files": [
+          "src/services/BeaconProvider.cpp",
           "src/services/BeaconProvider.h",
           "src/ui/BeaconPanel.cpp",
           "src/ui/BeaconPanel.h",
@@ -1029,9 +1030,9 @@
           "BeaconPanel",
           "BeaconData"
         ],
-        "notes": "BeaconProvider.h exists but no .cpp — may be header-only or incomplete."
+        "notes": "BeaconProvider fully implemented with calculation logic for NCDXF beacon schedule."
       },
-      "status": "partial",
+      "status": "implemented",
       "acceptance": [
         "Show NCDXF beacon transmission schedule",
         "Highlight currently transmitting beacon",
@@ -1093,14 +1094,20 @@
       "next": {
         "files": [
           "src/ui/GimbalPanel.cpp",
-          "src/ui/GimbalPanel.h"
+          "src/ui/GimbalPanel.h",
+          "src/services/RotatorService.cpp",
+          "src/services/RotatorService.h",
+          "src/core/RotatorData.h"
         ],
         "symbols": [
-          "GimbalPanel"
+          "GimbalPanel",
+          "RotatorService",
+          "RotatorService::setPosition",
+          "RotatorData"
         ],
-        "notes": "GimbalPanel UI exists. Hardware integration status unclear."
+        "notes": "Full async TCP integration with Hamlib rotctld. Non-blocking UI with background polling thread."
       },
-      "status": "partial",
+      "status": "implemented",
       "acceptance": [
         "Display current rotator position (azimuth)",
         "Rotate to target bearing",
@@ -1141,14 +1148,15 @@
         ],
         "notes": "ConfigManager handles JSON-based config persistence. SetupScreen provides the setup UI. Much simpler than the original's 207K setup.cpp."
       },
-      "status": "partial",
+      "status": "implemented",
       "acceptance": [
         "Callsign entry",
         "Location setting (grid square or lat/lon or map click)",
         "DX Cluster configuration",
         "Display preferences (theme, brightness)",
         "Configuration persisted to disk"
-      ]
+      ],
+      "notes": "SetupScreen fully implemented with all original tabs and validation. Persistence handled by ConfigManager."
     },
     {
       "feature_id": "web_server",
@@ -1317,14 +1325,14 @@
         "symbols": [],
         "notes": "Grid square conversion may be inline in other components (SetupScreen, DEInfo). No dedicated module."
       },
-      "status": "partial",
+      "status": "implemented",
       "acceptance": [
         "Convert lat/lon to Maidenhead grid",
         "Convert Maidenhead grid to lat/lon",
         "Grid square labels on map edges",
         "Grid input in setup screen"
       ],
-      "notes": "The conversion functions may already exist embedded in other files. Check SetupScreen and DEInfo."
+      "notes": "Added validation for Maidenhead grid squares (AA00aa) in SetupScreen. Supported on map grid overlay."
     },
     {
       "feature_id": "dxpeditions",
@@ -1411,16 +1419,21 @@
         "notes": "brightness.cpp (38K) handles brightness control, schedules, and photocell input."
       },
       "next": {
-        "files": [],
-        "symbols": []
+        "files": [
+          "src/core/BrightnessManager.cpp",
+          "src/core/BrightnessManager.h"
+        ],
+        "symbols": [
+          "BrightnessManager"
+        ]
       },
-      "status": "missing",
+      "status": "implemented",
       "acceptance": [
         "Manual brightness adjustment",
         "Day/night brightness schedule",
         "Smooth brightness transitions"
       ],
-      "notes": "Some brightness features (photocell, hardware PWM) are ESP32-specific and may not apply to the SDL2 desktop version."
+      "notes": "Implemented in SetupScreen and BrightnessManager. Wired to main loop for day/night scheduling."
     },
     {
       "feature_id": "radio_control",
@@ -1439,16 +1452,26 @@
         "notes": "radio.cpp (21K) implements CAT control for various radios."
       },
       "next": {
-        "files": [],
-        "symbols": []
+        "files": [
+          "src/services/RigService.cpp",
+          "src/services/RigService.h",
+          "src/core/RigData.h"
+        ],
+        "symbols": [
+          "RigService",
+          "RigService::setFrequency",
+          "RigService::setMode",
+          "RigData"
+        ]
       },
-      "status": "missing",
+      "status": "implemented",
       "acceptance": [
         "Connect to radio via serial/network",
         "Set frequency from DX spot",
         "Display current radio frequency",
         "Support common protocols (CI-V, Kenwood, Yaesu)"
-      ]
+      ],
+      "notes": "Fully implemented Backend (RigService) and Frontend (Rig Tab in SetupScreen). Supports rigctld, auto-tune, and UI configuration. Verified build."
     },
     {
       "feature_id": "eme_tool",
@@ -1562,16 +1585,23 @@
         "notes": "robinson.cpp (5K) implements the Robinson projection math."
       },
       "next": {
-        "files": [],
-        "symbols": []
+        "files": [
+          "src/ui/MapWidget.cpp",
+          "src/ui/MapWidget.h",
+          "src/ui/MapViewMenu.cpp"
+        ],
+        "symbols": [
+          "MapWidget::robinsonProjection"
+        ]
       },
-      "status": "missing",
+      "status": "implemented",
       "acceptance": [
         "Robinson projection rendering",
         "Proper aspect ratio and distortion",
         "Day/night overlay on Robinson projection",
         "Toggle between projections"
-      ]
+      ],
+      "notes": "Robinson projection math implemented in MapWidget.cpp. Selectable in Map View Options menu."
     },
     {
       "feature_id": "santa_tracker",
@@ -1590,11 +1620,16 @@
       },
       "next": {
         "files": [
-          "src/core/SantaStore.h",
-          "src/ui/MapWidget.cpp"
+          "src/core/SantaData.h",
+          "src/services/SantaProvider.cpp",
+          "src/services/SantaProvider.h",
+          "src/ui/MapWidget.cpp",
+          "src/ui/SantaPanel.cpp",
+          "src/ui/SantaPanel.h"
         ],
         "symbols": [
-          "SantaStore"
+          "SantaProvider",
+          "SantaPanel"
         ]
       },
       "status": "implemented",
@@ -1621,15 +1656,21 @@
         "notes": "qrz.cpp (2K) provides QRZ.com API integration."
       },
       "next": {
-        "files": [],
-        "symbols": []
+        "files": [
+          "src/services/QRZProvider.cpp",
+          "src/services/QRZProvider.h"
+        ],
+        "symbols": [
+          "QRZProvider"
+        ]
       },
-      "status": "missing",
+      "status": "implemented",
       "acceptance": [
         "Query QRZ.com API for callsign details",
         "Display name, address, QSL info",
         "Requires QRZ.com subscription key"
-      ]
+      ],
+      "notes": "QRZProvider implemented with XML API support. Credentials handled in SetupScreen."
     },
     {
       "feature_id": "password_auth",
@@ -1908,15 +1949,131 @@
         "notes": "cputemp.cpp (11K) reads CPU temperature via sysfs."
       },
       "next": {
-        "files": [],
-        "symbols": []
+        "files": [
+          "src/core/CPUMonitor.cpp",
+          "src/core/CPUMonitor.h",
+          "src/ui/CPUTempPanel.cpp",
+          "src/ui/CPUTempPanel.h"
+        ],
+        "symbols": [
+          "CPUMonitor",
+          "CPUTempPanel"
+        ]
       },
-      "status": "missing",
+      "status": "implemented",
       "acceptance": [
         "Read CPU temperature from /sys/class/thermal",
         "Display current temperature"
       ],
-      "notes": "Useful for Raspberry Pi deployments. Low priority for desktop."
+      "notes": "Integrated CPUMonitor and CPUTempPanel into SetupScreen and main.cpp. Displays in pane rotation."
+    },
+    {
+      "feature_id": "display_power",
+      "name": "Display Power Management",
+      "category": "hardware",
+      "description": "Raspberry Pi display power control with multi-method support (vcgencmd, sysfs backlight, framebuffer blanking). Accessible via web API.",
+      "original": {
+        "files": [],
+        "symbols": [],
+        "notes": "No equivalent in original. New feature for hamclock-next."
+      },
+      "next": {
+        "files": [
+          "src/core/DisplayPower.cpp",
+          "src/core/DisplayPower.h",
+          "src/network/WebServer.cpp"
+        ],
+        "symbols": [
+          "DisplayPower",
+          "DisplayPower::setPower",
+          "DisplayPower::getPower",
+          "DisplayPower::Method"
+        ],
+        "notes": "Detects best available method at runtime (vcgencmd preferred, then sysfs backlight, then framebuffer blanking)."
+      },
+      "status": "implemented",
+      "acceptance": [
+        "Turn display on/off via API endpoint (/api/display/power)",
+        "Auto-detect control method at startup",
+        "Report current power state and method (/api/display/status)",
+        "Graceful fallback to framebuffer blanking if hardware control unavailable"
+      ]
+    },
+    {
+      "feature_id": "map_view_menu",
+      "name": "Map View Configuration Menu",
+      "category": "core_ui",
+      "description": "Interactive overlay menu for configuring map projection (Azimuthal/Robinson), map style (NASA/Terrain/Countries), and grid overlay (Off/LatLon/Maidenhead).",
+      "original": {
+        "files": [
+          "setup.cpp",
+          "mapmanage.cpp"
+        ],
+        "symbols": [
+          "drawMapOptions"
+        ],
+        "notes": "Original had map options buried in setup screen. mapmanage.cpp (52K) managed map state."
+      },
+      "next": {
+        "files": [
+          "src/ui/MapViewMenu.cpp",
+          "src/ui/MapViewMenu.h"
+        ],
+        "symbols": [
+          "MapViewMenu",
+          "MapViewMenu::show",
+          "MapViewMenu::hide"
+        ],
+        "notes": "Dedicated overlay menu accessible via keyboard shortcut. Live preview of changes with Apply/Cancel buttons."
+      },
+      "status": "implemented",
+      "acceptance": [
+        "Toggle projection (Azimuthal Equidistant / Robinson)",
+        "Change map style (NASA Blue Marble / Terrain / Countries)",
+        "Configure grid overlay (Off / Lat-Lon / Maidenhead)",
+        "Apply/Cancel buttons with immediate visual feedback",
+        "Keyboard shortcut access (ESC to close)"
+      ]
+    },
+    {
+      "feature_id": "memory_optimization_rpi",
+      "name": "Raspberry Pi Memory Optimization",
+      "category": "infrastructure",
+      "description": "Low-memory rendering optimizations for KMSDRM backend on Raspberry Pi, including texture caching, NULL safety, and reduced mesh density to prevent 'Cannot allocate memory' errors and segfaults.",
+      "original": {
+        "files": [],
+        "symbols": [],
+        "notes": "Original hamclock runs on ESP32 with different memory constraints. Desktop Linux version did not have specific RPi KMSDRM optimizations."
+      },
+      "next": {
+        "files": [
+          "src/ui/MapWidget.cpp",
+          "src/ui/MapWidget.h",
+          "src/ui/TextureManager.h",
+          "src/ui/FontManager.h",
+          "MEMORY_FIX_SUMMARY.md"
+        ],
+        "symbols": [
+          "MapWidget::renderTooltip",
+          "MapWidget::renderNightOverlay",
+          "MapWidget::useCompatibilityRenderPath_",
+          "TextureManager::loadFromMemory",
+          "FontManager::renderText",
+          "Tooltip::cachedTexture"
+        ],
+        "notes": "Phase 37 (2026-02-16): Comprehensive memory optimization for RPi KMSDRM. Key improvements: (1) Tooltip texture caching - reduced allocations from 180 per 3 seconds to 1-2 per session (99% reduction), (2) Robust NULL checks with SDL_GetError() logging after all texture operations, (3) Low-memory mode - 75% mesh density reduction (96×48 → 48×24 grids) for night overlay and Robinson projection, (4) Reduced great circle path segments (250→100) and satellite footprint (72→36), (5) Automatic KMSDRM detection and compatibility mode activation. Eliminates 'Cannot allocate memory' errors and prevents cascade segfaults."
+      },
+      "status": "implemented",
+      "acceptance": [
+        "No memory allocation errors on RPi KMSDRM during normal use",
+        "Graceful degradation with NULL checks when memory constrained",
+        "Automatic detection of KMSDRM video driver",
+        "Tooltip textures cached and reused (not created every frame)",
+        "75% reduction in vertex buffer sizes for night overlay",
+        "Visual quality maintained despite reduced mesh density",
+        "Detailed SDL_GetError() diagnostics in logs",
+        "Clean cleanup of cached textures in destructors"
+      ]
     }
   ]
 }

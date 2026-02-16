@@ -20,12 +20,16 @@
 #include <sstream>
 #endif
 
+using namespace HamClock;
+
 WebServer::WebServer(SDL_Renderer *renderer, AppConfig &cfg,
                      HamClockState &state, ConfigManager &cfgMgr,
+                     std::shared_ptr<DisplayPower> displayPower,
                      std::shared_ptr<WatchlistStore> watchlist,
                      std::shared_ptr<SolarDataStore> solar, int port)
     : renderer_(renderer), cfg_(&cfg), state_(&state), cfgMgr_(&cfgMgr),
-      watchlist_(watchlist), solar_(solar), port_(port) {}
+      watchlist_(watchlist), solar_(solar), displayPower_(displayPower),
+      port_(port) {}
 
 WebServer::~WebServer() { stop(); }
 
@@ -66,14 +70,19 @@ void WebServer::updateFrame() {
   int w, h;
   SDL_GetRendererOutputSize(renderer_, &w, &h);
 
+  // Use 24-bit RGB for JPG capture
   SDL_Surface *surface =
-      SDL_CreateRGBSurfaceWithFormat(0, w, h, 32, SDL_PIXELFORMAT_RGB24);
+      SDL_CreateRGBSurfaceWithFormat(0, w, h, 24, SDL_PIXELFORMAT_RGB24);
   if (!surface)
     return;
+
+  // Clear surface to black just in case read fails partially
+  std::memset(surface->pixels, 0, surface->pitch * surface->h);
 
   if (SDL_RenderReadPixels(renderer_, NULL, SDL_PIXELFORMAT_RGB24,
                            surface->pixels, surface->pitch) == 0) {
     std::vector<unsigned char> jpeg;
+    // stbi_write_jpg_to_func expects 3 channels for RGB24
     stbi_write_jpg_to_func(stbi_write_to_vector, &jpeg, w, h, 3,
                            surface->pixels, 70);
 
@@ -204,7 +213,7 @@ void WebServer::run() {
             if (req.has_param("rx") && req.has_param("ry")) {
               float rx = std::stof(req.get_param_value("rx"));
               float ry = std::stof(req.get_param_value("ry"));
-              int w = 800, h = 480;
+              int w = HamClock::LOGICAL_WIDTH, h = HamClock::LOGICAL_HEIGHT;
               SDL_GetRendererOutputSize(renderer_, &w, &h);
               int px = static_cast<int>(rx * w);
               int py = static_cast<int>(ry * h);
@@ -284,53 +293,67 @@ void WebServer::run() {
     res.set_content("ok", "text/plain");
   });
 
-  svr.Get("/screen",
-          [this](const httplib::Request &req, httplib::Response &res) {
-            if (req.has_param("blank")) {
-              int blank = std::stoi(req.get_param_value("blank"));
-              if (blank) {
-                SDL_EnableScreenSaver();
-#ifdef __linux__
-                // Try RPi specific display power off
-                (void)system("vcgencmd display_power 0 > /dev/null 2>&1");
-                // Try X11 standard
-                (void)system("xset dpms force off > /dev/null 2>&1");
-#endif
-                LOG_I("WebServer", "Screen blanking requested");
-              } else {
-                SDL_DisableScreenSaver();
-#ifdef __linux__
-                // Try RPi specific display power on
-                (void)system("vcgencmd display_power 1 > /dev/null 2>&1");
-                // Try X11 standard
-                (void)system("xset dpms force on > /dev/null 2>&1");
-#endif
-                LOG_I("WebServer", "Screen unblanking requested");
-              }
-              res.set_content("ok", "text/plain");
-              return;
-            }
+  svr.Get(
+      "/screen", [this](const httplib::Request &req, httplib::Response &res) {
+        if (req.has_param("blank")) {
+          int blank = std::stoi(req.get_param_value("blank"));
+          SDL_Event event;
+          SDL_zero(event);
+          event.type = SDL_USEREVENT;
+          event.user.code = SDL_USER_EVENT_BLOCK_SLEEP;
+          event.user.data1 = blank ? nullptr : (void *)1;
+          SDL_PushEvent(&event);
 
-            if (req.has_param("prevent")) {
-              bool prevent = (req.get_param_value("prevent") == "1" ||
-                              req.get_param_value("prevent") == "on");
-              cfg_->preventSleep = prevent;
-              if (prevent)
-                SDL_DisableScreenSaver();
-              else
-                SDL_EnableScreenSaver();
-              if (cfgMgr_)
-                cfgMgr_->save(*cfg_);
-              res.set_content("ok", "text/plain");
-              return;
-            }
+          if (blank) {
+            LOG_I("WebServer", "Screen blanking requested via event");
+          } else {
+            LOG_I("WebServer", "Screen unblanking requested via event");
+          }
+          res.set_content("ok", "text/plain");
+          return;
+        }
 
-            // Default status
-            nlohmann::json j;
-            j["prevent_sleep"] = cfg_->preventSleep;
-            j["saver_enabled"] = SDL_IsScreenSaverEnabled() == SDL_TRUE;
-            res.set_content(j.dump(2), "application/json");
-          });
+        if (req.has_param("prevent")) {
+          bool prevent = (req.get_param_value("prevent") == "1" ||
+                          req.get_param_value("prevent") == "on");
+          cfg_->preventSleep = prevent;
+
+          SDL_Event event;
+          SDL_zero(event);
+          event.type = SDL_USEREVENT;
+          event.user.code = SDL_USER_EVENT_BLOCK_SLEEP;
+          event.user.data1 = prevent ? (void *)1 : nullptr;
+          SDL_PushEvent(&event);
+
+          if (cfgMgr_)
+            cfgMgr_->save(*cfg_);
+          res.set_content("ok", "text/plain");
+          return;
+        }
+
+        // Default status
+        nlohmann::json j;
+        j["prevent_sleep"] = cfg_->preventSleep;
+        j["saver_enabled"] = SDL_IsScreenSaverEnabled() == SDL_TRUE;
+#ifdef __linux__
+        // Check RPi specific display power
+        // This is a best effort check, not guaranteed to work on all systems
+        FILE *fp = popen("vcgencmd display_power", "r");
+        if (fp) {
+          char buffer[128];
+          if (fgets(buffer, sizeof(buffer), fp) != NULL) {
+            std::string output(buffer);
+            if (output.find("display_power=0") != std::string::npos) {
+              j["display_power"] = false;
+            } else if (output.find("display_power=1") != std::string::npos) {
+              j["display_power"] = true;
+            }
+          }
+          pclose(fp);
+        }
+#endif
+        res.set_content(j.dump(2), "application/json");
+      });
 
 #ifdef ENABLE_DEBUG_API
   svr.Get("/debug/widgets",
@@ -373,11 +396,11 @@ void WebServer::run() {
                     int ly = action.rect.y + action.rect.h / 2;
 
                     // Convert logical to "raw" coordinates that set_touch uses.
-                    float rx = static_cast<float>(lx) / 800.0f;
-                    float ry = static_cast<float>(ly) / 480.0f;
+                    float rx = static_cast<float>(lx) / static_cast<float>(HamClock::LOGICAL_WIDTH);
+                    float ry = static_cast<float>(ly) / static_cast<float>(HamClock::LOGICAL_HEIGHT);
 
                     // Now simulate the click as if it came from /set_touch
-                    int w = 800, h = 480;
+                    int w = HamClock::LOGICAL_WIDTH, h = HamClock::LOGICAL_HEIGHT;
                     SDL_GetRendererOutputSize(renderer_, &w, &h);
                     int px = static_cast<int>(rx * w);
                     int py = static_cast<int>(ry * h);
@@ -670,6 +693,51 @@ void WebServer::run() {
     }
     res.set_content(j.dump(2), "application/json");
   });
+
+  // Display Power Control
+  svr.Get("/api/display/status",
+          [this](const httplib::Request &, httplib::Response &res) {
+            nlohmann::json j;
+            if (displayPower_) {
+              j["success"] = true;
+              j["power"] = displayPower_->getPower() ? "on" : "off";
+              j["method"] = displayPower_->getMethodName();
+            } else {
+              j["success"] = false;
+              j["error"] = "DisplayPower module not initialized";
+            }
+            res.set_content(j.dump(), "application/json");
+          });
+
+  svr.Post("/api/display/power",
+           [this](const httplib::Request &req, httplib::Response &res) {
+             nlohmann::json j;
+             bool on = true;
+
+             try {
+               auto body = nlohmann::json::parse(req.body);
+               if (body.contains("state")) {
+                 std::string s = body["state"];
+                 on = (s == "on");
+               }
+             } catch (...) {
+               // Fallback to params if JSON parse fails
+               if (req.has_param("state")) {
+                 on = (req.get_param_value("state") == "on");
+               }
+             }
+
+             if (displayPower_) {
+               bool ok = displayPower_->setPower(on);
+               j["success"] = ok;
+               j["state"] = on ? "on" : "off";
+               j["method"] = displayPower_->getMethodName();
+             } else {
+               j["success"] = false;
+               j["error"] = "DisplayPower module not initialized";
+             }
+             res.set_content(j.dump(), "application/json");
+           });
 #endif
 
   LOG_I("WebServer", "Listening on port {}...", port_);

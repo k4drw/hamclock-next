@@ -5,6 +5,9 @@
 
 #include <string>
 
+struct SDL_Renderer;
+struct SDL_Texture;
+
 class DEInfo : public Widget {
 public:
   DEInfo(int x, int y, int w, int h, FontManager &fontMgr,
