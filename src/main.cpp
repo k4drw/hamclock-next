@@ -31,10 +31,12 @@
 #include "services/DRAPProvider.h"
 #include "services/DXClusterProvider.h"
 #include "services/DstProvider.h"
+#include "services/GPSProvider.h"
 #include "services/HistoryProvider.h"
 #include "services/LiveSpotProvider.h"
 #include "services/MoonProvider.h"
 #include "services/NOAAProvider.h"
+#include "services/RBNProvider.h"
 #include "services/RSSProvider.h"
 #include "services/RigService.h"
 #include "services/RotatorService.h"
@@ -96,9 +98,19 @@
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
+#ifdef _WIN32
+#include <winsock2.h>
+#endif
 #include <memory>
+#include <sstream>
 #ifdef __linux__
 #include <unistd.h>
+#endif
+
+#ifdef _WIN32
+#include <io.h>
+#define access _access
+#define F_OK 0
 #endif
 #include <vector>
 
@@ -148,6 +160,7 @@ int main(int argc, char *argv[]) {
   // Parse command-line arguments BEFORE starting logging
   bool forceFullscreen = false;
   bool forceSoftware = false;
+  bool webOnly = false;
   std::string logLevel = "warn"; // Default to WARN
 
   for (int i = 1; i < argc; ++i) {
@@ -156,6 +169,9 @@ int main(int argc, char *argv[]) {
       forceFullscreen = true;
     } else if (arg == "-s" || arg == "--software") {
       forceSoftware = true;
+    } else if (arg == "--web-only") {
+      webOnly = true;
+      forceSoftware = true; // software renderer required for offscreen capture
     } else if (arg == "--log-level" && i + 1 < argc) {
       logLevel = argv[++i];
     } else if (arg == "-h" || arg == "--help") {
@@ -164,6 +180,8 @@ int main(int argc, char *argv[]) {
       std::printf("  -f, --fullscreen      Force fullscreen mode\n");
       std::printf("  -s, --software        Force software rendering (no "
                   "OpenGL/MSAA)\n");
+      std::printf("  --web-only            Headless mode: no display window, "
+                  "serve display via /live.jpg\n");
       std::printf("  --log-level <level>   Set log level: "
                   "debug|info|warn|error (default: warn)\n");
       std::printf("  -h, --help            Show this help message\n");
@@ -217,6 +235,14 @@ int main(int argc, char *argv[]) {
   if (envDriver) {
     std::fprintf(stderr, "Requested SDL_VIDEODRIVER via env: %s\n", envDriver);
   }
+
+#ifdef _WIN32
+  WSADATA wsaData;
+  if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
+    LOG_ERROR("WSAStartup failed");
+    return EXIT_FAILURE;
+  }
+#endif
 
   if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) != 0) {
     LOG_ERROR("SDL_Init failed: {}", SDL_GetError());
@@ -286,7 +312,8 @@ int main(int argc, char *argv[]) {
     SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE, 0);
   }
 
-  Uint32 windowFlags = SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE;
+  Uint32 windowFlags =
+      (webOnly ? SDL_WINDOW_HIDDEN : SDL_WINDOW_SHOWN) | SDL_WINDOW_RESIZABLE;
   if (!forceSoftware) {
     windowFlags |= SDL_WINDOW_OPENGL;
   }
@@ -474,7 +501,7 @@ int main(int argc, char *argv[]) {
   auto rssStore = std::make_shared<RSSDataStore>();
   auto watchlistHitStore = std::make_shared<WatchlistHitStore>();
   auto spotStore = std::make_shared<LiveSpotDataStore>();
-  spotStore->setSelectedBandsMask(appCfg.pskBands);
+  spotStore->setSelectedBandsMask(appCfg.liveSpotsBands);
   auto activityStore = std::make_shared<ActivityDataStore>();
   auto dxcStore = std::make_shared<DXClusterDataStore>();
   auto bandStore = std::make_shared<BandConditionsStore>();
@@ -512,6 +539,19 @@ int main(int argc, char *argv[]) {
   WebServer webServer(renderer, appCfg, *state, cfgMgr, displayPower,
                       watchlistStore, solarStore, DEFAULT_WEB_SERVER_PORT);
   webServer.start();
+  if (webOnly) {
+    webServer.setAlwaysCapture(true);
+    std::printf(
+        "Web-only mode: display available at http://localhost:%d/live.jpg\n",
+        DEFAULT_WEB_SERVER_PORT);
+    std::printf("Web interface:                   http://localhost:%d/\n",
+                DEFAULT_WEB_SERVER_PORT);
+    LOG_I("Main", "Web-only mode active — serving display via /live.jpg");
+  }
+
+  // --- GPS Provider (persistent background service) ---
+  GPSProvider gpsProvider(state.get(), appCfg);
+  gpsProvider.start();
 
   bool appRunning = true;
   while (appRunning) {
@@ -715,6 +755,10 @@ int main(int argc, char *argv[]) {
                                     watchlistHitStore, state.get());
       dxcProvider.start(appCfg);
 
+      // RBN shares the LiveSpotDataStore (for real-time activity)
+      RBNProvider rbnProvider(spotStore, prefixMgr, state.get());
+      rbnProvider.start(appCfg);
+
       BandConditionsProvider bandProvider(solarStore, bandStore);
       bandProvider.update();
 
@@ -728,6 +772,7 @@ int main(int argc, char *argv[]) {
       historyProvider.fetchFlux();
       historyProvider.fetchSSN();
       historyProvider.fetchKp();
+      historyProvider.fetchXray();
 
       WeatherProvider deWeatherProvider(netManager, deWeatherStore);
       deWeatherProvider.fetch(state->deLocation.lat, state->deLocation.lon);
@@ -842,6 +887,10 @@ int main(int argc, char *argv[]) {
           widgetPool[type] = std::make_unique<HistoryPanel>(
               0, 0, 0, 0, fontMgr, texMgr, historyStore, "kp");
           break;
+        case WidgetType::HISTORY_XRAY:
+          widgetPool[type] = std::make_unique<HistoryPanel>(
+              0, 0, 0, 0, fontMgr, texMgr, historyStore, "xray");
+          break;
         case WidgetType::DRAP:
           widgetPool[type] = std::make_unique<DRAPPanel>(0, 0, 0, 0, fontMgr,
                                                          texMgr, drapProvider);
@@ -890,20 +939,21 @@ int main(int argc, char *argv[]) {
 
       // Populate pool with all types
       std::vector<WidgetType> allTypes = {
-          WidgetType::SOLAR,         WidgetType::DX_CLUSTER,
-          WidgetType::LIVE_SPOTS,    WidgetType::BAND_CONDITIONS,
-          WidgetType::CONTESTS,      WidgetType::ON_THE_AIR,
-          WidgetType::GIMBAL,        WidgetType::MOON,
-          WidgetType::CLOCK_AUX,     WidgetType::DX_PEDITIONS,
-          WidgetType::DE_WEATHER,    WidgetType::DX_WEATHER,
-          WidgetType::NCDXF,         WidgetType::SDO,
-          WidgetType::HISTORY_FLUX,  WidgetType::HISTORY_KP,
-          WidgetType::HISTORY_SSN,   WidgetType::DRAP,
-          WidgetType::AURORA,        WidgetType::AURORA_GRAPH,
-          WidgetType::ADIF,          WidgetType::COUNTDOWN,
-          WidgetType::CALLBOOK,      WidgetType::DST_INDEX,
-          WidgetType::WATCHLIST,     WidgetType::EME_TOOL,
-          WidgetType::SANTA_TRACKER, WidgetType::CPU_TEMP};
+          WidgetType::SOLAR,        WidgetType::DX_CLUSTER,
+          WidgetType::LIVE_SPOTS,   WidgetType::BAND_CONDITIONS,
+          WidgetType::CONTESTS,     WidgetType::ON_THE_AIR,
+          WidgetType::GIMBAL,       WidgetType::MOON,
+          WidgetType::CLOCK_AUX,    WidgetType::DX_PEDITIONS,
+          WidgetType::DE_WEATHER,   WidgetType::DX_WEATHER,
+          WidgetType::NCDXF,        WidgetType::SDO,
+          WidgetType::HISTORY_FLUX, WidgetType::HISTORY_KP,
+          WidgetType::HISTORY_SSN,  WidgetType::HISTORY_XRAY,
+          WidgetType::DRAP,         WidgetType::AURORA,
+          WidgetType::AURORA_GRAPH, WidgetType::ADIF,
+          WidgetType::COUNTDOWN,    WidgetType::CALLBOOK,
+          WidgetType::DST_INDEX,    WidgetType::WATCHLIST,
+          WidgetType::EME_TOOL,     WidgetType::SANTA_TRACKER,
+          WidgetType::CPU_TEMP};
       for (auto t : allTypes)
         addToPool(t);
 
@@ -978,6 +1028,7 @@ int main(int argc, char *argv[]) {
       mapArea.setSpotStore(spotStore);
       mapArea.setDXClusterStore(dxcStore);
       mapArea.setAuroraStore(auroraHistoryStore);
+      mapArea.setActivityStore(activityStore);
       RSSBanner rssBanner(139, 412, 660, 68, fontMgr, rssStore);
 
       // --- Apply Theme ---
@@ -1145,6 +1196,7 @@ int main(int argc, char *argv[]) {
           historyProvider.fetchFlux();
           historyProvider.fetchSSN();
           historyProvider.fetchKp();
+          historyProvider.fetchXray();
           adifProvider.fetch(cfgMgr.configDir() / "logs.adif");
           lastFetchMs = now;
         }
@@ -1295,6 +1347,7 @@ int main(int argc, char *argv[]) {
           case SDL_MOUSEMOTION: {
             int mx = event.motion.x, my = event.motion.y;
             if (FIDELITY_MODE) {
+              // Window coords → Scaled Renderer Coords
               float pixX =
                   event.motion.x * static_cast<float>(globalDrawW) / globalWinW;
               float pixY =
@@ -1474,6 +1527,10 @@ int main(int argc, char *argv[]) {
   SDL_DestroyRenderer(renderer);
   SDL_DestroyWindow(window);
   SDL_Quit();
+
+#ifdef _WIN32
+  WSACleanup();
+#endif
 
   return EXIT_SUCCESS;
 }

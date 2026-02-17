@@ -254,6 +254,30 @@ public:
     return static_cast<int>(w / renderScale_);
   }
 
+  // Returns the ascent of the font in logical units.
+  int getFontAscent(int ptSize) {
+    int renderPt = ptSize;
+    if (renderScale_ > 1.01f) {
+      renderPt = std::clamp(static_cast<int>(ptSize * renderScale_), 8, 600);
+    }
+    TTF_Font *font = getFont(renderPt);
+    if (!font)
+      return 0;
+    return static_cast<int>(TTF_FontAscent(font) / renderScale_);
+  }
+
+  // Returns the total height of the font in logical units.
+  int getFontHeight(int ptSize) {
+    int renderPt = ptSize;
+    if (renderScale_ > 1.01f) {
+      renderPt = std::clamp(static_cast<int>(ptSize * renderScale_), 8, 600);
+    }
+    TTF_Font *font = getFont(renderPt);
+    if (!font)
+      return 0;
+    return static_cast<int>(TTF_FontHeight(font) / renderScale_);
+  }
+
   void clearCache() {
     for (auto &[key, val] : textCache_) {
       MemoryMonitor::getInstance().destroyTexture(val.texture);

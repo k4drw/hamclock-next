@@ -4,12 +4,19 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#ifdef __linux__
 #include <fcntl.h>
+#include <linux/fb.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
+#endif
 
-#ifdef __linux__
-#include <linux/fb.h>
+#ifdef _WIN32
+#include <io.h>
+#define access _access
+#define W_OK 2
+#else
+#include <unistd.h>
 #endif
 
 DisplayPower::DisplayPower() { init(); }
@@ -45,6 +52,10 @@ void DisplayPower::init() {
 
 bool DisplayPower::setPower(bool on) {
   bool success = false;
+#ifdef _WIN32
+  (void)on;
+  success = false;
+#else
   switch (method_) {
   case Method::VCGENCMD:
     success = runVcgencmd(on);
@@ -59,6 +70,7 @@ bool DisplayPower::setPower(bool on) {
     success = false;
     break;
   }
+#endif
 
   if (success) {
     currentPower_ = on;
@@ -70,6 +82,9 @@ bool DisplayPower::setPower(bool on) {
 }
 
 bool DisplayPower::getPower() const {
+#ifdef _WIN32
+  return currentPower_; // On Windows, we can only return the last known state
+#else
   if (method_ == Method::VCGENCMD) {
     // We can actually query hardware for vcgencmd
     FILE *pipe = popen("vcgencmd display_power", "r");
@@ -83,6 +98,7 @@ bool DisplayPower::getPower() const {
     }
   }
   return currentPower_;
+#endif
 }
 
 std::string DisplayPower::getMethodName() const {
@@ -114,18 +130,35 @@ std::string DisplayPower::findBacklightPowerPath() {
 
 bool DisplayPower::writeSysfs(const std::string &path,
                               const std::string &value) {
+#ifdef _WIN32
+  (void)path;
+  (void)value;
+  return false;
+#else
+#ifdef __linux__
   int fd = open(path.c_str(), O_WRONLY);
   if (fd < 0)
     return false;
   ssize_t ret = write(fd, value.c_str(), value.size());
   close(fd);
   return ret > 0;
+#else
+  (void)path;
+  (void)value;
+  return false;
+#endif
+#endif
 }
 
 bool DisplayPower::runVcgencmd(bool on) {
+#ifdef _WIN32
+  (void)on;
+  return false;
+#else
   std::string cmd =
       on ? "vcgencmd display_power 1" : "vcgencmd display_power 0";
   return std::system((cmd + " > /dev/null 2>&1").c_str()) == 0;
+#endif
 }
 
 bool DisplayPower::blankFramebuffer(bool blank) {

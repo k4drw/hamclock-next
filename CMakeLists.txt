@@ -4,14 +4,14 @@ cmake_minimum_required(VERSION 3.18)
 set(CMAKE_POLICY_VERSION_MINIMUM 3.5 CACHE STRING "Compat for old FetchContent deps")
 
 project(HamClock-Next
-    VERSION 0.6.0
+    VERSION 0.7.0
     LANGUAGES C CXX
 )
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-add_compile_definitions(HAMCLOCK_VERSION="0.6B")
+add_compile_definitions(HAMCLOCK_VERSION="0.7B")
 
 # Force static builds globally for all FetchContent dependencies
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build static libs" FORCE)
@@ -371,6 +371,8 @@ add_executable(hamclock-next ${HC_WIN32_FLAG}
     src/services/SantaProvider.cpp
     src/services/RotatorService.cpp
     src/services/RigService.cpp
+    src/services/GPSProvider.cpp
+    src/services/RBNProvider.cpp
     src/services/QRZProvider.cpp
     src/ui/ActivityPanels.cpp
     src/ui/ADIFPanel.cpp
@@ -434,7 +436,7 @@ target_link_libraries(hamclock-next PRIVATE
 )
 
 if(WIN32)
-    target_link_libraries(hamclock-next PRIVATE ws2_32)
+    target_link_libraries(hamclock-next PRIVATE ws2_32 psapi)
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     # On Linux with GCC, link libstdc++ and libgcc statically for better portability
     target_link_options(hamclock-next PRIVATE -static-libstdc++ -static-libgcc)

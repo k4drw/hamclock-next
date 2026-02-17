@@ -243,8 +243,8 @@ void ADIFProvider::processFile(const std::filesystem::path &path) {
 
         // Insert at beginning (newest first)
         stats.recentQSOs.insert(stats.recentQSOs.begin(), qso);
-        if (stats.recentQSOs.size() > 100) {
-          stats.recentQSOs.resize(100);
+        if (stats.recentQSOs.size() > 50) {
+          stats.recentQSOs.resize(50);
         }
       } else {
         LOG_W("ADIFProvider", "Record {} has no CALL field", recordNum);

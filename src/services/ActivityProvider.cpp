@@ -1,4 +1,5 @@
 #include "ActivityProvider.h"
+#include "../core/Astronomy.h"
 #include "../core/Logger.h"
 #include <nlohmann/json.hpp>
 
@@ -150,6 +151,16 @@ void ActivityProvider::fetchPOTA() {
           os.freqKhz = 0;
         }
         os.spottedAt = std::chrono::system_clock::now();
+
+        // Resolve lat/lon from grid4 if available
+        std::string grid = spot.value("grid4", "");
+        if (!grid.empty()) {
+          double lat = 0, lon = 0;
+          if (Astronomy::gridToLatLon(grid, lat, lon)) {
+            os.lat = lat;
+            os.lon = lon;
+          }
+        }
 
         if (!os.call.empty()) {
           current.ontaSpots.push_back(os);

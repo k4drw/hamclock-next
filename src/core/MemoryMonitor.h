@@ -9,8 +9,8 @@
 #if defined(__linux__)
 #include <unistd.h>
 #elif defined(_WIN32)
-#include <psapi.h>
 #include <windows.h>
+#include <psapi.h>
 #endif
 
 class MemoryMonitor {

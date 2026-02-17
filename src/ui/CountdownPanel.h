@@ -19,10 +19,15 @@ public:
   bool onKeyDown(SDL_Keycode key, Uint16 mod) override;
   bool onTextInput(const char *text) override;
 
+  // Modal overrides
+  bool isModalActive() const override { return editing_; }
+  void renderModal(SDL_Renderer *renderer) override { renderSetup(renderer); }
+
 private:
-  void startEditing(bool editingTime);
+  void startEditing();
   void stopEditing(bool apply);
-  void renderEditOverlay(SDL_Renderer *renderer);
+  void renderSetup(SDL_Renderer *renderer);
+  bool handleSetupClick(int mx, int my);
 
   FontManager &fontMgr_;
   AppConfig &config_;
@@ -30,7 +35,14 @@ private:
 
   // Editor state
   bool editing_ = false;
-  bool editingTime_ = false;
-  std::string editText_;
+  int activeField_ = 0; // 0=Label, 1=Time
+  std::string labelEdit_;
+  std::string timeEdit_;
   int cursorPos_ = 0;
+
+  SDL_Rect menuRect_ = {0, 0, 0, 0};
+  SDL_Rect labelRect_ = {0, 0, 0, 0};
+  SDL_Rect timeRect_ = {0, 0, 0, 0};
+  SDL_Rect okRect_ = {0, 0, 0, 0};
+  SDL_Rect cancelRect_ = {0, 0, 0, 0};
 };

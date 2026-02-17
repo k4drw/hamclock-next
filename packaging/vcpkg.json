@@ -1,6 +1,6 @@
 {
     "name": "hamclock-next",
-    "version-string": "0.6B",
+    "version-string": "0.7B",
     "dependencies": [
         "sdl2",
         "sdl2-ttf",

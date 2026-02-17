@@ -1,5 +1,6 @@
 #include "CountdownPanel.h"
 #include "../core/Astronomy.h"
+#include "../core/Constants.h"
 #include "FontManager.h"
 
 #include <cstdio>
@@ -78,61 +79,68 @@ void CountdownPanel::render(SDL_Renderer *renderer) {
 
   fontMgr_.drawText(renderer, "Remaining", centerX, y_ + height_ - 14,
                     {100, 100, 100, 255}, 9, false, true);
-
-  if (editing_) {
-    renderEditOverlay(renderer);
-  }
 }
 
 bool CountdownPanel::onMouseUp(int mx, int my, Uint16) {
   if (editing_) {
-    stopEditing(true);
-    return true;
+    // If outside menu, close as cancel
+    if (mx < menuRect_.x || mx >= menuRect_.x + menuRect_.w ||
+        my < menuRect_.y || my >= menuRect_.y + menuRect_.h) {
+      stopEditing(false);
+      return true;
+    }
+    return handleSetupClick(mx, my);
   }
 
   if (mx >= x_ && mx < x_ + width_ && my >= y_ && my < y_ + height_) {
-    if (my < y_ + height_ / 2) {
-      startEditing(false); // Edit Label
-    } else {
-      startEditing(true); // Edit Time
-    }
+    startEditing();
     return true;
   }
   return false;
 }
 
-void CountdownPanel::startEditing(bool editingTime) {
+void CountdownPanel::startEditing() {
   editing_ = true;
-  editingTime_ = editingTime;
-  editText_ = editingTime ? config_.countdownTime : config_.countdownLabel;
-  if (editingTime && editText_.empty())
-    editText_ = "2026-06-27 18:00";
-  cursorPos_ = static_cast<int>(editText_.size());
+  activeField_ = 0;
+  labelEdit_ = config_.countdownLabel;
+  timeEdit_ = config_.countdownTime;
+  if (timeEdit_.empty())
+    timeEdit_ = "2026-06-27 18:00";
+  cursorPos_ = static_cast<int>(labelEdit_.size());
   SDL_StartTextInput();
 }
 
 void CountdownPanel::stopEditing(bool apply) {
   if (apply) {
-    if (editingTime_)
-      config_.countdownTime = editText_;
-    else
-      config_.countdownLabel = editText_;
+    config_.countdownLabel = labelEdit_;
+    config_.countdownTime = timeEdit_;
     update();
   }
   editing_ = false;
   SDL_StopTextInput();
 }
 
-bool CountdownPanel::onKeyDown(SDL_Keycode key, Uint16) {
+bool CountdownPanel::onKeyDown(SDL_Keycode key, Uint16 /*mod*/) {
   if (!editing_)
     return false;
-  if (key == SDLK_RETURN || key == SDLK_KP_ENTER)
+
+  std::string &activeText = (activeField_ == 0) ? labelEdit_ : timeEdit_;
+
+  if (key == SDLK_RETURN || key == SDLK_KP_ENTER) {
     stopEditing(true);
-  else if (key == SDLK_ESCAPE)
+  } else if (key == SDLK_ESCAPE) {
     stopEditing(false);
-  else if (key == SDLK_BACKSPACE && cursorPos_ > 0) {
-    editText_.erase(cursorPos_ - 1, 1);
+  } else if (key == SDLK_TAB) {
+    activeField_ = (activeField_ == 0) ? 1 : 0;
+    std::string &newText = (activeField_ == 0) ? labelEdit_ : timeEdit_;
+    cursorPos_ = static_cast<int>(newText.size());
+  } else if (key == SDLK_BACKSPACE && cursorPos_ > 0) {
+    activeText.erase(cursorPos_ - 1, 1);
     --cursorPos_;
+  } else if (key == SDLK_LEFT && cursorPos_ > 0) {
+    --cursorPos_;
+  } else if (key == SDLK_RIGHT && cursorPos_ < (int)activeText.size()) {
+    ++cursorPos_;
   }
   return true;
 }
@@ -140,29 +148,124 @@ bool CountdownPanel::onKeyDown(SDL_Keycode key, Uint16) {
 bool CountdownPanel::onTextInput(const char *text) {
   if (!editing_)
     return false;
-  editText_.insert(cursorPos_, text);
+
+  std::string &activeText = (activeField_ == 0) ? labelEdit_ : timeEdit_;
+  activeText.insert(cursorPos_, text);
   cursorPos_ += static_cast<int>(std::strlen(text));
   return true;
 }
 
-void CountdownPanel::renderEditOverlay(SDL_Renderer *renderer) {
-  SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-  SDL_SetRenderDrawColor(renderer, 0, 0, 0, 220);
-  SDL_Rect overlay = {x_ + 2, y_ + 2, width_ - 4, height_ - 4};
-  SDL_RenderFillRect(renderer, &overlay);
+void CountdownPanel::renderSetup(SDL_Renderer *renderer) {
+  // --- Centered Modal Setup ---
+  int menuW = 300;
+  int menuH = 180;
+  int menuX = (HamClock::LOGICAL_WIDTH - menuW) / 2;
+  int menuY = (HamClock::LOGICAL_HEIGHT - menuH) / 2;
+  menuRect_ = {menuX, menuY, menuW, menuH};
 
-  SDL_Color cyan = {0, 255, 255, 255};
-  fontMgr_.drawText(renderer, editingTime_ ? "Set Time:" : "Set Label:", x_ + 6,
-                    y_ + 10, cyan, 10);
+  // Shadow/Dim background (handled by main.cpp modal system usually,
+  // but we can draw a border or fill)
+  SDL_SetRenderDrawColor(renderer, 20, 20, 30, 255);
+  SDL_RenderFillRect(renderer, &menuRect_);
+  SDL_SetRenderDrawColor(renderer, 0, 200, 255, 255);
+  SDL_RenderDrawRect(renderer, &menuRect_);
 
-  fontMgr_.drawText(renderer, editText_, x_ + 6, y_ + 25, {255, 255, 255, 255},
-                    12);
+  SDL_Color white = {255, 255, 255, 255};
+  SDL_Color cyan = {0, 200, 255, 255};
+  SDL_Color gray = {150, 150, 150, 255};
+  SDL_Color orange = {255, 165, 0, 255};
 
-  if ((SDL_GetTicks() / 500) % 2 == 0) {
-    int tw = fontMgr_.getLogicalWidth(editText_.substr(0, cursorPos_), 12);
+  int y = menuY + 15;
+  int cx = menuX + menuW / 2;
+
+  fontMgr_.drawText(renderer, "Countdown Settings", cx, y, cyan, 16, true,
+                    true);
+  y += 25;
+
+  // Label Field
+  fontMgr_.drawText(renderer, "Event Label:", menuX + 15, y, white, 12);
+  y += 18;
+  labelRect_ = {menuX + 15, y, menuW - 30, 24};
+  SDL_SetRenderDrawColor(renderer, 40, 40, 50, 255);
+  SDL_RenderFillRect(renderer, &labelRect_);
+  SDL_SetRenderDrawColor(renderer, (activeField_ == 0) ? 255 : 80,
+                         (activeField_ == 0) ? 165 : 80, 0, 255);
+  SDL_RenderDrawRect(renderer, &labelRect_);
+  fontMgr_.drawText(renderer, labelEdit_, labelRect_.x + 6, labelRect_.y + 5,
+                    white, 14);
+
+  if (activeField_ == 0 && (SDL_GetTicks() / 500) % 2 == 0) {
+    int tw = fontMgr_.getLogicalWidth(labelEdit_.substr(0, cursorPos_), 14);
     SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
-    SDL_RenderDrawLine(renderer, x_ + 6 + tw, y_ + 25, x_ + 6 + tw, y_ + 37);
+    SDL_RenderDrawLine(renderer, labelRect_.x + 6 + tw, labelRect_.y + 4,
+                       labelRect_.x + 6 + tw, labelRect_.y + 20);
   }
+  y += 30;
 
-  SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+  // Time Field
+  fontMgr_.drawText(renderer, "Target Time (YYYY-MM-DD HH:MM):", menuX + 15, y,
+                    white, 11);
+  y += 18;
+  timeRect_ = {menuX + 15, y, menuW - 30, 24};
+  SDL_SetRenderDrawColor(renderer, 40, 40, 50, 255);
+  SDL_RenderFillRect(renderer, &timeRect_);
+  SDL_SetRenderDrawColor(renderer, (activeField_ == 1) ? 255 : 80,
+                         (activeField_ == 1) ? 165 : 80, 0, 255);
+  SDL_RenderDrawRect(renderer, &timeRect_);
+  fontMgr_.drawText(renderer, timeEdit_, timeRect_.x + 6, timeRect_.y + 5,
+                    white, 14);
+
+  if (activeField_ == 1 && (SDL_GetTicks() / 500) % 2 == 0) {
+    int tw = fontMgr_.getLogicalWidth(timeEdit_.substr(0, cursorPos_), 14);
+    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+    SDL_RenderDrawLine(renderer, timeRect_.x + 6 + tw, timeRect_.y + 4,
+                       timeRect_.x + 6 + tw, timeRect_.y + 20);
+  }
+  y += 35;
+
+  // Buttons
+  int btnW = 80;
+  int btnH = 26;
+  cancelRect_ = {cx - btnW - 10, y, btnW, btnH};
+  okRect_ = {cx + 10, y, btnW, btnH};
+
+  SDL_SetRenderDrawColor(renderer, 80, 30, 30, 255);
+  SDL_RenderFillRect(renderer, &cancelRect_);
+  SDL_SetRenderDrawColor(renderer, 200, 80, 80, 255);
+  SDL_RenderDrawRect(renderer, &cancelRect_);
+  fontMgr_.drawText(renderer, "Cancel", cancelRect_.x + btnW / 2,
+                    cancelRect_.y + btnH / 2, white, 12, false, true);
+
+  SDL_SetRenderDrawColor(renderer, 30, 80, 30, 255);
+  SDL_RenderFillRect(renderer, &okRect_);
+  SDL_SetRenderDrawColor(renderer, 80, 200, 80, 255);
+  SDL_RenderDrawRect(renderer, &okRect_);
+  fontMgr_.drawText(renderer, "Done", okRect_.x + btnW / 2,
+                    okRect_.y + btnH / 2, white, 12, false, true);
+}
+
+bool CountdownPanel::handleSetupClick(int mx, int my) {
+  if (mx >= labelRect_.x && mx < labelRect_.x + labelRect_.w &&
+      my >= labelRect_.y && my < labelRect_.y + labelRect_.h) {
+    activeField_ = 0;
+    cursorPos_ = (int)labelEdit_.size();
+    return true;
+  }
+  if (mx >= timeRect_.x && mx < timeRect_.x + timeRect_.w &&
+      my >= timeRect_.y && my < timeRect_.y + timeRect_.h) {
+    activeField_ = 1;
+    cursorPos_ = (int)timeEdit_.size();
+    return true;
+  }
+  if (mx >= okRect_.x && mx < okRect_.x + okRect_.w && my >= okRect_.y &&
+      my < okRect_.y + okRect_.h) {
+    stopEditing(true);
+    return true;
+  }
+  if (mx >= cancelRect_.x && mx < cancelRect_.x + cancelRect_.w &&
+      my >= cancelRect_.y && my < cancelRect_.y + cancelRect_.h) {
+    stopEditing(false);
+    return true;
+  }
+  return false;
 }

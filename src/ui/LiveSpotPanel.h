@@ -22,6 +22,15 @@ public:
   void onResize(int x, int y, int w, int h) override;
   bool onMouseUp(int mx, int my, Uint16 mod) override;
 
+  bool isModalActive() const override { return showSetup_; }
+  void renderModal(SDL_Renderer *renderer) override { renderSetup(renderer); }
+
+  std::string getName() const override { return "LiveSpots"; }
+  std::vector<std::string> getActions() const override;
+  bool performAction(const std::string &action) override;
+  SDL_Rect getActionRect(const std::string &action) const override;
+  nlohmann::json getDebugData() const override;
+
 private:
   void renderSetup(SDL_Renderer *renderer);
   bool handleSetupClick(int mx, int my);
@@ -41,12 +50,22 @@ private:
 
   // Setup Overlay State
   bool showSetup_ = false;
+  LiveSpotSource activeTab_ = LiveSpotSource::PSK;
+
+  // Pending settings for the currently active tab in the setup UI
   bool pendingOfDe_ = false;
   bool pendingUseCall_ = false;
+  int pendingMaxAge_ = 30;
+
+  // UI Rects for setup
+  SDL_Rect tabRects_[3] = {}; // PSK, RBN, WSPR
   SDL_Rect modeCheckRect_ = {};
   SDL_Rect filterCheckRect_ = {};
+  SDL_Rect ageIncrRect_ = {};
+  SDL_Rect ageDecrRect_ = {};
   SDL_Rect cancelBtnRect_ = {};
   SDL_Rect doneBtnRect_ = {};
+  SDL_Rect menuRect_ = {};
 
   // Cached textures
   SDL_Texture *titleTex_ = nullptr;
