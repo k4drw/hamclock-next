@@ -2,6 +2,8 @@
 #include "../core/HamClockState.h"
 #include "../core/Logger.h"
 #include "../core/StringUtils.h"
+#include <SDL.h>
+#include <nlohmann/json.hpp>
 
 #include <chrono>
 #include <cstdlib>
@@ -11,7 +13,7 @@ namespace {
 
 // Parse PSK Reporter XML response, aggregating spot counts per band
 // and collecting individual spot records for map plotting.
-// If plotReceivers is true (DE mode), we map who heard us (ReceiverLocator,
+// If plotReceivers is true (DI mode), we map who heard us (ReceiverLocator,
 // ReceiverCallsign). If plotReceivers is false (DX mode), we map who we heard
 // (SenderLocator, SenderCallsign).
 void parsePSKReporter(const std::string &body, LiveSpotData &data,
@@ -55,7 +57,8 @@ void parsePSKReporter(const std::string &body, LiveSpotData &data,
 
         if (grid.size() >= 4) {
           // Store in generic fields (SpotRecord uses receiverGrid for location)
-          data.spots.push_back({freqKhz, grid, call});
+          data.spots.push_back(
+              {freqKhz, grid, call, std::chrono::system_clock::now()});
           if (data.spots.size() >= 500) {
             LOG_W("LiveSpot", "Too many spots in response, capped at 500");
             break;
@@ -81,7 +84,7 @@ LiveSpotProvider::LiveSpotProvider(NetworkManager &net,
 
 void LiveSpotProvider::fetch() {
   std::string target;
-  if (config_.pskUseCall) {
+  if (config_.liveSpotsUseCall) {
     target = config_.callsign;
   } else {
     if (config_.grid.size() < 4) {
@@ -99,20 +102,20 @@ void LiveSpotProvider::fetch() {
   // Build PSK Reporter URL: spots from/by our location
   auto now = std::time(nullptr);
   int64_t quantizedNow = (static_cast<int64_t>(now) / 300) * 300;
-  int64_t windowStart = quantizedNow - (config_.pskMaxAge * 60);
+  int64_t windowStart = quantizedNow - (config_.liveSpotsMaxAge * 60);
 
   std::string param;
-  if (config_.pskOfDe) {
+  if (config_.liveSpotsOfDe) {
     // We are sender: Who heard ME?
-    param = config_.pskUseCall ? "senderCallsign=" : "senderLocator=";
+    param = config_.liveSpotsUseCall ? "senderCallsign=" : "senderLocator=";
   } else {
     // We are receiver: Who did I hear? (or who did people in my grid hear)
-    param = config_.pskUseCall ? "receiverCallsign=" : "receiverLocator=";
+    param = config_.liveSpotsUseCall ? "receiverCallsign=" : "receiverLocator=";
   }
 
-  std::string url = fmt::format("https://retrieve.pskreporter.info/"
-                                "query?{}{}&flowStartSeconds={}&rronly=1",
-                                param, target, windowStart);
+  std::string url =
+      "https://retrieve.pskreporter.info/query?" + param + target +
+      "&flowStartSeconds=" + std::to_string(windowStart) + "&rronly=1";
 
   LOG_I("LiveSpot", "Fetching {}", url);
   if (state_) {
@@ -122,7 +125,7 @@ void LiveSpotProvider::fetch() {
   auto store = store_;
   auto grid = config_.grid;
   auto state = state_;
-  bool ofDe = config_.pskOfDe;
+  bool ofDe = config_.liveSpotsOfDe;
 
   net_.fetchAsync(
       url,
@@ -159,7 +162,7 @@ nlohmann::json LiveSpotProvider::getDebugData() const {
   nlohmann::json j;
   j["callsign"] = config_.callsign;
   j["grid"] = config_.grid;
-  j["ofDe"] = config_.pskOfDe;
-  j["useCall"] = config_.pskUseCall;
+  j["ofDe"] = config_.liveSpotsOfDe;
+  j["useCall"] = config_.liveSpotsUseCall;
   return j;
 }

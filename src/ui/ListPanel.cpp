@@ -98,13 +98,19 @@ void ListPanel::render(SDL_Renderer *renderer) {
     if (rowY + rowH > y_ + height_)
       break;
 
-    // Alternating stripe background
-    SDL_Color stripeColor =
-        (i % 2 == 0) ? themes.rowStripe1 : themes.rowStripe2;
+    // Alternating stripe background, or accent for highlight
+    SDL_Color stripeColor;
+    if (static_cast<int>(i) == highlightedIndex_) {
+      stripeColor = themes.accent;
+      stripeColor.a = 180; // slightly transparent
+    } else {
+      stripeColor = (i % 2 == 0) ? themes.rowStripe1 : themes.rowStripe2;
+    }
     RenderUtils::drawRect(renderer, x_ + 1, rowY, width_ - 2, rowH,
                           stripeColor);
 
     // Render row text (cached)
+    SDL_Color rowColor = getRowColor(static_cast<int>(i), themes.text);
     if (rows_[i] != rowCache_[i].text) {
       if (rowCache_[i].tex) {
         MemoryMonitor::getInstance().destroyTexture(rowCache_[i].tex);

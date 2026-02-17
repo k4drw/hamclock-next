@@ -2,7 +2,13 @@
 #include <filesystem>
 #include <spdlog/sinks/rotating_file_sink.h>
 
+#ifdef _WIN32
+#include <io.h>
+#define access _access
+#define W_OK 2
+#else
 #include <unistd.h>
+#endif
 
 std::shared_ptr<spdlog::logger> Log::s_Logger;
 

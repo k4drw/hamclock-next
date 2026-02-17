@@ -805,6 +805,7 @@ void MapWidget::render(SDL_Renderer *renderer) {
   renderSatellite(renderer);
   renderSpotOverlay(renderer);
   renderDXClusterSpots(renderer);
+  renderActivityPins(renderer);
   renderMarker(renderer, sunLat_, sunLon_, 255, 255, 0, MarkerShape::Circle,
                true);
 
@@ -1452,6 +1453,29 @@ void MapWidget::renderAuroraOverlay(SDL_Renderer *renderer) {
     }
     p++;
   }
+}
+
+void MapWidget::renderActivityPins(SDL_Renderer *renderer) {
+  if (!activityStore_)
+    return;
+  auto data = activityStore_->get();
+  if (!data.valid || data.ontaSpots.empty())
+    return;
+
+  SDL_RenderSetClipRect(renderer, &mapRect_);
+  for (const auto &spot : data.ontaSpots) {
+    if (spot.lat == 0.0 && spot.lon == 0.0)
+      continue;
+    // POTA = green, SOTA = orange, other = white
+    Uint8 r = 255, g = 255, b = 255;
+    if (spot.program == "POTA") {
+      r = 0; g = 200; b = 80;
+    } else if (spot.program == "SOTA") {
+      r = 255; g = 140; b = 0;
+    }
+    renderMarker(renderer, spot.lat, spot.lon, r, g, b, MarkerShape::Square, false);
+  }
+  SDL_RenderSetClipRect(renderer, nullptr);
 }
 
 void MapWidget::renderProjectionSelect(SDL_Renderer *renderer) {

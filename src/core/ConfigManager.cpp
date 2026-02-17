@@ -97,6 +97,15 @@ bool ConfigManager::load(AppConfig &config) const {
     config.gridType = ap.value("grid_type", "latlon");
     config.qrzUsername = ap.value("qrz_username", "");
     config.qrzPassword = ap.value("qrz_password", "");
+  }
+
+  // Countdown (new dedicated section; falls back to legacy appearance keys)
+  if (json.contains("countdown")) {
+    auto &cd = json["countdown"];
+    config.countdownLabel = cd.value("label", "");
+    config.countdownTime = cd.value("time", "");
+  } else if (json.contains("appearance")) {
+    auto &ap = json["appearance"];
     config.countdownLabel = ap.value("countdown_label", "");
     config.countdownTime = ap.value("countdown_time", "");
   }
@@ -161,19 +170,46 @@ bool ConfigManager::load(AppConfig &config) const {
     config.dxClusterUseWSJTX = dxc.value("use_wsjtx", false);
   }
 
-  // PSK Reporter
-  if (json.contains("psk_reporter")) {
-    auto &psk = json["psk_reporter"];
-    config.pskOfDe = psk.value("of_de", false);
-    config.pskUseCall = psk.value("use_call", false);
-    config.pskMaxAge = psk.value("max_age", 30);
-    config.pskBands = psk.value("bands_mask", 0xFFF);
+  // Live Spots (Combined RBN, PSK Reporter, WSPR)
+  if (json.contains("live_spots")) {
+    auto &ls = json["live_spots"];
+    std::string src = ls.value("source", "psk");
+    if (src == "rbn")
+      config.liveSpotSource = LiveSpotSource::RBN;
+    else if (src == "wspr")
+      config.liveSpotSource = LiveSpotSource::WSPR;
+    else
+      config.liveSpotSource = LiveSpotSource::PSK;
+
+    config.liveSpotsOfDe = ls.value("of_de", true);
+    config.liveSpotsUseCall = ls.value("use_call", true);
+    config.liveSpotsMaxAge = ls.value("max_age", 30);
+    config.liveSpotsBands = ls.value("bands_mask", 0xFFF);
+    config.rbnHost = ls.value("rbn_host", "telnet.reversebeacon.net");
+    config.rbnPort = ls.value("rbn_port", 7000);
+  } else {
+    // Migration from legacy sections
+    if (json.contains("rbn")) {
+      auto &rbn = json["rbn"];
+      if (rbn.value("enabled", false)) {
+        config.liveSpotSource = LiveSpotSource::RBN;
+      }
+      config.rbnHost = rbn.value("host", "telnet.reversebeacon.net");
+    }
+    if (json.contains("psk_reporter")) {
+      auto &psk = json["psk_reporter"];
+      config.liveSpotsOfDe = psk.value("of_de", true);
+      config.liveSpotsUseCall = psk.value("use_call", true);
+      config.liveSpotsMaxAge = psk.value("max_age", 30);
+      config.liveSpotsBands = psk.value("bands_mask", 0xFFF);
+    }
   }
 
   // Power
   if (json.contains("power")) {
     auto &p = json["power"];
     config.preventSleep = p.value("prevent_sleep", true);
+    config.gpsEnabled = p.value("gps_enabled", false);
   }
 
   // Rotator (Hamlib rotctld)
@@ -225,8 +261,9 @@ bool ConfigManager::save(const AppConfig &config) const {
   json["appearance"]["grid_type"] = config.gridType;
   json["appearance"]["qrz_username"] = config.qrzUsername;
   json["appearance"]["qrz_password"] = config.qrzPassword;
-  json["appearance"]["countdown_label"] = config.countdownLabel;
-  json["appearance"]["countdown_time"] = config.countdownTime;
+
+  json["countdown"]["label"] = config.countdownLabel;
+  json["countdown"]["time"] = config.countdownTime;
 
   json["brightness"]["level"] = config.brightness;
   json["brightness"]["schedule"] = config.brightnessSchedule;
@@ -236,6 +273,7 @@ bool ConfigManager::save(const AppConfig &config) const {
   json["brightness"]["bright_minute"] = config.brightMinute;
 
   json["power"]["prevent_sleep"] = config.preventSleep;
+  json["power"]["gps_enabled"] = config.gpsEnabled;
 
   json["rotator"]["host"] = config.rotatorHost;
   json["rotator"]["port"] = config.rotatorPort;
@@ -269,10 +307,16 @@ bool ConfigManager::save(const AppConfig &config) const {
   json["dx_cluster"]["login"] = config.dxClusterLogin;
   json["dx_cluster"]["use_wsjtx"] = config.dxClusterUseWSJTX;
 
-  json["psk_reporter"]["of_de"] = config.pskOfDe;
-  json["psk_reporter"]["use_call"] = config.pskUseCall;
-  json["psk_reporter"]["max_age"] = config.pskMaxAge;
-  json["psk_reporter"]["bands_mask"] = config.pskBands;
+  json["live_spots"]["source"] =
+      (config.liveSpotSource == LiveSpotSource::RBN)    ? "rbn"
+      : (config.liveSpotSource == LiveSpotSource::WSPR) ? "wspr"
+                                                        : "psk";
+  json["live_spots"]["of_de"] = config.liveSpotsOfDe;
+  json["live_spots"]["use_call"] = config.liveSpotsUseCall;
+  json["live_spots"]["max_age"] = config.liveSpotsMaxAge;
+  json["live_spots"]["bands_mask"] = config.liveSpotsBands;
+  json["live_spots"]["rbn_host"] = config.rbnHost;
+  json["live_spots"]["rbn_port"] = config.rbnPort;
 
   std::ofstream ofs(configPath_);
   if (!ofs) {

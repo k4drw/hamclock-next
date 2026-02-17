@@ -18,45 +18,45 @@ void MapViewMenu::show(AppConfig &config, std::function<void()> onApply) {
   gridType_ = config.gridType;
 
   // Center the menu
-  int menuW = 500; // Increased from 420 to accommodate longer labels
-  int menuH = 380;
+  int menuW = 500;
+  int menuH = 320; // Reduced height
   menuRect_ = {HamClock::LOGICAL_WIDTH / 2 - menuW / 2,
                HamClock::LOGICAL_HEIGHT / 2 - menuH / 2, menuW, menuH};
 
   // Layout sections
-  int sectionX = menuRect_.x + 30; // More horizontal padding
-  int btnW = 20;
-  int btnGap = 200; // Good spacing for 500px width
+  int sectionX = menuRect_.x + 30;
+  int btnW = 18; // Slightly smaller radio buttons
+  int btnGap = 210;
 
   // Projection section
-  int y = menuRect_.y + 60;
+  int y = menuRect_.y + 45; // Start higher
   projHeaderY_ = y;
-  y += 30; // Options below header
+  y += 24; // Tighter vertical gap
   projEquiRect_ = {sectionX, y, btnW, btnW};
   projRobinsonRect_ = {sectionX + btnGap, y, btnW, btnW};
 
   // Style section
-  y += 50;
+  y += 42;
   styleHeaderY_ = y;
-  y += 30;
+  y += 24;
   styleNasaRect_ = {sectionX, y, btnW, btnW};
   styleTerrainRect_ = {sectionX + btnGap, y, btnW, btnW};
-  y += 35;
+  y += 28;
   styleCountriesRect_ = {sectionX, y, btnW, btnW};
 
   // Grid section
-  y += 50;
+  y += 42;
   gridHeaderY_ = y;
-  y += 30;
+  y += 24;
   gridOffRect_ = {sectionX, y, btnW, btnW};
   gridLatLonRect_ = {sectionX + btnGap, y, btnW, btnW};
-  y += 35;
+  y += 28;
   gridMaidenheadRect_ = {sectionX, y, btnW, btnW};
 
   // Footer buttons
   int btnFooterW = 100;
-  int btnH = 34;
-  int btnY = menuRect_.y + menuH - btnH - 15;
+  int btnH = 32;
+  int btnY = menuRect_.y + menuRect_.h - btnH - 18;
   cancelRect_ = {menuRect_.x + menuW / 2 - btnFooterW - 10, btnY, btnFooterW,
                  btnH};
   applyRect_ = {menuRect_.x + menuW / 2 + 10, btnY, btnFooterW, btnH};
@@ -88,11 +88,11 @@ void MapViewMenu::render(SDL_Renderer *renderer) {
 
   // Title
   fontMgr_.drawText(renderer, "Map View Options", menuRect_.x + menuRect_.w / 2,
-                    menuRect_.y + 20, themes.text, 18, false, true);
+                    menuRect_.y + 20, themes.text, 16, false, true);
 
   // Projection Section
   fontMgr_.drawText(renderer, "Projection:", menuRect_.x + 25, projHeaderY_,
-                    themes.text, 16, true);
+                    themes.text, 13, true);
   renderRadioButton(renderer, projEquiRect_, projection_ == "equirectangular",
                     "Equirectangular", themes.text);
   renderRadioButton(renderer, projRobinsonRect_, projection_ == "robinson",
@@ -100,7 +100,7 @@ void MapViewMenu::render(SDL_Renderer *renderer) {
 
   // Style Section
   fontMgr_.drawText(renderer, "Map Style:", menuRect_.x + 25, styleHeaderY_,
-                    themes.text, 16, true);
+                    themes.text, 13, true);
   renderRadioButton(renderer, styleNasaRect_, mapStyle_ == "nasa",
                     "NASA Blue Marble", themes.text);
 
@@ -113,7 +113,7 @@ void MapViewMenu::render(SDL_Renderer *renderer) {
 
   // Grid Section
   fontMgr_.drawText(renderer, "Grid Overlay:", menuRect_.x + 25, gridHeaderY_,
-                    themes.text, 16, true);
+                    themes.text, 13, true);
   renderRadioButton(renderer, gridOffRect_, !showGrid_, "Off", themes.text);
   renderRadioButton(renderer, gridLatLonRect_,
                     showGrid_ && gridType_ == "latlon", "Lat/Lon", themes.text);
@@ -130,7 +130,7 @@ void MapViewMenu::render(SDL_Renderer *renderer) {
   SDL_SetRenderDrawColor(renderer, 120, 120, 130, 255);
   SDL_RenderDrawRect(renderer, &cancelRect_);
   fontMgr_.drawText(renderer, "Cancel", cancelRect_.x + cancelRect_.w / 2,
-                    cancelRect_.y + cancelRect_.h / 2, {255, 255, 255, 255}, 16,
+                    cancelRect_.y + cancelRect_.h / 2, {255, 255, 255, 255}, 14,
                     false, true);
 
   // Apply button
@@ -141,7 +141,7 @@ void MapViewMenu::render(SDL_Renderer *renderer) {
                          themes.border.b, 255);
   SDL_RenderDrawRect(renderer, &applyRect_);
   fontMgr_.drawText(renderer, "Apply", applyRect_.x + applyRect_.w / 2,
-                    applyRect_.y + applyRect_.h / 2, {255, 255, 255, 255}, 16,
+                    applyRect_.y + applyRect_.h / 2, {255, 255, 255, 255}, 14,
                     false, true);
 }
 
@@ -166,7 +166,7 @@ void MapViewMenu::renderRadioButton(SDL_Renderer *renderer,
 
   // Label - aligned to match SetupScreen.cpp style
   fontMgr_.drawText(renderer, label, rect.x + rect.w + 10, rect.y + 2,
-                    textColor, 14, false, false);
+                    textColor, 12, false, false);
 }
 
 bool MapViewMenu::onMouseUp(int mx, int my, Uint16) {

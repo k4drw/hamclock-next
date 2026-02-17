@@ -26,6 +26,7 @@ public:
 
   std::string getName() const override { return "DXCluster"; }
   std::vector<std::string> getActions() const override;
+  bool performAction(const std::string &action) override;
   SDL_Rect getActionRect(const std::string &action) const override;
   nlohmann::json getDebugData() const override;
 
@@ -34,6 +35,9 @@ private:
   std::string
   formatAge(const std::chrono::system_clock::time_point &spottedAt) const;
 
+  SDL_Color getRowColor(int index,
+                        const SDL_Color &defaultColor) const override;
+
   std::shared_ptr<DXClusterDataStore> store_;
   RigService *rigService_;
   const AppConfig *config_;
@@ -41,6 +45,8 @@ private:
   bool setupRequested_ = false;
 
   std::vector<std::string> allRows_;
+  std::vector<double> allFreqs_;
+  std::vector<double> visibleFreqs_;
   int scrollOffset_ = 0;
   static constexpr int MAX_VISIBLE_ROWS = 15;
 };

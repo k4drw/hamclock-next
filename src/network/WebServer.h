@@ -30,6 +30,9 @@ public:
   // Call this once per frame from main thread to update the web mirror
   void updateFrame();
 
+  // In --web-only mode, capture every frame unconditionally (no display)
+  void setAlwaysCapture(bool on) { alwaysCapture_ = on; }
+
 private:
   void run();
 
@@ -51,5 +54,6 @@ private:
   // Timing to avoid capturing every single frame if no one is watching
   uint32_t lastCaptureTicks_ = 0;
   std::atomic<bool> needsCapture_{true};
-  void *svrPtr_ = nullptr; // httplib::Server*
+  bool alwaysCapture_ = false; // true in --web-only mode
+  void *svrPtr_ = nullptr;     // httplib::Server*
 };

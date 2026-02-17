@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../core/ActivityData.h"
 #include "../core/AuroraHistoryStore.h"
 #include "../core/ConfigManager.h"
 #include "../core/DXClusterData.h"
@@ -49,6 +50,10 @@ public:
     auroraStore_ = std::move(store);
   }
 
+  void setActivityStore(std::shared_ptr<ActivityDataStore> store) {
+    activityStore_ = std::move(store);
+  }
+
   void setOnConfigChanged(std::function<void()> cb) { onConfigChanged_ = cb; }
 
   // Modal interface for MapViewMenu
@@ -79,6 +84,7 @@ private:
   void renderSpotOverlay(SDL_Renderer *renderer);
   void renderDXClusterSpots(SDL_Renderer *renderer);
   void renderAuroraOverlay(SDL_Renderer *renderer);
+  void renderActivityPins(SDL_Renderer *renderer);
 
   TextureManager &texMgr_;
   FontManager &fontMgr_;
@@ -87,6 +93,7 @@ private:
   std::shared_ptr<LiveSpotDataStore> spotStore_;
   std::shared_ptr<DXClusterDataStore> dxcStore_;
   std::shared_ptr<AuroraHistoryStore> auroraStore_;
+  std::shared_ptr<ActivityDataStore> activityStore_;
   OrbitPredictor *predictor_ = nullptr;
 
   std::unique_ptr<MapViewMenu> mapViewMenu_;

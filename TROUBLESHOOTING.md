@@ -35,4 +35,17 @@ HamClock-Next includes specialized compatibility paths for artifact-free renderi
 **Solution**: Delete the configuration directory to start fresh:
 - **Linux**: `rm -rf ~/.local/share/HamClock/HamClock-Next/`
 - **macOS**: `rm -rf ~/Library/Application\ Support/HamClock/HamClock-Next/`
-- **Windows**: `rm -rf %APPDATA%\HamClock\HamClock-Next\`
+- **Windows**: `rmdir /s /q %APPDATA%\HamClock\HamClock-Next\`
+
+---
+
+## 🪟 Windows
+
+### Web server not accessible
+Ensure Windows Firewall allows inbound connections on port 8080.
+
+### Build issues
+Use `scripts/build-win64.sh` with Docker (dockcross). Do not attempt a native Windows build — cross-compile via Linux/Docker is the supported method.
+
+### Installer
+`build-win64/HamClock-Next-Setup.exe` is an NSIS installer that sets up PATH and creates Start Menu shortcuts.

@@ -64,6 +64,7 @@ private:
     Widgets
   };
   Tab activeTab_ = Tab::Identity;
+  bool gpsEnabled_ = false;
   std::string callsignText_;
   std::string gridText_;
   std::string latText_;
@@ -73,9 +74,6 @@ private:
   std::string clusterLogin_;
   bool clusterEnabled_ = true;
   bool clusterWSJTX_ = false;
-  bool pskOfDe_ = true;
-  bool pskUseCall_ = true;
-  int pskMaxAge_ = 30;
   int rotationInterval_ = 30;
   std::string theme_ = "default";
   SDL_Color callsignColor_ = {255, 165, 0, 255};
@@ -112,6 +110,7 @@ private:
   int hintSize_ = 14;
   SDL_Rect toggleRect_ = {0, 0, 0, 0};
   SDL_Rect clusterToggleRect_ = {0, 0, 0, 0};
+  SDL_Rect gpsToggleRect_ = {0, 0, 0, 0};
   SDL_Rect themeRect_ = {0, 0, 0, 0};
   SDL_Rect nightLightsRect_ = {0, 0, 0, 0};
   SDL_Rect metricToggleRect_ = {0, 0, 0, 0};

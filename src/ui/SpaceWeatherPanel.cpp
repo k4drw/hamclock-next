@@ -43,16 +43,19 @@ SDL_Color SpaceWeatherPanel::colorForSFI(int sfi) {
   return {255, 50, 50, 255};   // Red
 }
 
-SDL_Color SpaceWeatherPanel::colorForNOAAScale(int scale) {
-  // NOAA scales: 0 = no event, 1-2 = minor/moderate (green/yellow),
-  // 3-4 = strong/severe (yellow/red), 5 = extreme (red)
-  if (scale == 0)
-    return {100, 200, 100, 255}; // Dim green (no event)
-  if (scale <= 2)
-    return {0, 255, 0, 255}; // Green (minor/moderate)
-  if (scale <= 3)
-    return {255, 255, 0, 255}; // Yellow (strong)
-  return {255, 50, 50, 255};   // Red (severe/extreme)
+SDL_Color SpaceWeatherPanel::colorForNOAAScale(int scale,
+                                                const ThemeColors &themes) {
+  // Official NOAA 5-tier scale:
+  // 0 = no event, 1 = Minor, 2 = Moderate, 3 = Strong, 4/5 = Severe/Extreme
+  if (scale <= 0)
+    return themes.textDim;           // No event — muted
+  if (scale == 1)
+    return themes.success;           // Minor — green
+  if (scale == 2)
+    return themes.warning;           // Moderate — yellow
+  if (scale == 3)
+    return {255, 140, 0, 255};       // Strong — orange (no theme token)
+  return themes.danger;              // Severe/Extreme — red
 }
 
 void SpaceWeatherPanel::destroyCache() {
@@ -98,49 +101,48 @@ void SpaceWeatherPanel::update() {
   items_[4].value = buf;
   items_[4].valueColor = {255, 128, 0, 255};
 
+  ThemeColors themes = getThemeColors(theme_);
+
   std::snprintf(buf, sizeof(buf), "%.1f", data.solar_wind_density);
   items_[5].value = buf;
-  items_[5].valueColor = {0, 200, 255, 255};
+  items_[5].valueColor = themes.info;
 
   std::snprintf(buf, sizeof(buf), "%d", data.bz);
   items_[6].value = buf;
-  items_[6].valueColor =
-      (data.bz < 0) ? SDL_Color{255, 50, 50, 255} : SDL_Color{0, 255, 0, 255};
+  items_[6].valueColor = (data.bz < 0) ? themes.danger : themes.success;
 
   std::snprintf(buf, sizeof(buf), "%d", data.bt);
   items_[7].value = buf;
-  items_[7].valueColor = {255, 255, 255, 255};
+  items_[7].valueColor = themes.text;
 
   std::snprintf(buf, sizeof(buf), "%d", data.dst);
   items_[8].value = buf;
-  items_[8].valueColor = (data.dst < -50) ? SDL_Color{255, 50, 50, 255}
-                                          : SDL_Color{255, 255, 255, 255};
+  items_[8].valueColor = (data.dst < -50) ? themes.danger : themes.text;
 
   std::snprintf(buf, sizeof(buf), "%d", data.aurora);
   items_[9].value = buf;
-  items_[9].valueColor = (data.aurora > 50) ? SDL_Color{255, 128, 0, 255}
-                                            : SDL_Color{0, 255, 255, 255};
+  items_[9].valueColor = (data.aurora > 50) ? themes.warning : themes.info;
 
   std::snprintf(buf, sizeof(buf), "%d", data.drap);
   items_[10].value = buf;
-  items_[10].valueColor = {0, 255, 255, 255};
+  items_[10].valueColor = themes.info;
 
   items_[11].value = "-";
 
   // NOAA R-Scale (Radio Blackouts)
   std::snprintf(buf, sizeof(buf), "R%d", data.noaa_r_scale);
   items_[12].value = buf;
-  items_[12].valueColor = colorForNOAAScale(data.noaa_r_scale);
+  items_[12].valueColor = colorForNOAAScale(data.noaa_r_scale, themes);
 
   // NOAA S-Scale (Solar Radiation Storms)
   std::snprintf(buf, sizeof(buf), "S%d", data.noaa_s_scale);
   items_[13].value = buf;
-  items_[13].valueColor = colorForNOAAScale(data.noaa_s_scale);
+  items_[13].valueColor = colorForNOAAScale(data.noaa_s_scale, themes);
 
   // NOAA G-Scale (Geomagnetic Storms)
   std::snprintf(buf, sizeof(buf), "G%d", data.noaa_g_scale);
   items_[14].value = buf;
-  items_[14].valueColor = colorForNOAAScale(data.noaa_g_scale);
+  items_[14].valueColor = colorForNOAAScale(data.noaa_g_scale, themes);
 }
 
 void SpaceWeatherPanel::render(SDL_Renderer *renderer) {
@@ -286,6 +288,16 @@ SDL_Rect SpaceWeatherPanel::getActionRect(const std::string &action) const {
     return {x_, y_, width_, height_};
   }
   return {0, 0, 0, 0};
+}
+
+bool SpaceWeatherPanel::performAction(const std::string &action) {
+  if (action == "cycle_page") {
+    currentPage_ = (currentPage_ + 1) % 4;
+    lastPageUpdate_ = SDL_GetTicks();
+    destroyCache();
+    return true;
+  }
+  return false;
 }
 
 nlohmann::json SpaceWeatherPanel::getDebugData() const {

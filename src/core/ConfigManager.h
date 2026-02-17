@@ -8,6 +8,8 @@
 
 #include <SDL.h>
 
+enum class LiveSpotSource { PSK, RBN, WSPR };
+
 struct AppConfig {
   // Identity
   std::string callsign;
@@ -21,9 +23,9 @@ struct AppConfig {
   bool mapNightLights = true;
   bool useMetric = true;
   std::string projection = "equirectangular"; // or "robinson"
-  std::string mapStyle = "nasa";  // "nasa", "terrain", "countries"
+  std::string mapStyle = "nasa";              // "nasa", "terrain", "countries"
   bool showGrid = false;
-  std::string gridType = "latlon";  // "latlon" or "maidenhead"
+  std::string gridType = "latlon"; // "latlon" or "maidenhead"
 
   // Pane widget selection (top bar panes 1–3)
   // Pane widget selection (rotation sets)
@@ -44,16 +46,22 @@ struct AppConfig {
   std::string dxClusterLogin = "";
   bool dxClusterUseWSJTX = false; // If true, ignore host and use UDP port
 
+  // Live Spots (Combined RBN, PSK Reporter, WSPR)
+  LiveSpotSource liveSpotSource = LiveSpotSource::PSK;
+  bool liveSpotsOfDe =
+      true; // true if spots OF de (de is sender), false if BY de
+  bool liveSpotsUseCall = true; // true if filter by callsign, false if by grid
+  int liveSpotsMaxAge = 30;     // minutes
+  uint32_t liveSpotsBands = 0xFFF; // Bitmask of selected bands (lower 12 bits)
+  bool rbnEnabled =
+      false; // Kept for backward compat in logic, but mostly internal now
+  std::string rbnHost = "telnet.reversebeacon.net";
+  int rbnPort = 7000;
+
   // SDO Widget settings
   std::string sdoWavelength = "0193";
   bool sdoGrayline = false;
   bool sdoShowMovie = false;
-
-  // PSK Reporter
-  bool pskOfDe = true;    // true if spots OF de (de is sender), false if BY de
-  bool pskUseCall = true; // true if filter by callsign, false if by grid
-  int pskMaxAge = 30;     // minutes
-  uint32_t pskBands = 0xFFF; // Bitmask of selected bands (lower 12 bits)
 
   // Power / Screen
   bool preventSleep = true; // true to call SDL_DisableScreenSaver()
@@ -83,6 +91,9 @@ struct AppConfig {
   int dimMinute = 0;
   int brightHour = 6;
   int brightMinute = 0;
+
+  // Security
+  bool gpsEnabled = false;
 };
 
 class ConfigManager {

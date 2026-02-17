@@ -6,7 +6,9 @@
 #include <fcntl.h>
 #include <fstream>
 #include <sstream>
+#ifndef _WIN32
 #include <unistd.h>
+#endif
 
 BrightnessManager::BrightnessManager() {}
 
@@ -40,14 +42,16 @@ bool BrightnessManager::init() {
 }
 
 bool BrightnessManager::detectBrightnessPath() {
+#ifdef _WIN32
+  return false;
+#else
   // Common brightness control paths (RPi, x86 laptops, DSI displays)
-  const char *paths[] = {
-      "/sys/class/backlight/rpi_backlight/brightness",
-      "/sys/class/backlight/10-0045/brightness",
-      "/sys/class/backlight/6-0045/brightness",
-      "/sys/class/backlight/intel_backlight/brightness",
-      "/sys/class/backlight/acpi_video0/brightness",
-      nullptr};
+  const char *paths[] = {"/sys/class/backlight/rpi_backlight/brightness",
+                         "/sys/class/backlight/10-0045/brightness",
+                         "/sys/class/backlight/6-0045/brightness",
+                         "/sys/class/backlight/intel_backlight/brightness",
+                         "/sys/class/backlight/acpi_video0/brightness",
+                         nullptr};
 
   for (int i = 0; paths[i] != nullptr; i++) {
     if (access(paths[i], W_OK) == 0) {
@@ -63,6 +67,7 @@ bool BrightnessManager::detectBrightnessPath() {
   }
 
   return false;
+#endif
 }
 
 bool BrightnessManager::setBrightness(int percent) {
@@ -126,7 +131,11 @@ bool BrightnessManager::shouldBeDimmed() const {
   auto now = std::chrono::system_clock::now();
   std::time_t nowTime = std::chrono::system_clock::to_time_t(now);
   std::tm localTm;
+#ifdef _WIN32
+  localtime_s(&localTm, &nowTime);
+#else
   localtime_r(&nowTime, &localTm);
+#endif
 
   int currentMinutes = localTm.tm_hour * 60 + localTm.tm_min;
   int dimMinutes = dimHour_ * 60 + dimMinute_;

@@ -88,7 +88,7 @@ void WebServer::updateFrame() {
 
     std::lock_guard<std::mutex> lock(jpegMutex_);
     latestJpeg_ = std::move(jpeg);
-    needsCapture_ = false;
+    needsCapture_ = alwaysCapture_; // stay true in --web-only mode
   }
 
   SDL_FreeSurface(surface);
@@ -97,6 +97,8 @@ void WebServer::updateFrame() {
 void WebServer::run() {
   httplib::Server svr;
   svrPtr_ = &svr;
+
+  // No authentication required
 
   svr.Get("/", [](const httplib::Request &, httplib::Response &res) {
     std::string html = R"HTML(
@@ -380,63 +382,65 @@ void WebServer::run() {
             res.set_content(j.dump(2), "application/json");
           });
 
-  svr.Get("/debug/click",
-          [this](const httplib::Request &req, httplib::Response &res) {
-            if (req.has_param("widget") && req.has_param("action")) {
-              std::string wname = req.get_param_value("widget");
-              std::string aname = req.get_param_value("action");
+  svr.Get("/debug/click", [this](const httplib::Request &req,
+                                 httplib::Response &res) {
+    if (req.has_param("widget") && req.has_param("action")) {
+      std::string wname = req.get_param_value("widget");
+      std::string aname = req.get_param_value("action");
 
-              auto snapshot = UIRegistry::getInstance().getSnapshot();
-              if (snapshot.count(wname)) {
-                const auto &info = snapshot[wname];
-                for (const auto &action : info.actions) {
-                  if (action.name == aname) {
-                    // Found it! Calculate center in logical coords
-                    int lx = action.rect.x + action.rect.w / 2;
-                    int ly = action.rect.y + action.rect.h / 2;
+      auto snapshot = UIRegistry::getInstance().getSnapshot();
+      if (snapshot.count(wname)) {
+        const auto &info = snapshot[wname];
+        for (const auto &action : info.actions) {
+          if (action.name == aname) {
+            // Found it! Calculate center in logical coords
+            int lx = action.rect.x + action.rect.w / 2;
+            int ly = action.rect.y + action.rect.h / 2;
 
-                    // Convert logical to "raw" coordinates that set_touch uses.
-                    float rx = static_cast<float>(lx) / static_cast<float>(HamClock::LOGICAL_WIDTH);
-                    float ry = static_cast<float>(ly) / static_cast<float>(HamClock::LOGICAL_HEIGHT);
+            // Convert logical to "raw" coordinates that set_touch uses.
+            float rx = static_cast<float>(lx) /
+                       static_cast<float>(HamClock::LOGICAL_WIDTH);
+            float ry = static_cast<float>(ly) /
+                       static_cast<float>(HamClock::LOGICAL_HEIGHT);
 
-                    // Now simulate the click as if it came from /set_touch
-                    int w = HamClock::LOGICAL_WIDTH, h = HamClock::LOGICAL_HEIGHT;
-                    SDL_GetRendererOutputSize(renderer_, &w, &h);
-                    int px = static_cast<int>(rx * w);
-                    int py = static_cast<int>(ry * h);
+            // Now simulate the click as if it came from /set_touch
+            int w = HamClock::LOGICAL_WIDTH, h = HamClock::LOGICAL_HEIGHT;
+            SDL_GetRendererOutputSize(renderer_, &w, &h);
+            int px = static_cast<int>(rx * w);
+            int py = static_cast<int>(ry * h);
 
-                    SDL_Event event;
-                    SDL_zero(event);
-                    event.type = SDL_MOUSEBUTTONDOWN;
-                    event.button.button = SDL_BUTTON_LEFT;
-                    event.button.state = SDL_PRESSED;
-                    event.button.x = px;
-                    event.button.y = py;
-                    SDL_PushEvent(&event);
+            SDL_Event event;
+            SDL_zero(event);
+            event.type = SDL_MOUSEBUTTONDOWN;
+            event.button.button = SDL_BUTTON_LEFT;
+            event.button.state = SDL_PRESSED;
+            event.button.x = px;
+            event.button.y = py;
+            SDL_PushEvent(&event);
 
-                    SDL_zero(event);
-                    event.type = SDL_MOUSEBUTTONUP;
-                    event.button.button = SDL_BUTTON_LEFT;
-                    event.button.state = SDL_RELEASED;
-                    event.button.x = px;
-                    event.button.y = py;
-                    SDL_PushEvent(&event);
+            SDL_zero(event);
+            event.type = SDL_MOUSEBUTTONUP;
+            event.button.button = SDL_BUTTON_LEFT;
+            event.button.state = SDL_RELEASED;
+            event.button.x = px;
+            event.button.y = py;
+            SDL_PushEvent(&event);
 
-                    res.set_content("ok", "text/plain");
-                    return;
-                  }
-                }
-                res.status = 404;
-                res.set_content("action not found", "text/plain");
-                return;
-              }
-              res.status = 404;
-              res.set_content("widget not found", "text/plain");
-              return;
-            }
-            res.status = 400;
-            res.set_content("missing parameters", "text/plain");
-          });
+            res.set_content("ok", "text/plain");
+            return;
+          }
+        }
+        res.status = 404;
+        res.set_content("action not found", "text/plain");
+        return;
+      }
+      res.status = 404;
+      res.set_content("widget not found", "text/plain");
+      return;
+    }
+    res.status = 400;
+    res.set_content("missing parameters", "text/plain");
+  });
 
   svr.Get("/get_config.txt",
           [this](const httplib::Request &, httplib::Response &res) {
