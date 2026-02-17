@@ -53,12 +53,27 @@ void ONTAPanel::update() {
 
   auto data = store_->get();
   if (data.lastUpdated != lastUpdate_) {
+    // Update title to reflect current filter
+    static const char *kFilterNames[] = {"ALL", "POTA", "SOTA"};
+    static const char *kFilterPrograms[] = {nullptr, "POTA", "SOTA"};
+    std::string newTitle =
+        std::string("On The Air [") + kFilterNames[filterMode_] + "]";
+    if (newTitle != title_) {
+      title_ = newTitle;
+      destroyCache();
+    }
+
     std::vector<std::string> rows;
     // Format: "MODE  CALL     REF (PROG)"
+    const char *filterProg = kFilterPrograms[filterMode_];
     for (const auto &os : data.ontaSpots) {
+      if (filterProg && os.program != filterProg)
+        continue;
       std::stringstream ss;
       ss << std::left << std::setw(6) << os.mode << std::setw(10) << os.call
-         << os.ref << " (" << os.program << ")";
+         << os.ref;
+      if (filterMode_ == 0)
+        ss << " (" << os.program << ")";
       rows.push_back(ss.str());
       if (rows.size() >= 12)
         break;
@@ -69,4 +84,15 @@ void ONTAPanel::update() {
     setRows(rows);
     lastUpdate_ = data.lastUpdated;
   }
+}
+
+bool ONTAPanel::onMouseUp(int mx, int my, Uint16 /*mod*/) {
+  // Click anywhere in the title area (top ~20% of widget) cycles the filter
+  if (my >= y_ && my < y_ + height_ / 5) {
+    filterMode_ = (filterMode_ + 1) % 3;
+    // Force a re-render of title and rows
+    lastUpdate_ = {};
+    return true;
+  }
+  return false;
 }

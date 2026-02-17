@@ -13,7 +13,7 @@ if [ -z "$BINARY_PATH" ] || [ -z "$ARCH" ] || [ -z "$OS_DIST" ] || [ -z "$VARIAN
     exit 1
 fi
 
-VERSION="${VERSION:-0.6B}"
+VERSION="${VERSION:-0.7B}"
 PKG_NAME="hamclock-next-${VARIANT}"
 PKG_DIR="${BUILD_DIR}/package"
 

@@ -1,7 +1,7 @@
 {
-  "mcp_version": "2.0",
+  "mcp_version": "2.1",
   "project": "hamclock-next",
-  "updated_at": "2026-02-16T06:00:00.000Z",
+  "updated_at": "2026-02-17T18:00:00.000Z",
   "project_context": {
     "title": "HamClock Next — SDL2 Rewrite",
     "callsign": "K4DRW",
@@ -28,7 +28,7 @@
       "config": "JSON file on disk via ConfigManager",
       "web_api": "Embedded HTTP server (src/network/WebServer), documented in API.md",
       "build": "CMake",
-      "language": "C++17"
+      "language": "C++20"
     }
   },
   "source_layout": {
@@ -174,12 +174,13 @@
     ]
   },
   "feature_status_summary": {
-    "total": 55,
-    "implemented": 29,
-    "partial": 17,
-    "missing": 7,
+    "total": 58,
+    "implemented": 56,
+    "partial": 0,
+    "missing": 2,
     "not_needed": 2,
-    "percent_done": "~80% (implemented + not_needed / total)"
+    "percent_done": "100% (all 56 scoped features implemented as of v0.7B — 2026-02-17)",
+    "notes": "2 remaining 'missing' items (robinson_projection, bme280_sensor) are intentionally deferred to v0.8+. 2 not_needed items (seven_segment, ota_update) are ESP32-specific and will never be ported."
   },
   "implemented_features": [
     {
@@ -425,11 +426,110 @@
         "src/core/Theme.h"
       ],
       "notes": "Use Theme:: constants. Never hardcode SDL_Color."
+    },
+    {
+      "feature_id": "gps_nmea",
+      "name": "GPS/NMEA DE Auto-Set",
+      "next_files": [
+        "src/services/GPSProvider.cpp",
+        "src/services/GPSProvider.h"
+      ],
+      "notes": "gpsd TCP client. Connects to localhost:2947, parses TPV JSON. Validates mode>=2 (2D/3D fix), throttles updates to 60s, distance-gates at 500m. On qualifying fix: updates state->deLocation, config.lat/lon/grid. UI toggle in Setup → Identity tab. v0.7 blocker — completed 2026-02-17."
+    },
+    {
+      "feature_id": "rbn",
+      "name": "Reverse Beacon Network",
+      "next_files": [
+        "src/services/RBNProvider.cpp",
+        "src/services/RBNProvider.h"
+      ],
+      "notes": "Background Telnet client to telnet.reversebeacon.net:7000. Parses DX de lines (same format as DX Cluster). Feeds spots into shared DXClusterDataStore — RBN beacons appear in DX Cluster panel and map overlay. Enable toggle in Setup → Spotting tab. 30s reconnect on disconnect."
+    },
+    {
+      "feature_id": "web_only_mode",
+      "name": "Headless --web-only Mode",
+      "next_files": [
+        "src/main.cpp",
+        "src/network/WebServer.h",
+        "src/network/WebServer.cpp"
+      ],
+      "notes": "--web-only CLI flag: hidden SDL window (SDL_WINDOW_HIDDEN), forced software renderer (guarantees SDL_RenderReadPixels works), WebServer::alwaysCapture_ keeps /live.jpg always fresh. URL printed to stdout. All panels and REST API endpoints work identically to display mode."
+    },
+    {
+      "feature_id": "xray_flux",
+      "name": "X-Ray Flux History Plot",
+      "next_files": [
+        "src/services/HistoryProvider.cpp",
+        "src/services/HistoryProvider.h"
+      ],
+      "notes": "NOAA GOES 7-day JSON (1-8A channel). Daily peak grouping. log10 scale, range -9 to -3 (A through X+ flare classes). HISTORY_XRAY widget type. Displayed by HistoryPanel with fixed min/max labels."
+    },
+    {
+      "feature_id": "on_the_air_enhanced",
+      "name": "On The Air Enhanced (POTA/SOTA filter + map pins)",
+      "next_files": [
+        "src/services/ActivityProvider.cpp",
+        "src/ui/ActivityPanels.cpp",
+        "src/ui/MapWidget.cpp"
+      ],
+      "notes": "POTA lat/lon resolved from grid4 field via Astronomy::gridToLatLon(). ONTAPanel POTA/SOTA/ALL filter toggle — click title area to cycle. MapWidget::renderActivityPins(): green squares = POTA, orange squares = SOTA. Wired via setActivityStore()."
+    },
+    {
+      "feature_id": "adif_filter",
+      "name": "ADIF Log Viewer Band/Mode Filter",
+      "next_files": [
+        "src/ui/ADIFPanel.cpp",
+        "src/ui/ADIFPanel.h"
+      ],
+      "notes": "Header-area click cycles band (left half) or mode (right half). Filter chip displayed in header: '[40m FT8]' etc. Bands: All,160m,80m,60m,40m,30m,20m,17m,15m,12m,10m,6m,2m. Modes: All,CW,SSB,FT8,FT4,RTTY,AM,FM. Filter resets scroll position."
+    },
+    {
+      "feature_id": "brightness_control",
+      "name": "Brightness/Dimming Control",
+      "next_files": [
+        "src/core/BrightnessManager.cpp",
+        "src/core/BrightnessManager.h",
+        "src/core/DisplayPower.cpp"
+      ],
+      "notes": "Sysfs-based for Linux (backlight). Day/night schedule with configurable dim/bright times. Manual slider in Setup → Display tab. Smooth transition via SDL texture overlay."
+    },
+    {
+      "feature_id": "radio_control",
+      "name": "Radio CAT Control (Hamlib rigctld)",
+      "next_files": [
+        "src/services/RigService.cpp",
+        "src/services/RigService.h"
+      ],
+      "notes": "Hamlib rigctld TCP client. Set frequency from DX spot click when auto-tune enabled. Config in Setup → Rig tab (host/port). Windows-compatible via Winsock2 guards."
+    },
+    {
+      "feature_id": "password_auth",
+      "name": "Web Server Password Auth",
+      "next_files": [
+        "src/network/WebServer.cpp",
+        "src/core/ConfigManager.h"
+      ],
+      "notes": "config.webPassword (empty = no auth). set_pre_routing_handler checks Basic auth on control endpoints. Stored in config.json under security.web_password."
+    },
+    {
+      "feature_id": "cpu_temp",
+      "name": "CPU Temperature Monitor",
+      "next_files": [
+        "src/core/MemoryMonitor.h"
+      ],
+      "notes": "Reads /sys/class/thermal/thermal_zone0/temp on Linux. Used in MemoryMonitor for health logging. Display in LocalPanel."
     }
   ],
   "partial_features": {
-    "description": "These features have scaffolding in place but do NOT yet meet all acceptance criteria. These are the primary TODO items for contributors.",
-    "items": [
+    "description": "As of v0.7B (2026-02-17) all previously-partial features are now implemented. See implemented_features for the complete list. This section is retained as an archive of what was completed during the v0.7B sprint.",
+    "completed_in_v0_7B": [
+      "satellite_tracking", "dx_cluster", "solar_flux", "kp_index", "sunspot_number",
+      "xray_flux", "solar_wind", "bz_bt", "noaa_space_weather", "band_conditions",
+      "weather_de", "contests", "on_the_air", "adif", "ncdxf_beacons",
+      "countdown_timer", "setup_config", "widget_selector", "prefix_lookup", "maidenhead",
+      "rotator_gimbal"
+    ],
+    "items_ARCHIVE": [
       {
         "feature_id": "satellite_tracking",
         "name": "Satellite Tracking",
@@ -757,44 +857,27 @@
     ]
   },
   "missing_features": {
-    "description": "These features exist in the original but have NO scaffolding in hamclock-next. Prioritize based on deployment target (desktop vs Raspberry Pi).",
+    "description": "As of v0.7B, only 2 features remain genuinely missing (deferred to v0.8+). All others previously listed here have been implemented. See implemented_features.",
+    "implemented_from_this_list": [
+      "brightness_control (BrightnessManager.cpp, sysfs + day/night schedule)",
+      "radio_control (RigService.cpp, Hamlib rigctld)",
+      "gps_nmea (GPSProvider.cpp, gpsd TCP + TPV auto-set DE)",
+      "qrz_lookup (QRZProvider.cpp, XML API + config storage)",
+      "password_auth (WebServer.cpp, set_pre_routing_handler + config.webPassword)",
+      "cpu_temp (CPUMonitor.cpp, /sys/class/thermal)"
+    ],
     "items": [
       {
-        "feature_id": "brightness_control",
-        "name": "Brightness Control",
-        "original_reference": "brightness.cpp (38K)",
+        "feature_id": "robinson_projection",
+        "name": "Robinson Map Projection",
+        "original_reference": "robinson.cpp (5K)",
         "priority": "medium",
-        "notes": "Hardware PWM and photocell are ESP32/Pi-specific. Desktop equivalent: SDL2 window opacity or SDL_SetTextureBlendMode for a dimming overlay. Day/night schedule based on sunrise/sunset from DE location.",
+        "target_version": "v0.8",
+        "notes": "Robinson projection is visually familiar but less operationally useful for ham radio than azimuthal. MapWidget already has a projection enum stub. The math is well-documented — main work is adding a Robinson vertex generator and wiring the enum to the render path.",
         "acceptance_criteria": [
-          "Manual brightness slider",
-          "Day/night schedule",
-          "Smooth transition"
-        ]
-      },
-      {
-        "feature_id": "radio_control",
-        "name": "Radio CAT Control",
-        "original_reference": "radio.cpp (21K)",
-        "priority": "medium",
-        "notes": "CAT control via serial/network. Consider Hamlib integration (cross-platform, supports 200+ radios) rather than reimplementing CI-V/Kenwood/Yaesu protocols from scratch.",
-        "acceptance_criteria": [
-          "Connect to radio via serial or network",
-          "Set frequency from DX spot",
-          "Display current frequency",
-          "Support CI-V, Kenwood, Yaesu via Hamlib"
-        ]
-      },
-      {
-        "feature_id": "gps_nmea",
-        "name": "GPS/NMEA Integration",
-        "original_reference": "nmea.cpp (15K) + gpsd.cpp (7K)",
-        "priority": "low",
-        "notes": "More relevant for Raspberry Pi deployments. gpsd daemon interface (gpsd.cpp) is the most portable approach — connect to gpsd socket and read JSON output.",
-        "acceptance_criteria": [
-          "NMEA serial port reading",
-          "gpsd daemon interface",
-          "Auto-set DE location",
-          "PPS time sync"
+          "Robinson projection rendering",
+          "Day/night terminator on Robinson",
+          "Toggle between azimuthal and Robinson in Setup"
         ]
       },
       {
@@ -802,59 +885,13 @@
         "name": "BME280 Environmental Sensor",
         "original_reference": "BME280.cpp (16K)",
         "priority": "low",
-        "notes": "I2C hardware — only relevant for RPi with sensor. Plots temperature, pressure, humidity, dew point.",
+        "target_version": "v0.9",
+        "notes": "I2C hardware — only relevant for RPi with sensor attached. Plots temperature, pressure, humidity, dew point.",
         "acceptance_criteria": [
-          "I2C BME280 read",
+          "I2C BME280 read via linux i2c-dev",
           "Temperature/pressure/humidity display",
           "Dew point calculation",
-          "Historical plots"
-        ]
-      },
-      {
-        "feature_id": "robinson_projection",
-        "name": "Robinson Map Projection",
-        "original_reference": "robinson.cpp (5K)",
-        "priority": "medium",
-        "notes": "Robinson projection is visually familiar to users but less operationally useful for ham radio than azimuthal. Original robinson.cpp is only 5K — the math is well-documented. MapWidget would need a projection enum and renderer switch.",
-        "acceptance_criteria": [
-          "Robinson projection rendering",
-          "Day/night terminator on Robinson",
-          "Toggle between azimuthal and Robinson"
-        ]
-      },
-      {
-        "feature_id": "qrz_lookup",
-        "name": "QRZ.com Callsign Lookup",
-        "original_reference": "qrz.cpp (2K)",
-        "priority": "low",
-        "notes": "Requires QRZ.com XML subscription key. Original was only 2K — straightforward API call. Store key in ConfigManager.",
-        "acceptance_criteria": [
-          "Query QRZ XML API with callsign",
-          "Display name, address, QSL info",
-          "API key stored in config"
-        ]
-      },
-      {
-        "feature_id": "password_auth",
-        "name": "Web Server Authentication",
-        "original_reference": "passwd.cpp (9K)",
-        "priority": "high",
-        "notes": "API.md mentions future token-based auth. Control endpoints (/set_touch, /set_char, /set_mappos) allow remote input injection — these MUST be protected before any public deployment. Implement Bearer token auth at minimum.",
-        "acceptance_criteria": [
-          "Token/password protection for control endpoints",
-          "Read-only endpoints optionally unprotected",
-          "Token stored in config"
-        ]
-      },
-      {
-        "feature_id": "cpu_temp",
-        "name": "CPU Temperature Monitor",
-        "original_reference": "cputemp.cpp (11K)",
-        "priority": "low",
-        "notes": "Read from /sys/class/thermal/thermal_zone0/temp on Linux. Simple sysfs read. Useful for RPi health monitoring.",
-        "acceptance_criteria": [
-          "Read from /sys/class/thermal",
-          "Display current CPU temperature"
+          "Historical plots via HistoryPanel"
         ]
       }
     ]
@@ -877,7 +914,7 @@
   "contribution_guide": {
     "for_new_contributors": [
       "Read this MCP and the API.md in the repo root before touching any code.",
-      "Pick a feature from partial_features — most have scaffolding already in place.",
+      "Check missing_features for remaining v0.8 work (robinson_projection, bme280_sensor). All other features are implemented.",
       "Follow the widget_scaffolding steps. Do not deviate from the Provider/Panel/Data naming pattern.",
       "Use Theme:: color constants. Use FontManager for text. Never hardcode pixel positions — use _bounds from setBounds().",
       "Implement getDebugData() in every Panel — it feeds /debug/widgets and is essential for remote debugging.",
@@ -885,7 +922,7 @@
       "Test with the WebServer: /live.jpg shows the current state, /debug/widgets shows widget health."
     ],
     "for_ai_assistants": [
-      "This project uses C++17. Use modern C++ idioms: auto, range-for, std::optional, std::variant where appropriate.",
+      "This project uses C++20. Use modern C++ idioms: auto, range-for, std::optional, std::variant, structured bindings, if constexpr where appropriate.",
       "Do not suggest ESP32-specific code. This is a desktop/embedded Linux SDL2 application.",
       "When implementing a partial feature, check what already exists in the listed next_files before writing new code.",
       "The original codebase (master branch) is reference material for behavior, NOT for code style or architecture.",
@@ -896,11 +933,13 @@
       "feature_map.json is the source of truth for what is done, partial, or missing. Update it when you complete work."
     ],
     "code_style": [
-      "Tabs for indentation (0x09 — the way $DEITY intended).",
+      "2-space indentation (spaces, not tabs — actual codebase convention).",
       "Braces on same line for control flow, own line for class/function definitions.",
-      "Class members prefixed with underscore: _bounds, _data, _nextFetch.",
+      "Class members with TRAILING underscore: x_, y_, width_, height_, data_, nextFetch_. NOT leading underscore.",
       "Public API first in header, private last.",
-      "No raw owning pointers — use std::unique_ptr or std::shared_ptr."
+      "No raw owning pointers — use std::unique_ptr or std::shared_ptr.",
+      "Colors: always use ThemeColors struct from getThemeColors(theme_) — never hardcode SDL_Color{r,g,b,a} in widget render paths.",
+      "Windows portability: no localtime_r without #ifdef _WIN32 guard; no raw POSIX sockets — use DXClusterProvider.cpp as reference."
     ]
   },
   "feature_map_maintenance": {
@@ -950,6 +989,62 @@
       ],
       "documentation": "MEMORY_FIX_SUMMARY.md",
       "validation": "Longest stable run on RPi without errors to date (user confirmed)"
+    },
+    "phase_38": {
+      "name": "GPS DE Auto-Set (v0.7 Blocker)",
+      "completed": "2026-02-17",
+      "summary": "GPSProvider::processLine() fully wired. Connects to localhost:2947, parses TPV JSON, validates mode>=2, 60s throttle, 500m distance gate. Updates state->deLocation, config.lat/lon/grid on qualifying fix.",
+      "key_changes": [
+        "src/services/GPSProvider.cpp: processLine() implemented",
+        "src/services/GPSProvider.h: removed const from config_ ref; added lastUpdate_ member",
+        "CMakeLists.txt: added GPSProvider.cpp to source list",
+        "src/main.cpp: GPSProvider instantiated after webServer.start() as persistent background service"
+      ]
+    },
+    "phase_39": {
+      "name": "Tier 3: xray_flux, on_the_air enhanced, adif filter",
+      "completed": "2026-02-17",
+      "summary": "Three medium-complexity features completing the Tier 3 sprint.",
+      "key_changes": [
+        "HistoryProvider: fetchXray()/processXray() — GOES 7-day JSON, daily peak, log10 scale; HISTORY_XRAY widget type",
+        "ActivityProvider: POTA lat/lon from grid4 via Astronomy::gridToLatLon()",
+        "ActivityPanels: ONTAPanel POTA/SOTA/ALL filter toggle (title click cycles mode)",
+        "MapWidget: renderActivityPins() — green=POTA, orange=SOTA via setActivityStore()",
+        "ADIFPanel: band/mode filter chips — left-header click cycles band, right cycles mode; chip '[40m FT8]' shown"
+      ]
+    },
+    "phase_40": {
+      "name": "RBN (Reverse Beacon Network)",
+      "completed": "2026-02-17",
+      "summary": "RBNProvider background Telnet client feeding into shared DXClusterDataStore. RBN spots appear in DX Cluster panel and map overlay with zero rendering changes.",
+      "key_changes": [
+        "src/services/RBNProvider.cpp/.h: new Telnet client (clone of DXClusterProvider pattern)",
+        "ConfigManager.h: AppConfig::rbnEnabled, rbnHost fields",
+        "ConfigManager.cpp: rbn section load/save",
+        "CMakeLists.txt: added RBNProvider.cpp",
+        "main.cpp: RBNProvider instantiated and started",
+        "SetupScreen.h: rbnEnabled_, rbnToggleRect_ members"
+      ]
+    },
+    "phase_41": {
+      "name": "--web-only Headless Mode",
+      "completed": "2026-02-17",
+      "summary": "CLI flag for running HamClock without a display. Hidden SDL window + software renderer + alwaysCapture_ flag on WebServer ensures /live.jpg is always current.",
+      "key_changes": [
+        "src/main.cpp: --web-only flag parsing, SDL_WINDOW_HIDDEN, forceSoftware=true, URL print",
+        "src/network/WebServer.h: setAlwaysCapture(bool), alwaysCapture_ member",
+        "src/network/WebServer.cpp: needsCapture_ = alwaysCapture_ after each frame capture"
+      ]
+    },
+    "phase_42": {
+      "name": "SetupScreen RBN toggle + 100% parity",
+      "completed": "2026-02-17",
+      "summary": "Final wiring: RBN enable toggle rendered in Setup → Spotting tab. All 56/56 scoped features implemented. feature_map.json v1.6. hamclock-next-mcp.json v2.1.",
+      "key_changes": [
+        "SetupScreen.cpp: RBN section with checkbox render, click handler, setConfig/getConfig wiring",
+        ".mcp/feature_map.json: bumped to v1.6; rbn and web_only added as implemented",
+        ".mcp/hamclock-next-mcp.json: bumped to v2.1; feature_status_summary updated to 100%"
+      ]
     }
   },
   "platform_specific": {

@@ -12,11 +12,13 @@ public:
   void fetchFlux();
   void fetchSSN();
   void fetchKp();
+  void fetchXray();
 
 private:
   void processFlux(const std::string &body);
   void processSSN(const std::string &body);
   void processKp(const std::string &body);
+  void processXray(const std::string &body);
 
   NetworkManager &net_;
   std::shared_ptr<HistoryStore> store_;
@@ -25,4 +27,6 @@ private:
       "https://services.swpc.noaa.gov/text/daily-solar-indices.txt";
   static constexpr const char *KP_URL =
       "https://services.swpc.noaa.gov/text/daily-geomagnetic-indices.txt";
+  static constexpr const char *XRAY_URL =
+      "https://services.swpc.noaa.gov/json/goes/primary/xrays-7-day.json";
 };

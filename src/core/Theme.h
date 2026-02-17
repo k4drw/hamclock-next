@@ -11,6 +11,12 @@ struct ThemeColors {
   SDL_Color accent;
   SDL_Color rowStripe1;
   SDL_Color rowStripe2;
+
+  // Status colors
+  SDL_Color success; // Green-ish
+  SDL_Color warning; // Yellow-ish
+  SDL_Color danger;  // Red-ish
+  SDL_Color info;    // Cyan-ish
 };
 
 inline ThemeColors getThemeColors(const std::string &theme) {
@@ -23,6 +29,11 @@ inline ThemeColors getThemeColors(const std::string &theme) {
     colors.accent = {0, 200, 255, 255};
     colors.rowStripe1 = {25, 25, 30, 255};
     colors.rowStripe2 = {15, 15, 20, 255};
+
+    colors.success = {0, 255, 128, 255};
+    colors.warning = {255, 255, 0, 255};
+    colors.danger = {255, 80, 80, 255};
+    colors.info = {0, 180, 255, 255};
   } else if (theme == "glass") {
     colors.bg = {20, 25, 40, 200}; // semi-transparent
     colors.border = {100, 100, 150, 150};
@@ -31,8 +42,13 @@ inline ThemeColors getThemeColors(const std::string &theme) {
     colors.accent = {100, 200, 255, 255};
     colors.rowStripe1 = {30, 35, 50, 150};
     colors.rowStripe2 = {20, 25, 40, 100};
+
+    colors.success = {100, 255, 150, 200};
+    colors.warning = {255, 255, 150, 200};
+    colors.danger = {255, 150, 150, 200};
+    colors.info = {150, 220, 255, 200};
   } else {
-    // default (original HamClock-like colors often use dark backgrounds)
+    // default (original HamClock-like colors)
     colors.bg = {20, 20, 25, 255};
     colors.border = {80, 80, 80, 255};
     colors.text = {255, 255, 255, 255};
@@ -40,6 +56,11 @@ inline ThemeColors getThemeColors(const std::string &theme) {
     colors.accent = {255, 165, 0, 255}; // Orange
     colors.rowStripe1 = {30, 30, 35, 255};
     colors.rowStripe2 = {20, 20, 25, 255};
+
+    colors.success = {0, 255, 0, 255};
+    colors.warning = {255, 255, 0, 255};
+    colors.danger = {255, 50, 50, 255};
+    colors.info = {0, 255, 255, 255};
   }
   return colors;
 }

@@ -65,7 +65,7 @@ void ContestPanel::render(SDL_Renderer *renderer) {
     std::string status = "";
 
     if (now >= c.startTime && now <= c.endTime) {
-      statusColor = {0, 255, 0, 255}; // Running
+      statusColor = themes.success; // Running
       status = "NOW";
     } else {
       // Future

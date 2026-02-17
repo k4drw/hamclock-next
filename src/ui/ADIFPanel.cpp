@@ -4,6 +4,14 @@
 #include <cstdio>
 #include <vector>
 
+static const char *kFilterBands[] = {"All",  "160m", "80m", "60m",
+                                     "40m",  "30m",  "20m", "17m",
+                                     "15m",  "12m",  "10m", "6m",
+                                     "2m",   nullptr};
+static const char *kFilterModes[] = {"All",  "CW",   "SSB", "FT8",
+                                     "FT4",  "RTTY", "AM",  "FM",
+                                     nullptr};
+
 ADIFPanel::ADIFPanel(int x, int y, int w, int h, FontManager &fontMgr,
                      std::shared_ptr<ADIFStore> store)
     : Widget(x, y, w, h), fontMgr_(fontMgr), store_(std::move(store)) {}
@@ -74,12 +82,33 @@ void ADIFPanel::renderLogView(SDL_Renderer *renderer) {
   int pad = 4;
   int headerY = y_ + pad;
 
-  // Title
+  // Title with band/mode filter chips
   fontMgr_.drawText(renderer, "Recent QSOs", x_ + pad, headerY, themes.accent,
                     10, true);
+  // Filter chips (clickable): shown in right half of the title row
+  char chipBuf[32];
+  std::snprintf(chipBuf, sizeof(chipBuf), "[%s %s]",
+                kFilterBands[filterBandIdx_], kFilterModes[filterModeIdx_]);
+  fontMgr_.drawText(renderer, chipBuf, x_ + width_ / 2 + pad, headerY,
+                    themes.info, 9);
   headerY += headerHeight_;
 
-  if (!stats_.valid || stats_.recentQSOs.empty()) {
+  // Build filtered QSO list
+  const char *bandFilter =
+      (filterBandIdx_ == 0) ? nullptr : kFilterBands[filterBandIdx_];
+  const char *modeFilter =
+      (filterModeIdx_ == 0) ? nullptr : kFilterModes[filterModeIdx_];
+
+  std::vector<const QSORecord *> filtered;
+  for (const auto &qso : stats_.recentQSOs) {
+    if (bandFilter && qso.band != bandFilter)
+      continue;
+    if (modeFilter && qso.mode != modeFilter)
+      continue;
+    filtered.push_back(&qso);
+  }
+
+  if (!stats_.valid || filtered.empty()) {
     fontMgr_.drawText(renderer, "No QSOs Found", x_ + width_ / 2,
                       y_ + height_ / 2, themes.textDim, 12, false, true);
     return;
@@ -88,7 +117,7 @@ void ADIFPanel::renderLogView(SDL_Renderer *renderer) {
   // Calculate scrolling
   int availableHeight = height_ - headerHeight_ - pad * 2;
   int visibleRows = availableHeight / rowHeight_;
-  int totalRows = static_cast<int>(stats_.recentQSOs.size());
+  int totalRows = static_cast<int>(filtered.size());
   maxScroll_ = std::max(0, totalRows - visibleRows);
 
   // Clamp scroll offset
@@ -126,7 +155,7 @@ void ADIFPanel::renderLogView(SDL_Renderer *renderer) {
   int endIdx = std::min(scrollOffset_ + visibleRows, totalRows);
 
   for (int i = scrollOffset_; i < endIdx; ++i) {
-    const QSORecord &qso = stats_.recentQSOs[i];
+    const QSORecord &qso = *filtered[i];
 
     // Alternate row background
     if (i % 2 == 0) {
@@ -254,6 +283,24 @@ void ADIFPanel::onMouseMove(int mx, int my) {
 bool ADIFPanel::onMouseUp(int mx, int my, Uint16 /*mod*/) {
   if (draggingScrollbar_) {
     draggingScrollbar_ = false;
+    return true;
+  }
+
+  // Click in header row: left half cycles band filter, right half cycles mode
+  if (my >= y_ && my < y_ + headerHeight_) {
+    if (mx < x_ + width_ / 2) {
+      // Count filter bands
+      int n = 0;
+      while (kFilterBands[n])
+        n++;
+      filterBandIdx_ = (filterBandIdx_ + 1) % n;
+    } else {
+      int n = 0;
+      while (kFilterModes[n])
+        n++;
+      filterModeIdx_ = (filterModeIdx_ + 1) % n;
+    }
+    scrollOffset_ = 0;
     return true;
   }
 

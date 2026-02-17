@@ -39,6 +39,10 @@ private:
   // View toggle (future: can switch between stats and log view)
   bool showLogView_ = true;
 
+  // Band/mode filter (index into kFilterBands/kFilterModes; 0 = All)
+  int filterBandIdx_ = 0;
+  int filterModeIdx_ = 0;
+
   // Mouse drag state for scrollbar
   bool draggingScrollbar_ = false;
   int dragStartY_ = 0;

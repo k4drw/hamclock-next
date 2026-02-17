@@ -133,6 +133,13 @@ bool PaneContainer::onKeyDown(SDL_Keycode key, Uint16 mod) {
   return false;
 }
 
+bool PaneContainer::onTextInput(const char *text) {
+  if (isModalActive() && activeWidget_) {
+    return activeWidget_->onTextInput(text);
+  }
+  return false;
+}
+
 std::vector<std::string> PaneContainer::getActions() const {
   std::vector<std::string> actions = {"change_rotation", "tap", "rotate"};
   if (activeWidget_) {

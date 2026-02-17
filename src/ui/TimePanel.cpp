@@ -233,9 +233,10 @@ void TimePanel::render(SDL_Renderer *renderer) {
                         infoFontSize_);
 
       // Rotating info (shifted slightly right to give more room for uptime)
+      // Rotating info
       const std::string &centerText = infoTexts_[infoRotateIdx_];
       TTF_SizeUTF8(infoFont, centerText.c_str(), &tw, &th);
-      fontMgr_.drawText(renderer, centerText, x_ + (width_ - tw) * 0.58f, infoY,
+      fontMgr_.drawText(renderer, centerText, x_ + (width_ - tw) / 2, infoY,
                         gray, infoFontSize_);
 
       // Right: version
@@ -245,7 +246,7 @@ void TimePanel::render(SDL_Renderer *renderer) {
     }
   }
 
-  // --- Time: HH:MM (large, white) + SS (superscript, gray) ---
+  // --- Time: HH:MM (large, white) + SS (superscript, white) ---
   if (!hmTex_ || currentHM_ != lastHM_ || hmFontSize_ != lastHmFontSize_) {
     MemoryMonitor::getInstance().destroyTexture(hmTex_);
     SDL_Color white = {255, 255, 255, 255};
@@ -267,11 +268,21 @@ void TimePanel::render(SDL_Renderer *renderer) {
     SDL_Rect dst = {x_ + pad, dy, hmW_, hmH_};
     SDL_RenderCopy(renderer, hmTex_, nullptr, &dst);
 
-    // SS superscript (aligned with top of HH:MM characters)
+    // SS superscript (visually aligned with top of digits)
     if (secTex_) {
-      // Large fonts have significant internal leading (top padding).
-      // Nudge seconds down so their top is visually even with the big digits.
-      int secY = dy + (hmH_ * 0.12f);
+      // Use font ascent to align seconds precisely
+      int hmAscent = fontMgr_.getFontAscent(hmFontSize_);
+      int secAscent = fontMgr_.getFontAscent(secFontSize_);
+
+      // Top of digits is approx (baseline - ascent).
+      // We'll align the baseline of seconds slightly above the baseline of HM
+      int secY = dy + (hmH_ * 0.15f);
+
+      // Safety clamp: ensure seconds don't bleed out of the row
+      if (secY + secH_ > timeBaseY + timeRowH) {
+        secY = timeBaseY + timeRowH - secH_;
+      }
+
       SDL_Rect secDst = {x_ + pad + hmW_ + 2, secY, secW_, secH_};
       SDL_RenderCopy(renderer, secTex_, nullptr, &secDst);
     }

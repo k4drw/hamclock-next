@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../core/SolarData.h"
+#include "../core/Theme.h"
 #include "FontManager.h"
 #include "Widget.h"
 
@@ -21,6 +22,7 @@ public:
 
   std::string getName() const override { return "SpaceWeather"; }
   std::vector<std::string> getActions() const override;
+  bool performAction(const std::string &action) override;
   SDL_Rect getActionRect(const std::string &action) const override;
   nlohmann::json getDebugData() const override;
 
@@ -28,7 +30,7 @@ private:
   void destroyCache();
   static SDL_Color colorForK(int k);
   static SDL_Color colorForSFI(int sfi);
-  static SDL_Color colorForNOAAScale(int scale);
+  static SDL_Color colorForNOAAScale(int scale, const ThemeColors &themes);
 
   FontManager &fontMgr_;
   std::shared_ptr<SolarDataStore> store_;

@@ -28,10 +28,13 @@ public:
             std::shared_ptr<ActivityDataStore> store);
 
   void update() override;
+  bool onMouseUp(int mx, int my, Uint16 mod) override;
 
 private:
   ActivityProvider &provider_;
   std::shared_ptr<ActivityDataStore> store_;
   std::chrono::system_clock::time_point lastUpdate_{};
   uint32_t lastFetch_ = 0;
+  // 0=ALL, 1=POTA, 2=SOTA
+  int filterMode_ = 0;
 };

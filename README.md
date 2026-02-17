@@ -1,9 +1,9 @@
-# HamClock-Next (v0.6B)
+# HamClock-Next (v0.7B)
 
 HamClock-Next is a modern, SDL2-based reconstruction of the classic HamClock. It focuses on visual fidelity, high-DPI support, and a smooth user experience while maintaining the essential functionality loved by amateur radio operators.
 
 > [!WARNING]
-> **BETA RELEASE NOTICE**: This is a Beta release (**v0.6B**). While functional, it is still under active development and contains known bugs. Breaking changes and refinements are ongoing. Please report issues on GitHub.
+> **BETA RELEASE NOTICE**: This is a Beta release (**v0.7B**). While functional, it is still under active development and contains known bugs. Breaking changes and refinements are ongoing. Please report issues on GitHub.
 
 ## Key Accomplishments
 
@@ -85,7 +85,7 @@ sudo apt-get install cmake build-essential pkg-config \
   libcurl4-openssl-dev libsqlite3-dev
 
 # Clone the repository
-git clone https://github.com/USER/hamclock-next.git
+git clone https://github.com/k4drw/hamclock-next.git
 cd hamclock-next
 
 # Build with single thread (safe for 1GB RAM)
@@ -109,7 +109,7 @@ HamClock-Next builds natively on macOS (Intel and Apple Silicon):
 brew install cmake sdl2 sdl2_image sdl2_ttf curl
 
 # Clone the repository
-git clone https://github.com/USER/hamclock-next.git
+git clone https://github.com/k4drw/hamclock-next.git
 cd hamclock-next
 
 # Build .app bundle
@@ -129,6 +129,18 @@ cd hamclock-next
 **Build times:**
 - **M1/M2/M3 Mac**: ~2-5 minutes (first build)
 - **Intel Mac**: ~5-10 minutes
+
+### Building for Windows (x64 Cross-Compile)
+
+Requires Docker (image is auto-pulled on first run).
+
+```bash
+bash scripts/build-win64.sh
+```
+
+Produces `build-win64/hamclock-next.exe` and `build-win64/HamClock-Next-Setup.exe`.
+
+The installer (`HamClock-Next-Setup.exe`) sets up PATH and creates Start Menu shortcuts.
 
 **Speed up rebuilds with ccache:**
 ```bash
@@ -179,6 +191,7 @@ HamClock-Next also attempts to disable this at runtime, but the kernel parameter
 ### Command Line Options
 - `-f, --fullscreen`: Launch in fullscreen mode.
 - `-s, --software`: Force software rendering (disables OpenGL/MSAA). Essential for environments without a functioning 3D setup or DRI access.
+- `--log-level <level>`: Set logging verbosity. Values: `debug`, `info`, `warn`, `error` (default: `warn`).
 - `-h, --help`: Show help message.
 
 ## Data & Configuration Locations
@@ -204,11 +217,11 @@ To get started with AI-assisted contributions, see the **[MCP_GUIDE.md](MCP_GUID
 
 ## Roadmap & Next Steps
 
-The following features are planned:
-
-- [ ] **Phase 6: Hardware Control** — Rotator control (Hamlib/Rigctl) and BME280 environment sensor integration.
-- [ ] **World Map Overlays** — Gray line optimizations, CQ/ITU Zones, and Prefix overlays.
-- [ ] **Multi-Instance Sync** — Sharing state between multiple clocks on the same network.
+- ✅ **Phase 6: Hardware Control** (RigService CAT, RotatorService, CPUMonitor) — DONE
+- ✅ **Windows x64 cross-build** (dockcross) — DONE (02-17-2026)
+- ✅ **GPS/NMEA**: GPSProvider integrated; time/location sync supported. — DONE (02-17-2026)
+- [ ] **World Map Overlays** — CQ/ITU Zones, Prefix overlays
+- [ ] **Multi-Instance Sync** — Sharing state between multiple clocks on the same network
 
 ---
 *Created by the HamClock-Next team.*

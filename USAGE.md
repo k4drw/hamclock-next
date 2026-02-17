@@ -43,6 +43,9 @@ The map is the primary tool for propagation and location tracking.
 - **Gear Icon**: Clicking the gear in the bottom-right opens the global **Main Setup Screen**.
 - **Callsign Editing**: Click directly on your **Callsign** to open the inline nameplate editor and color palette.
 
+### Setup → Services Tab
+- **GPS Toggle**: Enable the GPS toggle to synchronize the DE location from a running `gpsd` daemon (Linux/Raspberry Pi). Requires `gpsd` to be installed and running with a connected GPS receiver.
+
 ---
 
 ## ⌨️ Keyboard Shortcuts
@@ -53,6 +56,17 @@ The map is the primary tool for propagation and location tracking.
 | `o`            | Toggle Debug Overlay (performance metrics)   |
 | `k`            | Cycle Layout Alignment (Left, Center, Right) |
 | `q` / `Ctrl+Q` | Quit Application                             |
+
+---
+
+## 🖥️ Command Line Options
+
+| Option | Description |
+| :----- | :---------- |
+| `-f`, `--fullscreen` | Launch in fullscreen mode |
+| `-s`, `--software` | Force software rendering (no OpenGL/MSAA) |
+| `--log-level <level>` | Set log verbosity: `debug`, `info`, `warn`, `error` (default: `warn`) |
+| `-h`, `--help` | Show help message |
 
 ---
 

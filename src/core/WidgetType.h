@@ -21,6 +21,7 @@ enum class WidgetType {
   HISTORY_FLUX,
   HISTORY_KP,
   HISTORY_SSN,
+  HISTORY_XRAY,
   DRAP,
   AURORA,
   AURORA_GRAPH,
@@ -70,6 +71,8 @@ inline const char *widgetTypeToString(WidgetType t) {
     return "history_kp";
   case WidgetType::HISTORY_SSN:
     return "history_ssn";
+  case WidgetType::HISTORY_XRAY:
+    return "history_xray";
   case WidgetType::DRAP:
     return "drap";
   case WidgetType::AURORA:
@@ -132,6 +135,8 @@ inline const char *widgetTypeDisplayName(WidgetType t) {
     return "K-Index";
   case WidgetType::HISTORY_SSN:
     return "Sunspots";
+  case WidgetType::HISTORY_XRAY:
+    return "X-Ray Flux";
   case WidgetType::DRAP:
     return "DRAP";
   case WidgetType::AURORA:
@@ -194,6 +199,8 @@ inline WidgetType widgetTypeFromString(const std::string &s,
     return WidgetType::HISTORY_KP;
   if (s == "history_ssn")
     return WidgetType::HISTORY_SSN;
+  if (s == "history_xray")
+    return WidgetType::HISTORY_XRAY;
   if (s == "drap")
     return WidgetType::DRAP;
   if (s == "aurora")
