@@ -229,11 +229,11 @@ void SetupScreen::render(SDL_Renderer *renderer) {
   SDL_RenderFillRect(renderer, &bg);
 
   int cx = x_ + width_ / 2;
-  int pad = std::max(16, width_ / 24);
-  int fieldW = std::min(400, width_ - 2 * pad);
+  int pad = std::max(12, width_ / 40);
+  int fieldW = std::min(600, width_ - 2 * pad);
   int fieldX = cx - fieldW / 2;
-  int fieldH = fieldSize_ + 14;
-  int textPad = 7;
+  int fieldH = fieldSize_ + 10;
+  int textPad = 6;
 
   LOG_D("SetupScreen", "Layout: pad={}, fieldW={}, fieldX={}, fieldH={}", pad,
         fieldW, fieldX, fieldH);
@@ -246,7 +246,7 @@ void SetupScreen::render(SDL_Renderer *renderer) {
 
   fontMgr_.drawText(renderer, "HamClock-Next Setup", cx, y, cyan, titleSize_,
                     true, true);
-  y += titleSize_ + pad;
+  y += titleSize_ + pad / 2;
 
   const char *tabs[] = {"Identity", "Spotting", "Appearance", "Display",
                         "Rig",      "Services", "Widgets"};
@@ -339,7 +339,7 @@ void SetupScreen::render(SDL_Renderer *renderer) {
 void SetupScreen::renderTabIdentity(SDL_Renderer *renderer, int, int pad,
                                     int fieldW, int fieldH, int fieldX,
                                     int textPad) {
-  int y = (y_ + titleSize_ + 2 * pad + fieldH + pad / 2);
+  int y = (y_ + titleSize_ + 2 * pad + fieldH);
   int vSpace = pad / 2;
   SDL_Color white = {255, 255, 255, 255};
   SDL_Color orange = {255, 165, 0, 255};
@@ -388,12 +388,26 @@ void SetupScreen::renderTabIdentity(SDL_Renderer *renderer, int, int pad,
     fontMgr_.drawText(renderer, "Auto-calculated from grid", fieldX, y, gray,
                       hintSize_);
   }
+  y += pad;
+
+  gpsToggleRect_ = {fieldX, y, 20, 20};
+  SDL_SetRenderDrawColor(renderer, 50, 50, 60, 255);
+  SDL_RenderFillRect(renderer, &gpsToggleRect_);
+  SDL_SetRenderDrawColor(renderer, 100, 100, 120, 255);
+  SDL_RenderDrawRect(renderer, &gpsToggleRect_);
+  if (gpsEnabled_) {
+    SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
+    SDL_Rect check = {fieldX + 4, y + 4, 12, 12};
+    SDL_RenderFillRect(renderer, &check);
+  }
+  fontMgr_.drawText(renderer, "Synchronize with GPS (gpsd)", fieldX + 30, y + 2,
+                    white, labelSize_);
 }
 
 void SetupScreen::renderTabDXCluster(SDL_Renderer *renderer, int cx, int pad,
                                      int fieldW, int fieldH, int fieldX,
                                      int textPad) {
-  int y = (y_ + titleSize_ + 2 * pad + fieldH + pad / 2);
+  int y = (y_ + titleSize_ + 2 * pad + fieldH);
   int vSpace = 5;
   SDL_Color white = {255, 255, 255, 255};
   SDL_Color orange = {255, 165, 0, 255};
@@ -462,12 +476,15 @@ void SetupScreen::renderTabDXCluster(SDL_Renderer *renderer, int cx, int pad,
                     white, labelSize_);
   toggleRect_ = toggle;
   y += 30;
+
+  toggleRect_ = toggle;
+  y += 30;
 }
 
 void SetupScreen::renderTabAppearance(SDL_Renderer *renderer, int, int pad,
                                       int fieldW, int fieldH, int fieldX,
                                       int textPad) {
-  int y = (y_ + titleSize_ + 2 * pad + fieldH + pad / 2);
+  int y = (y_ + titleSize_ + 2 * pad + fieldH);
   int vSpace = pad / 2;
   SDL_Color white = {255, 255, 255, 255};
   SDL_Color orange = {255, 165, 0, 255};
@@ -537,7 +554,7 @@ void SetupScreen::renderTabAppearance(SDL_Renderer *renderer, int, int pad,
 void SetupScreen::renderTabDisplay(SDL_Renderer *renderer, int, int pad,
                                    int fieldW, int fieldH, int fieldX,
                                    int textPad) {
-  int y = (y_ + titleSize_ + 2 * pad + fieldH + pad / 2);
+  int y = (y_ + titleSize_ + 2 * pad + fieldH);
   int vSpace = pad / 2;
   SDL_Color white = {255, 255, 255, 255};
   SDL_Color gray = {140, 140, 140, 255};
@@ -597,7 +614,7 @@ void SetupScreen::renderTabDisplay(SDL_Renderer *renderer, int, int pad,
 void SetupScreen::renderTabServices(SDL_Renderer *renderer, int, int pad,
                                     int fieldW, int fieldH, int fieldX,
                                     int textPad) {
-  int y = (y_ + titleSize_ + 2 * pad + fieldH + pad / 2);
+  int y = (y_ + titleSize_ + 2 * pad + fieldH);
   int vSpace = pad / 2;
   SDL_Color white = {255, 255, 255, 255};
   SDL_Color orange = {255, 165, 0, 255};
@@ -620,27 +637,34 @@ void SetupScreen::renderTabServices(SDL_Renderer *renderer, int, int pad,
               orange, gray, white, white, gray);
   y += vSpace;
 
+  y += vSpace;
+
+  // Countdown settings side-by-side
+  int halfW = (fieldW - pad) / 2;
   fontMgr_.drawText(renderer, "Countdown Label:", fieldX, y, white, labelSize_,
                     true);
-  y += labelSize_ + 4;
-  renderField(renderer, fontMgr_, countdownLabel_, "e.g. Contest Start", fieldX,
-              y, fieldW, fieldH, fieldSize_, textPad, activeField_ == 2, true,
-              cursorPos_, orange, gray, white, white, gray);
-  y += vSpace;
-
-  fontMgr_.drawText(renderer, "Countdown Target (YYYY-MM-DD HH:MM):", fieldX, y,
+  fontMgr_.drawText(renderer,
+                    "Target (YYYY-MM-DD HH:MM):", fieldX + halfW + pad, y,
                     white, labelSize_, true);
   y += labelSize_ + 4;
-  renderField(renderer, fontMgr_, countdownTime_, "e.g. 2024-11-28 18:00",
-              fieldX, y, fieldW, fieldH, fieldSize_, textPad, activeField_ == 3,
-              true, cursorPos_, orange, gray, white, white, gray);
-  y += vSpace;
+
+  int lblY = y;
+  renderField(renderer, fontMgr_, countdownLabel_, "e.g. Contest", fieldX, lblY,
+              halfW, fieldH, fieldSize_, textPad, activeField_ == 2, true,
+              cursorPos_, orange, gray, white, white, gray);
+
+  int tY = y;
+  renderField(renderer, fontMgr_, countdownTime_, "2024-11-28 18:00",
+              fieldX + halfW + pad, tY, halfW, fieldH, fieldSize_, textPad,
+              activeField_ == 3, true, cursorPos_, orange, gray, white, white,
+              gray);
+  y = std::max(lblY, tY) + vSpace;
 }
 
-void SetupScreen::renderTabRig(SDL_Renderer *renderer, int cx, int pad,
+void SetupScreen::renderTabRig(SDL_Renderer *renderer, int /*cx*/, int pad,
                                int fieldW, int fieldH, int fieldX,
                                int textPad) {
-  int y = (y_ + titleSize_ + 2 * pad + fieldH + pad / 2);
+  int y = (y_ + titleSize_ + 2 * pad + fieldH);
   int vSpace = pad / 2;
   SDL_Color white = {255, 255, 255, 255};
   SDL_Color orange = {255, 165, 0, 255};
@@ -685,10 +709,10 @@ void SetupScreen::renderTabRig(SDL_Renderer *renderer, int cx, int pad,
                     y, gray, hintSize_);
 }
 
-void SetupScreen::renderTabWidgets(SDL_Renderer *renderer, int cx, int pad,
+void SetupScreen::renderTabWidgets(SDL_Renderer *renderer, int /*cx*/, int pad,
                                    int fieldW, int fieldH, int fieldX,
-                                   int textPad) {
-  int y = (y_ + titleSize_ + 2 * pad + fieldH + pad / 2);
+                                   int /*textPad*/) {
+  int y = (y_ + titleSize_ + 2 * pad + fieldH);
   SDL_Color white = {255, 255, 255, 255};
   SDL_Color gray = {140, 140, 140, 255};
 
@@ -774,11 +798,11 @@ void SetupScreen::onResize(int x, int y, int w, int h) {
 
 bool SetupScreen::onMouseUp(int mx, int my, Uint16) {
   int cx = x_ + width_ / 2;
-  int pad = std::max(16, width_ / 24);
-  int fieldW = std::min(400, width_ - 2 * pad);
+  int pad = std::max(12, width_ / 40);
+  int fieldW = std::min(600, width_ - 2 * pad);
   int fieldX = cx - fieldW / 2;
-  int fieldH = fieldSize_ + 14;
-  int y = y_ + titleSize_ + 2 * pad;
+  int fieldH = fieldSize_ + 10;
+  int y = y_ + titleSize_ + (3 * pad) / 2;
 
   // Check Footer Buttons
   if (mx >= cancelBtnRect_.x && mx <= cancelBtnRect_.x + cancelBtnRect_.w &&
@@ -806,6 +830,14 @@ bool SetupScreen::onMouseUp(int mx, int my, Uint16) {
         cursorPos_ = 0;
         return true;
       }
+    }
+  }
+
+  if (activeTab_ == Tab::Identity) {
+    if (mx >= gpsToggleRect_.x && mx <= gpsToggleRect_.x + gpsToggleRect_.w &&
+        my >= gpsToggleRect_.y && my <= gpsToggleRect_.y + gpsToggleRect_.h) {
+      gpsEnabled_ = !gpsEnabled_;
+      return true;
     }
   }
 
@@ -879,7 +911,7 @@ bool SetupScreen::onMouseUp(int mx, int my, Uint16) {
   }
 
   if (activeTab_ == Tab::Widgets) {
-    int yTabBase = y_ + titleSize_ + 2 * pad + fieldH + pad / 2;
+    int yTabBase = y_ + titleSize_ + 2 * pad + fieldH;
     int ySelector = yTabBase + labelSize_ + pad / 2;
     int paneW = fieldW / 4;
     if (my >= ySelector && my <= ySelector + 30) {
@@ -908,7 +940,7 @@ bool SetupScreen::onMouseUp(int mx, int my, Uint16) {
   }
 
   // Handle generic field clicks for active tab
-  int yStart = y_ + titleSize_ + 2 * pad + fieldH + pad / 2;
+  int yStart = y_ + titleSize_ + 2 * pad + fieldH;
   int nFields = 0;
   if (activeTab_ == Tab::Identity)
     nFields = 4;
@@ -944,6 +976,15 @@ bool SetupScreen::onMouseUp(int mx, int my, Uint16) {
         fy += (labelSize_ + 4 + fieldH + pad) + (24 + pad);
         fw = (fieldW - pad) / 2;
         if (i == 1)
+          fx += fw + pad;
+      }
+    } else if (activeTab_ == Tab::Services) {
+      if (i < 2) {
+        fy += i * (labelSize_ + 4 + fieldH + vSpace);
+      } else { // Label/Target row
+        fy += 2 * (labelSize_ + 4 + fieldH + vSpace);
+        fw = (fieldW - pad) / 2;
+        if (i == 3)
           fx += fw + pad;
       }
     } else { // All other tabs with simple vertical field lists
@@ -1296,6 +1337,7 @@ bool SetupScreen::onTextInput(const char *inputText) {
 }
 
 void SetupScreen::setConfig(const AppConfig &cfg) {
+  gpsEnabled_ = cfg.gpsEnabled;
   callsignText_ = cfg.callsign;
   gridText_ = cfg.grid;
   if (cfg.lat != 0.0 || cfg.lon != 0.0) {
@@ -1310,9 +1352,6 @@ void SetupScreen::setConfig(const AppConfig &cfg) {
   clusterLogin_ = cfg.dxClusterLogin;
   clusterEnabled_ = cfg.dxClusterEnabled;
   clusterWSJTX_ = cfg.dxClusterUseWSJTX;
-  pskOfDe_ = cfg.pskOfDe;
-  pskUseCall_ = cfg.pskUseCall;
-  pskMaxAge_ = cfg.pskMaxAge;
 
   rotationInterval_ = cfg.rotationIntervalS;
   theme_ = cfg.theme;
@@ -1354,6 +1393,7 @@ void SetupScreen::setConfig(const AppConfig &cfg) {
 
 AppConfig SetupScreen::getConfig() const {
   AppConfig cfg;
+  cfg.gpsEnabled = gpsEnabled_;
   cfg.callsign = callsignText_;
   cfg.grid = gridText_;
   cfg.lat = std::atof(latText_.c_str());
@@ -1365,9 +1405,6 @@ AppConfig SetupScreen::getConfig() const {
   cfg.dxClusterLogin = clusterLogin_;
   cfg.dxClusterEnabled = clusterEnabled_;
   cfg.dxClusterUseWSJTX = clusterWSJTX_;
-  cfg.pskOfDe = pskOfDe_;
-  cfg.pskUseCall = pskUseCall_;
-  cfg.pskMaxAge = pskMaxAge_;
 
   cfg.rotationIntervalS = rotationInterval_;
   cfg.theme = theme_;

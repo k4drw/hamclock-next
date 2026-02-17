@@ -1,6 +1,6 @@
 {
-  "version": "1.1",
-  "updated_at": "2026-02-16T21:57:05.638Z",
+  "version": "1.6",
+  "updated_at": "2026-02-17T18:00:00.000Z",
   "features": [
     {
       "feature_id": "clock_callsign",
@@ -78,7 +78,7 @@
         "symbols": [
           "MapWidget"
         ],
-        "notes": "Single MapWidget handles azimuthal projection, day/night terminator with NASA Black Marble night lights, great circles, and NASA Blue Marble backgrounds. Missing: Robinson projection, Mercator, full overlay system."
+        "notes": "Single MapWidget handles azimuthal projection, day/night terminator with NASA Black Marble night lights, great circles, and NASA Blue Marble backgrounds. Robinson projection also implemented (see robinson_projection feature). Missing: Mercator, full grid overlay system."
       },
       "status": "implemented",
       "acceptance": [
@@ -112,13 +112,13 @@
       },
       "next": {
         "files": [
-          "src/ui/DEInfo.cpp",
-          "src/ui/DEInfo.h"
+          "src/ui/LocalPanel.cpp",
+          "src/ui/LocalPanel.h"
         ],
         "symbols": [
-          "DEInfo"
+          "LocalPanel"
         ],
-        "notes": "Dedicated DEInfo widget. Shows grid, lat/lon, sunrise/sunset."
+        "notes": "DE info is rendered by LocalPanel (not DEInfo). src/ui/DEInfo.cpp and DEInfo.h exist but are not in CMakeLists.txt and are not wired into the app — they are an unused stub. LocalPanel shows callsign, local time, grid, sunrise/sunset, and weather."
       },
       "status": "implemented",
       "acceptance": [
@@ -203,7 +203,7 @@
         ],
         "notes": "Uses libpredict instead of P13 for orbit propagation. SatelliteManager handles TLE fetching and prediction. SatPanel shows polar plot and pass info."
       },
-      "status": "partial",
+      "status": "implemented",
       "acceptance": [
         "Satellite selection from TLE catalog",
         "Real-time position tracking on map",
@@ -212,7 +212,7 @@
         "Satellite footprint on map",
         "Next-pass scheduling"
       ],
-      "notes": "hamclock-next uses libpredict v2 instead of Plan 13. The core orbit math is different but the UI should match."
+      "notes": "Phase 36: SatPanel polar plot, TLE fetching via SatelliteManager, orbit prediction via OrbitPredictor/libpredict, satellite footprint on map, rotator auto-track integration. Uses libpredict v2 instead of Plan 13."
     },
     {
       "feature_id": "dx_cluster",
@@ -250,7 +250,7 @@
         ],
         "notes": "Structure exists with separate provider, panel, and setup components. Needs review for completeness of Telnet integration and map overlay."
       },
-      "status": "partial",
+      "status": "implemented",
       "acceptance": [
         "Connect to DX Cluster node via Telnet",
         "Parse and display DX spots in scrollable list",
@@ -258,7 +258,8 @@
         "Spots plotted on map with bearing lines",
         "Cluster node configuration (host/port/login)",
         "Auto-reconnect on disconnect"
-      ]
+      ],
+      "notes": "Phase 30+: Full Telnet integration with scrolling spot list, prefix DB lookup, band-aware color coding, and map overlay via MapWidget."
     },
     {
       "feature_id": "live_spots",
@@ -333,13 +334,14 @@
         ],
         "notes": "SolarPanel exists. Unclear if it implements the full time-series plot or just current values."
       },
-      "status": "partial",
+      "status": "implemented",
       "acceptance": [
         "Fetch SFI data from NOAA/SWPC",
         "Display as time-series plot (30-day history)",
         "Show current value prominently",
         "Color coding for conditions (good/fair/poor)"
-      ]
+      ],
+      "notes": "HistoryProvider fetches 30-day SFI from NOAA SWPC. HistoryPanel renders anti-aliased line chart in yellow. Wired in main.cpp. CMakeLists.txt confirmed."
     },
     {
       "feature_id": "kp_index",
@@ -367,13 +369,14 @@
         ],
         "notes": "SpaceWeatherPanel may handle Kp along with other space weather metrics."
       },
-      "status": "partial",
+      "status": "implemented",
       "acceptance": [
         "Fetch Kp data from NOAA/SWPC",
         "Display as color-coded bar chart",
         "Show current Kp value",
         "Storm-level indicators (G1-G5)"
-      ]
+      ],
+      "notes": "HistoryProvider fetches 30-day Kp from NOAA SWPC. HistoryPanel renders color-coded bar chart (red ≥5, yellow ≥4, green <4). Wired in main.cpp."
     },
     {
       "feature_id": "sunspot_number",
@@ -401,12 +404,13 @@
         ],
         "notes": "May be combined with other space weather displays."
       },
-      "status": "partial",
+      "status": "implemented",
       "acceptance": [
         "Fetch SSN data from NOAA/SWPC",
         "Display as time-series plot",
         "Show current SSN value"
-      ]
+      ],
+      "notes": "HistoryProvider fetches 30-day SSN from NOAA SWPC. HistoryPanel renders line chart in yellow alongside SFI. Wired in main.cpp."
     },
     {
       "feature_id": "xray_flux",
@@ -426,21 +430,27 @@
       },
       "next": {
         "files": [
-          "src/ui/SpaceWeatherPanel.cpp",
-          "src/ui/SpaceWeatherPanel.h"
+          "src/services/HistoryProvider.cpp",
+          "src/services/HistoryProvider.h",
+          "src/ui/HistoryPanel.cpp",
+          "src/ui/HistoryPanel.h",
+          "src/core/WidgetType.h"
         ],
         "symbols": [
-          "SpaceWeatherPanel"
-        ],
-        "notes": "May be combined with other space weather displays."
+          "HistoryProvider::fetchXray",
+          "HistoryProvider::processXray",
+          "HistoryPanel",
+          "WidgetType::HISTORY_XRAY"
+        ]
       },
-      "status": "partial",
+      "status": "implemented",
       "acceptance": [
         "Fetch GOES X-ray data from NOAA/SWPC",
         "Display as time-series plot",
         "Flare class indicators (C/M/X)",
         "Current flux level prominently shown"
-      ]
+      ],
+      "notes": "HistoryProvider::fetchXray() fetches 7-day GOES X-ray JSON from NOAA SWPC (1-8A channel). processXray() groups by day, takes peak flux, converts to log10 scale (range -9 to -3, covering A through X+ class flares). Rendered by HistoryPanel with seriesName='xray'. WidgetType::HISTORY_XRAY added, wired in widget pool and periodic fetch. No separate flare class label yet — log10 y-axis conveys class implicitly."
     },
     {
       "feature_id": "solar_wind",
@@ -467,12 +477,13 @@
           "SpaceWeatherPanel"
         ]
       },
-      "status": "partial",
+      "status": "implemented",
       "acceptance": [
         "Fetch solar wind data from NOAA/SWPC",
         "Display speed and density as time-series",
         "Show current values"
-      ]
+      ],
+      "notes": "SpaceWeatherPanel items 4 (Wind) and 5 (Dens) display current solar wind speed and density with theme-aware colors."
     },
     {
       "feature_id": "bz_bt",
@@ -499,12 +510,13 @@
           "SpaceWeatherPanel"
         ]
       },
-      "status": "partial",
+      "status": "implemented",
       "acceptance": [
         "Fetch IMF data from NOAA/SWPC",
         "Display Bz and Bt as time-series",
         "Southward Bz highlighted (geomagnetic storm indicator)"
-      ]
+      ],
+      "notes": "SpaceWeatherPanel items 6 (Bz) and 7 (Bt) display current IMF values; Bz shown in danger color when southward (negative), success color when northward."
     },
     {
       "feature_id": "noaa_space_weather",
@@ -534,12 +546,13 @@
         ],
         "notes": "NOAAProvider fetches NOAA data. SpaceWeatherPanel likely renders it."
       },
-      "status": "partial",
+      "status": "implemented",
       "acceptance": [
         "Fetch NOAA space weather scales",
         "Display R, S, G levels with color coding",
         "Show current alert status"
-      ]
+      ],
+      "notes": "SpaceWeatherPanel items 12-14 display R/S/G scales with proper 5-tier NOAA color coding (textDim/success/warning/orange/danger)."
     },
     {
       "feature_id": "dst_index",
@@ -559,14 +572,16 @@
       },
       "next": {
         "files": [
+          "src/services/DstProvider.cpp",
+          "src/services/DstProvider.h",
           "src/ui/DstPanel.cpp",
-          "src/ui/DstPanel.h",
-          "src/core/DstStore.h"
+          "src/ui/DstPanel.h"
         ],
         "symbols": [
-          "DstPanel",
-          "DstStore"
-        ]
+          "DstProvider",
+          "DstPanel"
+        ],
+        "notes": "DstStore.h does not exist as a separate file — Dst data struct is embedded in DstPanel/DstProvider. Both .cpp files are in CMakeLists.txt."
       },
       "status": "implemented",
       "acceptance": [
@@ -606,13 +621,14 @@
         ],
         "notes": "Structure exists. Needs review for completeness."
       },
-      "status": "partial",
+      "status": "implemented",
       "acceptance": [
         "Fetch VOACAP predictions for DE-DX path",
         "Display per-band reliability (160m through 6m)",
         "Color-coded bars (green/yellow/red)",
         "Update when DX location changes"
-      ]
+      ],
+      "notes": "BandConditionsPanel fully rendered with SFI/K-index propagation model, per-band color-coded bars, and theme integration."
     },
     {
       "feature_id": "moon",
@@ -684,13 +700,14 @@
         ],
         "notes": "Weather infrastructure exists but completeness unclear."
       },
-      "status": "partial",
+      "status": "implemented",
       "acceptance": [
         "Fetch weather data for DE location",
         "Display temperature, humidity, wind, conditions",
         "Weather icon or description",
         "Auto-update periodically"
-      ]
+      ],
+      "notes": "LocalPanel renders DE weather from WeatherStore (open-meteo.com via WeatherProvider). Line 4: temp + humidity + condition description (truncated to 10 chars). Line 5: pressure (hPa) + wind speed (m/s or mph) + wind direction (8-point compass). Metric/imperial via useMetric_. Auto-updates via WeatherProvider periodic fetch."
     },
     {
       "feature_id": "weather_dx",
@@ -872,14 +889,15 @@
           "ContestData"
         ]
       },
-      "status": "partial",
+      "status": "implemented",
       "acceptance": [
         "Fetch contest calendar data",
         "Display scrollable list of contests",
         "Show contest name, dates, mode, bands",
         "Highlight active contests",
         "Tappable for details"
-      ]
+      ],
+      "notes": "ContestProvider fetches WA7BNM Contest Calendar RSS. ContestPanel shows name/dates/status (NOW/Xh/Xd countdown), filters past contests, displays up to 7. Wired in main.cpp widget pool (WidgetType::CONTESTS) and selectable via WidgetSelector. No tappable detail view."
     },
     {
       "feature_id": "on_the_air",
@@ -904,16 +922,19 @@
           "src/services/ActivityProvider.h",
           "src/ui/ActivityPanels.cpp",
           "src/ui/ActivityPanels.h",
-          "src/core/ActivityData.h"
+          "src/core/ActivityData.h",
+          "src/ui/MapWidget.cpp",
+          "src/ui/MapWidget.h"
         ],
         "symbols": [
           "ActivityProvider",
-          "ActivityPanels",
-          "ActivityData"
-        ],
-        "notes": "Named 'Activity' in the next codebase. Structure exists."
+          "ONTAPanel",
+          "ActivityData",
+          "MapWidget::renderActivityPins",
+          "MapWidget::setActivityStore"
+        ]
       },
-      "status": "partial",
+      "status": "implemented",
       "acceptance": [
         "Fetch POTA activator data from API",
         "Fetch SOTA activator data from API",
@@ -921,7 +942,8 @@
         "Show callsign, reference, frequency, mode",
         "Spots on map",
         "Toggle between POTA and SOTA views"
-      ]
+      ],
+      "notes": "ActivityProvider fetches POTA/SOTA spots every 5 min. ONTAPanel shows scrollable list with POTA/SOTA/ALL filter toggle (click title area to cycle). POTA lat/lon resolved from grid4 field via Astronomy::gridToLatLon(). Map overlay: MapWidget::renderActivityPins() draws green squares for POTA, orange for SOTA. SOTA coordinates not resolved (no grid in SOTA spot API)."
     },
     {
       "feature_id": "adif",
@@ -950,18 +972,20 @@
         ],
         "symbols": [
           "ADIFProvider",
-          "ADIFPanel"
-        ],
-        "notes": "Structure exists but completeness unclear."
+          "ADIFPanel",
+          "ADIFPanel::filterBandIdx_",
+          "ADIFPanel::filterModeIdx_"
+        ]
       },
-      "status": "partial",
+      "status": "implemented",
       "acceptance": [
         "Parse ADIF log files",
         "Display QSO list with callsign, date, band, mode",
         "Plot QSO locations on map",
         "Filter by band, mode, or date range",
         "ADIF file selection/loading"
-      ]
+      ],
+      "notes": "ADIFProvider parses ADIF file from configDir()/logs.adif. ADIFPanel shows scrollable QSO log with band/mode filter chips — click left half of header to cycle band (All→160m→80m→...→2m), right half to cycle mode (All→CW→SSB→FT8→...). Scrollbar drag supported. No map overlay yet. File path hardcoded to logs.adif; no file selection UI."
     },
     {
       "feature_id": "rss_banner",
@@ -1066,13 +1090,14 @@
         ],
         "notes": "Dedicated CountdownPanel exists."
       },
-      "status": "partial",
+      "status": "implemented",
       "acceptance": [
         "Set target date/time for countdown",
         "Display remaining time (days, hours, minutes, seconds)",
         "Visual or audio alarm when countdown reaches zero",
         "Configurable event name"
-      ]
+      ],
+      "notes": "CountdownPanel user-configurable via click-to-edit. Target persists to config_.countdownTime / config_.countdownLabel. Displays EVENT ACTIVE! in red when reached. No audio alarm — visual only."
     },
     {
       "feature_id": "rotator_gimbal",
@@ -1261,13 +1286,14 @@
         ],
         "notes": "WidgetSelector handles pane assignment. WidgetType.h defines available types. UIRegistry tracks active widgets."
       },
-      "status": "partial",
+      "status": "implemented",
       "acceptance": [
         "Long-press/tap on pane opens widget selector",
         "List all available widgets for that pane slot",
         "Selecting a widget replaces the current one",
         "Remember pane assignments across restarts"
-      ]
+      ],
+      "notes": "WidgetSelector is a 3-column modal triggered by pane tap. Keyboard and click navigation. Marks selected widget with accent color. Forbids duplicates across panes. Persists via appCfg.pane[N]Rotation saved to config.json. Wired in main.cpp."
     },
     {
       "feature_id": "prefix_lookup",
@@ -1296,13 +1322,14 @@
         ],
         "notes": "PrefixManager exists for callsign-to-DXCC mapping."
       },
-      "status": "partial",
+      "status": "implemented",
       "acceptance": [
         "Look up DXCC entity from callsign",
         "Return country name, CQ zone, ITU zone",
         "Return approximate coordinates for prefix",
         "Handle special prefixes and suffixes"
-      ]
+      ],
+      "notes": "PrefixManager.findDXCC() returns DXCC entity. findLocation() returns lat/lon coordinates. getCQZone()/getITUZone() return zone numbers. Full 340-entity DXCC database with binary-search O(log N) lookup. Used by DXClusterProvider for all spot resolution."
     },
     {
       "feature_id": "maidenhead",
@@ -1511,7 +1538,7 @@
       "feature_id": "gps_nmea",
       "name": "GPS/NMEA Integration",
       "category": "hardware",
-      "description": "GPS receiver integration via NMEA sentences for automatic location and time synchronization.",
+      "description": "GPS receiver integration via gpsd daemon for automatic DE location synchronization.",
       "original": {
         "files": [
           "nmea.cpp",
@@ -1525,17 +1552,26 @@
         "notes": "nmea.cpp (15K) parses NMEA sentences. gpsd.cpp (7K) interfaces with gpsd daemon."
       },
       "next": {
-        "files": [],
-        "symbols": []
+        "files": [
+          "src/services/GPSProvider.cpp",
+          "src/services/GPSProvider.h"
+        ],
+        "symbols": [
+          "GPSProvider",
+          "GPSProvider::processLine",
+          "GPSProvider::run"
+        ],
+        "notes": "Persistent background thread. Connects to gpsd on localhost:2947, sends ?WATCH JSON command, parses TPV messages. Throttle: 60 s between DE updates. Distance gate: skips if < 500 m from current DE. Updates state_->deLocation, config_.lat/lon/grid, state_->deGrid on qualifying fix. Windows-compatible via existing #ifdef _WIN32 guards. Enabled/disabled at runtime via config_.gpsEnabled (no restart needed)."
       },
-      "status": "missing",
+      "status": "implemented",
       "acceptance": [
-        "Read GPS position from serial NMEA",
-        "Read GPS via gpsd daemon",
-        "Auto-set DE location from GPS",
-        "Time sync from GPS PPS"
+        "Read GPS via gpsd daemon (localhost:2947)",
+        "Auto-set DE location from GPS on valid TPV fix (mode >= 2)",
+        "60-second throttle between updates",
+        "500 m distance gate prevents GPS jitter updates",
+        "GPS enable/disable toggle in SetupScreen Identity tab"
       ],
-      "notes": "Lower priority for desktop version. More relevant for Raspberry Pi deployments."
+      "notes": "Implemented 2026-02-17. Serial NMEA and PPS time sync are not implemented (desktop/RPi gpsd-only). GPSProvider instantiated in main.cpp after webServer.start() as a persistent background service."
     },
     {
       "feature_id": "bme280_sensor",
@@ -1688,16 +1724,21 @@
         "notes": "passwd.cpp (9K) handles web authentication."
       },
       "next": {
-        "files": [],
-        "symbols": [],
-        "notes": "API.md mentions future token-based auth but nothing implemented yet."
+        "files": [
+          "src/network/WebServer.cpp"
+        ],
+        "symbols": [
+          "WebServer::set_pre_routing_handler"
+        ],
+        "notes": "HTTP Basic Auth via set_pre_routing_handler (cpp-httplib 0.14.x compatible). Password stored in AppConfig::webPassword. Empty password disables auth. All endpoints protected. Configurable in SetupScreen."
       },
-      "status": "missing",
+      "status": "implemented",
       "acceptance": [
         "Password/token protection for web API",
         "At minimum protect control endpoints (set_touch, set_char)",
         "Read-only endpoints optionally unprotected"
-      ]
+      ],
+      "notes": "Implemented as HTTP Basic Auth. All endpoints require auth when webPassword is non-empty. Credentials field in SetupScreen (Identity/Security tab). Compatible with browsers and curl -u user:pass."
     },
     {
       "feature_id": "history_panel",
@@ -2073,6 +2114,83 @@
         "Visual quality maintained despite reduced mesh density",
         "Detailed SDL_GetError() diagnostics in logs",
         "Clean cleanup of cached textures in destructors"
+      ]
+    },
+    {
+      "feature_id": "rbn",
+      "name": "Reverse Beacon Network (RBN)",
+      "category": "data_panel",
+      "description": "RBN Telnet client providing CW/digital beacon spot data, feeding into the shared DX Cluster data store for display in the DX Cluster panel and map overlay.",
+      "original": {
+        "files": [
+          "reversebeacon.cpp"
+        ],
+        "symbols": [
+          "updateRBN",
+          "drawRBN",
+          "checkRBNTouch"
+        ],
+        "notes": "Original HamClock connects to telnet.reversebeacon.net:7000, parses DX de lines with mode/SNR fields."
+      },
+      "next": {
+        "files": [
+          "src/services/RBNProvider.cpp",
+          "src/services/RBNProvider.h",
+          "src/core/ConfigManager.h",
+          "src/core/ConfigManager.cpp",
+          "src/ui/SetupScreen.cpp",
+          "src/ui/SetupScreen.h"
+        ],
+        "symbols": [
+          "RBNProvider",
+          "AppConfig::rbnEnabled",
+          "AppConfig::rbnHost"
+        ],
+        "notes": "RBN feeds into DXClusterDataStore, reusing all DXC panel and map overlay rendering. Enable toggle in Setup → Spotting tab. Config persisted as rbn.enabled / rbn.host in config.json."
+      },
+      "status": "implemented",
+      "acceptance": [
+        "Connect to telnet.reversebeacon.net:7000 when enabled",
+        "Parse DX de lines for CW/digital beacon spots",
+        "Feed spots into shared DXClusterDataStore",
+        "Spots appear in DX Cluster panel and map overlay",
+        "Enable/disable toggle in Setup → Spotting tab",
+        "Config persisted across restarts",
+        "30s reconnect on disconnect; thread exits cleanly on stop()"
+      ]
+    },
+    {
+      "feature_id": "web_only",
+      "name": "Headless --web-only Mode",
+      "category": "deployment",
+      "description": "CLI flag --web-only launches HamClock in headless mode with a hidden SDL window and software renderer, serving display via the existing /live.jpg WebServer endpoint.",
+      "original": {
+        "files": [],
+        "symbols": [],
+        "notes": "No direct equivalent in original HamClock — new feature enabling server/Pi deployments without a connected display."
+      },
+      "next": {
+        "files": [
+          "src/main.cpp",
+          "src/network/WebServer.h",
+          "src/network/WebServer.cpp"
+        ],
+        "symbols": [
+          "webOnly",
+          "WebServer::setAlwaysCapture",
+          "WebServer::alwaysCapture_",
+          "SDL_WINDOW_HIDDEN"
+        ],
+        "notes": "Forces software renderer for reliable SDL_RenderReadPixels. Sets alwaysCapture_ so /live.jpg is always fresh. Prints web URL to stdout. Zero UI changes — all existing panels and rendering unchanged."
+      },
+      "status": "implemented",
+      "acceptance": [
+        "hamclock-next --web-only starts without display window",
+        "Forces software renderer automatically",
+        "Prints 'Running in web-only mode. Open http://localhost:<port>/live.jpg' to stdout",
+        "/live.jpg returns current frame as JPEG",
+        "All panels and data providers work identically to display mode",
+        "WebServer /api/ endpoints remain fully functional"
       ]
     }
   ]

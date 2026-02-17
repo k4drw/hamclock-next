@@ -2,6 +2,7 @@
 
 #include "FontManager.h"
 #include "Widget.h"
+#include <SDL_pixels.h>
 
 #include <string>
 #include <vector>
@@ -19,6 +20,13 @@ public:
   void render(SDL_Renderer *renderer) override;
   void onResize(int x, int y, int w, int h) override;
   void setRows(const std::vector<std::string> &rows);
+  void setHighlightedIndex(int index) { highlightedIndex_ = index; }
+  int getHighlightedIndex() const { return highlightedIndex_; }
+
+  virtual SDL_Color getRowColor(int /*index*/,
+                                const SDL_Color &defaultColor) const {
+    return defaultColor;
+  }
 
   std::string getName() const override { return "ListPanel:" + title_; }
   nlohmann::json getDebugData() const override;
@@ -29,6 +37,7 @@ protected:
   FontManager &fontMgr_;
   std::string title_;
   std::vector<std::string> rows_;
+  int highlightedIndex_ = -1;
 
   SDL_Texture *titleTex_ = nullptr;
   int titleW_ = 0, titleH_ = 0;

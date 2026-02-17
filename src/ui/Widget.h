@@ -63,6 +63,11 @@ public:
   // Semantic Debug API
   virtual std::string getName() const { return "Widget"; }
   virtual std::vector<std::string> getActions() const { return {}; }
+  virtual bool performAction(const std::string &action) {
+    (void)action;
+    return false;
+  }
+
   virtual SDL_Rect getActionRect(const std::string &action) const {
     (void)action;
     return {0, 0, 0, 0};

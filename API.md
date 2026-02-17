@@ -106,6 +106,28 @@ Simulates typing a full string into the application.
 
 ---
 
+---
+
+## Configuration Notes
+
+### config.json Structure (02-17-2026)
+
+Operators who manually edit `config.json` should be aware of the following structure changes introduced in the 02-17-2026 session:
+
+- **Countdown timer fields** are now stored under a `countdown` section:
+  ```json
+  { "countdown": { "enabled": true, "duration_sec": 300, "label": "QSO Timer" } }
+  ```
+- **Web password** is now stored under a `security` section:
+  ```json
+  { "security": { "web_password": "" } }
+  ```
+- Backward-compatibility fallback reads legacy flat keys on first load and migrates them automatically.
+
+No GPS-specific REST endpoints exist yet. GPS provider status is internal; DE auto-set from gpsd is pending.
+
+---
+
 ## Proposed Future Endpoints
 
 The following endpoints are suggested for future implementation to improve remote management:

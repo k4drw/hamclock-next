@@ -1,13 +1,18 @@
 #include "RigService.h"
 #include "../core/Logger.h"
 
+#ifdef _WIN32
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#else
 #include <arpa/inet.h>
-#include <chrono>
-#include <cstring>
 #include <netinet/in.h>
 #include <sys/socket.h>
-#include <thread>
 #include <unistd.h>
+#endif
+#include <chrono>
+#include <cstring>
+#include <thread>
 
 RigService::RigService(std::shared_ptr<RigDataStore> store,
                        const AppConfig &config, HamClockState *state)
@@ -269,18 +274,24 @@ void RigService::commandWorker() {
 
 bool RigService::connectToRig() {
   // Create TCP socket
-  sockfd_ = socket(AF_INET, SOCK_STREAM, 0);
+  sockfd_ = (int)socket(AF_INET, SOCK_STREAM, 0);
   if (sockfd_ < 0) {
-    LOG_E("Rig", "Failed to create socket: {}", strerror(errno));
+    LOG_E("Rig", "Failed to create socket");
     return false;
   }
 
-  // Set socket timeout
+  // Set socket timeout (platform-specific)
+#ifdef _WIN32
+  DWORD timeout_ms = 2000;
+  setsockopt(sockfd_, SOL_SOCKET, SO_RCVTIMEO, (const char *)&timeout_ms, sizeof(timeout_ms));
+  setsockopt(sockfd_, SOL_SOCKET, SO_SNDTIMEO, (const char *)&timeout_ms, sizeof(timeout_ms));
+#else
   struct timeval timeout;
   timeout.tv_sec = 2;
   timeout.tv_usec = 0;
   setsockopt(sockfd_, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
   setsockopt(sockfd_, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
+#endif
 
   // Connect to rigctld
   struct sockaddr_in addr;
@@ -290,14 +301,22 @@ bool RigService::connectToRig() {
 
   if (inet_pton(AF_INET, config_.rigHost.c_str(), &addr.sin_addr) <= 0) {
     LOG_E("Rig", "Invalid address: {}", config_.rigHost);
+#ifdef _WIN32
+    closesocket(sockfd_);
+#else
     close(sockfd_);
+#endif
     sockfd_ = -1;
     return false;
   }
 
   if (connect(sockfd_, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
-    LOG_E("Rig", "Connection failed: {}", strerror(errno));
+    LOG_E("Rig", "Connection failed");
+#ifdef _WIN32
+    closesocket(sockfd_);
+#else
     close(sockfd_);
+#endif
     sockfd_ = -1;
     return false;
   }
@@ -307,7 +326,11 @@ bool RigService::connectToRig() {
 
 void RigService::disconnectFromRig() {
   if (sockfd_ >= 0) {
+#ifdef _WIN32
+    closesocket(sockfd_);
+#else
     close(sockfd_);
+#endif
     sockfd_ = -1;
   }
   connected_ = false;
@@ -319,19 +342,19 @@ bool RigService::sendCommand(const std::string &cmd, std::string &response) {
   }
 
   // Send command
-  ssize_t sent = send(sockfd_, cmd.c_str(), cmd.length(), 0);
+  int sent = send(sockfd_, cmd.c_str(), (int)cmd.length(), 0);
   if (sent < 0) {
-    LOG_E("Rig", "Send failed: {}", strerror(errno));
+    LOG_E("Rig", "Send failed");
     return false;
   }
 
   // Read response
   char buffer[512];
   std::memset(buffer, 0, sizeof(buffer));
-  ssize_t received = recv(sockfd_, buffer, sizeof(buffer) - 1, 0);
+  int received = recv(sockfd_, buffer, sizeof(buffer) - 1, 0);
 
   if (received <= 0) {
-    LOG_E("Rig", "Receive failed: {}", strerror(errno));
+    LOG_E("Rig", "Receive failed");
     return false;
   }
 

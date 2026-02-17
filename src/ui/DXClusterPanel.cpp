@@ -1,7 +1,9 @@
 #include "DXClusterPanel.h"
 #include "../core/ConfigManager.h"
+#include "../core/LiveSpotData.h"
 #include "../core/Logger.h"
 #include "../services/RigService.h"
+#include <SDL.h>
 
 #include <algorithm>
 #include <iomanip>
@@ -9,8 +11,7 @@
 
 DXClusterPanel::DXClusterPanel(int x, int y, int w, int h, FontManager &fontMgr,
                                std::shared_ptr<DXClusterDataStore> store,
-                               RigService *rigService,
-                               const AppConfig *config)
+                               RigService *rigService, const AppConfig *config)
     : ListPanel(x, y, w, h, fontMgr, "DX Cluster", {}), store_(store),
       rigService_(rigService), config_(config) {}
 
@@ -23,10 +24,8 @@ void DXClusterPanel::update() {
     lastUpdate_ = data->lastUpdate;
   }
 
-  // Re-render visible rows if data changed or scrolled (though ListPanel
-  // handles its own render tick, we update contents here)
-  if (dataChanged) {
-    // Ensure scroll offset is valid
+  // Sync scroll offset and visible rows
+  if (dataChanged || true) { // Always update visible slice if needed
     if (allRows_.empty()) {
       scrollOffset_ = 0;
     } else {
@@ -34,8 +33,9 @@ void DXClusterPanel::update() {
       scrollOffset_ = std::min(scrollOffset_, maxScroll);
     }
 
-    // Update ListPanel rows
     std::vector<std::string> visible;
+    visibleFreqs_.clear();
+
     if (allRows_.empty()) {
       visible.push_back(
           data->connected
@@ -43,17 +43,43 @@ void DXClusterPanel::update() {
               : (data->statusMsg.empty() ? "Disconnected" : data->statusMsg));
     } else {
       for (int i = 0; i < MAX_VISIBLE_ROWS; ++i) {
-        if (scrollOffset_ + i < (int)allRows_.size()) {
-          visible.push_back(allRows_[scrollOffset_ + i]);
+        int idx = scrollOffset_ + i;
+        if (idx < (int)allRows_.size()) {
+          visible.push_back(allRows_[idx]);
+          visibleFreqs_.push_back(allFreqs_[idx]);
         }
       }
     }
     setRows(visible);
+
+    // Update Highlight
+    int highlighted = -1;
+    if (data->hasSelection) {
+      // Find selected spot in current visible slice
+      for (int i = 0; i < (int)visibleFreqs_.size(); ++i) {
+        int idx = scrollOffset_ + i;
+        // In rebuildRows we reverse the spots, so DXClusterData::spots is not
+        // directly indexed. We compare values.
+        auto spots = data->spots;
+        std::reverse(spots.begin(), spots.end());
+        if (idx < (int)spots.size()) {
+          const auto &spot = spots[idx];
+          if (spot.txCall == data->selectedSpot.txCall &&
+              spot.freqKhz == data->selectedSpot.freqKhz &&
+              spot.spottedAt == data->selectedSpot.spottedAt) {
+            highlighted = i;
+            break;
+          }
+        }
+      }
+    }
+    setHighlightedIndex(highlighted);
   }
 }
 
 void DXClusterPanel::rebuildRows(const DXClusterData &data) {
   allRows_.clear();
+  allFreqs_.clear();
   auto spots = data.spots;
   // Most recent first
   std::reverse(spots.begin(), spots.end());
@@ -61,14 +87,23 @@ void DXClusterPanel::rebuildRows(const DXClusterData &data) {
   for (const auto &spot : spots) {
     std::stringstream ss;
     // Format: "14025.0 K1ABC      5m"
-    // Freq: 8 chars
-    // Call: 11 chars
-    // Age:  4 chars (right aligned)
     ss << std::fixed << std::setprecision(1) << std::setw(8) << spot.freqKhz
        << " " << std::left << std::setw(11) << spot.txCall << std::right
        << std::setw(4) << formatAge(spot.spottedAt);
     allRows_.push_back(ss.str());
+    allFreqs_.push_back(spot.freqKhz);
   }
+}
+
+SDL_Color DXClusterPanel::getRowColor(int index,
+                                      const SDL_Color &defaultColor) const {
+  if (index >= 0 && index < (int)visibleFreqs_.size()) {
+    int bandIdx = freqToBandIndex(visibleFreqs_[index]);
+    if (bandIdx >= 0) {
+      return kBands[bandIdx].color;
+    }
+  }
+  return defaultColor;
 }
 
 std::string DXClusterPanel::formatAge(
@@ -78,7 +113,7 @@ std::string DXClusterPanel::formatAge(
       std::chrono::duration_cast<std::chrono::minutes>(now - spottedAt).count();
 
   if (age < 0)
-    return "0m"; // Future spot?
+    return "0m";
   if (age < 60)
     return std::to_string(age) + "m";
   return std::to_string(age / 60) + "h";
@@ -89,7 +124,7 @@ bool DXClusterPanel::onMouseWheel(int scrollY) {
     return false;
 
   int maxScroll = std::max(0, (int)allRows_.size() - MAX_VISIBLE_ROWS);
-  int newOffset = scrollOffset_ - scrollY; // Scroll up decreases offset
+  int newOffset = scrollOffset_ - scrollY;
 
   if (newOffset < 0)
     newOffset = 0;
@@ -98,91 +133,60 @@ bool DXClusterPanel::onMouseWheel(int scrollY) {
 
   if (newOffset != scrollOffset_) {
     scrollOffset_ = newOffset;
-
-    // Immediate update of visible rows
-    std::vector<std::string> visible;
-    for (int i = 0; i < MAX_VISIBLE_ROWS; ++i) {
-      if (scrollOffset_ + i < (int)allRows_.size()) {
-        visible.push_back(allRows_[scrollOffset_ + i]);
-      }
-    }
-    setRows(visible);
     return true;
   }
   return false;
 }
 
 bool DXClusterPanel::onMouseUp(int mx, int my, Uint16 /*mod*/) {
-  if (my > y_ + height_ / 2) {
-    // Check if we clicked on a row
-    int headerH = 20; // Approx header height if we had one, but we don't.
-                      // Adjust based on where list starts.
-    // ListPanel renders from y_ + something.
-    // Let's assume standard list rendering geometry.
-    // If ListPanel used similar logic to what we see in other panels:
-    // It renders visible rows starting at y_.
+  // Check if we clicked on a row
+  int rowH = 14;
+  auto font = fontMgr_.getFont(rowFontSize_);
+  if (font)
+    rowH = TTF_FontLineSkip(font);
 
-    int rowH = 14;
-    auto font = fontMgr_.getFont(rowFontSize_);
-    if (font)
-      rowH = TTF_FontLineSkip(font);
+  // ListPanel starts rendering after title. Adjust my.
+  // We can just hit test visible rows from y_ + something.
+  // For simplicity, let's use the same logic as ListPanel::render.
+  int pad = std::max(2, static_cast<int>(width_ * 0.03f));
+  int curY = y_ + pad;
+  // If we had a titleTex_, we add pad.
+  // Let's assume title height is ~titleFontSize_ + pad.
+  curY +=
+      rowFontSize_ + pad; // Title is usually same font size as row or larger
 
-    int relY = my - y_;
-    int clickedRow = relY / rowH;
+  if (my < curY)
+    return false;
 
-    auto data = store_->snapshot();
-    // Reverse logic matches rebuildRows
-    // We need to access the sorted spots as displayed.
-    // Rebuilding them here is inefficient but safe.
-    auto spots = data->spots;
-    std::reverse(spots.begin(), spots.end());
+  int clickedRow = (my - curY) / rowH;
 
-    if (clickedRow >= 0 && clickedRow < MAX_VISIBLE_ROWS) {
-      int idx = scrollOffset_ + clickedRow;
-      if (idx >= 0 && idx < (int)spots.size()) {
-        const auto &spot = spots[idx];
-        bool isSame = data->hasSelection &&
-                      data->selectedSpot.txCall == spot.txCall &&
-                      data->selectedSpot.freqKhz == spot.freqKhz &&
-                      data->selectedSpot.spottedAt == spot.spottedAt;
+  auto data = store_->snapshot();
+  auto spots = data->spots;
+  std::reverse(spots.begin(), spots.end());
 
-        if (isSame) {
-          store_->clearSelection();
-        } else {
-          store_->selectSpot(spot);
+  if (clickedRow >= 0 && clickedRow < (int)visibleFreqs_.size()) {
+    int idx = scrollOffset_ + clickedRow;
+    if (idx >= 0 && idx < (int)spots.size()) {
+      const auto &spot = spots[idx];
+      bool isSame = data->hasSelection &&
+                    data->selectedSpot.txCall == spot.txCall &&
+                    data->selectedSpot.freqKhz == spot.freqKhz &&
+                    data->selectedSpot.spottedAt == spot.spottedAt;
 
-          // Auto-tune rig to spot frequency if enabled and service available
-          if (rigService_ && config_ && config_->rigAutoTune) {
-            // Convert kHz to Hz
-            long long freqHz = static_cast<long long>(spot.freqKhz * 1000.0);
+      if (isSame) {
+        store_->clearSelection();
+      } else {
+        store_->selectSpot(spot);
 
-            if (rigService_->setFrequency(freqHz)) {
-              LOG_I("DXCluster", "Tuning rig to {:.1f} kHz ({} - {})",
-                    spot.freqKhz, spot.txCall, spot.mode);
-            } else {
-              LOG_W("DXCluster", "Failed to tune rig to {:.1f} kHz",
-                    spot.freqKhz);
-            }
-          }
+        // Auto-tune rig to spot frequency if enabled
+        if (rigService_ && config_ && config_->rigAutoTune) {
+          long long freqHz = static_cast<long long>(spot.freqKhz * 1000.0);
+          rigService_->setFrequency(freqHz);
         }
-        return true;
       }
+      return true;
     }
   }
-
-  // Keep the setup request check for bottom half if valid,
-  // but wait... the logic "my > y_ + height_ / 2" was for "setupRequested_".
-  // The user wanted "click on Counts to bring up options" for LiveSpots.
-  // For DXCluster, "setup" might be less critical or handled differently.
-  // The original code used the bottom half click for setup.
-  // We should preserve that OR maybe move it to a specific button?
-  // User asked: "is it possible for the DX Cluster to NOT plot all spots on the
-  // map and only plot those clicked on in the widget?" Accessing the bottom
-  // half for setup makes selecting rows in the bottom half impossible. Let's
-  // REMOVE the big "bottom half = setup" hit area and rely on Semantic API or
-  // specific UI element if needed. Or, since we don't have a "Setup" button
-  // visible, maybe we add one or rely on the "DX Cluster" title click? For now,
-  // let's prioritize the Row Selection.
 
   return false;
 }
@@ -193,10 +197,29 @@ std::vector<std::string> DXClusterPanel::getActions() const {
 
 SDL_Rect DXClusterPanel::getActionRect(const std::string &action) const {
   if (action == "open_setup") {
-    // Bottom half triggers setup
-    return {x_, y_ + height_ / 2, width_, height_ / 2};
+    // Title area triggers setup?
+    return {x_, y_, width_, 20};
   }
   return {0, 0, 0, 0};
+}
+
+bool DXClusterPanel::performAction(const std::string &action) {
+  if (action == "scroll_up") {
+    if (scrollOffset_ > 0) {
+      scrollOffset_--;
+      return true;
+    }
+  } else if (action == "scroll_down") {
+    int maxScroll = std::max(0, (int)allRows_.size() - MAX_VISIBLE_ROWS);
+    if (scrollOffset_ < maxScroll) {
+      scrollOffset_++;
+      return true;
+    }
+  } else if (action == "open_setup") {
+    setupRequested_ = true;
+    return true;
+  }
+  return false;
 }
 
 nlohmann::json DXClusterPanel::getDebugData() const {
@@ -205,9 +228,9 @@ nlohmann::json DXClusterPanel::getDebugData() const {
   j["connected"] = data->connected;
   j["spotCount"] = data->spots.size();
   j["scrollOffset"] = scrollOffset_;
-  if (!data->spots.empty()) {
-    j["lastSpotFreq"] = data->spots.back().freqKhz;
-    j["lastSpotCall"] = data->spots.back().txCall;
+  j["highlightedIndex"] = getHighlightedIndex();
+  if (data->hasSelection) {
+    j["selectedSpot"] = data->selectedSpot.txCall;
   }
   return j;
 }
