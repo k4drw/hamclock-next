@@ -10,6 +10,7 @@ struct Contest {
   std::chrono::system_clock::time_point startTime;
   std::chrono::system_clock::time_point endTime;
   std::string url;
+  std::string dateDesc; // raw date string from RSS description, e.g. "1300Z, Feb 9 to 2359Z, Feb 13"
 };
 
 struct ContestData {

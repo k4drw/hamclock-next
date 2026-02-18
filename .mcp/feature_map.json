@@ -2160,6 +2160,107 @@
       ]
     },
     {
+      "feature_id": "voacap_map_overlay",
+      "name": "VOACAP World Map Overlay",
+      "category": "map",
+      "description": "VOACAP-based ionospheric propagation overlaid on the world map as a color grid. Supports MUF (Maximum Usable Frequency), REL (reliability 0-100%), and TOA (time-of-arrival) overlay types. TX location is DE by default; frequency, UTC hour, mode, and power are user-selectable. Original renders 660x330 equirectangular RGB565 bitmap blended onto the map.",
+      "original": {
+        "files": [
+          "earthmap.cpp",
+          "mapmanage.cpp",
+          "bands.cpp"
+        ],
+        "symbols": [
+          "updateVOACAPMap",
+          "drawVOACAPMap",
+          "PLOT_CH_BC",
+          "showVOACAPArea"
+        ],
+        "notes": "earthmap.cpp and mapmanage.cpp (50K and 52K respectively) handle map overlay blending. bands.cpp fetches backend VOACAP data. Output is a 660x330 RGB565 BMP zlib-compressed, fetched from backend (originally voacap.com or self-hosted). Three overlay types: MUF (rainbow scale 0-35 MHz), REL (gray-to-green 0-100%), TOA (green-to-gray 0-40ms)."
+      },
+      "next": {
+        "files": [],
+        "symbols": [],
+        "notes": "Not yet implemented. BandConditionsPanel covers the DE-to-DX text prediction but NOT the world map color overlay. Implementation path: (1) Add VoacapProvider fetching from open-hamclock-backend voacap_service.py endpoint, (2) Store 660x330 RGB565 pixel grid in VoacapOverlayData, (3) Extend MapWidget to blend overlay texture onto world map, (4) Add overlay type selector to MapViewMenu. WebServer endpoint /api/propagation/voacap now returns schema and backend proxy instructions."
+      },
+      "status": "missing",
+      "acceptance": [
+        "Select overlay type (MUF / REL / TOA) in map options",
+        "Overlay renders as semi-transparent color grid on world map",
+        "TX location defaults to DE; user can override",
+        "Band/frequency selector (80m, 40m, 20m, 15m, 10m)",
+        "UTC hour matches current time (auto-update every 30 min)",
+        "Color legend shown on map edge",
+        "Works in both azimuthal and Robinson projections",
+        "Toggle overlay on/off without reloading map"
+      ],
+      "notes": "HIGHEST PRIORITY parity gap. open-hamclock-backend/ham/HamClock/voacap_service.py has the complete physics engine (MUF/REL/TOA, vectorized NumPy, 660x330). Missing backend CGI endpoints are: fetchVOACAP-MUF.pl, fetchVOACAP-TOA.pl, fetchVOACAPArea.pl (see open-hamclock-backend/PROJECT_STATUS.md). MCP tool 'get_voacap_overlay' now documents the full request/response schema. See docs/parity.md for alignment notes (equirectangular vs azimuthal reprojection challenge)."
+    },
+    {
+      "feature_id": "muf_rt_map_overlay",
+      "name": "KC2G Real-Time MUF Map Overlay",
+      "category": "map",
+      "description": "Semi-transparent overlay of the real-time Maximum Usable Frequency map derived from the global KC2G ionosonde network (prop.kc2g.com). Updated approximately every 15 minutes. No local calculation required — just fetch and display.",
+      "original": {
+        "files": [
+          "mapmanage.cpp"
+        ],
+        "symbols": [
+          "updateMUFRT",
+          "drawMUFRT"
+        ],
+        "notes": "mapmanage.cpp fetches a pre-rendered MUF-RT BMP image from the HamClock backend server which in turn sources it from the KC2G ionosonde network. The image is 660x330 equirectangular and blended onto the map at ~40% opacity."
+      },
+      "next": {
+        "files": [
+          "src/ui/MapWidget.cpp",
+          "src/ui/MapWidget.h"
+        ],
+        "symbols": [],
+        "notes": "No implementation yet. MapWidget already handles SDL_Texture overlays. Implementation path: (1) Fetch https://prop.kc2g.com/renders/current/mufd-normal-now.png via CORS proxy (web) or NetworkManager (native), (2) Decode PNG to SDL_Texture, (3) Blend onto map at configurable opacity, (4) Auto-refresh every 15 min. No backend required — direct fetch from KC2G. For native use, open-hamclock-backend also provides pre-generated BMP variants via its scripts/build_muf_rt.py."
+      },
+      "status": "missing",
+      "acceptance": [
+        "Fetch MUF-RT image from KC2G or OHB backend",
+        "Display as semi-transparent overlay on world map",
+        "Auto-refresh every 15 minutes",
+        "Toggle on/off in MapViewMenu",
+        "Show timestamp of last update",
+        "Works with CORS proxy in web/WASM mode"
+      ],
+      "notes": "Simplest parity gap to close — no physics required. KC2G PNG is publicly available. Backend-free path: fetch prop.kc2g.com/renders/current/mufd-normal-now.png. Alignment: KC2G image is equirectangular; same reprojection challenge as VOACAP overlay applies for azimuthal display."
+    },
+    {
+      "feature_id": "cloud_cover_overlay",
+      "name": "Cloud Cover / Weather Map Overlay",
+      "category": "map",
+      "description": "Semi-transparent cloud cover or weather satellite imagery overlaid on the world map. Original fetched composite cloud imagery and blended it onto the map at reduced opacity.",
+      "original": {
+        "files": [
+          "mapmanage.cpp"
+        ],
+        "symbols": [
+          "updateClouds",
+          "drawClouds"
+        ],
+        "notes": "mapmanage.cpp fetches cloud imagery from the HamClock backend server (which sourced it from NASA GIBS or similar). Pre-rendered 660x330 BMP, blended at ~30% opacity on the day side of the map."
+      },
+      "next": {
+        "files": [],
+        "symbols": [],
+        "notes": "Not implemented. open-hamclock-backend/scripts/update_cloud_maps.sh generates cloud composites. For a backend-free approach: NASA GIBS tiles (https://gibs.earthdata.nasa.gov) provide near-real-time cloud imagery as XYZ tiles or WMS. Alternative: Open Meteo provides weather data but not cloud imagery. Implementation requires tile fetching + projection warping."
+      },
+      "status": "missing",
+      "acceptance": [
+        "Fetch near-real-time cloud cover imagery",
+        "Display as semi-transparent overlay on world map",
+        "Auto-refresh every 30 minutes",
+        "Toggle on/off in MapViewMenu",
+        "Day-side only (cloud cover irrelevant at night)"
+      ],
+      "notes": "Lower priority than VOACAP overlays. Backend-dependent for pre-rendered 660x330 composite. Backend-free path requires implementing tile fetching from NASA GIBS, which adds significant complexity. Recommend deferring until VOACAP overlays are implemented."
+    },
+    {
       "feature_id": "web_only",
       "name": "Headless --web-only Mode",
       "category": "deployment",

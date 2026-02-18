@@ -3,6 +3,7 @@
 #include "../core/Astronomy.h"
 #include "../core/HamClockState.h"
 #include "../core/Logger.h"
+#include "../core/StringUtils.h"
 #include <chrono>
 #include <cstdio>
 #include <nlohmann/json.hpp>
@@ -27,7 +28,7 @@ static int calculateRScale(double xray_flux) {
     return 2; // R2 (Moderate)
   if (xray_flux >= 1e-5)
     return 1; // R1 (Minor)
-  return 0; // R0 (No event)
+  return 0;   // R0 (No event)
 }
 
 // Calculate S-scale (Solar Radiation Storms) from >=10 MeV proton flux
@@ -43,7 +44,7 @@ static int calculateSScale(double proton_flux) {
     return 2; // S2 (Moderate)
   if (proton_flux >= 10)
     return 1; // S1 (Minor)
-  return 0; // S0 (No event)
+  return 0;   // S0 (No event)
 }
 
 // Calculate G-scale (Geomagnetic Storms) from Kp index
@@ -59,7 +60,7 @@ static int calculateGScale(int kp_index) {
     return 2; // G2 (Moderate)
   if (kp_index >= 5)
     return 1; // G1 (Minor)
-  return 0; // G0 (No event)
+  return 0;   // G0 (No event)
 }
 
 void NOAAProvider::fetch() {
@@ -99,25 +100,21 @@ void NOAAProvider::fetchKIndex() {
     if (!row.is_array() || row.size() < 3)
       return;
 
-    try {
-      auto data = store->get();
-      double kp = std::stod(row[1].get<std::string>());
-      data.k_index = static_cast<int>(kp);
-      data.a_index = std::stoi(row[2].get<std::string>());
-      data.noaa_g_scale = calculateGScale(data.k_index);
-      data.last_updated = std::chrono::system_clock::now();
-      data.valid = true;
-      store->set(data);
-      if (state) {
-        auto &s = state->services["NOAA:KIndex"];
-        s.ok = true;
-        s.lastSuccess = std::chrono::system_clock::now();
-      }
-      LOG_I("NOAAProvider", "Updated K-Index: K={}, G-scale=G{}",
-            data.k_index, data.noaa_g_scale);
-    } catch (const std::exception &e) {
-      LOG_E("NOAAProvider", "KP parse error: {}", e.what());
+    auto data = store->get();
+    double kp = StringUtils::safe_stod(row[1].get<std::string>());
+    data.k_index = static_cast<int>(kp);
+    data.a_index = StringUtils::safe_stoi(row[2].get<std::string>());
+    data.noaa_g_scale = calculateGScale(data.k_index);
+    data.last_updated = std::chrono::system_clock::now();
+    data.valid = true;
+    store->set(data);
+    if (state) {
+      auto &s = state->services["NOAA:KIndex"];
+      s.ok = true;
+      s.lastSuccess = std::chrono::system_clock::now();
     }
+    LOG_I("NOAAProvider", "Updated K-Index: K={}, G-scale=G{}", data.k_index,
+          data.noaa_g_scale);
   });
 }
 
@@ -130,23 +127,20 @@ void NOAAProvider::fetchSFI() {
     if (j.is_discarded() || !j.is_array())
       return;
 
-    try {
-      auto data = store->get();
-      // Try to find the flux value. Some variants of the JSON use "Flux" or
-      // index 1.
-      double flux = 0;
-      if (j.is_object() && j.contains("Flux")) {
-        flux = std::stod(j["Flux"].get<std::string>());
-      } else if (j.is_array() && j.size() >= 2 && j.back().is_array()) {
-        flux = std::stod(j.back()[1].get<std::string>());
-      }
-      if (flux > 0) {
-        data.sfi = static_cast<int>(flux);
-        data.valid = true;
-        store->set(data);
-        LOG_D("NOAAProvider", "SFI={}", data.sfi);
-      }
-    } catch (...) {
+    auto data = store->get();
+    // Try to find the flux value. Some variants of the JSON use "Flux" or
+    // index 1.
+    double flux = 0;
+    if (j.is_object() && j.contains("Flux")) {
+      flux = StringUtils::safe_stod(j["Flux"].get<std::string>());
+    } else if (j.is_array() && j.size() >= 2 && j.back().is_array()) {
+      flux = StringUtils::safe_stod(j.back()[1].get<std::string>());
+    }
+    if (flux > 0) {
+      data.sfi = static_cast<int>(flux);
+      data.valid = true;
+      store->set(data);
+      LOG_D("NOAAProvider", "SFI={}", data.sfi);
     }
   });
 }
@@ -208,20 +202,18 @@ void NOAAProvider::fetchPlasma() {
     if (j.is_discarded() || !j.is_array() || j.size() < 2)
       return;
 
-    try {
-      auto data = store->get();
-      const auto &row = j.back();
-      // row: [time, density, speed, temp]
-      if (row[1].is_string())
-        data.solar_wind_density = std::stod(row[1].get<std::string>());
-      if (row[2].is_string())
-        data.solar_wind_speed = std::stod(row[2].get<std::string>());
-      data.valid = true;
-      store->set(data);
-      LOG_D("NOAAProvider", "Wind={:.1f} km/s, Dense={:.1f}",
-            data.solar_wind_speed, data.solar_wind_density);
-    } catch (...) {
-    }
+    auto data = store->get();
+    const auto &row = j.back();
+    // row: [time, density, speed, temp]
+    if (row[1].is_string())
+      data.solar_wind_density =
+          StringUtils::safe_stod(row[1].get<std::string>());
+    if (row[2].is_string())
+      data.solar_wind_speed = StringUtils::safe_stod(row[2].get<std::string>());
+    data.valid = true;
+    store->set(data);
+    LOG_D("NOAAProvider", "Wind={:.1f} km/s, Dense={:.1f}",
+          data.solar_wind_speed, data.solar_wind_density);
   });
 }
 
@@ -234,21 +226,18 @@ void NOAAProvider::fetchMag() {
     if (j.is_discarded() || !j.is_array() || j.size() < 2)
       return;
 
-    try {
-      auto data = store->get();
-      const auto &row = j.back();
-      // row: [time, bx, by, bz, lon, lat, bt]
-      if (row[3].is_string())
-        data.bz =
-            static_cast<int>(std::round(std::stod(row[3].get<std::string>())));
-      if (row[6].is_string())
-        data.bt =
-            static_cast<int>(std::round(std::stod(row[6].get<std::string>())));
-      data.valid = true;
-      store->set(data);
-      LOG_D("NOAAProvider", "Bz={}, Bt={}", data.bz, data.bt);
-    } catch (...) {
-    }
+    auto data = store->get();
+    const auto &row = j.back();
+    // row: [time, bx, by, bz, lon, lat, bt]
+    if (row[3].is_string())
+      data.bz = static_cast<int>(
+          std::round(StringUtils::safe_stod(row[3].get<std::string>())));
+    if (row[6].is_string())
+      data.bt = static_cast<int>(
+          std::round(StringUtils::safe_stod(row[6].get<std::string>())));
+    data.valid = true;
+    store->set(data);
+    LOG_D("NOAAProvider", "Bz={}, Bt={}", data.bz, data.bt);
   });
 }
 
@@ -263,7 +252,7 @@ void NOAAProvider::fetchDST() {
 
     try {
       auto data = store->get();
-      data.dst = std::stoi(j.back()[1].get<std::string>());
+      data.dst = StringUtils::safe_stoi(j.back()[1].get<std::string>());
       data.valid = true;
       store->set(data);
       LOG_D("NOAAProvider", "DST={}", data.dst);
@@ -506,7 +495,8 @@ void NOAAProvider::fetchProtonFlux() {
       } else {
         if (state) {
           state->services["NOAA:ProtonFlux"].ok = false;
-          state->services["NOAA:ProtonFlux"].lastError = "No >=10 MeV data found";
+          state->services["NOAA:ProtonFlux"].lastError =
+              "No >=10 MeV data found";
         }
       }
     } catch (const std::exception &e) {

@@ -23,6 +23,10 @@ public:
                   std::function<void(std::string)> callback,
                   int cacheAgeSeconds = 3600, bool force = false);
 
+  // Set CORS proxy prefix (WASM only). Called at startup from AppConfig.
+  // All subsequent fetchAsync calls prepend this to external URLs.
+  void setCorsProxyUrl(const std::string &url) { corsProxyUrl_ = url; }
+
 private:
   struct CacheEntry {
     std::string data;
@@ -33,6 +37,7 @@ private:
   std::unordered_map<std::string, CacheEntry> cache_;
   std::mutex cacheMutex_;
   std::filesystem::path cacheDir_;
+  std::string corsProxyUrl_;
 
   // Helper to compute safe filename for a URL (e.g. simple hash)
   std::string hashUrl(const std::string &url);

@@ -1,6 +1,7 @@
 #include "SetupScreen.h"
 #include "../core/Astronomy.h"
 #include "../core/Logger.h"
+#include "../core/StringUtils.h"
 
 #include <algorithm>
 #include <cmath>
@@ -20,10 +21,10 @@ SetupScreen::SetupScreen(int x, int y, int w, int h, FontManager &fontMgr,
 
 void SetupScreen::recalcLayout() {
   int h = height_;
-  titleSize_ = std::clamp(static_cast<int>(h * 0.06f), 18, 48);
-  labelSize_ = std::clamp(static_cast<int>(h * 0.035f), 12, 24);
-  fieldSize_ = std::clamp(static_cast<int>(h * 0.045f), 14, 32);
-  hintSize_ = std::clamp(static_cast<int>(h * 0.028f), 10, 18);
+  titleSize_ = std::clamp(static_cast<int>(h * 0.050f), 16, 36);
+  labelSize_ = std::clamp(static_cast<int>(h * 0.030f), 11, 20);
+  fieldSize_ = std::clamp(static_cast<int>(h * 0.038f), 13, 26);
+  hintSize_  = std::clamp(static_cast<int>(h * 0.024f), 10, 15);
 }
 
 void SetupScreen::autoPopulateLatLon() {
@@ -73,23 +74,19 @@ std::string *SetupScreen::getActiveFieldText() {
     case 2:
       return &clusterLogin_;
     }
+  } else if (activeTab_ == Tab::Appearance) {
+    switch (activeField_) {
+    case 1:
+      return &dimTime_;
+    case 2:
+      return &brightTime_;
+    }
   } else if (activeTab_ == Tab::Services) {
     switch (activeField_) {
     case 0:
       return &qrzUsername_;
     case 1:
       return &qrzPassword_;
-    case 2:
-      return &countdownLabel_;
-    case 3:
-      return &countdownTime_;
-    }
-  } else if (activeTab_ == Tab::Display) {
-    switch (activeField_) {
-    case 0:
-      return &dimTime_;
-    case 1:
-      return &brightTime_;
     }
   } else if (activeTab_ == Tab::Rig) {
     switch (activeField_) {
@@ -172,6 +169,12 @@ static void renderField(SDL_Renderer *renderer, FontManager &fontMgr,
   SDL_RenderFillRect(renderer, &rect);
   SDL_SetRenderDrawColor(renderer, border.r, border.g, border.b, 255);
   SDL_RenderDrawRect(renderer, &rect);
+  if (active) {
+    SDL_Rect glow = {fieldX - 1, y - 1, fieldW + 2, fieldH + 2};
+    SDL_SetRenderDrawColor(renderer, border.r / 2, border.g / 2, border.b / 2,
+                           255);
+    SDL_RenderDrawRect(renderer, &glow);
+  }
 
   // Set clipping rectangle to prevent text overflow
   SDL_Rect clipRect = {fieldX + 2, y + 2, fieldW - 4, fieldH - 4};
@@ -229,11 +232,11 @@ void SetupScreen::render(SDL_Renderer *renderer) {
   SDL_RenderFillRect(renderer, &bg);
 
   int cx = x_ + width_ / 2;
-  int pad = std::max(12, width_ / 40);
-  int fieldW = std::min(600, width_ - 2 * pad);
+  int pad = std::max(16, width_ / 24);
+  int fieldW = std::min(400, width_ - 2 * pad);
   int fieldX = cx - fieldW / 2;
-  int fieldH = fieldSize_ + 10;
-  int textPad = 6;
+  int fieldH = fieldSize_ + 14;
+  int textPad = 7;
 
   LOG_D("SetupScreen", "Layout: pad={}, fieldW={}, fieldX={}, fieldH={}", pad,
         fieldW, fieldX, fieldH);
@@ -246,11 +249,12 @@ void SetupScreen::render(SDL_Renderer *renderer) {
 
   fontMgr_.drawText(renderer, "HamClock-Next Setup", cx, y, cyan, titleSize_,
                     true, true);
-  y += titleSize_ + pad / 2;
+  y += titleSize_ + pad / 2; // tightened: was +pad, halved gap to tab bar
 
-  const char *tabs[] = {"Identity", "Spotting", "Appearance", "Display",
+  // Appearance tab absorbs brightness/display settings — 6 tabs total
+  const char *tabs[] = {"Identity", "Spotting", "Display",
                         "Rig",      "Services", "Widgets"};
-  int numTabs = 7;
+  int numTabs = 6;
   int tabW = fieldW / numTabs;
 
   // Calculate safe font size for tabs to prevent overflow
@@ -285,7 +289,6 @@ void SetupScreen::render(SDL_Renderer *renderer) {
                       active ? white : gray, tabFontSize, false, true);
   }
   y += fieldH + pad / 2;
-  int contentY = y;
 
   switch (activeTab_) {
   case Tab::Identity:
@@ -296,9 +299,6 @@ void SetupScreen::render(SDL_Renderer *renderer) {
     break;
   case Tab::Appearance:
     renderTabAppearance(renderer, cx, pad, fieldW, fieldH, fieldX, textPad);
-    break;
-  case Tab::Display:
-    renderTabDisplay(renderer, cx, pad, fieldW, fieldH, fieldX, textPad);
     break;
   case Tab::Rig:
     renderTabRig(renderer, cx, pad, fieldW, fieldH, fieldX, textPad);
@@ -311,7 +311,7 @@ void SetupScreen::render(SDL_Renderer *renderer) {
     break;
   }
 
-  y = y_ + height_ - pad - 40;
+  y = y_ + height_ - 12 - 40; // anchored: fixed 12px bottom clearance (was pad)
   int btnW = 100;
   int btnH = 34;
 
@@ -339,7 +339,7 @@ void SetupScreen::render(SDL_Renderer *renderer) {
 void SetupScreen::renderTabIdentity(SDL_Renderer *renderer, int, int pad,
                                     int fieldW, int fieldH, int fieldX,
                                     int textPad) {
-  int y = (y_ + titleSize_ + 2 * pad + fieldH);
+  int y = (y_ + titleSize_ + 2 * pad + fieldH); // tightened: removed extra pad/2
   int vSpace = pad / 2;
   SDL_Color white = {255, 255, 255, 255};
   SDL_Color orange = {255, 165, 0, 255};
@@ -407,7 +407,7 @@ void SetupScreen::renderTabIdentity(SDL_Renderer *renderer, int, int pad,
 void SetupScreen::renderTabDXCluster(SDL_Renderer *renderer, int cx, int pad,
                                      int fieldW, int fieldH, int fieldX,
                                      int textPad) {
-  int y = (y_ + titleSize_ + 2 * pad + fieldH);
+  int y = (y_ + titleSize_ + 2 * pad + fieldH); // tightened: removed extra pad/2
   int vSpace = 5;
   SDL_Color white = {255, 255, 255, 255};
   SDL_Color orange = {255, 165, 0, 255};
@@ -477,27 +477,41 @@ void SetupScreen::renderTabDXCluster(SDL_Renderer *renderer, int cx, int pad,
   toggleRect_ = toggle;
   y += 30;
 
-  toggleRect_ = toggle;
-  y += 30;
+  // --- RBN SECTION ---
+  fontMgr_.drawText(renderer, "--- Reverse Beacon Network ---", cx, y, cyan,
+                    labelSize_, true, true);
+  y += labelSize_ + vSpace;
+
+  SDL_Rect rbnToggle = {fieldX, y, 20, 20};
+  SDL_SetRenderDrawColor(renderer, 50, 50, 60, 255);
+  SDL_RenderFillRect(renderer, &rbnToggle);
+  SDL_SetRenderDrawColor(renderer, 100, 100, 120, 255);
+  SDL_RenderDrawRect(renderer, &rbnToggle);
+  if (rbnEnabled_) {
+    SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
+    SDL_Rect check = {fieldX + 4, y + 4, 12, 12};
+    SDL_RenderFillRect(renderer, &check);
+  }
+  fontMgr_.drawText(renderer, "Enable RBN (feeds DX Cluster panel)",
+                    fieldX + 30, y + 2, white, labelSize_);
+  rbnToggleRect_ = rbnToggle;
+  y += 24;
 }
 
-void SetupScreen::renderTabAppearance(SDL_Renderer *renderer, int, int pad,
+void SetupScreen::renderTabAppearance(SDL_Renderer *renderer, int cx, int pad,
                                       int fieldW, int fieldH, int fieldX,
                                       int textPad) {
-  int y = (y_ + titleSize_ + 2 * pad + fieldH);
+  int y = (y_ + titleSize_ + 2 * pad + fieldH); // tightened: removed extra pad/2
   int vSpace = pad / 2;
   SDL_Color white = {255, 255, 255, 255};
   SDL_Color orange = {255, 165, 0, 255};
   SDL_Color gray = {140, 140, 140, 255};
+  SDL_Color cyan = {0, 200, 255, 255};
 
-  fontMgr_.drawText(renderer, "Pane Rotation Interval (seconds):", fieldX, y,
-                    white, labelSize_, true);
-  y += labelSize_ + 4;
-  std::string rotStr = std::to_string(rotationInterval_);
-  renderField(renderer, fontMgr_, rotStr, "30", fieldX, y, fieldW, fieldH,
-              fieldSize_, textPad, activeField_ == 0, true, cursorPos_, orange,
-              gray, white, white, gray);
-  y += pad;
+  // --- Appearance section ---
+  fontMgr_.drawText(renderer, "--- Appearance ---", cx, y, cyan, labelSize_,
+                    true, true);
+  y += labelSize_ + vSpace;
 
   fontMgr_.drawText(renderer, "Theme:", fieldX, y, white, labelSize_);
   SDL_Rect themeBtn = {fieldX + fieldW - 100, y, 100, 24};
@@ -523,7 +537,7 @@ void SetupScreen::renderTabAppearance(SDL_Renderer *renderer, int, int pad,
   fontMgr_.drawText(renderer, "Enable Map Night Lights", fieldX + 30, y + 2,
                     white, labelSize_);
   nightLightsRect_ = nlToggle;
-  y += pad;
+  y += 24 + vSpace;
 
   SDL_Rect metricToggle = {fieldX, y, 20, 20};
   SDL_SetRenderDrawColor(renderer, 50, 50, 60, 255);
@@ -535,34 +549,31 @@ void SetupScreen::renderTabAppearance(SDL_Renderer *renderer, int, int pad,
     SDL_Rect check = {fieldX + 4, y + 4, 12, 12};
     SDL_RenderFillRect(renderer, &check);
   }
-  fontMgr_.drawText(renderer, "Use Metric Units (Celsius, km, m/s)",
+  fontMgr_.drawText(renderer, "Use Metric Units (°C, km, m/s)",
                     fieldX + 30, y + 2, white, labelSize_);
   metricToggleRect_ = metricToggle;
-  y += pad;
+  y += 24 + vSpace;
 
-  fontMgr_.drawText(renderer, "Callsign Color:", fieldX, y, white, labelSize_);
-  SDL_Rect colorBox = {fieldX + fieldW - 40, y, 40, 20};
-  SDL_SetRenderDrawColor(renderer, callsignColor_.r, callsignColor_.g,
-                         callsignColor_.b, 255);
-  SDL_RenderFillRect(renderer, &colorBox);
-  y += pad * 2;
+  fontMgr_.drawText(renderer, "Pane Rotation Interval (s):", fieldX, y, white,
+                    labelSize_);
+  int rotBtnW = 60;
+  SDL_Rect rotBtn = {fieldX + fieldW - rotBtnW, y - 2, rotBtnW, fieldH};
+  SDL_SetRenderDrawColor(renderer, 30, 30, 40, 255);
+  SDL_RenderFillRect(renderer, &rotBtn);
+  SDL_SetRenderDrawColor(renderer, activeField_ == 0 ? 255 : 80,
+                         activeField_ == 0 ? 165 : 80,
+                         activeField_ == 0 ? 0 : 80, 255);
+  SDL_RenderDrawRect(renderer, &rotBtn);
+  std::string rotStr = std::to_string(rotationInterval_);
+  fontMgr_.drawText(renderer, rotStr, rotBtn.x + rotBtnW / 2,
+                    rotBtn.y + fieldH / 2, white, fieldSize_, false, true);
+  y += fieldH + vSpace;
 
-  fontMgr_.drawText(renderer, "(Selection of colors coming soon...)", fieldX, y,
-                    gray, hintSize_);
-}
+  // --- Brightness section ---
+  fontMgr_.drawText(renderer, "--- Brightness ---", cx, y, cyan, labelSize_,
+                    true, true);
+  y += labelSize_ + vSpace;
 
-void SetupScreen::renderTabDisplay(SDL_Renderer *renderer, int, int pad,
-                                   int fieldW, int fieldH, int fieldX,
-                                   int textPad) {
-  int y = (y_ + titleSize_ + 2 * pad + fieldH);
-  int vSpace = pad / 2;
-  SDL_Color white = {255, 255, 255, 255};
-  SDL_Color gray = {140, 140, 140, 255};
-
-  // Brightness Slider
-  fontMgr_.drawText(renderer, "Brightness:", fieldX, y, white, labelSize_,
-                    true);
-  y += labelSize_ + 4;
   brightnessSliderRect_ = {fieldX, y, fieldW, fieldH};
   SDL_SetRenderDrawColor(renderer, 30, 30, 40, 255);
   SDL_RenderFillRect(renderer, &brightnessSliderRect_);
@@ -576,9 +587,8 @@ void SetupScreen::renderTabDisplay(SDL_Renderer *renderer, int, int pad,
   std::string brightText = std::to_string(brightness) + "%";
   fontMgr_.drawText(renderer, brightText, fieldX + fieldW / 2, y + fieldH / 2,
                     white, fieldSize_, false, true);
-  y += fieldH + pad;
+  y += fieldH + vSpace;
 
-  // Schedule Toggle
   scheduleToggleRect_ = {fieldX, y, 20, 20};
   SDL_SetRenderDrawColor(renderer, 50, 50, 60, 255);
   SDL_RenderFillRect(renderer, &scheduleToggleRect_);
@@ -591,7 +601,7 @@ void SetupScreen::renderTabDisplay(SDL_Renderer *renderer, int, int pad,
   }
   fontMgr_.drawText(renderer, "Enable Dim/Bright Schedule", fieldX + 30, y + 2,
                     white, labelSize_);
-  y += 24 + pad;
+  y += 24 + vSpace;
 
   if (brightnessMgr_.isScheduleEnabled()) {
     fontMgr_.drawText(renderer, "Dim Time:", fieldX, y, white, labelSize_);
@@ -599,22 +609,28 @@ void SetupScreen::renderTabDisplay(SDL_Renderer *renderer, int, int pad,
                       white, labelSize_);
     y += labelSize_ + 4;
     int halfW = (fieldW - pad) / 2;
-    renderField(renderer, fontMgr_, dimTime_, "HH:MM", fieldX, y, halfW, fieldH,
-                fieldSize_, textPad, activeField_ == 0, true, cursorPos_, white,
-                gray, white, white, gray);
-    int y_bright =
-        y - fieldH; // renderField advances y, we want them side-by-side
-    renderField(renderer, fontMgr_, brightTime_, "HH:MM", fieldX + halfW + pad,
-                y_bright, halfW, fieldH, fieldSize_, textPad, activeField_ == 1,
-                true, cursorPos_, white, gray, white, white, gray);
-    y += vSpace;
+    int dimY = y;
+    renderField(renderer, fontMgr_, dimTime_, "HH:MM", fieldX, dimY, halfW,
+                fieldH, fieldSize_, textPad, activeField_ == 1, true, cursorPos_,
+                orange, gray, white, white, gray);
+    dimTimeRect_ = {fieldX, dimY, halfW, fieldH};
+    int brightY = y;
+    renderField(renderer, fontMgr_, brightTime_, "HH:MM",
+                fieldX + halfW + pad, brightY, halfW, fieldH, fieldSize_,
+                textPad, activeField_ == 2, true, cursorPos_, orange, gray,
+                white, white, gray);
+    brightTimeRect_ = {fieldX + halfW + pad, brightY, halfW, fieldH};
+  } else {
+    dimTimeRect_ = {0, 0, 0, 0};
+    brightTimeRect_ = {0, 0, 0, 0};
   }
 }
+
 
 void SetupScreen::renderTabServices(SDL_Renderer *renderer, int, int pad,
                                     int fieldW, int fieldH, int fieldX,
                                     int textPad) {
-  int y = (y_ + titleSize_ + 2 * pad + fieldH);
+  int y = (y_ + titleSize_ + 2 * pad + fieldH); // tightened: removed extra pad/2
   int vSpace = pad / 2;
   SDL_Color white = {255, 255, 255, 255};
   SDL_Color orange = {255, 165, 0, 255};
@@ -636,35 +652,12 @@ void SetupScreen::renderTabServices(SDL_Renderer *renderer, int, int pad,
               fieldH, fieldSize_, textPad, activeField_ == 1, true, cursorPos_,
               orange, gray, white, white, gray);
   y += vSpace;
-
-  y += vSpace;
-
-  // Countdown settings side-by-side
-  int halfW = (fieldW - pad) / 2;
-  fontMgr_.drawText(renderer, "Countdown Label:", fieldX, y, white, labelSize_,
-                    true);
-  fontMgr_.drawText(renderer,
-                    "Target (YYYY-MM-DD HH:MM):", fieldX + halfW + pad, y,
-                    white, labelSize_, true);
-  y += labelSize_ + 4;
-
-  int lblY = y;
-  renderField(renderer, fontMgr_, countdownLabel_, "e.g. Contest", fieldX, lblY,
-              halfW, fieldH, fieldSize_, textPad, activeField_ == 2, true,
-              cursorPos_, orange, gray, white, white, gray);
-
-  int tY = y;
-  renderField(renderer, fontMgr_, countdownTime_, "2024-11-28 18:00",
-              fieldX + halfW + pad, tY, halfW, fieldH, fieldSize_, textPad,
-              activeField_ == 3, true, cursorPos_, orange, gray, white, white,
-              gray);
-  y = std::max(lblY, tY) + vSpace;
 }
 
-void SetupScreen::renderTabRig(SDL_Renderer *renderer, int /*cx*/, int pad,
+void SetupScreen::renderTabRig(SDL_Renderer *renderer, int cx, int pad,
                                int fieldW, int fieldH, int fieldX,
                                int textPad) {
-  int y = (y_ + titleSize_ + 2 * pad + fieldH);
+  int y = (y_ + titleSize_ + 2 * pad + fieldH); // tightened: removed extra pad/2
   int vSpace = pad / 2;
   SDL_Color white = {255, 255, 255, 255};
   SDL_Color orange = {255, 165, 0, 255};
@@ -709,10 +702,10 @@ void SetupScreen::renderTabRig(SDL_Renderer *renderer, int /*cx*/, int pad,
                     y, gray, hintSize_);
 }
 
-void SetupScreen::renderTabWidgets(SDL_Renderer *renderer, int /*cx*/, int pad,
+void SetupScreen::renderTabWidgets(SDL_Renderer *renderer, int cx, int pad,
                                    int fieldW, int fieldH, int fieldX,
-                                   int /*textPad*/) {
-  int y = (y_ + titleSize_ + 2 * pad + fieldH);
+                                   int textPad) {
+  int y = (y_ + titleSize_ + 2 * pad + fieldH); // tightened: removed extra pad/2
   SDL_Color white = {255, 255, 255, 255};
   SDL_Color gray = {140, 140, 140, 255};
 
@@ -798,11 +791,11 @@ void SetupScreen::onResize(int x, int y, int w, int h) {
 
 bool SetupScreen::onMouseUp(int mx, int my, Uint16) {
   int cx = x_ + width_ / 2;
-  int pad = std::max(12, width_ / 40);
-  int fieldW = std::min(600, width_ - 2 * pad);
+  int pad = std::max(16, width_ / 24);
+  int fieldW = std::min(400, width_ - 2 * pad);
   int fieldX = cx - fieldW / 2;
-  int fieldH = fieldSize_ + 10;
-  int y = y_ + titleSize_ + (3 * pad) / 2;
+  int fieldH = fieldSize_ + 14;
+  int y = y_ + titleSize_ + 2 * pad;
 
   // Check Footer Buttons
   if (mx >= cancelBtnRect_.x && mx <= cancelBtnRect_.x + cancelBtnRect_.w &&
@@ -820,12 +813,15 @@ bool SetupScreen::onMouseUp(int mx, int my, Uint16) {
     return true;
   }
 
-  int numTabs = 7;
+  const Tab tabValues[] = {Tab::Identity, Tab::Spotting, Tab::Appearance,
+                           Tab::Rig,      Tab::Services, Tab::Widgets};
+  int numTabs = 6;
   int tabW = fieldW / numTabs;
+  y = y_ + titleSize_ + 3 * pad / 2; // matches render(): pad/2 gap after title
   if (my >= y && my <= y + fieldH) {
     for (int i = 0; i < numTabs; ++i) {
       if (mx >= fieldX + i * tabW && mx <= fieldX + (i + 1) * tabW) {
-        activeTab_ = (Tab)i;
+        activeTab_ = tabValues[i];
         activeField_ = 0;
         cursorPos_ = 0;
         return true;
@@ -852,6 +848,11 @@ bool SetupScreen::onMouseUp(int mx, int my, Uint16) {
     if (mx >= toggleRect_.x && mx <= toggleRect_.x + toggleRect_.w &&
         my >= toggleRect_.y && my <= toggleRect_.y + toggleRect_.h) {
       clusterWSJTX_ = !clusterWSJTX_;
+      return true;
+    }
+    if (mx >= rbnToggleRect_.x && mx <= rbnToggleRect_.x + rbnToggleRect_.w &&
+        my >= rbnToggleRect_.y && my <= rbnToggleRect_.y + rbnToggleRect_.h) {
+      rbnEnabled_ = !rbnEnabled_;
       return true;
     }
   }
@@ -883,7 +884,7 @@ bool SetupScreen::onMouseUp(int mx, int my, Uint16) {
     }
   }
 
-  if (activeTab_ == Tab::Display) {
+  if (activeTab_ == Tab::Appearance) {
     if (mx >= brightnessSliderRect_.x &&
         mx <= brightnessSliderRect_.x + brightnessSliderRect_.w &&
         my >= brightnessSliderRect_.y &&
@@ -900,6 +901,20 @@ bool SetupScreen::onMouseUp(int mx, int my, Uint16) {
       brightnessMgr_.setScheduleEnabled(!brightnessMgr_.isScheduleEnabled());
       return true;
     }
+    // Dim / Bright time text fields (rects tracked by renderTabAppearance)
+    auto hitTimeField = [&](SDL_Rect &r, int fieldIdx) {
+      if (mx >= r.x && mx < r.x + r.w && my >= r.y && my < r.y + r.h) {
+        activeField_ = fieldIdx;
+        std::string *ft = getActiveFieldText();
+        cursorPos_ = ft ? (int)ft->size() : 0;
+        return true;
+      }
+      return false;
+    };
+    if (hitTimeField(dimTimeRect_, 1))
+      return true;
+    if (hitTimeField(brightTimeRect_, 2))
+      return true;
   }
 
   if (activeTab_ == Tab::Rig) {
@@ -911,7 +926,7 @@ bool SetupScreen::onMouseUp(int mx, int my, Uint16) {
   }
 
   if (activeTab_ == Tab::Widgets) {
-    int yTabBase = y_ + titleSize_ + 2 * pad + fieldH;
+    int yTabBase = y_ + titleSize_ + 2 * pad + fieldH; // matches content start
     int ySelector = yTabBase + labelSize_ + pad / 2;
     int paneW = fieldW / 4;
     if (my >= ySelector && my <= ySelector + 30) {
@@ -940,20 +955,18 @@ bool SetupScreen::onMouseUp(int mx, int my, Uint16) {
   }
 
   // Handle generic field clicks for active tab
-  int yStart = y_ + titleSize_ + 2 * pad + fieldH;
+  int yStart = y_ + titleSize_ + 2 * pad + fieldH + pad / 2;
   int nFields = 0;
   if (activeTab_ == Tab::Identity)
     nFields = 4;
   else if (activeTab_ == Tab::Spotting)
     nFields = 3;
   else if (activeTab_ == Tab::Appearance)
-    nFields = 1;
-  else if (activeTab_ == Tab::Display)
-    nFields = 2;
+    nFields = 1; // only rotation interval; dim/bright handled by explicit rects
   else if (activeTab_ == Tab::Rig)
     nFields = 2;
   else if (activeTab_ == Tab::Services)
-    nFields = 4;
+    nFields = 2;
 
   for (int i = 0; i < nFields; ++i) {
     int fy = yStart;
@@ -970,22 +983,6 @@ bool SetupScreen::onMouseUp(int mx, int my, Uint16) {
         if (i == 3) { // lon
           fx += fw + pad;
         }
-      }
-    } else if (activeTab_ == Tab::Display) {
-      if (i == 0 || i == 1) {
-        fy += (labelSize_ + 4 + fieldH + pad) + (24 + pad);
-        fw = (fieldW - pad) / 2;
-        if (i == 1)
-          fx += fw + pad;
-      }
-    } else if (activeTab_ == Tab::Services) {
-      if (i < 2) {
-        fy += i * (labelSize_ + 4 + fieldH + vSpace);
-      } else { // Label/Target row
-        fy += 2 * (labelSize_ + 4 + fieldH + vSpace);
-        fw = (fieldW - pad) / 2;
-        if (i == 3)
-          fx += fw + pad;
       }
     } else { // All other tabs with simple vertical field lists
       fy += i * (labelSize_ + 4 + fieldH + vSpace);
@@ -1056,31 +1053,23 @@ bool SetupScreen::onKeyDown(SDL_Keycode key, Uint16) {
       break;
     }
   } else if (activeTab_ == Tab::Appearance) {
-    nFields = 1;
+    nFields = 3; // 0=rotation interval, 1=dimTime, 2=brightTime
+    switch (activeField_) {
+    case 1:
+      text = &dimTime_;
+      break;
+    case 2:
+      text = &brightTime_;
+      break;
+    }
   } else if (activeTab_ == Tab::Services) {
-    nFields = 4;
+    nFields = 2;
     switch (activeField_) {
     case 0:
       text = &qrzUsername_;
       break;
     case 1:
       text = &qrzPassword_;
-      break;
-    case 2:
-      text = &countdownLabel_;
-      break;
-    case 3:
-      text = &countdownTime_;
-      break;
-    }
-  } else if (activeTab_ == Tab::Display) {
-    nFields = 2;
-    switch (activeField_) {
-    case 0:
-      text = &dimTime_;
-      break;
-    case 1:
-      text = &brightTime_;
       break;
     }
   } else if (activeTab_ == Tab::Rig) {
@@ -1100,10 +1089,12 @@ bool SetupScreen::onKeyDown(SDL_Keycode key, Uint16) {
     complete_ = true;
     cancelled_ = true;
     return true;
-  case SDLK_TAB:
+  case SDLK_TAB: {
     activeField_ = (activeField_ + 1) % nFields;
-    cursorPos_ = 0;
+    std::string *nf = getActiveFieldText();
+    cursorPos_ = nf ? (int)nf->size() : 0;
     return true;
+  }
   case SDLK_RETURN:
   case SDLK_KP_ENTER:
     if (!callsignText_.empty() && gridValid_) {
@@ -1189,12 +1180,27 @@ bool SetupScreen::onTextInput(const char *inputText) {
     }
   } else if (activeTab_ == Tab::Appearance) {
     if (activeField_ == 0) {
+      // Rotation interval: numeric only
       if (inputText[0] >= '0' && inputText[0] <= '9') {
         rotationInterval_ = rotationInterval_ * 10 + (inputText[0] - '0');
         if (rotationInterval_ > 3600)
           rotationInterval_ = 3600;
       }
       return true;
+    }
+    // Fields 1 & 2: dimTime_ / brightTime_ (HH:MM)
+    maxLen = 5;
+    switch (activeField_) {
+    case 1:
+      field = &dimTime_;
+      break;
+    case 2:
+      field = &brightTime_;
+      break;
+    }
+    if (field && field->size() == 2 && inputText[0] != ':') {
+      field->append(":");
+      cursorPos_ = 3;
     }
   } else if (activeTab_ == Tab::Services) {
     switch (activeField_) {
@@ -1214,22 +1220,6 @@ bool SetupScreen::onTextInput(const char *inputText) {
       field = &countdownTime_;
       maxLen = 16;
       break;
-    }
-  } else if (activeTab_ == Tab::Display) {
-    maxLen = 5;
-    switch (activeField_) {
-    case 0:
-      field = &dimTime_;
-      break;
-    case 1:
-      field = &brightTime_;
-      break;
-    }
-
-    // Auto-insert colon if user types digits
-    if (field && field->size() == 2 && inputText[0] != ':') {
-      field->append(":");
-      cursorPos_ = 3;
     }
   }
 
@@ -1352,6 +1342,10 @@ void SetupScreen::setConfig(const AppConfig &cfg) {
   clusterLogin_ = cfg.dxClusterLogin;
   clusterEnabled_ = cfg.dxClusterEnabled;
   clusterWSJTX_ = cfg.dxClusterUseWSJTX;
+  rbnEnabled_ = cfg.rbnEnabled;
+  pskOfDe_ = cfg.liveSpotsOfDe;
+  pskUseCall_ = cfg.liveSpotsUseCall;
+  pskMaxAge_ = cfg.liveSpotsMaxAge;
 
   rotationInterval_ = cfg.rotationIntervalS;
   theme_ = cfg.theme;
@@ -1365,7 +1359,6 @@ void SetupScreen::setConfig(const AppConfig &cfg) {
   qrzPassword_ = cfg.qrzPassword;
   countdownLabel_ = cfg.countdownLabel;
   countdownTime_ = cfg.countdownTime;
-
   brightnessMgr_.setBrightness(cfg.brightness);
   brightnessMgr_.setScheduleEnabled(cfg.brightnessSchedule);
   brightnessMgr_.setDimTime(cfg.dimHour, cfg.dimMinute);
@@ -1405,6 +1398,10 @@ AppConfig SetupScreen::getConfig() const {
   cfg.dxClusterLogin = clusterLogin_;
   cfg.dxClusterEnabled = clusterEnabled_;
   cfg.dxClusterUseWSJTX = clusterWSJTX_;
+  cfg.rbnEnabled = rbnEnabled_;
+  cfg.liveSpotsOfDe = pskOfDe_;
+  cfg.liveSpotsUseCall = pskUseCall_;
+  cfg.liveSpotsMaxAge = pskMaxAge_;
 
   cfg.rotationIntervalS = rotationInterval_;
   cfg.theme = theme_;
@@ -1418,7 +1415,6 @@ AppConfig SetupScreen::getConfig() const {
   cfg.qrzPassword = qrzPassword_;
   cfg.countdownLabel = countdownLabel_;
   cfg.countdownTime = countdownTime_;
-
   cfg.brightness = brightnessMgr_.getBrightness();
   cfg.brightnessSchedule = brightnessMgr_.isScheduleEnabled();
 
@@ -1481,7 +1477,7 @@ SDL_Rect SetupScreen::getActionRect(const std::string &action) const {
   // Fields (approximate positions)
   int yStart = y_ + titleSize_ + 3 * pad + fieldH;
   if (action.find("field_") == 0) {
-    int idx = std::stoi(action.substr(6));
+    int idx = StringUtils::safe_stoi(action.substr(6));
     int fy = yStart + idx * (labelSize_ + fieldH + pad / 2);
     return {fieldX, fy, fieldW, fieldH};
   }

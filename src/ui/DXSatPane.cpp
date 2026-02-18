@@ -86,15 +86,37 @@ void DXSatPane::render(SDL_Renderer *renderer) {
 
   if (mode_ == Mode::SAT) {
     int headerH = std::max(1, height_ / 10);
+    int btnFont = std::max(8, std::min(12, headerH * 2 / 5));
+
+    // Rotator "Trk" button (top-right corner)
     trackButtonRect_ = {x_ + width_ - headerH, y_, headerH, headerH};
-    SDL_Color color = (satMgr_.getTrackedSatellite() == selectedSatName_)
-                          ? SDL_Color{0, 255, 0, 255}
-                          : SDL_Color{100, 100, 100, 255};
-    SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a);
+    bool isTracking = (satMgr_.getTrackedSatellite() == selectedSatName_);
+    SDL_Color rotColor = isTracking ? SDL_Color{0, 210, 0, 255}
+                                    : SDL_Color{80, 80, 80, 255};
+    SDL_SetRenderDrawColor(renderer, rotColor.r / 5, rotColor.g / 5,
+                           rotColor.b / 5, 255);
+    SDL_RenderFillRect(renderer, &trackButtonRect_);
+    SDL_SetRenderDrawColor(renderer, rotColor.r, rotColor.g, rotColor.b, 255);
     SDL_RenderDrawRect(renderer, &trackButtonRect_);
-    fontMgr_.drawText(
-        renderer, "Track", trackButtonRect_.x + trackButtonRect_.w / 2,
-        trackButtonRect_.y + trackButtonRect_.h / 2, color, 10, false, true);
+    fontMgr_.drawText(renderer, "Trk",
+                      trackButtonRect_.x + trackButtonRect_.w / 2,
+                      trackButtonRect_.y + trackButtonRect_.h / 2, rotColor,
+                      btnFont, false, true);
+
+    // Map "Pth" button (to the left of Trk): toggles satellite ground track
+    mapTrackBtnRect_ = {x_ + width_ - 2 * headerH - 2, y_, headerH, headerH};
+    SDL_Color pathColor = mapTrackVisible_ ? SDL_Color{80, 200, 255, 255}
+                                           : SDL_Color{80, 80, 80, 255};
+    SDL_SetRenderDrawColor(renderer, pathColor.r / 5, pathColor.g / 5,
+                           pathColor.b / 5, 255);
+    SDL_RenderFillRect(renderer, &mapTrackBtnRect_);
+    SDL_SetRenderDrawColor(renderer, pathColor.r, pathColor.g, pathColor.b,
+                           255);
+    SDL_RenderDrawRect(renderer, &mapTrackBtnRect_);
+    fontMgr_.drawText(renderer, "Pth",
+                      mapTrackBtnRect_.x + mapTrackBtnRect_.w / 2,
+                      mapTrackBtnRect_.y + mapTrackBtnRect_.h / 2, pathColor,
+                      btnFont, false, true);
   }
 }
 
@@ -132,6 +154,17 @@ bool DXSatPane::onMouseUp(int mx, int my, Uint16 mod) {
       } else {
         satMgr_.trackSatellite(selectedSatName_);
       }
+      return true;
+    }
+
+    // Map Track button: toggle satellite ground track on world map
+    if (mx >= mapTrackBtnRect_.x &&
+        mx <= mapTrackBtnRect_.x + mapTrackBtnRect_.w &&
+        my >= mapTrackBtnRect_.y &&
+        my <= mapTrackBtnRect_.y + mapTrackBtnRect_.h) {
+      mapTrackVisible_ = !mapTrackVisible_;
+      if (onMapTrackToggle_)
+        onMapTrackToggle_(mapTrackVisible_);
       return true;
     }
   }

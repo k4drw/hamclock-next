@@ -1,7 +1,9 @@
 #include "NetworkManager.h"
 #include "../core/Logger.h"
 
+#ifndef __EMSCRIPTEN__
 #include <curl/curl.h>
+#endif
 
 #include <thread>
 
@@ -46,6 +48,12 @@ static size_t headerCallback(char *ptr, size_t size, size_t nmemb,
   return size * nmemb;
 }
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten/fetch.h>
+#endif
+
+// ... (existing includes)
+
 // Basic in-memory cache to prevent accidental tight-loop fetches
 void NetworkManager::fetchAsync(const std::string &url,
                                 std::function<void(std::string)> callback,
@@ -81,6 +89,62 @@ void NetworkManager::fetchAsync(const std::string &url,
     }
   }
 
+#ifdef __EMSCRIPTEN__
+  std::string fetchUrl = url;
+  if (!corsProxyUrl_.empty() && url.find("http") == 0) {
+    fetchUrl = corsProxyUrl_ + url;
+  }
+
+  emscripten_fetch_attr_t attr;
+  emscripten_fetch_attr_init(&attr);
+  std::strcpy(attr.requestMethod, "GET");
+  attr.attributes = EMSCRIPTEN_FETCH_LOAD_TO_MEMORY;
+
+  // Capture callback in a heap-allocated wrapper
+  struct FetchCtx {
+    NetworkManager *mgr;
+    std::string url;
+    std::function<void(std::string)> cb;
+  };
+  auto *ctx = new FetchCtx{this, url, callback};
+  attr.userData = ctx;
+
+  attr.onsuccess = [](emscripten_fetch_t *fetch) {
+    auto *ctx = static_cast<FetchCtx *>(fetch->userData);
+    if (fetch->data && fetch->numBytes > 0) {
+      std::string response(fetch->data, fetch->numBytes);
+
+      // Update in-memory cache
+      {
+        std::lock_guard<std::mutex> lock(ctx->mgr->cacheMutex_);
+        CacheEntry entry;
+        entry.timestamp = std::time(nullptr);
+        // We don't have header headers easily in simple fetch on WASM,
+        // but we can at least cache the data for small responses.
+        if (response.size() < 512 * 1024) {
+          entry.data = response;
+        }
+        ctx->mgr->cache_[ctx->url] = entry;
+      }
+
+      ctx->cb(std::move(response));
+    } else {
+      ctx->cb("");
+    }
+    delete ctx;
+    emscripten_fetch_close(fetch);
+  };
+  attr.onerror = [](emscripten_fetch_t *fetch) {
+    auto *ctx = static_cast<FetchCtx *>(fetch->userData);
+    LOG_E("NetworkManager", "WASM fetch failed for {} (status {})", ctx->url,
+          fetch->status);
+    ctx->cb(""); // empty string = failure
+    delete ctx;
+    emscripten_fetch_close(fetch);
+  };
+
+  emscripten_fetch(&attr, fetchUrl.c_str());
+#else
   std::thread([this, url, callback = std::move(callback), hasCache, cached]() {
     CURL *curl = curl_easy_init();
     if (!curl) {
@@ -193,6 +257,7 @@ void NetworkManager::fetchAsync(const std::string &url,
 
     callback(std::move(response));
   }).detach();
+#endif
 }
 
 NetworkManager::NetworkManager(const std::filesystem::path &cacheDir)

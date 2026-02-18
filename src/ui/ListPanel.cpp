@@ -109,21 +109,26 @@ void ListPanel::render(SDL_Renderer *renderer) {
     RenderUtils::drawRect(renderer, x_ + 1, rowY, width_ - 2, rowH,
                           stripeColor);
 
-    // Render row text (cached)
-    SDL_Color rowColor = getRowColor(static_cast<int>(i), themes.text);
-    if (rows_[i] != rowCache_[i].text) {
-      if (rowCache_[i].tex) {
-        MemoryMonitor::getInstance().destroyTexture(rowCache_[i].tex);
+    // Render row text (cached). Subclasses can override row color via getRowColor.
+    SDL_Color thisRowColor = getRowColor(static_cast<int>(i), rowColor);
+    auto &rc = rowCache_[i];
+    bool colorChanged = (rc.color.r != thisRowColor.r ||
+                         rc.color.g != thisRowColor.g ||
+                         rc.color.b != thisRowColor.b);
+    if (rows_[i] != rc.text || colorChanged) {
+      if (rc.tex) {
+        MemoryMonitor::getInstance().destroyTexture(rc.tex);
+        rc.tex = nullptr;
       }
-      rowCache_[i].tex =
-          fontMgr_.renderText(renderer, rows_[i], rowColor, rowFontSize_,
-                              &rowCache_[i].w, &rowCache_[i].h);
-      rowCache_[i].text = rows_[i];
+      rc.tex = fontMgr_.renderText(renderer, rows_[i], thisRowColor,
+                                   rowFontSize_, &rc.w, &rc.h);
+      rc.text = rows_[i];
+      rc.color = thisRowColor;
     }
-    if (rowCache_[i].tex) {
-      int ty = rowY + (rowH - rowCache_[i].h) / 2;
-      SDL_Rect dst = {x_ + pad, ty, rowCache_[i].w, rowCache_[i].h};
-      SDL_RenderCopy(renderer, rowCache_[i].tex, nullptr, &dst);
+    if (rc.tex) {
+      int ty = rowY + (rowH - rc.h) / 2;
+      SDL_Rect dst = {x_ + pad, ty, rc.w, rc.h};
+      SDL_RenderCopy(renderer, rc.tex, nullptr, &dst);
     }
   }
 }

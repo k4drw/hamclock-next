@@ -2,7 +2,6 @@
 
 #include "FontManager.h"
 #include "Widget.h"
-#include <SDL_pixels.h>
 
 #include <string>
 #include <vector>
@@ -23,16 +22,17 @@ public:
   void setHighlightedIndex(int index) { highlightedIndex_ = index; }
   int getHighlightedIndex() const { return highlightedIndex_; }
 
-  virtual SDL_Color getRowColor(int /*index*/,
-                                const SDL_Color &defaultColor) const {
-    return defaultColor;
-  }
-
   std::string getName() const override { return "ListPanel:" + title_; }
   nlohmann::json getDebugData() const override;
 
 protected:
   void destroyCache();
+
+  // Overridable row color hook. Called by render() for each row.
+  virtual SDL_Color getRowColor(int /*index*/,
+                                const SDL_Color &defaultColor) const {
+    return defaultColor;
+  }
 
   FontManager &fontMgr_;
   std::string title_;
@@ -46,6 +46,7 @@ protected:
     SDL_Texture *tex = nullptr;
     int w = 0, h = 0;
     std::string text;
+    SDL_Color color = {0, 0, 0, 0};
   };
   std::vector<RowCache> rowCache_;
 

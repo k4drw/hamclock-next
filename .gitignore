@@ -15,6 +15,7 @@ release/
 .DS_Store
 Thumbs.db
 .stfolder/
+.stversions/
 
 # Dependencies
 lib/
@@ -24,7 +25,10 @@ include/nlohmann/
 # Working Documentation
 working_docs/
 hamclock-original
+open-hamclock-backend
 .claude
+AI_RULES.md
+CLAUDE.md
 
 # Docker
 docker-build/

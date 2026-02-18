@@ -7,6 +7,10 @@
 #include <filesystem>
 #include <fstream>
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
+
 static std::string colorToHex(SDL_Color c) {
   char buf[8];
   std::snprintf(buf, sizeof(buf), "#%02X%02X%02X", c.r, c.g, c.b);
@@ -53,6 +57,56 @@ bool ConfigManager::init() {
     return false;
   }
 
+#ifdef __EMSCRIPTEN__
+  // Mount IDBFS and sync (load from IndexedDB into virtual FS).
+  // IMPORTANT: SDL_GetPrefPath returns a path with a trailing slash.
+  // FS.mount() requires a clean path with no trailing slash or it silently
+  // fails, causing every save to write to session-only MEMFS that vanishes
+  // on reload.  Strip the trailing slash before passing to JS.
+  std::string mountPath = configDir_.string();
+  while (mountPath.size() > 1 && mountPath.back() == '/')
+    mountPath.pop_back();
+
+  EM_ASM(
+      {
+        var path = UTF8ToString($0);
+        console.log('[IDBFS] Mounting at: ' + path);
+
+        // Create the mount point directory in MEMFS if needed.
+        // Parent dirs already exist (created by create_directories above).
+        try {
+          FS.mkdir(path);
+        } catch (e) {
+          // EEXIST is expected on every run after the first — not an error.
+        }
+
+        var mounted = false;
+        try {
+          FS.mount(IDBFS, {}, path);
+          mounted = true;
+          console.log('[IDBFS] Mount succeeded');
+        } catch (e) {
+          console.error('[IDBFS] Mount FAILED — config will not persist:', e);
+        }
+
+        // Sync from IndexedDB into MEMFS, then notify C++.
+        // If mount failed we still call back so the app is not stuck in
+        // Loading state; it will just show the setup screen every run.
+        FS.syncfs(
+            true, function(err) {
+              if (err) {
+                console.error('[IDBFS] Sync-from-IDB failed:', err);
+              } else {
+                console.log('[IDBFS] Sync-from-IDB complete' +
+                            (mounted ? '' : ' (no IDBFS — session only)'));
+              }
+              if (typeof Module._hamclock_after_idbfs == = 'function')
+                Module._hamclock_after_idbfs();
+            });
+      },
+      mountPath.c_str());
+#endif
+
   configPath_ = configDir_ / "config.json";
   return true;
 }
@@ -95,6 +149,27 @@ bool ConfigManager::load(AppConfig &config) const {
     config.mapStyle = ap.value("map_style", "nasa");
     config.showGrid = ap.value("show_grid", false);
     config.gridType = ap.value("grid_type", "latlon");
+
+    // Legacy migration: if show_muf_rt is present and true, defaulting to Muf
+    if (ap.contains("prop_overlay")) {
+      std::string po = ap.value("prop_overlay", "none");
+      if (po == "muf")
+        config.propOverlay = PropOverlayType::Muf;
+      else if (po == "voacap")
+        config.propOverlay = PropOverlayType::Voacap;
+      else
+        config.propOverlay = PropOverlayType::None;
+    } else if (ap.contains("show_muf_rt")) {
+      bool showMuf = ap.value("show_muf_rt", false);
+      config.propOverlay =
+          showMuf ? PropOverlayType::Muf : PropOverlayType::None;
+    }
+
+    config.propBand = ap.value("prop_band", "20m");
+    config.propMode = ap.value("prop_mode", "SSB");
+    config.propPower = ap.value("prop_power", 100);
+    config.mufRtOpacity = ap.value("muf_rt_opacity", 40);
+    config.showSatTrack = ap.value("show_sat_track", true);
     config.qrzUsername = ap.value("qrz_username", "");
     config.qrzPassword = ap.value("qrz_password", "");
   }
@@ -108,6 +183,22 @@ bool ConfigManager::load(AppConfig &config) const {
     auto &ap = json["appearance"];
     config.countdownLabel = ap.value("countdown_label", "");
     config.countdownTime = ap.value("countdown_time", "");
+  }
+
+  // RSS
+  if (json.contains("rss")) {
+    config.rssEnabled = json["rss"].value("enabled", true);
+  }
+
+  // Activity panels
+  if (json.contains("activity")) {
+    config.ontaFilter = json["activity"].value("onta_filter", "all");
+  }
+
+  // Network (WASM proxy URL)
+  if (json.contains("network")) {
+    const auto &n = json["network"];
+    config.corsProxyUrl = n.value("cors_proxy_url", config.corsProxyUrl);
   }
 
   // Brightness
@@ -259,6 +350,20 @@ bool ConfigManager::save(const AppConfig &config) const {
   json["appearance"]["map_style"] = config.mapStyle;
   json["appearance"]["show_grid"] = config.showGrid;
   json["appearance"]["grid_type"] = config.gridType;
+  std::string po = "none";
+  if (config.propOverlay == PropOverlayType::Muf)
+    po = "muf";
+  else if (config.propOverlay == PropOverlayType::Voacap)
+    po = "voacap";
+  json["appearance"]["prop_overlay"] = po;
+  json["appearance"]["prop_band"] = config.propBand;
+  json["appearance"]["prop_mode"] = config.propMode;
+  json["appearance"]["prop_power"] = config.propPower;
+  // Legacy compat
+  json["appearance"]["show_muf_rt"] =
+      (config.propOverlay == PropOverlayType::Muf);
+  json["appearance"]["muf_rt_opacity"] = config.mufRtOpacity;
+  json["appearance"]["show_sat_track"] = config.showSatTrack;
   json["appearance"]["qrz_username"] = config.qrzUsername;
   json["appearance"]["qrz_password"] = config.qrzPassword;
 
@@ -274,6 +379,8 @@ bool ConfigManager::save(const AppConfig &config) const {
 
   json["power"]["prevent_sleep"] = config.preventSleep;
   json["power"]["gps_enabled"] = config.gpsEnabled;
+
+  json["network"]["cors_proxy_url"] = config.corsProxyUrl;
 
   json["rotator"]["host"] = config.rotatorHost;
   json["rotator"]["port"] = config.rotatorPort;
@@ -318,6 +425,9 @@ bool ConfigManager::save(const AppConfig &config) const {
   json["live_spots"]["rbn_host"] = config.rbnHost;
   json["live_spots"]["rbn_port"] = config.rbnPort;
 
+  json["rss"]["enabled"] = config.rssEnabled;
+  json["activity"]["onta_filter"] = config.ontaFilter;
+
   std::ofstream ofs(configPath_);
   if (!ofs) {
     std::fprintf(stderr, "ConfigManager: cannot write %s\n",
@@ -326,5 +436,29 @@ bool ConfigManager::save(const AppConfig &config) const {
   }
 
   ofs << json.dump(2) << "\n";
+
+#ifdef __EMSCRIPTEN__
+  // Flush MEMFS -> IndexedDB.  Retry once after 1 s on failure (handles
+  // the case where the browser closes the tab before the first attempt
+  // completes — the retry gives a second chance to persist the write).
+  EM_ASM({
+    function doSync(retriesLeft) {
+      FS.syncfs(
+          false, function(err) {
+            if (err) {
+              console.error('[IDBFS] Flush to IndexedDB failed (retries=' +
+                                retriesLeft + '):',
+                            err);
+              if (retriesLeft > 0)
+                setTimeout(function() { doSync(retriesLeft - 1); }, 1000);
+            } else {
+              console.log('[IDBFS] Config flushed to IndexedDB');
+            }
+          });
+    }
+    doSync(1);
+  });
+#endif
+
   return ofs.good();
 }

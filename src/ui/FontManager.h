@@ -188,12 +188,11 @@ public:
       return;
     }
 
-    // Heuristic: If string contains moving time (HH:MM:SS) or countdown
     // markers, don't cache to prevent rapid VRAM growth. Render every frame
     // instead.
     bool volatileText =
         forceVolatile ||
-        (text.length() >= 5 && (text.find(':') != std::string::npos ||
+        (text.length() >= 5 && ((text.find(':') != std::string::npos && text.find(':', text.find(':') + 1) != std::string::npos) ||
                                 text.find("Up ") != std::string::npos ||
                                 (text.find('s') != std::string::npos &&
                                  text.find('m') != std::string::npos)));
@@ -252,30 +251,6 @@ public:
     }
 
     return static_cast<int>(w / renderScale_);
-  }
-
-  // Returns the ascent of the font in logical units.
-  int getFontAscent(int ptSize) {
-    int renderPt = ptSize;
-    if (renderScale_ > 1.01f) {
-      renderPt = std::clamp(static_cast<int>(ptSize * renderScale_), 8, 600);
-    }
-    TTF_Font *font = getFont(renderPt);
-    if (!font)
-      return 0;
-    return static_cast<int>(TTF_FontAscent(font) / renderScale_);
-  }
-
-  // Returns the total height of the font in logical units.
-  int getFontHeight(int ptSize) {
-    int renderPt = ptSize;
-    if (renderScale_ > 1.01f) {
-      renderPt = std::clamp(static_cast<int>(ptSize * renderScale_), 8, 600);
-    }
-    TTF_Font *font = getFont(renderPt);
-    if (!font)
-      return 0;
-    return static_cast<int>(TTF_FontHeight(font) / renderScale_);
   }
 
   void clearCache() {

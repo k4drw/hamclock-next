@@ -22,6 +22,7 @@
 DisplayPower::DisplayPower() { init(); }
 
 void DisplayPower::init() {
+#ifndef __EMSCRIPTEN__
   // 1. Test vcgencmd (RPi preferred)
   if (std::system("vcgencmd display_power -1 > /dev/null 2>&1") == 0) {
     method_ = Method::VCGENCMD;
@@ -48,10 +49,14 @@ void DisplayPower::init() {
 
   method_ = Method::NONE;
   LOG_W("Display", "No hardware screen control detected.");
+#else
+  method_ = Method::NONE;
+#endif
 }
 
 bool DisplayPower::setPower(bool on) {
   bool success = false;
+#ifndef __EMSCRIPTEN__
 #ifdef _WIN32
   (void)on;
   success = false;
@@ -71,17 +76,25 @@ bool DisplayPower::setPower(bool on) {
     break;
   }
 #endif
+#else
+  (void)on;
+  success = false;
+#endif
 
   if (success) {
     currentPower_ = on;
     LOG_I("Display", "Screen power set to {}", on ? "ON" : "OFF");
   } else {
+    // Only log error on desktop
+#ifndef __EMSCRIPTEN__
     LOG_E("Display", "Failed to set screen power to {}", on ? "ON" : "OFF");
+#endif
   }
   return success;
 }
 
 bool DisplayPower::getPower() const {
+#ifndef __EMSCRIPTEN__
 #ifdef _WIN32
   return currentPower_; // On Windows, we can only return the last known state
 #else
@@ -99,9 +112,13 @@ bool DisplayPower::getPower() const {
   }
   return currentPower_;
 #endif
+#else
+  return true;
+#endif
 }
 
 std::string DisplayPower::getMethodName() const {
+#ifndef __EMSCRIPTEN__
   switch (method_) {
   case Method::VCGENCMD:
     return "vcgencmd";
@@ -112,10 +129,12 @@ std::string DisplayPower::getMethodName() const {
   case Method::NONE:
     return "none";
   }
-  return "unknown";
+#endif
+  return "none";
 }
 
 std::string DisplayPower::findBacklightPowerPath() {
+#ifndef __EMSCRIPTEN__
   const char *paths[] = {"/sys/class/backlight/rpi_backlight/bl_power",
                          "/sys/class/backlight/10-0045/bl_power",
                          "/sys/class/backlight/6-0045/bl_power", nullptr};
@@ -125,11 +144,13 @@ std::string DisplayPower::findBacklightPowerPath() {
       return paths[i];
     }
   }
+#endif
   return "";
 }
 
 bool DisplayPower::writeSysfs(const std::string &path,
                               const std::string &value) {
+#ifndef __EMSCRIPTEN__
 #ifdef _WIN32
   (void)path;
   (void)value;
@@ -148,9 +169,15 @@ bool DisplayPower::writeSysfs(const std::string &path,
   return false;
 #endif
 #endif
+#else
+  (void)path;
+  (void)value;
+  return false;
+#endif
 }
 
 bool DisplayPower::runVcgencmd(bool on) {
+#ifndef __EMSCRIPTEN__
 #ifdef _WIN32
   (void)on;
   return false;
@@ -159,9 +186,14 @@ bool DisplayPower::runVcgencmd(bool on) {
       on ? "vcgencmd display_power 1" : "vcgencmd display_power 0";
   return std::system((cmd + " > /dev/null 2>&1").c_str()) == 0;
 #endif
+#else
+  (void)on;
+  return false;
+#endif
 }
 
 bool DisplayPower::blankFramebuffer(bool blank) {
+#ifndef __EMSCRIPTEN__
 #ifdef __linux__
   int fd = open("/dev/fb0", O_RDWR);
   if (fd < 0)
@@ -188,6 +220,10 @@ bool DisplayPower::blankFramebuffer(bool blank) {
   // If we're using FB blanking as fallback, it's mostly a dummy for now.
   return true;
 #else
+  return false;
+#endif
+#else
+  (void)blank;
   return false;
 #endif
 }

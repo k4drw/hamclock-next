@@ -238,6 +238,8 @@ RSSProvider::RSSProvider(NetworkManager &net,
     : net_(net), store_(std::move(store)) {}
 
 void RSSProvider::fetch() {
+  if (!enabled_)
+    return;
   auto agg = std::make_shared<FeedAggregator>(store_);
 
   // Feed 0: HamWeekly (Atom)

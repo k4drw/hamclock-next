@@ -5,14 +5,12 @@
 #include <ctime>
 #include <fcntl.h>
 #include <fstream>
-#include <sstream>
-#ifndef _WIN32
 #include <unistd.h>
-#endif
 
 BrightnessManager::BrightnessManager() {}
 
 bool BrightnessManager::init() {
+#ifndef __EMSCRIPTEN__
   if (!detectBrightnessPath()) {
     LOG_W("Brightness", "No brightness control found");
     available_ = false;
@@ -36,15 +34,14 @@ bool BrightnessManager::init() {
     available_ = true;
     return true;
   }
+#endif
 
   available_ = false;
   return false;
 }
 
 bool BrightnessManager::detectBrightnessPath() {
-#ifdef _WIN32
-  return false;
-#else
+#ifndef __EMSCRIPTEN__
   // Common brightness control paths (RPi, x86 laptops, DSI displays)
   const char *paths[] = {"/sys/class/backlight/rpi_backlight/brightness",
                          "/sys/class/backlight/10-0045/brightness",
@@ -65,12 +62,13 @@ bool BrightnessManager::detectBrightnessPath() {
       return true;
     }
   }
+#endif
 
   return false;
-#endif
 }
 
 bool BrightnessManager::setBrightness(int percent) {
+#ifndef __EMSCRIPTEN__
   if (!available_) {
     return false;
   }
@@ -89,31 +87,41 @@ bool BrightnessManager::setBrightness(int percent) {
     LOG_I("Brightness", "Set to {}% ({})", percent, value);
     return true;
   }
+#endif
 
   return false;
 }
 
 int BrightnessManager::getBrightness() const {
+#ifndef __EMSCRIPTEN__
   if (!available_) {
     return -1;
   }
 
   return currentPercent_;
+#else
+  return -1;
+#endif
 }
 
 void BrightnessManager::setDimTime(int hour, int minute) {
+#ifndef __EMSCRIPTEN__
   dimHour_ = hour;
   dimMinute_ = minute;
   LOG_I("Brightness", "Dim time set to {:02d}:{:02d}", hour, minute);
+#endif
 }
 
 void BrightnessManager::setBrightTime(int hour, int minute) {
+#ifndef __EMSCRIPTEN__
   brightHour_ = hour;
   brightMinute_ = minute;
   LOG_I("Brightness", "Bright time set to {:02d}:{:02d}", hour, minute);
+#endif
 }
 
 void BrightnessManager::update() {
+#ifndef __EMSCRIPTEN__
   if (!available_ || !scheduleEnabled_) {
     return;
   }
@@ -125,9 +133,11 @@ void BrightnessManager::update() {
   if (targetPercent != currentPercent_) {
     setBrightness(targetPercent);
   }
+#endif
 }
 
 bool BrightnessManager::shouldBeDimmed() const {
+#ifndef __EMSCRIPTEN__
   auto now = std::chrono::system_clock::now();
   std::time_t nowTime = std::chrono::system_clock::to_time_t(now);
   std::tm localTm;
@@ -149,9 +159,13 @@ bool BrightnessManager::shouldBeDimmed() const {
     // Dim period within same day (unusual, but handle it)
     return (currentMinutes >= dimMinutes && currentMinutes < brightMinutes);
   }
+#else
+  return false;
+#endif
 }
 
 bool BrightnessManager::writeBrightness(int value) {
+#ifndef __EMSCRIPTEN__
   std::ofstream file(brightnessPath_);
   if (!file.is_open()) {
     LOG_E("Brightness", "Failed to open {} for writing", brightnessPath_);
@@ -167,9 +181,13 @@ bool BrightnessManager::writeBrightness(int value) {
   }
 
   return true;
+#else
+  return false;
+#endif
 }
 
 int BrightnessManager::readBrightness() const {
+#ifndef __EMSCRIPTEN__
   std::ifstream file(brightnessPath_);
   if (!file.is_open()) {
     LOG_E("Brightness", "Failed to open {} for reading", brightnessPath_);
@@ -186,4 +204,7 @@ int BrightnessManager::readBrightness() const {
   }
 
   return value;
+#else
+  return -1;
+#endif
 }

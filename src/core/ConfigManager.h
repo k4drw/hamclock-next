@@ -9,6 +9,7 @@
 #include <SDL.h>
 
 enum class LiveSpotSource { PSK, RBN, WSPR };
+enum class PropOverlayType { None, Muf, Voacap };
 
 struct AppConfig {
   // Identity
@@ -26,6 +27,12 @@ struct AppConfig {
   std::string mapStyle = "nasa";              // "nasa", "terrain", "countries"
   bool showGrid = false;
   std::string gridType = "latlon"; // "latlon" or "maidenhead"
+  PropOverlayType propOverlay = PropOverlayType::None;
+  std::string propBand = "20m";
+  std::string propMode = "SSB";
+  int propPower = 100;   // Watts
+  int mufRtOpacity = 40; // percentage
+  bool showSatTrack = true; // Show satellite ground track line on world map
 
   // Pane widget selection (top bar panes 1–3)
   // Pane widget selection (rotation sets)
@@ -92,8 +99,24 @@ struct AppConfig {
   int brightHour = 6;
   int brightMinute = 0;
 
+  // RSS
+  bool rssEnabled = true; // Show RSS news banner
+
+  // Activity panels
+  std::string ontaFilter = "all"; // "all", "pota", or "sota"
+
   // Security
   bool gpsEnabled = false;
+
+  // Network (WASM)
+  // CORS proxy prefix prepended to all external URLs in the WASM build.
+  // Default "/proxy/" works with the bundled serve.py and the nginx snippet.
+  // Set to "" to disable (only if your server sends CORS headers itself).
+#ifdef __EMSCRIPTEN__
+  std::string corsProxyUrl = "/proxy/";
+#else
+  std::string corsProxyUrl = "";
+#endif
 };
 
 class ConfigManager {
