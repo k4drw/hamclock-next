@@ -1,4 +1,5 @@
 #include "DRAPPanel.h"
+#include "../core/StringUtils.h"
 #include "../core/Theme.h"
 #include <SDL.h>
 #include <cstdio>
@@ -64,7 +65,7 @@ void DRAPPanel::render(SDL_Renderer *renderer) {
   // Parse the value to determine color
   float freq = 0.0f;
   if (!currentValue_.empty()) {
-    freq = std::stof(currentValue_);
+    freq = StringUtils::safe_stof(currentValue_);
   }
 
   // Color coding: higher DRAP = worse conditions

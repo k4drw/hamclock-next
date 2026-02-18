@@ -1,12 +1,13 @@
 #pragma once
 
 #include "../core/Constants.h"
-#include <SDL.h>
 #include <atomic>
 #include <memory>
 #include <mutex>
 #include <thread>
-#include <vector>
+
+// Forward declaration to avoid pulling SDL into the header
+struct SDL_Renderer;
 
 struct AppConfig;
 struct HamClockState;
@@ -19,6 +20,7 @@ class WebServer {
 public:
   WebServer(SDL_Renderer *renderer, AppConfig &cfg, HamClockState &state,
             ConfigManager &cfgMgr, std::shared_ptr<DisplayPower> displayPower,
+            std::atomic<bool> &reloadFlag,
             std::shared_ptr<WatchlistStore> watchlist = nullptr,
             std::shared_ptr<SolarDataStore> solar = nullptr,
             int port = HamClock::DEFAULT_WEB_SERVER_PORT);
@@ -26,12 +28,6 @@ public:
 
   void start();
   void stop();
-
-  // Call this once per frame from main thread to update the web mirror
-  void updateFrame();
-
-  // In --web-only mode, capture every frame unconditionally (no display)
-  void setAlwaysCapture(bool on) { alwaysCapture_ = on; }
 
 private:
   void run();
@@ -43,17 +39,10 @@ private:
   std::shared_ptr<WatchlistStore> watchlist_;
   std::shared_ptr<SolarDataStore> solar_;
   std::shared_ptr<DisplayPower> displayPower_;
+  std::atomic<bool> *reloadFlag_; // points to AppContext::configReloadRequested
   int port_;
   std::thread thread_;
   std::atomic<bool> running_{false};
 
-  // The latest captured JPEG
-  std::vector<unsigned char> latestJpeg_;
-  std::mutex jpegMutex_;
-
-  // Timing to avoid capturing every single frame if no one is watching
-  uint32_t lastCaptureTicks_ = 0;
-  std::atomic<bool> needsCapture_{true};
-  bool alwaysCapture_ = false; // true in --web-only mode
-  void *svrPtr_ = nullptr;     // httplib::Server*
+  void *svrPtr_ = nullptr; // httplib::Server*
 };

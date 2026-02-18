@@ -49,7 +49,6 @@ struct SpotRecord {
   double freqKhz;
   std::string receiverGrid; // Maidenhead locator of receiving station
   std::string senderCallsign;
-  std::chrono::system_clock::time_point timestamp;
 };
 
 struct LiveSpotData {
@@ -108,52 +107,6 @@ public:
       newData->selectedBands[idx] = !newData->selectedBands[idx];
       data_ = newData;
     }
-  }
-
-  void addSpot(const SpotRecord &spot) {
-    std::lock_guard<std::mutex> lock(mutex_);
-    auto newData = std::make_shared<LiveSpotData>(*data_);
-    int idx = freqToBandIndex(spot.freqKhz);
-    if (idx >= 0) {
-      newData->bandCounts[idx]++;
-    }
-    newData->spots.push_back(spot);
-    newData->lastUpdated = std::chrono::system_clock::now();
-    newData->valid = true;
-    data_ = newData;
-  }
-
-  void prune(std::chrono::system_clock::time_point oldest) {
-    std::lock_guard<std::mutex> lock(mutex_);
-    auto newData = std::make_shared<LiveSpotData>(*data_);
-    bool changed = false;
-
-    auto it = newData->spots.begin();
-    while (it != newData->spots.end()) {
-      if (it->timestamp < oldest) {
-        int idx = freqToBandIndex(it->freqKhz);
-        if (idx >= 0 && newData->bandCounts[idx] > 0) {
-          newData->bandCounts[idx]--;
-        }
-        it = newData->spots.erase(it);
-        changed = true;
-      } else {
-        ++it;
-      }
-    }
-
-    if (changed) {
-      newData->lastUpdated = std::chrono::system_clock::now();
-      data_ = newData;
-    }
-  }
-
-  void clearSpots() {
-    std::lock_guard<std::mutex> lock(mutex_);
-    auto newData = std::make_shared<LiveSpotData>(*data_);
-    newData->spots.clear();
-    std::memset(newData->bandCounts, 0, sizeof(newData->bandCounts));
-    data_ = newData;
   }
 
 private:

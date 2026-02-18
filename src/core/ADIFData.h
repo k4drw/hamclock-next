@@ -8,8 +8,8 @@
 // Individual QSO record for display in log viewer
 struct QSORecord {
   std::string callsign;
-  std::string date;      // YYYYMMDD format
-  std::string time;      // HHMMSS format
+  std::string date; // YYYYMMDD format
+  std::string time; // HHMMSS format
   std::string band;
   std::string mode;
   std::string freq;
@@ -19,6 +19,8 @@ struct QSORecord {
   std::string qth;
   std::string gridsquare;
   std::string comment;
+  double lat = 0.0;
+  double lon = 0.0;
 };
 
 struct ADIFStats {
@@ -29,6 +31,8 @@ struct ADIFStats {
   std::vector<QSORecord> recentQSOs; // Most recent QSOs (newest first)
 
   bool valid = false;
+  std::string activeBandFilter;
+  std::string activeModeFilter;
 };
 
 class ADIFStore {
@@ -41,6 +45,12 @@ public:
   ADIFStats get() const {
     std::lock_guard<std::mutex> lock(mutex_);
     return stats_;
+  }
+
+  void setFilters(const std::string &band, const std::string &mode) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    stats_.activeBandFilter = band;
+    stats_.activeModeFilter = mode;
   }
 
 private:
