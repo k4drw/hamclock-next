@@ -99,12 +99,7 @@ void DXClusterProvider::runTelnet(const std::string &host, int port,
   std::memcpy(&server_addr.sin_addr, he->h_addr_list[0], he->h_length);
 
   if (connect(sock, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
-#ifdef _WIN32
-    int err = WSAGetLastError();
-    LOG_E("DXCluster", "Connect to {} failed: error {}", host, err);
-#else
     LOG_E("DXCluster", "Connect to {} failed: {}", host, std::strerror(errno));
-#endif
     if (state_)
       state_->services["DXCluster"].lastError = "Connect failed";
     close(sock);

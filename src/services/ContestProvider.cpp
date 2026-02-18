@@ -1,5 +1,6 @@
 #include "ContestProvider.h"
 #include "../core/Astronomy.h"
+#include "../core/StringUtils.h"
 #include <chrono>
 #include <cstdio>
 #include <ctime>
@@ -48,11 +49,24 @@ void ContestProvider::processData(const std::string &body) {
       c.title = item.substr(t_start + 7, t_end - (t_start + 7));
     }
 
+    // Extract link/url
+    size_t l_start = item.find("<link>");
+    size_t l_end = item.find("</link>");
+    if (l_start != std::string::npos && l_end != std::string::npos) {
+      c.url = item.substr(l_start + 6, l_end - (l_start + 6));
+      // Trim whitespace
+      while (!c.url.empty() && (c.url.front() == ' ' || c.url.front() == '\n' || c.url.front() == '\r'))
+        c.url.erase(c.url.begin());
+      while (!c.url.empty() && (c.url.back() == ' ' || c.url.back() == '\n' || c.url.back() == '\r'))
+        c.url.pop_back();
+    }
+
     // Extract description (dates)
     size_t d_start = item.find("<description>");
     size_t d_end = item.find("</description>");
     if (d_start != std::string::npos && d_end != std::string::npos) {
       std::string desc = item.substr(d_start + 13, d_end - (d_start + 13));
+      c.dateDesc = desc;
 
       // Format 1: "1300Z, Feb 9 to 2359Z, Feb 13"
       // Format 2: "0130Z-0330Z, Feb 11"
@@ -63,9 +77,9 @@ void ContestProvider::processData(const std::string &body) {
         struct tm t = {};
         t.tm_year = currentYear - 1900;
         t.tm_mon = monthIdx;
-        t.tm_mday = std::stoi(dayStr);
-        t.tm_hour = std::stoi(timeStr.substr(0, 2));
-        t.tm_min = std::stoi(timeStr.substr(2, 2));
+        t.tm_mday = StringUtils::safe_stoi(dayStr);
+        t.tm_hour = StringUtils::safe_stoi(timeStr.substr(0, 2));
+        t.tm_min = StringUtils::safe_stoi(timeStr.substr(2, 2));
         t.tm_isdst = 0;
         return std::chrono::system_clock::from_time_t(
             Astronomy::portable_timegm(&t));

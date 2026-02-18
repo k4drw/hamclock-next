@@ -1,4 +1,5 @@
 #include "CallbookProvider.h"
+#include "../core/StringUtils.h"
 #include <nlohmann/json.hpp>
 
 using json = nlohmann::json;
@@ -39,8 +40,10 @@ void CallbookProvider::fetchCallook(const std::string &callsign,
           result.address = j["address"]["line1"].get<std::string>();
           result.city = j["address"]["line2"].get<std::string>();
           result.grid = j["location"]["gridsquare"].get<std::string>();
-          result.lat = std::stof(j["location"]["latitude"].get<std::string>());
-          result.lon = std::stof(j["location"]["longitude"].get<std::string>());
+          result.lat = StringUtils::safe_stof(
+              j["location"]["latitude"].get<std::string>());
+          result.lon = StringUtils::safe_stof(
+              j["location"]["longitude"].get<std::string>());
           result.source = "Callook.info";
         }
       }

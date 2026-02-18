@@ -106,7 +106,7 @@ public:
 
     // Specialized Logic: Generate alpha channel from pixel brightness for
     // certain textures.
-    if (key == "night_map" || key == "nasa_moon" || key == "sdo_latest") {
+    if (key == "nasa_moon" || key == "sdo_latest") {
       uint8_t *pixels = (uint8_t *)surface->pixels;
       for (int y = 0; y < surface->h; ++y) {
         uint32_t *row = (uint32_t *)(pixels + y * surface->pitch);
@@ -145,17 +145,23 @@ public:
         maxW_ = info.max_texture_width;
         maxH_ = info.max_texture_height;
         LOG_I("TextureManager", "GPU Max Texture Size: {}x{}", maxW_, maxH_);
-#if defined(__linux__) || defined(__arm__) || defined(__aarch64__)
-        // On RPi and similar platforms, even if the driver claims to support
-        // 8k textures, GPU memory (gpu_mem) is often very limited.
+#if defined(__linux__) || defined(__arm__) || defined(__aarch64__) ||          \
+    defined(__EMSCRIPTEN__)
+        // On RPi and WASM, GPU memory is limited.
         // Cap at 2048 to save memory. 5400x2700 RGBA32 is ~58MB!
-        if (maxW_ > 2048) {
-          maxW_ = 2048;
-          LOG_I("TextureManager",
-                "Capping texture limit to 2048 for Pi/Linux stability");
+        int cap = 2048;
+#ifdef __EMSCRIPTEN__
+        if (key == "earth_map" || key == "night_map") {
+          cap = 1024;
         }
-        if (maxH_ > 2048)
-          maxH_ = 2048;
+#endif
+        if (maxW_ > cap) {
+          maxW_ = cap;
+          LOG_I("TextureManager",
+                "Capping texture limit to {} for stability", cap);
+        }
+        if (maxH_ > cap)
+          maxH_ = cap;
 #endif
       }
     }

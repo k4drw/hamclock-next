@@ -87,29 +87,11 @@ void LocalPanel::update() {
       char wBuf[64];
       float temp = useMetric_ ? wd.temp : (wd.temp * 1.8f + 32.0f);
       const char *tempUnit = useMetric_ ? "C" : "F";
-
-      // Line 4: temp + humidity + brief condition description
-      std::string desc = wd.description;
-      if (!desc.empty()) {
-        desc[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(desc[0])));
-        if (desc.size() > 10) desc.resize(10); // keep it narrow
-      }
-      if (!desc.empty())
-        std::snprintf(wBuf, sizeof(wBuf), "%.0f%s %d%% %s", temp, tempUnit,
-                      wd.humidity, desc.c_str());
-      else
-        std::snprintf(wBuf, sizeof(wBuf), "%.0f%s %d%%", temp, tempUnit,
-                      wd.humidity);
+      std::snprintf(wBuf, sizeof(wBuf), "%.0f %s  %d%%", temp, tempUnit,
+                    wd.humidity);
       lineText_[4] = wBuf;
 
-      // Line 5: pressure + wind speed/direction
-      static const char *kWindDirs[] = {"N",  "NE", "E",  "SE",
-                                        "S",  "SW", "W",  "NW"};
-      int wdirIdx = static_cast<int>((wd.windDeg + 22.5f) / 45.0f) % 8;
-      float windDisp = useMetric_ ? wd.windSpeed : (wd.windSpeed * 2.237f);
-      const char *windUnit = useMetric_ ? "m/s" : "mph";
-      std::snprintf(wBuf, sizeof(wBuf), "%.0fhPa %.0f%s %s", wd.pressure,
-                    windDisp, windUnit, kWindDirs[wdirIdx]);
+      std::snprintf(wBuf, sizeof(wBuf), "%.0f hPa", wd.pressure);
       lineText_[5] = wBuf;
     } else {
       lineText_[4] = "";

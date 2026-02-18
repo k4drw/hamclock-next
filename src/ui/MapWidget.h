@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../core/ActivityData.h"
+#include "../core/ADIFData.h"
 #include "../core/AuroraHistoryStore.h"
 #include "../core/ConfigManager.h"
 #include "../core/DXClusterData.h"
@@ -19,6 +19,10 @@
 #include <mutex>
 #include <string>
 
+class MufRtProvider;
+class IonosondeProvider;
+class SolarDataStore;
+
 class MapWidget : public Widget {
 public:
   MapWidget(int x, int y, int w, int h, TextureManager &texMgr,
@@ -32,6 +36,7 @@ public:
   void onResize(int x, int y, int w, int h) override;
   bool onMouseUp(int mx, int my, Uint16 mod) override;
   void onMouseMove(int mx, int my) override;
+  bool onMouseWheel(int scrollY) override;
 
   // Set the satellite predictor for map overlays (non-owning). nullptr to
   // clear.
@@ -50,9 +55,13 @@ public:
     auroraStore_ = std::move(store);
   }
 
-  void setActivityStore(std::shared_ptr<ActivityDataStore> store) {
-    activityStore_ = std::move(store);
+  void setADIFStore(std::shared_ptr<ADIFStore> store) {
+    adifStore_ = std::move(store);
   }
+
+  void setMufRtProvider(MufRtProvider *p) { mufrt_ = p; }
+  void setIonosondeProvider(IonosondeProvider *p) { iono_ = p; }
+  void setSolarDataStore(SolarDataStore *s) { solar_ = s; }
 
   void setOnConfigChanged(std::function<void()> cb) { onConfigChanged_ = cb; }
 
@@ -84,7 +93,8 @@ private:
   void renderSpotOverlay(SDL_Renderer *renderer);
   void renderDXClusterSpots(SDL_Renderer *renderer);
   void renderAuroraOverlay(SDL_Renderer *renderer);
-  void renderActivityPins(SDL_Renderer *renderer);
+  void renderADIFPins(SDL_Renderer *renderer);
+  void renderMufRtOverlay(SDL_Renderer *renderer);
 
   TextureManager &texMgr_;
   FontManager &fontMgr_;
@@ -93,7 +103,10 @@ private:
   std::shared_ptr<LiveSpotDataStore> spotStore_;
   std::shared_ptr<DXClusterDataStore> dxcStore_;
   std::shared_ptr<AuroraHistoryStore> auroraStore_;
-  std::shared_ptr<ActivityDataStore> activityStore_;
+  std::shared_ptr<ADIFStore> adifStore_;
+  MufRtProvider *mufrt_ = nullptr;
+  IonosondeProvider *iono_ = nullptr;
+  SolarDataStore *solar_ = nullptr;
   OrbitPredictor *predictor_ = nullptr;
 
   std::unique_ptr<MapViewMenu> mapViewMenu_;
@@ -105,6 +118,7 @@ private:
   std::mutex mapDataMutex_;
   std::string pendingMapData_;
   std::string pendingNightMapData_;
+  std::string pendingMufData_;
 
   double sunLat_ = 0;
   double sunLon_ = 0;
@@ -120,6 +134,7 @@ private:
   std::vector<SDL_Vertex> spotVerts_;
   std::vector<int> spotIndices_;
   std::vector<SDL_Vertex> mapVerts_;
+  std::string lastProjection_;
   std::vector<SDL_Vertex> markerVerts_;
   std::vector<int> markerIndices_;
 
@@ -148,6 +163,13 @@ private:
   SDL_Rect projRect_ = {};
   bool useCompatibilityRenderPath_ = false;
   SDL_Texture *nightOverlayTexture_ = nullptr;
+  SDL_Texture *mufRtTexture_ = nullptr;
+  uint32_t lastMufUpdateMs_ = 0;
   double lastUpdateSunLat_ = -999.0;
   double lastUpdateSunLon_ = -999.0;
+
+  void renderOverlayInfo(SDL_Renderer *renderer);
+  void renderRssButton(SDL_Renderer *renderer);
+
+  SDL_Rect rssRect_ = {};
 };

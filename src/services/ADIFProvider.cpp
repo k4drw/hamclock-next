@@ -1,12 +1,15 @@
 #include "ADIFProvider.h"
+#include "../core/Astronomy.h"
 #include "../core/Logger.h"
+#include "../core/PrefixManager.h"
+#include "../core/StringUtils.h"
 #include <algorithm>
 #include <cctype>
 #include <fstream>
-#include <sstream>
 
-ADIFProvider::ADIFProvider(std::shared_ptr<ADIFStore> store)
-    : store_(std::move(store)) {}
+ADIFProvider::ADIFProvider(std::shared_ptr<ADIFStore> store,
+                           PrefixManager &prefixMgr)
+    : store_(std::move(store)), prefixMgr_(prefixMgr) {}
 
 void ADIFProvider::fetch(const std::filesystem::path &path) {
   if (std::filesystem::exists(path)) {
@@ -68,7 +71,7 @@ static std::string getTagContent(const std::string &line,
     if (lenStr.empty())
       return "";
 
-    len = std::stoi(lenStr);
+    len = StringUtils::safe_stoi(lenStr);
   } catch (...) {
     LOG_W("ADIFProvider", "Invalid length for tag {}", tag);
     return "";
@@ -180,6 +183,8 @@ void ADIFProvider::processFile(const std::filesystem::path &path) {
       std::string myGrid = getTagContent(record, "MY_GRIDSQUARE");
       std::string comment = getTagContent(record, "COMMENT");
       std::string notes = getTagContent(record, "NOTES");
+      std::string latStr = getTagContent(record, "LAT");
+      std::string lonStr = getTagContent(record, "LON");
 
       if (!call.empty()) {
         stats.totalQSOs++;
@@ -192,23 +197,31 @@ void ADIFProvider::processFile(const std::filesystem::path &path) {
         // Infer band from frequency if BAND tag missing
         std::string useBand = band;
         if (useBand.empty() && !freq.empty()) {
-          try {
-            double freqMhz = std::stod(freq);
-            if (freqMhz >= 1.8 && freqMhz < 2.0) useBand = "160m";
-            else if (freqMhz >= 3.5 && freqMhz < 4.0) useBand = "80m";
-            else if (freqMhz >= 7.0 && freqMhz < 7.3) useBand = "40m";
-            else if (freqMhz >= 10.1 && freqMhz < 10.15) useBand = "30m";
-            else if (freqMhz >= 14.0 && freqMhz < 14.35) useBand = "20m";
-            else if (freqMhz >= 18.068 && freqMhz < 18.168) useBand = "17m";
-            else if (freqMhz >= 21.0 && freqMhz < 21.45) useBand = "15m";
-            else if (freqMhz >= 24.89 && freqMhz < 24.99) useBand = "12m";
-            else if (freqMhz >= 28.0 && freqMhz < 29.7) useBand = "10m";
-            else if (freqMhz >= 50.0 && freqMhz < 54.0) useBand = "6m";
-            else if (freqMhz >= 144.0 && freqMhz < 148.0) useBand = "2m";
-            else if (freqMhz >= 420.0 && freqMhz < 450.0) useBand = "70cm";
-          } catch (...) {
-            // Invalid frequency, skip
-          }
+          double freqMhz = StringUtils::safe_stod(freq);
+          if (freqMhz >= 1.8 && freqMhz < 2.0)
+            useBand = "160m";
+          else if (freqMhz >= 3.5 && freqMhz < 4.0)
+            useBand = "80m";
+          else if (freqMhz >= 7.0 && freqMhz < 7.3)
+            useBand = "40m";
+          else if (freqMhz >= 10.1 && freqMhz < 10.15)
+            useBand = "30m";
+          else if (freqMhz >= 14.0 && freqMhz < 14.35)
+            useBand = "20m";
+          else if (freqMhz >= 18.068 && freqMhz < 18.168)
+            useBand = "17m";
+          else if (freqMhz >= 21.0 && freqMhz < 21.45)
+            useBand = "15m";
+          else if (freqMhz >= 24.89 && freqMhz < 24.99)
+            useBand = "12m";
+          else if (freqMhz >= 28.0 && freqMhz < 29.7)
+            useBand = "10m";
+          else if (freqMhz >= 50.0 && freqMhz < 54.0)
+            useBand = "6m";
+          else if (freqMhz >= 144.0 && freqMhz < 148.0)
+            useBand = "2m";
+          else if (freqMhz >= 420.0 && freqMhz < 450.0)
+            useBand = "70cm";
         }
 
         // Count by band
@@ -217,7 +230,8 @@ void ADIFProvider::processFile(const std::filesystem::path &path) {
         }
 
         // Maintain latest calls list (most recent first)
-        auto it = std::find(stats.latestCalls.begin(), stats.latestCalls.end(), call);
+        auto it =
+            std::find(stats.latestCalls.begin(), stats.latestCalls.end(), call);
         if (it != stats.latestCalls.end()) {
           stats.latestCalls.erase(it);
         }
@@ -241,10 +255,26 @@ void ADIFProvider::processFile(const std::filesystem::path &path) {
         qso.gridsquare = gridsquare;
         qso.comment = comment;
 
+        // Resolve location
+        if (!latStr.empty() && !lonStr.empty()) {
+          // Format is often "N040 12.345" or similar, but simplify for now
+          // assuming decimal or simple string
+          qso.lat = StringUtils::safe_stod(latStr);
+          qso.lon = StringUtils::safe_stod(lonStr);
+        } else if (!gridsquare.empty()) {
+          Astronomy::gridToLatLon(gridsquare.c_str(), qso.lat, qso.lon);
+        } else {
+          LatLong ll;
+          if (prefixMgr_.findLocation(call, ll)) {
+            qso.lat = ll.lat;
+            qso.lon = ll.lon;
+          }
+        }
+
         // Insert at beginning (newest first)
         stats.recentQSOs.insert(stats.recentQSOs.begin(), qso);
-        if (stats.recentQSOs.size() > 50) {
-          stats.recentQSOs.resize(50);
+        if (stats.recentQSOs.size() > 100) {
+          stats.recentQSOs.resize(100);
         }
       } else {
         LOG_W("ADIFProvider", "Record {} has no CALL field", recordNum);
@@ -258,7 +288,8 @@ void ADIFProvider::processFile(const std::filesystem::path &path) {
 
       // Safety check: if record gets too large, something is wrong
       if (record.length() > 100000) {
-        LOG_E("ADIFProvider", "Record too large (>100KB) at line {}, skipping", lineNum);
+        LOG_E("ADIFProvider", "Record too large (>100KB) at line {}, skipping",
+              lineNum);
         record.clear();
       }
     }

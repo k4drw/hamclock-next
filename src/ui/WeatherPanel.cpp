@@ -69,17 +69,17 @@ void WeatherPanel::render(SDL_Renderer *renderer) {
 
     std::snprintf(valBuf, sizeof(valBuf), "%.1f", temp);
     std::snprintf(lblBuf, sizeof(lblBuf), "%s %s", prefix, tempUnit);
-    drawNarrowRow(valBuf, lblBuf, 0, themes.success);
+    drawNarrowRow(valBuf, lblBuf, 0, {0, 255, 0, 255}); // Green in original
 
     std::snprintf(valBuf, sizeof(valBuf), "%d", currentData_.humidity);
-    drawNarrowRow(valBuf, "Humidity", 1, themes.success);
+    drawNarrowRow(valBuf, "Humidity", 1, {0, 255, 0, 255});
 
     std::snprintf(valBuf, sizeof(valBuf), "%.0f", wind);
     std::snprintf(lblBuf, sizeof(lblBuf), "%s", windUnit);
-    drawNarrowRow(valBuf, lblBuf, 2, themes.success);
+    drawNarrowRow(valBuf, lblBuf, 2, {0, 255, 0, 255});
 
     drawNarrowRow(degToDir(currentData_.windDeg), "Wind Dir", 3,
-                  themes.success);
+                  {0, 255, 0, 255});
     return;
   }
 
@@ -93,8 +93,8 @@ void WeatherPanel::render(SDL_Renderer *renderer) {
 
   if (!dataValid_) {
     fontMgr_.drawText(renderer, "Waiting for data...", centerX,
-                      y_ + height_ / 2, themes.textDim, infoFontSize_, false,
-                      true);
+                      y_ + height_ / 2, {150, 150, 150, 255}, infoFontSize_,
+                      false, true);
     return;
   }
 
@@ -110,7 +110,7 @@ void WeatherPanel::render(SDL_Renderer *renderer) {
 
   // Description
   fontMgr_.drawText(renderer, currentData_.description, centerX, curY,
-                    themes.warning, infoFontSize_, false, true);
+                    {255, 255, 0, 255}, infoFontSize_, false, true);
   curY += infoFontSize_ + 12;
 
   // Details Grid

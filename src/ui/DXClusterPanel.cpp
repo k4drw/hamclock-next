@@ -3,7 +3,6 @@
 #include "../core/LiveSpotData.h"
 #include "../core/Logger.h"
 #include "../services/RigService.h"
-#include <SDL.h>
 
 #include <algorithm>
 #include <iomanip>

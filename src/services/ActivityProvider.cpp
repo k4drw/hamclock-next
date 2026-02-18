@@ -1,6 +1,7 @@
 #include "ActivityProvider.h"
 #include "../core/Astronomy.h"
 #include "../core/Logger.h"
+#include "../core/StringUtils.h"
 #include <nlohmann/json.hpp>
 
 using json = nlohmann::json;
@@ -144,23 +145,9 @@ void ActivityProvider::fetchPOTA() {
         os.call = spot.value("activator", "");
         os.ref = spot.value("reference", "");
         os.mode = spot.value("mode", "");
-        try {
-          std::string freq = spot.value("frequency", "0");
-          os.freqKhz = std::stod(freq);
-        } catch (...) {
-          os.freqKhz = 0;
-        }
+        std::string freq = spot.value("frequency", "0");
+        os.freqKhz = StringUtils::safe_stod(freq);
         os.spottedAt = std::chrono::system_clock::now();
-
-        // Resolve lat/lon from grid4 if available
-        std::string grid = spot.value("grid4", "");
-        if (!grid.empty()) {
-          double lat = 0, lon = 0;
-          if (Astronomy::gridToLatLon(grid, lat, lon)) {
-            os.lat = lat;
-            os.lon = lon;
-          }
-        }
 
         if (!os.call.empty()) {
           current.ontaSpots.push_back(os);
@@ -195,12 +182,8 @@ void ActivityProvider::fetchSOTA() {
         os.ref = spot.value("associationCode", "") + "/" +
                  spot.value("summitCode", "");
         os.mode = spot.value("mode", "");
-        try {
-          std::string freq = spot.value("frequency", "0");
-          os.freqKhz = std::stod(freq) * 1000.0; // SOTA MHz to kHz? Check API
-        } catch (...) {
-          os.freqKhz = 0;
-        }
+        std::string freq = spot.value("frequency", "0");
+        os.freqKhz = StringUtils::safe_stod(freq) * 1000.0; // SOTA MHz to kHz? Check API
         os.spottedAt = std::chrono::system_clock::now();
 
         if (!os.call.empty()) {

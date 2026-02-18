@@ -21,9 +21,15 @@ public:
   void render(SDL_Renderer *renderer) override;
   void onResize(int x, int y, int w, int h) override;
 
+  // Enable or disable RSS display and fetching. When disabled, render() is a
+  // no-op and update() skips the rotation timer (fetch is gated in provider).
+  void setEnabled(bool enabled) { enabled_ = enabled; }
+
 private:
   void destroyCache();
   void rebuildTextures(SDL_Renderer *renderer);
+
+  bool enabled_ = true;
 
   FontManager &fontMgr_;
   std::shared_ptr<RSSDataStore> store_;

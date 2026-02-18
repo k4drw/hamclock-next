@@ -1,6 +1,7 @@
 #include "TimePanel.h"
 #include "../core/Astronomy.h"
 #include "../core/MemoryMonitor.h"
+#include "../core/StringUtils.h"
 #include "../core/Theme.h"
 #include "FontCatalog.h"
 #include "RenderUtils.h"
@@ -184,10 +185,10 @@ void TimePanel::render(SDL_Renderer *renderer) {
   int pad = std::max(4, static_cast<int>(width_ * 0.03f));
 
   // 4-row layout proportional to 148px:
-  // Callsign: 42, Info bar: 16, Clock: 58, Date: 32
-  int callRowH = height_ * 42 / 148;
+  // Callsign: 50 (was 42), Info bar: 16, Clock: 50 (was 58), Date: 32
+  int callRowH = height_ * 50 / 148;
   int infoRowH = height_ * 16 / 148;
-  int timeRowH = height_ * 58 / 148;
+  int timeRowH = height_ * 50 / 148;
 
   int callBaseY = y_;
   int infoBaseY = callBaseY + callRowH;
@@ -195,7 +196,6 @@ void TimePanel::render(SDL_Renderer *renderer) {
   int dateBaseY = timeBaseY + timeRowH;
   int dateRowH = y_ + height_ - dateBaseY;
 
-  // --- Callsign (large, user-selected color, centered) ---
   // --- Callsign (large, user-selected color, centered) ---
   if (callFontSize_ != lastCallFontSize_ || !callTex_) {
     MemoryMonitor::getInstance().destroyTexture(callTex_);
@@ -233,10 +233,9 @@ void TimePanel::render(SDL_Renderer *renderer) {
                         infoFontSize_);
 
       // Rotating info (shifted slightly right to give more room for uptime)
-      // Rotating info
       const std::string &centerText = infoTexts_[infoRotateIdx_];
       TTF_SizeUTF8(infoFont, centerText.c_str(), &tw, &th);
-      fontMgr_.drawText(renderer, centerText, x_ + (width_ - tw) / 2, infoY,
+      fontMgr_.drawText(renderer, centerText, x_ + (width_ - tw) * 0.58f, infoY,
                         gray, infoFontSize_);
 
       // Right: version
@@ -246,7 +245,7 @@ void TimePanel::render(SDL_Renderer *renderer) {
     }
   }
 
-  // --- Time: HH:MM (large, white) + SS (superscript, white) ---
+  // --- Time: HH:MM (large, white) + SS (superscript, gray) ---
   if (!hmTex_ || currentHM_ != lastHM_ || hmFontSize_ != lastHmFontSize_) {
     MemoryMonitor::getInstance().destroyTexture(hmTex_);
     SDL_Color white = {255, 255, 255, 255};
@@ -268,21 +267,11 @@ void TimePanel::render(SDL_Renderer *renderer) {
     SDL_Rect dst = {x_ + pad, dy, hmW_, hmH_};
     SDL_RenderCopy(renderer, hmTex_, nullptr, &dst);
 
-    // SS superscript (visually aligned with top of digits)
+    // SS superscript (aligned with top of HH:MM characters)
     if (secTex_) {
-      // Use font ascent to align seconds precisely
-      int hmAscent = fontMgr_.getFontAscent(hmFontSize_);
-      int secAscent = fontMgr_.getFontAscent(secFontSize_);
-
-      // Top of digits is approx (baseline - ascent).
-      // We'll align the baseline of seconds slightly above the baseline of HM
-      int secY = dy + (hmH_ * 0.15f);
-
-      // Safety clamp: ensure seconds don't bleed out of the row
-      if (secY + secH_ > timeBaseY + timeRowH) {
-        secY = timeBaseY + timeRowH - secH_;
-      }
-
+      // Large fonts have significant internal leading (top padding).
+      // Nudge seconds down so their top is visually even with the big digits.
+      int secY = dy + (hmH_ * 0.12f);
       SDL_Rect secDst = {x_ + pad + hmW_ + 2, secY, secW_, secH_};
       SDL_RenderCopy(renderer, secTex_, nullptr, &secDst);
     }
@@ -314,7 +303,7 @@ void TimePanel::render(SDL_Renderer *renderer) {
 void TimePanel::onResize(int x, int y, int w, int h) {
   Widget::onResize(x, y, w, h);
   auto *cat = fontMgr_.catalog();
-  callFontSize_ = static_cast<int>(cat->ptSize(FontStyle::MediumBold) * 1.4f);
+  callFontSize_ = static_cast<int>(cat->ptSize(FontStyle::LargeBold) * 0.8f);
   hmFontSize_ = cat->ptSize(FontStyle::LargeBold);
   secFontSize_ = cat->ptSize(FontStyle::SmallRegular);
   dateFontSize_ = cat->ptSize(FontStyle::Fast);
@@ -590,7 +579,7 @@ SDL_Rect TimePanel::getActionRect(const std::string &action) const {
     }
 
     if (action.find("color_") == 0) {
-      int idx = std::stoi(action.substr(6));
+      int idx = StringUtils::safe_stoi(action.substr(6));
       int paletteY = y_ + pad + textFieldH + pad;
       int swatchSize = std::clamp(static_cast<int>(width_ * 0.08f), 16, 32);
       int gap = std::max(2, swatchSize / 6);
