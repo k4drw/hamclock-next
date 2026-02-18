@@ -4,14 +4,23 @@ cmake_minimum_required(VERSION 3.18)
 set(CMAKE_POLICY_VERSION_MINIMUM 3.5 CACHE STRING "Compat for old FetchContent deps")
 
 project(HamClock-Next
-    VERSION 0.7.0
+    VERSION 0.8.0
     LANGUAGES C CXX
 )
 
-set(CMAKE_CXX_STANDARD 20)
+if(EMSCRIPTEN)
+    # Use C++17 for WASM to avoid fmt/spdlog consteval issues in Emscripten's C++20 implementation
+    set(CMAKE_CXX_STANDARD 17)
+else()
+    set(CMAKE_CXX_STANDARD 20)
+endif()
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-add_compile_definitions(HAMCLOCK_VERSION="0.7B")
+add_compile_definitions(HAMCLOCK_VERSION="0.8B")
+
+# Pthreads are not enabled for WASM: the app is single-threaded in that
+# context and enabling them would require SharedArrayBuffer + COOP/COEP HTTP
+# headers.  See the hamclock-wasm target below for details.
 
 # Force static builds globally for all FetchContent dependencies
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build static libs" FORCE)
@@ -36,60 +45,86 @@ endif()
 # --- Dependencies (FetchContent - The "Universal Build" Strategy) ---
 include(FetchContent)
 
-# 1. SDL2 (Base) - Always build from source for consistency and static linking
-if(TRUE) # Force FetchContent
-    set(SDL_STATIC ON CACHE BOOL "Build static SDL library")
-    set(SDL_SHARED OFF CACHE BOOL "Build shared SDL library")
-    set(SDL2_SHARED OFF CACHE BOOL "Build shared SDL library" FORCE)
-    set(SDL2_STATIC ON CACHE BOOL "Build static SDL library" FORCE)
-    # ...
-    set(SDL_TEST OFF CACHE BOOL "Disable SDL tests")
-    set(SDL_JOYSTICK OFF CACHE BOOL "Disable SDL joystick")
-    set(SDL_HAPTIC OFF CACHE BOOL "Disable SDL haptic")
-    set(SDL_SENSOR OFF CACHE BOOL "Disable SDL sensor")
+if(NOT EMSCRIPTEN)
+    # 1. SDL2 (Base) - Always build from source for consistency and static linking
+    if(TRUE) # Force FetchContent
+        set(SDL_STATIC ON CACHE BOOL "Build static SDL library")
+        set(SDL_SHARED OFF CACHE BOOL "Build shared SDL library")
+        set(SDL2_SHARED OFF CACHE BOOL "Build shared SDL library" FORCE)
+        set(SDL2_STATIC ON CACHE BOOL "Build static SDL library" FORCE)
+        # ...
+        set(SDL_TEST OFF CACHE BOOL "Disable SDL tests")
+        set(SDL_JOYSTICK OFF CACHE BOOL "Disable SDL joystick")
+        set(SDL_HAPTIC OFF CACHE BOOL "Disable SDL haptic")
+        set(SDL_SENSOR OFF CACHE BOOL "Disable SDL sensor")
 
-    set(SDL_PIPEWIRE OFF CACHE BOOL "Disable SDL PipeWire audio")
+        set(SDL_PIPEWIRE OFF CACHE BOOL "Disable SDL PipeWire audio")
 
-    FetchContent_Declare(
-        SDL2
-        GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
-        GIT_TAG        release-2.30.2
-        GIT_SHALLOW    TRUE
-    )
+        FetchContent_Declare(
+            SDL2
+            GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
+            GIT_TAG        release-2.30.2
+            GIT_SHALLOW    TRUE
+        )
+    endif()
 endif()
 
-# 2. SDL2_ttf - Always build from source
-if(TRUE)
-    set(SDL2TTF_VENDORED ON CACHE BOOL "Use vendored dependencies for SDL2_ttf")
-    set(SDL2TTF_BUILD_SHARED_LIBS OFF CACHE BOOL "Build shared SDL2_ttf library")
-    FetchContent_Declare(
-        SDL2_ttf
-        GIT_REPOSITORY https://github.com/libsdl-org/SDL_ttf.git
-        GIT_TAG        release-2.22.0
-        GIT_SHALLOW    TRUE
-    )
+if(NOT EMSCRIPTEN)
+    # 2. SDL2_ttf - Always build from source
+    if(TRUE)
+        set(SDL2TTF_VENDORED ON CACHE BOOL "Use vendored dependencies for SDL2_ttf")
+        set(SDL2TTF_BUILD_SHARED_LIBS OFF CACHE BOOL "Build shared SDL2_ttf library")
+        FetchContent_Declare(
+            SDL2_ttf
+            GIT_REPOSITORY https://github.com/libsdl-org/SDL_ttf.git
+            GIT_TAG        release-2.22.0
+            GIT_SHALLOW    TRUE
+        )
+    endif()
 endif()
 
-# 3. SDL2_image - Always build from source
-if(TRUE)
-    set(SDL2IMAGE_VENDORED ON CACHE BOOL "Use vendored dependencies for SDL2_image")
-    set(SDL2IMAGE_SAMPLES OFF CACHE BOOL "Disable SDL2_image samples")
-    set(SDL2IMAGE_BUILD_SHARED_LIBS OFF CACHE BOOL "Build shared SDL2_image library")
-    set(SDL2IMAGE_WEBP OFF CACHE BOOL "Disable WebP to avoid MinGW link errors")
+if(NOT EMSCRIPTEN)
+    # 3. SDL2_image - Always build from source
+    if(TRUE)
+        set(SDL2IMAGE_VENDORED ON CACHE BOOL "Use vendored dependencies for SDL2_image")
+        set(SDL2IMAGE_SAMPLES OFF CACHE BOOL "Disable SDL2_image samples")
+        set(SDL2IMAGE_BUILD_SHARED_LIBS OFF CACHE BOOL "Build shared SDL2_image library")
+        set(SDL2IMAGE_WEBP OFF CACHE BOOL "Disable WebP to avoid MinGW link errors")
 
-    set(SDL2IMAGE_TIF OFF CACHE BOOL "Disable TIFF - not used")
-    set(SDL2IMAGE_JXL OFF CACHE BOOL "Disable JXL - not used")
-    set(SDL2IMAGE_AVIF OFF CACHE BOOL "Disable AVIF - not used")
-    FetchContent_Declare(
-        SDL2_image
-        GIT_REPOSITORY https://github.com/libsdl-org/SDL_image.git
-        GIT_TAG        release-2.8.2
-        GIT_SHALLOW    TRUE
-    )
+        set(SDL2IMAGE_TIF OFF CACHE BOOL "Disable TIFF - not used")
+        set(SDL2IMAGE_JXL OFF CACHE BOOL "Disable JXL - not used")
+        set(SDL2IMAGE_AVIF OFF CACHE BOOL "Disable AVIF - not used")
+        FetchContent_Declare(
+            SDL2_image
+            GIT_REPOSITORY https://github.com/libsdl-org/SDL_image.git
+            GIT_TAG        release-2.8.2
+            GIT_SHALLOW    TRUE
+        )
+    endif()
+endif()
+
+if(NOT EMSCRIPTEN)
+    # 4. SDL2_mixer - Always build from source
+    if(TRUE)
+        set(SDL2MIXER_VENDORED ON CACHE BOOL "Use vendored dependencies for SDL2_mixer")
+        set(SDL2MIXER_SAMPLES OFF CACHE BOOL "Disable SDL2_mixer samples")
+        set(SDL2MIXER_BUILD_SHARED_LIBS OFF CACHE BOOL "Build shared SDL2_mixer library")
+        set(SDL2MIXER_OPUS OFF CACHE BOOL "Disable OPUS")
+        set(SDL2MIXER_FLAC OFF CACHE BOOL "Disable FLAC")
+        set(SDL2MIXER_MOD OFF CACHE BOOL "Disable MOD")
+        set(SDL2MIXER_MIDI OFF CACHE BOOL "Disable MIDI")
+        set(SDL2MIXER_MP3 OFF CACHE BOOL "Disable MP3")
+        FetchContent_Declare(
+            SDL2_mixer
+            GIT_REPOSITORY https://github.com/libsdl-org/SDL_mixer.git
+            GIT_TAG        release-2.8.0
+            GIT_SHALLOW    TRUE
+        )
+    endif()
 endif()
 
 # 4. mbedtls (for static SSL on Linux/RPi)
-if(NOT WIN32)
+if(NOT WIN32 AND NOT EMSCRIPTEN)
     set(ENABLE_TESTING OFF CACHE BOOL "Disable mbedtls tests")
     set(ENABLE_PROGRAMS OFF CACHE BOOL "Disable mbedtls programs")
     set(MBEDTLS_FATAL_WARNINGS OFF CACHE BOOL "No fatal warnings")
@@ -108,41 +143,43 @@ if(NOT WIN32)
 endif()
 
 # 5. CURL
-if(WIN32)
-    # Windows always uses vendored static build
-    set(USE_SYSTEM_CURL OFF)
-else()
-    # On Linux/macOS, check for system CURL first
-    find_package(CURL)
-    if(CURL_FOUND)
-        message(STATUS "Using System Curl: ${CURL_VERSION_STRING}")
-        set(USE_SYSTEM_CURL ON)
-    else()
-        message(STATUS "System Curl not found, building from source")
-        set(USE_SYSTEM_CURL OFF)
-    endif()
-endif()
-
-if(NOT USE_SYSTEM_CURL)
-    set(CURL_DISABLE_INSTALL ON CACHE BOOL "Disable curl installation")
-    set(BUILD_CURL_EXE OFF CACHE BOOL "Disable curl executable")
-    set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build static libs" FORCE)
-    set(HTTP_ONLY ON CACHE BOOL "Build HTTP-only curl")
+if(NOT EMSCRIPTEN)
     if(WIN32)
-        set(CURL_USE_OPENSSL OFF CACHE BOOL "Disable OpenSSL on Windows (use Schannel)")
-        set(CURL_USE_SCHANNEL ON CACHE BOOL "Use Windows native SSL")
+        # Windows always uses vendored static build
+        set(USE_SYSTEM_CURL OFF)
     else()
-        set(CURL_USE_OPENSSL OFF CACHE BOOL "Disable OpenSSL")
-        set(CURL_USE_MBEDTLS ON CACHE BOOL "Use mbedtls for static build")
-        set(CURL_USE_SCHANNEL OFF CACHE BOOL "Disable Schannel on non-Windows")
+        # On Linux/macOS, check for system CURL first
+        find_package(CURL)
+        if(CURL_FOUND)
+            message(STATUS "Using System Curl: ${CURL_VERSION_STRING}")
+            set(USE_SYSTEM_CURL ON)
+        else()
+            message(STATUS "System Curl not found, building from source")
+            set(USE_SYSTEM_CURL OFF)
+        endif()
     endif()
-    set(CURL_CA_FALLBACK ON CACHE BOOL "Use system CA certificates")
-    FetchContent_Declare(
-        CURL
-        GIT_REPOSITORY https://github.com/curl/curl.git
-        GIT_TAG        curl-8_11_1
-        GIT_SHALLOW    TRUE
-    )
+
+    if(NOT USE_SYSTEM_CURL)
+        set(CURL_DISABLE_INSTALL ON CACHE BOOL "Disable curl installation")
+        set(BUILD_CURL_EXE OFF CACHE BOOL "Disable curl executable")
+        set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build static libs" FORCE)
+        set(HTTP_ONLY ON CACHE BOOL "Build HTTP-only curl")
+        if(WIN32)
+            set(CURL_USE_OPENSSL OFF CACHE BOOL "Disable OpenSSL on Windows (use Schannel)")
+            set(CURL_USE_SCHANNEL ON CACHE BOOL "Use Windows native SSL")
+        else()
+            set(CURL_USE_OPENSSL OFF CACHE BOOL "Disable OpenSSL")
+            set(CURL_USE_MBEDTLS ON CACHE BOOL "Use mbedtls for static build")
+            set(CURL_USE_SCHANNEL OFF CACHE BOOL "Disable Schannel on non-Windows")
+        endif()
+        set(CURL_CA_FALLBACK ON CACHE BOOL "Use system CA certificates")
+        FetchContent_Declare(
+            CURL
+            GIT_REPOSITORY https://github.com/curl/curl.git
+            GIT_TAG        curl-8_11_1
+            GIT_SHALLOW    TRUE
+        )
+    endif()
 endif()
 
 # 5. SQLite3 (Using the official amalgamation)
@@ -180,31 +217,50 @@ if(NOT httplib_FOUND)
     )
 endif()
 
-find_package(spdlog QUIET)
-if(NOT spdlog_FOUND)
-    FetchContent_Declare(
-        spdlog
-        GIT_REPOSITORY https://github.com/gabime/spdlog.git
-        GIT_TAG        v1.12.0
-    )
-endif()
+# 9. Fmt & Spdlog
+# Force FetchContent for these to avoid version mismatches with system libraries (like Linuxbrew)
+# which can cause "basic_format_string not found" errors in spdlog/common.h.
+FetchContent_Declare(
+    fmt
+    GIT_REPOSITORY https://github.com/fmtlib/fmt.git
+    GIT_TAG        10.2.1
+)
+FetchContent_MakeAvailable(fmt)
+
+set(SPDLOG_FMT_EXTERNAL ON CACHE BOOL "Use external fmt library" FORCE)
+FetchContent_Declare(
+    spdlog
+    GIT_REPOSITORY https://github.com/gabime/spdlog.git
+    GIT_TAG        v1.15.0
+)
+FetchContent_MakeAvailable(spdlog)
+
 
 # --- Make Available (Order carefully) ---
 # 1. Base dependencies
-FetchContent_MakeAvailable(SDL2)
+if(NOT EMSCRIPTEN)
+    FetchContent_MakeAvailable(SDL2)
+endif()
 FetchContent_MakeAvailable(sqlite3_amalgamation)
 
 if(NOT nlohmann_json_FOUND)
     FetchContent_MakeAvailable(nlohmann_json)
 endif()
 
-if(NOT spdlog_FOUND)
-    FetchContent_MakeAvailable(spdlog)
+if(NOT httplib_FOUND)
+    FetchContent_MakeAvailable(httplib)
 endif()
 
+
+
+
 # 2. SDL Extensions (Must come AFTER SDL2 is made available)
-FetchContent_MakeAvailable(SDL2_ttf)
-FetchContent_MakeAvailable(SDL2_image)
+if(NOT EMSCRIPTEN)
+    FetchContent_MakeAvailable(SDL2_ttf)
+    FetchContent_MakeAvailable(SDL2_image)
+    FetchContent_MakeAvailable(SDL2_mixer)
+endif()
+
 
 # Define SDL2 Aliases if missing
 if(NOT TARGET SDL2::SDL2)
@@ -224,8 +280,10 @@ if(NOT TARGET SDL2::SDL2main)
 endif()
 
 # Propagate include dirs
-get_target_property(SDL2_INCLUDE_DIRS SDL2-static INTERFACE_INCLUDE_DIRECTORIES)
-set(SDL2_INCLUDE_DIR ${SDL2_INCLUDE_DIRS} CACHE PATH "SDL2 include dir" FORCE)
+if(NOT EMSCRIPTEN)
+    get_target_property(SDL2_INCLUDE_DIRS SDL2-static INTERFACE_INCLUDE_DIRECTORIES)
+    set(SDL2_INCLUDE_DIR ${SDL2_INCLUDE_DIRS} CACHE PATH "SDL2 include dir" FORCE)
+endif()
 
 if(NOT httplib_FOUND)
     FetchContent_MakeAvailable(httplib)
@@ -248,12 +306,15 @@ if(NOT libpredict_FOUND)
     endif()
 endif()
 
-if(NOT USE_SYSTEM_CURL)
+if(NOT USE_SYSTEM_CURL AND NOT EMSCRIPTEN)
+    if(ENABLE_DEBUG_API)
+        message(STATUS "Integrating Curl for debug API")
+    endif()
     FetchContent_MakeAvailable(CURL)
     if(NOT TARGET libcurl)
         add_library(libcurl ALIAS CURL::libcurl)
     endif()
-else()
+elseif(NOT EMSCRIPTEN)
     if(NOT TARGET libcurl)
         add_library(libcurl ALIAS CURL::libcurl)
     endif()
@@ -273,11 +334,16 @@ endif()
 
 
 # SDL Extensions (Now safe to load, as SDL2::SDL2 is defined)
-if(NOT SDL2_ttf_FOUND)
-    FetchContent_MakeAvailable(SDL2_ttf)
-endif()
-if(NOT SDL2_image_FOUND)
-    FetchContent_MakeAvailable(SDL2_image)
+if(NOT EMSCRIPTEN)
+    if(NOT SDL2_ttf_FOUND)
+        FetchContent_MakeAvailable(SDL2_ttf)
+    endif()
+    if(NOT SDL2_image_FOUND)
+        FetchContent_MakeAvailable(SDL2_image)
+    endif()
+    if(NOT SDL2_mixer_FOUND)
+        FetchContent_MakeAvailable(SDL2_mixer)
+    endif()
 endif()
 
 # Create ALIAS targets for Extensions (for consistency)
@@ -300,6 +366,17 @@ endif()
 if(NOT TARGET SDL2_image::SDL2_image-static)
     if(TARGET SDL2_image)
         add_library(SDL2_image::SDL2_image-static ALIAS SDL2_image)
+    endif()
+endif()
+
+if(NOT TARGET SDL2_mixer::SDL2_mixer)
+    if(TARGET SDL2_mixer)
+        add_library(SDL2_mixer::SDL2_mixer ALIAS SDL2_mixer)
+    endif()
+endif()
+if(NOT TARGET SDL2_mixer::SDL2_mixer-static)
+    if(TARGET SDL2_mixer)
+        add_library(SDL2_mixer::SDL2_mixer-static ALIAS SDL2_mixer)
     endif()
 endif()
 
@@ -331,11 +408,7 @@ endif()
 
 # --- Application Target ---
 
-if(WIN32)
-    set(HC_WIN32_FLAG WIN32)
-endif()
-
-add_executable(hamclock-next ${HC_WIN32_FLAG}
+set(HAMCLOCK_SOURCES
     src/main.cpp
     src/core/Logger.cpp
     src/core/ConfigManager.cpp
@@ -349,6 +422,8 @@ add_executable(hamclock-next ${HC_WIN32_FLAG}
     src/core/PrefixManager.cpp
     src/core/CitiesManager.cpp
     src/core/StringUtils.cpp
+    src/core/SoundManager.cpp
+    src/core/PropEngine.cpp
     src/network/NetworkManager.cpp
     src/network/WebServer.cpp
     src/services/NOAAProvider.cpp
@@ -359,6 +434,8 @@ add_executable(hamclock-next ${HC_WIN32_FLAG}
     src/services/LiveSpotProvider.cpp
     src/services/DXClusterProvider.cpp
     src/services/AuroraProvider.cpp
+    src/services/MufRtProvider.cpp
+    src/services/IonosondeProvider.cpp
     src/services/HistoryProvider.cpp
     src/services/BandConditionsProvider.cpp
     src/services/BeaconProvider.cpp
@@ -415,59 +492,120 @@ add_executable(hamclock-next ${HC_WIN32_FLAG}
     src/ui/SantaPanel.cpp
 )
 
-target_include_directories(hamclock-next PRIVATE
-    ${CMAKE_SOURCE_DIR}/include
-    ${libpredict_BINARY_DIR}/include
-    ${SDL2_INCLUDE_DIRS}
-)
-
-target_link_libraries(hamclock-next PRIVATE
-    SDL2::SDL2
-    SDL2::SDL2main
-    SDL2_ttf
-    SDL2_image
-    libcurl
-    sqlite3
-    nlohmann_json::nlohmann_json
-    predict_static
-    Threads::Threads
-    httplib::httplib
-    spdlog::spdlog
-)
-
-if(WIN32)
-    target_link_libraries(hamclock-next PRIVATE ws2_32 psapi)
-elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    # On Linux with GCC, link libstdc++ and libgcc statically for better portability
-    target_link_options(hamclock-next PRIVATE -static-libstdc++ -static-libgcc)
-endif()
-
-if(APPLE)
-    # Clean up any leaked flags from dependencies that might have touched global linker flags
-    string(REPLACE "-static-libgcc" "" CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS}")
-    string(REPLACE "-static-libstdc++" "" CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS}")
-
-    # macOS App Bundle Configuration
-    set_target_properties(hamclock-next PROPERTIES
-        MACOSX_BUNDLE TRUE
-        MACOSX_BUNDLE_GUI_IDENTIFIER com.hamclock.next
-        MACOSX_BUNDLE_BUNDLE_NAME "HamClock-Next"
-        MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
-        MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
-        MACOSX_BUNDLE_ICON_FILE "HamClockNext"
-        MACOSX_BUNDLE_INFO_PLIST "${CMAKE_SOURCE_DIR}/packaging/macos/Info.plist.in"
+if(EMSCRIPTEN)
+    set(CMAKE_EXECUTABLE_SUFFIX ".html")
+    
+    add_executable(hamclock-wasm ${HAMCLOCK_SOURCES})
+    
+    # Emscripten Flags for SDL2 and Memory.
+    # Pthreads are NOT enabled for the WASM build: the app is single-threaded
+    # in this context (all threaded services are #ifndef __EMSCRIPTEN__) and
+    # enabling pthreads would require SharedArrayBuffer, which in turn requires
+    # COOP/COEP HTTP headers on every server that serves the app.  Removing
+    # pthreads lets the app be served from any plain HTTP server (nginx, Apache,
+    # Python's http.server, etc.) without special header configuration.
+    target_link_options(hamclock-wasm PRIVATE
+        "-sUSE_SDL=2"
+        "-sUSE_SDL_IMAGE=2"
+        "-sSDL2_IMAGE_FORMATS=['png','jpg']"
+        "-sUSE_SDL_TTF=2"
+        "-sUSE_SDL_MIXER=2"
+        "-sALLOW_MEMORY_GROWTH=1"
+        "-sINITIAL_MEMORY=536870912"
+        "-sASSERTIONS=1"
+        "-sFETCH=1"
+        "-lidbfs.js"
+        "-sEXPORTED_RUNTIME_METHODS=['callMain','FS']"
+        "-sEXPORTED_FUNCTIONS=['_main','_hamclock_after_idbfs']"
+        "--shell-file" "${CMAKE_SOURCE_DIR}/packaging/web/shell.html"
     )
 
-    # Copy icon into bundle
-    set_source_files_properties(
-        "${CMAKE_SOURCE_DIR}/packaging/macos/HamClockNext.icns"
-        PROPERTIES
-        MACOSX_PACKAGE_LOCATION "Resources"
+    target_include_directories(hamclock-wasm PRIVATE
+        ${CMAKE_SOURCE_DIR}/include
+        ${libpredict_BINARY_DIR}/include
     )
 
-    target_sources(hamclock-next PRIVATE
-        "${CMAKE_SOURCE_DIR}/packaging/macos/HamClockNext.icns"
+    target_compile_options(hamclock-wasm PRIVATE
+        "-sUSE_SDL=2"
+        "-sUSE_SDL_TTF=2"
+        "-sUSE_SDL_IMAGE=2"
+        "-sUSE_SDL_MIXER=2"
     )
+
+    # Link non-SDL dependencies (SDL is handled by flags)
+    target_link_libraries(hamclock-wasm PRIVATE
+        sqlite3
+        nlohmann_json::nlohmann_json
+        predict_static
+        httplib::httplib
+        fmt::fmt
+        spdlog::spdlog
+    )
+
+else()
+    # Desktop Build
+    if(WIN32)
+        set(HC_WIN32_FLAG WIN32)
+    endif()
+
+    add_executable(hamclock-next ${HC_WIN32_FLAG} ${HAMCLOCK_SOURCES})
+
+    target_include_directories(hamclock-next PRIVATE
+        ${CMAKE_SOURCE_DIR}/include
+        ${libpredict_BINARY_DIR}/include
+        ${SDL2_INCLUDE_DIRS}
+    )
+
+    target_link_libraries(hamclock-next PRIVATE
+        SDL2::SDL2
+        SDL2::SDL2main
+        SDL2_ttf
+        SDL2_image
+        SDL2_mixer
+        libcurl
+        sqlite3
+        nlohmann_json::nlohmann_json
+        predict_static
+        Threads::Threads
+        httplib::httplib
+        fmt::fmt
+        spdlog::spdlog
+    )
+
+    if(WIN32)
+        target_link_libraries(hamclock-next PRIVATE ws2_32 psapi)
+    elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+        # On Linux with GCC, link libstdc++ and libgcc statically for better portability
+        target_link_options(hamclock-next PRIVATE -static-libstdc++ -static-libgcc)
+    endif()
+
+    if(APPLE)
+        # Clean up any leaked flags from dependencies that might have touched global linker flags
+        string(REPLACE "-static-libgcc" "" CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS}")
+        string(REPLACE "-static-libstdc++" "" CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS}")
+
+        # macOS App Bundle Configuration
+        set_target_properties(hamclock-next PROPERTIES
+            MACOSX_BUNDLE TRUE
+            MACOSX_BUNDLE_GUI_IDENTIFIER com.hamclock.next
+            MACOSX_BUNDLE_BUNDLE_NAME "HamClock-Next"
+            MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
+            MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
+            MACOSX_BUNDLE_ICON_FILE "HamClockNext"
+            MACOSX_BUNDLE_INFO_PLIST "${CMAKE_SOURCE_DIR}/packaging/macos/Info.plist.in"
+        )
+
+        # Copy icon into bundle
+        set_source_files_properties(
+            "${CMAKE_SOURCE_DIR}/packaging/macos/HamClockNext.icns"
+            PROPERTIES
+            MACOSX_PACKAGE_LOCATION "Resources"
+        )
+
+        target_sources(hamclock-next PRIVATE
+            "${CMAKE_SOURCE_DIR}/packaging/macos/HamClockNext.icns"
+        )
+    endif()
 endif()
 
 # --- Custom targets for data updates ---

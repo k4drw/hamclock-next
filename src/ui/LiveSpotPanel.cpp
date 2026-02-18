@@ -1,9 +1,9 @@
 #include "LiveSpotPanel.h"
 #include "../core/ConfigManager.h"
-#include "../core/Constants.h"
 #include "../core/MemoryMonitor.h"
 #include "../core/Theme.h"
 
+#include "../core/StringUtils.h"
 #include <cstring>
 
 LiveSpotPanel::LiveSpotPanel(int x, int y, int w, int h, FontManager &fontMgr,
@@ -43,20 +43,18 @@ void LiveSpotPanel::update() {
       }
       bc.lastCount = -1;
     }
-
-    // Dynamic subtitle based on source
-    std::string srcStr = "PSK";
-    if (config_.liveSpotSource == LiveSpotSource::RBN)
-      srcStr = "RBN";
-    if (config_.liveSpotSource == LiveSpotSource::WSPR)
-      srcStr = "WSPR";
-
-    std::string sub = "of " + data->grid + " - " + srcStr + " " +
-                      std::to_string(config_.liveSpotsMaxAge) + " mins";
+    // Rebuild subtitle if grid changed
+    std::string srcTag;
+    switch (config_.liveSpotSource) {
+    case LiveSpotSource::WSPR: srcTag = "WSPR"; break;
+    case LiveSpotSource::RBN:  srcTag = "RBN";  break;
+    default:                   srcTag = "PSK";  break;
+    }
+    std::string sub = "of " + data->grid + " - " + srcTag + " " +
+                      std::to_string(data->windowMinutes) + " mins";
     if (sub != lastSubtitle_) {
       if (subtitleTex_) {
         MemoryMonitor::getInstance().destroyTexture(subtitleTex_);
-        subtitleTex_ = nullptr;
       }
       lastSubtitle_ = sub;
     }
@@ -66,6 +64,11 @@ void LiveSpotPanel::update() {
 void LiveSpotPanel::render(SDL_Renderer *renderer) {
   if (!fontMgr_.ready())
     return;
+
+  if (showSetup_) {
+    renderSetup(renderer);
+    return;
+  }
 
   ThemeColors themes = getThemeColors(theme_);
   // Background
@@ -218,58 +221,51 @@ void LiveSpotPanel::render(SDL_Renderer *renderer) {
 
 void LiveSpotPanel::renderSetup(SDL_Renderer *renderer) {
   ThemeColors themes = getThemeColors(theme_);
-
-  // --- Pop-out Setup Menu Centered on screen ---
-  int menuW = 320;
-  int menuH = 260;
-  int menuX = (HamClock::LOGICAL_WIDTH - menuW) / 2;
-  int menuY = (HamClock::LOGICAL_HEIGHT - menuH) / 2;
-  menuRect_ = {menuX, menuY, menuW, menuH};
-
   // Background
   SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, 255);
-  SDL_RenderFillRect(renderer, &menuRect_);
+  SDL_Rect bg = {x_, y_, width_, height_};
+  SDL_RenderFillRect(renderer, &bg);
   SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
                          themes.border.b, 255);
-  SDL_RenderDrawRect(renderer, &menuRect_);
+  SDL_RenderDrawRect(renderer, &bg);
 
   SDL_Color cyan = themes.accent;
   SDL_Color white = themes.text;
-  SDL_Color blue = themes.textDim;
+  SDL_Color red = themes.danger;
   SDL_Color green = themes.success;
 
-  int y = menuY + 10;
-  int cx = menuX + menuW / 2;
+  int y = y_ + 10;
+  int cx = x_ + width_ / 2;
 
-  // --- Tabs: PSK | RBN | WSPR ---
-  const char *tabs[] = {"PSK", "RBN", "WSPR"};
-  int tabCount = 3;
-  int tabW = (menuW - 24) / tabCount;
-  int tabH = 24;
-  for (int i = 0; i < tabCount; ++i) {
-    tabRects_[i] = {menuX + 12 + i * tabW, y, tabW, tabH};
-    bool active = (activeTab_ == static_cast<LiveSpotSource>(i));
-    SDL_SetRenderDrawColor(renderer, active ? 60 : 30, active ? 60 : 30,
-                           active ? 80 : 40, 255);
-    SDL_RenderFillRect(renderer, &tabRects_[i]);
-    SDL_SetRenderDrawColor(renderer, active ? 100 : 60, active ? 100 : 60,
-                           active ? 150 : 80, 255);
-    SDL_RenderDrawRect(renderer, &tabRects_[i]);
-
-    int tw, th;
-    SDL_Texture *t = fontMgr_.renderText(
-        renderer, tabs[i], active ? white : blue, cellFontSize_ + 2, &tw, &th);
-    if (t) {
-      SDL_Rect tr = {tabRects_[i].x + (tabW - tw) / 2,
-                     tabRects_[i].y + (tabH - th) / 2, tw, th};
-      SDL_RenderCopy(renderer, t, nullptr, &tr);
-      MemoryMonitor::getInstance().destroyTexture(t);
-    }
-  }
-  y += tabH + 16;
-
-  int lx = menuX + 16;
+  // Title
   int tw, th;
+  SDL_Texture *t = fontMgr_.renderText(renderer, "--- Live Spots ---", cyan,
+                                       titleFontSize_, &tw, &th);
+  if (t) {
+    SDL_Rect tr = {cx - tw / 2, y, tw, th};
+    SDL_RenderCopy(renderer, t, nullptr, &tr);
+    MemoryMonitor::getInstance().destroyTexture(t);
+  }
+  y += th + 8;
+
+  int lx = x_ + 10;
+
+  // Source cycle button
+  std::string srcLabel;
+  switch (pendingSource_) {
+  case LiveSpotSource::WSPR: srcLabel = "[WSPRnet]";      break;
+  case LiveSpotSource::RBN:  srcLabel = "[RBN]";          break;
+  default:                   srcLabel = "[PSK Reporter]"; break;
+  }
+  t = fontMgr_.renderText(renderer, "Source: " + srcLabel, white,
+                           cellFontSize_, &tw, &th);
+  if (t) {
+    SDL_Rect tr = {lx, y, tw, th};
+    SDL_RenderCopy(renderer, t, nullptr, &tr);
+    MemoryMonitor::getInstance().destroyTexture(t);
+  }
+  sourceRect_ = {lx, y, tw + 8, th + 4};
+  y += th + 10;
 
   // Mode: DE/DX
   SDL_Rect box = {lx, y, 16, 16};
@@ -278,22 +274,27 @@ void LiveSpotPanel::renderSetup(SDL_Renderer *renderer) {
   SDL_SetRenderDrawColor(renderer, 100, 100, 120, 255);
   SDL_RenderDrawRect(renderer, &box);
   if (pendingOfDe_) {
-    SDL_SetRenderDrawColor(renderer, green.r, green.g, green.b, 255);
+    SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
     SDL_Rect inner = {lx + 3, y + 3, 10, 10};
     SDL_RenderFillRect(renderer, &inner);
   }
-  modeCheckRect_ = {lx, y, menuW - 32, 16};
+  modeCheckRect_ = {lx, y, width_ - 20, 16};
 
-  std::string modeTxt =
-      pendingOfDe_ ? "Mode: DE (Spots OF Me)" : "Mode: DX (Spots BY Me)";
-  SDL_Texture *t = fontMgr_.renderText(renderer, modeTxt, white,
-                                       cellFontSize_ + 2, &tw, &th);
+  t = fontMgr_.renderText(renderer, "Mode: DE (Map receivers hearing Me)",
+                          pendingOfDe_ ? white : white, cellFontSize_, &tw,
+                          &th);
+  // If not DE, it's DX
+  if (!pendingOfDe_) {
+    MemoryMonitor::getInstance().destroyTexture(t);
+    t = fontMgr_.renderText(renderer, "Mode: DX (Map senders I hear)", white,
+                            cellFontSize_, &tw, &th);
+  }
   if (t) {
     SDL_Rect tr = {lx + 24, y + (16 - th) / 2, tw, th};
     SDL_RenderCopy(renderer, t, nullptr, &tr);
     MemoryMonitor::getInstance().destroyTexture(t);
   }
-  y += 28;
+  y += 24;
 
   // Filter: Call/Grid
   box = {lx, y, 16, 16};
@@ -302,100 +303,33 @@ void LiveSpotPanel::renderSetup(SDL_Renderer *renderer) {
   SDL_SetRenderDrawColor(renderer, 100, 100, 120, 255);
   SDL_RenderDrawRect(renderer, &box);
   if (pendingUseCall_) {
-    SDL_SetRenderDrawColor(renderer, green.r, green.g, green.b, 255);
+    SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
     SDL_Rect inner = {lx + 3, y + 3, 10, 10};
     SDL_RenderFillRect(renderer, &inner);
   }
-  filterCheckRect_ = {lx, y, menuW - 32, 16};
+  filterCheckRect_ = {lx, y, width_ - 20, 16};
 
-  std::string filterTxt =
-      pendingUseCall_
-          ? "Filter: Callsign (" + config_.callsign + ")"
-          : "Filter: Grid (" +
-                (config_.grid.size() >= 4 ? config_.grid.substr(0, 4)
-                                          : config_.grid) +
-                ")";
-  t = fontMgr_.renderText(renderer, filterTxt, white, cellFontSize_ + 2, &tw,
-                          &th);
+  t = fontMgr_.renderText(renderer,
+                          pendingUseCall_ ? "Filter: Callsign" : "Filter: Grid",
+                          white, cellFontSize_, &tw, &th);
   if (t) {
     SDL_Rect tr = {lx + 24, y + (16 - th) / 2, tw, th};
     SDL_RenderCopy(renderer, t, nullptr, &tr);
     MemoryMonitor::getInstance().destroyTexture(t);
   }
-  y += 28;
-
-  // Max Age
-  t = fontMgr_.renderText(renderer, "Max Age (mins):", blue, cellFontSize_ + 2,
-                          &tw, &th);
-  if (t) {
-    SDL_Rect tr = {lx, y, tw, th};
-    SDL_RenderCopy(renderer, t, nullptr, &tr);
-    MemoryMonitor::getInstance().destroyTexture(t);
-  }
-
-  int ageX = lx + 120;
-  ageDecrRect_ = {ageX, y - 2, 24, 24};
-  ageIncrRect_ = {ageX + 60, y - 2, 24, 24};
-
-  SDL_SetRenderDrawColor(renderer, 40, 40, 50, 255);
-  SDL_RenderFillRect(renderer, &ageDecrRect_);
-  SDL_RenderFillRect(renderer, &ageIncrRect_);
-  SDL_SetRenderDrawColor(renderer, 80, 80, 100, 255);
-  SDL_RenderDrawRect(renderer, &ageDecrRect_);
-  SDL_RenderDrawRect(renderer, &ageIncrRect_);
-
-  t = fontMgr_.renderText(renderer, "-", white, cellFontSize_ + 4, &tw, &th);
-  if (t) {
-    SDL_Rect tr = {ageDecrRect_.x + (24 - tw) / 2,
-                   ageDecrRect_.y + (24 - th) / 2, tw, th};
-    SDL_RenderCopy(renderer, t, nullptr, &tr);
-    MemoryMonitor::getInstance().destroyTexture(t);
-  }
-  t = fontMgr_.renderText(renderer, "+", white, cellFontSize_ + 4, &tw, &th);
-  if (t) {
-    SDL_Rect tr = {ageIncrRect_.x + (24 - tw) / 2,
-                   ageIncrRect_.y + (24 - th) / 2, tw, th};
-    SDL_RenderCopy(renderer, t, nullptr, &tr);
-    MemoryMonitor::getInstance().destroyTexture(t);
-  }
-
-  t = fontMgr_.renderText(renderer, std::to_string(pendingMaxAge_), white,
-                          cellFontSize_ + 4, &tw, &th);
-  if (t) {
-    SDL_Rect tr = {ageX + 32, y, 20, th};
-    SDL_RenderCopy(renderer, t, nullptr, &tr);
-    MemoryMonitor::getInstance().destroyTexture(t);
-  }
-  y += 36;
-
-  // Info
-  std::string info;
-  if (activeTab_ == LiveSpotSource::PSK)
-    info = "Fetch via PSKReporter XML API";
-  else if (activeTab_ == LiveSpotSource::RBN)
-    info = "Real-time telnet feed (Telnet RBN)";
-  else
-    info = "WSPRnet streaming (experimental)";
-
-  t = fontMgr_.renderText(renderer, info, blue, 10, &tw, &th);
-  if (t) {
-    SDL_Rect tr = {cx - tw / 2, y, tw, th};
-    SDL_RenderCopy(renderer, t, nullptr, &tr);
-    MemoryMonitor::getInstance().destroyTexture(t);
-  }
 
   // Buttons at bottom
-  int btnW = 80;
-  int btnH = 32;
-  int btnY = menuY + menuH - btnH - 12;
+  int btnW = 60;
+  int btnH = 24;
+  int btnY = y_ + height_ - btnH - 6;
 
+  // Cancel
   cancelBtnRect_ = {cx - btnW - 10, btnY, btnW, btnH};
   SDL_SetRenderDrawColor(renderer, 60, 20, 20, 255);
   SDL_RenderFillRect(renderer, &cancelBtnRect_);
   SDL_SetRenderDrawColor(renderer, 150, 50, 50, 255);
   SDL_RenderDrawRect(renderer, &cancelBtnRect_);
-  t = fontMgr_.renderText(renderer, "Cancel", white, cellFontSize_ + 2, &tw,
-                          &th);
+  t = fontMgr_.renderText(renderer, "Cancel", white, cellFontSize_, &tw, &th);
   if (t) {
     SDL_Rect tr = {cancelBtnRect_.x + (btnW - tw) / 2,
                    cancelBtnRect_.y + (btnH - th) / 2, tw, th};
@@ -403,12 +337,13 @@ void LiveSpotPanel::renderSetup(SDL_Renderer *renderer) {
     MemoryMonitor::getInstance().destroyTexture(t);
   }
 
+  // Done
   doneBtnRect_ = {cx + 10, btnY, btnW, btnH};
   SDL_SetRenderDrawColor(renderer, 20, 60, 20, 255);
   SDL_RenderFillRect(renderer, &doneBtnRect_);
   SDL_SetRenderDrawColor(renderer, 50, 150, 50, 255);
   SDL_RenderDrawRect(renderer, &doneBtnRect_);
-  t = fontMgr_.renderText(renderer, "Done", white, cellFontSize_ + 2, &tw, &th);
+  t = fontMgr_.renderText(renderer, "Done", white, cellFontSize_, &tw, &th);
   if (t) {
     SDL_Rect tr = {doneBtnRect_.x + (btnW - tw) / 2,
                    doneBtnRect_.y + (btnH - th) / 2, tw, th};
@@ -418,28 +353,20 @@ void LiveSpotPanel::renderSetup(SDL_Renderer *renderer) {
 }
 
 bool LiveSpotPanel::onMouseUp(int mx, int my, Uint16 /*mod*/) {
-  if (showSetup_) {
-    // Modal setup consumes all clicks. If outside menu, close as cancel?
-    // Usually HamClock clicks outside dismiss.
-    if (mx < menuRect_.x || mx >= menuRect_.x + menuRect_.w ||
-        my < menuRect_.y || my >= menuRect_.y + menuRect_.h) {
-      showSetup_ = false;
-      return true;
-    }
-    return handleSetupClick(mx, my);
-  }
-
   if (mx < x_ || mx >= x_ + width_ || my < y_ || my >= y_ + height_)
     return false;
+
+  if (showSetup_) {
+    return handleSetupClick(mx, my);
+  }
 
   // Check footer click -> Open setup
   if (mx >= footerRect_.x && mx <= footerRect_.x + footerRect_.w &&
       my >= footerRect_.y && my <= footerRect_.y + footerRect_.h) {
     showSetup_ = true;
-    activeTab_ = config_.liveSpotSource;
     pendingOfDe_ = config_.liveSpotsOfDe;
     pendingUseCall_ = config_.liveSpotsUseCall;
-    pendingMaxAge_ = config_.liveSpotsMaxAge;
+    pendingSource_ = config_.liveSpotSource;
     return true;
   }
 
@@ -471,16 +398,18 @@ bool LiveSpotPanel::onMouseUp(int mx, int my, Uint16 /*mod*/) {
 }
 
 bool LiveSpotPanel::handleSetupClick(int mx, int my) {
-  // Tabs
-  for (int i = 0; i < 3; ++i) {
-    if (mx >= tabRects_[i].x && mx <= tabRects_[i].x + tabRects_[i].w &&
-        my >= tabRects_[i].y && my <= tabRects_[i].y + tabRects_[i].h) {
-      activeTab_ = static_cast<LiveSpotSource>(i);
-      return true;
-    }
+  // Source cycle button
+  if (mx >= sourceRect_.x && mx <= sourceRect_.x + sourceRect_.w &&
+      my >= sourceRect_.y && my <= sourceRect_.y + sourceRect_.h) {
+    if (pendingSource_ == LiveSpotSource::PSK)
+      pendingSource_ = LiveSpotSource::WSPR;
+    else if (pendingSource_ == LiveSpotSource::WSPR)
+      pendingSource_ = LiveSpotSource::RBN;
+    else
+      pendingSource_ = LiveSpotSource::PSK;
+    return true;
   }
 
-  // Mode/Filter Checkboxes
   if (mx >= modeCheckRect_.x && mx <= modeCheckRect_.x + modeCheckRect_.w &&
       my >= modeCheckRect_.y && my <= modeCheckRect_.y + modeCheckRect_.h) {
     pendingOfDe_ = !pendingOfDe_;
@@ -493,22 +422,6 @@ bool LiveSpotPanel::handleSetupClick(int mx, int my) {
     pendingUseCall_ = !pendingUseCall_;
     return true;
   }
-
-  // Age Buttons
-  if (mx >= ageDecrRect_.x && mx <= ageDecrRect_.x + ageDecrRect_.w &&
-      my >= ageDecrRect_.y && my <= ageDecrRect_.y + ageDecrRect_.h) {
-    if (pendingMaxAge_ > 15)
-      pendingMaxAge_ -= 15;
-    return true;
-  }
-  if (mx >= ageIncrRect_.x && mx <= ageIncrRect_.x + ageIncrRect_.w &&
-      my >= ageIncrRect_.y && my <= ageIncrRect_.y + ageIncrRect_.h) {
-    if (pendingMaxAge_ < 1440)
-      pendingMaxAge_ += 15;
-    return true;
-  }
-
-  // Pop-out Action Buttons
   if (mx >= cancelBtnRect_.x && mx <= cancelBtnRect_.x + cancelBtnRect_.w &&
       my >= cancelBtnRect_.y && my <= cancelBtnRect_.y + cancelBtnRect_.h) {
     showSetup_ = false;
@@ -517,17 +430,18 @@ bool LiveSpotPanel::handleSetupClick(int mx, int my) {
   if (mx >= doneBtnRect_.x && mx <= doneBtnRect_.x + doneBtnRect_.w &&
       my >= doneBtnRect_.y && my <= doneBtnRect_.y + doneBtnRect_.h) {
     // Save
-    config_.liveSpotSource = activeTab_;
     config_.liveSpotsOfDe = pendingOfDe_;
     config_.liveSpotsUseCall = pendingUseCall_;
-    config_.liveSpotsMaxAge = pendingMaxAge_;
+    config_.liveSpotSource = pendingSource_;
+    // Invalidate subtitle so it rebuilds with new source tag
+    if (subtitleTex_) {
+      MemoryMonitor::getInstance().destroyTexture(subtitleTex_);
+      subtitleTex_ = nullptr;
+    }
+    lastSubtitle_.clear();
     cfgMgr_.save(config_);
-
-    // Clear and refetch if source changed
-    store_->clearSpots();
     provider_.updateConfig(config_);
     provider_.fetch(); // Force refresh with new settings
-
     showSetup_ = false;
     return true;
   }
@@ -571,7 +485,7 @@ SDL_Rect LiveSpotPanel::getActionRect(const std::string &action) const {
   // Expected format: toggle_band_N
   if (action.find("toggle_band_") == 0) {
     try {
-      int idx = std::stoi(action.substr(12));
+      int idx = StringUtils::safe_stoi(action.substr(12));
       if (idx >= 0 && idx < kNumBands) {
         // Re-calculate cell position based on verified grid logic from render()
         // Grid is 2 columns x (kNumBands/2) rows
@@ -602,7 +516,7 @@ SDL_Rect LiveSpotPanel::getActionRect(const std::string &action) const {
 bool LiveSpotPanel::performAction(const std::string &action) {
   if (action.find("toggle_band_") == 0) {
     try {
-      int idx = std::stoi(action.substr(12));
+      int idx = StringUtils::safe_stoi(action.substr(12));
       if (idx >= 0 && idx < kNumBands) {
         store_->toggleBand(idx);
         config_.liveSpotsBands = store_->getSelectedBandsMask();

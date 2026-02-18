@@ -39,7 +39,7 @@ private:
   // View toggle (future: can switch between stats and log view)
   bool showLogView_ = true;
 
-  // Band/mode filter (index into kFilterBands/kFilterModes; 0 = All)
+  // Filter state (band/mode cycle buttons in log view header)
   int filterBandIdx_ = 0;
   int filterModeIdx_ = 0;
 

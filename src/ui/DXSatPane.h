@@ -46,6 +46,14 @@ public:
       std::function<void(const std::string &mode, const std::string &satName)>;
   void setOnModeChanged(ModeChangedCb cb) { onModeChanged_ = std::move(cb); }
 
+  // Called when the "Map Track" button is toggled. Arg is the new enabled state.
+  void setOnMapTrackToggle(std::function<void(bool)> cb) {
+    onMapTrackToggle_ = std::move(cb);
+  }
+
+  // Sync the Map Track button state from config (call after config load).
+  void setMapTrackVisible(bool visible) { mapTrackVisible_ = visible; }
+
   void update() override;
   void render(SDL_Renderer *renderer) override;
   void onResize(int x, int y, int w, int h) override;
@@ -111,6 +119,9 @@ private:
   int menuFontSize_ = 14;
 
   ModeChangedCb onModeChanged_;
+  std::function<void(bool)> onMapTrackToggle_;
   std::string pendingSatRestore_; // satellite name to restore when data arrives
   SDL_Rect trackButtonRect_ = {0, 0, 0, 0};
+  SDL_Rect mapTrackBtnRect_ = {0, 0, 0, 0};
+  bool mapTrackVisible_ = true; // mirrors config_.showSatTrack
 };

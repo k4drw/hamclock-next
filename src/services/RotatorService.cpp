@@ -1,18 +1,13 @@
 #include "RotatorService.h"
 #include "../core/Logger.h"
 
-#ifdef _WIN32
-#include <winsock2.h>
-#include <ws2tcpip.h>
-#else
 #include <arpa/inet.h>
-#include <netinet/in.h>
-#include <sys/socket.h>
-#include <unistd.h>
-#endif
 #include <chrono>
 #include <cstring>
+#include <netinet/in.h>
+#include <sys/socket.h>
 #include <thread>
+#include <unistd.h>
 
 RotatorService::RotatorService(std::shared_ptr<RotatorDataStore> store,
                                const AppConfig &config, HamClockState *state)
@@ -21,6 +16,7 @@ RotatorService::RotatorService(std::shared_ptr<RotatorDataStore> store,
 RotatorService::~RotatorService() { stop(); }
 
 void RotatorService::start() {
+#ifndef __EMSCRIPTEN__
   if (running_)
     return;
 
@@ -34,9 +30,11 @@ void RotatorService::start() {
   pollThread_ = std::thread(&RotatorService::pollLoop, this);
   LOG_I("Rotator", "Service started ({}:{})", config_.rotatorHost,
         config_.rotatorPort);
+#endif
 }
 
 void RotatorService::stop() {
+#ifndef __EMSCRIPTEN__
   if (!running_)
     return;
 
@@ -48,16 +46,20 @@ void RotatorService::stop() {
   }
 
   LOG_I("Rotator", "Service stopped");
+#endif
 }
 
 RotatorData RotatorService::getPosition() const {
+#ifndef __EMSCRIPTEN__
   if (store_) {
     return store_->get();
   }
+#endif
   return RotatorData{};
 }
 
 bool RotatorService::setPosition(double azimuth, double elevation) {
+#ifndef __EMSCRIPTEN__
   if (!connected_) {
     LOG_W("Rotator", "Cannot set position: not connected");
     return false;
@@ -78,9 +80,15 @@ bool RotatorService::setPosition(double azimuth, double elevation) {
   }
 
   return success;
+#else
+  (void)azimuth;
+  (void)elevation;
+  return false;
+#endif
 }
 
 bool RotatorService::stopRotator() {
+#ifndef __EMSCRIPTEN__
   if (!connected_) {
     LOG_W("Rotator", "Cannot stop: not connected");
     return false;
@@ -99,11 +107,21 @@ bool RotatorService::stopRotator() {
   }
 
   return success;
+#else
+  return false;
+#endif
 }
 
-bool RotatorService::isConnected() const { return connected_.load(); }
+bool RotatorService::isConnected() const {
+#ifndef __EMSCRIPTEN__
+  return connected_.load();
+#else
+  return false;
+#endif
+}
 
 void RotatorService::pollLoop() {
+#ifndef __EMSCRIPTEN__
   using namespace std::chrono_literals;
 
   while (running_) {
@@ -173,28 +191,24 @@ void RotatorService::pollLoop() {
   }
 
   disconnectFromRotator();
+#endif
 }
 
 bool RotatorService::connectToRotator() {
+#ifndef __EMSCRIPTEN__
   // Create TCP socket
-  sockfd_ = (int)socket(AF_INET, SOCK_STREAM, 0);
+  sockfd_ = socket(AF_INET, SOCK_STREAM, 0);
   if (sockfd_ < 0) {
-    LOG_E("Rotator", "Failed to create socket");
+    LOG_E("Rotator", "Failed to create socket: {}", strerror(errno));
     return false;
   }
 
-  // Set socket timeout (platform-specific)
-#ifdef _WIN32
-  DWORD timeout_ms = 2000;
-  setsockopt(sockfd_, SOL_SOCKET, SO_RCVTIMEO, (const char *)&timeout_ms, sizeof(timeout_ms));
-  setsockopt(sockfd_, SOL_SOCKET, SO_SNDTIMEO, (const char *)&timeout_ms, sizeof(timeout_ms));
-#else
+  // Set socket timeout
   struct timeval timeout;
   timeout.tv_sec = 2;
   timeout.tv_usec = 0;
   setsockopt(sockfd_, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
   setsockopt(sockfd_, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
-#endif
 
   // Connect to rotctld
   struct sockaddr_in addr;
@@ -214,7 +228,7 @@ bool RotatorService::connectToRotator() {
   }
 
   if (connect(sockfd_, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
-    LOG_E("Rotator", "Connection failed");
+    LOG_E("Rotator", "Connection failed: {}", strerror(errno));
 #ifdef _WIN32
     closesocket(sockfd_);
 #else
@@ -225,9 +239,13 @@ bool RotatorService::connectToRotator() {
   }
 
   return true;
+#else
+  return false;
+#endif
 }
 
 void RotatorService::disconnectFromRotator() {
+#ifndef __EMSCRIPTEN__
   if (sockfd_ >= 0) {
 #ifdef _WIN32
     closesocket(sockfd_);
@@ -237,43 +255,53 @@ void RotatorService::disconnectFromRotator() {
     sockfd_ = -1;
   }
   connected_ = false;
+#endif
 }
 
-bool RotatorService::sendCommand(const std::string &cmd, std::string &response) {
+bool RotatorService::sendCommand(const std::string &cmd,
+                                 std::string &response) {
+#ifndef __EMSCRIPTEN__
   if (sockfd_ < 0) {
     return false;
   }
 
   // Send command
-  int sent = send(sockfd_, cmd.c_str(), (int)cmd.length(), 0);
+  ssize_t sent = send(sockfd_, cmd.c_str(), cmd.length(), 0);
   if (sent < 0) {
-    LOG_E("Rotator", "Send failed");
+    LOG_E("Rotator", "Send failed: {}", strerror(errno));
     return false;
   }
 
   // Read response
   char buffer[256];
   std::memset(buffer, 0, sizeof(buffer));
-  int received = recv(sockfd_, buffer, sizeof(buffer) - 1, 0);
+  ssize_t received = recv(sockfd_, buffer, sizeof(buffer) - 1, 0);
 
   if (received <= 0) {
-    LOG_E("Rotator", "Receive failed");
+    LOG_E("Rotator", "Receive failed: {}", strerror(errno));
     return false;
   }
 
   response = std::string(buffer, received);
   return true;
+#else
+  (void)cmd;
+  (void)response;
+  return false;
+#endif
 }
 
 bool RotatorService::getAzEl(double &az, double &el) {
+#ifndef __EMSCRIPTEN__
   // Send 'p' command to get position
   std::string response;
   if (!sendCommand("p\n", response)) {
     return false;
   }
 
-  // Parse response: "Azimuth: XXX.X\nElevation: YYY.Y\n" or just "XXX.X\nYYY.Y\n"
-  // Hamlib rotctld returns: "Azimuth\nElevation\n" for 'p' command
+  // Parse response: "Azimuth: XXX.X\nElevation: YYY.Y\n" or just
+  // "XXX.X\nYYY.Y\n" Hamlib rotctld returns: "Azimuth\nElevation\n" for 'p'
+  // command
   double azVal = 0, elVal = 0;
 
   // Try simple format first (most common)
@@ -293,9 +321,15 @@ bool RotatorService::getAzEl(double &az, double &el) {
 
   LOG_W("Rotator", "Failed to parse position response: {}", response);
   return false;
+#else
+  (void)az;
+  (void)el;
+  return false;
+#endif
 }
 
 bool RotatorService::setAzEl(double az, double el) {
+#ifndef __EMSCRIPTEN__
   // Send 'P' command to set position
   char cmd[64];
   std::snprintf(cmd, sizeof(cmd), "P %.1f %.1f\n", az, el);
@@ -312,4 +346,9 @@ bool RotatorService::setAzEl(double az, double el) {
 
   LOG_W("Rotator", "Set position returned: {}", response);
   return false;
+#else
+  (void)az;
+  (void)el;
+  return false;
+#endif
 }

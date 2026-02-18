@@ -17,7 +17,7 @@
 #endif
 #include <cstring>
 
-RBNProvider::RBNProvider(std::shared_ptr<LiveSpotDataStore> store,
+RBNProvider::RBNProvider(std::shared_ptr<DXClusterDataStore> store,
                          PrefixManager &pm, HamClockState *state)
     : store_(store), pm_(pm), state_(state) {}
 
@@ -28,14 +28,12 @@ void RBNProvider::start(const AppConfig &config) {
     stop();
 
   config_ = config;
-
-  // Only run if RBN is the active source
-  if (config_.liveSpotSource != LiveSpotSource::RBN)
+  if (!config_.rbnEnabled)
     return;
 
   running_ = true;
   stopRequested_ = false;
-  thread_ = std::thread([this]() { this->run(); });
+  thread_ = std::thread(&RBNProvider::run, this);
 }
 
 void RBNProvider::stop() {
@@ -46,12 +44,12 @@ void RBNProvider::stop() {
 }
 
 void RBNProvider::run() {
-  std::string host = config_.rbnHost.empty() ? DEFAULT_HOST : config_.rbnHost;
-  int port = (config_.rbnPort == 0) ? DEFAULT_PORT : config_.rbnPort;
-  std::string login = config_.callsign;
+  std::string host =
+      config_.rbnHost.empty() ? DEFAULT_HOST : config_.rbnHost;
+  std::string login = config_.callsign; // RBN login = operator callsign
 
   while (!stopRequested_) {
-    runTelnet(host, port, login);
+    runTelnet(host, DEFAULT_PORT, login);
 
     if (stopRequested_)
       break;
@@ -63,7 +61,7 @@ void RBNProvider::run() {
 }
 
 void RBNProvider::runTelnet(const std::string &host, int port,
-                            const std::string &login) {
+                             const std::string &login) {
   LOG_I("RBN", "Connecting to {}:{}", host, port);
   if (state_) {
     auto &s = state_->services["RBN"];
@@ -95,7 +93,7 @@ void RBNProvider::runTelnet(const std::string &host, int port,
 
   if (connect(sock, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
 #ifdef _WIN32
-    LOG_E("RBN", "Connect to {} failed", host);
+    LOG_E("RBN", "Connect to {} failed: error {}", host, WSAGetLastError());
 #else
     LOG_E("RBN", "Connect to {} failed: {}", host, std::strerror(errno));
 #endif
@@ -125,9 +123,7 @@ void RBNProvider::runTelnet(const std::string &host, int port,
 
   std::string buffer;
   bool loggedIn = login.empty();
-  bool filterSent = false;
   auto lastHeartbeat = std::chrono::system_clock::now();
-  auto lastPrune = std::chrono::system_clock::now();
 
   while (!stopRequested_) {
 #ifdef _WIN32
@@ -163,7 +159,8 @@ void RBNProvider::runTelnet(const std::string &host, int port,
       while ((pos = buffer.find('\n')) != std::string::npos) {
         std::string line = buffer.substr(0, pos);
         buffer.erase(0, pos + 1);
-        while (!line.empty() && (line.back() == '\r' || line.back() == '\n'))
+        while (!line.empty() &&
+               (line.back() == '\r' || line.back() == '\n'))
           line.pop_back();
 
         if (!line.empty()) {
@@ -195,36 +192,15 @@ void RBNProvider::runTelnet(const std::string &host, int port,
         }
       }
 
-      // Send filters once logged in
-      if (loggedIn && !filterSent) {
-        std::string filterCmd;
-        if (config_.liveSpotsOfDe) {
-          // I am the sender, show who heard ME (dx is callsign)
-          filterCmd = "set dx filter call " + config_.callsign + "\r\n";
-        } else {
-          // I am the receiver, show what I heard (spotter is callsign)
-          filterCmd = "set dx filter spotter " + config_.callsign + "\r\n";
-        }
-        LOG_I("RBN", "Sending filter: {}", filterCmd);
-        send(sock, filterCmd.c_str(), (int)filterCmd.length(), 0);
-        filterSent = true;
-      }
-
       if (buffer.length() > 4096)
         buffer.clear();
     }
 
-    auto now = std::chrono::system_clock::now();
     // Heartbeat every 60 seconds
+    auto now = std::chrono::system_clock::now();
     if (now - lastHeartbeat > std::chrono::seconds(60)) {
       send(sock, "\r\n", 2, 0);
       lastHeartbeat = now;
-    }
-
-    // Prune every 60 seconds
-    if (now - lastPrune > std::chrono::seconds(60)) {
-      store_->prune(now - std::chrono::minutes(config_.liveSpotsMaxAge));
-      lastPrune = now;
     }
   }
 
@@ -232,7 +208,7 @@ void RBNProvider::runTelnet(const std::string &host, int port,
 }
 
 void RBNProvider::processLine(const std::string &line) {
-  if (line.empty() || line[0] == '#')
+  if (line.empty())
     return;
 
   // Standard DX de format:
@@ -241,46 +217,93 @@ void RBNProvider::processLine(const std::string &line) {
   if (!dxde)
     return;
 
+  DXClusterSpot spot;
   char rxCall[32], txCall[32];
   float freq;
 
   if (sscanf(dxde, "DX de %31[^ :]: %f %31s", rxCall, &freq, txCall) != 3)
     return;
 
-  // Band filtering
-  int bandIdx = freqToBandIndex(freq);
-  if (bandIdx < 0)
-    return;
+  spot.rxCall = rxCall;
+  spot.txCall = txCall;
+  spot.freqKhz = freq;
+  spot.spottedAt = std::chrono::system_clock::now();
 
-  // Logic filtering: RBN usually respects filters on the server, but we double
-  // check here if we used 'of call' vs 'by call'
-  bool isMeTx = (config_.callsign == txCall);
-  bool isMeRx = (config_.callsign == rxCall);
-
-  if (config_.liveSpotsOfDe && !isMeTx)
-    return;
-  if (!config_.liveSpotsOfDe && !isMeRx)
-    return;
-
-  SpotRecord rec;
-  rec.freqKhz = freq;
-  rec.senderCallsign = txCall;
-  rec.timestamp = std::chrono::system_clock::now();
-
-  // If we are showing who heard ME, plot the receiver.
-  // If we are showing what I heard, plot the sender.
-  const char *targetCall = config_.liveSpotsOfDe ? rxCall : txCall;
-
-  LatLong ll;
-  if (pm_.findLocation(targetCall, ll)) {
-    rec.receiverGrid = Astronomy::latLonToGrid(ll.lat, ll.lon);
-  } else {
-    // If we can't find coordinates, we can't plot it on the map.
-    return;
+  // Parse time (HHMM before trailing Z, typically at position 70-74)
+  if (line.length() >= 74 && line[74] == 'Z') {
+    int hr, mn;
+    if (sscanf(line.c_str() + 70, "%2d%2d", &hr, &mn) == 2) {
+      auto now = std::chrono::system_clock::now();
+      std::time_t now_c = std::chrono::system_clock::to_time_t(now);
+      struct tm tm_buf{};
+      struct tm *tm = Astronomy::portable_gmtime(&now_c, &tm_buf);
+      tm->tm_hour = hr;
+      tm->tm_min = mn;
+      tm->tm_sec = 0;
+      std::time_t spot_c = Astronomy::portable_timegm(tm);
+      if (spot_c > now_c)
+        spot_c -= 86400;
+      spot.spottedAt = std::chrono::system_clock::from_time_t(spot_c);
+    }
   }
 
-  LOG_D("RBN", "Spot ({}): {} on {:.1f} kHz",
-        config_.liveSpotsOfDe ? "Of DE" : "By DE", txCall, freq);
+  // Parse mode from comment field (RBN always includes it)
+  // Format after callsign: "  CW    20 dB  12 WPM  CQ"
+  // The mode is at a fixed offset after the spotter/freq/call fields.
+  // RBN line: "DX de SPOTTER: FREQ  CALL          MODE  SNR  SPEED  TYPE  TIME"
+  // Rough parse: find the 4th token after "DX de ..." in the line
+  {
+    // Seek past "DX de SPOTTER: FREQ  CALL" to extract mode+SNR
+    const char *p = dxde;
+    int spaces = 0;
+    // Skip past rxCall, freq, txCall (3 whitespace-delimited tokens)
+    // then read the mode token
+    int tokens = 0;
+    bool inToken = false;
+    while (*p && tokens < 3) {
+      if (*p == ' ' || *p == ':') {
+        if (inToken)
+          tokens++;
+        inToken = false;
+      } else {
+        inToken = true;
+      }
+      p++;
+    }
+    (void)spaces; // suppress warning
 
-  store_->addSpot(rec);
+    // Now skip whitespace to find mode token
+    while (*p == ' ')
+      p++;
+    // Read mode token
+    char mode[16] = {};
+    int mi = 0;
+    while (*p && *p != ' ' && mi < 15)
+      mode[mi++] = *p++;
+    if (mi > 0)
+      spot.mode = mode;
+
+    // Try to parse SNR: skip whitespace, read number, expect " dB"
+    while (*p == ' ')
+      p++;
+    float snr = 0;
+    if (sscanf(p, "%f dB", &snr) == 1)
+      spot.snr = snr;
+  }
+
+  // Resolve coordinates from prefix database
+  LatLong ll;
+  if (pm_.findLocation(spot.txCall, ll)) {
+    spot.txLat = ll.lat;
+    spot.txLon = ll.lon;
+  }
+  if (pm_.findLocation(spot.rxCall, ll)) {
+    spot.rxLat = ll.lat;
+    spot.rxLon = ll.lon;
+  }
+
+  LOG_D("RBN", "Spot: {} on {:.1f} kHz {} {:.0f}dB", spot.txCall,
+        spot.freqKhz, spot.mode, spot.snr);
+
+  store_->addSpot(spot);
 }

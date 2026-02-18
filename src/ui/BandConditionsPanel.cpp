@@ -14,18 +14,17 @@ void BandConditionsPanel::update() {
 }
 
 SDL_Color BandConditionsPanel::colorForCondition(BandCondition cond) {
-  ThemeColors themes = getThemeColors(theme_);
   switch (cond) {
   case BandCondition::EXCELLENT:
-    return themes.info;
+    return {0, 255, 255, 255}; // Cyan
   case BandCondition::GOOD:
-    return themes.success;
+    return {0, 255, 0, 255}; // Green
   case BandCondition::FAIR:
-    return themes.warning;
+    return {255, 255, 0, 255}; // Yellow
   case BandCondition::POOR:
-    return themes.danger;
+    return {255, 50, 50, 255}; // Red
   default:
-    return themes.textDim;
+    return {150, 150, 150, 255};
   }
 }
 

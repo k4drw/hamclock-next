@@ -2,19 +2,21 @@
 #include "../core/Theme.h"
 #include <algorithm>
 #include <cstdio>
+#include <cstring>
 #include <vector>
 
-static const char *kFilterBands[] = {"All",  "160m", "80m", "60m",
-                                     "40m",  "30m",  "20m", "17m",
-                                     "15m",  "12m",  "10m", "6m",
-                                     "2m",   nullptr};
-static const char *kFilterModes[] = {"All",  "CW",   "SSB", "FT8",
-                                     "FT4",  "RTTY", "AM",  "FM",
-                                     nullptr};
+static const char *kFilterBands[] = {"All", "160m", "80m", "60m",  "40m",
+                                     "30m", "20m",  "17m", "15m",  "12m",
+                                     "10m", "6m",   "2m",  nullptr};
+static const char *kFilterModes[] = {"All",  "CW", "SSB", "FT8",  "FT4",
+                                     "RTTY", "AM", "FM",  nullptr};
 
 ADIFPanel::ADIFPanel(int x, int y, int w, int h, FontManager &fontMgr,
                      std::shared_ptr<ADIFStore> store)
-    : Widget(x, y, w, h), fontMgr_(fontMgr), store_(std::move(store)) {}
+    : Widget(x, y, w, h), fontMgr_(fontMgr), store_(std::move(store)) {
+  store_->setFilters(kFilterBands[filterBandIdx_],
+                     kFilterModes[filterModeIdx_]);
+}
 
 void ADIFPanel::update() { stats_ = store_->get(); }
 
@@ -42,7 +44,7 @@ void ADIFPanel::renderStatsView(SDL_Renderer *renderer) {
 
   if (!stats_.valid) {
     fontMgr_.drawText(renderer, "No Log Found", x_ + width_ / 2,
-                      y_ + height_ / 2, themes.textDim, 12, false, true);
+                      y_ + height_ / 2, themes.info, 12, false, true);
     return;
   }
 
@@ -57,7 +59,7 @@ void ADIFPanel::renderStatsView(SDL_Renderer *renderer) {
   std::sort(topBands.begin(), topBands.end(),
             [](auto &a, auto &b) { return a.second > b.second; });
 
-  fontMgr_.drawText(renderer, "Top Bands:", x_ + pad, curY, themes.textDim, 9);
+  fontMgr_.drawText(renderer, "Top Bands:", x_ + pad, curY, themes.info, 9);
   curY += 12;
   for (size_t i = 0; i < std::min((size_t)3, topBands.size()); ++i) {
     std::snprintf(buf, sizeof(buf), "%s: %d", topBands[i].first.c_str(),
@@ -68,7 +70,7 @@ void ADIFPanel::renderStatsView(SDL_Renderer *renderer) {
   curY += 5;
 
   // Latest Calls
-  fontMgr_.drawText(renderer, "Latest:", x_ + pad, curY, themes.textDim, 9);
+  fontMgr_.drawText(renderer, "Latest:", x_ + pad, curY, themes.info, 9);
   curY += 12;
   for (const auto &call : stats_.latestCalls) {
     fontMgr_.drawText(renderer, call, x_ + pad + 5, curY, themes.accent, 10);
@@ -85,12 +87,12 @@ void ADIFPanel::renderLogView(SDL_Renderer *renderer) {
   // Title with band/mode filter chips
   fontMgr_.drawText(renderer, "Recent QSOs", x_ + pad, headerY, themes.accent,
                     10, true);
-  // Filter chips (clickable): shown in right half of the title row
+  // Filter chips (clickable): band on the right side of title row
   char chipBuf[32];
   std::snprintf(chipBuf, sizeof(chipBuf), "[%s %s]",
                 kFilterBands[filterBandIdx_], kFilterModes[filterModeIdx_]);
-  fontMgr_.drawText(renderer, chipBuf, x_ + width_ / 2 + pad, headerY,
-                    themes.info, 9);
+  fontMgr_.drawText(renderer, chipBuf, x_ + width_ - pad, headerY, themes.info,
+                    9, true, false, true);
   headerY += headerHeight_;
 
   // Build filtered QSO list
@@ -110,7 +112,7 @@ void ADIFPanel::renderLogView(SDL_Renderer *renderer) {
 
   if (!stats_.valid || filtered.empty()) {
     fontMgr_.drawText(renderer, "No QSOs Found", x_ + width_ / 2,
-                      y_ + height_ / 2, themes.textDim, 12, false, true);
+                      y_ + height_ / 2, themes.info, 12, false, true);
     return;
   }
 
@@ -127,7 +129,8 @@ void ADIFPanel::renderLogView(SDL_Renderer *renderer) {
   int scrollbarW = 8;
   int contentW = width_ - scrollbarW - pad * 2;
 
-  // Column layout: Call(20%), Time(25%), Band(12%), Mode(12%), RST(10%), Grid(21%)
+  // Column layout: Call(20%), Time(25%), Band(12%), Mode(12%), RST(10%),
+  // Grid(21%)
   int colCall = x_ + pad;
   int colTime = colCall + static_cast<int>(contentW * 0.20);
   int colBand = colTime + static_cast<int>(contentW * 0.25);
@@ -136,7 +139,7 @@ void ADIFPanel::renderLogView(SDL_Renderer *renderer) {
   int colGrid = colRST + static_cast<int>(contentW * 0.10);
 
   // Column headers
-  SDL_Color headerColor = themes.textDim;
+  SDL_Color headerColor = themes.info;
   fontMgr_.drawText(renderer, "Call", colCall, headerY, headerColor, 9, true);
   fontMgr_.drawText(renderer, "Time", colTime, headerY, headerColor, 9, true);
   fontMgr_.drawText(renderer, "Band", colBand, headerY, headerColor, 9, true);
@@ -208,9 +211,9 @@ void ADIFPanel::renderLogView(SDL_Renderer *renderer) {
     // Scrollbar thumb
     float thumbRatio = (float)visibleRows / totalRows;
     int thumbH = std::max(20, static_cast<int>(scrollbarH * thumbRatio));
-    int thumbY = scrollbarY +
-                 static_cast<int>((float)scrollOffset_ / maxScroll_ *
-                                  (scrollbarH - thumbH));
+    int thumbY =
+        scrollbarY + static_cast<int>((float)scrollOffset_ / maxScroll_ *
+                                      (scrollbarH - thumbH));
 
     SDL_SetRenderDrawColor(renderer, themes.accent.r, themes.accent.g,
                            themes.accent.b, 200);
@@ -301,6 +304,8 @@ bool ADIFPanel::onMouseUp(int mx, int my, Uint16 /*mod*/) {
       filterModeIdx_ = (filterModeIdx_ + 1) % n;
     }
     scrollOffset_ = 0;
+    store_->setFilters(kFilterBands[filterBandIdx_],
+                       kFilterModes[filterModeIdx_]);
     return true;
   }
 

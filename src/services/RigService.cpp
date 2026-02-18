@@ -21,6 +21,7 @@ RigService::RigService(std::shared_ptr<RigDataStore> store,
 RigService::~RigService() { stop(); }
 
 void RigService::start() {
+#ifndef __EMSCRIPTEN__
   if (running_)
     return;
 
@@ -33,9 +34,11 @@ void RigService::start() {
   running_ = true;
   workerThread_ = std::thread(&RigService::commandWorker, this);
   LOG_I("Rig", "Service started ({}:{})", config_.rigHost, config_.rigPort);
+#endif
 }
 
 void RigService::stop() {
+#ifndef __EMSCRIPTEN__
   if (!running_)
     return;
 
@@ -56,9 +59,11 @@ void RigService::stop() {
 
   disconnectFromRig();
   LOG_I("Rig", "Service stopped");
+#endif
 }
 
 bool RigService::setFrequency(long long freqHz) {
+#ifndef __EMSCRIPTEN__
   if (!running_) {
     LOG_W("Rig", "Service not running, cannot set frequency");
     return false;
@@ -81,9 +86,14 @@ bool RigService::setFrequency(long long freqHz) {
 
   LOG_I("Rig", "Queued SET_FREQ: {} Hz", freqHz);
   return true;
+#else
+  (void)freqHz;
+  return false;
+#endif
 }
 
 bool RigService::setMode(const std::string &mode, int passbandHz) {
+#ifndef __EMSCRIPTEN__
   if (!running_) {
     LOG_W("Rig", "Service not running, cannot set mode");
     return false;
@@ -106,9 +116,15 @@ bool RigService::setMode(const std::string &mode, int passbandHz) {
 
   LOG_I("Rig", "Queued SET_MODE: {} ({}Hz)", mode, passbandHz);
   return true;
+#else
+  (void)mode;
+  (void)passbandHz;
+  return false;
+#endif
 }
 
 bool RigService::setPTT(bool on) {
+#ifndef __EMSCRIPTEN__
   if (!running_) {
     LOG_W("Rig", "Service not running, cannot set PTT");
     return false;
@@ -130,18 +146,31 @@ bool RigService::setPTT(bool on) {
 
   LOG_I("Rig", "Queued SET_PTT: {}", on ? "ON" : "OFF");
   return true;
+#else
+  (void)on;
+  return false;
+#endif
 }
 
 RigData RigService::getState() const {
+#ifndef __EMSCRIPTEN__
   if (store_) {
     return store_->get();
   }
+#endif
   return RigData{};
 }
 
-bool RigService::isConnected() const { return connected_.load(); }
+bool RigService::isConnected() const {
+#ifndef __EMSCRIPTEN__
+  return connected_.load();
+#else
+  return false;
+#endif
+}
 
 void RigService::commandWorker() {
+#ifndef __EMSCRIPTEN__
   using namespace std::chrono_literals;
 
   LOG_I("Rig", "Command worker thread started");
@@ -270,9 +299,11 @@ void RigService::commandWorker() {
   }
 
   LOG_I("Rig", "Command worker thread exiting");
+#endif
 }
 
 bool RigService::connectToRig() {
+#ifndef __EMSCRIPTEN__
   // Create TCP socket
   sockfd_ = (int)socket(AF_INET, SOCK_STREAM, 0);
   if (sockfd_ < 0) {
@@ -283,8 +314,10 @@ bool RigService::connectToRig() {
   // Set socket timeout (platform-specific)
 #ifdef _WIN32
   DWORD timeout_ms = 2000;
-  setsockopt(sockfd_, SOL_SOCKET, SO_RCVTIMEO, (const char *)&timeout_ms, sizeof(timeout_ms));
-  setsockopt(sockfd_, SOL_SOCKET, SO_SNDTIMEO, (const char *)&timeout_ms, sizeof(timeout_ms));
+  setsockopt(sockfd_, SOL_SOCKET, SO_RCVTIMEO, (const char *)&timeout_ms,
+             sizeof(timeout_ms));
+  setsockopt(sockfd_, SOL_SOCKET, SO_SNDTIMEO, (const char *)&timeout_ms,
+             sizeof(timeout_ms));
 #else
   struct timeval timeout;
   timeout.tv_sec = 2;
@@ -322,9 +355,13 @@ bool RigService::connectToRig() {
   }
 
   return true;
+#else
+  return false;
+#endif
 }
 
 void RigService::disconnectFromRig() {
+#ifndef __EMSCRIPTEN__
   if (sockfd_ >= 0) {
 #ifdef _WIN32
     closesocket(sockfd_);
@@ -334,35 +371,43 @@ void RigService::disconnectFromRig() {
     sockfd_ = -1;
   }
   connected_ = false;
+#endif
 }
 
 bool RigService::sendCommand(const std::string &cmd, std::string &response) {
+#ifndef __EMSCRIPTEN__
   if (sockfd_ < 0) {
     return false;
   }
 
   // Send command
-  int sent = send(sockfd_, cmd.c_str(), (int)cmd.length(), 0);
+  ssize_t sent = send(sockfd_, cmd.c_str(), cmd.length(), 0);
   if (sent < 0) {
-    LOG_E("Rig", "Send failed");
+    LOG_E("Rig", "Send failed: {}", strerror(errno));
     return false;
   }
 
   // Read response
   char buffer[512];
   std::memset(buffer, 0, sizeof(buffer));
-  int received = recv(sockfd_, buffer, sizeof(buffer) - 1, 0);
+  ssize_t received = recv(sockfd_, buffer, sizeof(buffer) - 1, 0);
 
   if (received <= 0) {
-    LOG_E("Rig", "Receive failed");
+    LOG_E("Rig", "Receive failed: {}", strerror(errno));
     return false;
   }
 
   response = std::string(buffer, received);
   return true;
+#else
+  (void)cmd;
+  (void)response;
+  return false;
+#endif
 }
 
 bool RigService::executeSetFreq(long long freqHz) {
+#ifndef __EMSCRIPTEN__
   // Hamlib 'F' command: Set frequency in Hz
   char cmd[64];
   std::snprintf(cmd, sizeof(cmd), "F %lld\n", freqHz);
@@ -380,9 +425,14 @@ bool RigService::executeSetFreq(long long freqHz) {
 
   LOG_W("Rig", "Set frequency returned: {}", response);
   return false;
+#else
+  (void)freqHz;
+  return false;
+#endif
 }
 
 bool RigService::executeGetFreq(long long &freqHz) {
+#ifndef __EMSCRIPTEN__
   // Hamlib 'f' command: Get frequency
   std::string response;
   if (!sendCommand("f\n", response)) {
@@ -397,9 +447,14 @@ bool RigService::executeGetFreq(long long &freqHz) {
 
   LOG_W("Rig", "Failed to parse frequency response: {}", response);
   return false;
+#else
+  (void)freqHz;
+  return false;
+#endif
 }
 
 bool RigService::executeSetMode(const std::string &mode, int passbandHz) {
+#ifndef __EMSCRIPTEN__
   // Hamlib 'M' command: Set mode and passband
   // Format: M <mode> <passband>
   char cmd[128];
@@ -418,9 +473,15 @@ bool RigService::executeSetMode(const std::string &mode, int passbandHz) {
 
   LOG_W("Rig", "Set mode returned: {}", response);
   return false;
+#else
+  (void)mode;
+  (void)passbandHz;
+  return false;
+#endif
 }
 
 bool RigService::executeGetMode(std::string &mode, int &passbandHz) {
+#ifndef __EMSCRIPTEN__
   // Hamlib 'm' command: Get mode
   std::string response;
   if (!sendCommand("m\n", response)) {
@@ -437,9 +498,15 @@ bool RigService::executeGetMode(std::string &mode, int &passbandHz) {
 
   LOG_W("Rig", "Failed to parse mode response: {}", response);
   return false;
+#else
+  (void)mode;
+  (void)passbandHz;
+  return false;
+#endif
 }
 
 bool RigService::executeSetPTT(bool on) {
+#ifndef __EMSCRIPTEN__
   // Hamlib 'T' command: Set PTT
   // Format: T <0|1>
   char cmd[16];
@@ -458,4 +525,8 @@ bool RigService::executeSetPTT(bool on) {
 
   LOG_W("Rig", "Set PTT returned: {}", response);
   return false;
+#else
+  (void)on;
+  return false;
+#endif
 }

@@ -44,8 +44,6 @@ private:
                            int fieldH, int fieldX, int textPad);
   void renderTabWidgets(SDL_Renderer *renderer, int cx, int pad, int fieldW,
                         int fieldH, int fieldX, int textPad);
-  void renderTabDisplay(SDL_Renderer *renderer, int cx, int pad, int fieldW,
-                        int fieldH, int fieldX, int textPad);
   void renderTabServices(SDL_Renderer *renderer, int cx, int pad, int fieldW,
                          int fieldH, int fieldX, int textPad);
   void renderTabRig(SDL_Renderer *renderer, int cx, int pad, int fieldW,
@@ -54,11 +52,11 @@ private:
   FontManager &fontMgr_;
   BrightnessManager &brightnessMgr_;
 
+  // Appearance tab absorbs the old Display tab (brightness/schedule now live there)
   enum class Tab {
     Identity,
     Spotting,
     Appearance,
-    Display,
     Rig,
     Services,
     Widgets
@@ -74,6 +72,10 @@ private:
   std::string clusterLogin_;
   bool clusterEnabled_ = true;
   bool clusterWSJTX_ = false;
+  bool rbnEnabled_ = false;
+  bool pskOfDe_ = true;
+  bool pskUseCall_ = true;
+  int pskMaxAge_ = 30;
   int rotationInterval_ = 30;
   std::string theme_ = "default";
   SDL_Color callsignColor_ = {255, 165, 0, 255};
@@ -87,6 +89,7 @@ private:
   std::string qrzPassword_;
   std::string countdownLabel_;
   std::string countdownTime_; // YYYY-MM-DD HH:MM
+  std::string webPasswordText_;
   std::string dimTime_;
   std::string brightTime_;
   std::string rigHost_;
@@ -110,6 +113,7 @@ private:
   int hintSize_ = 14;
   SDL_Rect toggleRect_ = {0, 0, 0, 0};
   SDL_Rect clusterToggleRect_ = {0, 0, 0, 0};
+  SDL_Rect rbnToggleRect_ = {0, 0, 0, 0};
   SDL_Rect gpsToggleRect_ = {0, 0, 0, 0};
   SDL_Rect themeRect_ = {0, 0, 0, 0};
   SDL_Rect nightLightsRect_ = {0, 0, 0, 0};
@@ -118,6 +122,8 @@ private:
   SDL_Rect cancelBtnRect_ = {0, 0, 0, 0};
   SDL_Rect brightnessSliderRect_ = {0, 0, 0, 0};
   SDL_Rect scheduleToggleRect_ = {0, 0, 0, 0};
+  SDL_Rect dimTimeRect_ = {0, 0, 0, 0};
+  SDL_Rect brightTimeRect_ = {0, 0, 0, 0};
 
   struct WidgetClickRect {
     WidgetType type;

@@ -15,6 +15,8 @@ RSSBanner::RSSBanner(int x, int y, int w, int h, FontManager &fontMgr,
 }
 
 void RSSBanner::update() {
+  if (!enabled_)
+    return;
   auto data = store_->get();
   if (data.valid && data.headlines != lastHeadlines_) {
     lastHeadlines_ = data.headlines;
@@ -34,6 +36,9 @@ void RSSBanner::update() {
 }
 
 void RSSBanner::render(SDL_Renderer *renderer) {
+  if (!enabled_)
+    return;
+
   // If we need to rebuild textures for the current headline
   if (currentLines_.empty() && !lastHeadlines_.empty()) {
     rebuildTextures(renderer);
@@ -66,7 +71,8 @@ void RSSBanner::render(SDL_Renderer *renderer) {
 
   for (const auto &line : currentLines_) {
     if (line.tex) {
-      int curX = x_ + (width_ - line.w) / 2;
+      int offset = (width_ - line.w) / 2;
+      int curX = x_ + (offset > 0 ? offset : 0);
       SDL_Rect dst = {curX, curY, line.w, line.h};
       SDL_RenderCopy(renderer, line.tex, nullptr, &dst);
       curY += line.h;

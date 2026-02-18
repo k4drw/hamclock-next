@@ -137,8 +137,8 @@ QRZLookupResult QRZProvider::parseResponse(const std::string &xml,
   std::string latStr = extractTag(xml, "lat");
   std::string lonStr = extractTag(xml, "lon");
   if (!latStr.empty() && !lonStr.empty()) {
-    result.lat = std::stod(latStr);
-    result.lon = std::stod(lonStr);
+    result.lat = StringUtils::safe_stod(latStr);
+    result.lon = StringUtils::safe_stod(lonStr);
   }
 
   return result;

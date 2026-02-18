@@ -1,5 +1,6 @@
 #include "DstProvider.h"
 #include "../core/Astronomy.h"
+#include "../core/StringUtils.h"
 #include <algorithm>
 #include <chrono>
 #include <ctime>
@@ -36,7 +37,7 @@ void DstProvider::fetch() {
         std::string time_str = row[0];
         float val = 0;
         if (row[1].is_string())
-          val = std::stof(row[1].get<std::string>());
+          val = StringUtils::safe_stof(row[1].get<std::string>());
         else if (row[1].is_number())
           val = row[1].get<float>();
 

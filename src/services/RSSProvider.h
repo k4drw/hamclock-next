@@ -11,7 +11,11 @@ public:
 
     void fetch();
 
+    // When disabled, fetch() is a no-op (stops network activity).
+    void setEnabled(bool enabled) { enabled_ = enabled; }
+
 private:
     NetworkManager& net_;
     std::shared_ptr<RSSDataStore> store_;
+    bool enabled_ = true;
 };

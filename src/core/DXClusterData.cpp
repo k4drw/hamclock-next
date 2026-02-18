@@ -1,6 +1,7 @@
 #include "DXClusterData.h"
 #include "DatabaseManager.h"
 #include "Logger.h"
+#include "StringUtils.h"
 #include <algorithm>
 #include <chrono>
 #include <sstream>
@@ -52,19 +53,15 @@ void DXClusterDataStore::loadPersisted() {
     s.rxCall = row[2];
     s.rxGrid = row[3];
     s.mode = row[4];
-    try {
-      s.freqKhz = std::stod(row[5]);
-      s.snr = std::stod(row[6]);
-      s.txLat = std::stod(row[7]);
-      s.txLon = std::stod(row[8]);
-      s.rxLat = std::stod(row[9]);
-      s.rxLon = std::stod(row[10]);
-      int64_t ts = std::stoll(row[11]);
-      s.spottedAt =
-          std::chrono::system_clock::time_point(std::chrono::seconds(ts));
-    } catch (...) {
-      return true; // convert error, skip
-    }
+    s.freqKhz = StringUtils::safe_stod(row[5]);
+    s.snr = StringUtils::safe_stod(row[6]);
+    s.txLat = StringUtils::safe_stod(row[7]);
+    s.txLon = StringUtils::safe_stod(row[8]);
+    s.rxLat = StringUtils::safe_stod(row[9]);
+    s.rxLon = StringUtils::safe_stod(row[10]);
+    int64_t ts = std::stoll(row[11]);
+    s.spottedAt =
+        std::chrono::system_clock::time_point(std::chrono::seconds(ts));
     newData->spots.push_back(s);
     return true;
   });
