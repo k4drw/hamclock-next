@@ -20,6 +20,7 @@
 #include "core/MemoryMonitor.h"
 #include "core/SoundManager.h"
 #include "core/WidgetType.h"
+#include "core/WorkerService.h"
 
 #include "network/NetworkManager.h"
 #include "network/WebServer.h"
@@ -268,6 +269,10 @@ struct DashboardContext {
   bool cursorVisible = true;
   Uint32 lastSleepAssert = 0;
 
+  // State for background data aggregation
+  std::vector<std::string> rssHeadlines[3];
+  bool rssDataDirty = false;
+
   DashboardContext(AppContext &ctx);
   ~DashboardContext() = default;
 
@@ -342,6 +347,8 @@ extern "C" EMSCRIPTEN_KEEPALIVE void hamclock_after_idbfs() {
 // Main tick function for Emscripten/MainLoop
 void main_tick();
 
+uint32_t HamClock::AE_BASE_EVENT = 0;
+
 int main(int argc, char *argv[]) {
 #ifndef _WIN32
   SDL_SetMainReady();
@@ -349,6 +356,9 @@ int main(int argc, char *argv[]) {
 #ifndef __EMSCRIPTEN__
   curl_global_init(CURL_GLOBAL_ALL);
 #endif
+
+  // Initialize the worker service right away
+  WorkerService::getInstance();
 
   g_app = new AppContext();
   AppContext &ctx = *g_app;
@@ -438,9 +448,14 @@ int main(int argc, char *argv[]) {
   }
 #endif
 
-  if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) != 0) {
+  if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_EVENTS) != 0) {
     LOG_ERROR("SDL_Init failed: {}", SDL_GetError());
     return EXIT_FAILURE;
+  }
+  
+  AE_BASE_EVENT = SDL_RegisterEvents(2);
+  if (AE_BASE_EVENT == (uint32_t)-1) {
+    LOG_W("Main", "Failed to reserve user events for background tasks");
   }
 
   int imgFlags = IMG_INIT_PNG | IMG_INIT_JPG;
@@ -632,6 +647,7 @@ int main(int argc, char *argv[]) {
 #endif
 
   // Cleanup
+  WorkerService::getInstance().stop();
   SoundManager::getInstance().cleanup();
   SDL_DestroyRenderer(ctx.renderer);
   SDL_DestroyWindow(ctx.window);
@@ -1246,7 +1262,30 @@ void DashboardContext::update(AppContext &ctx) {
       }
       break;
     default:
-      break;
+        // Handle custom application events
+        if (event.type >= AE_BASE_EVENT) {
+            switch (event.type - AE_BASE_EVENT) {
+                case AE_SATELLITE_TRACK_READY: {
+                    auto* track = static_cast<std::vector<GroundTrackPoint>*>(event.user.data1);
+                    if (track && ctx.dashboard && ctx.dashboard->mapArea) {
+                        ctx.dashboard->mapArea->onSatTrackReady(*track);
+                    }
+                    delete track; // Free the memory allocated by the worker thread
+                    break;
+                }
+                case AE_RSS_DATA_READY: {
+                    int feed_idx = event.user.code;
+                    auto* headlines = static_cast<std::vector<std::string>*>(event.user.data1);
+                    if (headlines && feed_idx >= 0 && feed_idx < 3) {
+                        rssHeadlines[feed_idx] = std::move(*headlines);
+                        rssDataDirty = true;
+                    }
+                    delete headlines;
+                    break;
+                }
+            }
+        }
+        break;
     }
 
     // Dispatch other events
@@ -1314,6 +1353,24 @@ void DashboardContext::update(AppContext &ctx) {
             break;
       }
     }
+  }
+
+  // After event loop, process any aggregated data
+  if (rssDataDirty) {
+    RSSData data;
+    for (int i = 0; i < 3; ++i) {
+        data.headlines.insert(data.headlines.end(), rssHeadlines[i].begin(), rssHeadlines[i].end());
+    }
+    if (data.headlines.empty()) {
+      data.headlines = {
+          "HamClock-Next: A modern amateur radio dashboard",
+          "Welcome to HamClock -- real-time propagation and space weather",
+      };
+    }
+    data.lastUpdated = std::chrono::system_clock::now();
+    data.valid = true;
+    ctx.rssStore->set(data);
+    rssDataDirty = false;
   }
 
   if (timePanel->isSetupRequested()) {

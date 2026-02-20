@@ -424,6 +424,7 @@ set(HAMCLOCK_SOURCES
     src/core/CitiesManager.cpp
     src/core/StringUtils.cpp
     src/core/SoundManager.cpp
+    src/core/WorkerService.cpp
     src/core/PropEngine.cpp
     src/network/NetworkManager.cpp
     src/network/WebServer.cpp
