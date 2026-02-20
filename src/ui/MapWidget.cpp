@@ -1423,40 +1423,58 @@ void MapWidget::renderONTASpots(SDL_Renderer *renderer) {
   if (!activityStore_)
     return;
 
-  // Retrieve data
-  ActivityData data;
-  {
-    // Scoped lock just to copy data
-    // ActivityDataStore::get() already locks, so this is fine
-    data = activityStore_->get();
-  }
+  ActivityData data = activityStore_->get();
+  if (!data.hasSelection)
+    return;
 
-  if (data.ontaSpots.empty())
+  const auto &spot = data.selectedSpot;
+  if (spot.lat == 0.0 && spot.lon == 0.0)
     return;
 
   SDL_RenderSetClipRect(renderer, &mapRect_);
+  SDL_Texture *lineTex = texMgr_.get(LINE_AA_KEY);
 
-  // POTA Color: #355e3b (Hunter Green) -> Let's use bright Lime Green for
-  // visibility on map SOTA Color: #003366 (Dark Blue) -> Let's use Cyan/Blue
-  SDL_Color potaColor = {50, 255, 50, 255};
-  SDL_Color sotaColor = {0, 200, 255, 255};
+  // Lime Green for POTA, Cyan for SOTA
+  SDL_Color color = (spot.program == "POTA") ? SDL_Color{50, 255, 50, 255}
+                                             : SDL_Color{0, 200, 255, 255};
 
-  int limit = useCompatibilityRenderPath_ ? 50 : 200;
-  int count = 0;
+  LatLon de = state_->deLocation;
+  auto path = Astronomy::calculateGreatCirclePath(de, {spot.lat, spot.lon}, 100);
 
-  for (const auto &spot : data.ontaSpots) {
-    if (spot.lat == 0.0 && spot.lon == 0.0)
-      continue; // SOTA spots with no coords will be skipped here
+  std::vector<SDL_FPoint> segment;
+  SDL_Color lineColor = {color.r, color.g, color.b, 100};
 
-    if (count++ > limit)
-      break;
+  for (size_t i = 0; i < path.size(); ++i) {
+    if (i > 0) {
+      double lon0 = path[i - 1].lon;
+      double lon1 = path[i].lon;
+      if (std::fabs(lon0 - lon1) > 180.0) {
+        double lon1_adj = (lon1 < 0) ? lon1 + 360.0 : lon1 - 360.0;
+        double borderLon = (lon1 < 0) ? 180.0 : -180.0;
+        double f = (borderLon - lon0) / (lon1_adj - lon0);
+        double borderLat = path[i - 1].lat + f * (path[i].lat - path[i - 1].lat);
 
-    SDL_Color c = (spot.program == "POTA") ? potaColor : sotaColor;
-
-    // Use Square markers for ONTA to differentiate from DX Cluster (Circle)
-    renderMarker(renderer, spot.lat, spot.lon, c.r, c.g, c.b,
-                 MarkerShape::Square, true);
+        segment.push_back(latLonToScreen(borderLat, borderLon));
+        if (segment.size() >= 2) {
+          RenderUtils::drawPolylineTextured(renderer, lineTex, segment.data(),
+                                            static_cast<int>(segment.size()),
+                                            1.0f, lineColor);
+        }
+        segment.clear();
+        segment.push_back(latLonToScreen(borderLat, -borderLon));
+      }
+    }
+    segment.push_back(latLonToScreen(path[i].lat, path[i].lon));
   }
+  if (segment.size() >= 2) {
+    RenderUtils::drawPolylineTextured(renderer, lineTex, segment.data(),
+                                      static_cast<int>(segment.size()), 1.0f,
+                                      lineColor);
+  }
+
+  // Use Square markers for ONTA to differentiate from DX Cluster (Circle)
+  renderMarker(renderer, spot.lat, spot.lon, color.r, color.g, color.b,
+               MarkerShape::Square, true);
 
   SDL_RenderSetClipRect(renderer, nullptr);
 }

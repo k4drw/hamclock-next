@@ -1,3 +1,4 @@
+#include "core/ActivityLocationManager.h"
 #include "core/AuroraHistoryStore.h"
 #include "core/BrightnessManager.h"
 #include "core/CPUMonitor.h"
@@ -577,6 +578,9 @@ int main(int argc, char *argv[]) {
   ctx.netManager =
       std::make_unique<NetworkManager>(ctx.cfgMgr.configDir() / "cache");
   ctx.netManager->setCorsProxyUrl(ctx.appCfg.corsProxyUrl);
+  
+  ActivityLocationManager::getInstance().init(*ctx.netManager, ctx.cfgMgr.configDir() / "cache");
+
   ctx.prefixMgr.init();
   CitiesManager::getInstance().init();
 
