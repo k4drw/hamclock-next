@@ -25,6 +25,7 @@
 #include "network/WebServer.h"
 #include "services/ADIFProvider.h"
 #include "services/ActivityProvider.h"
+#include "services/AsteroidProvider.h"
 #include "services/AuroraProvider.h"
 #include "services/BandConditionsProvider.h"
 #include "services/CallbookProvider.h"
@@ -48,6 +49,7 @@
 #include "services/WeatherProvider.h"
 #include "ui/ADIFPanel.h"
 #include "ui/ActivityPanels.h"
+#include "ui/AsteroidPanel.h"
 #include "ui/AuroraGraphPanel.h"
 #include "ui/AuroraPanel.h"
 #include "ui/BandConditionsPanel.h"
@@ -234,6 +236,7 @@ struct DashboardContext {
   std::unique_ptr<IonosondeProvider> ionosondeProvider;
   std::unique_ptr<SantaProvider> santaProvider;
   std::unique_ptr<SatelliteManager> satMgr;
+  std::unique_ptr<AsteroidProvider> asteroidProvider;
 
   // Services
 #ifndef __EMSCRIPTEN__
@@ -724,9 +727,8 @@ DashboardContext::DashboardContext(AppContext &ctx)
   rssProvider = std::make_unique<RSSProvider>(netManager, rssStore);
   rssProvider->fetch();
 
-  spotProvider = std::make_unique<LiveSpotProvider>(netManager, spotStore,
-                                                    appCfg, state.get(),
-                                                    dxcStore);
+  spotProvider = std::make_unique<LiveSpotProvider>(
+      netManager, spotStore, appCfg, state.get(), dxcStore);
   spotProvider->fetch();
 
 #ifndef __EMSCRIPTEN__
@@ -801,6 +803,9 @@ DashboardContext::DashboardContext(AppContext &ctx)
 
   ionosondeProvider = std::make_unique<IonosondeProvider>(netManager);
   ionosondeProvider->update();
+
+  asteroidProvider = std::make_unique<AsteroidProvider>(netManager);
+  asteroidProvider->update();
 
   santaProvider = std::make_unique<SantaProvider>(santaStore);
   santaProvider->update();
@@ -943,6 +948,10 @@ DashboardContext::DashboardContext(AppContext &ctx)
       widgetPool[type] = std::make_unique<CPUTempPanel>(
           0, 0, 0, 0, fontMgr, ctx.cpuMonitor, appCfg.useMetric);
       break;
+    case WidgetType::ASTEROID:
+      widgetPool[type] = std::make_unique<AsteroidPanel>(0, 0, 0, 0, fontMgr,
+                                                         *asteroidProvider);
+      break;
     default:
       widgetPool[type] = std::make_unique<PlaceholderWidget>(
           0, 0, 0, 0, fontMgr, widgetTypeDisplayName(type), cyan);
@@ -964,7 +973,8 @@ DashboardContext::DashboardContext(AppContext &ctx)
       WidgetType::ADIF,          WidgetType::COUNTDOWN,
       WidgetType::CALLBOOK,      WidgetType::DST_INDEX,
       WidgetType::WATCHLIST,     WidgetType::EME_TOOL,
-      WidgetType::SANTA_TRACKER, WidgetType::CPU_TEMP};
+      WidgetType::SANTA_TRACKER, WidgetType::CPU_TEMP,
+      WidgetType::ASTEROID};
   for (auto t : allTypes)
     addToPool(t);
 
@@ -1039,6 +1049,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
   mapArea->setAuroraStore(auroraHistoryStore);
   mapArea->setIonosondeProvider(ionosondeProvider.get());
   mapArea->setSolarDataStore(ctx.solarStore.get());
+  mapArea->setActivityStore(ctx.activityStore);
   // NOAAProvider seems to populate solar data?
   // Let's check main.cpp earlier.
 
@@ -1149,6 +1160,7 @@ void DashboardContext::update(AppContext &ctx) {
     adifProvider->fetch(ctx.cfgMgr.configDir() / "logs.adif");
     mufRtProvider->update();
     ionosondeProvider->update();
+    asteroidProvider->update();
     lastFetchMs = now;
   }
 
@@ -1358,7 +1370,7 @@ void DashboardContext::update(AppContext &ctx) {
 
   for (auto *w : widgets)
     w->update();
-  satMgr->update();
+  // satMgr->update(); // Deprecated: Auto-tracking handled by RotatorService
   ctx.brightnessMgr->update();
 }
 

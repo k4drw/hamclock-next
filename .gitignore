@@ -16,6 +16,7 @@ release/
 Thumbs.db
 .stfolder/
 .stversions/
+.stignore
 
 # Dependencies
 lib/

@@ -24,6 +24,33 @@ void LiveSpotPanel::update() {
   }
 
   auto data = store_->snapshot();
+
+  // Rebuild subtitle if grid changed or source changed
+  std::string srcTag;
+  switch (config_.liveSpotSource) {
+  case LiveSpotSource::WSPR:
+    srcTag = "WSPR";
+    break;
+  case LiveSpotSource::RBN:
+    srcTag = "RBN";
+    break;
+  default:
+    srcTag = "PSK";
+    break;
+  }
+
+  std::string grid = data->valid ? data->grid : "...";
+  std::string sub = "of " + grid + " - " + srcTag + " " +
+                    std::to_string(config_.liveSpotsMaxAge) + " mins";
+
+  if (sub != lastSubtitle_) {
+    if (subtitleTex_) {
+      MemoryMonitor::getInstance().destroyTexture(subtitleTex_);
+    }
+    lastSubtitle_ = sub;
+    // subtitleTex_ will be recreated in render()
+  }
+
   if (!data->valid)
     return;
 
@@ -42,21 +69,6 @@ void LiveSpotPanel::update() {
         MemoryMonitor::getInstance().destroyTexture(bc.countTex);
       }
       bc.lastCount = -1;
-    }
-    // Rebuild subtitle if grid changed
-    std::string srcTag;
-    switch (config_.liveSpotSource) {
-    case LiveSpotSource::WSPR: srcTag = "WSPR"; break;
-    case LiveSpotSource::RBN:  srcTag = "RBN";  break;
-    default:                   srcTag = "PSK";  break;
-    }
-    std::string sub = "of " + data->grid + " - " + srcTag + " " +
-                      std::to_string(data->windowMinutes) + " mins";
-    if (sub != lastSubtitle_) {
-      if (subtitleTex_) {
-        MemoryMonitor::getInstance().destroyTexture(subtitleTex_);
-      }
-      lastSubtitle_ = sub;
     }
   }
 }
@@ -253,12 +265,18 @@ void LiveSpotPanel::renderSetup(SDL_Renderer *renderer) {
   // Source cycle button
   std::string srcLabel;
   switch (pendingSource_) {
-  case LiveSpotSource::WSPR: srcLabel = "[WSPRnet]";      break;
-  case LiveSpotSource::RBN:  srcLabel = "[RBN]";          break;
-  default:                   srcLabel = "[PSK Reporter]"; break;
+  case LiveSpotSource::WSPR:
+    srcLabel = "[WSPRnet]";
+    break;
+  case LiveSpotSource::RBN:
+    srcLabel = "[RBN]";
+    break;
+  default:
+    srcLabel = "[PSK Reporter]";
+    break;
   }
-  t = fontMgr_.renderText(renderer, "Source: " + srcLabel, white,
-                           cellFontSize_, &tw, &th);
+  t = fontMgr_.renderText(renderer, "Source: " + srcLabel, white, cellFontSize_,
+                          &tw, &th);
   if (t) {
     SDL_Rect tr = {lx, y, tw, th};
     SDL_RenderCopy(renderer, t, nullptr, &tr);

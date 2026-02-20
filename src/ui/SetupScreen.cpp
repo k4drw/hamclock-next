@@ -24,7 +24,7 @@ void SetupScreen::recalcLayout() {
   titleSize_ = std::clamp(static_cast<int>(h * 0.050f), 16, 36);
   labelSize_ = std::clamp(static_cast<int>(h * 0.030f), 11, 20);
   fieldSize_ = std::clamp(static_cast<int>(h * 0.038f), 13, 26);
-  hintSize_  = std::clamp(static_cast<int>(h * 0.024f), 10, 15);
+  hintSize_ = std::clamp(static_cast<int>(h * 0.024f), 10, 15);
 }
 
 void SetupScreen::autoPopulateLatLon() {
@@ -339,7 +339,8 @@ void SetupScreen::render(SDL_Renderer *renderer) {
 void SetupScreen::renderTabIdentity(SDL_Renderer *renderer, int, int pad,
                                     int fieldW, int fieldH, int fieldX,
                                     int textPad) {
-  int y = (y_ + titleSize_ + 2 * pad + fieldH); // tightened: removed extra pad/2
+  int y =
+      (y_ + titleSize_ + 2 * pad + fieldH); // tightened: removed extra pad/2
   int vSpace = pad / 2;
   SDL_Color white = {255, 255, 255, 255};
   SDL_Color orange = {255, 165, 0, 255};
@@ -407,7 +408,8 @@ void SetupScreen::renderTabIdentity(SDL_Renderer *renderer, int, int pad,
 void SetupScreen::renderTabDXCluster(SDL_Renderer *renderer, int cx, int pad,
                                      int fieldW, int fieldH, int fieldX,
                                      int textPad) {
-  int y = (y_ + titleSize_ + 2 * pad + fieldH); // tightened: removed extra pad/2
+  int y =
+      (y_ + titleSize_ + 2 * pad + fieldH); // tightened: removed extra pad/2
   int vSpace = 5;
   SDL_Color white = {255, 255, 255, 255};
   SDL_Color orange = {255, 165, 0, 255};
@@ -501,7 +503,8 @@ void SetupScreen::renderTabDXCluster(SDL_Renderer *renderer, int cx, int pad,
 void SetupScreen::renderTabAppearance(SDL_Renderer *renderer, int cx, int pad,
                                       int fieldW, int fieldH, int fieldX,
                                       int textPad) {
-  int y = (y_ + titleSize_ + 2 * pad + fieldH); // tightened: removed extra pad/2
+  int y =
+      (y_ + titleSize_ + 2 * pad + fieldH); // tightened: removed extra pad/2
   int vSpace = pad / 2;
   SDL_Color white = {255, 255, 255, 255};
   SDL_Color orange = {255, 165, 0, 255};
@@ -549,9 +552,23 @@ void SetupScreen::renderTabAppearance(SDL_Renderer *renderer, int cx, int pad,
     SDL_Rect check = {fieldX + 4, y + 4, 12, 12};
     SDL_RenderFillRect(renderer, &check);
   }
-  fontMgr_.drawText(renderer, "Use Metric Units (°C, km, m/s)",
-                    fieldX + 30, y + 2, white, labelSize_);
+  fontMgr_.drawText(renderer, "Use Metric Units (°C, km, m/s)", fieldX + 30,
+                    y + 2, white, labelSize_);
   metricToggleRect_ = metricToggle;
+  y += 24 + vSpace;
+
+  rssToggleRect_ = {fieldX, y, 20, 20};
+  SDL_SetRenderDrawColor(renderer, 50, 50, 60, 255);
+  SDL_RenderFillRect(renderer, &rssToggleRect_);
+  SDL_SetRenderDrawColor(renderer, 100, 100, 120, 255);
+  SDL_RenderDrawRect(renderer, &rssToggleRect_);
+  if (rssEnabled_) {
+    SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
+    SDL_Rect check = {fieldX + 4, y + 4, 12, 12};
+    SDL_RenderFillRect(renderer, &check);
+  }
+  fontMgr_.drawText(renderer, "Enable News (RSS) Banner", fieldX + 30, y + 2,
+                    white, labelSize_);
   y += 24 + vSpace;
 
   fontMgr_.drawText(renderer, "Pane Rotation Interval (s):", fieldX, y, white,
@@ -611,14 +628,13 @@ void SetupScreen::renderTabAppearance(SDL_Renderer *renderer, int cx, int pad,
     int halfW = (fieldW - pad) / 2;
     int dimY = y;
     renderField(renderer, fontMgr_, dimTime_, "HH:MM", fieldX, dimY, halfW,
-                fieldH, fieldSize_, textPad, activeField_ == 1, true, cursorPos_,
-                orange, gray, white, white, gray);
+                fieldH, fieldSize_, textPad, activeField_ == 1, true,
+                cursorPos_, orange, gray, white, white, gray);
     dimTimeRect_ = {fieldX, dimY, halfW, fieldH};
     int brightY = y;
-    renderField(renderer, fontMgr_, brightTime_, "HH:MM",
-                fieldX + halfW + pad, brightY, halfW, fieldH, fieldSize_,
-                textPad, activeField_ == 2, true, cursorPos_, orange, gray,
-                white, white, gray);
+    renderField(renderer, fontMgr_, brightTime_, "HH:MM", fieldX + halfW + pad,
+                brightY, halfW, fieldH, fieldSize_, textPad, activeField_ == 2,
+                true, cursorPos_, orange, gray, white, white, gray);
     brightTimeRect_ = {fieldX + halfW + pad, brightY, halfW, fieldH};
   } else {
     dimTimeRect_ = {0, 0, 0, 0};
@@ -626,11 +642,11 @@ void SetupScreen::renderTabAppearance(SDL_Renderer *renderer, int cx, int pad,
   }
 }
 
-
 void SetupScreen::renderTabServices(SDL_Renderer *renderer, int, int pad,
                                     int fieldW, int fieldH, int fieldX,
                                     int textPad) {
-  int y = (y_ + titleSize_ + 2 * pad + fieldH); // tightened: removed extra pad/2
+  int y =
+      (y_ + titleSize_ + 2 * pad + fieldH); // tightened: removed extra pad/2
   int vSpace = pad / 2;
   SDL_Color white = {255, 255, 255, 255};
   SDL_Color orange = {255, 165, 0, 255};
@@ -657,7 +673,8 @@ void SetupScreen::renderTabServices(SDL_Renderer *renderer, int, int pad,
 void SetupScreen::renderTabRig(SDL_Renderer *renderer, int cx, int pad,
                                int fieldW, int fieldH, int fieldX,
                                int textPad) {
-  int y = (y_ + titleSize_ + 2 * pad + fieldH); // tightened: removed extra pad/2
+  int y =
+      (y_ + titleSize_ + 2 * pad + fieldH); // tightened: removed extra pad/2
   int vSpace = pad / 2;
   SDL_Color white = {255, 255, 255, 255};
   SDL_Color orange = {255, 165, 0, 255};
@@ -705,7 +722,8 @@ void SetupScreen::renderTabRig(SDL_Renderer *renderer, int cx, int pad,
 void SetupScreen::renderTabWidgets(SDL_Renderer *renderer, int cx, int pad,
                                    int fieldW, int fieldH, int fieldX,
                                    int textPad) {
-  int y = (y_ + titleSize_ + 2 * pad + fieldH); // tightened: removed extra pad/2
+  int y =
+      (y_ + titleSize_ + 2 * pad + fieldH); // tightened: removed extra pad/2
   SDL_Color white = {255, 255, 255, 255};
   SDL_Color gray = {140, 140, 140, 255};
 
@@ -757,7 +775,8 @@ void SetupScreen::renderTabWidgets(SDL_Renderer *renderer, int cx, int pad,
   for (size_t i = 0; i < sizeof(allTypes) / sizeof(allTypes[0]); ++i) {
     WidgetType t = allTypes[i];
     SDL_Rect r = {curX, y, 16, 16};
-    SDL_SetRenderDrawColor(renderer, 50, 50, 60, 255);
+    // Neutral dark background (prevents 'blue' look)
+    SDL_SetRenderDrawColor(renderer, 45, 45, 48, 255);
     SDL_RenderFillRect(renderer, &r);
     SDL_SetRenderDrawColor(renderer, 100, 100, 120, 255);
     SDL_RenderDrawRect(renderer, &r);
@@ -880,6 +899,11 @@ bool SetupScreen::onMouseUp(int mx, int my, Uint16) {
         my >= metricToggleRect_.y &&
         my <= metricToggleRect_.y + metricToggleRect_.h) {
       useMetric_ = !useMetric_;
+      return true;
+    }
+    if (mx >= rssToggleRect_.x && mx <= rssToggleRect_.x + rssToggleRect_.w &&
+        my >= rssToggleRect_.y && my <= rssToggleRect_.y + rssToggleRect_.h) {
+      rssEnabled_ = !rssEnabled_;
       return true;
     }
   }
@@ -1354,6 +1378,7 @@ void SetupScreen::setConfig(const AppConfig &cfg) {
   callsignColor_ = cfg.callsignColor;
   panelMode_ = cfg.panelMode;
   selectedSatellite_ = cfg.selectedSatellite;
+  rssEnabled_ = cfg.rssEnabled;
 
   qrzUsername_ = cfg.qrzUsername;
   qrzPassword_ = cfg.qrzPassword;
@@ -1407,6 +1432,7 @@ AppConfig SetupScreen::getConfig() const {
   cfg.theme = theme_;
   cfg.mapNightLights = mapNightLights_;
   cfg.useMetric = useMetric_;
+  cfg.rssEnabled = rssEnabled_;
   cfg.callsignColor = callsignColor_;
   cfg.panelMode = panelMode_;
   cfg.selectedSatellite = selectedSatellite_;

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../core/ADIFData.h"
+#include "../core/ActivityData.h"
 #include "../core/AuroraHistoryStore.h"
 #include "../core/ConfigManager.h"
 #include "../core/DXClusterData.h"
@@ -59,6 +60,10 @@ public:
     adifStore_ = std::move(store);
   }
 
+  void setActivityStore(std::shared_ptr<ActivityDataStore> store) {
+    activityStore_ = std::move(store);
+  }
+
   void setMufRtProvider(MufRtProvider *p) { mufrt_ = p; }
   void setIonosondeProvider(IonosondeProvider *p) { iono_ = p; }
   void setSolarDataStore(SolarDataStore *s) { solar_ = s; }
@@ -94,6 +99,7 @@ private:
   void renderDXClusterSpots(SDL_Renderer *renderer);
   void renderAuroraOverlay(SDL_Renderer *renderer);
   void renderADIFPins(SDL_Renderer *renderer);
+  void renderONTASpots(SDL_Renderer *renderer);
   void renderMufRtOverlay(SDL_Renderer *renderer);
 
   TextureManager &texMgr_;
@@ -104,6 +110,7 @@ private:
   std::shared_ptr<DXClusterDataStore> dxcStore_;
   std::shared_ptr<AuroraHistoryStore> auroraStore_;
   std::shared_ptr<ADIFStore> adifStore_;
+  std::shared_ptr<ActivityDataStore> activityStore_;
   MufRtProvider *mufrt_ = nullptr;
   IonosondeProvider *iono_ = nullptr;
   SolarDataStore *solar_ = nullptr;

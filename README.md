@@ -1,9 +1,9 @@
-# HamClock-Next (v0.7B)
+# HamClock-Next (v0.8B)
 
 HamClock-Next is a modern, SDL2-based reconstruction of the classic HamClock. It focuses on visual fidelity, high-DPI support, and a smooth user experience while maintaining the essential functionality loved by amateur radio operators.
 
 > [!WARNING]
-> **BETA RELEASE NOTICE**: This is a Beta release (**v0.7B**). While functional, it is still under active development and contains known bugs. Breaking changes and refinements are ongoing. Please report issues on GitHub.
+> **BETA RELEASE NOTICE**: This is a Beta release (**v0.8B**). While functional, it is still under active development and contains known bugs. Breaking changes and refinements are ongoing. Please report issues on GitHub.
 
 ## Key Accomplishments
 
@@ -93,6 +93,10 @@ mkdir build
 cd build
 cmake ..
 cmake --build . -j1
+
+# For automated universal builds (recommended for releases):
+./scripts/build-linux-arm64-universal.sh   # Builds ARM64 DEBs (Unified + FB0)
+./scripts/build-linux-armhf-universal.sh   # Builds ARMhf DEBs (Unified + FB0)
 ```
 
 **Build times:**
@@ -151,6 +155,13 @@ cmake -DCMAKE_C_COMPILER_LAUNCHER=ccache \
 cmake --build . -j1
 ```
 With ccache, incremental builds take only **30-60 seconds**!
+
+### Universal Linux Packages (Debian/Ubuntu/PiOS)
+
+We provide high-compatibility **Universal Binaries** built against a Debian Bullseye baseline (glibc 2.31). These are distributed in two distinct `.deb` variants:
+
+1. **`unified`**: The standard desktop package. Includes dependencies for X11, Wayland, and KMSDRM. Recommended for most users.
+2. **`fb0`**: A lean "kiosk" package. Only includes dependencies for direct framebuffer (KMSDRM) rendering. Ideal for headless Raspberry Pi Lite installs.
 
 For detailed technical references and remote control info, see:
 - **[API.md](API.md)** - Remote control and debugging API reference
