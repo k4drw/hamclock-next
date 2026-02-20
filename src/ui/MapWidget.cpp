@@ -1,8 +1,20 @@
+#ifdef _WIN32
+#ifndef _USE_MATH_DEFINES
+#define _USE_MATH_DEFINES
+#endif
+#endif
 #include "MapWidget.h"
+#include "PaneContainer.h"
 #include "../core/Astronomy.h"
+#include "../core/Constants.h"
 #include "../core/LiveSpotData.h"
 #include "../core/Logger.h"
 #include "../core/PropEngine.h"
+#include "../core/WorkerService.h"
+#include "../services/BeaconProvider.h"
+#include "../core/BeaconData.h"
+#include "../services/CloudProvider.h"
+#include "../services/WxMbProvider.h"
 #include "../services/IonosondeProvider.h"
 #include "../services/MufRtProvider.h"
 #include "EmbeddedIcons.h"
@@ -13,6 +25,9 @@
 
 #include <SDL_video.h>
 #include <chrono>
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
 #include <cmath>
 #include <cstring>
 #include <vector>
@@ -101,6 +116,9 @@ MapWidget::MapWidget(int x, int y, int w, int h, TextureManager &texMgr,
           "KMSDRM detected, enabling night overlay compatibility path.");
   }
 
+  // Initialize WxMbProvider
+  wxmb_ = std::make_unique<WxMbProvider>(netMgr_);
+
   // Initialize MapViewMenu
   mapViewMenu_ = std::make_unique<MapViewMenu>(fontMgr);
   mapViewMenu_->setTheme(config.theme);
@@ -109,11 +127,11 @@ MapWidget::MapWidget(int x, int y, int w, int h, TextureManager &texMgr,
   recalcMapRect();
 }
 
-MapWidget::~MapWidget() {
-  MemoryMonitor::getInstance().destroyTexture(nightOverlayTexture_);
-  MemoryMonitor::getInstance().destroyTexture(tooltip_.cachedTexture);
-}
-
+  MapWidget::~MapWidget() {
+    MemoryMonitor::getInstance().destroyTexture(nightOverlayTexture_);
+    MemoryMonitor::getInstance().destroyTexture(propTexture_);
+    MemoryMonitor::getInstance().destroyTexture(tooltip_.cachedTexture);
+  }
 void MapWidget::recalcMapRect() {
   int mapW = width_;
   int mapH = mapW / 2;
@@ -198,52 +216,96 @@ void MapWidget::update() {
     mapViewMenu_->update();
   }
 
-  uint32_t nowMs = SDL_GetTicks();
-  if (nowMs - lastPosUpdateMs_ < 1000) // 1 second is plenty
-    return;
-  lastPosUpdateMs_ = nowMs;
+      uint32_t nowMs = SDL_GetTicks();
+  
+      // General 1-second updates
+      if (nowMs - lastPosUpdateMs_ > 1000) {
+        auto now = std::chrono::system_clock::now();
+        auto sun = Astronomy::sunPosition(now);
+        sunLat_ = sun.lat;
+        sunLon_ = sun.lon;
+        lastPosUpdateMs_ = nowMs;
+      }
+  // Satellite ground track update (every 5 seconds)
+  if (predictor_ && predictor_->isReady() && config_.showSatTrack) {
+    if (nowMs - lastSatTrackUpdateMs_ > 5000) {
+      lastSatTrackUpdateMs_ = nowMs;
 
-  auto now = std::chrono::system_clock::now();
-  auto sun = Astronomy::sunPosition(now);
-  sunLat_ = sun.lat;
-  sunLon_ = sun.lon;
+      // Offload the expensive calculation to a worker thread.
+      WorkerService::getInstance().submitTask([this] {
+        auto *track_ptr = new std::vector<GroundTrackPoint>();
+        *track_ptr =
+            predictor_->groundTrack(std::chrono::system_clock::to_time_t(
+                                        std::chrono::system_clock::now()),
+                                    90, 30);
 
-  // Cache Great Circle
+        SDL_Event event;
+        SDL_zero(event);
+        event.type =
+            HamClock::AE_BASE_EVENT + HamClock::AE_SATELLITE_TRACK_READY;
+        event.user.data1 = track_ptr;
+        SDL_PushEvent(&event);
+      });
+    }
+  } else if (!cachedSatTrack_.empty()) {
+    cachedSatTrack_.clear();
+    satTrackDirty_ = true;
+  }
 
+  // Great Circle update (on change)
   if (state_->dxActive) {
     if (state_->deLocation.lat != lastDE_.lat ||
         state_->deLocation.lon != lastDE_.lon ||
         state_->dxLocation.lat != lastDX_.lat ||
         state_->dxLocation.lon != lastDX_.lon) {
-      // Low-memory mode: reduce path segments on KMSDRM
       int segments = useCompatibilityRenderPath_ ? 100 : 250;
       cachedGreatCircle_ = Astronomy::calculateGreatCirclePath(
           state_->deLocation, state_->dxLocation, segments);
       lastDE_ = state_->deLocation;
       lastDX_ = state_->dxLocation;
+      greatCircleDirty_ = true;
     }
-  } else {
-    cachedGreatCircle_.clear();
-  }
+      } else if (!cachedGreatCircle_.empty()) {
+        cachedGreatCircle_.clear();
+        greatCircleDirty_ = true;
+      }
+  
+          // Propagation Overlay updates (every 15 mins or on change)
+          if (config_.propOverlay != PropOverlayType::None &&
+              config_.propOverlay != PropOverlayType::Muf) {
+            bool changed = (lastPropType_ != config_.propOverlay) ||
+                           (lastBand_ != config_.propBand) ||
+                           (lastMode_ != config_.propMode) ||
+                           (lastPower_ != config_.propPower);
+      
+            if (changed || (nowMs - lastPropUpdateMs_ > 900000)) {
+              updatePropagationOverlay();
+              lastPropUpdateMs_ = nowMs;
+              lastPropType_ = config_.propOverlay;
+              lastBand_ = config_.propBand;
+              lastMode_ = config_.propMode;
+              lastPower_ = config_.propPower;
+            }
+          }
+      
+          // WX pressure overlay (check every 10 minutes)
+          if (config_.weatherOverlay == WeatherOverlayType::WxMb) {
+            uint64_t nowMs64 = static_cast<uint64_t>(SDL_GetTicks());
+            if (nowMs64 - wxLastCheckMs_ > 600000ULL || wxLastCheckMs_ == 0) {
+              wxLastCheckMs_ = nowMs64;
+              wxmb_->update();
+            }
+          }
 
-  // Check if month changed
-  std::time_t t = std::chrono::system_clock::to_time_t(now);
-  std::tm *tm = std::localtime(&t);
+          // Monthly map texture update
+          auto now_for_month = std::chrono::system_clock::now();
+          std::time_t t = std::chrono::system_clock::to_time_t(now_for_month);
+          std::tm *tm = std::localtime(&t);
   int month = tm->tm_mon + 1; // 1-12
 
   if (month != currentMonth_) {
     currentMonth_ = month;
 
-    // All three NASA Blue Marble variants are only published at 3x5400x2700.
-    // There are no smaller pre-made versions on that CDN.
-    // TextureManager::loadFromMemory() downscales automatically when the
-    // decoded image exceeds the GPU texture size limit (2048x2048 on WASM).
-    //
-    // mapStyle values and their CDN paths:
-    //   "nasa"       → bmng-base            world.2004MM.3x5400x2700.jpg
-    //   "topo"       → bmng-topography       world.topo.200401.3x5400x2700.jpg
-    //   "topo_bathy" → bmng-topography-bathymetry
-    //                  world.topo.bathy.200401.3x5400x2700.jpg
     char url[256];
     const std::string &style = config_.mapStyle;
     if (style == "topo_bathy") {
@@ -261,7 +323,6 @@ void MapWidget::update() {
           "world.topo.2004%02d.3x5400x2700.jpg",
           kMonthNames[month - 1], month);
     } else {
-      // Default: "nasa" — plain Blue Marble base imagery
       if (style != "nasa") {
         LOG_W("MapWidget", "Unknown map style '{}', falling back to 'nasa'",
               style);
@@ -288,9 +349,6 @@ void MapWidget::update() {
         },
         86400 * 30); // Cache for a month
 
-    // Also fetch night lights map (NASA Black Marble 2012)
-    // We use a smaller version of this too if available, but for now just add
-    // logging
     const char *nightUrl = "https://eoimages.gsfc.nasa.gov/images/imagerecords/"
                            "79000/79765/dnb_land_ocean_ice.2012.3600x1800.jpg";
     LOG_I("MapWidget", "Starting async fetch for Night Lights");
@@ -309,36 +367,15 @@ void MapWidget::update() {
         86400 * 365); // Cache for a year
   }
 
-  if (config_.propOverlay != PropOverlayType::None) {
-    bool needUpdate = false;
-
-    // Check native provider
-    if (iono_ && iono_->hasData()) {
-      uint32_t lastUp = iono_->getLastUpdateMs();
-      if (lastUp != lastMufUpdateMs_) {
-        needUpdate = true;
-      }
-    }
-    // Fallback to MufRt (only if type is Muf and no native data?)
-    // Actually simplicity first: if native available, use it.
-    else if (mufrt_ && mufrt_->hasData()) {
-      uint32_t lastUp = mufrt_->getLastUpdateMs();
-      if (lastUp != lastMufUpdateMs_) {
-        std::lock_guard<std::mutex> lock(mapDataMutex_);
-        pendingMufData_ = mufrt_->getData();
-        lastMufUpdateMs_ = lastUp;
-      }
-    }
-
-    if (needUpdate && iono_ && solar_) {
-      uint32_t now = SDL_GetTicks();
-      if (now - lastMufUpdateMs_ > 5000) { // Throttle generation
-        lastMufUpdateMs_ = now;
-      }
-    }
-  }
-}
-
+      if (config_.propOverlay != PropOverlayType::None) {
+        if (iono_ && iono_->hasData()) {
+          uint32_t lastUp = iono_->getLastUpdateMs();
+          if (lastUp != lastMufUpdateMs_) {
+            updatePropagationOverlay();
+            lastMufUpdateMs_ = lastUp;
+          }
+        }
+      }}
 bool MapWidget::onMouseUp(int mx, int my, Uint16 mod) {
   // Pass through to menu if visible
   if (mapViewMenu_->isVisible()) {
@@ -346,8 +383,8 @@ bool MapWidget::onMouseUp(int mx, int my, Uint16 mod) {
   }
 
   // Check RSS toggle button (lower-left corner)
-  if (mx >= rssRect_.x && mx < rssRect_.x + rssRect_.w &&
-      my >= rssRect_.y && my < rssRect_.y + rssRect_.h) {
+  if (mx >= rssRect_.x && mx < rssRect_.x + rssRect_.w && my >= rssRect_.y &&
+      my < rssRect_.y + rssRect_.h) {
     config_.rssEnabled = !config_.rssEnabled;
     if (onConfigChanged_)
       onConfigChanged_();
@@ -365,9 +402,13 @@ bool MapWidget::onMouseUp(int mx, int my, Uint16 mod) {
             config_.showGrid ? "ON" : "OFF", config_.gridType);
       if (onConfigChanged_)
         onConfigChanged_();
-      // Force map reload if style changed
+      // Force map and geometry reload
       mapLoaded_ = false;
       currentMonth_ = 0; // Trigger month update
+      greatCircleDirty_ = true;
+      satTrackDirty_ = true;
+      gridDirty_ = true;
+      mapVerts_.clear();
     });
     return true;
   }
@@ -525,46 +566,81 @@ void MapWidget::renderMarker(SDL_Renderer *renderer, double lat, double lon,
 }
 
 void MapWidget::renderGreatCircle(SDL_Renderer *renderer) {
-  if (!state_->dxActive || cachedGreatCircle_.empty())
+  if (cachedGreatCircle_.empty())
     return;
 
-  auto &path = cachedGreatCircle_;
-
-  SDL_Color color = {255, 255, 0, 255}; // Yellow
   SDL_Texture *lineTex = texMgr_.get(LINE_AA_KEY);
+  if (!lineTex)
+    return;
 
-  std::vector<SDL_FPoint> segment;
-  float thickness = 1.2f;
+  if (greatCircleDirty_) {
+    greatCircleVerts_.clear();
+    greatCircleIndices_.clear();
 
-  for (size_t i = 0; i < path.size(); ++i) {
-    if (i > 0) {
-      double lon0 = path[i - 1].lon;
-      double lon1 = path[i].lon;
-      if (std::fabs(lon0 - lon1) > 180.0) {
-        // Wrap-around detected: interpolate to edge
-        double lon1_adj = (lon1 < 0) ? lon1 + 360.0 : lon1 - 360.0;
-        double borderLon = (lon1 < 0) ? 180.0 : -180.0;
-        double f = (borderLon - lon0) / (lon1_adj - lon0);
-        double borderLat =
-            path[i - 1].lat + f * (path[i].lat - path[i - 1].lat);
+    const auto &path = cachedGreatCircle_;
+    float thickness = 1.2f;
+    float r = thickness / 2.0f;
+    SDL_Color color = {255, 255, 0, 255}; // Yellow
 
-        // Finish current segment at edge
-        segment.push_back(latLonToScreen(borderLat, borderLon));
-        RenderUtils::drawPolylineTextured(renderer, lineTex, segment.data(),
-                                          static_cast<int>(segment.size()),
-                                          thickness, color);
-        segment.clear();
+    std::vector<SDL_FPoint> segment;
+    auto add_segment_geom = [&](const std::vector<SDL_FPoint> &seg) {
+      for (size_t i = 1; i < seg.size(); i++) {
+        SDL_FPoint p1 = seg[i - 1];
+        SDL_FPoint p2 = seg[i];
+        float dx = p2.x - p1.x;
+        float dy = p2.y - p1.y;
+        float len = std::sqrt(dx * dx + dy * dy);
+        if (len < 0.1f)
+          continue;
 
-        // Start next segment at other edge
-        segment.push_back(latLonToScreen(borderLat, -borderLon));
+        float nx = -dy / len * r;
+        float ny = dx / len * r;
+
+        int base = static_cast<int>(greatCircleVerts_.size());
+        greatCircleVerts_.push_back({{p1.x + nx, p1.y + ny}, color, {0, 0}});
+        greatCircleVerts_.push_back({{p1.x - nx, p1.y - ny}, color, {0, 1}});
+        greatCircleVerts_.push_back({{p2.x + nx, p2.y + ny}, color, {1, 0}});
+        greatCircleVerts_.push_back({{p2.x - nx, p2.y - ny}, color, {1, 1}});
+
+        greatCircleIndices_.push_back(base + 0);
+        greatCircleIndices_.push_back(base + 1);
+        greatCircleIndices_.push_back(base + 2);
+        greatCircleIndices_.push_back(base + 1);
+        greatCircleIndices_.push_back(base + 2);
+        greatCircleIndices_.push_back(base + 3);
       }
+    };
+
+    for (size_t i = 0; i < path.size(); ++i) {
+      if (i > 0) {
+        double lon0 = path[i - 1].lon;
+        double lon1 = path[i].lon;
+        if (std::fabs(lon0 - lon1) > 180.0) {
+          double lon1_adj = (lon1 < 0) ? lon1 + 360.0 : lon1 - 360.0;
+          double borderLon = (lon1 < 0) ? 180.0 : -180.0;
+          double f = (borderLon - lon0) / (lon1_adj - lon0);
+          double borderLat =
+              path[i - 1].lat + f * (path[i].lat - path[i - 1].lat);
+
+          segment.push_back(latLonToScreen(borderLat, borderLon));
+          add_segment_geom(segment);
+          segment.clear();
+          segment.push_back(latLonToScreen(borderLat, -borderLon));
+        }
+      }
+      segment.push_back(latLonToScreen(path[i].lat, path[i].lon));
     }
-    segment.push_back(latLonToScreen(path[i].lat, path[i].lon));
+    if (segment.size() >= 2) {
+      add_segment_geom(segment);
+    }
+    greatCircleDirty_ = false;
   }
-  if (segment.size() >= 2) {
-    RenderUtils::drawPolylineTextured(renderer, lineTex, segment.data(),
-                                      static_cast<int>(segment.size()),
-                                      thickness, color);
+
+  if (!greatCircleVerts_.empty()) {
+    SDL_RenderGeometry(renderer, lineTex, greatCircleVerts_.data(),
+                       (int)greatCircleVerts_.size(),
+                       greatCircleIndices_.data(),
+                       (int)greatCircleIndices_.size());
   }
 }
 
@@ -794,6 +870,7 @@ void MapWidget::render(SDL_Renderer *renderer) {
   // Check for any newly downloaded map data from background thread
   {
     std::lock_guard<std::mutex> lock(mapDataMutex_);
+
     if (!pendingMapData_.empty()) {
       SDL_Texture *mapTex =
           texMgr_.loadFromMemory(renderer, MAP_KEY, pendingMapData_);
@@ -817,16 +894,15 @@ void MapWidget::render(SDL_Renderer *renderer) {
       // Clear pending data even on failure to prevent retry loops
       pendingNightMapData_.clear();
     }
-    if (!pendingMufData_.empty()) {
-      SDL_Texture *tex =
-          texMgr_.loadFromMemory(renderer, "muf_rt_overlay", pendingMufData_);
-      if (!tex) {
-        LOG_E("MapWidget", "Failed to create MUF texture: {}", SDL_GetError());
-      }
-      pendingMufData_.clear();
-    }
-  }
-
+          if (!pendingMufData_.empty()) {
+            SDL_Texture *tex =
+                texMgr_.loadFromMemory(renderer, "muf_rt_overlay", pendingMufData_);
+            if (!tex) {
+              LOG_E("MapWidget", "Failed to create MUF texture: {}", SDL_GetError());
+            }
+            pendingMufData_.clear();
+          }
+        }
   if (!mapLoaded_) {
     SDL_Texture *tex = texMgr_.get(MAP_KEY);
     if (!tex) {
@@ -902,9 +978,11 @@ void MapWidget::render(SDL_Renderer *renderer) {
     }
   }
 
-  renderMufRtOverlay(renderer);
-  renderNightOverlay(renderer);
-  renderGridOverlay(renderer);
+          renderPropagationOverlay(renderer);
+          renderMufRtOverlay(renderer);
+          renderWxMbOverlay(renderer);
+          renderNightOverlay(renderer);
+          renderGridOverlay(renderer);
   renderGreatCircle(renderer);
 
   renderMarker(renderer, state_->deLocation.lat, state_->deLocation.lon, 255,
@@ -918,10 +996,11 @@ void MapWidget::render(SDL_Renderer *renderer) {
   renderSatellite(renderer);
   renderSpotOverlay(renderer);
   renderDXClusterSpots(renderer);
-  renderADIFPins(renderer);
-
-  renderMarker(renderer, sunLat_, sunLon_, 255, 255, 0, MarkerShape::Circle,
-               true);
+      renderADIFPins(renderer);
+      renderONTASpots(renderer);
+      renderBeacons(renderer);
+  
+      renderMarker(renderer, sunLat_, sunLon_, 255, 255, 0, MarkerShape::Circle,               true);
 
   renderProjectionSelect(renderer);
   renderRssButton(renderer);
@@ -940,17 +1019,18 @@ void MapWidget::renderSatellite(SDL_Renderer *renderer) {
   if (!predictor_ || !predictor_->isReady())
     return;
   SubSatPoint ssp = predictor_->subSatPoint();
-  renderSatFootprint(renderer, ssp.lat, ssp.lon, ssp.footprint);
-  if (config_.showSatTrack)
+  if (config_.showSatTrack) {
+    renderSatFootprint(renderer, ssp.lat, ssp.lon, ssp.footprint);
     renderSatGroundTrack(renderer);
 
-  SDL_FPoint pt = latLonToScreen(ssp.lat, ssp.lon);
-  int iconSz = std::max(16, std::min(mapRect_.w, mapRect_.h) / 25);
-  SDL_Texture *satTex = texMgr_.get(SAT_ICON_KEY);
-  if (satTex) {
-    SDL_FRect dst = {pt.x - iconSz / 2.0f, pt.y - iconSz / 2.0f,
-                     static_cast<float>(iconSz), static_cast<float>(iconSz)};
-    SDL_RenderCopyF(renderer, satTex, nullptr, &dst);
+    SDL_FPoint pt = latLonToScreen(ssp.lat, ssp.lon);
+    int iconSz = std::max(16, std::min(mapRect_.w, mapRect_.h) / 25);
+    SDL_Texture *satTex = texMgr_.get(SAT_ICON_KEY);
+    if (satTex) {
+      SDL_FRect dst = {pt.x - iconSz / 2.0f, pt.y - iconSz / 2.0f,
+                       static_cast<float>(iconSz), static_cast<float>(iconSz)};
+      SDL_RenderCopyF(renderer, satTex, nullptr, &dst);
+    }
   }
 }
 
@@ -1023,51 +1103,105 @@ void MapWidget::renderSatFootprint(SDL_Renderer *renderer, double lat,
 }
 
 void MapWidget::renderSatGroundTrack(SDL_Renderer *renderer) {
-  if (!predictor_)
+  if (cachedSatTrack_.size() < 2)
     return;
-  std::time_t now = std::time(nullptr);
-  auto track = predictor_->groundTrack(now, 90, 30);
-  if (track.size() < 2)
-    return;
+
   SDL_RenderSetClipRect(renderer, &mapRect_);
   SDL_Texture *lineTex = texMgr_.get(LINE_AA_KEY);
-  float thickness = 1.5f;
+  if (!lineTex)
+    return;
 
-  std::vector<SDL_FPoint> segment;
-  for (size_t i = 0; i < track.size(); ++i) {
-    if (i > 0) {
-      double lon0 = track[i - 1].lon;
-      double lon1 = track[i].lon;
-      if (std::fabs(lon0 - lon1) > 180.0) {
-        double lon1_adj = (lon1 < 0) ? lon1 + 360.0 : lon1 - 360.0;
-        double borderLon = (lon1 < 0) ? 180.0 : -180.0;
-        double f = (borderLon - lon0) / (lon1_adj - lon0);
-        double borderLat =
-            track[i - 1].lat + f * (track[i].lat - track[i - 1].lat);
+  if (satTrackDirty_) {
+    satTrackVerts_.clear();
+    satTrackIndices_.clear();
 
-        segment.push_back(latLonToScreen(borderLat, borderLon));
-        if (segment.size() >= 2) {
-          RenderUtils::drawPolylineTextured(renderer, lineTex, segment.data(),
-                                            static_cast<int>(segment.size()),
-                                            thickness, {255, 200, 0, 150});
-        }
-        segment.clear();
-        segment.push_back(latLonToScreen(borderLat, -borderLon));
+    float thickness = 1.5f;
+    float r = thickness / 2.0f;
+    SDL_Color color = {255, 200, 0, 150};
+
+    std::vector<SDL_FPoint> segment;
+    auto add_segment_geom = [&](const std::vector<SDL_FPoint> &seg) {
+      for (size_t i = 1; i < seg.size(); i++) {
+        SDL_FPoint p1 = seg[i - 1];
+        SDL_FPoint p2 = seg[i];
+        float dx = p2.x - p1.x;
+        float dy = p2.y - p1.y;
+        float len = std::sqrt(dx * dx + dy * dy);
+        if (len < 0.1f)
+          continue;
+
+        float nx = -dy / len * r;
+        float ny = dx / len * r;
+
+        int base = static_cast<int>(satTrackVerts_.size());
+        satTrackVerts_.push_back({{p1.x + nx, p1.y + ny}, color, {0, 0}});
+        satTrackVerts_.push_back({{p1.x - nx, p1.y - ny}, color, {0, 1}});
+        satTrackVerts_.push_back({{p2.x + nx, p2.y + ny}, color, {1, 0}});
+        satTrackVerts_.push_back({{p2.x - nx, p2.y - ny}, color, {1, 1}});
+
+        satTrackIndices_.push_back(base + 0);
+        satTrackIndices_.push_back(base + 1);
+        satTrackIndices_.push_back(base + 2);
+        satTrackIndices_.push_back(base + 1);
+        satTrackIndices_.push_back(base + 2);
+        satTrackIndices_.push_back(base + 3);
       }
+    };
+
+    for (size_t i = 0; i < cachedSatTrack_.size(); ++i) {
+      if (i > 0) {
+        double lon0 = cachedSatTrack_[i - 1].lon;
+        double lon1 = cachedSatTrack_[i].lon;
+        if (std::fabs(lon0 - lon1) > 180.0) {
+          double lon1_adj = (lon1 < 0) ? lon1 + 360.0 : lon1 - 360.0;
+          double borderLon = (lon1 < 0) ? 180.0 : -180.0;
+          double f = (borderLon - lon0) / (lon1_adj - lon0);
+          double borderLat =
+              cachedSatTrack_[i - 1].lat +
+              f * (cachedSatTrack_[i].lat - cachedSatTrack_[i - 1].lat);
+
+          segment.push_back(latLonToScreen(borderLat, borderLon));
+          add_segment_geom(segment);
+          segment.clear();
+          segment.push_back(latLonToScreen(borderLat, -borderLon));
+        }
+      }
+      segment.push_back(
+          latLonToScreen(cachedSatTrack_[i].lat, cachedSatTrack_[i].lon));
     }
-    segment.push_back(latLonToScreen(track[i].lat, track[i].lon));
+    if (segment.size() >= 2) {
+      add_segment_geom(segment);
+    }
+    satTrackDirty_ = false;
   }
-  if (segment.size() >= 2) {
-    RenderUtils::drawPolylineTextured(renderer, lineTex, segment.data(),
-                                      static_cast<int>(segment.size()),
-                                      thickness, {255, 200, 0, 150});
+
+  if (!satTrackVerts_.empty()) {
+    SDL_RenderGeometry(renderer, lineTex, satTrackVerts_.data(),
+                       (int)satTrackVerts_.size(), satTrackIndices_.data(),
+                       (int)satTrackIndices_.size());
   }
+
   SDL_RenderSetClipRect(renderer, nullptr);
 }
 
 void MapWidget::renderSpotOverlay(SDL_Renderer *renderer) {
   if (!spotStore_)
     return;
+
+  // Only show if Live Spots widget is enabled in any pane's rotation
+  bool widgetEnabled = false;
+  for (auto *pane : panes_) {
+    if (pane) {
+      const auto &rotation = pane->getRotation();
+      if (std::find(rotation.begin(), rotation.end(), WidgetType::LIVE_SPOTS) != rotation.end()) {
+        widgetEnabled = true;
+        break;
+      }
+    }
+  }
+  if (!widgetEnabled)
+    return;
+
   auto data = spotStore_->snapshot();
   if (!data->valid || data->spots.empty())
     return;
@@ -1321,79 +1455,336 @@ void MapWidget::renderADIFPins(SDL_Renderer *renderer) {
   SDL_RenderSetClipRect(renderer, nullptr);
 }
 
+void MapWidget::renderONTASpots(SDL_Renderer *renderer) {
+  if (!activityStore_)
+    return;
+
+  ActivityData data = activityStore_->get();
+  if (!data.hasSelection)
+    return;
+
+  const auto &spot = data.selectedSpot;
+  if (spot.lat == 0.0 && spot.lon == 0.0)
+    return;
+
+  SDL_RenderSetClipRect(renderer, &mapRect_);
+  SDL_Texture *lineTex = texMgr_.get(LINE_AA_KEY);
+
+  // Lime Green for POTA, Cyan for SOTA
+  SDL_Color color = (spot.program == "POTA") ? SDL_Color{50, 255, 50, 255}
+                                             : SDL_Color{0, 200, 255, 255};
+
+  LatLon de = state_->deLocation;
+  auto path = Astronomy::calculateGreatCirclePath(de, {spot.lat, spot.lon}, 100);
+
+  std::vector<SDL_FPoint> segment;
+  SDL_Color lineColor = {color.r, color.g, color.b, 100};
+
+  for (size_t i = 0; i < path.size(); ++i) {
+    if (i > 0) {
+      double lon0 = path[i - 1].lon;
+      double lon1 = path[i].lon;
+      if (std::fabs(lon0 - lon1) > 180.0) {
+        double lon1_adj = (lon1 < 0) ? lon1 + 360.0 : lon1 - 360.0;
+        double borderLon = (lon1 < 0) ? 180.0 : -180.0;
+        double f = (borderLon - lon0) / (lon1_adj - lon0);
+        double borderLat = path[i - 1].lat + f * (path[i].lat - path[i - 1].lat);
+
+        segment.push_back(latLonToScreen(borderLat, borderLon));
+        if (segment.size() >= 2) {
+          RenderUtils::drawPolylineTextured(renderer, lineTex, segment.data(),
+                                            static_cast<int>(segment.size()),
+                                            1.0f, lineColor);
+        }
+        segment.clear();
+        segment.push_back(latLonToScreen(borderLat, -borderLon));
+      }
+    }
+    segment.push_back(latLonToScreen(path[i].lat, path[i].lon));
+  }
+  if (segment.size() >= 2) {
+    RenderUtils::drawPolylineTextured(renderer, lineTex, segment.data(),
+                                      static_cast<int>(segment.size()), 1.0f,
+                                      lineColor);
+  }
+
+  // Use Square markers for ONTA to differentiate from DX Cluster (Circle)
+  renderMarker(renderer, spot.lat, spot.lon, color.r, color.g, color.b,
+               MarkerShape::Square, true);
+
+  SDL_RenderSetClipRect(renderer, nullptr);
+}
+
+void MapWidget::renderBeacons(SDL_Renderer *renderer) {
+  if (!config_.showBeacons || !beacons_)
+    return;
+
+  // Only show if NCDXF widget is enabled in any pane's rotation
+  bool widgetEnabled = false;
+  for (auto *pane : panes_) {
+    if (pane) {
+      const auto &rotation = pane->getRotation();
+      if (std::find(rotation.begin(), rotation.end(), WidgetType::NCDXF) != rotation.end()) {
+        widgetEnabled = true;
+        break;
+      }
+    }
+  }
+  if (!widgetEnabled)
+    return;
+
+  auto active = beacons_->getActiveBeacons();
+
+  SDL_RenderSetClipRect(renderer, &mapRect_);
+
+  for (size_t i = 0; i < NCDXF_BEACONS.size(); ++i) {
+    const auto &b = NCDXF_BEACONS[i];
+
+    // Check if this beacon is in the active list
+    bool isTransmitting = false;
+    for (const auto &ab : active) {
+      if (ab.index == (int)i) {
+        isTransmitting = true;
+        break;
+      }
+    }
+
+    if (isTransmitting) {
+      // Bright Yellow for transmitting
+      renderMarker(renderer, b.lat, b.lon, 255, 255, 0, MarkerShape::Circle,
+                   true);
+    } else {
+      // Dim Gray for idle
+      renderMarker(renderer, b.lat, b.lon, 100, 100, 100, MarkerShape::Circle,
+                   true);
+    }
+  }
+
+  SDL_RenderSetClipRect(renderer, nullptr);
+}
+
 void MapWidget::renderMufRtOverlay(SDL_Renderer *renderer) {
+  if (config_.propOverlay != PropOverlayType::Muf)
+    return;
+
+  // MUF is now handled by renderPropagationOverlay using internal grid
+}
+
+void MapWidget::renderPropagationOverlay(SDL_Renderer *renderer) {
   if (config_.propOverlay == PropOverlayType::None)
     return;
 
-  // Prefer Native Engine
-  if (iono_ && solar_) {
-    static uint32_t lastGen = 0;
-    static SDL_Texture *nativeTex = nullptr;
-    static PropOverlayType lastType = PropOverlayType::None;
-    static std::string lastBand = "";
-    static std::string lastMode = "";
-    static int lastPower = -1;
+  if (!propTexture_)
+    return;
 
-    uint32_t now = SDL_GetTicks();
-    bool typeChanged = (lastType != config_.propOverlay);
-    bool bandChanged = (lastBand != config_.propBand);
-    bool modeChanged = (lastMode != config_.propMode);
-    bool powerChanged = (lastPower != config_.propPower);
+  SDL_SetTextureAlphaMod(propTexture_, (Uint8)(config_.mufRtOpacity * 2.55f));
+  SDL_SetTextureBlendMode(propTexture_, SDL_BLENDMODE_BLEND);
 
-    // Update if texture missing, time elapsed, or params changed
-    if (!nativeTex || (now - lastGen > 300000) || typeChanged || bandChanged ||
-        modeChanged || powerChanged) {
-      PropPathParams params;
-      params.txLat = state_->deLocation.lat;
-      params.txLon = state_->deLocation.lon;
-      params.mode = config_.propMode;
-      params.watts = (double)config_.propPower;
+  SDL_RenderSetClipRect(renderer, &mapRect_);
 
-      // Determine frequency from band
-      std::string band = config_.propBand;
-      if (band == "80m")
-        params.mhz = 3.5;
-      else if (band == "60m")
-        params.mhz = 5.3;
-      else if (band == "40m")
-        params.mhz = 7.0;
-      else if (band == "30m")
-        params.mhz = 10.1;
-      else if (band == "20m")
-        params.mhz = 14.1;
-      else if (band == "15m")
-        params.mhz = 21.1;
-      else if (band == "10m")
-        params.mhz = 28.2;
-      else
-        params.mhz = 14.1; // Default
+  // Geometry buffer management
+  const int gridW = useCompatibilityRenderPath_ ? 48 : 96;
+  const int gridH = useCompatibilityRenderPath_ ? 24 : 48;
 
-      params.watts = 100;
-      params.mode = "SSB";
+  if (propVerts_.size() != (size_t)((gridW + 1) * (gridH + 1))) {
+    propVerts_.resize((gridW + 1) * (gridH + 1));
+    propIndices_.clear();
+    propIndices_.reserve(gridW * gridH * 6);
+    for (int j = 0; j < gridH; ++j) {
+      for (int i = 0; i < gridW; ++i) {
+        int p0 = j * (gridW + 1) + i;
+        int p1 = p0 + 1;
+        int p2 = (j + 1) * (gridW + 1) + i;
+        int p3 = p2 + 1;
+        propIndices_.push_back(p0);
+        propIndices_.push_back(p1);
+        propIndices_.push_back(p2);
+        propIndices_.push_back(p2);
+        propIndices_.push_back(p1);
+        propIndices_.push_back(p3);
+      }
+    }
+  }
 
-      SolarData sw = solar_->get();
+  // Update warped vertices if projection or sun changed (we reuse projection math from night)
+  // But unlike night, propagation isn't tied to sun, so just projection.
+  static std::string lastPropProj = "";
+  if (lastPropProj != config_.projection) {
+    for (int j = 0; j <= gridH; ++j) {
+      for (int i = 0; i <= gridW; ++i) {
+        int idx = j * (gridW + 1) + i;
+        double lat = 90.0 - (double)j * 180.0 / gridH;
+        double lon = (double)i * 360.0 / gridW - 180.0;
 
-      // Output Type: 0=MUF, 1=Rel
-      int outType = (config_.propOverlay == PropOverlayType::Voacap) ? 1 : 0;
+        SDL_FPoint pt = latLonToScreen(lat, lon);
+        float u = (float)i / gridW;
+        float v = (float)j / gridH;
 
-      // Generate 660x330 grid
-      std::vector<float> grid =
-          PropEngine::generateGrid(params, sw, iono_, outType);
+        // Hide vertices outside map area (for Azimuthal mostly)
+        if (pt.x < mapRect_.x || pt.x > mapRect_.x + mapRect_.w ||
+            pt.y < mapRect_.y || pt.y > mapRect_.y + mapRect_.h) {
+          propVerts_[idx] = {{pt.x, pt.y}, {0, 0, 0, 0}, {u, v}};
+        } else {
+          propVerts_[idx] = {{pt.x, pt.y}, {255, 255, 255, 255}, {u, v}};
+        }
+      }
+    }
+    lastPropProj = config_.projection;
+  }
 
-      // Convert to pixels (Heatmap)
-      int w = PropEngine::MAP_W;
-      int h = PropEngine::MAP_H;
-      std::vector<uint32_t> pixels(w * h);
+  if (config_.projection == "robinson" || config_.projection == "azimuthal") {
+    // Note: for azimuthal, screenToLatLon handles the projection warping
+    SDL_RenderGeometry(renderer, propTexture_, propVerts_.data(),
+                       (int)propVerts_.size(), propIndices_.data(),
+                       (int)propIndices_.size());
+  } else {
+    SDL_RenderCopy(renderer, propTexture_, nullptr, &mapRect_);
+  }
 
-      float maxVal = (outType == 1) ? 100.0f : 50.0f; // 100% or 50MHz
+  SDL_RenderSetClipRect(renderer, nullptr);
+}
 
-      for (size_t i = 0; i < grid.size(); ++i) {
-        float val = grid[i];
-        float t = val / maxVal;
-        t = std::max(0.0f, std::min(t, 1.0f));
+void MapWidget::renderWxMbOverlay(SDL_Renderer *renderer) {
+  if (config_.weatherOverlay != WeatherOverlayType::WxMb)
+    return;
+  if (!wxmb_)
+    return;
+  SDL_Texture *tex = wxmb_->getTexture(renderer, mapRect_.w, mapRect_.h);
+  if (!tex)
+    return;
+  SDL_SetTextureBlendMode(tex, SDL_BLENDMODE_BLEND);
+  SDL_SetTextureAlphaMod(tex, 180);
+  SDL_RenderSetClipRect(renderer, &mapRect_);
+  SDL_RenderCopy(renderer, tex, nullptr, &mapRect_);
+  SDL_RenderSetClipRect(renderer, nullptr);
+}
 
-        uint8_t r = 0, g = 0, b = 0;
-        // Jet-like colormap
+void MapWidget::updatePropagationOverlay() {
+  if (config_.propOverlay == PropOverlayType::None) {
+    return;
+  }
+
+  PropPathParams params;
+  params.txLat = state_->deLocation.lat;
+  params.txLon = state_->deLocation.lon;
+
+  auto getMhz = [](const std::string &band) -> double {
+    if (band == "80m") return 3.5;
+    if (band == "60m") return 5.3;
+    if (band == "40m") return 7.0;
+    if (band == "30m") return 10.1;
+    if (band == "20m") return 14.1;
+    if (band == "17m") return 18.1;
+    if (band == "15m") return 21.1;
+    if (band == "12m") return 24.9;
+    if (band == "10m") return 28.4;
+    if (band == "6m")  return 50.1;
+    return 14.1;
+  };
+
+  params.mhz = getMhz(config_.propBand);
+  params.watts = config_.propPower;
+  params.mode = config_.propMode;
+  params.toa = 3;
+  params.path = 0;
+
+  SolarData sw{};
+  if (solar_) {
+    sw = solar_->get();
+  }
+
+  // outputType: 0=MUF, 1=Reliability, 2=TOA
+  int outputType = 0;
+  if (config_.propOverlay == PropOverlayType::Reliability) {
+      outputType = 1;
+  } else if (config_.propOverlay == PropOverlayType::Toa) {
+      outputType = 2;
+  }
+  
+  PropOverlayType overlayType = config_.propOverlay;
+  
+  // MUF (RT) uses real-time ionosonde data; VOACAP/Reliability use solar models
+  auto *ionoProvider = (overlayType == PropOverlayType::Muf) ? iono_ : nullptr;
+
+  WorkerService::getInstance().submitTask(
+      [params, sw, ionoProvider, outputType, overlayType]() {
+        auto grid =
+            PropEngine::generateGrid(params, sw, ionoProvider, outputType);
+
+        auto *result = new std::vector<float>(std::move(grid));
+        SDL_Event event;
+        SDL_zero(event);
+        event.type = HamClock::AE_BASE_EVENT + HamClock::AE_PROP_DATA_READY;
+        event.user.code = static_cast<int>(overlayType);
+        event.user.data1 = result;
+        SDL_PushEvent(&event);
+      });
+}
+
+void MapWidget::onPropDataReady(PropOverlayType type,
+                                const std::vector<float> &grid) {
+  if (grid.size() != PropEngine::MAP_W * PropEngine::MAP_H)
+    return;
+
+  // Create/recreate texture if needed
+  // We use standard SDL_Renderer from main, but MapWidget doesn't store it.
+  // We'll use the one from the last render call or just create it lazily.
+  // Actually, we can't create textures on background threads, and this
+  // method is called on the MAIN thread via SDL_PushEvent handler.
+
+  // We need a renderer. We'll grab it from the window.
+  SDL_Window *win = SDL_GL_GetCurrentWindow();
+  if (!win) return;
+  SDL_Renderer *renderer = SDL_GetRenderer(win);
+  if (!renderer) return;
+
+  if (!propTexture_) {
+    propTexture_ = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32,
+                                     SDL_TEXTUREACCESS_STATIC,
+                                     PropEngine::MAP_W, PropEngine::MAP_H);
+  }
+
+  std::vector<uint32_t> pixels(grid.size());
+  float maxVal;
+  if (type == PropOverlayType::Reliability) maxVal = 100.0f;
+  else if (type == PropOverlayType::Toa)    maxVal = 40.0f;
+  else                                       maxVal = 50.0f; // MUF
+
+  for (size_t i = 0; i < grid.size(); ++i) {
+    float val = grid[i];
+    float t = val / maxVal;
+    t = std::max(0.0f, std::min(t, 1.0f));
+
+    uint8_t r = 0, g = 0, b = 0;
+    if (type == PropOverlayType::Reliability) {
+        // Reliability: Grey -> Yellow -> Green
+        if (t < 0.5f) {
+            float f = t / 0.5f;
+            r = (uint8_t)(100 + f * 155);
+            g = (uint8_t)(100 + f * 155);
+            b = 100;
+        } else {
+            float f = (t - 0.5f) / 0.5f;
+            r = (uint8_t)(255 * (1.0f - f));
+            g = 255;
+            b = (uint8_t)(100 * (1.0f - f));
+        }
+    } else if (type == PropOverlayType::Toa) {
+        // TOA: low angle = green (favorable long DX), high angle = red (steep/local)
+        // t=0 → transparent (no path); t>0 rendered green→yellow→red
+        if (t < 0.5f) {
+            float f = t * 2.0f;
+            r = (uint8_t)(f * 255.0f);
+            g = 200;
+            b = 0;
+        } else {
+            float f = (t - 0.5f) * 2.0f;
+            r = 255;
+            g = (uint8_t)((1.0f - f) * 200.0f);
+            b = 0;
+        }
+    } else {
+        // Jet-like colormap for MUF
         if (t < 0.25f) { // Blue -> Cyan
           float f = t / 0.25f;
           b = 255;
@@ -1411,54 +1802,16 @@ void MapWidget::renderMufRtOverlay(SDL_Renderer *renderer) {
           r = 255;
           g = (uint8_t)((1.0f - f) * 255.0f);
         }
-
-        uint8_t a = (val > 2.0f) ? 255 : 0;
-        pixels[i] = (a << 24) | (b << 16) | (g << 8) | r;
-      }
-
-      if (nativeTex)
-        SDL_DestroyTexture(nativeTex);
-      nativeTex = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32,
-                                    SDL_TEXTUREACCESS_STATIC, w, h);
-      SDL_UpdateTexture(nativeTex, nullptr, pixels.data(),
-                        w * sizeof(uint32_t));
-      SDL_SetTextureBlendMode(nativeTex, SDL_BLENDMODE_BLEND);
-
-      lastGen = now;
-      lastType = config_.propOverlay;
-      lastBand = config_.propBand;
-      lastMode = config_.propMode;
-      lastPower = config_.propPower;
     }
 
-    if (nativeTex) {
-      SDL_SetTextureAlphaMod(nativeTex, (Uint8)(config_.mufRtOpacity * 2.55f));
-
-      if (config_.projection == "robinson") {
-        SDL_RenderGeometry(renderer, nativeTex, mapVerts_.data(),
-                           (int)mapVerts_.size(), nightIndices_.data(),
-                           (int)nightIndices_.size());
-      } else {
-        SDL_RenderCopy(renderer, nativeTex, nullptr, &mapRect_);
-      }
-    }
-    return;
+    uint8_t a = (val > 0.1f) ? 200 : 0;
+    pixels[i] = (a << 24) | (b << 16) | (g << 8) | r;
   }
-  // Fallback to legacy MufRtProvider (fetched PNG)
-  SDL_Texture *tex = texMgr_.get("muf_rt_overlay");
-  if (!tex)
-    return;
 
-  SDL_SetTextureAlphaMod(tex, (Uint8)(config_.mufRtOpacity * 2.55f));
-  SDL_SetTextureBlendMode(tex, SDL_BLENDMODE_BLEND);
-
-  if (config_.projection == "robinson") {
-    SDL_RenderGeometry(renderer, tex, mapVerts_.data(), (int)mapVerts_.size(),
-                       nightIndices_.data(), (int)nightIndices_.size());
-  } else {
-    SDL_RenderCopy(renderer, tex, nullptr, &mapRect_);
-  }
+  SDL_UpdateTexture(propTexture_, nullptr, pixels.data(),
+                    PropEngine::MAP_W * sizeof(uint32_t));
 }
+
 
 void MapWidget::onResize(int x, int y, int w, int h) {
   Widget::onResize(x, y, w, h);
@@ -1466,6 +1819,11 @@ void MapWidget::onResize(int x, int y, int w, int h) {
   if (nightOverlayTexture_) {
     MemoryMonitor::getInstance().destroyTexture(nightOverlayTexture_);
   }
+  // Invalidate all cached geometry that depends on screen coordinates
+  gridDirty_ = true;
+  greatCircleDirty_ = true;
+  satTrackDirty_ = true;
+  mapVerts_.clear(); // Also force map mesh regen
 }
 
 // --- Tooltip Rendering ---
@@ -1621,6 +1979,11 @@ nlohmann::json MapWidget::getDebugData() const {
   }
 
   return j;
+}
+
+void MapWidget::onSatTrackReady(const std::vector<GroundTrackPoint> &track) {
+  cachedSatTrack_ = track;
+  satTrackDirty_ = true;
 }
 
 void MapWidget::renderGridOverlay(SDL_Renderer *renderer) {
@@ -1794,15 +2157,31 @@ void MapWidget::renderRssButton(SDL_Renderer *renderer) {
 }
 
 void MapWidget::renderOverlayInfo(SDL_Renderer *renderer) {
-  if (config_.propOverlay == PropOverlayType::None)
+  if (config_.propOverlay == PropOverlayType::None &&
+      config_.weatherOverlay == WeatherOverlayType::None)
     return;
 
   std::string text;
   if (config_.propOverlay == PropOverlayType::Muf) {
-    text = "MUF Overlay";
+    text = "MUF Overlay (RT)";
   } else if (config_.propOverlay == PropOverlayType::Voacap) {
     text = fmt::format("VOACAP ({} / {} / {}W)", config_.propBand,
                        config_.propMode, config_.propPower);
+  } else if (config_.propOverlay == PropOverlayType::Reliability) {
+    text = fmt::format("Reliability ({} / {} / {}W)", config_.propBand,
+                       config_.propMode, config_.propPower);
+  } else if (config_.propOverlay == PropOverlayType::Toa) {
+    text = "TOA Overlay";
+  }
+
+  if (config_.weatherOverlay == WeatherOverlayType::Clouds) {
+    if (!text.empty())
+      text += " + ";
+    text += "Clouds";
+  } else if (config_.weatherOverlay == WeatherOverlayType::WxMb) {
+    if (!text.empty())
+      text += " + ";
+    text += "WX/Pressure";
   }
 
   if (text.empty())

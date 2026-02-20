@@ -1,0 +1,63 @@
+{
+  "features": [
+    {
+      "feature_id": "1",
+      "name": "1",
+      "original_pointers": [
+        "SOTA activator map pins"
+      ],
+      "next_pointers": [
+        "map"
+      ],
+      "status": "🟠 MEDIUM",
+      "source_strategy": "⚠️ partial",
+      "notes": "No — blocked by SOTA API",
+      "suggested_gaps": []
+    },
+    {
+      "feature_id": "2",
+      "name": "2",
+      "original_pointers": [
+        "Cloud/weather satellite map overlay"
+      ],
+      "next_pointers": [
+        "map"
+      ],
+      "status": "🟠 MEDIUM",
+      "source_strategy": "❌ missing",
+      "notes": "open-hamclock-backend",
+      "suggested_gaps": []
+    },
+    {
+      "feature_id": "3",
+      "name": "3",
+      "original_pointers": [
+        "WX precipitation/radar map overlay"
+      ],
+      "next_pointers": [
+        "map"
+      ],
+      "status": "🟡 LOW",
+      "source_strategy": "❌ missing",
+      "notes": "open-hamclock-backend",
+      "suggested_gaps": []
+    },
+    {
+      "feature_id": "4",
+      "name": "4",
+      "original_pointers": [
+        "BME280 I2C sensor (RPi only)"
+      ],
+      "next_pointers": [
+        "hardware"
+      ],
+      "status": "🔵 VERY LOW",
+      "source_strategy": "❌ deferred",
+      "notes": "No (hardware)",
+      "suggested_gaps": []
+    }
+  ],
+  "top_improvements": [],
+  "top_gaps": [],
+  "parity_score": 0
+}

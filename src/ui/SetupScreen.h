@@ -52,15 +52,9 @@ private:
   FontManager &fontMgr_;
   BrightnessManager &brightnessMgr_;
 
-  // Appearance tab absorbs the old Display tab (brightness/schedule now live there)
-  enum class Tab {
-    Identity,
-    Spotting,
-    Appearance,
-    Rig,
-    Services,
-    Widgets
-  };
+  // Appearance tab absorbs the old Display tab (brightness/schedule now live
+  // there)
+  enum class Tab { Identity, Spotting, Appearance, Rig, Services, Widgets };
   Tab activeTab_ = Tab::Identity;
   bool gpsEnabled_ = false;
   std::string callsignText_;
@@ -83,6 +77,7 @@ private:
   std::string selectedSatellite_;
   bool mapNightLights_ = true;
   bool useMetric_ = true;
+  bool rssEnabled_ = true;
 
   // Services & Rig
   std::string qrzUsername_;
@@ -118,6 +113,7 @@ private:
   SDL_Rect themeRect_ = {0, 0, 0, 0};
   SDL_Rect nightLightsRect_ = {0, 0, 0, 0};
   SDL_Rect metricToggleRect_ = {0, 0, 0, 0};
+  SDL_Rect rssToggleRect_ = {0, 0, 0, 0};
   SDL_Rect okBtnRect_ = {0, 0, 0, 0};
   SDL_Rect cancelBtnRect_ = {0, 0, 0, 0};
   SDL_Rect brightnessSliderRect_ = {0, 0, 0, 0};

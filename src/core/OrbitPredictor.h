@@ -1,47 +1,12 @@
 #pragma once
 
-#include "SatelliteManager.h"
+#include "SatelliteTypes.h"
 
 #include <predict/predict.h>
 
 #include <ctime>
 #include <string>
 #include <vector>
-
-// Result of observing a satellite from an observer position.
-struct SatObservation {
-  double azimuth = 0.0;   // degrees [0, 360)
-  double elevation = 0.0; // degrees [-90, 90]
-  double range = 0.0;     // km
-  double rangeRate = 0.0; // km/s (positive = receding)
-  bool visible = false;
-};
-
-// Sub-satellite point on the ground.
-struct SubSatPoint {
-  double lat = 0.0;       // degrees, north positive
-  double lon = 0.0;       // degrees, east positive
-  double altitude = 0.0;  // km above earth
-  double footprint = 0.0; // footprint diameter in km
-};
-
-// A predicted pass (AOS to LOS).
-struct SatPass {
-  std::time_t aosTime = 0; // acquisition of signal (UTC)
-  double aosAz = 0.0;      // azimuth at AOS (degrees)
-  std::time_t losTime = 0; // loss of signal (UTC)
-  double losAz = 0.0;      // azimuth at LOS (degrees)
-  double maxEl = 0.0;      // max elevation during pass (degrees)
-};
-
-// Ground track point for orbit path rendering.
-struct GroundTrackPoint {
-  double lat = 0.0;
-  double lon = 0.0;
-
-  GroundTrackPoint() = default;
-  GroundTrackPoint(double la, double lo) : lat(la), lon(lo) {}
-};
 
 // RAII wrapper around libpredict's C API.
 class OrbitPredictor {

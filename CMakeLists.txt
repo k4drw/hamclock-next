@@ -1,10 +1,20 @@
 cmake_minimum_required(VERSION 3.18)
 
+# Read version from file
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/VERSION" VER_NUM)
+string(STRIP "${VER_NUM}" VER_NUM)
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/VERSION_SUFFIX" VER_SUFFIX)
+string(STRIP "${VER_SUFFIX}" VER_SUFFIX)
+
+# Calculate short display version (e.g. 0.8B if version is 0.8.0)
+string(REGEX REPLACE "\\.0$" "" SHORT_VER "${VER_NUM}")
+set(HAMCLOCK_DISPLAY_VERSION "${SHORT_VER}${VER_SUFFIX}")
+
 # libpredict v2.0.0 uses cmake_minimum_required(VERSION 2.8) which modern CMake rejects
 set(CMAKE_POLICY_VERSION_MINIMUM 3.5 CACHE STRING "Compat for old FetchContent deps")
 
 project(HamClock-Next
-    VERSION 0.8.0
+    VERSION ${VER_NUM}
     LANGUAGES C CXX
 )
 
@@ -16,7 +26,7 @@ else()
 endif()
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-add_compile_definitions(HAMCLOCK_VERSION="0.8B")
+add_compile_definitions(HAMCLOCK_VERSION="${HAMCLOCK_DISPLAY_VERSION}")
 
 # Pthreads are not enabled for WASM: the app is single-threaded in that
 # context and enabling them would require SharedArrayBuffer + COOP/COEP HTTP
@@ -114,6 +124,7 @@ if(NOT EMSCRIPTEN)
         set(SDL2MIXER_MOD OFF CACHE BOOL "Disable MOD")
         set(SDL2MIXER_MIDI OFF CACHE BOOL "Disable MIDI")
         set(SDL2MIXER_MP3 OFF CACHE BOOL "Disable MP3")
+        set(SDL2MIXER_WAVPACK OFF CACHE BOOL "Disable Wavpack")
         FetchContent_Declare(
             SDL2_mixer
             GIT_REPOSITORY https://github.com/libsdl-org/SDL_mixer.git
@@ -423,11 +434,14 @@ set(HAMCLOCK_SOURCES
     src/core/CitiesManager.cpp
     src/core/StringUtils.cpp
     src/core/SoundManager.cpp
+    src/core/WorkerService.cpp
     src/core/PropEngine.cpp
+    src/core/ActivityLocationManager.cpp
     src/network/NetworkManager.cpp
     src/network/WebServer.cpp
     src/services/NOAAProvider.cpp
     src/services/RSSProvider.cpp
+    src/services/CloudProvider.cpp
     src/services/ADIFProvider.cpp
     src/services/ActivityProvider.cpp
     src/services/DRAPProvider.cpp
@@ -435,6 +449,7 @@ set(HAMCLOCK_SOURCES
     src/services/DXClusterProvider.cpp
     src/services/AuroraProvider.cpp
     src/services/MufRtProvider.cpp
+    src/services/WxMbProvider.cpp
     src/services/IonosondeProvider.cpp
     src/services/HistoryProvider.cpp
     src/services/BandConditionsProvider.cpp
@@ -449,10 +464,12 @@ set(HAMCLOCK_SOURCES
     src/services/RotatorService.cpp
     src/services/RigService.cpp
     src/services/GPSProvider.cpp
+    src/services/AsteroidProvider.cpp
     src/services/RBNProvider.cpp
     src/services/QRZProvider.cpp
     src/ui/ActivityPanels.cpp
     src/ui/ADIFPanel.cpp
+    src/ui/AsteroidPanel.cpp
     src/ui/AuroraPanel.cpp
     src/ui/AuroraGraphPanel.cpp
     src/ui/DXClusterPanel.cpp
@@ -573,6 +590,7 @@ else()
     )
 
     if(WIN32)
+        add_definitions(-D_WIN32_WINNT=0x0601) # Target Windows 7+
         target_link_libraries(hamclock-next PRIVATE ws2_32 psapi)
     elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
         # On Linux with GCC, link libstdc++ and libgcc statically for better portability
@@ -606,6 +624,10 @@ else()
             "${CMAKE_SOURCE_DIR}/packaging/macos/HamClockNext.icns"
         )
     endif()
+    install(TARGETS hamclock-next
+        RUNTIME DESTINATION bin
+        BUNDLE DESTINATION .
+    )
 endif()
 
 # --- Custom targets for data updates ---

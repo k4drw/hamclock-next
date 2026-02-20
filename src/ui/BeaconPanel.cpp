@@ -7,8 +7,9 @@
 #include "RenderUtils.h"
 #include <cstdio>
 
-BeaconPanel::BeaconPanel(int x, int y, int w, int h, FontManager &fontMgr)
-    : Widget(x, y, w, h), fontMgr_(fontMgr) {}
+BeaconPanel::BeaconPanel(int x, int y, int w, int h, FontManager &fontMgr,
+                         BeaconProvider &provider)
+    : Widget(x, y, w, h), fontMgr_(fontMgr), provider_(provider) {}
 
 BeaconPanel::~BeaconPanel() { clearTextCache(); }
 

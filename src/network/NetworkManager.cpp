@@ -79,12 +79,24 @@ void NetworkManager::fetchAsync(const std::string &url,
         callback(cached.data);
         return;
       } else {
-        LOG_T(
-            "NetworkManager",
-            "Memory record found but no data (too large), checking disk for {}",
-            url);
-        // Data was too large for RAM cache, check disk.
-        // For simplicity, we just let the thread handle it.
+        LOG_T("NetworkManager",
+              "Memory record found but no data (too large), loading from disk "
+              "for {}",
+              url);
+        std::thread([this, url, callback]() {
+          std::filesystem::path p = cacheDir_ / hashUrl(url);
+          std::ifstream ifs(p, std::ios::binary);
+          std::string data;
+          if (ifs) {
+            std::string line;
+            for (int i = 0; i < 5; ++i)
+              std::getline(ifs, line);
+            data.assign((std::istreambuf_iterator<char>(ifs)),
+                        (std::istreambuf_iterator<char>()));
+          }
+          callback(data);
+        }).detach();
+        return;
       }
     }
   }
@@ -188,13 +200,27 @@ void NetworkManager::fetchAsync(const std::string &url,
               headers.at("last-modified") == cached.lastModified) {
             LOG_T("NetworkManager", "Cache validated (HEAD) for {}", url);
             // Still valid! Update timestamp and return cached
+
+            std::string retData = cached.data;
+            if (retData.empty()) {
+              std::filesystem::path p = cacheDir_ / hashUrl(url);
+              std::ifstream ifs(p, std::ios::binary);
+              if (ifs) {
+                std::string line;
+                for (int i = 0; i < 5; ++i)
+                  std::getline(ifs, line);
+                retData.assign((std::istreambuf_iterator<char>(ifs)),
+                               (std::istreambuf_iterator<char>()));
+              }
+            }
+
             {
               std::lock_guard<std::mutex> lock(cacheMutex_);
               cache_[url].timestamp = std::time(nullptr);
-              saveToDisk(url, cache_[url], cached.data);
+              saveToDisk(url, cache_[url], retData);
             }
             curl_easy_cleanup(curl);
-            callback(cached.data);
+            callback(std::move(retData));
             return;
           }
         }
@@ -337,12 +363,20 @@ void NetworkManager::loadCache() {
             if (!std::getline(ifs, etag))
               continue;
 
-            // Read rest of file as data
-            std::string data((std::istreambuf_iterator<char>(ifs)),
-                             (std::istreambuf_iterator<char>()));
+            auto currentPos = ifs.tellg();
+            ifs.seekg(0, std::ios::end);
+            size_t dataSize = (size_t)ifs.tellg() - (size_t)currentPos;
+            ifs.seekg(currentPos, std::ios::beg);
+
+            std::string data;
+            if (dataSize <= 512 * 1024) {
+              // Read rest of file as data
+              data.assign((std::istreambuf_iterator<char>(ifs)),
+                          (std::istreambuf_iterator<char>()));
+            }
 
             std::lock_guard<std::mutex> lock(cacheMutex_);
-            cache_[url] = {data, ts, lm, etag};
+            cache_[url] = {std::move(data), ts, lm, etag};
           } catch (...) {
           }
         }

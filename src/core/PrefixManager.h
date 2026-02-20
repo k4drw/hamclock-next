@@ -2,7 +2,9 @@
 
 #include <mutex>
 #include <string>
-#include <vector>
+
+// Forward declaration from PrefixData.h to avoid including the large data file here
+struct StaticPrefixEntry;
 
 struct LatLong {
   double lat;
@@ -25,7 +27,7 @@ class PrefixManager {
 public:
   PrefixManager();
 
-  // Initialize: load from static data
+  // Initialize: point to static data
   void init();
 
   // Find location for a callsign. Returns true if found.
@@ -47,15 +49,7 @@ public:
   // Get ITU zone from DXCC number. Returns -1 if not found.
   int getITUZone(int dxcc);
 
-  // Helper structure for internal storage
-  struct PrefixEntry {
-    std::string call;
-    float lat;
-    float lon;
-    int dxcc;
-  };
-
 private:
-  std::vector<PrefixEntry> entries_;
+  const StaticPrefixEntry *findEntry(const std::string &call);
   std::mutex mutex_;
 };

@@ -29,4 +29,17 @@ static constexpr int DEFAULT_FONT_SIZE = 24;
 // Custom SDL user event for blocking sleep
 static constexpr uint32_t SDL_USER_EVENT_BLOCK_SLEEP = 0x8001;
 
+// Base for custom application events, registered at runtime
+extern uint32_t AE_BASE_EVENT;
+// Specific app event offsets from the base
+static constexpr uint32_t AE_SATELLITE_TRACK_READY = 1;
+static constexpr uint32_t AE_RSS_DATA_READY = 2;
+static constexpr uint32_t AE_SOLAR_DATA_READY = 3;
+static constexpr uint32_t AE_AURORA_DATA_READY = 4;
+static constexpr uint32_t AE_ACTIVITY_DATA_READY = 5;
+static constexpr uint32_t AE_WEATHER_DATA_READY = 6;
+static constexpr uint32_t AE_CONTEST_DATA_READY = 7;
+static constexpr uint32_t AE_HISTORY_DATA_READY = 8;
+static constexpr uint32_t AE_PROP_DATA_READY = 9;
+
 } // namespace HamClock

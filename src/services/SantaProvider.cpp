@@ -2,6 +2,10 @@
 #include <cmath>
 #include <ctime>
 
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+
 void SantaProvider::update() {
   auto now = std::chrono::system_clock::now();
   std::time_t now_t = std::chrono::system_clock::to_time_t(now);

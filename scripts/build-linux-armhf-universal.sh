@@ -1,31 +1,33 @@
-#!/bin/bash
-# Raspberry Pi (ARMv7) X11 Build for Trixie
-# Target: RPi Running Raspberry Pi OS (Trixie/Testing) Desktop
+# Universal ARMhf Build (X11 + Wayland + KMSDRM)
+# Target: ARMv7/ARMhf (RPi Zero 2W 32-bit, Older Pi, SBCs)
+# Baseline: Debian Bullseye (glibc 2.31) for maximum compatibility
 
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 REPO_ROOT=$(dirname "$SCRIPT_DIR")
 cd "$REPO_ROOT" || exit 1
 
-IMAGE="debian:trixie"
+IMAGE="debian:bullseye"
+BUILD_DIR="build-linux-armhf-universal"
 
 # Clean build directory
 echo "Cleaning old build artifacts..."
-docker run --rm -v "$(pwd)":/work -w /work $IMAGE rm -rf build-rpi-trixie-x11
-mkdir -p build-rpi-trixie-x11
+rm -rf "$BUILD_DIR"
+mkdir -p "$BUILD_DIR"
 
 # Run Build
-echo "Starting Raspberry Pi Trixie-X11 Build (ARMv7)..."
-docker run --rm -v "$(pwd)":/work -w /work $IMAGE bash -c "
+echo "Starting Unified ARMhf Build (X11 + KMSDRM)..."
+docker run --rm -v "$(pwd)":/work:z -w /work $IMAGE bash -c "
     dpkg --add-architecture armhf && \
     apt-get update && apt-get install -y \
         build-essential cmake git gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf pkg-config ca-certificates \
         libx11-dev:armhf libxext-dev:armhf libxcursor-dev:armhf libxi-dev:armhf \
         libxrandr-dev:armhf libxss-dev:armhf libxxf86vm-dev:armhf libxinerama-dev:armhf \
+        libwayland-dev:armhf libxkbcommon-dev:armhf wayland-protocols \
         libdrm-dev:armhf libgbm-dev:armhf libegl-dev:armhf libgles-dev:armhf \
         libdbus-1-dev:armhf libudev-dev:armhf libasound2-dev:armhf && \
     export PKG_CONFIG_PATH=/usr/lib/arm-linux-gnueabihf/pkgconfig && \
     export PKG_CONFIG_LIBDIR=/usr/lib/arm-linux-gnueabihf/pkgconfig && \
-    cmake -Bbuild-rpi-trixie-x11 -H. \
+    cmake -B$BUILD_DIR -H. \
         -DCMAKE_SYSTEM_NAME=Linux \
         -DCMAKE_SYSTEM_PROCESSOR=arm \
         -DCMAKE_C_COMPILER=arm-linux-gnueabihf-gcc \
@@ -37,8 +39,10 @@ docker run --rm -v "$(pwd)":/work -w /work $IMAGE bash -c "
         -DSDL_STATIC=ON \
         -DSDL_SHARED=OFF \
         -DSDL_X11=ON \
-        -DSDL_WAYLAND=OFF \
-        -DSDL_KMSDRM=OFF \
+        -DSDL_X11_DYNAMIC=libX11.so.6 \
+        -DSDL_WAYLAND=ON \
+        -DSDL_WAYLAND_DYNAMIC=libwayland-client.so.0 \
+        -DSDL_KMSDRM=ON \
         -DSDL_OPENGL=OFF \
         -DSDL_GLES=ON \
         -DSDL2IMAGE_VENDORED=ON \
@@ -47,18 +51,21 @@ docker run --rm -v "$(pwd)":/work -w /work $IMAGE bash -c "
         -DSDL2IMAGE_TIF=OFF \
         -DSDL2IMAGE_JXL=OFF \
         -DSDL2IMAGE_AVIF=OFF && \
-    cmake --build build-rpi-trixie-x11 -j\$(nproc)
+    cmake --build $BUILD_DIR -j\$(nproc) && \
+    chown -R $(id -u):$(id -g) $BUILD_DIR
 "
 
 if [ $? -eq 0 ]; then
     echo "--------------------------------------------------"
-    echo "SUCCESS: Raspberry Pi Trixie-X11 build finished!"
-    echo "Binary: build-rpi-trixie-x11/hamclock-next"
+    echo "SUCCESS: Unified ARMhf Build finished!"
+    echo "Binary: $BUILD_DIR/hamclock-next"
 
-    # Create Debian Package
-    echo "Packaging..."
-    chmod +x packaging/linux/create_deb.sh
-    ./packaging/linux/create_deb.sh "build-rpi-trixie-x11/hamclock-next" "armhf" "trixie" "x11" "build-rpi-trixie-x11"
+    # Packaging - We create two packages with the same binary but different dependencies
+    echo "Packaging Unified (Desktop) DEB..."
+    ./packaging/linux/create_deb.sh "$BUILD_DIR/hamclock-next" "armhf" "unified" "$BUILD_DIR"
+
+    echo "Packaging Lean (Kiosk/Headless) DEB..."
+    ./packaging/linux/create_deb.sh "$BUILD_DIR/hamclock-next" "armhf" "fb0" "$BUILD_DIR"
     
     echo "--------------------------------------------------"
 else

@@ -35,19 +35,23 @@ private:
   std::string projection_;
   std::string mapStyle_;
   bool showGrid_;
+  bool showBeacons_;
   std::string gridType_;
   PropOverlayType propOverlay_;
+  WeatherOverlayType weatherOverlay_;
   std::string propBand_;
   std::string propMode_;
   int propPower_;
 
   // Combo options
   std::vector<std::string> projOpts_ = {"Equirectangular", "Robinson",
-                                        "Mercator"};
+                                        "Azimuthal", "Mercator"};
   std::vector<std::string> mapOpts_ = {"NASA Blue Marble", "Topo",
                                        "Topo + Bathy"};
   std::vector<std::string> gridOpts_ = {"Off", "Lat/Lon", "Maidenhead"};
-  std::vector<std::string> overlayOpts_ = {"None", "MUF", "VOACAP"};
+  std::vector<std::string> overlayOpts_ = {"None", "MUF", "VOACAP",
+                                           "Reliability", "TOA"};
+  std::vector<std::string> weatherOpts_ = {"None", "WX/Pressure"};
   std::vector<std::string> bandOpts_ = {"80m", "60m", "40m", "30m", "20m",
                                         "17m", "15m", "12m", "10m", "6m"};
   std::vector<std::string> modeOpts_ = {"SSB", "CW", "FT8", "AM", "WSPR"};
@@ -56,7 +60,8 @@ private:
 
   // Rects for dropdown HEADERS
   SDL_Rect projRec_, styleRec_;
-  SDL_Rect gridRec_, overlayRec_;
+  SDL_Rect gridRec_, overlayRec_, weatherRec_;
+  SDL_Rect beaconsRec_;
   SDL_Rect bandRec_, modeRec_, powerRec_; // VOACAP row
 
   enum {
@@ -64,6 +69,7 @@ private:
     COMBO_STYLE,
     COMBO_GRID,
     COMBO_OVERLAY,
+    COMBO_WEATHER,
     COMBO_BAND,
     COMBO_MODE,
     COMBO_POWER
@@ -87,7 +93,7 @@ private:
   // SDL_Rect propNoneRect_, propMufRect_, propVoacapRect_; // REMOVED
   // SDL_Rect pb80_, pb40_, pb20_, pb15_, pb10_; // REMOVED
   SDL_Rect applyRect_, cancelRect_;
-  int projHeaderY_ = 0, styleHeaderY_ = 0, gridHeaderY_ = 0, mufRtHeaderY_ = 0;
+  int projHeaderY_ = 0, styleHeaderY_ = 0, gridHeaderY_ = 0, mufRtHeaderY_ = 0, weatherHeaderY_ = 0;
 
   std::string theme_ = "default";
 

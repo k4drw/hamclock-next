@@ -1,5 +1,38 @@
 #pragma once
 
+#ifdef _WIN32
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
+
+// Manual declaration to bypass broken PSAPI headers in some MinGW environments
+typedef struct _HC_PROCESS_MEMORY_COUNTERS {
+  DWORD cb;
+  DWORD PageFaultCount;
+  SIZE_T PeakWorkingSetSize;
+  SIZE_T WorkingSetSize;
+  SIZE_T QuotaPeakPagedPoolUsage;
+  SIZE_T QuotaPagedPoolUsage;
+  SIZE_T QuotaPeakNonPagedPoolUsage;
+  SIZE_T QuotaNonPagedPoolUsage;
+  SIZE_T PagefileUsage;
+  SIZE_T PeakPagefileUsage;
+} HC_PROCESS_MEMORY_COUNTERS;
+
+extern "C" {
+// Use GetProcessMemoryInfo which is usually exported from psapi.dll
+// We use the 'K32' prefix as well if it's modern Windows
+BOOL WINAPI GetProcessMemoryInfo(HANDLE Process,
+                                 HC_PROCESS_MEMORY_COUNTERS *ppsmemCounters,
+                                 DWORD cb);
+// Also common in modern psapi
+BOOL WINAPI K32GetProcessMemoryInfo(HANDLE Process,
+                                    HC_PROCESS_MEMORY_COUNTERS *ppsmemCounters,
+                                    DWORD cb);
+}
+#endif
+
 #include "Logger.h"
 #include <SDL.h>
 #include <atomic>
@@ -8,9 +41,6 @@
 
 #if defined(__linux__)
 #include <unistd.h>
-#elif defined(_WIN32)
-#include <psapi.h>
-#include <windows.h>
 #endif
 
 class MemoryMonitor {
@@ -50,9 +80,13 @@ public:
     fclose(fp);
     return (size_t)rss * (size_t)sysconf(_SC_PAGESIZE);
 #elif defined(_WIN32)
-    PROCESS_MEMORY_COUNTERS pmc;
-    if (GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof(pmc))) {
-      return pmc.WorkingSetSize;
+    HC_PROCESS_MEMORY_COUNTERS pmc;
+    pmc.cb = sizeof(pmc);
+    // Try K32 first, then fallback
+    if (K32GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof(pmc))) {
+      return (size_t)pmc.WorkingSetSize;
+    } else if (GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof(pmc))) {
+      return (size_t)pmc.WorkingSetSize;
     }
     return 0;
 #else

@@ -12,8 +12,6 @@ public:
   void fetch();
 
 private:
-  void processData(const std::string &body);
-
   NetworkManager &net_;
   std::shared_ptr<ContestStore> store_;
 
