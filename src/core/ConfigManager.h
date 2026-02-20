@@ -9,7 +9,8 @@
 #include <SDL.h>
 
 enum class LiveSpotSource { PSK, RBN, WSPR };
-enum class PropOverlayType { None, Muf, Voacap };
+enum class PropOverlayType { None, Muf, Voacap, Reliability, Toa };
+enum class WeatherOverlayType { None, Clouds };
 
 struct AppConfig {
   // Identity
@@ -25,11 +26,11 @@ struct AppConfig {
   bool useMetric = true;
   std::string projection = "equirectangular"; // or "robinson"
   std::string mapStyle = "nasa";              // "nasa", "terrain", "countries"
-  bool showGrid = false;
-  std::string gridType = "latlon"; // "latlon" or "maidenhead"
-  PropOverlayType propOverlay = PropOverlayType::None;
-  std::string propBand = "20m";
-  std::string propMode = "SSB";
+      bool showGrid = false;
+      std::string gridType = "latlon"; // "latlon" or "maidenhead"
+      PropOverlayType propOverlay = PropOverlayType::None;
+      WeatherOverlayType weatherOverlay = WeatherOverlayType::None;
+      std::string propBand = "20m";  std::string propMode = "SSB";
   int propPower = 100;   // Watts
   int mufRtOpacity = 40; // percentage
   bool showSatTrack = true; // Show satellite ground track line on world map

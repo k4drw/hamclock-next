@@ -10,6 +10,7 @@
 #include "../core/Logger.h"
 #include "../core/PropEngine.h"
 #include "../core/WorkerService.h"
+#include "../services/CloudProvider.h"
 #include "../services/IonosondeProvider.h"
 #include "../services/MufRtProvider.h"
 #include "EmbeddedIcons.h"
@@ -119,11 +120,11 @@ MapWidget::MapWidget(int x, int y, int w, int h, TextureManager &texMgr,
   recalcMapRect();
 }
 
-MapWidget::~MapWidget() {
-  MemoryMonitor::getInstance().destroyTexture(nightOverlayTexture_);
-  MemoryMonitor::getInstance().destroyTexture(tooltip_.cachedTexture);
-}
-
+  MapWidget::~MapWidget() {
+    MemoryMonitor::getInstance().destroyTexture(nightOverlayTexture_);
+    MemoryMonitor::getInstance().destroyTexture(propTexture_);
+    MemoryMonitor::getInstance().destroyTexture(tooltip_.cachedTexture);
+  }
 void MapWidget::recalcMapRect() {
   int mapW = width_;
   int mapH = mapW / 2;
@@ -258,13 +259,30 @@ void MapWidget::update() {
       lastDX_ = state_->dxLocation;
       greatCircleDirty_ = true;
     }
-  } else if (!cachedGreatCircle_.empty()) {
-    cachedGreatCircle_.clear();
-    greatCircleDirty_ = true;
-  }
-
-  // Monthly map texture update
-  auto now_for_month = std::chrono::system_clock::now();
+      } else if (!cachedGreatCircle_.empty()) {
+        cachedGreatCircle_.clear();
+        greatCircleDirty_ = true;
+      }
+  
+      // Propagation Overlay updates (every 15 mins or on change)
+      if (config_.propOverlay != PropOverlayType::None &&
+          config_.propOverlay != PropOverlayType::Muf) {
+        bool changed = (lastPropType_ != config_.propOverlay) ||
+                       (lastBand != config_.propBand) ||
+                       (lastMode != config_.propMode) ||
+                       (lastPower != config_.propPower);
+  
+        if (changed || (nowMs - lastPropUpdateMs_ > 900000)) {
+          updatePropagationOverlay();
+          lastPropUpdateMs_ = nowMs;
+          lastPropType_ = config_.propOverlay;
+          lastBand = config_.propBand;
+          lastMode = config_.propMode;
+          lastPower = config_.propPower;
+        }
+      }
+  
+      // Monthly map texture update  auto now_for_month = std::chrono::system_clock::now();
   std::time_t t = std::chrono::system_clock::to_time_t(now_for_month);
   std::tm *tm = std::localtime(&t);
   int month = tm->tm_mon + 1; // 1-12
@@ -851,6 +869,10 @@ void MapWidget::render(SDL_Renderer *renderer) {
   // Check for any newly downloaded map data from background thread
   {
     std::lock_guard<std::mutex> lock(mapDataMutex_);
+    if (clouds_ && config_.weatherOverlay == WeatherOverlayType::Clouds) {
+      clouds_->update();
+    }
+
     if (!pendingMapData_.empty()) {
       SDL_Texture *mapTex =
           texMgr_.loadFromMemory(renderer, MAP_KEY, pendingMapData_);
@@ -874,16 +896,24 @@ void MapWidget::render(SDL_Renderer *renderer) {
       // Clear pending data even on failure to prevent retry loops
       pendingNightMapData_.clear();
     }
-    if (!pendingMufData_.empty()) {
-      SDL_Texture *tex =
-          texMgr_.loadFromMemory(renderer, "muf_rt_overlay", pendingMufData_);
-      if (!tex) {
-        LOG_E("MapWidget", "Failed to create MUF texture: {}", SDL_GetError());
-      }
-      pendingMufData_.clear();
-    }
-  }
-
+          if (!pendingMufData_.empty()) {
+            SDL_Texture *tex =
+                texMgr_.loadFromMemory(renderer, "muf_rt_overlay", pendingMufData_);
+            if (!tex) {
+              LOG_E("MapWidget", "Failed to create MUF texture: {}", SDL_GetError());
+            }
+            pendingMufData_.clear();
+          }
+          if (!pendingCloudData_.empty()) {
+            SDL_Texture *tex =
+                texMgr_.loadFromMemory(renderer, "cloud_overlay", pendingCloudData_);
+            if (!tex) {
+              LOG_E("MapWidget", "Failed to create Cloud texture: {}",
+                    SDL_GetError());
+            }
+            pendingCloudData_.clear();
+          }
+        }
   if (!mapLoaded_) {
     SDL_Texture *tex = texMgr_.get(MAP_KEY);
     if (!tex) {
@@ -959,9 +989,10 @@ void MapWidget::render(SDL_Renderer *renderer) {
     }
   }
 
-  renderMufRtOverlay(renderer);
-  renderNightOverlay(renderer);
-  renderGridOverlay(renderer);
+          renderPropagationOverlay(renderer);
+          renderMufRtOverlay(renderer);
+          renderNightOverlay(renderer);
+          renderCloudOverlay(renderer);  renderGridOverlay(renderer);
   renderGreatCircle(renderer);
 
   renderMarker(renderer, state_->deLocation.lat, state_->deLocation.lon, 255,
@@ -1480,78 +1511,230 @@ void MapWidget::renderONTASpots(SDL_Renderer *renderer) {
 }
 
 void MapWidget::renderMufRtOverlay(SDL_Renderer *renderer) {
-  if (config_.propOverlay == PropOverlayType::None)
+  if (config_.propOverlay != PropOverlayType::Muf)
     return;
 
-  // Prefer Native Engine
-  if (iono_ && solar_) {
-    static uint32_t lastGen = 0;
-    static SDL_Texture *nativeTex = nullptr;
-    static PropOverlayType lastType = PropOverlayType::None;
-    static std::string lastBand = "";
-    static std::string lastMode = "";
-    static int lastPower = -1;
+  SDL_Texture *tex = texMgr_.get("muf_rt_overlay");
+  if (!tex)
+    return;
 
-    uint32_t now = SDL_GetTicks();
-    bool typeChanged = (lastType != config_.propOverlay);
-    bool bandChanged = (lastBand != config_.propBand);
-    bool modeChanged = (lastMode != config_.propMode);
-    bool powerChanged = (lastPower != config_.propPower);
+  SDL_SetTextureAlphaMod(tex, (Uint8)(config_.mufRtOpacity * 2.55f));
+  SDL_SetTextureBlendMode(tex, SDL_BLENDMODE_BLEND);
 
-    // Update if texture missing, time elapsed, or params changed
-    if (!nativeTex || (now - lastGen > 300000) || typeChanged || bandChanged ||
-        modeChanged || powerChanged) {
-      PropPathParams params;
-      params.txLat = state_->deLocation.lat;
-      params.txLon = state_->deLocation.lon;
-      params.mode = config_.propMode;
-      params.watts = (double)config_.propPower;
+  SDL_RenderSetClipRect(renderer, &mapRect_);
+  if (config_.projection == "robinson") {
+    SDL_RenderGeometry(renderer, tex, mapVerts_.data(), (int)mapVerts_.size(),
+                       nightIndices_.data(), (int)nightIndices_.size());
+  } else if (config_.projection == "azimuthal") {
+    // We reuse nightIndices_ for topology, but we need to ensure the mesh
+    // is up to date if we were to support transparency properly.
+    // For now, simple copy for non-warped projections.
+    SDL_RenderCopy(renderer, tex, nullptr, &mapRect_);
+  } else {
+    SDL_RenderCopy(renderer, tex, nullptr, &mapRect_);
+  }
+  SDL_RenderSetClipRect(renderer, nullptr);
+}
 
-      // Determine frequency from band
-      std::string band = config_.propBand;
-      if (band == "80m")
-        params.mhz = 3.5;
-      else if (band == "60m")
-        params.mhz = 5.3;
-      else if (band == "40m")
-        params.mhz = 7.0;
-      else if (band == "30m")
-        params.mhz = 10.1;
-      else if (band == "20m")
-        params.mhz = 14.1;
-      else if (band == "15m")
-        params.mhz = 21.1;
-      else if (band == "10m")
-        params.mhz = 28.2;
-      else
-        params.mhz = 14.1; // Default
+void MapWidget::renderCloudOverlay(SDL_Renderer *renderer) {
+  if (config_.weatherOverlay != WeatherOverlayType::Clouds)
+    return;
 
-      params.watts = 100;
-      params.mode = "SSB";
+  SDL_Texture *tex = texMgr_.get("cloud_overlay");
+  if (!tex)
+    return;
 
-      SolarData sw = solar_->get();
+  // Clouds are subtle, white on transparent usually in the GIBS product
+  // but it's a JPG, so we might need a special blend or color key.
+  // Actually GIBS MODIS Cloud Fraction is white clouds on black background.
+  // We'll use additive blending.
+  SDL_SetTextureBlendMode(tex, SDL_BLENDMODE_ADD);
+  SDL_SetTextureAlphaMod(tex, 128); // 50% opacity
 
-      // Output Type: 0=MUF, 1=Rel
-      int outType = (config_.propOverlay == PropOverlayType::Voacap) ? 1 : 0;
+  SDL_RenderSetClipRect(renderer, &mapRect_);
+  if (config_.projection == "robinson" || config_.projection == "azimuthal") {
+    SDL_RenderGeometry(renderer, tex, mapVerts_.data(), (int)mapVerts_.size(),
+                       nightIndices_.data(), (int)nightIndices_.size());
+  } else {
+    SDL_RenderCopy(renderer, tex, nullptr, &mapRect_);
+  }
+  SDL_RenderSetClipRect(renderer, nullptr);
+}
 
-      // Generate 660x330 grid
-      std::vector<float> grid =
-          PropEngine::generateGrid(params, sw, iono_, outType);
+void MapWidget::renderPropagationOverlay(SDL_Renderer *renderer) {
+  if (config_.propOverlay == PropOverlayType::None ||
+      config_.propOverlay == PropOverlayType::Muf)
+    return;
 
-      // Convert to pixels (Heatmap)
-      int w = PropEngine::MAP_W;
-      int h = PropEngine::MAP_H;
-      std::vector<uint32_t> pixels(w * h);
+  if (!propTexture_)
+    return;
 
-      float maxVal = (outType == 1) ? 100.0f : 50.0f; // 100% or 50MHz
+  SDL_SetTextureAlphaMod(propTexture_, (Uint8)(config_.mufRtOpacity * 2.55f));
+  SDL_SetTextureBlendMode(propTexture_, SDL_BLENDMODE_BLEND);
 
-      for (size_t i = 0; i < grid.size(); ++i) {
-        float val = grid[i];
-        float t = val / maxVal;
-        t = std::max(0.0f, std::min(t, 1.0f));
+  SDL_RenderSetClipRect(renderer, &mapRect_);
 
-        uint8_t r = 0, g = 0, b = 0;
-        // Jet-like colormap
+  // Geometry buffer management
+  const int gridW = useCompatibilityRenderPath_ ? 48 : 96;
+  const int gridH = useCompatibilityRenderPath_ ? 24 : 48;
+
+  if (propVerts_.size() != (size_t)((gridW + 1) * (gridH + 1))) {
+    propVerts_.resize((gridW + 1) * (gridH + 1));
+    propIndices_.clear();
+    propIndices_.reserve(gridW * gridH * 6);
+    for (int j = 0; j < gridH; ++j) {
+      for (int i = 0; i < gridW; ++i) {
+        int p0 = j * (gridW + 1) + i;
+        int p1 = p0 + 1;
+        int p2 = (j + 1) * (gridW + 1) + i;
+        int p3 = p2 + 1;
+        propIndices_.push_back(p0);
+        propIndices_.push_back(p1);
+        propIndices_.push_back(p2);
+        propIndices_.push_back(p2);
+        propIndices_.push_back(p1);
+        propIndices_.push_back(p3);
+      }
+    }
+  }
+
+  // Update warped vertices if projection or sun changed (we reuse projection math from night)
+  // But unlike night, propagation isn't tied to sun, so just projection.
+  static std::string lastPropProj = "";
+  if (lastPropProj != config_.projection) {
+    for (int j = 0; j <= gridH; ++j) {
+      float sy = mapRect_.y + (float)j * mapRect_.h / gridH;
+      for (int i = 0; i <= gridW; ++i) {
+        float sx = mapRect_.x + (float)i * mapRect_.w / gridW;
+        int idx = j * (gridW + 1) + i;
+
+        double lat, lon;
+        if (screenToLatLon((int)sx, (int)sy, lat, lon)) {
+          float u = static_cast<float>((lon + 180.0) / 360.0);
+          float v = static_cast<float>((90.0 - lat) / 180.0);
+          propVerts_[idx] = {{sx, sy}, {255, 255, 255, 255}, {u, v}};
+        } else {
+          propVerts_[idx] = {{sx, sy}, {0, 0, 0, 0}, {0, 0}};
+        }
+      }
+    }
+    lastPropProj = config_.projection;
+  }
+
+  if (config_.projection == "robinson" || config_.projection == "azimuthal") {
+    // Note: for azimuthal, screenToLatLon handles the projection warping
+    SDL_RenderGeometry(renderer, propTexture_, propVerts_.data(),
+                       (int)propVerts_.size(), propIndices_.data(),
+                       (int)propIndices_.size());
+  } else {
+    SDL_RenderCopy(renderer, propTexture_, nullptr, &mapRect_);
+  }
+
+  SDL_RenderSetClipRect(renderer, nullptr);
+}
+
+void MapWidget::updatePropagationOverlay() {
+  if (config_.propOverlay == PropOverlayType::None ||
+      config_.propOverlay == PropOverlayType::Muf) {
+    return;
+  }
+
+  PropPathParams params;
+  params.txLat = state_->deLocation.lat;
+  params.txLon = state_->deLocation.lon;
+
+  auto getMhz = [](const std::string &band) -> double {
+    if (band == "80m") return 3.5;
+    if (band == "60m") return 5.3;
+    if (band == "40m") return 7.0;
+    if (band == "30m") return 10.1;
+    if (band == "20m") return 14.1;
+    if (band == "17m") return 18.1;
+    if (band == "15m") return 21.1;
+    if (band == "12m") return 24.9;
+    if (band == "10m") return 28.4;
+    if (band == "6m")  return 50.1;
+    return 14.1;
+  };
+
+  params.mhz = getMhz(config_.propBand);
+  params.watts = config_.propPower;
+  params.mode = config_.propMode;
+  params.toa = 3;
+  params.path = 0;
+
+  SolarData sw{};
+  if (solar_) {
+    sw = solar_->get();
+  }
+
+  int outputType =
+      (config_.propOverlay == PropOverlayType::Reliability) ? 1 : 0;
+  PropOverlayType overlayType = config_.propOverlay;
+  auto *ionoProvider = iono_;
+
+  WorkerService::getInstance().submitTask(
+      [params, sw, ionoProvider, outputType, overlayType]() {
+        auto grid =
+            PropEngine::generateGrid(params, sw, ionoProvider, outputType);
+
+        auto *result = new std::vector<float>(std::move(grid));
+        SDL_Event event;
+        SDL_zero(event);
+        event.type = HamClock::AE_BASE_EVENT + HamClock::AE_PROP_DATA_READY;
+        event.user.code = static_cast<int>(overlayType);
+        event.user.data1 = result;
+        SDL_PushEvent(&event);
+      });
+}
+
+void MapWidget::onPropDataReady(PropOverlayType type,
+                                const std::vector<float> &grid) {
+  if (grid.size() != PropEngine::MAP_W * PropEngine::MAP_H)
+    return;
+
+  // Create/recreate texture if needed
+  // We use standard SDL_Renderer from main, but MapWidget doesn't store it.
+  // We'll use the one from the last render call or just create it lazily.
+  // Actually, we can't create textures on background threads, and this
+  // method is called on the MAIN thread via SDL_PushEvent handler.
+
+  // We need a renderer. We'll grab it from the window.
+  SDL_Window *win = SDL_GL_GetCurrentWindow();
+  if (!win) return;
+  SDL_Renderer *renderer = SDL_GetRenderer(win);
+  if (!renderer) return;
+
+  if (!propTexture_) {
+    propTexture_ = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32,
+                                     SDL_TEXTUREACCESS_STATIC,
+                                     PropEngine::MAP_W, PropEngine::MAP_H);
+  }
+
+  std::vector<uint32_t> pixels(grid.size());
+  float maxVal = (type == PropOverlayType::Reliability) ? 100.0f : 50.0f;
+
+  for (size_t i = 0; i < grid.size(); ++i) {
+    float val = grid[i];
+    float t = val / maxVal;
+    t = std::max(0.0f, std::min(t, 1.0f));
+
+    uint8_t r = 0, g = 0, b = 0;
+    if (type == PropOverlayType::Reliability) {
+        // Reliability: Grey -> Yellow -> Green
+        if (t < 0.5f) {
+            float f = t / 0.5f;
+            r = (uint8_t)(100 + f * 155);
+            g = (uint8_t)(100 + f * 155);
+            b = 100;
+        } else {
+            float f = (t - 0.5f) / 0.5f;
+            r = (uint8_t)(255 * (1.0f - f));
+            g = 255;
+            b = (uint8_t)(100 * (1.0f - f));
+        }
+    } else {
+        // Jet-like colormap for MUF
         if (t < 0.25f) { // Blue -> Cyan
           float f = t / 0.25f;
           b = 255;
@@ -1569,54 +1752,16 @@ void MapWidget::renderMufRtOverlay(SDL_Renderer *renderer) {
           r = 255;
           g = (uint8_t)((1.0f - f) * 255.0f);
         }
-
-        uint8_t a = (val > 2.0f) ? 255 : 0;
-        pixels[i] = (a << 24) | (b << 16) | (g << 8) | r;
-      }
-
-      if (nativeTex)
-        SDL_DestroyTexture(nativeTex);
-      nativeTex = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32,
-                                    SDL_TEXTUREACCESS_STATIC, w, h);
-      SDL_UpdateTexture(nativeTex, nullptr, pixels.data(),
-                        w * sizeof(uint32_t));
-      SDL_SetTextureBlendMode(nativeTex, SDL_BLENDMODE_BLEND);
-
-      lastGen = now;
-      lastType = config_.propOverlay;
-      lastBand = config_.propBand;
-      lastMode = config_.propMode;
-      lastPower = config_.propPower;
     }
 
-    if (nativeTex) {
-      SDL_SetTextureAlphaMod(nativeTex, (Uint8)(config_.mufRtOpacity * 2.55f));
-
-      if (config_.projection == "robinson") {
-        SDL_RenderGeometry(renderer, nativeTex, mapVerts_.data(),
-                           (int)mapVerts_.size(), nightIndices_.data(),
-                           (int)nightIndices_.size());
-      } else {
-        SDL_RenderCopy(renderer, nativeTex, nullptr, &mapRect_);
-      }
-    }
-    return;
+    uint8_t a = (val > 0.1f) ? 200 : 0;
+    pixels[i] = (a << 24) | (b << 16) | (g << 8) | r;
   }
-  // Fallback to legacy MufRtProvider (fetched PNG)
-  SDL_Texture *tex = texMgr_.get("muf_rt_overlay");
-  if (!tex)
-    return;
 
-  SDL_SetTextureAlphaMod(tex, (Uint8)(config_.mufRtOpacity * 2.55f));
-  SDL_SetTextureBlendMode(tex, SDL_BLENDMODE_BLEND);
-
-  if (config_.projection == "robinson") {
-    SDL_RenderGeometry(renderer, tex, mapVerts_.data(), (int)mapVerts_.size(),
-                       nightIndices_.data(), (int)nightIndices_.size());
-  } else {
-    SDL_RenderCopy(renderer, tex, nullptr, &mapRect_);
-  }
+  SDL_UpdateTexture(propTexture_, nullptr, pixels.data(),
+                    PropEngine::MAP_W * sizeof(uint32_t));
 }
+
 
 void MapWidget::onResize(int x, int y, int w, int h) {
   Widget::onResize(x, y, w, h);

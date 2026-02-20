@@ -21,6 +21,7 @@
 #include <string>
 
 class MufRtProvider;
+class CloudProvider;
 class IonosondeProvider;
 class SolarDataStore;
 
@@ -65,6 +66,7 @@ public:
   }
 
   void setMufRtProvider(MufRtProvider *p) { mufrt_ = p; }
+  void setCloudProvider(CloudProvider *p) { clouds_ = p; }
   void setIonosondeProvider(IonosondeProvider *p) { iono_ = p; }
   void setSolarDataStore(SolarDataStore *s) { solar_ = s; }
 
@@ -103,6 +105,9 @@ private:
   void renderADIFPins(SDL_Renderer *renderer);
   void renderONTASpots(SDL_Renderer *renderer);
   void renderMufRtOverlay(SDL_Renderer *renderer);
+  void renderCloudOverlay(SDL_Renderer *renderer);
+  void renderPropagationOverlay(SDL_Renderer *renderer);
+  void updatePropagationOverlay();
 
   TextureManager &texMgr_;
   FontManager &fontMgr_;
@@ -114,6 +119,7 @@ private:
   std::shared_ptr<ADIFStore> adifStore_;
   std::shared_ptr<ActivityDataStore> activityStore_;
   MufRtProvider *mufrt_ = nullptr;
+  CloudProvider *clouds_ = nullptr;
   IonosondeProvider *iono_ = nullptr;
   SolarDataStore *solar_ = nullptr;
   OrbitPredictor *predictor_ = nullptr;
@@ -128,6 +134,7 @@ private:
   std::string pendingMapData_;
   std::string pendingNightMapData_;
   std::string pendingMufData_;
+  std::string pendingCloudData_;
 
   double sunLat_ = 0;
   double sunLon_ = 0;
@@ -139,7 +146,9 @@ private:
   std::vector<GroundTrackPoint> cachedSatTrack_;
   std::vector<SDL_Vertex> shadowVerts_;
   std::vector<SDL_Vertex> lightVerts_;
+  std::vector<SDL_Vertex> propVerts_;
   std::vector<int> nightIndices_;
+  std::vector<int> propIndices_;
 
   // Caches for render-ready geometry to avoid per-frame recalculation
   bool greatCircleDirty_ = true;
@@ -185,7 +194,10 @@ private:
   bool useCompatibilityRenderPath_ = false;
   SDL_Texture *nightOverlayTexture_ = nullptr;
   SDL_Texture *mufRtTexture_ = nullptr;
+  SDL_Texture *propTexture_ = nullptr;
   uint32_t lastMufUpdateMs_ = 0;
+  uint32_t lastPropUpdateMs_ = 0;
+  PropOverlayType lastPropType_ = PropOverlayType::None;
   double lastUpdateSunLat_ = -999.0;
   double lastUpdateSunLon_ = -999.0;
 

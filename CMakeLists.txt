@@ -441,6 +441,7 @@ set(HAMCLOCK_SOURCES
     src/network/WebServer.cpp
     src/services/NOAAProvider.cpp
     src/services/RSSProvider.cpp
+    src/services/CloudProvider.cpp
     src/services/ADIFProvider.cpp
     src/services/ActivityProvider.cpp
     src/services/DRAPProvider.cpp

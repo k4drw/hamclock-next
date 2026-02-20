@@ -40,5 +40,6 @@ static constexpr uint32_t AE_ACTIVITY_DATA_READY = 5;
 static constexpr uint32_t AE_WEATHER_DATA_READY = 6;
 static constexpr uint32_t AE_CONTEST_DATA_READY = 7;
 static constexpr uint32_t AE_HISTORY_DATA_READY = 8;
+static constexpr uint32_t AE_PROP_DATA_READY = 9;
 
 } // namespace HamClock
