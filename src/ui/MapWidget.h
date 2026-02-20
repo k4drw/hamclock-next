@@ -130,14 +130,26 @@ private:
   double sunLat_ = 0;
   double sunLon_ = 0;
   uint32_t lastPosUpdateMs_ = 0;
+  uint32_t lastSatTrackUpdateMs_ = 0;
 
   // Math caches to save CPU
   std::vector<LatLon> cachedGreatCircle_;
+  std::vector<GroundTrackPoint> cachedSatTrack_;
   std::vector<SDL_Vertex> shadowVerts_;
   std::vector<SDL_Vertex> lightVerts_;
   std::vector<int> nightIndices_;
 
-  // Buffers for batching spots
+  // Caches for render-ready geometry to avoid per-frame recalculation
+  bool greatCircleDirty_ = true;
+  std::vector<SDL_Vertex> greatCircleVerts_;
+  std::vector<int> greatCircleIndices_;
+  bool satTrackDirty_ = true;
+  std::vector<SDL_Vertex> satTrackVerts_;
+  std::vector<int> satTrackIndices_;
+  bool gridDirty_ = true;
+  std::vector<SDL_Vertex> gridVerts_;
+
+  // Buffers for batching spots (dynamic per frame)
   std::vector<SDL_Vertex> spotVerts_;
   std::vector<int> spotIndices_;
   std::vector<SDL_Vertex> mapVerts_;

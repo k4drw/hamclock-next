@@ -180,7 +180,7 @@ void ActivityProvider::fetchPOTA() {
 
         if (os.lat == 0.0 && os.lon == 0.0) {
           // Debug: why is this spot missing location?
-          LOG_W("ActivityProvider", "POTA JSON Missing Lat/Lon/Grid: {}",
+          LOG_D("ActivityProvider", "POTA JSON Missing Lat/Lon/Grid: {}",
                 spot.dump());
         }
 

@@ -207,51 +207,55 @@ void MapWidget::update() {
   }
 
   uint32_t nowMs = SDL_GetTicks();
-  if (nowMs - lastPosUpdateMs_ < 1000) // 1 second is plenty
-    return;
-  lastPosUpdateMs_ = nowMs;
+  
+  // General 1-second updates
+  if (nowMs - lastPosUpdateMs_ > 1000) {
+    auto now = std::chrono::system_clock::now();
+    auto sun = Astronomy::sunPosition(now);
+    sunLat_ = sun.lat;
+    sunLon_ = sun.lon;
+    lastPosUpdateMs_ = nowMs;
+  }
 
-  auto now = std::chrono::system_clock::now();
-  auto sun = Astronomy::sunPosition(now);
-  sunLat_ = sun.lat;
-  sunLon_ = sun.lon;
+  // Satellite ground track update (every 5 seconds)
+  if (predictor_ && predictor_->isReady() && config_.showSatTrack) {
+    if (nowMs - lastSatTrackUpdateMs_ > 5000) {
+      cachedSatTrack_ = predictor_->groundTrack(std::chrono::system_clock::to_time_t(std::chrono::system_clock::now()), 90, 30);
+      satTrackDirty_ = true;
+      lastSatTrackUpdateMs_ = nowMs;
+    }
+  } else if (!cachedSatTrack_.empty()) {
+    cachedSatTrack_.clear();
+    satTrackDirty_ = true;
+  }
 
-  // Cache Great Circle
-
+  // Great Circle update (on change)
   if (state_->dxActive) {
     if (state_->deLocation.lat != lastDE_.lat ||
         state_->deLocation.lon != lastDE_.lon ||
         state_->dxLocation.lat != lastDX_.lat ||
         state_->dxLocation.lon != lastDX_.lon) {
-      // Low-memory mode: reduce path segments on KMSDRM
       int segments = useCompatibilityRenderPath_ ? 100 : 250;
       cachedGreatCircle_ = Astronomy::calculateGreatCirclePath(
           state_->deLocation, state_->dxLocation, segments);
       lastDE_ = state_->deLocation;
       lastDX_ = state_->dxLocation;
+      greatCircleDirty_ = true;
     }
-  } else {
+  } else if (!cachedGreatCircle_.empty()) {
     cachedGreatCircle_.clear();
+    greatCircleDirty_ = true;
   }
 
-  // Check if month changed
-  std::time_t t = std::chrono::system_clock::to_time_t(now);
+  // Monthly map texture update
+  auto now_for_month = std::chrono::system_clock::now();
+  std::time_t t = std::chrono::system_clock::to_time_t(now_for_month);
   std::tm *tm = std::localtime(&t);
   int month = tm->tm_mon + 1; // 1-12
 
   if (month != currentMonth_) {
     currentMonth_ = month;
 
-    // All three NASA Blue Marble variants are only published at 3x5400x2700.
-    // There are no smaller pre-made versions on that CDN.
-    // TextureManager::loadFromMemory() downscales automatically when the
-    // decoded image exceeds the GPU texture size limit (2048x2048 on WASM).
-    //
-    // mapStyle values and their CDN paths:
-    //   "nasa"       → bmng-base            world.2004MM.3x5400x2700.jpg
-    //   "topo"       → bmng-topography       world.topo.200401.3x5400x2700.jpg
-    //   "topo_bathy" → bmng-topography-bathymetry
-    //                  world.topo.bathy.200401.3x5400x2700.jpg
     char url[256];
     const std::string &style = config_.mapStyle;
     if (style == "topo_bathy") {
@@ -269,7 +273,6 @@ void MapWidget::update() {
           "world.topo.2004%02d.3x5400x2700.jpg",
           kMonthNames[month - 1], month);
     } else {
-      // Default: "nasa" — plain Blue Marble base imagery
       if (style != "nasa") {
         LOG_W("MapWidget", "Unknown map style '{}', falling back to 'nasa'",
               style);
@@ -296,9 +299,6 @@ void MapWidget::update() {
         },
         86400 * 30); // Cache for a month
 
-    // Also fetch night lights map (NASA Black Marble 2012)
-    // We use a smaller version of this too if available, but for now just add
-    // logging
     const char *nightUrl = "https://eoimages.gsfc.nasa.gov/images/imagerecords/"
                            "79000/79765/dnb_land_ocean_ice.2012.3600x1800.jpg";
     LOG_I("MapWidget", "Starting async fetch for Night Lights");
@@ -319,16 +319,12 @@ void MapWidget::update() {
 
   if (config_.propOverlay != PropOverlayType::None) {
     bool needUpdate = false;
-
-    // Check native provider
     if (iono_ && iono_->hasData()) {
       uint32_t lastUp = iono_->getLastUpdateMs();
       if (lastUp != lastMufUpdateMs_) {
         needUpdate = true;
       }
     }
-    // Fallback to MufRt (only if type is Muf and no native data?)
-    // Actually simplicity first: if native available, use it.
     else if (mufrt_ && mufrt_->hasData()) {
       uint32_t lastUp = mufrt_->getLastUpdateMs();
       if (lastUp != lastMufUpdateMs_) {
@@ -346,7 +342,6 @@ void MapWidget::update() {
     }
   }
 }
-
 bool MapWidget::onMouseUp(int mx, int my, Uint16 mod) {
   // Pass through to menu if visible
   if (mapViewMenu_->isVisible()) {
@@ -373,9 +368,13 @@ bool MapWidget::onMouseUp(int mx, int my, Uint16 mod) {
             config_.showGrid ? "ON" : "OFF", config_.gridType);
       if (onConfigChanged_)
         onConfigChanged_();
-      // Force map reload if style changed
+      // Force map and geometry reload
       mapLoaded_ = false;
       currentMonth_ = 0; // Trigger month update
+      greatCircleDirty_ = true;
+      satTrackDirty_ = true;
+      gridDirty_ = true;
+      mapVerts_.clear();
     });
     return true;
   }
@@ -533,46 +532,77 @@ void MapWidget::renderMarker(SDL_Renderer *renderer, double lat, double lon,
 }
 
 void MapWidget::renderGreatCircle(SDL_Renderer *renderer) {
-  if (!state_->dxActive || cachedGreatCircle_.empty())
+  if (cachedGreatCircle_.empty())
     return;
 
-  auto &path = cachedGreatCircle_;
-
-  SDL_Color color = {255, 255, 0, 255}; // Yellow
   SDL_Texture *lineTex = texMgr_.get(LINE_AA_KEY);
+  if (!lineTex) return;
 
-  std::vector<SDL_FPoint> segment;
-  float thickness = 1.2f;
+  if (greatCircleDirty_) {
+    greatCircleVerts_.clear();
+    greatCircleIndices_.clear();
 
-  for (size_t i = 0; i < path.size(); ++i) {
-    if (i > 0) {
-      double lon0 = path[i - 1].lon;
-      double lon1 = path[i].lon;
-      if (std::fabs(lon0 - lon1) > 180.0) {
-        // Wrap-around detected: interpolate to edge
-        double lon1_adj = (lon1 < 0) ? lon1 + 360.0 : lon1 - 360.0;
-        double borderLon = (lon1 < 0) ? 180.0 : -180.0;
-        double f = (borderLon - lon0) / (lon1_adj - lon0);
-        double borderLat =
-            path[i - 1].lat + f * (path[i].lat - path[i - 1].lat);
+    const auto &path = cachedGreatCircle_;
+    float thickness = 1.2f;
+    float r = thickness / 2.0f;
+    SDL_Color color = {255, 255, 0, 255}; // Yellow
 
-        // Finish current segment at edge
-        segment.push_back(latLonToScreen(borderLat, borderLon));
-        RenderUtils::drawPolylineTextured(renderer, lineTex, segment.data(),
-                                          static_cast<int>(segment.size()),
-                                          thickness, color);
-        segment.clear();
+    std::vector<SDL_FPoint> segment;
+    auto add_segment_geom = [&](const std::vector<SDL_FPoint>& seg) {
+        for (size_t i = 1; i < seg.size(); i++) {
+            SDL_FPoint p1 = seg[i-1];
+            SDL_FPoint p2 = seg[i];
+            float dx = p2.x - p1.x;
+            float dy = p2.y - p1.y;
+            float len = std::sqrt(dx * dx + dy * dy);
+            if (len < 0.1f) continue;
 
-        // Start next segment at other edge
-        segment.push_back(latLonToScreen(borderLat, -borderLon));
+            float nx = -dy / len * r;
+            float ny = dx / len * r;
+
+            int base = static_cast<int>(greatCircleVerts_.size());
+            greatCircleVerts_.push_back({{p1.x + nx, p1.y + ny}, color, {0, 0}});
+            greatCircleVerts_.push_back({{p1.x - nx, p1.y - ny}, color, {0, 1}});
+            greatCircleVerts_.push_back({{p2.x + nx, p2.y + ny}, color, {1, 0}});
+            greatCircleVerts_.push_back({{p2.x - nx, p2.y - ny}, color, {1, 1}});
+
+            greatCircleIndices_.push_back(base + 0);
+            greatCircleIndices_.push_back(base + 1);
+            greatCircleIndices_.push_back(base + 2);
+            greatCircleIndices_.push_back(base + 1);
+            greatCircleIndices_.push_back(base + 2);
+            greatCircleIndices_.push_back(base + 3);
+        }
+    };
+    
+    for (size_t i = 0; i < path.size(); ++i) {
+      if (i > 0) {
+        double lon0 = path[i - 1].lon;
+        double lon1 = path[i].lon;
+        if (std::fabs(lon0 - lon1) > 180.0) {
+          double lon1_adj = (lon1 < 0) ? lon1 + 360.0 : lon1 - 360.0;
+          double borderLon = (lon1 < 0) ? 180.0 : -180.0;
+          double f = (borderLon - lon0) / (lon1_adj - lon0);
+          double borderLat = path[i - 1].lat + f * (path[i].lat - path[i - 1].lat);
+
+          segment.push_back(latLonToScreen(borderLat, borderLon));
+          add_segment_geom(segment);
+          segment.clear();
+          segment.push_back(latLonToScreen(borderLat, -borderLon));
+        }
       }
+      segment.push_back(latLonToScreen(path[i].lat, path[i].lon));
     }
-    segment.push_back(latLonToScreen(path[i].lat, path[i].lon));
+    if (segment.size() >= 2) {
+      add_segment_geom(segment);
+    }
+    greatCircleDirty_ = false;
   }
-  if (segment.size() >= 2) {
-    RenderUtils::drawPolylineTextured(renderer, lineTex, segment.data(),
-                                      static_cast<int>(segment.size()),
-                                      thickness, color);
+
+  if (!greatCircleVerts_.empty()) {
+    SDL_RenderGeometry(renderer, lineTex, greatCircleVerts_.data(),
+                       (int)greatCircleVerts_.size(), greatCircleIndices_.data(),
+                       (int)greatCircleIndices_.size());
   }
 }
 
@@ -1033,45 +1063,80 @@ void MapWidget::renderSatFootprint(SDL_Renderer *renderer, double lat,
 }
 
 void MapWidget::renderSatGroundTrack(SDL_Renderer *renderer) {
-  if (!predictor_)
+  if (cachedSatTrack_.size() < 2)
     return;
-  std::time_t now = std::time(nullptr);
-  auto track = predictor_->groundTrack(now, 90, 30);
-  if (track.size() < 2)
-    return;
+
   SDL_RenderSetClipRect(renderer, &mapRect_);
   SDL_Texture *lineTex = texMgr_.get(LINE_AA_KEY);
-  float thickness = 1.5f;
+  if (!lineTex) return;
 
-  std::vector<SDL_FPoint> segment;
-  for (size_t i = 0; i < track.size(); ++i) {
-    if (i > 0) {
-      double lon0 = track[i - 1].lon;
-      double lon1 = track[i].lon;
-      if (std::fabs(lon0 - lon1) > 180.0) {
-        double lon1_adj = (lon1 < 0) ? lon1 + 360.0 : lon1 - 360.0;
-        double borderLon = (lon1 < 0) ? 180.0 : -180.0;
-        double f = (borderLon - lon0) / (lon1_adj - lon0);
-        double borderLat =
-            track[i - 1].lat + f * (track[i].lat - track[i - 1].lat);
+  if (satTrackDirty_) {
+    satTrackVerts_.clear();
+    satTrackIndices_.clear();
 
-        segment.push_back(latLonToScreen(borderLat, borderLon));
-        if (segment.size() >= 2) {
-          RenderUtils::drawPolylineTextured(renderer, lineTex, segment.data(),
-                                            static_cast<int>(segment.size()),
-                                            thickness, {255, 200, 0, 150});
+    float thickness = 1.5f;
+    float r = thickness / 2.0f;
+    SDL_Color color = {255, 200, 0, 150};
+
+    std::vector<SDL_FPoint> segment;
+    auto add_segment_geom = [&](const std::vector<SDL_FPoint>& seg) {
+        for (size_t i = 1; i < seg.size(); i++) {
+            SDL_FPoint p1 = seg[i-1];
+            SDL_FPoint p2 = seg[i];
+            float dx = p2.x - p1.x;
+            float dy = p2.y - p1.y;
+            float len = std::sqrt(dx * dx + dy * dy);
+            if (len < 0.1f) continue;
+
+            float nx = -dy / len * r;
+            float ny = dx / len * r;
+
+            int base = static_cast<int>(satTrackVerts_.size());
+            satTrackVerts_.push_back({{p1.x + nx, p1.y + ny}, color, {0, 0}});
+            satTrackVerts_.push_back({{p1.x - nx, p1.y - ny}, color, {0, 1}});
+            satTrackVerts_.push_back({{p2.x + nx, p2.y + ny}, color, {1, 0}});
+            satTrackVerts_.push_back({{p2.x - nx, p2.y - ny}, color, {1, 1}});
+
+            satTrackIndices_.push_back(base + 0);
+            satTrackIndices_.push_back(base + 1);
+            satTrackIndices_.push_back(base + 2);
+            satTrackIndices_.push_back(base + 1);
+            satTrackIndices_.push_back(base + 2);
+            satTrackIndices_.push_back(base + 3);
         }
-        segment.clear();
-        segment.push_back(latLonToScreen(borderLat, -borderLon));
+    };
+
+    for (size_t i = 0; i < cachedSatTrack_.size(); ++i) {
+      if (i > 0) {
+        double lon0 = cachedSatTrack_[i - 1].lon;
+        double lon1 = cachedSatTrack_[i].lon;
+        if (std::fabs(lon0 - lon1) > 180.0) {
+          double lon1_adj = (lon1 < 0) ? lon1 + 360.0 : lon1 - 360.0;
+          double borderLon = (lon1 < 0) ? 180.0 : -180.0;
+          double f = (borderLon - lon0) / (lon1_adj - lon0);
+          double borderLat =
+              cachedSatTrack_[i - 1].lat + f * (cachedSatTrack_[i].lat - cachedSatTrack_[i - 1].lat);
+
+          segment.push_back(latLonToScreen(borderLat, borderLon));
+          add_segment_geom(segment);
+          segment.clear();
+          segment.push_back(latLonToScreen(borderLat, -borderLon));
+        }
       }
+      segment.push_back(latLonToScreen(cachedSatTrack_[i].lat, cachedSatTrack_[i].lon));
     }
-    segment.push_back(latLonToScreen(track[i].lat, track[i].lon));
+    if (segment.size() >= 2) {
+      add_segment_geom(segment);
+    }
+    satTrackDirty_ = false;
   }
-  if (segment.size() >= 2) {
-    RenderUtils::drawPolylineTextured(renderer, lineTex, segment.data(),
-                                      static_cast<int>(segment.size()),
-                                      thickness, {255, 200, 0, 150});
+  
+  if (!satTrackVerts_.empty()) {
+    SDL_RenderGeometry(renderer, lineTex, satTrackVerts_.data(),
+                       (int)satTrackVerts_.size(), satTrackIndices_.data(),
+                       (int)satTrackIndices_.size());
   }
+
   SDL_RenderSetClipRect(renderer, nullptr);
 }
 
@@ -1518,6 +1583,11 @@ void MapWidget::onResize(int x, int y, int w, int h) {
   if (nightOverlayTexture_) {
     MemoryMonitor::getInstance().destroyTexture(nightOverlayTexture_);
   }
+  // Invalidate all cached geometry that depends on screen coordinates
+  gridDirty_ = true;
+  greatCircleDirty_ = true;
+  satTrackDirty_ = true;
+  mapVerts_.clear(); // Also force map mesh regen
 }
 
 // --- Tooltip Rendering ---
