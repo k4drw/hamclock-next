@@ -18,6 +18,7 @@ void MapViewMenu::show(AppConfig &config, std::function<void()> onApply) {
   showGrid_ = config.showGrid;
   gridType_ = config.gridType;
   propOverlay_ = config.propOverlay;
+  weatherOverlay_ = config.weatherOverlay;
   propBand_ = config.propBand;
   propMode_ = config.propMode;
   propPower_ = config.propPower;
@@ -25,7 +26,7 @@ void MapViewMenu::show(AppConfig &config, std::function<void()> onApply) {
 
   // Center the menu
   int menuW = 500;
-  int menuH = 340;
+  int menuH = 410;
   menuRect_ = {HamClock::LOGICAL_WIDTH / 2 - menuW / 2,
                HamClock::LOGICAL_HEIGHT / 2 - menuH / 2, menuW, menuH};
 
@@ -48,7 +49,12 @@ void MapViewMenu::show(AppConfig &config, std::function<void()> onApply) {
   gridHeaderY_ = y;
   mufRtHeaderY_ = y;
 
-  // Row 3 (VOACAP) - 3 columns
+  // Row 3
+  y += 70;
+  weatherRec_ = {col1X, y + 25, colW, 30};
+  weatherHeaderY_ = y;
+
+  // Row 4 (VOACAP) - 3 columns
   y += 70;
   int col3W = (menuW - 40) / 3 - 10; // ~143
   int c1 = menuRect_.x + 20;
@@ -130,10 +136,25 @@ void MapViewMenu::render(SDL_Renderer *renderer) {
     propLabel = "MUF";
   else if (propOverlay_ == PropOverlayType::Voacap)
     propLabel = "VOACAP";
+  else if (propOverlay_ == PropOverlayType::Reliability)
+    propLabel = "Reliability";
+  else if (propOverlay_ == PropOverlayType::Toa)
+    propLabel = "TOA";
   drawDropdown(renderer, overlayRec_, propLabel, openCombo_ == COMBO_OVERLAY);
 
-  // VOACAP Extras
-  if (propOverlay_ == PropOverlayType::Voacap) {
+  // Weather Section
+  fontMgr_.drawText(renderer, "Weather Overlay", weatherRec_.x, weatherHeaderY_,
+                    themes.text, 16, false);
+  std::string weatherLabel = (weatherOverlay_ == WeatherOverlayType::Clouds)
+                                 ? "Clouds"
+                                 : "None";
+  drawDropdown(renderer, weatherRec_, weatherLabel,
+               openCombo_ == COMBO_WEATHER);
+
+  // VOACAP Extras (Used for VOACAP, Reliability, and TOA)
+  if (propOverlay_ == PropOverlayType::Voacap ||
+      propOverlay_ == PropOverlayType::Reliability ||
+      propOverlay_ == PropOverlayType::Toa) {
     fontMgr_.drawText(renderer, "Band", bandRec_.x, bandRec_.y - 20,
                       themes.text, 16, false);
     drawDropdown(renderer, bandRec_, propBand_, openCombo_ == COMBO_BAND);
@@ -156,10 +177,11 @@ void MapViewMenu::render(SDL_Renderer *renderer) {
       drawDropdownList(renderer, styleRec_, mapOpts_);
     else if (openCombo_ == COMBO_GRID)
       drawDropdownList(renderer, gridRec_, gridOpts_);
-    else if (openCombo_ == COMBO_OVERLAY)
-      drawDropdownList(renderer, overlayRec_, overlayOpts_);
-    else if (openCombo_ == COMBO_BAND)
-      drawDropdownList(renderer, bandRec_, bandOpts_);
+          else if (openCombo_ == COMBO_OVERLAY)
+            drawDropdownList(renderer, overlayRec_, overlayOpts_);
+          else if (openCombo_ == COMBO_WEATHER)
+            drawDropdownList(renderer, weatherRec_, weatherOpts_);
+          else if (openCombo_ == COMBO_BAND)      drawDropdownList(renderer, bandRec_, bandOpts_);
     else if (openCombo_ == COMBO_MODE)
       drawDropdownList(renderer, modeRec_, modeOpts_);
     else if (openCombo_ == COMBO_POWER)
@@ -342,19 +364,31 @@ bool MapViewMenu::onMouseUp(int mx, int my, Uint16) {
       }))
     return true;
 
-  if (handleCombo(overlayRec_, COMBO_OVERLAY, overlayOpts_, [&](int idx) {
-        if (idx == 0)
-          propOverlay_ = PropOverlayType::None;
-        else if (idx == 1)
-          propOverlay_ = PropOverlayType::Muf;
-        else if (idx == 2)
-          propOverlay_ = PropOverlayType::Voacap;
-      }))
-    return true;
-
-  if (propOverlay_ == PropOverlayType::Voacap) {
-    if (handleCombo(bandRec_, COMBO_BAND, bandOpts_,
-                    [&](int idx) { propBand_ = bandOpts_[idx]; }))
+          if (handleCombo(overlayRec_, COMBO_OVERLAY, overlayOpts_, [&](int idx) {
+                if (idx == 0)
+                  propOverlay_ = PropOverlayType::None;
+                else if (idx == 1)
+                  propOverlay_ = PropOverlayType::Muf;
+                else if (idx == 2)
+                  propOverlay_ = PropOverlayType::Voacap;
+                else if (idx == 3)
+                  propOverlay_ = PropOverlayType::Reliability;
+                else if (idx == 4)
+                  propOverlay_ = PropOverlayType::Toa;
+              }))
+            return true;
+      
+          if (handleCombo(weatherRec_, COMBO_WEATHER, weatherOpts_, [&](int idx) {
+                if (idx == 0)
+                  weatherOverlay_ = WeatherOverlayType::None;
+                else if (idx == 1)
+                  weatherOverlay_ = WeatherOverlayType::Clouds;
+              }))
+            return true;
+      
+          if (propOverlay_ == PropOverlayType::Voacap ||          propOverlay_ == PropOverlayType::Reliability ||
+          propOverlay_ == PropOverlayType::Toa) {
+        if (handleCombo(bandRec_, COMBO_BAND, bandOpts_,                    [&](int idx) { propBand_ = bandOpts_[idx]; }))
       return true;
 
     if (handleCombo(modeRec_, COMBO_MODE, modeOpts_,
@@ -390,10 +424,10 @@ bool MapViewMenu::onMouseUp(int mx, int my, Uint16) {
     config_->projection = projection_;
     config_->mapStyle = mapStyle_;
     config_->showGrid = showGrid_;
-    config_->gridType = gridType_;
-    config_->propOverlay = propOverlay_;
-    config_->propBand = propBand_;
-    config_->propMode = propMode_;
+          config_->gridType = gridType_;
+          config_->propOverlay = propOverlay_;
+          config_->weatherOverlay = weatherOverlay_;
+          config_->propBand = propBand_;    config_->propMode = propMode_;
     config_->propPower = propPower_;
 
     hide();

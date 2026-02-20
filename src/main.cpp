@@ -40,6 +40,7 @@
 #include "services/LiveSpotProvider.h"
 #include "services/MoonProvider.h"
 #include "services/MufRtProvider.h"
+#include "services/CloudProvider.h"
 #include "services/NOAAProvider.h"
 #include "services/RBNProvider.h"
 #include "services/RSSProvider.h"
@@ -234,6 +235,7 @@ struct DashboardContext {
   std::unique_ptr<DstProvider> dstProvider;
   std::unique_ptr<ADIFProvider> adifProvider;
   std::unique_ptr<MufRtProvider> mufRtProvider;
+  std::unique_ptr<CloudProvider> cloudProvider;
   std::unique_ptr<IonosondeProvider> ionosondeProvider;
   std::unique_ptr<SantaProvider> santaProvider;
   std::unique_ptr<SatelliteManager> satMgr;
@@ -818,11 +820,13 @@ DashboardContext::DashboardContext(AppContext &ctx)
   adifProvider = std::make_unique<ADIFProvider>(adifStore, ctx.prefixMgr);
   adifProvider->fetch(ctx.cfgMgr.configDir() / "logs.adif");
 
-  mufRtProvider = std::make_unique<MufRtProvider>(netManager);
-  mufRtProvider->update();
-
-  ionosondeProvider = std::make_unique<IonosondeProvider>(netManager);
-  ionosondeProvider->update();
+      mufRtProvider = std::make_unique<MufRtProvider>(netManager);
+      mufRtProvider->update();
+  
+      cloudProvider = std::make_unique<CloudProvider>(netManager);
+      cloudProvider->update();
+  
+      ionosondeProvider = std::make_unique<IonosondeProvider>(netManager);  ionosondeProvider->update();
 
   asteroidProvider = std::make_unique<AsteroidProvider>(netManager);
   asteroidProvider->update();
@@ -1066,6 +1070,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
   mapArea->setDXClusterStore(dxcStore);
   mapArea->setADIFStore(adifStore);
   mapArea->setMufRtProvider(mufRtProvider.get());
+  mapArea->setCloudProvider(cloudProvider.get());
   mapArea->setAuroraStore(auroraHistoryStore);
   mapArea->setIonosondeProvider(ionosondeProvider.get());
   mapArea->setSolarDataStore(ctx.solarStore.get());
@@ -1406,16 +1411,24 @@ void DashboardContext::update(AppContext &ctx) {
           delete update;
           break;
         }
-        case AE_HISTORY_DATA_READY: {
-          auto *update = static_cast<HistorySeries *>(event.user.data1);
-          if (update && ctx.historyStore) {
-            ctx.historyStore->update(update->name, *update);
-          }
-          delete update;
-          break;
-        }
-        }
-      }
+                  case AE_HISTORY_DATA_READY: {
+                    auto *update = static_cast<HistorySeries *>(event.user.data1);
+                    if (update && ctx.historyStore) {
+                      ctx.historyStore->update(update->name, *update);
+                    }
+                    delete update;
+                    break;
+                  }
+                  case AE_PROP_DATA_READY: {
+                    auto *grid = static_cast<std::vector<float> *>(event.user.data1);
+                    if (grid && ctx.dashboard && ctx.dashboard->mapArea) {
+                      ctx.dashboard->mapArea->onPropDataReady(
+                          static_cast<PropOverlayType>(event.user.code), *grid);
+                    }
+                    delete grid;
+                    break;
+                  }
+                  }      }
       break;
     }
 
