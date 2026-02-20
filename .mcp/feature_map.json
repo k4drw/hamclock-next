@@ -2179,11 +2179,21 @@
         "notes": "earthmap.cpp and mapmanage.cpp (50K and 52K respectively) handle map overlay blending. bands.cpp fetches backend VOACAP data. Output is a 660x330 RGB565 BMP zlib-compressed, fetched from backend (originally voacap.com or self-hosted). Three overlay types: MUF (rainbow scale 0-35 MHz), REL (gray-to-green 0-100%), TOA (green-to-gray 0-40ms)."
       },
       "next": {
-        "files": [],
-        "symbols": [],
-        "notes": "Not yet implemented. BandConditionsPanel covers the DE-to-DX text prediction but NOT the world map color overlay. Implementation path: (1) Add VoacapProvider fetching from open-hamclock-backend voacap_service.py endpoint, (2) Store 660x330 RGB565 pixel grid in VoacapOverlayData, (3) Extend MapWidget to blend overlay texture onto world map, (4) Add overlay type selector to MapViewMenu. WebServer endpoint /api/propagation/voacap now returns schema and backend proxy instructions."
+        "files": [
+          "src/core/PropEngine.cpp",
+          "src/core/PropEngine.h",
+          "src/ui/MapWidget.cpp",
+          "src/ui/MapWidget.h",
+          "src/ui/MapViewMenu.cpp"
+        ],
+        "symbols": [
+          "PropEngine::generateGrid",
+          "MapWidget::updatePropagationOverlay",
+          "MapWidget::renderPropagationOverlay"
+        ],
+        "notes": "Full C++ propagation engine (PropEngine) generates MUF, Reliability, and TOA grids. WorkerService handles async computation. MapWidget renders as warped texture overlay on azimuthal and Robinson projections."
       },
-      "status": "missing",
+      "status": "implemented",
       "acceptance": [
         "Select overlay type (MUF / REL / TOA) in map options",
         "Overlay renders as semi-transparent color grid on world map",
@@ -2194,10 +2204,10 @@
         "Works in both azimuthal and Robinson projections",
         "Toggle overlay on/off without reloading map"
       ],
-      "notes": "HIGHEST PRIORITY parity gap. open-hamclock-backend/ham/HamClock/voacap_service.py has the complete physics engine (MUF/REL/TOA, vectorized NumPy, 660x330). Missing backend CGI endpoints are: fetchVOACAP-MUF.pl, fetchVOACAP-TOA.pl, fetchVOACAPArea.pl (see open-hamclock-backend/PROJECT_STATUS.md). MCP tool 'get_voacap_overlay' now documents the full request/response schema. See docs/parity.md for alignment notes (equirectangular vs azimuthal reprojection challenge).",
+      "notes": "VOACAP-style ionospheric propagation overlays. PropEngine.cpp implements the mathematical models for all three types (MUF, Reliability, and takeoff angle).",
       "implementation": {
-        "status": "partial",
-        "notes": "MUF (outputType=0) and Reliability (outputType=1) grids are computed by PropEngine and rendered on MapWidget via WorkerService. TOA (outputType) is exposed in MapViewMenu but PropEngine has no TOA grid; selecting TOA silently renders MUF \u2014 bug. Implemented 2026-02-20."
+        "status": "implemented",
+        "notes": "MUF, Reliability, and TOA grids are fully implemented in PropEngine and rendered on MapWidget via WorkerService. TOA geometric model (F2 h=350km, multi-hop) added 2026-02-20."
       }
     },
     {
@@ -2217,13 +2227,16 @@
       },
       "next": {
         "files": [
-          "src/ui/MapWidget.cpp",
-          "src/ui/MapWidget.h"
+          "src/services/MufRtProvider.cpp",
+          "src/services/MufRtProvider.h",
+          "src/ui/MapWidget.cpp"
         ],
-        "symbols": [],
-        "notes": "No implementation yet. MapWidget already handles SDL_Texture overlays. Implementation path: (1) Fetch https://prop.kc2g.com/renders/current/mufd-normal-now.png via CORS proxy (web) or NetworkManager (native), (2) Decode PNG to SDL_Texture, (3) Blend onto map at configurable opacity, (4) Auto-refresh every 15 min. No backend required \u2014 direct fetch from KC2G. For native use, open-hamclock-backend also provides pre-generated BMP variants via its scripts/build_muf_rt.py."
+        "symbols": [
+          "MufRtProvider"
+        ],
+        "notes": "MufRtProvider fetches real-time MUF image from prop.kc2g.com. MapWidget renders as warped texture overlay."
       },
-      "status": "missing",
+      "status": "implemented",
       "acceptance": [
         "Fetch MUF-RT image from KC2G or OHB backend",
         "Display as semi-transparent overlay on world map",
@@ -2232,10 +2245,10 @@
         "Show timestamp of last update",
         "Works with CORS proxy in web/WASM mode"
       ],
-      "notes": "Simplest parity gap to close \u2014 no physics required. KC2G PNG is publicly available. Backend-free path: fetch prop.kc2g.com/renders/current/mufd-normal-now.png. Alignment: KC2G image is equirectangular; same reprojection challenge as VOACAP overlay applies for azimuthal display.",
+      "notes": "Real-time MUF ionosonde data from KC2G. Implemented as an alternative to VOACAP projections.",
       "implementation": {
         "status": "implemented",
-        "notes": "MufRtProvider fetches KC2G image (prop.kc2g.com/renders/current/mufd-normal-now.png); blended as semi-transparent overlay on MapWidget. Label differentiated from VOACAP in 2026-02-20 refinement."
+        "notes": "MufRtProvider fetches KC2G image (prop.kc2g.com/renders/current/mufd-normal-now.png); blended as semi-transparent overlay on MapWidget. Differentiated from VOACAP in 2026-02-20 refinement."
       }
     },
     {
@@ -2301,6 +2314,35 @@
         "All panels and data providers work identically to display mode",
         "WebServer /api/ endpoints remain fully functional"
       ]
+    },
+    {
+      "feature_id": "wx_precipitation_overlay",
+      "name": "Weather Precipitation Overlay",
+      "category": "map",
+      "description": "Real-time precipitation/radar imagery overlaid on the world map. Original fetched radar composites from NOAA/NWS or similar sources.",
+      "original": {
+        "files": [
+          "mapmanage.cpp"
+        ],
+        "symbols": [
+          "updateRadar",
+          "drawRadar"
+        ],
+        "notes": "mapmanage.cpp fetches radar imagery from the HamClock backend server."
+      },
+      "next": {
+        "files": [],
+        "symbols": [],
+        "notes": "Not implemented. Requires radar imagery source (e.g. NOAA NOMADS or RainyView)."
+      },
+      "status": "missing",
+      "acceptance": [
+        "Fetch real-time radar/precipitation imagery",
+        "Display as semi-transparent overlay on world map",
+        "Auto-refresh interval",
+        "Toggle on/off in MapViewMenu"
+      ],
+      "notes": "Backend-dependent feature for pre-rendered 660x330 composite."
     }
   ]
 }

@@ -174,13 +174,13 @@
     ]
   },
   "feature_status_summary": {
-    "total": 63,
-    "implemented": 61,
+    "total": 71,
+    "implemented": 67,
     "partial": 1,
-    "missing": 1,
+    "missing": 3,
     "not_needed": 2,
-    "percent_done": "~94% (67/71 parity features per parity.md \u2014 2026-02-20)",
-    "notes": "v0.9B sprint: WorkerService thread pool, POTA/SOTA map pins, PropEngine MUF/REL/TOA heatmaps (calculateTOA geometric model, F2 h=350km, multi-hop), SOTA coordinate resolution (summitslist.csv pre-seed + api2.sota.org.uk fallback), WxMb weather overlay (GFS GRIB2 pressure/wind from NOAA NOMADS). 0 partial. 1 missing: bme280_sensor (hardware, deferred). 2 not_needed: seven_segment, ota_update (ESP32-specific). Cloud cover overlay still pending (CloudProvider is a stub)."
+    "percent_done": "~95% (68/71 parity features per parity.md — 2026-02-20)",
+    "notes": "v0.9B sprint complete: PropEngine MUF/REL/TOA grids, MufRtProvider KC2G integration, POTA/SOTA map pins (SOTA partial due to coordinate resolution), WxMb weather overlay. Missing: cloud_cover_overlay, wx_precipitation_overlay, bme280_sensor."
   },
   "implemented_features": [
     {
@@ -518,6 +518,24 @@
         "src/core/MemoryMonitor.h"
       ],
       "notes": "Reads /sys/class/thermal/thermal_zone0/temp on Linux. Used in MemoryMonitor for health logging. Display in LocalPanel."
+    },
+    {
+      "feature_id": "voacap_map_overlay",
+      "name": "VOACAP Propagation Overlay",
+      "next_files": [
+        "src/core/PropEngine.cpp",
+        "src/ui/MapWidget.cpp"
+      ],
+      "notes": "Local C++ calculation of MUF, Reliability, and TOA grids. WorkerService threaded."
+    },
+    {
+      "feature_id": "muf_rt_map_overlay",
+      "name": "KC2G Real-Time MUF Overlay",
+      "next_files": [
+        "src/services/MufRtProvider.cpp",
+        "src/ui/MapWidget.cpp"
+      ],
+      "notes": "Direct fetch and warp of KC2G MUF imagery."
     }
   ],
   "partial_features": {
