@@ -1,4 +1,5 @@
 #include "ActivityProvider.h"
+#include "../core/ActivityLocationManager.h"
 #include "../core/Astronomy.h"
 #include "../core/Constants.h"
 #include "../core/Logger.h"
@@ -157,17 +158,23 @@ void ActivityProvider::fetchPOTA() {
               os.lon = StringUtils::safe_stod(spot["longitude"]);
           }
 
-          // Fallback to Grid Square if Lat/Lon missing
+          // Fallback to Manager or Grid Square if Lat/Lon missing
           if (os.lat == 0.0 && os.lon == 0.0) {
-            std::string grid = spot.value("grid", "");
-            if (grid.empty())
-              grid = spot.value("activatorGrid", "");
-            if (!grid.empty()) {
-              double glat, glon;
-              if (Astronomy::gridToLatLon(grid, glat, glon)) {
-                os.lat = glat;
-                os.lon = glon;
-              }
+            float plat, plon;
+            if (ActivityLocationManager::getInstance().getPOTALocation(os.ref, plat, plon)) {
+                os.lat = plat;
+                os.lon = plon;
+            } else {
+                std::string grid = spot.value("grid", "");
+                if (grid.empty())
+                  grid = spot.value("activatorGrid", "");
+                if (!grid.empty()) {
+                  double glat, glon;
+                  if (Astronomy::gridToLatLon(grid, glat, glon)) {
+                    os.lat = glat;
+                    os.lon = glon;
+                  }
+                }
             }
           }
 
@@ -218,6 +225,12 @@ void ActivityProvider::fetchSOTA() {
           os.freqKhz =
               StringUtils::safe_stod(freq) * 1000.0; // SOTA MHz to kHz? Check API
           os.spottedAt = std::chrono::system_clock::now();
+
+          float slat, slon;
+          if (ActivityLocationManager::getInstance().getSOTALocation(os.ref, slat, slon)) {
+              os.lat = slat;
+              os.lon = slon;
+          }
 
           if (!os.call.empty()) {
             update->ontaSpots.push_back(os);

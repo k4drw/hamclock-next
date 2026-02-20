@@ -436,6 +436,7 @@ set(HAMCLOCK_SOURCES
     src/core/SoundManager.cpp
     src/core/WorkerService.cpp
     src/core/PropEngine.cpp
+    src/core/ActivityLocationManager.cpp
     src/network/NetworkManager.cpp
     src/network/WebServer.cpp
     src/services/NOAAProvider.cpp

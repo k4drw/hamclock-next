@@ -30,6 +30,9 @@ struct ActivityData {
   std::vector<ONTASpot> ontaSpots;
   std::chrono::system_clock::time_point lastUpdated;
   bool valid = false;
+
+  bool hasSelection = false;
+  ONTASpot selectedSpot;
 };
 
 class ActivityDataStore {
