@@ -63,6 +63,7 @@ void ONTAPanel::setFilter(const std::string &f) {
 
 void ONTAPanel::rebuildRows(const ActivityData &data) {
   std::vector<std::string> rows;
+  currentSpots_.clear();
   for (const auto &os : data.ontaSpots) {
     if (filter_ == Filter::POTA && os.program != "POTA")
       continue;
@@ -73,6 +74,7 @@ void ONTAPanel::rebuildRows(const ActivityData &data) {
     ss << std::left << std::setw(6) << os.mode << std::setw(10) << os.call
        << os.ref << " (" << os.program << ")";
     rows.push_back(ss.str());
+    currentSpots_.push_back(os);
     if (rows.size() >= 12)
       break;
   }
@@ -96,6 +98,21 @@ void ONTAPanel::update() {
   if (data.lastUpdated != lastUpdate_) {
     rebuildRows(data);
     lastUpdate_ = data.lastUpdated;
+  }
+
+  // Update highlight from selection
+  if (data.hasSelection) {
+    int foundIdx = -1;
+    for (size_t i = 0; i < currentSpots_.size(); ++i) {
+      if (currentSpots_[i].call == data.selectedSpot.call &&
+          currentSpots_[i].ref == data.selectedSpot.ref) {
+        foundIdx = static_cast<int>(i);
+        break;
+      }
+    }
+    setHighlightedIndex(foundIdx);
+  } else {
+    setHighlightedIndex(-1);
   }
 }
 
@@ -153,7 +170,10 @@ bool ONTAPanel::onMouseUp(int mx, int my, Uint16 mod) {
     }
 
     // Rebuild rows immediately with current data
-    rebuildRows(store_->get());
+    auto data = store_->get();
+    data.hasSelection = false;
+    store_->set(data);
+    rebuildRows(data);
 
     if (onFilterChanged_) {
       std::string fstr;
@@ -165,6 +185,25 @@ bool ONTAPanel::onMouseUp(int mx, int my, Uint16 mod) {
       onFilterChanged_(fstr);
     }
     return true;
+  }
+
+  // Check row hit
+  int pad = std::max(2, static_cast<int>(width_ * 0.03f));
+  int titleAreaH = pad * 2 + titleH_;
+  if (my > y_ + titleAreaH) {
+    int rowY = my - (y_ + titleAreaH);
+    int rowH = rowFontSize_ + pad;
+    if (rowH > 0) {
+      size_t idx = rowY / rowH;
+      if (idx < currentSpots_.size()) {
+        auto data = store_->get();
+        data.hasSelection = true;
+        data.selectedSpot = currentSpots_[idx];
+        store_->set(data);
+        setHighlightedIndex(static_cast<int>(idx));
+        return true;
+      }
+    }
   }
 
   return false;

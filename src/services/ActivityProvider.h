@@ -6,6 +6,8 @@
 
 class ActivityProvider {
 public:
+  enum class UpdateType { DXPeds, POTA, SOTA };
+
   ActivityProvider(NetworkManager &net,
                    std::shared_ptr<ActivityDataStore> store);
 

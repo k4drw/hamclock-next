@@ -2,8 +2,6 @@
 
 #include "IonosondeData.h"
 #include "SolarData.h"
-#include <cstdint>
-#include <optional>
 #include <string>
 #include <vector>
 
@@ -58,12 +56,22 @@ public:
                                      double currentHour, double signalMarginDb);
 
   /**
+   * Calculate take-off angle (degrees) for a path from TX to a grid point.
+   * Returns 0 if no propagation is possible (freq > MUF).
+   * @param distKm Path distance
+   * @param muf Maximum Usable Frequency for this path
+   * @param freqMhz Operating frequency
+   * @return Elevation angle in degrees (0 = no path, ~1-40 = valid path)
+   */
+  static double calculateTOA(double distKm, double muf, double freqMhz);
+
+  /**
    * Generate a 660x330 grid of values.
    * @param params Transmission parameters
    * @param swSpaceWeather Current space weather (SFI, SSN, K, etc.)
    * @param ionoProvider Reference to provider for fetching iono data per-point
-   * @param outputType 0=MUF, 1=Reliability
-   * @return vector of floats (0-100 for Rel, 0-50 for MUF)
+   * @param outputType 0=MUF, 1=Reliability, 2=TOA (take-off angle)
+   * @return vector of floats (0-100 for Rel, 0-50 for MUF, 0-40 for TOA degrees)
    */
   static std::vector<float>
   generateGrid(const PropPathParams &params, const SolarData &sw,

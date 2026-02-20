@@ -1,8 +1,6 @@
 #include "SatelliteManager.h"
-#include "Logger.h"
-#include "OrbitPredictor.h"
 #include "../services/RotatorService.h"
-#include <cmath>
+#include "Logger.h"
 
 #include <algorithm>
 #include <cctype>
@@ -43,38 +41,41 @@ void SatelliteManager::fetch(bool force) {
 }
 
 void SatelliteManager::update() {
-  if (trackedSatName_.empty() || !rotator_) {
-    return;
-  }
-
-  const SatelliteTLE *tle = findByName(trackedSatName_);
-  if (!tle) {
-    return;
-  }
-
-  OrbitPredictor predictor;
-  predictor.setObserver(obsLat_, obsLon_);
-  if (!predictor.loadTLE(*tle)) {
-    return;
-  }
-
-  SatObservation obs = predictor.observe();
-  if (obs.elevation < 0) {
-    return; // sat is below horizon
-  }
-
-  RotatorData currentPos = rotator_->getPosition();
-  double az_error = std::abs(obs.azimuth - currentPos.azimuth);
-  double el_error = std::abs(obs.elevation - currentPos.elevation);
-
-  if (az_error > 2.0 || el_error > 2.0) {
-    rotator_->setPosition(obs.azimuth, obs.elevation);
-  }
+  // Deprecated: Tracking logic moved to RotatorService::pollLoop
+  // This function is kept for API compatibility but is now a no-op
 }
 
 void SatelliteManager::trackSatellite(const std::string &satName) {
   std::lock_guard<std::mutex> lock(mutex_);
   trackedSatName_ = satName;
+
+  if (rotator_) {
+    if (satName.empty()) {
+      currentSat_.reset();
+      rotator_->stopAutoTrack();
+    } else {
+      // Find the TLE for this satellite
+      auto it = std::find_if(
+          satellites_.begin(), satellites_.end(), [&](const SatelliteTLE &s) {
+            // Case-insensitive compare
+            std::string s1 = s.name;
+            std::string s2 = satName;
+            std::transform(s1.begin(), s1.end(), s1.begin(), ::tolower);
+            std::transform(s2.begin(), s2.end(), s2.begin(), ::tolower);
+            return s1 == s2;
+          });
+
+      if (it != satellites_.end()) {
+        currentSat_ = std::make_unique<Satellite>(*it);
+        currentSat_->setObserver(obsLat_, obsLon_);
+        rotator_->autoTrack(currentSat_.get());
+      } else {
+        LOG_W("SatManager", "Cannot track '{}': TLE not found", satName);
+        currentSat_.reset();
+        rotator_->stopAutoTrack();
+      }
+    }
+  }
 }
 
 std::string SatelliteManager::getTrackedSatellite() const {
@@ -133,6 +134,30 @@ void SatelliteManager::parse(const std::string &raw) {
   satellites_ = std::move(result);
   dataValid_ = true;
   lastFetch_ = std::chrono::steady_clock::now();
+
+  // If we are currently tracking a satellite, we should update the TLE
+  // in RotatorService in case it changed.
+  if (!trackedSatName_.empty() && rotator_) {
+    // We need to re-find the satellite in the new list
+    // Note: we are holding the lock here, so we can't call trackSatellite()
+    // directly if it also takes the lock. But trackSatellite takes the lock.
+    // So we should find it here and call rotator directly.
+
+    auto it = std::find_if(
+        satellites_.begin(), satellites_.end(), [&](const SatelliteTLE &s) {
+          std::string s1 = s.name;
+          std::string s2 = trackedSatName_;
+          std::transform(s1.begin(), s1.end(), s1.begin(), ::tolower);
+          std::transform(s2.begin(), s2.end(), s2.begin(), ::tolower);
+          return s1 == s2;
+        });
+
+    if (it != satellites_.end()) {
+      currentSat_ = std::make_unique<Satellite>(*it);
+      currentSat_->setObserver(obsLat_, obsLon_);
+      rotator_->autoTrack(currentSat_.get()); // Update TLE
+    }
+  }
 }
 
 std::vector<SatelliteTLE> SatelliteManager::getSatellites() const {

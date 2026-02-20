@@ -370,7 +370,7 @@ function formatRepoMap(index: RepoIndex): string {
 // ---------------------------------------------------------------------------
 
 const server = new McpServer(
-  { name: "hamclock-feature-bridge", version: "0.3.0" },
+  { name: "hamclock-feature-bridge", version: "0.4.0" },
   { capabilities: { tools: {}, resources: {} } }
 );
 
@@ -1323,85 +1323,31 @@ server.tool(
   "List all propagation-related parity gaps between hamclock-original and hamclock-next, with implementation priority and suggested approach for each.",
   {},
   async () => {
+    // Updated 2026-02-20: POTA pins ✅, VOACAP MUF ✅, VOACAP REL ✅, muf_rt ✅,
+    //   VOACAP TOA ✅ (PropEngine::calculateTOA, geometric model F2 h=350km, multi-hop),
+    //   SOTA coord resolution ✅ (summitslist.csv pre-seed + api2.sota.org.uk fallback),
+    //   WxMb (GFS GRIB2 pressure/wind overlay) ✅
+    // Remaining gaps: cloud cover only
     const gaps = [
-      {
-        feature_id: "voacap_map_overlay",
-        name: "VOACAP World Map Overlay (MUF/REL/TOA)",
-        priority: "HIGH",
-        status: "missing",
-        backend_needed: true,
-        approach: "1) Implement fetchVOACAP-MUF.pl + fetchVOACAP-TOA.pl in open-hamclock-backend (uses existing voacap_service.py). 2) Add VoacapProvider in src/services/ that fetches 660x330 BMP via NetworkManager. 3) Add overlay texture to MapWidget. 4) Add overlay selector to MapViewMenu. 5) Handle equirectangular→azimuthal reprojection.",
-        backend_free_alt: "None for on-demand. KC2G MUF-RT image is static (no frequency/mode params).",
-        files_to_create: ["src/services/VoacapProvider.cpp", "src/services/VoacapProvider.h", "src/core/VoacapOverlayData.h"],
-        files_to_modify: ["src/ui/MapWidget.cpp", "src/ui/MapViewMenu.cpp"],
-      },
-      {
-        feature_id: "muf_rt_map_overlay",
-        name: "KC2G Real-Time MUF Map Overlay",
-        priority: "HIGH",
-        status: "missing",
-        backend_needed: false,
-        approach: "1) Add MufRtProvider that fetches prop.kc2g.com/renders/current/mufd-normal-now.png every 15 min. 2) Decode PNG to SDL_Texture (SDL_image already available). 3) Blend onto MapWidget. 4) Toggle in MapViewMenu.",
-        backend_free_alt: "Yes — direct HTTPS fetch from KC2G, CORS proxy in web mode.",
-        files_to_create: ["src/services/MufRtProvider.cpp", "src/services/MufRtProvider.h"],
-        files_to_modify: ["src/ui/MapWidget.cpp", "src/ui/MapViewMenu.cpp"],
-      },
-      {
-        feature_id: "adif_map_overlay",
-        name: "ADIF QSO Pins on Map",
-        priority: "MEDIUM",
-        status: "partial",
-        backend_needed: false,
-        approach: "ADIFProvider already parses QSO records. Add renderADIFPins() to MapWidget similar to renderActivityPins(). Use PrefixManager to resolve callsign to coordinates when grid is absent.",
-        backend_free_alt: "Yes — all data is local.",
-        files_to_modify: ["src/ui/MapWidget.cpp", "src/ui/MapWidget.h", "src/ui/ADIFPanel.cpp"],
-      },
       {
         feature_id: "cloud_cover_overlay",
         name: "Cloud Cover Map Overlay",
-        priority: "MEDIUM",
+        priority: "LOW",
         status: "missing",
         backend_needed: true,
-        approach: "open-hamclock-backend scripts/update_cloud_maps.sh generates composites. Alternatively: NASA GIBS WMS tiles. Requires server-side compositing for equirectangular output.",
+        approach: "open-hamclock-backend scripts/update_cloud_maps.sh generates composites. Alternatively: NASA GIBS WMS tiles. Requires server-side compositing for equirectangular output. CloudProvider is currently a stub. Note: the WxMb (GFS pressure/wind) overlay IS implemented via WxMbProvider — cloud cover is a separate feature.",
         backend_free_alt: "Partial — NASA GIBS tiles but complex to composite client-side.",
-        files_to_create: ["src/services/CloudOverlayProvider.cpp"],
-        files_to_modify: ["src/ui/MapWidget.cpp", "src/ui/MapViewMenu.cpp"],
-      },
-      {
-        feature_id: "sota_map_pins",
-        name: "SOTA Activator Map Pins",
-        priority: "LOW",
-        status: "partial",
-        backend_needed: false,
-        approach: "SOTA API does not return coordinates. Options: (1) Use SOTA summit database to resolve summit reference to coords, (2) Omit SOTA pins until API includes coords. See ActivityProvider.cpp.",
-        backend_free_alt: "Yes — local summit database or API enrichment.",
-        files_to_modify: ["src/services/ActivityProvider.cpp", "src/ui/MapWidget.cpp"],
-      },
-      {
-        feature_id: "countdown_audio_alarm",
-        name: "Audio Alarm for Countdown Timer",
-        priority: "LOW",
-        status: "partial",
-        backend_needed: false,
-        approach: "CountdownPanel.cpp shows visual 'EVENT ACTIVE!' banner. Add SDL_mixer (already common SDL companion) or SDL2 audio beep via SDL_OpenAudio when countdown reaches zero.",
-        backend_free_alt: "Yes — SDL2 audio subsystem.",
-        files_to_modify: ["src/ui/CountdownPanel.cpp", "CMakeLists.txt"],
-      },
-      {
-        feature_id: "mercator_projection",
-        name: "Mercator Map Projection",
-        priority: "LOW",
-        status: "missing",
-        backend_needed: false,
-        approach: "Add MapProjection::MERCATOR to MapWidget. Implement standard Web Mercator math. VOACAP overlays would align naturally with Mercator (both equirectangular family).",
-        backend_free_alt: "Yes — pure math.",
+        files_to_create: ["src/services/CloudProvider.cpp (implement, currently stub)"],
         files_to_modify: ["src/ui/MapWidget.cpp", "src/ui/MapViewMenu.cpp"],
       },
     ];
 
     const lines: string[] = [];
     lines.push(`# Propagation & Map Overlay Parity Gaps`);
-    lines.push(`Total gaps: ${gaps.length} | High: ${gaps.filter(g => g.priority === "HIGH").length} | Medium: ${gaps.filter(g => g.priority === "MEDIUM").length} | Low: ${gaps.filter(g => g.priority === "LOW").length}`);
+    lines.push(`Updated: 2026-02-20 | feature_map.json v1.8`);
+    lines.push(`Total remaining gaps: ${gaps.length} | Low: ${gaps.filter(g => g.priority === "LOW").length}`);
+    lines.push(``);
+    lines.push(`**Already implemented (no longer gaps):** POTA pins ✅, VOACAP MUF ✅, VOACAP REL ✅, VOACAP TOA ✅, KC2G MUF-RT ✅, SOTA coord resolution ✅ (summitslist.csv + api2.sota.org.uk), WxMb pressure/wind overlay ✅ (GFS GRIB2 decoder, marching-squares contours, wind quivers)`);
     lines.push(``);
 
     for (const gap of gaps) {
@@ -1418,12 +1364,7 @@ server.tool(
 
     lines.push(`---`);
     lines.push(`## Recommended Implementation Order`);
-    lines.push(`1. **muf_rt_map_overlay** — highest impact, no backend, just fetch + display KC2G PNG`);
-    lines.push(`2. **adif_map_overlay** — in-app, no backend, moderate effort`);
-    lines.push(`3. **voacap_map_overlay** — highest parity value but requires OHB CGI endpoints first`);
-    lines.push(`4. **countdown_audio_alarm** — quick SDL2 audio win`);
-    lines.push(`5. **cloud_cover_overlay** — backend-dependent, lower priority`);
-    lines.push(`6. **mercator_projection** — pure math, low effort, enables natural VOACAP alignment`);
+    lines.push(`1. **cloud_cover_overlay** — backend-dependent; use open-hamclock-backend or NASA GIBS tiles`);
 
     return { content: [{ type: "text" as const, text: lines.join("\n") }] };
   }

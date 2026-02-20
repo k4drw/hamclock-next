@@ -1,0 +1,40 @@
+name: Build RPMs
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-rpm-fedora:
+    name: Fedora RPM (x86_64)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Build Fedora RPM
+        run: |
+          chmod +x scripts/build-rpm-fedora.sh
+          ./scripts/build-rpm-fedora.sh
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: hamclock-fedora-rpm
+          path: |
+            build-rpm/RPMS/**/*.rpm
+            build-rpm/SRPMS/**/*.rpm
+
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            build-rpm/RPMS/**/*.rpm
+            build-rpm/SRPMS/**/*.rpm

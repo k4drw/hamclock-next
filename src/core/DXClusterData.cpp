@@ -82,11 +82,8 @@ void DXClusterDataStore::set(const DXClusterData &data) {
 }
 
 void DXClusterDataStore::addSpot(const DXClusterSpot &spot) {
-  std::lock_guard<std::mutex> lock(mutex_);
-
-  // Create a copy to modify (dithering)
+  // Create a dithered copy of the spot
   DXClusterSpot s = spot;
-
   // Apply dithering to prevent stacking
   // +/- ~0.5 degree (approx 2 pixels on 800px wide map)
   if (s.txLat != 0 || s.txLon != 0) {
@@ -98,13 +95,31 @@ void DXClusterDataStore::addSpot(const DXClusterSpot &spot) {
     s.rxLon += (static_cast<float>(rand() % 100) / 50.0f - 1.0f) * 0.5f;
   }
 
-  // Add to memory
-  auto newData = std::make_shared<DXClusterData>(*data_);
-  newData->spots.push_back(s);
-  newData->lastUpdate = std::chrono::system_clock::now();
-  data_ = newData;
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
 
-  // Persist to DB
+    // Create a single copy to modify
+    auto newData = std::make_shared<DXClusterData>(*data_);
+
+    // 1. Add the new spot to the copy
+    newData->spots.push_back(s);
+    newData->lastUpdate = std::chrono::system_clock::now();
+
+    // 2. Prune old spots from the same copy (in-place)
+    auto now = std::chrono::system_clock::now();
+    auto maxAge = std::chrono::minutes(60);
+    newData->spots.erase(std::remove_if(newData->spots.begin(),
+                                        newData->spots.end(),
+                                        [&](const DXClusterSpot &spot_to_prune) {
+                                          return (now - spot_to_prune.spottedAt) > maxAge;
+                                        }),
+                         newData->spots.end());
+    
+    // 3. Atomically swap the main pointer
+    data_ = newData;
+  }
+
+  // Persist to DB (outside the lock)
   auto &db = DatabaseManager::instance();
   int64_t ts = std::chrono::duration_cast<std::chrono::seconds>(
                    s.spottedAt.time_since_epoch())
@@ -122,7 +137,7 @@ void DXClusterDataStore::addSpot(const DXClusterSpot &spot) {
 
   db.exec(ss.str());
 
-  pruneOldSpots();
+  pruneOldSpots(); // This now only prunes the DB
 }
 
 void DXClusterDataStore::setConnected(bool connected,
@@ -145,21 +160,10 @@ void DXClusterDataStore::clear() {
 }
 
 void DXClusterDataStore::pruneOldSpots() {
+  // Prune DB only. In-memory pruning is now done in addSpot.
   auto now = std::chrono::system_clock::now();
-  auto maxAge = std::chrono::minutes(60); // Default 60 mins
+  auto maxAge = std::chrono::minutes(60);
 
-  // Prune memory
-  auto newData = std::make_shared<DXClusterData>(*data_);
-  newData->spots.erase(std::remove_if(newData->spots.begin(),
-                                      newData->spots.end(),
-                                      [&](const DXClusterSpot &s) {
-                                        return (now - s.spottedAt) > maxAge;
-                                      }),
-                       newData->spots.end());
-  data_ = newData;
-
-  // Prune DB (occasionally? or every time? Let's do it every time for correct
-  // sync)
   int64_t cutoffTs = std::chrono::duration_cast<std::chrono::seconds>(
                          (now - maxAge).time_since_epoch())
                          .count();

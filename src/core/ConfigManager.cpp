@@ -100,7 +100,7 @@ bool ConfigManager::init() {
                 console.log('[IDBFS] Sync-from-IDB complete' +
                             (mounted ? '' : ' (no IDBFS — session only)'));
               }
-              if (typeof Module._hamclock_after_idbfs == = 'function')
+              if (typeof Module._hamclock_after_idbfs === 'function')
                 Module._hamclock_after_idbfs();
             });
       },

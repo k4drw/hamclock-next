@@ -29,7 +29,10 @@ docker run --rm -v "$(pwd)":/work -w /work $IMAGE bash -c "
         -DSDL2IMAGE_SAMPLES=OFF \
         -DSDL2IMAGE_VENDORED=ON && \
     cmake --build build-win64 -j\$(nproc) && \
-    makensis packaging/windows/installer.nsi
+    VERSION=\$(cat VERSION | tr -d '[:space:]') && \
+    SUFFIX=\$(cat VERSION_SUFFIX | tr -d '[:space:]') && \
+    makensis -DVERSION=\"\${VERSION}\${SUFFIX}\" packaging/windows/installer.nsi && \
+    chown -R $(id -u):$(id -g) build-win64 packaging/windows/icon.ico
 "
 
 if [ $? -eq 0 ]; then

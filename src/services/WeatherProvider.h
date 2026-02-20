@@ -7,16 +7,16 @@
 
 class WeatherProvider {
 public:
-  WeatherProvider(NetworkManager &net, std::shared_ptr<WeatherStore> store);
+  WeatherProvider(NetworkManager &net, std::shared_ptr<WeatherStore> store,
+                  int id = 0);
 
   // Fetch weather for a specific location.
   void fetch(double lat, double lon);
 
 private:
-  void processData(const std::string &body);
-
   NetworkManager &net_;
   std::shared_ptr<WeatherStore> store_;
+  int id_;
 
   // Using open-meteo.com for free, no-key weather data
   // Example:

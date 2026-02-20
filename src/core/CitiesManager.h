@@ -2,6 +2,7 @@
 
 #include <mutex>
 #include <string>
+#include <vector>
 
 class CitiesManager {
 public:
@@ -17,4 +18,8 @@ private:
   CitiesManager() = default;
   std::mutex mutex_;
   bool initialized_ = false;
+
+  // Spatial grid for fast lookups. Grid is 180x360 cells (1-degree resolution).
+  // Each cell contains a vector of indices into the g_CityData array.
+  std::vector<std::vector<std::vector<size_t>>> grid_;
 };

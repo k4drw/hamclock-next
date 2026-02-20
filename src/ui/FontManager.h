@@ -173,23 +173,8 @@ public:
       return;
 
     int basePt = ptSize > 0 ? ptSize : defaultSize_;
-    TextCacheKey key{text, color, basePt, bold};
-
-    // Check cache
-    auto it = textCache_.find(key);
-    if (it != textCache_.end()) {
-      it->second.lastUsed = SDL_GetTicks();
-      SDL_Rect dst = {x, y, it->second.w, it->second.h};
-      if (centered) {
-        dst.x -= it->second.w / 2;
-        dst.y -= it->second.h / 2;
-      }
-      SDL_RenderCopy(renderer, it->second.texture, nullptr, &dst);
-      return;
-    }
-
-    // markers, don't cache to prevent rapid VRAM growth. Render every frame
-    // instead.
+    
+    // Heuristic for volatile text (timers, etc.) that changes every frame
     bool volatileText =
         forceVolatile ||
         (text.length() >= 5 && ((text.find(':') != std::string::npos && text.find(':', text.find(':') + 1) != std::string::npos) ||
@@ -197,31 +182,77 @@ public:
                                 (text.find('s') != std::string::npos &&
                                  text.find('m') != std::string::npos)));
 
-    // Not in cache - render new texture
-    int w = 0, h = 0;
-    SDL_Texture *tex = renderText(renderer, text, color, ptSize, &w, &h, bold);
-    if (!tex)
-      return;
+    if (volatileText) {
+      VolatileCacheKey key{x, y, basePt, bold};
+      auto it = volatileCache_.find(key);
 
-    if (!volatileText) {
+      // If we have a cached texture and the text is unchanged, just draw it.
+      if (it != volatileCache_.end() && it->second.text == text) {
+        it->second.lastUsed = SDL_GetTicks();
+        SDL_Rect dst = {x, y, it->second.w, it->second.h};
+        if (centered) {
+          dst.x -= it->second.w / 2;
+          dst.y -= it->second.h / 2;
+        }
+        SDL_RenderCopy(renderer, it->second.texture, nullptr, &dst);
+        return;
+      }
+
+      // Text has changed or is new, we need to re-render.
+      int w = 0, h = 0;
+      SDL_Texture *tex = renderText(renderer, text, color, basePt, &w, &h, bold);
+      if (!tex)
+        return;
+
+      // If an old texture was here, destroy it.
+      if (it != volatileCache_.end()) {
+        MemoryMonitor::getInstance().destroyTexture(it->second.texture);
+      }
+      
+      // Store the new texture and its text content in the volatile cache.
+      volatileCache_[key] = {tex, w, h, SDL_GetTicks(), text};
+
+      SDL_Rect dst = {x, y, w, h};
+      if (centered) {
+        dst.x -= w / 2;
+        dst.y -= h / 2;
+      }
+      SDL_RenderCopy(renderer, tex, nullptr, &dst);
+
+    } else {
+      // Logic for non-volatile, persistent text
+      TextCacheKey key{text, color, basePt, bold};
+      auto it = textCache_.find(key);
+      if (it != textCache_.end()) {
+        it->second.lastUsed = SDL_GetTicks();
+        SDL_Rect dst = {x, y, it->second.w, it->second.h};
+        if (centered) {
+          dst.x -= it->second.w / 2;
+          dst.y -= it->second.h / 2;
+        }
+        SDL_RenderCopy(renderer, it->second.texture, nullptr, &dst);
+        return;
+      }
+      
+      // Not in cache - render new texture
+      int w = 0, h = 0;
+      SDL_Texture *tex = renderText(renderer, text, color, ptSize, &w, &h, bold);
+      if (!tex)
+        return;
+
       // Prune cache if it gets too large
       if (textCache_.size() > 300) {
         pruneCache();
       }
       // Add to cache
       textCache_[key] = {tex, w, h, SDL_GetTicks()};
-    }
 
-    SDL_Rect dst = {x, y, w, h};
-    if (centered) {
-      dst.x -= w / 2;
-      dst.y -= h / 2;
-    }
-    SDL_RenderCopy(renderer, tex, nullptr, &dst);
-
-    if (volatileText) {
-      // Destroy temporary volatile texture
-      MemoryMonitor::getInstance().destroyTexture(tex);
+      SDL_Rect dst = {x, y, w, h};
+      if (centered) {
+        dst.x -= w / 2;
+        dst.y -= h / 2;
+      }
+      SDL_RenderCopy(renderer, tex, nullptr, &dst);
     }
   }
 
@@ -258,6 +289,10 @@ public:
       MemoryMonitor::getInstance().destroyTexture(val.texture);
     }
     textCache_.clear();
+    for (auto &[key, val] : volatileCache_) {
+      MemoryMonitor::getInstance().destroyTexture(val.texture);
+    }
+    volatileCache_.clear();
   }
 
 private:
@@ -284,10 +319,29 @@ private:
     }
   };
 
+  struct VolatileCacheKey {
+    int x, y, ptSize;
+    bool bold;
+
+    bool operator<(const VolatileCacheKey &other) const {
+      if (x != other.x) return x < other.x;
+      if (y != other.y) return y < other.y;
+      if (ptSize != other.ptSize) return ptSize < other.ptSize;
+      return bold < other.bold;
+    }
+  };
+
   struct CachedTexture {
     SDL_Texture *texture;
     int w, h;
     uint32_t lastUsed;
+  };
+
+  struct CachedTextureWithText {
+    SDL_Texture *texture;
+    int w, h;
+    uint32_t lastUsed;
+    std::string text;
   };
 
   void pruneCache() {
@@ -310,6 +364,7 @@ private:
   float renderScale_ = 1.0f;
   std::map<int, TTF_Font *> cache_;
   std::map<TextCacheKey, CachedTexture> textCache_;
+  std::map<VolatileCacheKey, CachedTextureWithText> volatileCache_;
   FontCatalog *catalog_ = nullptr;
   int maxW_ = 0;
   int maxH_ = 0;

@@ -1,0 +1,36 @@
+name: Build Linux ARM64 (Universal)
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-arm64:
+    name: ARM64 Universal DEB
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Build ARM64 Universal
+        run: |
+          chmod +x scripts/build-linux-arm64-universal.sh
+          ./scripts/build-linux-arm64-universal.sh
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hamclock-linux-arm64
+          path: build-linux-arm64-universal/*.deb
+
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/v')
+        with:
+          files: build-linux-arm64-universal/*.deb

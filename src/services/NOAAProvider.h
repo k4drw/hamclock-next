@@ -10,6 +10,19 @@ struct HamClockState;
 
 class NOAAProvider {
 public:
+  enum class UpdateType {
+    KIndex,
+    SFI,
+    SN,
+    Plasma,
+    Mag,
+    DST,
+    Aurora,
+    DRAP,
+    XRay,
+    ProtonFlux
+  };
+
   NOAAProvider(NetworkManager &net, std::shared_ptr<SolarDataStore> store,
                std::shared_ptr<AuroraHistoryStore> auroraStore = nullptr,
                HamClockState *state = nullptr);

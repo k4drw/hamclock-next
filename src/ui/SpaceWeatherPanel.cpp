@@ -44,18 +44,18 @@ SDL_Color SpaceWeatherPanel::colorForSFI(int sfi) {
 }
 
 SDL_Color SpaceWeatherPanel::colorForNOAAScale(int scale,
-                                                const ThemeColors &themes) {
+                                               const ThemeColors &themes) {
   // Official NOAA 5-tier scale:
   // 0 = no event, 1 = Minor, 2 = Moderate, 3 = Strong, 4/5 = Severe/Extreme
   if (scale <= 0)
-    return themes.textDim;           // No event — muted
+    return themes.textDim; // No event — muted
   if (scale == 1)
-    return themes.success;           // Minor — green
+    return themes.success; // Minor — green
   if (scale == 2)
-    return themes.warning;           // Moderate — yellow
+    return themes.warning; // Moderate — yellow
   if (scale == 3)
-    return {255, 140, 0, 255};       // Strong — orange (no theme token)
-  return themes.danger;              // Severe/Extreme — red
+    return {255, 140, 0, 255}; // Strong — orange (no theme token)
+  return themes.danger;        // Severe/Extreme — red
 }
 
 void SpaceWeatherPanel::destroyCache() {
@@ -181,10 +181,14 @@ void SpaceWeatherPanel::render(SDL_Renderer *renderer) {
   bool labelFontChanged = (labelFontSize_ != lastLabelFontSize_);
   bool valueFontChanged = (valueFontSize_ != lastValueFontSize_);
 
-  // 2x2 grid layout for current page
-  int cellW = width_ / 2;
-  int cellH = height_ / 2;
-  int pad = std::max(2, static_cast<int>(cellH * 0.1f));
+  // Grid layout for current page
+  bool isNarrow = (width_ < 110);
+  int numCols = isNarrow ? 1 : 2;
+  int numRows = isNarrow ? 4 : 2;
+
+  int cellW = width_ / numCols;
+  int cellH = (height_ - 10) / numRows; // Leave space for pagination bar
+  int pad = std::max(1, static_cast<int>(cellH * 0.05f));
 
   SDL_Color labelColor = themes.textDim;
 
@@ -196,8 +200,8 @@ void SpaceWeatherPanel::render(SDL_Renderer *renderer) {
     if (itemIdx >= kNumItems)
       continue;
 
-    int col = i % 2;
-    int row = i / 2;
+    int col = i % numCols;
+    int row = i / numCols;
     int cellX = x_ + col * cellW;
     int cellY = y_ + row * cellH;
 
@@ -239,21 +243,32 @@ void SpaceWeatherPanel::render(SDL_Renderer *renderer) {
     // Draw value (below label, centered)
     if (items_[itemIdx].valueTex) {
       int vx = cellX + (cellW - items_[itemIdx].valueW) / 2;
-      int vy = cellY + pad + items_[itemIdx].labelH;
+      // Use a slight overlap prevention or specific offset
+      int vy = cellY + cellH - pad - items_[itemIdx].valueH -
+               2; // Offset from bottom of cell
+      if (vy < cellY + items_[itemIdx].labelH + pad) {
+        vy = cellY + items_[itemIdx].labelH + pad - 1; // Minimal spacing
+      }
       SDL_Rect dst = {vx, vy, items_[itemIdx].valueW, items_[itemIdx].valueH};
       SDL_RenderCopy(renderer, items_[itemIdx].valueTex, nullptr, &dst);
     }
   }
 
-  // Draw pagination dots (bottom center)
+  // Draw pagination bar (bottom) - 4 segments
+  int barH = 2;
+  int segPad = 2;
+  int barY = y_ + height_ - barH - 2;
+  int totalBarW = width_ - 2 * segPad;
+  int segW = totalBarW / 4;
+
   for (int i = 0; i < 4; ++i) {
-    SDL_Rect dot = {x_ + width_ / 2 - 20 + i * 12, y_ + height_ - 8, 6, 6};
+    SDL_Rect seg = {x_ + segPad + i * segW, barY, segW - 1, barH};
     if (i == currentPage_) {
-      SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+      SDL_SetRenderDrawColor(renderer, 0, 200, 255, 255); // Cyan highlight
     } else {
-      SDL_SetRenderDrawColor(renderer, 80, 80, 80, 255);
+      SDL_SetRenderDrawColor(renderer, 60, 60, 60, 255); // Muted gray
     }
-    SDL_RenderFillRect(renderer, &dot);
+    SDL_RenderFillRect(renderer, &seg);
   }
 
   lastLabelFontSize_ = labelFontSize_;

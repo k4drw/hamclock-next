@@ -1,19 +1,26 @@
 #!/bin/bash
 # Generic script to package HamClock-Next as a .deb
-# Usage: ./create_deb.sh <binary_path> <arch> <os_dist> <variant> <build_dir>
+# Usage: ./create_deb.sh <binary_path> <arch> <variant> <build_dir>
 
 BINARY_PATH=$1
 ARCH=$2
-OS_DIST=$3  # e.g. "bullseye", "bookworm", "trixie"
-VARIANT=$4  # e.g. "fb0" or "x11"
-BUILD_DIR=$5
+VARIANT=$3  # e.g. "fb0" or "x11"
+BUILD_DIR=$4
 
-if [ -z "$BINARY_PATH" ] || [ -z "$ARCH" ] || [ -z "$OS_DIST" ] || [ -z "$VARIANT" ] || [ -z "$BUILD_DIR" ]; then
-    echo "Usage: $0 <binary_path> <arch> <os_dist> <variant> <build_dir>"
+if [ -z "$BINARY_PATH" ] || [ -z "$ARCH" ] || [ -z "$VARIANT" ] || [ -z "$BUILD_DIR" ]; then
+    echo "Usage: $0 <binary_path> <arch> <variant> <build_dir>"
     exit 1
 fi
 
-VERSION="${VERSION:-0.7B}"
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+REPO_ROOT=$(dirname "$(dirname "$SCRIPT_DIR")")
+
+if [ -z "$VERSION" ]; then
+    V_NUM=$(cat "$REPO_ROOT/VERSION" | tr -d '[:space:]')
+    V_SUF=$(cat "$REPO_ROOT/VERSION_SUFFIX" | tr -d '[:space:]')
+    VERSION="${V_NUM}${V_SUF}"
+fi
+
 PKG_NAME="hamclock-next-${VARIANT}"
 PKG_DIR="${BUILD_DIR}/package"
 
@@ -30,8 +37,6 @@ cp "$BINARY_PATH" "$PKG_DIR/usr/bin/hamclock-next"
 chmod 755 "$PKG_DIR/usr/bin/hamclock-next"
 
 # 1b. Install Icon
-SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
-REPO_ROOT=$(dirname "$(dirname "$SCRIPT_DIR")")
 cp "$REPO_ROOT/packaging/icon.png" "$PKG_DIR/usr/share/icons/hicolor/256x256/apps/hamclock-next.png"
 
 # 2. Add Desktop entry (for X11 builds mainly, but useful for menu entry too)
@@ -49,10 +54,14 @@ EOF
 # 3. Create Control File
 # Determine dependencies based on variant
 DEPENDS="libc6, libcurl4, libstdc++6"
-if [ "$VARIANT" == "x11" ]; then
-    DEPENDS="$DEPENDS, libx11-6, libxext6, libxcursor1, libxi6, libxrandr2, libxss1, libxxf86vm1, libxinerama1, libgl1"
+if [ "$VARIANT" == "unified" ] || [ "$VARIANT" == "universal" ]; then
+    # Full desktop dependencies (X11 + Wayland + DRM)
+    VARIANT="unified"
+    DEPENDS="$DEPENDS, libx11-6, libxext6, libxcursor1, libxi6, libxrandr2, libxss1, libxxf86vm1, libxinerama1, libwayland-client0, libwayland-cursor0, libwayland-egl1, libxkbcommon0, libgl1, libdrm2, libgbm1, libegl1, libgles2"
 else
+    # Lean headless/kiosk dependencies (DRM/GBM only - no X11/Wayland)
     DEPENDS="$DEPENDS, libdrm2, libgbm1, libegl1, libgles2"
+    VARIANT="fb0"
 fi
 
 cat > "$PKG_DIR/DEBIAN/control" <<EOF
@@ -66,10 +75,12 @@ Priority: optional
 Description: HamClock Next - Portable Amateur Radio Clock
  A modern, feature-rich clock for amateur radio operators.
  Features contest calendars, propagation predictions, satellite tracking, and more.
- Built for ${OS_DIST} (${VARIANT}).
+ Built for Linux (${VARIANT}).
 EOF
 
 # 4. Build Package
-dpkg-deb --build "$PKG_DIR" "${BUILD_DIR}/hamclock-next_${VERSION}_${OS_DIST}_${VARIANT}_${ARCH}.deb"
+# Simplified naming: no OS distribution in filename
+FINAL_FILENAME="${BUILD_DIR}/hamclock-next_${VERSION}_${VARIANT}_${ARCH}.deb"
+dpkg-deb --build "$PKG_DIR" "$FINAL_FILENAME"
 
-echo "Package created: ${BUILD_DIR}/hamclock-next_${VERSION}_${OS_DIST}_${VARIANT}_${ARCH}.deb"
+echo "Package created: $FINAL_FILENAME"
