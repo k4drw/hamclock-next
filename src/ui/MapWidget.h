@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../core/ADIFData.h"
+#include "../core/ActivityData.h"
 #include "../core/AuroraHistoryStore.h"
 #include "../core/ConfigManager.h"
 #include "../core/DXClusterData.h"
@@ -20,8 +21,12 @@
 #include <string>
 
 class MufRtProvider;
+class CloudProvider;
+class WxMbProvider;
+class BeaconProvider;
 class IonosondeProvider;
 class SolarDataStore;
+class PaneContainer;
 
 class MapWidget : public Widget {
 public:
@@ -59,9 +64,17 @@ public:
     adifStore_ = std::move(store);
   }
 
+  void setActivityStore(std::shared_ptr<ActivityDataStore> store) {
+    activityStore_ = std::move(store);
+  }
+
   void setMufRtProvider(MufRtProvider *p) { mufrt_ = p; }
+  void setCloudProvider(CloudProvider *p) { clouds_ = p; }
+  void setBeaconProvider(BeaconProvider *p) { beacons_ = p; }
   void setIonosondeProvider(IonosondeProvider *p) { iono_ = p; }
   void setSolarDataStore(SolarDataStore *s) { solar_ = s; }
+
+  void setPanes(const std::vector<PaneContainer *> &panes) { panes_ = panes; }
 
   void setOnConfigChanged(std::function<void()> cb) { onConfigChanged_ = cb; }
 
@@ -75,6 +88,9 @@ public:
   SDL_Rect getActionRect(const std::string &action) const override;
   nlohmann::json getDebugData() const override;
 
+  // Thread-safe method for receiving data from background threads
+  void onSatTrackReady(const std::vector<GroundTrackPoint>& track);
+  void onPropDataReady(PropOverlayType type, const std::vector<float> &grid);
 private:
   SDL_FPoint latLonToScreen(double lat, double lon) const;
   bool screenToLatLon(int sx, int sy, double &lat, double &lon) const;
@@ -94,7 +110,13 @@ private:
   void renderDXClusterSpots(SDL_Renderer *renderer);
   void renderAuroraOverlay(SDL_Renderer *renderer);
   void renderADIFPins(SDL_Renderer *renderer);
+  void renderONTASpots(SDL_Renderer *renderer);
+  void renderBeacons(SDL_Renderer *renderer);
   void renderMufRtOverlay(SDL_Renderer *renderer);
+  void renderCloudOverlay(SDL_Renderer *renderer);
+  void renderWxMbOverlay(SDL_Renderer *renderer);
+  void renderPropagationOverlay(SDL_Renderer *renderer);
+  void updatePropagationOverlay();
 
   TextureManager &texMgr_;
   FontManager &fontMgr_;
@@ -104,10 +126,15 @@ private:
   std::shared_ptr<DXClusterDataStore> dxcStore_;
   std::shared_ptr<AuroraHistoryStore> auroraStore_;
   std::shared_ptr<ADIFStore> adifStore_;
+  std::shared_ptr<ActivityDataStore> activityStore_;
   MufRtProvider *mufrt_ = nullptr;
+  CloudProvider *clouds_ = nullptr;
+  std::unique_ptr<WxMbProvider> wxmb_;
+  BeaconProvider *beacons_ = nullptr;
   IonosondeProvider *iono_ = nullptr;
   SolarDataStore *solar_ = nullptr;
   OrbitPredictor *predictor_ = nullptr;
+  std::vector<PaneContainer *> panes_;
 
   std::unique_ptr<MapViewMenu> mapViewMenu_;
 
@@ -123,14 +150,28 @@ private:
   double sunLat_ = 0;
   double sunLon_ = 0;
   uint32_t lastPosUpdateMs_ = 0;
+  uint32_t lastSatTrackUpdateMs_ = 0;
 
   // Math caches to save CPU
   std::vector<LatLon> cachedGreatCircle_;
+  std::vector<GroundTrackPoint> cachedSatTrack_;
   std::vector<SDL_Vertex> shadowVerts_;
   std::vector<SDL_Vertex> lightVerts_;
+  std::vector<SDL_Vertex> propVerts_;
   std::vector<int> nightIndices_;
+  std::vector<int> propIndices_;
 
-  // Buffers for batching spots
+  // Caches for render-ready geometry to avoid per-frame recalculation
+  bool greatCircleDirty_ = true;
+  std::vector<SDL_Vertex> greatCircleVerts_;
+  std::vector<int> greatCircleIndices_;
+  bool satTrackDirty_ = true;
+  std::vector<SDL_Vertex> satTrackVerts_;
+  std::vector<int> satTrackIndices_;
+  bool gridDirty_ = true;
+  std::vector<SDL_Vertex> gridVerts_;
+
+  // Buffers for batching spots (dynamic per frame)
   std::vector<SDL_Vertex> spotVerts_;
   std::vector<int> spotIndices_;
   std::vector<SDL_Vertex> mapVerts_;
@@ -164,7 +205,14 @@ private:
   bool useCompatibilityRenderPath_ = false;
   SDL_Texture *nightOverlayTexture_ = nullptr;
   SDL_Texture *mufRtTexture_ = nullptr;
+  SDL_Texture *propTexture_ = nullptr;
   uint32_t lastMufUpdateMs_ = 0;
+  uint64_t wxLastCheckMs_ = 0;
+  uint32_t lastPropUpdateMs_ = 0;
+  PropOverlayType lastPropType_ = PropOverlayType::None;
+  std::string lastBand_;
+  std::string lastMode_;
+  int lastPower_ = -1;
   double lastUpdateSunLat_ = -999.0;
   double lastUpdateSunLon_ = -999.0;
 

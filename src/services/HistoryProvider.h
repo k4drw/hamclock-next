@@ -7,6 +7,8 @@
 
 class HistoryProvider {
 public:
+  enum class SeriesType { Flux, SSN, Kp };
+
   HistoryProvider(NetworkManager &net, std::shared_ptr<HistoryStore> store);
 
   void fetchFlux();
@@ -14,10 +16,6 @@ public:
   void fetchKp();
 
 private:
-  void processFlux(const std::string &body);
-  void processSSN(const std::string &body);
-  void processKp(const std::string &body);
-
   NetworkManager &net_;
   std::shared_ptr<HistoryStore> store_;
 

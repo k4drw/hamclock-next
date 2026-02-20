@@ -57,4 +57,5 @@ private:
   Filter filter_ = Filter::ALL;
   SDL_Rect chipRect_ = {0, 0, 0, 0};
   std::function<void(const std::string &)> onFilterChanged_;
+  std::vector<ONTASpot> currentSpots_;
 };

@@ -1,0 +1,36 @@
+name: Build Linux x64 DEB
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-linux-x64:
+    name: Ubuntu/Debian x64 DEB
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Build x64 DEB
+        run: |
+          chmod +x scripts/build-linux-x64-deb.sh
+          ./scripts/build-linux-x64-deb.sh
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hamclock-linux-x64-deb
+          path: build-linux-x64/*.deb
+
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/v')
+        with:
+          files: build-linux-x64/*.deb

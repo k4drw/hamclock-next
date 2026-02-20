@@ -1,0 +1,36 @@
+name: Build Linux ARMhf (Universal)
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-armhf:
+    name: ARMhf Universal DEB
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Build ARMhf Universal
+        run: |
+          chmod +x scripts/build-linux-armhf-universal.sh
+          ./scripts/build-linux-armhf-universal.sh
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hamclock-linux-armhf
+          path: build-linux-armhf-universal/*.deb
+
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/v')
+        with:
+          files: build-linux-armhf-universal/*.deb

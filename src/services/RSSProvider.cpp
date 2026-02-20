@@ -1,22 +1,22 @@
 #include "RSSProvider.h"
+#include "../core/Constants.h"
 #include "../core/Logger.h"
+#include "../core/WorkerService.h"
+#include "SDL_events.h"
+
+#include <string>
+#include <vector>
 
 namespace {
+
+// ... (All the helper functions: stripCDATA, stripTags, decodeEntities,
+// collapse, extractTitles, parseAtom, parseRSS, parseNG3K remain unchanged)
 
 struct FeedInfo {
   const char *url;
   const char *name;
+  std::function<std::vector<std::string>(const std::string &)> parser;
 };
-
-static constexpr FeedInfo kFeeds[] = {
-    // 1. HamWeekly (Atom format)
-    {"https://daily.hamweekly.com/atom.xml", "HamWeekly"},
-    // 2. ARNewsLine (RSS format)
-    {"https://www.arnewsline.org/?format=rss", "ARNewsLine"},
-    // 3. NG3K (HTML table of DX expeditions)
-    {"https://www.ng3k.com/Misc/adxo.html", "NG3K"},
-};
-static constexpr int kNumFeeds = sizeof(kFeeds) / sizeof(kFeeds[0]);
 
 // Strip <![CDATA[...]]> wrapper if present.
 std::string stripCDATA(const std::string &s) {
@@ -27,23 +27,18 @@ std::string stripCDATA(const std::string &s) {
 }
 
 // Remove HTML/XML tags from a string.
-// Replaces tags with spaces to prevent text concatenation.
 std::string stripTags(const std::string &s) {
   std::string result;
   bool inTag = false;
   bool needSpace = false;
-
   for (char c : s) {
     if (c == '<') {
-      // Entering a tag - mark that we might need a space after
-      if (!inTag && !result.empty() && result.back() != ' ') {
+      if (!inTag && !result.empty() && result.back() != ' ')
         needSpace = true;
-      }
       inTag = true;
       continue;
     }
     if (c == '>') {
-      // Exiting a tag
       inTag = false;
       if (needSpace) {
         result += ' ';
@@ -53,7 +48,7 @@ std::string stripTags(const std::string &s) {
     }
     if (!inTag) {
       result += c;
-      needSpace = false; // Reset if we have actual content
+      needSpace = false;
     }
   }
   return result;
@@ -63,32 +58,26 @@ std::string stripTags(const std::string &s) {
 std::string decodeEntities(const std::string &s) {
   std::string result;
   result.reserve(s.size());
-
   for (size_t i = 0; i < s.size(); ++i) {
     if (s[i] == '&' && i + 1 < s.size()) {
-      // Find the semicolon
       size_t end = s.find(';', i + 1);
       if (end != std::string::npos && end - i <= 10) {
         std::string entity = s.substr(i + 1, end - i - 1);
-
-        // Common HTML entities
-        if (entity == "amp") {
+        if (entity == "amp")
           result += '&';
-        } else if (entity == "lt") {
+        else if (entity == "lt")
           result += '<';
-        } else if (entity == "gt") {
+        else if (entity == "gt")
           result += '>';
-        } else if (entity == "quot") {
+        else if (entity == "quot")
           result += '"';
-        } else if (entity == "apos" || entity == "#39") {
+        else if (entity == "apos" || entity == "#39")
           result += '\'';
-        } else if (entity == "nbsp" || entity == "#160") {
+        else if (entity == "nbsp" || entity == "#160")
           result += ' ';
-        } else {
-          // Unknown entity - keep as is
+        else
           result += s.substr(i, end - i + 1);
-        }
-        i = end; // Skip past the semicolon (loop will increment)
+        i = end;
       } else {
         result += s[i];
       }
@@ -99,10 +88,10 @@ std::string decodeEntities(const std::string &s) {
   return result;
 }
 
-// Collapse runs of whitespace (including newlines) to single spaces, trim ends.
+// Collapse runs of whitespace to single spaces, trim ends.
 std::string collapse(const std::string &s) {
   std::string result;
-  bool lastSpace = true; // trims leading whitespace
+  bool lastSpace = true;
   for (char c : s) {
     if (c == '\n' || c == '\r' || c == '\t')
       c = ' ';
@@ -120,16 +109,12 @@ std::string collapse(const std::string &s) {
   return result;
 }
 
-// Extract <title> text from blocks delimited by startTag/endTag.
-// Works for both RSS (<item>) and Atom (<entry>) feeds.
+// Extract <title> text from blocks
 std::vector<std::string> extractTitles(const std::string &body,
                                        const char *startTag,
                                        const char *endTag) {
   std::vector<std::string> titles;
   std::string::size_type pos = 0;
-  const auto startLen = std::char_traits<char>::length(startTag);
-  const auto endLen = std::char_traits<char>::length(endTag);
-
   while (pos < body.size()) {
     auto blockStart = body.find(startTag, pos);
     if (blockStart == std::string::npos)
@@ -137,7 +122,6 @@ std::vector<std::string> extractTitles(const std::string &body,
     auto blockEnd = body.find(endTag, blockStart);
     if (blockEnd == std::string::npos)
       break;
-
     auto titleStart = body.find("<title>", blockStart);
     if (titleStart != std::string::npos && titleStart < blockEnd) {
       titleStart += 7;
@@ -152,27 +136,20 @@ std::vector<std::string> extractTitles(const std::string &body,
           titles.push_back(t);
       }
     }
-    pos = blockEnd + endLen;
-    (void)startLen; // used only for clarity
+    pos = blockEnd + std::char_traits<char>::length(endTag);
   }
   return titles;
 }
 
-// Parse Atom feed: <entry>...<title>...</title>...</entry>
 std::vector<std::string> parseAtom(const std::string &body) {
   return extractTitles(body, "<entry>", "</entry>");
 }
-
-// Parse RSS feed: <item>...<title>...</title>...</item>
 std::vector<std::string> parseRSS(const std::string &body) {
   return extractTitles(body, "<item>", "</item>");
 }
-
-// Parse NG3K HTML page: extract DX expedition rows from table.
 std::vector<std::string> parseNG3K(const std::string &body) {
   std::vector<std::string> headlines;
   std::string::size_type pos = 0;
-
   while (pos < body.size() && headlines.size() < 15) {
     auto rowStart = body.find("<tr", pos);
     if (rowStart == std::string::npos)
@@ -183,53 +160,24 @@ std::vector<std::string> parseNG3K(const std::string &body) {
     auto rowEnd = body.find("</tr>", tagEnd);
     if (rowEnd == std::string::npos)
       break;
-
     std::string rowContent = body.substr(tagEnd + 1, rowEnd - tagEnd - 1);
     std::string text = stripTags(rowContent);
     text = decodeEntities(text);
     text = collapse(text);
-
-    // Keep rows with enough substance (skip headers / empty rows)
     if (text.size() > 15) {
       headlines.push_back(text);
     }
-
     pos = rowEnd + 5;
   }
   return headlines;
 }
 
-// Shared state that accumulates headlines from all feeds.
-// Each callback updates its own slot; the combined list is pushed to the store.
-struct FeedAggregator {
-  std::mutex mutex;
-  std::vector<std::string> perFeed[kNumFeeds];
-  std::shared_ptr<RSSDataStore> store;
-
-  explicit FeedAggregator(std::shared_ptr<RSSDataStore> s)
-      : store(std::move(s)) {}
-
-  void update(int idx, std::vector<std::string> headlines) {
-    std::lock_guard<std::mutex> lock(mutex);
-    perFeed[idx] = std::move(headlines);
-
-    RSSData data;
-    for (int i = 0; i < kNumFeeds; ++i)
-      for (const auto &h : perFeed[i])
-        data.headlines.push_back(h);
-
-    if (data.headlines.empty()) {
-      data.headlines = {
-          "HamClock-Next: A modern amateur radio dashboard",
-          "Welcome to HamClock -- real-time propagation and space weather",
-      };
-    }
-
-    data.lastUpdated = std::chrono::system_clock::now();
-    data.valid = true;
-    store->set(data);
-  }
+static const FeedInfo kFeeds[] = {
+    {"https://daily.hamweekly.com/atom.xml", "HamWeekly", parseAtom},
+    {"https://www.arnewsline.org/?format=rss", "ARNewsLine", parseRSS},
+    {"https://www.ng3k.com/Misc/adxo.html", "NG3K", parseNG3K},
 };
+static constexpr int kNumFeeds = sizeof(kFeeds) / sizeof(kFeeds[0]);
 
 } // namespace
 
@@ -240,29 +188,31 @@ RSSProvider::RSSProvider(NetworkManager &net,
 void RSSProvider::fetch() {
   if (!enabled_)
     return;
-  auto agg = std::make_shared<FeedAggregator>(store_);
 
-  // Feed 0: HamWeekly (Atom)
-  net_.fetchAsync(kFeeds[0].url, [agg](std::string body) {
-    auto headlines = parseAtom(body);
-    LOG_I("RSSProvider", "{} -> {} headlines", kFeeds[0].name,
-          headlines.size());
-    agg->update(0, std::move(headlines));
-  });
+  for (int i = 0; i < kNumFeeds; ++i) {
+    const auto &feed = kFeeds[i];
+    net_.fetchAsync(feed.url, [feed_index = i, feed_name = feed.name,
+                               parser = feed.parser](std::string body) {
+      if (body.empty()) {
+        LOG_W("RSSProvider", "Fetch failed for {}", feed_name);
+        return;
+      }
 
-  // Feed 1: ARNewsLine (RSS)
-  net_.fetchAsync(kFeeds[1].url, [agg](std::string body) {
-    auto headlines = parseRSS(body);
-    LOG_I("RSSProvider", "{} -> {} headlines", kFeeds[1].name,
-          headlines.size());
-    agg->update(1, std::move(headlines));
-  });
+      // Offload the parsing to a worker thread
+      WorkerService::getInstance().submitTask(
+          [body, feed_index, feed_name, parser]() {
+            LOG_D("RSSProvider", "Parsing {} on worker thread.", feed_name);
+            auto *headlines = new std::vector<std::string>(parser(body));
+            LOG_I("RSSProvider", "{} -> {} headlines", feed_name,
+                  headlines->size());
 
-  // Feed 2: NG3K (HTML)
-  net_.fetchAsync(kFeeds[2].url, [agg](std::string body) {
-    auto headlines = parseNG3K(body);
-    LOG_I("RSSProvider", "{} -> {} headlines", kFeeds[2].name,
-          headlines.size());
-    agg->update(2, std::move(headlines));
-  });
+            SDL_Event event;
+            SDL_zero(event);
+            event.type = HamClock::AE_BASE_EVENT + HamClock::AE_RSS_DATA_READY;
+            event.user.code = feed_index;
+            event.user.data1 = headlines;
+            SDL_PushEvent(&event);
+          });
+    });
+  }
 }

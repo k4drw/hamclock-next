@@ -1,3 +1,4 @@
+#include "core/ActivityLocationManager.h"
 #include "core/AuroraHistoryStore.h"
 #include "core/BrightnessManager.h"
 #include "core/CPUMonitor.h"
@@ -17,16 +18,18 @@
 #ifdef ENABLE_DEBUG_API
 #include "core/UIRegistry.h"
 #endif
-#include "core/MemoryMonitor.h"
 #include "core/SoundManager.h"
 #include "core/WidgetType.h"
+#include "core/WorkerService.h"
 
 #include "network/NetworkManager.h"
 #include "network/WebServer.h"
 #include "services/ADIFProvider.h"
 #include "services/ActivityProvider.h"
+#include "services/AsteroidProvider.h"
 #include "services/AuroraProvider.h"
 #include "services/BandConditionsProvider.h"
+#include "services/BeaconProvider.h"
 #include "services/CallbookProvider.h"
 #include "services/ContestProvider.h"
 #include "services/DRAPProvider.h"
@@ -38,6 +41,7 @@
 #include "services/LiveSpotProvider.h"
 #include "services/MoonProvider.h"
 #include "services/MufRtProvider.h"
+#include "services/CloudProvider.h"
 #include "services/NOAAProvider.h"
 #include "services/RBNProvider.h"
 #include "services/RSSProvider.h"
@@ -48,6 +52,7 @@
 #include "services/WeatherProvider.h"
 #include "ui/ADIFPanel.h"
 #include "ui/ActivityPanels.h"
+#include "ui/AsteroidPanel.h"
 #include "ui/AuroraGraphPanel.h"
 #include "ui/AuroraPanel.h"
 #include "ui/BandConditionsPanel.h"
@@ -107,7 +112,6 @@
 #include <winsock2.h>
 #endif
 #include <memory>
-#include <sstream>
 #ifdef __linux__
 #include <unistd.h>
 #endif
@@ -154,6 +158,7 @@ struct AppContext {
 
   // Data Stores
   std::shared_ptr<SolarDataStore> solarStore;
+  std::shared_ptr<AuroraHistoryStore> auroraHistoryStore;
   std::shared_ptr<WatchlistStore> watchlistStore;
   std::shared_ptr<RSSDataStore> rssStore;
   std::shared_ptr<WatchlistHitStore> watchlistHitStore;
@@ -231,9 +236,12 @@ struct DashboardContext {
   std::unique_ptr<DstProvider> dstProvider;
   std::unique_ptr<ADIFProvider> adifProvider;
   std::unique_ptr<MufRtProvider> mufRtProvider;
+  std::unique_ptr<CloudProvider> cloudProvider;
   std::unique_ptr<IonosondeProvider> ionosondeProvider;
   std::unique_ptr<SantaProvider> santaProvider;
   std::unique_ptr<SatelliteManager> satMgr;
+  std::unique_ptr<AsteroidProvider> asteroidProvider;
+  std::unique_ptr<BeaconProvider> beaconProvider;
 
   // Services
 #ifndef __EMSCRIPTEN__
@@ -264,6 +272,10 @@ struct DashboardContext {
   Uint32 lastMouseMotionMs = 0;
   bool cursorVisible = true;
   Uint32 lastSleepAssert = 0;
+
+  // State for background data aggregation
+  std::vector<std::string> rssHeadlines[3];
+  bool rssDataDirty = false;
 
   DashboardContext(AppContext &ctx);
   ~DashboardContext() = default;
@@ -339,6 +351,8 @@ extern "C" EMSCRIPTEN_KEEPALIVE void hamclock_after_idbfs() {
 // Main tick function for Emscripten/MainLoop
 void main_tick();
 
+uint32_t HamClock::AE_BASE_EVENT = 0;
+
 int main(int argc, char *argv[]) {
 #ifndef _WIN32
   SDL_SetMainReady();
@@ -346,6 +360,9 @@ int main(int argc, char *argv[]) {
 #ifndef __EMSCRIPTEN__
   curl_global_init(CURL_GLOBAL_ALL);
 #endif
+
+  // Initialize the worker service right away
+  WorkerService::getInstance();
 
   g_app = new AppContext();
   AppContext &ctx = *g_app;
@@ -435,9 +452,14 @@ int main(int argc, char *argv[]) {
   }
 #endif
 
-  if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) != 0) {
+  if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_EVENTS) != 0) {
     LOG_ERROR("SDL_Init failed: {}", SDL_GetError());
     return EXIT_FAILURE;
+  }
+
+  AE_BASE_EVENT = SDL_RegisterEvents(2);
+  if (AE_BASE_EVENT == (uint32_t)-1) {
+    LOG_W("Main", "Failed to reserve user events for background tasks");
   }
 
   int imgFlags = IMG_INIT_PNG | IMG_INIT_JPG;
@@ -560,10 +582,14 @@ int main(int argc, char *argv[]) {
   ctx.netManager =
       std::make_unique<NetworkManager>(ctx.cfgMgr.configDir() / "cache");
   ctx.netManager->setCorsProxyUrl(ctx.appCfg.corsProxyUrl);
+  
+  ActivityLocationManager::getInstance().init(*ctx.netManager, ctx.cfgMgr.configDir() / "cache");
+
   ctx.prefixMgr.init();
   CitiesManager::getInstance().init();
 
   ctx.solarStore = std::make_shared<SolarDataStore>();
+  ctx.auroraHistoryStore = std::make_shared<AuroraHistoryStore>();
   ctx.watchlistStore = std::make_shared<WatchlistStore>();
   ctx.rssStore = std::make_shared<RSSDataStore>();
   ctx.watchlistHitStore = std::make_shared<WatchlistHitStore>();
@@ -629,6 +655,7 @@ int main(int argc, char *argv[]) {
 #endif
 
   // Cleanup
+  WorkerService::getInstance().stop();
   SoundManager::getInstance().cleanup();
   SDL_DestroyRenderer(ctx.renderer);
   SDL_DestroyWindow(ctx.window);
@@ -716,7 +743,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
   auto &netManager = *ctx.netManager;
   auto &appCfg = ctx.appCfg;
 
-  auto auroraHistoryStore = std::make_shared<AuroraHistoryStore>();
+  auto auroraHistoryStore = ctx.auroraHistoryStore;
   noaaProvider = std::make_unique<NOAAProvider>(
       netManager, solarStore, auroraHistoryStore, state.get());
   noaaProvider->fetch();
@@ -724,9 +751,8 @@ DashboardContext::DashboardContext(AppContext &ctx)
   rssProvider = std::make_unique<RSSProvider>(netManager, rssStore);
   rssProvider->fetch();
 
-  spotProvider = std::make_unique<LiveSpotProvider>(netManager, spotStore,
-                                                    appCfg, state.get(),
-                                                    dxcStore);
+  spotProvider = std::make_unique<LiveSpotProvider>(
+      netManager, spotStore, appCfg, state.get(), dxcStore);
   spotProvider->fetch();
 
 #ifndef __EMSCRIPTEN__
@@ -775,11 +801,11 @@ DashboardContext::DashboardContext(AppContext &ctx)
   historyProvider->fetchKp();
 
   deWeatherProvider =
-      std::make_unique<WeatherProvider>(netManager, deWeatherStore);
+      std::make_unique<WeatherProvider>(netManager, deWeatherStore, 0);
   deWeatherProvider->fetch(state->deLocation.lat, state->deLocation.lon);
 
   dxWeatherProvider =
-      std::make_unique<WeatherProvider>(netManager, dxWeatherStore);
+      std::make_unique<WeatherProvider>(netManager, dxWeatherStore, 1);
   dxWeatherProvider->fetch(state->dxLocation.lat, state->dxLocation.lon);
 
   sdoProvider = std::make_unique<SDOProvider>(netManager);
@@ -796,14 +822,20 @@ DashboardContext::DashboardContext(AppContext &ctx)
   adifProvider = std::make_unique<ADIFProvider>(adifStore, ctx.prefixMgr);
   adifProvider->fetch(ctx.cfgMgr.configDir() / "logs.adif");
 
-  mufRtProvider = std::make_unique<MufRtProvider>(netManager);
-  mufRtProvider->update();
+      mufRtProvider = std::make_unique<MufRtProvider>(netManager);
+      mufRtProvider->update();
+  
+      cloudProvider = std::make_unique<CloudProvider>(netManager);
+      cloudProvider->update();
+  
+      ionosondeProvider = std::make_unique<IonosondeProvider>(netManager);  ionosondeProvider->update();
 
-  ionosondeProvider = std::make_unique<IonosondeProvider>(netManager);
-  ionosondeProvider->update();
-
-  santaProvider = std::make_unique<SantaProvider>(santaStore);
-  santaProvider->update();
+      asteroidProvider = std::make_unique<AsteroidProvider>(netManager);
+      asteroidProvider->update();
+  
+      beaconProvider = std::make_unique<BeaconProvider>();
+  
+      santaProvider = std::make_unique<SantaProvider>(santaStore);  santaProvider->update();
 
   SDL_Color cyan = {0, 200, 255, 255};
   timePanel =
@@ -932,16 +964,19 @@ DashboardContext::DashboardContext(AppContext &ctx)
       widgetPool[type] = std::make_unique<WeatherPanel>(
           0, 0, 0, 0, fontMgr, dxWeatherStore, "DX Weather");
       break;
-    case WidgetType::NCDXF:
-      widgetPool[type] = std::make_unique<BeaconPanel>(0, 0, 0, 0, fontMgr);
-      break;
-    case WidgetType::SDO:
+          case WidgetType::NCDXF:
+            widgetPool[type] = std::make_unique<BeaconPanel>(0, 0, 0, 0, fontMgr, *beaconProvider);
+            break;    case WidgetType::SDO:
       widgetPool[type] =
           std::make_unique<SDOPanel>(0, 0, 0, 0, fontMgr, texMgr, *sdoProvider);
       break;
     case WidgetType::CPU_TEMP:
       widgetPool[type] = std::make_unique<CPUTempPanel>(
           0, 0, 0, 0, fontMgr, ctx.cpuMonitor, appCfg.useMetric);
+      break;
+    case WidgetType::ASTEROID:
+      widgetPool[type] = std::make_unique<AsteroidPanel>(0, 0, 0, 0, fontMgr,
+                                                         *asteroidProvider);
       break;
     default:
       widgetPool[type] = std::make_unique<PlaceholderWidget>(
@@ -964,7 +999,8 @@ DashboardContext::DashboardContext(AppContext &ctx)
       WidgetType::ADIF,          WidgetType::COUNTDOWN,
       WidgetType::CALLBOOK,      WidgetType::DST_INDEX,
       WidgetType::WATCHLIST,     WidgetType::EME_TOOL,
-      WidgetType::SANTA_TRACKER, WidgetType::CPU_TEMP};
+      WidgetType::SANTA_TRACKER, WidgetType::CPU_TEMP,
+      WidgetType::ASTEROID};
   for (auto t : allTypes)
     addToPool(t);
 
@@ -1036,11 +1072,19 @@ DashboardContext::DashboardContext(AppContext &ctx)
   mapArea->setDXClusterStore(dxcStore);
   mapArea->setADIFStore(adifStore);
   mapArea->setMufRtProvider(mufRtProvider.get());
+  mapArea->setCloudProvider(cloudProvider.get());
+  mapArea->setBeaconProvider(beaconProvider.get());
   mapArea->setAuroraStore(auroraHistoryStore);
   mapArea->setIonosondeProvider(ionosondeProvider.get());
   mapArea->setSolarDataStore(ctx.solarStore.get());
-  // NOAAProvider seems to populate solar data?
-  // Let's check main.cpp earlier.
+      mapArea->setActivityStore(ctx.activityStore);
+  
+      std::vector<PaneContainer *> panePtrs;
+      for (const auto &p : panes)
+        panePtrs.push_back(p.get());
+      mapArea->setPanes(panePtrs);
+  
+      // NOAAProvider seems to populate solar data?  // Let's check main.cpp earlier.
 
   rssBanner = std::make_unique<RSSBanner>(139, 412, 660, 68, fontMgr, rssStore);
   rssBanner->setEnabled(appCfg.rssEnabled);
@@ -1149,6 +1193,7 @@ void DashboardContext::update(AppContext &ctx) {
     adifProvider->fetch(ctx.cfgMgr.configDir() / "logs.adif");
     mufRtProvider->update();
     ionosondeProvider->update();
+    asteroidProvider->update();
     lastFetchMs = now;
   }
 
@@ -1234,6 +1279,164 @@ void DashboardContext::update(AppContext &ctx) {
       }
       break;
     default:
+      // Handle custom application events
+      if (event.type >= AE_BASE_EVENT) {
+        switch (event.type - AE_BASE_EVENT) {
+        case AE_SATELLITE_TRACK_READY: {
+          auto *track =
+              static_cast<std::vector<GroundTrackPoint> *>(event.user.data1);
+          if (track && ctx.dashboard && ctx.dashboard->mapArea) {
+            ctx.dashboard->mapArea->onSatTrackReady(*track);
+          }
+          delete track; // Free the memory allocated by the worker thread
+          break;
+        }
+        case AE_RSS_DATA_READY: {
+          int feed_idx = event.user.code;
+          auto *headlines =
+              static_cast<std::vector<std::string> *>(event.user.data1);
+          if (headlines && feed_idx >= 0 && feed_idx < 3) {
+            rssHeadlines[feed_idx] = std::move(*headlines);
+            rssDataDirty = true;
+          }
+          delete headlines;
+          break;
+        }
+        case AE_SOLAR_DATA_READY: {
+          auto *update = static_cast<SolarData *>(event.user.data1);
+          if (update && ctx.solarStore) {
+            auto data = ctx.solarStore->get();
+            switch (static_cast<NOAAProvider::UpdateType>(event.user.code)) {
+            case NOAAProvider::UpdateType::KIndex:
+              data.k_index = update->k_index;
+              data.a_index = update->a_index;
+              data.noaa_g_scale = update->noaa_g_scale;
+              data.last_updated = update->last_updated;
+              data.valid = true;
+              break;
+            case NOAAProvider::UpdateType::SFI:
+              data.sfi = update->sfi;
+              data.valid = true;
+              break;
+            case NOAAProvider::UpdateType::SN:
+              data.sunspot_number = update->sunspot_number;
+              data.valid = true;
+              break;
+            case NOAAProvider::UpdateType::Plasma:
+              data.solar_wind_speed = update->solar_wind_speed;
+              data.solar_wind_density = update->solar_wind_density;
+              break;
+            case NOAAProvider::UpdateType::Mag:
+              data.bt = update->bt;
+              data.bz = update->bz;
+              break;
+            case NOAAProvider::UpdateType::DST:
+              data.dst = update->dst;
+              break;
+            case NOAAProvider::UpdateType::Aurora:
+              data.aurora = update->aurora;
+              break;
+            case NOAAProvider::UpdateType::DRAP:
+              data.drap = update->drap;
+              break;
+            case NOAAProvider::UpdateType::XRay:
+              data.xray_flux = update->xray_flux;
+              data.noaa_r_scale = update->noaa_r_scale;
+              break;
+            case NOAAProvider::UpdateType::ProtonFlux:
+              data.proton_flux = update->proton_flux;
+              data.noaa_s_scale = update->noaa_s_scale;
+              break;
+            }
+            ctx.solarStore->set(data);
+          }
+          delete update;
+          break;
+        }
+        case AE_AURORA_DATA_READY: {
+          float percent = *(static_cast<float *>(event.user.data1));
+          if (ctx.auroraHistoryStore) {
+            ctx.auroraHistoryStore->addPoint(percent);
+          }
+          delete static_cast<float *>(event.user.data1);
+          break;
+        }
+        case AE_ACTIVITY_DATA_READY: {
+          auto *update = static_cast<ActivityData *>(event.user.data1);
+          if (update && ctx.activityStore) {
+            auto data = ctx.activityStore->get();
+            switch (
+                static_cast<ActivityProvider::UpdateType>(event.user.code)) {
+            case ActivityProvider::UpdateType::DXPeds:
+              data.dxpeds = std::move(update->dxpeds);
+              break;
+            case ActivityProvider::UpdateType::POTA: {
+              auto it = std::remove_if(
+                  data.ontaSpots.begin(), data.ontaSpots.end(),
+                  [](const ONTASpot &s) { return s.program == "POTA"; });
+              data.ontaSpots.erase(it, data.ontaSpots.end());
+              data.ontaSpots.insert(data.ontaSpots.end(),
+                                    update->ontaSpots.begin(),
+                                    update->ontaSpots.end());
+              break;
+            }
+            case ActivityProvider::UpdateType::SOTA: {
+              auto it = std::remove_if(
+                  data.ontaSpots.begin(), data.ontaSpots.end(),
+                  [](const ONTASpot &s) { return s.program == "SOTA"; });
+              data.ontaSpots.erase(it, data.ontaSpots.end());
+              data.ontaSpots.insert(data.ontaSpots.end(),
+                                    update->ontaSpots.begin(),
+                                    update->ontaSpots.end());
+              break;
+            }
+            }
+            data.lastUpdated = std::chrono::system_clock::now();
+            data.valid = true;
+            ctx.activityStore->set(data);
+          }
+          delete update;
+          break;
+        }
+        case AE_WEATHER_DATA_READY: {
+          auto *update = static_cast<WeatherData *>(event.user.data1);
+          int id = event.user.code;
+          if (update) {
+            if (id == 0 && ctx.deWeatherStore) {
+              ctx.deWeatherStore->update(*update);
+            } else if (id == 1 && ctx.dxWeatherStore) {
+              ctx.dxWeatherStore->update(*update);
+            }
+          }
+          delete update;
+          break;
+        }
+        case AE_CONTEST_DATA_READY: {
+          auto *update = static_cast<ContestData *>(event.user.data1);
+          if (update && ctx.contestStore) {
+            ctx.contestStore->update(*update);
+          }
+          delete update;
+          break;
+        }
+                  case AE_HISTORY_DATA_READY: {
+                    auto *update = static_cast<HistorySeries *>(event.user.data1);
+                    if (update && ctx.historyStore) {
+                      ctx.historyStore->update(update->name, *update);
+                    }
+                    delete update;
+                    break;
+                  }
+                  case AE_PROP_DATA_READY: {
+                    auto *grid = static_cast<std::vector<float> *>(event.user.data1);
+                    if (grid && ctx.dashboard && ctx.dashboard->mapArea) {
+                      ctx.dashboard->mapArea->onPropDataReady(
+                          static_cast<PropOverlayType>(event.user.code), *grid);
+                    }
+                    delete grid;
+                    break;
+                  }
+                  }      }
       break;
     }
 
@@ -1304,6 +1507,25 @@ void DashboardContext::update(AppContext &ctx) {
     }
   }
 
+  // After event loop, process any aggregated data
+  if (rssDataDirty) {
+    RSSData data;
+    for (int i = 0; i < 3; ++i) {
+      data.headlines.insert(data.headlines.end(), rssHeadlines[i].begin(),
+                            rssHeadlines[i].end());
+    }
+    if (data.headlines.empty()) {
+      data.headlines = {
+          "HamClock-Next: A modern amateur radio dashboard",
+          "Welcome to HamClock -- real-time propagation and space weather",
+      };
+    }
+    data.lastUpdated = std::chrono::system_clock::now();
+    data.valid = true;
+    ctx.rssStore->set(data);
+    rssDataDirty = false;
+  }
+
   if (timePanel->isSetupRequested()) {
     timePanel->clearSetupRequest();
     ctx.activeSetup = AppContext::SetupMode::Main;
@@ -1358,7 +1580,7 @@ void DashboardContext::update(AppContext &ctx) {
 
   for (auto *w : widgets)
     w->update();
-  satMgr->update();
+  // satMgr->update(); // Deprecated: Auto-tracking handled by RotatorService
   ctx.brightnessMgr->update();
 }
 

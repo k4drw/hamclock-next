@@ -1,25 +1,42 @@
 #pragma once
 
 #include "../network/NetworkManager.h"
+#include "OrbitPredictor.h"
+#include "SatelliteTypes.h"
 #include <chrono>
+#include <memory>
 #include <mutex>
 #include <string>
 #include <vector>
 
 class RotatorService; // Forward declaration
 
-struct SatelliteTLE {
-  std::string name;  // Satellite name (trimmed)
-  std::string line1; // TLE line 1
-  std::string line2; // TLE line 2
-  int noradId = 0;   // NORAD catalog number (from line 1)
+// High-level abstraction for a satellite
+class Satellite {
+public:
+  Satellite(const SatelliteTLE &tle) : tle_(tle) { predictor_.loadTLE(tle); }
+  void setObserver(double lat, double lon) { predictor_.setObserver(lat, lon); }
+  SatObservation predict(std::time_t now = 0) const {
+    if (now == 0)
+      now = std::time(nullptr);
+    return predictor_.observeAt(now);
+  }
+  const std::string &getName() const { return tle_.name; }
+  const SatelliteTLE &getTLE() const { return tle_; }
+
+private:
+  SatelliteTLE tle_;
+  mutable OrbitPredictor predictor_;
 };
 
 class SatelliteManager {
 public:
   explicit SatelliteManager(NetworkManager &net);
   void fetch(bool force = false);
+
+  // Deprecated: Tracking logic moved to RotatorService
   void update();
+
   std::vector<SatelliteTLE> getSatellites() const;
   bool hasData() const;
   const SatelliteTLE *findByNoradId(int noradId) const;
@@ -49,7 +66,7 @@ private:
   std::chrono::steady_clock::time_point lastFetch_;
 
   std::string trackedSatName_;
+  std::unique_ptr<Satellite> currentSat_;
   double obsLat_ = 0.0;
   double obsLon_ = 0.0;
 };
-

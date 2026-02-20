@@ -74,20 +74,22 @@ public:
   // Set provider data, preserving UI-driven selectedBands state.
   void set(const LiveSpotData &data) {
     std::lock_guard<std::mutex> lock(mutex_);
-    auto newData = std::make_shared<LiveSpotData>(data);
-    // Preserve UI state
-    std::memcpy(newData->selectedBands, data_->selectedBands,
-                sizeof(newData->selectedBands));
-    data_ = newData;
+    
+    // Perform an in-place update to avoid deep copy churn
+    std::memcpy(data_->bandCounts, data.bandCounts, sizeof(data.bandCounts));
+    data_->spots = data.spots;
+    data_->grid = data.grid;
+    data_->windowMinutes = data.windowMinutes;
+    data_->lastUpdated = data.lastUpdated;
+    data_->valid = data.valid;
+    // Note: selectedBands is intentionally not overwritten to preserve UI state.
   }
 
   void setSelectedBandsMask(uint32_t mask) {
     std::lock_guard<std::mutex> lock(mutex_);
-    auto newData = std::make_shared<LiveSpotData>(*data_);
     for (int i = 0; i < kNumBands; ++i) {
-      newData->selectedBands[i] = (mask & (1 << i)) != 0;
+      data_->selectedBands[i] = (mask & (1 << i)) != 0;
     }
-    data_ = newData;
   }
 
   uint32_t getSelectedBandsMask() const {
@@ -103,9 +105,7 @@ public:
   void toggleBand(int idx) {
     std::lock_guard<std::mutex> lock(mutex_);
     if (idx >= 0 && idx < kNumBands) {
-      auto newData = std::make_shared<LiveSpotData>(*data_);
-      newData->selectedBands[idx] = !newData->selectedBands[idx];
-      data_ = newData;
+      data_->selectedBands[idx] = !data_->selectedBands[idx];
     }
   }
 

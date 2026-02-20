@@ -11,12 +11,16 @@ struct SDL_Texture;
 
 class BeaconPanel : public Widget {
 public:
-  BeaconPanel(int x, int y, int w, int h, FontManager &fontMgr);
+  BeaconPanel(int x, int y, int w, int h, FontManager &fontMgr,
+              BeaconProvider &provider);
   ~BeaconPanel();
 
   void update() override;
   void render(SDL_Renderer *renderer) override;
   void onResize(int x, int y, int w, int h) override;
+
+  void setTheme(const std::string &theme) override { theme_ = theme; }
+  std::string getName() const override { return "BeaconPanel"; }
 
 private:
   // Texture cache to prevent per-frame texture creation/destruction
@@ -32,7 +36,7 @@ private:
                             int fontSize, bool bold);
 
   FontManager &fontMgr_;
-  BeaconProvider provider_;
+  BeaconProvider &provider_;
 
   std::vector<ActiveBeacon> active_;
   float progress_ = 0;
