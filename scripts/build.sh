@@ -1,4 +1,5 @@
 #!/bin/bash
+#rm -rf build
 cmake -B build
 JOBS=$(( $(nproc) / 2 ))
 [ $JOBS -lt 1 ] && JOBS=1

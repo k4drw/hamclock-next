@@ -5,9 +5,11 @@
 #endif
 #include "MapWidget.h"
 #include "../core/Astronomy.h"
+#include "../core/Constants.h"
 #include "../core/LiveSpotData.h"
 #include "../core/Logger.h"
 #include "../core/PropEngine.h"
+#include "../core/WorkerService.h"
 #include "../services/IonosondeProvider.h"
 #include "../services/MufRtProvider.h"
 #include "EmbeddedIcons.h"
@@ -207,7 +209,7 @@ void MapWidget::update() {
   }
 
   uint32_t nowMs = SDL_GetTicks();
-  
+
   // General 1-second updates
   if (nowMs - lastPosUpdateMs_ > 1000) {
     auto now = std::chrono::system_clock::now();
@@ -220,9 +222,23 @@ void MapWidget::update() {
   // Satellite ground track update (every 5 seconds)
   if (predictor_ && predictor_->isReady() && config_.showSatTrack) {
     if (nowMs - lastSatTrackUpdateMs_ > 5000) {
-      cachedSatTrack_ = predictor_->groundTrack(std::chrono::system_clock::to_time_t(std::chrono::system_clock::now()), 90, 30);
-      satTrackDirty_ = true;
       lastSatTrackUpdateMs_ = nowMs;
+
+      // Offload the expensive calculation to a worker thread.
+      WorkerService::getInstance().submitTask([this] {
+        auto *track_ptr = new std::vector<GroundTrackPoint>();
+        *track_ptr =
+            predictor_->groundTrack(std::chrono::system_clock::to_time_t(
+                                        std::chrono::system_clock::now()),
+                                    90, 30);
+
+        SDL_Event event;
+        SDL_zero(event);
+        event.type =
+            HamClock::AE_BASE_EVENT + HamClock::AE_SATELLITE_TRACK_READY;
+        event.user.data1 = track_ptr;
+        SDL_PushEvent(&event);
+      });
     }
   } else if (!cachedSatTrack_.empty()) {
     cachedSatTrack_.clear();
@@ -324,8 +340,7 @@ void MapWidget::update() {
       if (lastUp != lastMufUpdateMs_) {
         needUpdate = true;
       }
-    }
-    else if (mufrt_ && mufrt_->hasData()) {
+    } else if (mufrt_ && mufrt_->hasData()) {
       uint32_t lastUp = mufrt_->getLastUpdateMs();
       if (lastUp != lastMufUpdateMs_) {
         std::lock_guard<std::mutex> lock(mapDataMutex_);
@@ -536,7 +551,8 @@ void MapWidget::renderGreatCircle(SDL_Renderer *renderer) {
     return;
 
   SDL_Texture *lineTex = texMgr_.get(LINE_AA_KEY);
-  if (!lineTex) return;
+  if (!lineTex)
+    return;
 
   if (greatCircleDirty_) {
     greatCircleVerts_.clear();
@@ -548,33 +564,34 @@ void MapWidget::renderGreatCircle(SDL_Renderer *renderer) {
     SDL_Color color = {255, 255, 0, 255}; // Yellow
 
     std::vector<SDL_FPoint> segment;
-    auto add_segment_geom = [&](const std::vector<SDL_FPoint>& seg) {
-        for (size_t i = 1; i < seg.size(); i++) {
-            SDL_FPoint p1 = seg[i-1];
-            SDL_FPoint p2 = seg[i];
-            float dx = p2.x - p1.x;
-            float dy = p2.y - p1.y;
-            float len = std::sqrt(dx * dx + dy * dy);
-            if (len < 0.1f) continue;
+    auto add_segment_geom = [&](const std::vector<SDL_FPoint> &seg) {
+      for (size_t i = 1; i < seg.size(); i++) {
+        SDL_FPoint p1 = seg[i - 1];
+        SDL_FPoint p2 = seg[i];
+        float dx = p2.x - p1.x;
+        float dy = p2.y - p1.y;
+        float len = std::sqrt(dx * dx + dy * dy);
+        if (len < 0.1f)
+          continue;
 
-            float nx = -dy / len * r;
-            float ny = dx / len * r;
+        float nx = -dy / len * r;
+        float ny = dx / len * r;
 
-            int base = static_cast<int>(greatCircleVerts_.size());
-            greatCircleVerts_.push_back({{p1.x + nx, p1.y + ny}, color, {0, 0}});
-            greatCircleVerts_.push_back({{p1.x - nx, p1.y - ny}, color, {0, 1}});
-            greatCircleVerts_.push_back({{p2.x + nx, p2.y + ny}, color, {1, 0}});
-            greatCircleVerts_.push_back({{p2.x - nx, p2.y - ny}, color, {1, 1}});
+        int base = static_cast<int>(greatCircleVerts_.size());
+        greatCircleVerts_.push_back({{p1.x + nx, p1.y + ny}, color, {0, 0}});
+        greatCircleVerts_.push_back({{p1.x - nx, p1.y - ny}, color, {0, 1}});
+        greatCircleVerts_.push_back({{p2.x + nx, p2.y + ny}, color, {1, 0}});
+        greatCircleVerts_.push_back({{p2.x - nx, p2.y - ny}, color, {1, 1}});
 
-            greatCircleIndices_.push_back(base + 0);
-            greatCircleIndices_.push_back(base + 1);
-            greatCircleIndices_.push_back(base + 2);
-            greatCircleIndices_.push_back(base + 1);
-            greatCircleIndices_.push_back(base + 2);
-            greatCircleIndices_.push_back(base + 3);
-        }
+        greatCircleIndices_.push_back(base + 0);
+        greatCircleIndices_.push_back(base + 1);
+        greatCircleIndices_.push_back(base + 2);
+        greatCircleIndices_.push_back(base + 1);
+        greatCircleIndices_.push_back(base + 2);
+        greatCircleIndices_.push_back(base + 3);
+      }
     };
-    
+
     for (size_t i = 0; i < path.size(); ++i) {
       if (i > 0) {
         double lon0 = path[i - 1].lon;
@@ -583,7 +600,8 @@ void MapWidget::renderGreatCircle(SDL_Renderer *renderer) {
           double lon1_adj = (lon1 < 0) ? lon1 + 360.0 : lon1 - 360.0;
           double borderLon = (lon1 < 0) ? 180.0 : -180.0;
           double f = (borderLon - lon0) / (lon1_adj - lon0);
-          double borderLat = path[i - 1].lat + f * (path[i].lat - path[i - 1].lat);
+          double borderLat =
+              path[i - 1].lat + f * (path[i].lat - path[i - 1].lat);
 
           segment.push_back(latLonToScreen(borderLat, borderLon));
           add_segment_geom(segment);
@@ -601,7 +619,8 @@ void MapWidget::renderGreatCircle(SDL_Renderer *renderer) {
 
   if (!greatCircleVerts_.empty()) {
     SDL_RenderGeometry(renderer, lineTex, greatCircleVerts_.data(),
-                       (int)greatCircleVerts_.size(), greatCircleIndices_.data(),
+                       (int)greatCircleVerts_.size(),
+                       greatCircleIndices_.data(),
                        (int)greatCircleIndices_.size());
   }
 }
@@ -1068,7 +1087,8 @@ void MapWidget::renderSatGroundTrack(SDL_Renderer *renderer) {
 
   SDL_RenderSetClipRect(renderer, &mapRect_);
   SDL_Texture *lineTex = texMgr_.get(LINE_AA_KEY);
-  if (!lineTex) return;
+  if (!lineTex)
+    return;
 
   if (satTrackDirty_) {
     satTrackVerts_.clear();
@@ -1079,31 +1099,32 @@ void MapWidget::renderSatGroundTrack(SDL_Renderer *renderer) {
     SDL_Color color = {255, 200, 0, 150};
 
     std::vector<SDL_FPoint> segment;
-    auto add_segment_geom = [&](const std::vector<SDL_FPoint>& seg) {
-        for (size_t i = 1; i < seg.size(); i++) {
-            SDL_FPoint p1 = seg[i-1];
-            SDL_FPoint p2 = seg[i];
-            float dx = p2.x - p1.x;
-            float dy = p2.y - p1.y;
-            float len = std::sqrt(dx * dx + dy * dy);
-            if (len < 0.1f) continue;
+    auto add_segment_geom = [&](const std::vector<SDL_FPoint> &seg) {
+      for (size_t i = 1; i < seg.size(); i++) {
+        SDL_FPoint p1 = seg[i - 1];
+        SDL_FPoint p2 = seg[i];
+        float dx = p2.x - p1.x;
+        float dy = p2.y - p1.y;
+        float len = std::sqrt(dx * dx + dy * dy);
+        if (len < 0.1f)
+          continue;
 
-            float nx = -dy / len * r;
-            float ny = dx / len * r;
+        float nx = -dy / len * r;
+        float ny = dx / len * r;
 
-            int base = static_cast<int>(satTrackVerts_.size());
-            satTrackVerts_.push_back({{p1.x + nx, p1.y + ny}, color, {0, 0}});
-            satTrackVerts_.push_back({{p1.x - nx, p1.y - ny}, color, {0, 1}});
-            satTrackVerts_.push_back({{p2.x + nx, p2.y + ny}, color, {1, 0}});
-            satTrackVerts_.push_back({{p2.x - nx, p2.y - ny}, color, {1, 1}});
+        int base = static_cast<int>(satTrackVerts_.size());
+        satTrackVerts_.push_back({{p1.x + nx, p1.y + ny}, color, {0, 0}});
+        satTrackVerts_.push_back({{p1.x - nx, p1.y - ny}, color, {0, 1}});
+        satTrackVerts_.push_back({{p2.x + nx, p2.y + ny}, color, {1, 0}});
+        satTrackVerts_.push_back({{p2.x - nx, p2.y - ny}, color, {1, 1}});
 
-            satTrackIndices_.push_back(base + 0);
-            satTrackIndices_.push_back(base + 1);
-            satTrackIndices_.push_back(base + 2);
-            satTrackIndices_.push_back(base + 1);
-            satTrackIndices_.push_back(base + 2);
-            satTrackIndices_.push_back(base + 3);
-        }
+        satTrackIndices_.push_back(base + 0);
+        satTrackIndices_.push_back(base + 1);
+        satTrackIndices_.push_back(base + 2);
+        satTrackIndices_.push_back(base + 1);
+        satTrackIndices_.push_back(base + 2);
+        satTrackIndices_.push_back(base + 3);
+      }
     };
 
     for (size_t i = 0; i < cachedSatTrack_.size(); ++i) {
@@ -1115,7 +1136,8 @@ void MapWidget::renderSatGroundTrack(SDL_Renderer *renderer) {
           double borderLon = (lon1 < 0) ? 180.0 : -180.0;
           double f = (borderLon - lon0) / (lon1_adj - lon0);
           double borderLat =
-              cachedSatTrack_[i - 1].lat + f * (cachedSatTrack_[i].lat - cachedSatTrack_[i - 1].lat);
+              cachedSatTrack_[i - 1].lat +
+              f * (cachedSatTrack_[i].lat - cachedSatTrack_[i - 1].lat);
 
           segment.push_back(latLonToScreen(borderLat, borderLon));
           add_segment_geom(segment);
@@ -1123,14 +1145,15 @@ void MapWidget::renderSatGroundTrack(SDL_Renderer *renderer) {
           segment.push_back(latLonToScreen(borderLat, -borderLon));
         }
       }
-      segment.push_back(latLonToScreen(cachedSatTrack_[i].lat, cachedSatTrack_[i].lon));
+      segment.push_back(
+          latLonToScreen(cachedSatTrack_[i].lat, cachedSatTrack_[i].lon));
     }
     if (segment.size() >= 2) {
       add_segment_geom(segment);
     }
     satTrackDirty_ = false;
   }
-  
+
   if (!satTrackVerts_.empty()) {
     SDL_RenderGeometry(renderer, lineTex, satTrackVerts_.data(),
                        (int)satTrackVerts_.size(), satTrackIndices_.data(),
@@ -1743,6 +1766,11 @@ nlohmann::json MapWidget::getDebugData() const {
   }
 
   return j;
+}
+
+void MapWidget::onSatTrackReady(const std::vector<GroundTrackPoint> &track) {
+  cachedSatTrack_ = track;
+  satTrackDirty_ = true;
 }
 
 void MapWidget::renderGridOverlay(SDL_Renderer *renderer) {

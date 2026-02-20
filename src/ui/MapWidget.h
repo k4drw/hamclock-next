@@ -80,6 +80,8 @@ public:
   SDL_Rect getActionRect(const std::string &action) const override;
   nlohmann::json getDebugData() const override;
 
+  // Thread-safe method for receiving data from background threads
+  void onSatTrackReady(const std::vector<GroundTrackPoint>& track);
 private:
   SDL_FPoint latLonToScreen(double lat, double lon) const;
   bool screenToLatLon(int sx, int sy, double &lat, double &lon) const;

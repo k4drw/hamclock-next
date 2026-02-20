@@ -51,7 +51,8 @@ docker run --rm -v "$(pwd)":/work:z -w /work $IMAGE bash -c "
         -DSDL2IMAGE_TIF=OFF \
         -DSDL2IMAGE_JXL=OFF \
         -DSDL2IMAGE_AVIF=OFF && \
-    cmake --build $BUILD_DIR -j\$(nproc)
+    cmake --build $BUILD_DIR -j\$(nproc) && \
+    chown -R $(id -u):$(id -g) $BUILD_DIR
 "
 
 if [ $? -eq 0 ]; then
