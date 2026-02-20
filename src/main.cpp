@@ -29,6 +29,7 @@
 #include "services/AsteroidProvider.h"
 #include "services/AuroraProvider.h"
 #include "services/BandConditionsProvider.h"
+#include "services/BeaconProvider.h"
 #include "services/CallbookProvider.h"
 #include "services/ContestProvider.h"
 #include "services/DRAPProvider.h"
@@ -240,6 +241,7 @@ struct DashboardContext {
   std::unique_ptr<SantaProvider> santaProvider;
   std::unique_ptr<SatelliteManager> satMgr;
   std::unique_ptr<AsteroidProvider> asteroidProvider;
+  std::unique_ptr<BeaconProvider> beaconProvider;
 
   // Services
 #ifndef __EMSCRIPTEN__
@@ -828,11 +830,12 @@ DashboardContext::DashboardContext(AppContext &ctx)
   
       ionosondeProvider = std::make_unique<IonosondeProvider>(netManager);  ionosondeProvider->update();
 
-  asteroidProvider = std::make_unique<AsteroidProvider>(netManager);
-  asteroidProvider->update();
-
-  santaProvider = std::make_unique<SantaProvider>(santaStore);
-  santaProvider->update();
+      asteroidProvider = std::make_unique<AsteroidProvider>(netManager);
+      asteroidProvider->update();
+  
+      beaconProvider = std::make_unique<BeaconProvider>();
+  
+      santaProvider = std::make_unique<SantaProvider>(santaStore);  santaProvider->update();
 
   SDL_Color cyan = {0, 200, 255, 255};
   timePanel =
@@ -961,10 +964,9 @@ DashboardContext::DashboardContext(AppContext &ctx)
       widgetPool[type] = std::make_unique<WeatherPanel>(
           0, 0, 0, 0, fontMgr, dxWeatherStore, "DX Weather");
       break;
-    case WidgetType::NCDXF:
-      widgetPool[type] = std::make_unique<BeaconPanel>(0, 0, 0, 0, fontMgr);
-      break;
-    case WidgetType::SDO:
+          case WidgetType::NCDXF:
+            widgetPool[type] = std::make_unique<BeaconPanel>(0, 0, 0, 0, fontMgr, *beaconProvider);
+            break;    case WidgetType::SDO:
       widgetPool[type] =
           std::make_unique<SDOPanel>(0, 0, 0, 0, fontMgr, texMgr, *sdoProvider);
       break;
@@ -1071,12 +1073,18 @@ DashboardContext::DashboardContext(AppContext &ctx)
   mapArea->setADIFStore(adifStore);
   mapArea->setMufRtProvider(mufRtProvider.get());
   mapArea->setCloudProvider(cloudProvider.get());
+  mapArea->setBeaconProvider(beaconProvider.get());
   mapArea->setAuroraStore(auroraHistoryStore);
   mapArea->setIonosondeProvider(ionosondeProvider.get());
   mapArea->setSolarDataStore(ctx.solarStore.get());
-  mapArea->setActivityStore(ctx.activityStore);
-  // NOAAProvider seems to populate solar data?
-  // Let's check main.cpp earlier.
+      mapArea->setActivityStore(ctx.activityStore);
+  
+      std::vector<PaneContainer *> panePtrs;
+      for (const auto &p : panes)
+        panePtrs.push_back(p.get());
+      mapArea->setPanes(panePtrs);
+  
+      // NOAAProvider seems to populate solar data?  // Let's check main.cpp earlier.
 
   rssBanner = std::make_unique<RSSBanner>(139, 412, 660, 68, fontMgr, rssStore);
   rssBanner->setEnabled(appCfg.rssEnabled);

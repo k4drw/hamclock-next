@@ -35,6 +35,7 @@ private:
   std::string projection_;
   std::string mapStyle_;
   bool showGrid_;
+  bool showBeacons_;
   std::string gridType_;
   PropOverlayType propOverlay_;
   WeatherOverlayType weatherOverlay_;
@@ -50,7 +51,7 @@ private:
   std::vector<std::string> gridOpts_ = {"Off", "Lat/Lon", "Maidenhead"};
   std::vector<std::string> overlayOpts_ = {"None", "MUF", "VOACAP",
                                            "Reliability", "TOA"};
-  std::vector<std::string> weatherOpts_ = {"None", "Clouds"};
+  std::vector<std::string> weatherOpts_ = {"None", "WX/Pressure"};
   std::vector<std::string> bandOpts_ = {"80m", "60m", "40m", "30m", "20m",
                                         "17m", "15m", "12m", "10m", "6m"};
   std::vector<std::string> modeOpts_ = {"SSB", "CW", "FT8", "AM", "WSPR"};
@@ -60,6 +61,7 @@ private:
   // Rects for dropdown HEADERS
   SDL_Rect projRec_, styleRec_;
   SDL_Rect gridRec_, overlayRec_, weatherRec_;
+  SDL_Rect beaconsRec_;
   SDL_Rect bandRec_, modeRec_, powerRec_; // VOACAP row
 
   enum {

@@ -370,7 +370,7 @@ function formatRepoMap(index: RepoIndex): string {
 // ---------------------------------------------------------------------------
 
 const server = new McpServer(
-  { name: "hamclock-feature-bridge", version: "0.3.0" },
+  { name: "hamclock-feature-bridge", version: "0.4.0" },
   { capabilities: { tools: {}, resources: {} } }
 );
 
@@ -1323,55 +1323,31 @@ server.tool(
   "List all propagation-related parity gaps between hamclock-original and hamclock-next, with implementation priority and suggested approach for each.",
   {},
   async () => {
+    // Updated 2026-02-20: POTA pins ✅, VOACAP MUF ✅, VOACAP REL ✅, muf_rt ✅,
+    //   VOACAP TOA ✅ (PropEngine::calculateTOA, geometric model F2 h=350km, multi-hop),
+    //   SOTA coord resolution ✅ (summitslist.csv pre-seed + api2.sota.org.uk fallback),
+    //   WxMb (GFS GRIB2 pressure/wind overlay) ✅
+    // Remaining gaps: cloud cover only
     const gaps = [
-      {
-        feature_id: "voacap_map_overlay",
-        name: "VOACAP World Map Overlay (MUF/REL/TOA)",
-        priority: "HIGH",
-        status: "missing",
-        backend_needed: true,
-        approach: "1) Implement fetchVOACAP-MUF.pl + fetchVOACAP-TOA.pl in open-hamclock-backend (uses existing voacap_service.py). 2) Add VoacapProvider in src/services/ that fetches 660x330 BMP via NetworkManager. 3) Add overlay texture to MapWidget. 4) Add overlay selector to MapViewMenu. 5) Handle equirectangular→azimuthal reprojection.",
-        backend_free_alt: "None for on-demand. KC2G MUF-RT PNG overlay (muf_rt_map_overlay) is already implemented and provides real-time MUF without backend.",
-        files_to_create: ["src/services/VoacapProvider.cpp", "src/services/VoacapProvider.h", "src/core/VoacapOverlayData.h"],
-        files_to_modify: ["src/ui/MapWidget.cpp", "src/ui/MapViewMenu.cpp"],
-      },
       {
         feature_id: "cloud_cover_overlay",
         name: "Cloud Cover Map Overlay",
-        priority: "MEDIUM",
-        status: "missing",
-        backend_needed: true,
-        approach: "open-hamclock-backend scripts/update_cloud_maps.sh generates composites. Alternatively: NASA GIBS WMS tiles. Requires server-side compositing for equirectangular output.",
-        backend_free_alt: "Partial — NASA GIBS tiles but complex to composite client-side.",
-        files_to_create: ["src/services/CloudOverlayProvider.cpp"],
-        files_to_modify: ["src/ui/MapWidget.cpp", "src/ui/MapViewMenu.cpp"],
-      },
-      {
-        feature_id: "wx_precipitation_overlay",
-        name: "WX Precipitation/Radar Map Overlay",
-        priority: "MEDIUM",
-        status: "missing",
-        backend_needed: true,
-        approach: "open-hamclock-backend fetches radar/precip composites. Alternatively: NOAA/NWS radar tiles or RainViewer API. Requires equirectangular composite for overlay.",
-        backend_free_alt: "Partial — RainViewer public tile API, but compositing is complex client-side.",
-        files_to_create: ["src/services/WxRadarProvider.cpp"],
-        files_to_modify: ["src/ui/MapWidget.cpp", "src/ui/MapViewMenu.cpp"],
-      },
-      {
-        feature_id: "sota_map_pins",
-        name: "SOTA Activator Map Pins",
         priority: "LOW",
-        status: "partial",
-        backend_needed: false,
-        approach: "SOTA API does not return coordinates. Options: (1) Use SOTA summit database to resolve summit reference to coords, (2) Omit SOTA pins until API includes coords. See ActivityProvider.cpp.",
-        backend_free_alt: "Yes — local summit database or API enrichment.",
-        files_to_modify: ["src/services/ActivityProvider.cpp", "src/ui/MapWidget.cpp"],
+        status: "missing",
+        backend_needed: true,
+        approach: "open-hamclock-backend scripts/update_cloud_maps.sh generates composites. Alternatively: NASA GIBS WMS tiles. Requires server-side compositing for equirectangular output. CloudProvider is currently a stub. Note: the WxMb (GFS pressure/wind) overlay IS implemented via WxMbProvider — cloud cover is a separate feature.",
+        backend_free_alt: "Partial — NASA GIBS tiles but complex to composite client-side.",
+        files_to_create: ["src/services/CloudProvider.cpp (implement, currently stub)"],
+        files_to_modify: ["src/ui/MapWidget.cpp", "src/ui/MapViewMenu.cpp"],
       },
     ];
 
     const lines: string[] = [];
     lines.push(`# Propagation & Map Overlay Parity Gaps`);
-    lines.push(`Total gaps: ${gaps.length} | High: ${gaps.filter(g => g.priority === "HIGH").length} | Medium: ${gaps.filter(g => g.priority === "MEDIUM").length} | Low: ${gaps.filter(g => g.priority === "LOW").length}`);
+    lines.push(`Updated: 2026-02-20 | feature_map.json v1.8`);
+    lines.push(`Total remaining gaps: ${gaps.length} | Low: ${gaps.filter(g => g.priority === "LOW").length}`);
+    lines.push(``);
+    lines.push(`**Already implemented (no longer gaps):** POTA pins ✅, VOACAP MUF ✅, VOACAP REL ✅, VOACAP TOA ✅, KC2G MUF-RT ✅, SOTA coord resolution ✅ (summitslist.csv + api2.sota.org.uk), WxMb pressure/wind overlay ✅ (GFS GRIB2 decoder, marching-squares contours, wind quivers)`);
     lines.push(``);
 
     for (const gap of gaps) {
@@ -1388,10 +1364,7 @@ server.tool(
 
     lines.push(`---`);
     lines.push(`## Recommended Implementation Order`);
-    lines.push(`1. **voacap_map_overlay** — highest remaining parity value; requires OHB fetchVOACAP-MUF.pl + fetchVOACAP-TOA.pl first`);
-    lines.push(`2. **cloud_cover_overlay** — backend-dependent; use open-hamclock-backend or NASA GIBS tiles`);
-    lines.push(`3. **wx_precipitation_overlay** — backend-dependent; RainViewer or NWS tiles`);
-    lines.push(`4. **sota_map_pins** — in-app, no backend; blocked on SOTA API providing summit coordinates`);
+    lines.push(`1. **cloud_cover_overlay** — backend-dependent; use open-hamclock-backend or NASA GIBS tiles`);
 
     return { content: [{ type: "text" as const, text: lines.join("\n") }] };
   }

@@ -166,6 +166,25 @@ double PropEngine::calculateReliability(double freqMhz, double distKm,
   return std::min(99.0, std::max(0.0, rel));
 }
 
+double PropEngine::calculateTOA(double distKm, double muf, double freqMhz) {
+  // No path if operating frequency exceeds MUF
+  if (muf < 1.0 || freqMhz > muf * 1.05) return 0.0;
+  if (distKm < 50.0) return 0.0; // TX vicinity — below minimum skip distance
+
+  // F2 layer virtual reflection height (km) — standard assumption
+  const double h = 350.0;
+
+  // For multi-hop paths each hop covers distKm/N; use N = ceil(dist/3500)
+  double hops = std::max(1.0, std::ceil(distKm / 3500.0));
+  double hopDist = distKm / hops;
+
+  // Elevation angle at transmitter (flat-earth approximation)
+  // el = arctan(2h / hopDist)
+  double elDeg = std::atan2(2.0 * h, hopDist) * 180.0 / M_PI;
+
+  return std::min(elDeg, 90.0);
+}
+
 // Haversine helper
 static double haversineKm(double lat1, double lon1, double lat2, double lon2) {
   double R = 6371.0;
@@ -182,7 +201,7 @@ std::vector<float>
 PropEngine::generateGrid(const PropPathParams &params, const SolarData &sw,
                          const class IonosondeProvider *ionoProvider,
                          int outputType) {
-  // outputType: 0=MUF, 1=Reliability
+  // outputType: 0=MUF, 1=Reliability, 2=TOA (take-off angle degrees)
 
   std::vector<float> grid;
   grid.resize(MAP_W * MAP_H);
@@ -226,7 +245,9 @@ PropEngine::generateGrid(const PropPathParams &params, const SolarData &sw,
       double dist = haversineKm(params.txLat, params.txLon, lat, lon);
       if (dist < 10.0) {
         // At TX location, 100% reliable or max MUF?
-        grid[y * MAP_W + x] = (outputType == 0) ? 50.0f : 100.0f;
+        grid[y * MAP_W + x] = (outputType == 0) ? 50.0f
+                             : (outputType == 2) ? 0.0f
+                             : 100.0f;
         continue;
       }
 
@@ -272,6 +293,12 @@ PropEngine::generateGrid(const PropPathParams &params, const SolarData &sw,
         // MUF
         float val = (float)calculateMUF(dist, midLatDeg, midLonDeg, utcHour,
                                         sfi, ssn, iono);
+        grid[y * MAP_W + x] = val;
+      } else if (outputType == 2) {
+        // TOA (take-off angle in degrees)
+        double muf = calculateMUF(dist, midLatDeg, midLonDeg, utcHour, sfi,
+                                  ssn, iono);
+        float val = (float)calculateTOA(dist, muf, params.mhz);
         grid[y * MAP_W + x] = val;
       } else {
         // Reliability

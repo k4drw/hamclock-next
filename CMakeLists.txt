@@ -449,6 +449,7 @@ set(HAMCLOCK_SOURCES
     src/services/DXClusterProvider.cpp
     src/services/AuroraProvider.cpp
     src/services/MufRtProvider.cpp
+    src/services/WxMbProvider.cpp
     src/services/IonosondeProvider.cpp
     src/services/HistoryProvider.cpp
     src/services/BandConditionsProvider.cpp

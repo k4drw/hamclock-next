@@ -230,6 +230,9 @@ void ActivityProvider::fetchSOTA() {
           if (ActivityLocationManager::getInstance().getSOTALocation(os.ref, slat, slon)) {
               os.lat = slat;
               os.lon = slon;
+          } else {
+              // Trigger async per-summit API lookup for next refresh cycle
+              ActivityLocationManager::getInstance().resolveSummitAsync(os.ref);
           }
 
           if (!os.call.empty()) {
