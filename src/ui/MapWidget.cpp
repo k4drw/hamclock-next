@@ -4,13 +4,17 @@
 #endif
 #endif
 #include "MapWidget.h"
+#include "PaneContainer.h"
 #include "../core/Astronomy.h"
 #include "../core/Constants.h"
 #include "../core/LiveSpotData.h"
 #include "../core/Logger.h"
 #include "../core/PropEngine.h"
 #include "../core/WorkerService.h"
+#include "../services/BeaconProvider.h"
+#include "../core/BeaconData.h"
 #include "../services/CloudProvider.h"
+#include "../services/WxMbProvider.h"
 #include "../services/IonosondeProvider.h"
 #include "../services/MufRtProvider.h"
 #include "EmbeddedIcons.h"
@@ -112,6 +116,9 @@ MapWidget::MapWidget(int x, int y, int w, int h, TextureManager &texMgr,
           "KMSDRM detected, enabling night overlay compatibility path.");
   }
 
+  // Initialize WxMbProvider
+  wxmb_ = std::make_unique<WxMbProvider>(netMgr_);
+
   // Initialize MapViewMenu
   mapViewMenu_ = std::make_unique<MapViewMenu>(fontMgr);
   mapViewMenu_->setTheme(config.theme);
@@ -209,17 +216,16 @@ void MapWidget::update() {
     mapViewMenu_->update();
   }
 
-  uint32_t nowMs = SDL_GetTicks();
-
-  // General 1-second updates
-  if (nowMs - lastPosUpdateMs_ > 1000) {
-    auto now = std::chrono::system_clock::now();
-    auto sun = Astronomy::sunPosition(now);
-    sunLat_ = sun.lat;
-    sunLon_ = sun.lon;
-    lastPosUpdateMs_ = nowMs;
-  }
-
+      uint32_t nowMs = SDL_GetTicks();
+  
+      // General 1-second updates
+      if (nowMs - lastPosUpdateMs_ > 1000) {
+        auto now = std::chrono::system_clock::now();
+        auto sun = Astronomy::sunPosition(now);
+        sunLat_ = sun.lat;
+        sunLon_ = sun.lon;
+        lastPosUpdateMs_ = nowMs;
+      }
   // Satellite ground track update (every 5 seconds)
   if (predictor_ && predictor_->isReady() && config_.showSatTrack) {
     if (nowMs - lastSatTrackUpdateMs_ > 5000) {
@@ -264,27 +270,37 @@ void MapWidget::update() {
         greatCircleDirty_ = true;
       }
   
-      // Propagation Overlay updates (every 15 mins or on change)
-      if (config_.propOverlay != PropOverlayType::None &&
-          config_.propOverlay != PropOverlayType::Muf) {
-        bool changed = (lastPropType_ != config_.propOverlay) ||
-                       (lastBand != config_.propBand) ||
-                       (lastMode != config_.propMode) ||
-                       (lastPower != config_.propPower);
-  
-        if (changed || (nowMs - lastPropUpdateMs_ > 900000)) {
-          updatePropagationOverlay();
-          lastPropUpdateMs_ = nowMs;
-          lastPropType_ = config_.propOverlay;
-          lastBand = config_.propBand;
-          lastMode = config_.propMode;
-          lastPower = config_.propPower;
-        }
-      }
-  
-      // Monthly map texture update  auto now_for_month = std::chrono::system_clock::now();
-  std::time_t t = std::chrono::system_clock::to_time_t(now_for_month);
-  std::tm *tm = std::localtime(&t);
+          // Propagation Overlay updates (every 15 mins or on change)
+          if (config_.propOverlay != PropOverlayType::None &&
+              config_.propOverlay != PropOverlayType::Muf) {
+            bool changed = (lastPropType_ != config_.propOverlay) ||
+                           (lastBand_ != config_.propBand) ||
+                           (lastMode_ != config_.propMode) ||
+                           (lastPower_ != config_.propPower);
+      
+            if (changed || (nowMs - lastPropUpdateMs_ > 900000)) {
+              updatePropagationOverlay();
+              lastPropUpdateMs_ = nowMs;
+              lastPropType_ = config_.propOverlay;
+              lastBand_ = config_.propBand;
+              lastMode_ = config_.propMode;
+              lastPower_ = config_.propPower;
+            }
+          }
+      
+          // WX pressure overlay (check every 10 minutes)
+          if (config_.weatherOverlay == WeatherOverlayType::WxMb) {
+            uint64_t nowMs64 = static_cast<uint64_t>(SDL_GetTicks());
+            if (nowMs64 - wxLastCheckMs_ > 600000ULL || wxLastCheckMs_ == 0) {
+              wxLastCheckMs_ = nowMs64;
+              wxmb_->update();
+            }
+          }
+
+          // Monthly map texture update
+          auto now_for_month = std::chrono::system_clock::now();
+          std::time_t t = std::chrono::system_clock::to_time_t(now_for_month);
+          std::tm *tm = std::localtime(&t);
   int month = tm->tm_mon + 1; // 1-12
 
   if (month != currentMonth_) {
@@ -351,30 +367,15 @@ void MapWidget::update() {
         86400 * 365); // Cache for a year
   }
 
-  if (config_.propOverlay != PropOverlayType::None) {
-    bool needUpdate = false;
-    if (iono_ && iono_->hasData()) {
-      uint32_t lastUp = iono_->getLastUpdateMs();
-      if (lastUp != lastMufUpdateMs_) {
-        needUpdate = true;
-      }
-    } else if (mufrt_ && mufrt_->hasData()) {
-      uint32_t lastUp = mufrt_->getLastUpdateMs();
-      if (lastUp != lastMufUpdateMs_) {
-        std::lock_guard<std::mutex> lock(mapDataMutex_);
-        pendingMufData_ = mufrt_->getData();
-        lastMufUpdateMs_ = lastUp;
-      }
-    }
-
-    if (needUpdate && iono_ && solar_) {
-      uint32_t now = SDL_GetTicks();
-      if (now - lastMufUpdateMs_ > 5000) { // Throttle generation
-        lastMufUpdateMs_ = now;
-      }
-    }
-  }
-}
+      if (config_.propOverlay != PropOverlayType::None) {
+        if (iono_ && iono_->hasData()) {
+          uint32_t lastUp = iono_->getLastUpdateMs();
+          if (lastUp != lastMufUpdateMs_) {
+            updatePropagationOverlay();
+            lastMufUpdateMs_ = lastUp;
+          }
+        }
+      }}
 bool MapWidget::onMouseUp(int mx, int my, Uint16 mod) {
   // Pass through to menu if visible
   if (mapViewMenu_->isVisible()) {
@@ -869,9 +870,6 @@ void MapWidget::render(SDL_Renderer *renderer) {
   // Check for any newly downloaded map data from background thread
   {
     std::lock_guard<std::mutex> lock(mapDataMutex_);
-    if (clouds_ && config_.weatherOverlay == WeatherOverlayType::Clouds) {
-      clouds_->update();
-    }
 
     if (!pendingMapData_.empty()) {
       SDL_Texture *mapTex =
@@ -903,15 +901,6 @@ void MapWidget::render(SDL_Renderer *renderer) {
               LOG_E("MapWidget", "Failed to create MUF texture: {}", SDL_GetError());
             }
             pendingMufData_.clear();
-          }
-          if (!pendingCloudData_.empty()) {
-            SDL_Texture *tex =
-                texMgr_.loadFromMemory(renderer, "cloud_overlay", pendingCloudData_);
-            if (!tex) {
-              LOG_E("MapWidget", "Failed to create Cloud texture: {}",
-                    SDL_GetError());
-            }
-            pendingCloudData_.clear();
           }
         }
   if (!mapLoaded_) {
@@ -991,8 +980,9 @@ void MapWidget::render(SDL_Renderer *renderer) {
 
           renderPropagationOverlay(renderer);
           renderMufRtOverlay(renderer);
+          renderWxMbOverlay(renderer);
           renderNightOverlay(renderer);
-          renderCloudOverlay(renderer);  renderGridOverlay(renderer);
+          renderGridOverlay(renderer);
   renderGreatCircle(renderer);
 
   renderMarker(renderer, state_->deLocation.lat, state_->deLocation.lon, 255,
@@ -1006,11 +996,11 @@ void MapWidget::render(SDL_Renderer *renderer) {
   renderSatellite(renderer);
   renderSpotOverlay(renderer);
   renderDXClusterSpots(renderer);
-  renderADIFPins(renderer);
-  renderONTASpots(renderer);
-
-  renderMarker(renderer, sunLat_, sunLon_, 255, 255, 0, MarkerShape::Circle,
-               true);
+      renderADIFPins(renderer);
+      renderONTASpots(renderer);
+      renderBeacons(renderer);
+  
+      renderMarker(renderer, sunLat_, sunLon_, 255, 255, 0, MarkerShape::Circle,               true);
 
   renderProjectionSelect(renderer);
   renderRssButton(renderer);
@@ -1197,6 +1187,21 @@ void MapWidget::renderSatGroundTrack(SDL_Renderer *renderer) {
 void MapWidget::renderSpotOverlay(SDL_Renderer *renderer) {
   if (!spotStore_)
     return;
+
+  // Only show if Live Spots widget is enabled in any pane's rotation
+  bool widgetEnabled = false;
+  for (auto *pane : panes_) {
+    if (pane) {
+      const auto &rotation = pane->getRotation();
+      if (std::find(rotation.begin(), rotation.end(), WidgetType::LIVE_SPOTS) != rotation.end()) {
+        widgetEnabled = true;
+        break;
+      }
+    }
+  }
+  if (!widgetEnabled)
+    return;
+
   auto data = spotStore_->snapshot();
   if (!data->valid || data->spots.empty())
     return;
@@ -1510,60 +1515,63 @@ void MapWidget::renderONTASpots(SDL_Renderer *renderer) {
   SDL_RenderSetClipRect(renderer, nullptr);
 }
 
+void MapWidget::renderBeacons(SDL_Renderer *renderer) {
+  if (!config_.showBeacons || !beacons_)
+    return;
+
+  // Only show if NCDXF widget is enabled in any pane's rotation
+  bool widgetEnabled = false;
+  for (auto *pane : panes_) {
+    if (pane) {
+      const auto &rotation = pane->getRotation();
+      if (std::find(rotation.begin(), rotation.end(), WidgetType::NCDXF) != rotation.end()) {
+        widgetEnabled = true;
+        break;
+      }
+    }
+  }
+  if (!widgetEnabled)
+    return;
+
+  auto active = beacons_->getActiveBeacons();
+
+  SDL_RenderSetClipRect(renderer, &mapRect_);
+
+  for (size_t i = 0; i < NCDXF_BEACONS.size(); ++i) {
+    const auto &b = NCDXF_BEACONS[i];
+
+    // Check if this beacon is in the active list
+    bool isTransmitting = false;
+    for (const auto &ab : active) {
+      if (ab.index == (int)i) {
+        isTransmitting = true;
+        break;
+      }
+    }
+
+    if (isTransmitting) {
+      // Bright Yellow for transmitting
+      renderMarker(renderer, b.lat, b.lon, 255, 255, 0, MarkerShape::Circle,
+                   true);
+    } else {
+      // Dim Gray for idle
+      renderMarker(renderer, b.lat, b.lon, 100, 100, 100, MarkerShape::Circle,
+                   true);
+    }
+  }
+
+  SDL_RenderSetClipRect(renderer, nullptr);
+}
+
 void MapWidget::renderMufRtOverlay(SDL_Renderer *renderer) {
   if (config_.propOverlay != PropOverlayType::Muf)
     return;
 
-  SDL_Texture *tex = texMgr_.get("muf_rt_overlay");
-  if (!tex)
-    return;
-
-  SDL_SetTextureAlphaMod(tex, (Uint8)(config_.mufRtOpacity * 2.55f));
-  SDL_SetTextureBlendMode(tex, SDL_BLENDMODE_BLEND);
-
-  SDL_RenderSetClipRect(renderer, &mapRect_);
-  if (config_.projection == "robinson") {
-    SDL_RenderGeometry(renderer, tex, mapVerts_.data(), (int)mapVerts_.size(),
-                       nightIndices_.data(), (int)nightIndices_.size());
-  } else if (config_.projection == "azimuthal") {
-    // We reuse nightIndices_ for topology, but we need to ensure the mesh
-    // is up to date if we were to support transparency properly.
-    // For now, simple copy for non-warped projections.
-    SDL_RenderCopy(renderer, tex, nullptr, &mapRect_);
-  } else {
-    SDL_RenderCopy(renderer, tex, nullptr, &mapRect_);
-  }
-  SDL_RenderSetClipRect(renderer, nullptr);
-}
-
-void MapWidget::renderCloudOverlay(SDL_Renderer *renderer) {
-  if (config_.weatherOverlay != WeatherOverlayType::Clouds)
-    return;
-
-  SDL_Texture *tex = texMgr_.get("cloud_overlay");
-  if (!tex)
-    return;
-
-  // Clouds are subtle, white on transparent usually in the GIBS product
-  // but it's a JPG, so we might need a special blend or color key.
-  // Actually GIBS MODIS Cloud Fraction is white clouds on black background.
-  // We'll use additive blending.
-  SDL_SetTextureBlendMode(tex, SDL_BLENDMODE_ADD);
-  SDL_SetTextureAlphaMod(tex, 128); // 50% opacity
-
-  SDL_RenderSetClipRect(renderer, &mapRect_);
-  if (config_.projection == "robinson" || config_.projection == "azimuthal") {
-    SDL_RenderGeometry(renderer, tex, mapVerts_.data(), (int)mapVerts_.size(),
-                       nightIndices_.data(), (int)nightIndices_.size());
-  } else {
-    SDL_RenderCopy(renderer, tex, nullptr, &mapRect_);
-  }
-  SDL_RenderSetClipRect(renderer, nullptr);
+  // MUF is now handled by renderPropagationOverlay using internal grid
 }
 
 void MapWidget::renderPropagationOverlay(SDL_Renderer *renderer) {
-  if (config_.propOverlay == PropOverlayType::None ||
-      config_.propOverlay == PropOverlayType::Muf)
+  if (config_.propOverlay == PropOverlayType::None)
     return;
 
   if (!propTexture_)
@@ -1603,18 +1611,21 @@ void MapWidget::renderPropagationOverlay(SDL_Renderer *renderer) {
   static std::string lastPropProj = "";
   if (lastPropProj != config_.projection) {
     for (int j = 0; j <= gridH; ++j) {
-      float sy = mapRect_.y + (float)j * mapRect_.h / gridH;
       for (int i = 0; i <= gridW; ++i) {
-        float sx = mapRect_.x + (float)i * mapRect_.w / gridW;
         int idx = j * (gridW + 1) + i;
+        double lat = 90.0 - (double)j * 180.0 / gridH;
+        double lon = (double)i * 360.0 / gridW - 180.0;
 
-        double lat, lon;
-        if (screenToLatLon((int)sx, (int)sy, lat, lon)) {
-          float u = static_cast<float>((lon + 180.0) / 360.0);
-          float v = static_cast<float>((90.0 - lat) / 180.0);
-          propVerts_[idx] = {{sx, sy}, {255, 255, 255, 255}, {u, v}};
+        SDL_FPoint pt = latLonToScreen(lat, lon);
+        float u = (float)i / gridW;
+        float v = (float)j / gridH;
+
+        // Hide vertices outside map area (for Azimuthal mostly)
+        if (pt.x < mapRect_.x || pt.x > mapRect_.x + mapRect_.w ||
+            pt.y < mapRect_.y || pt.y > mapRect_.y + mapRect_.h) {
+          propVerts_[idx] = {{pt.x, pt.y}, {0, 0, 0, 0}, {u, v}};
         } else {
-          propVerts_[idx] = {{sx, sy}, {0, 0, 0, 0}, {0, 0}};
+          propVerts_[idx] = {{pt.x, pt.y}, {255, 255, 255, 255}, {u, v}};
         }
       }
     }
@@ -1633,9 +1644,23 @@ void MapWidget::renderPropagationOverlay(SDL_Renderer *renderer) {
   SDL_RenderSetClipRect(renderer, nullptr);
 }
 
+void MapWidget::renderWxMbOverlay(SDL_Renderer *renderer) {
+  if (config_.weatherOverlay != WeatherOverlayType::WxMb)
+    return;
+  if (!wxmb_)
+    return;
+  SDL_Texture *tex = wxmb_->getTexture(renderer, mapRect_.w, mapRect_.h);
+  if (!tex)
+    return;
+  SDL_SetTextureBlendMode(tex, SDL_BLENDMODE_BLEND);
+  SDL_SetTextureAlphaMod(tex, 180);
+  SDL_RenderSetClipRect(renderer, &mapRect_);
+  SDL_RenderCopy(renderer, tex, nullptr, &mapRect_);
+  SDL_RenderSetClipRect(renderer, nullptr);
+}
+
 void MapWidget::updatePropagationOverlay() {
-  if (config_.propOverlay == PropOverlayType::None ||
-      config_.propOverlay == PropOverlayType::Muf) {
+  if (config_.propOverlay == PropOverlayType::None) {
     return;
   }
 
@@ -1668,10 +1693,18 @@ void MapWidget::updatePropagationOverlay() {
     sw = solar_->get();
   }
 
-  int outputType =
-      (config_.propOverlay == PropOverlayType::Reliability) ? 1 : 0;
+  // outputType: 0=MUF, 1=Reliability, 2=TOA
+  int outputType = 0;
+  if (config_.propOverlay == PropOverlayType::Reliability) {
+      outputType = 1;
+  } else if (config_.propOverlay == PropOverlayType::Toa) {
+      outputType = 2;
+  }
+  
   PropOverlayType overlayType = config_.propOverlay;
-  auto *ionoProvider = iono_;
+  
+  // MUF (RT) uses real-time ionosonde data; VOACAP/Reliability use solar models
+  auto *ionoProvider = (overlayType == PropOverlayType::Muf) ? iono_ : nullptr;
 
   WorkerService::getInstance().submitTask(
       [params, sw, ionoProvider, outputType, overlayType]() {
@@ -1712,7 +1745,10 @@ void MapWidget::onPropDataReady(PropOverlayType type,
   }
 
   std::vector<uint32_t> pixels(grid.size());
-  float maxVal = (type == PropOverlayType::Reliability) ? 100.0f : 50.0f;
+  float maxVal;
+  if (type == PropOverlayType::Reliability) maxVal = 100.0f;
+  else if (type == PropOverlayType::Toa)    maxVal = 40.0f;
+  else                                       maxVal = 50.0f; // MUF
 
   for (size_t i = 0; i < grid.size(); ++i) {
     float val = grid[i];
@@ -1732,6 +1768,20 @@ void MapWidget::onPropDataReady(PropOverlayType type,
             r = (uint8_t)(255 * (1.0f - f));
             g = 255;
             b = (uint8_t)(100 * (1.0f - f));
+        }
+    } else if (type == PropOverlayType::Toa) {
+        // TOA: low angle = green (favorable long DX), high angle = red (steep/local)
+        // t=0 → transparent (no path); t>0 rendered green→yellow→red
+        if (t < 0.5f) {
+            float f = t * 2.0f;
+            r = (uint8_t)(f * 255.0f);
+            g = 200;
+            b = 0;
+        } else {
+            float f = (t - 0.5f) * 2.0f;
+            r = 255;
+            g = (uint8_t)((1.0f - f) * 200.0f);
+            b = 0;
         }
     } else {
         // Jet-like colormap for MUF
@@ -2107,15 +2157,31 @@ void MapWidget::renderRssButton(SDL_Renderer *renderer) {
 }
 
 void MapWidget::renderOverlayInfo(SDL_Renderer *renderer) {
-  if (config_.propOverlay == PropOverlayType::None)
+  if (config_.propOverlay == PropOverlayType::None &&
+      config_.weatherOverlay == WeatherOverlayType::None)
     return;
 
   std::string text;
   if (config_.propOverlay == PropOverlayType::Muf) {
-    text = "MUF Overlay";
+    text = "MUF Overlay (RT)";
   } else if (config_.propOverlay == PropOverlayType::Voacap) {
     text = fmt::format("VOACAP ({} / {} / {}W)", config_.propBand,
                        config_.propMode, config_.propPower);
+  } else if (config_.propOverlay == PropOverlayType::Reliability) {
+    text = fmt::format("Reliability ({} / {} / {}W)", config_.propBand,
+                       config_.propMode, config_.propPower);
+  } else if (config_.propOverlay == PropOverlayType::Toa) {
+    text = "TOA Overlay";
+  }
+
+  if (config_.weatherOverlay == WeatherOverlayType::Clouds) {
+    if (!text.empty())
+      text += " + ";
+    text += "Clouds";
+  } else if (config_.weatherOverlay == WeatherOverlayType::WxMb) {
+    if (!text.empty())
+      text += " + ";
+    text += "WX/Pressure";
   }
 
   if (text.empty())

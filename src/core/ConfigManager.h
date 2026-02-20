@@ -10,7 +10,7 @@
 
 enum class LiveSpotSource { PSK, RBN, WSPR };
 enum class PropOverlayType { None, Muf, Voacap, Reliability, Toa };
-enum class WeatherOverlayType { None, Clouds };
+enum class WeatherOverlayType { None, Clouds, WxMb };
 
 struct AppConfig {
   // Identity
@@ -32,11 +32,11 @@ struct AppConfig {
       WeatherOverlayType weatherOverlay = WeatherOverlayType::None;
       std::string propBand = "20m";  std::string propMode = "SSB";
   int propPower = 100;   // Watts
-  int mufRtOpacity = 40; // percentage
-  bool showSatTrack = true; // Show satellite ground track line on world map
-
-  // Pane widget selection (top bar panes 1–3)
-  // Pane widget selection (rotation sets)
+      int mufRtOpacity = 40; // percentage
+      bool showSatTrack = true; // Show satellite ground track line on world map
+      bool showBeacons = true; // Show NCDXF beacons on world map
+      
+      // Pane widget selection (top bar panes 1–3)  // Pane widget selection (rotation sets)
   std::vector<WidgetType> pane1Rotation = {WidgetType::SOLAR};
   std::vector<WidgetType> pane2Rotation = {WidgetType::DX_CLUSTER};
   std::vector<WidgetType> pane3Rotation = {WidgetType::LIVE_SPOTS};

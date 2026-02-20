@@ -22,8 +22,11 @@
 
 class MufRtProvider;
 class CloudProvider;
+class WxMbProvider;
+class BeaconProvider;
 class IonosondeProvider;
 class SolarDataStore;
+class PaneContainer;
 
 class MapWidget : public Widget {
 public:
@@ -67,8 +70,11 @@ public:
 
   void setMufRtProvider(MufRtProvider *p) { mufrt_ = p; }
   void setCloudProvider(CloudProvider *p) { clouds_ = p; }
+  void setBeaconProvider(BeaconProvider *p) { beacons_ = p; }
   void setIonosondeProvider(IonosondeProvider *p) { iono_ = p; }
   void setSolarDataStore(SolarDataStore *s) { solar_ = s; }
+
+  void setPanes(const std::vector<PaneContainer *> &panes) { panes_ = panes; }
 
   void setOnConfigChanged(std::function<void()> cb) { onConfigChanged_ = cb; }
 
@@ -84,6 +90,7 @@ public:
 
   // Thread-safe method for receiving data from background threads
   void onSatTrackReady(const std::vector<GroundTrackPoint>& track);
+  void onPropDataReady(PropOverlayType type, const std::vector<float> &grid);
 private:
   SDL_FPoint latLonToScreen(double lat, double lon) const;
   bool screenToLatLon(int sx, int sy, double &lat, double &lon) const;
@@ -104,8 +111,10 @@ private:
   void renderAuroraOverlay(SDL_Renderer *renderer);
   void renderADIFPins(SDL_Renderer *renderer);
   void renderONTASpots(SDL_Renderer *renderer);
+  void renderBeacons(SDL_Renderer *renderer);
   void renderMufRtOverlay(SDL_Renderer *renderer);
   void renderCloudOverlay(SDL_Renderer *renderer);
+  void renderWxMbOverlay(SDL_Renderer *renderer);
   void renderPropagationOverlay(SDL_Renderer *renderer);
   void updatePropagationOverlay();
 
@@ -120,9 +129,12 @@ private:
   std::shared_ptr<ActivityDataStore> activityStore_;
   MufRtProvider *mufrt_ = nullptr;
   CloudProvider *clouds_ = nullptr;
+  std::unique_ptr<WxMbProvider> wxmb_;
+  BeaconProvider *beacons_ = nullptr;
   IonosondeProvider *iono_ = nullptr;
   SolarDataStore *solar_ = nullptr;
   OrbitPredictor *predictor_ = nullptr;
+  std::vector<PaneContainer *> panes_;
 
   std::unique_ptr<MapViewMenu> mapViewMenu_;
 
@@ -134,7 +146,6 @@ private:
   std::string pendingMapData_;
   std::string pendingNightMapData_;
   std::string pendingMufData_;
-  std::string pendingCloudData_;
 
   double sunLat_ = 0;
   double sunLon_ = 0;
@@ -196,8 +207,12 @@ private:
   SDL_Texture *mufRtTexture_ = nullptr;
   SDL_Texture *propTexture_ = nullptr;
   uint32_t lastMufUpdateMs_ = 0;
+  uint64_t wxLastCheckMs_ = 0;
   uint32_t lastPropUpdateMs_ = 0;
   PropOverlayType lastPropType_ = PropOverlayType::None;
+  std::string lastBand_;
+  std::string lastMode_;
+  int lastPower_ = -1;
   double lastUpdateSunLat_ = -999.0;
   double lastUpdateSunLon_ = -999.0;
 

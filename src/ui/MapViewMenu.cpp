@@ -16,6 +16,7 @@ void MapViewMenu::show(AppConfig &config, std::function<void()> onApply) {
   projection_ = config.projection;
   mapStyle_ = config.mapStyle;
   showGrid_ = config.showGrid;
+  showBeacons_ = config.showBeacons;
   gridType_ = config.gridType;
   propOverlay_ = config.propOverlay;
   weatherOverlay_ = config.weatherOverlay;
@@ -53,6 +54,8 @@ void MapViewMenu::show(AppConfig &config, std::function<void()> onApply) {
   y += 70;
   weatherRec_ = {col1X, y + 25, colW, 30};
   weatherHeaderY_ = y;
+
+  beaconsRec_ = {col2X + 10, y + 30, 20, 20};
 
   // Row 4 (VOACAP) - 3 columns
   y += 70;
@@ -145,11 +148,17 @@ void MapViewMenu::render(SDL_Renderer *renderer) {
   // Weather Section
   fontMgr_.drawText(renderer, "Weather Overlay", weatherRec_.x, weatherHeaderY_,
                     themes.text, 16, false);
-  std::string weatherLabel = (weatherOverlay_ == WeatherOverlayType::Clouds)
-                                 ? "Clouds"
-                                 : "None";
+  std::string weatherLabel = "None";
+  if (weatherOverlay_ == WeatherOverlayType::Clouds)
+    weatherLabel = "Clouds";
+  else if (weatherOverlay_ == WeatherOverlayType::WxMb)
+    weatherLabel = "WX/Pressure";
   drawDropdown(renderer, weatherRec_, weatherLabel,
                openCombo_ == COMBO_WEATHER);
+
+  // Beacons Toggle
+  renderRadioButton(renderer, beaconsRec_, showBeacons_, "NCDXF Beacons",
+                    themes.text);
 
   // VOACAP Extras (Used for VOACAP, Reliability, and TOA)
   if (propOverlay_ == PropOverlayType::Voacap ||
@@ -378,15 +387,21 @@ bool MapViewMenu::onMouseUp(int mx, int my, Uint16) {
               }))
             return true;
       
-          if (handleCombo(weatherRec_, COMBO_WEATHER, weatherOpts_, [&](int idx) {
-                if (idx == 0)
-                  weatherOverlay_ = WeatherOverlayType::None;
-                else if (idx == 1)
-                  weatherOverlay_ = WeatherOverlayType::Clouds;
-              }))
-            return true;
-      
-          if (propOverlay_ == PropOverlayType::Voacap ||          propOverlay_ == PropOverlayType::Reliability ||
+              if (handleCombo(weatherRec_, COMBO_WEATHER, weatherOpts_, [&](int idx) {
+                    if (idx == 0)
+                      weatherOverlay_ = WeatherOverlayType::None;
+                    else if (idx == 1)
+                      weatherOverlay_ = WeatherOverlayType::WxMb;
+                  }))
+                return true;
+          
+              if (mx >= beaconsRec_.x && mx < beaconsRec_.x + beaconsRec_.w &&
+                  my >= beaconsRec_.y && my < beaconsRec_.y + beaconsRec_.h) {
+                showBeacons_ = !showBeacons_;
+                return true;
+              }
+          
+              if (propOverlay_ == PropOverlayType::Voacap ||          propOverlay_ == PropOverlayType::Reliability ||
           propOverlay_ == PropOverlayType::Toa) {
         if (handleCombo(bandRec_, COMBO_BAND, bandOpts_,                    [&](int idx) { propBand_ = bandOpts_[idx]; }))
       return true;
@@ -423,9 +438,9 @@ bool MapViewMenu::onMouseUp(int mx, int my, Uint16) {
     // Apply changes to config
     config_->projection = projection_;
     config_->mapStyle = mapStyle_;
-    config_->showGrid = showGrid_;
-          config_->gridType = gridType_;
-          config_->propOverlay = propOverlay_;
+          config_->showGrid = showGrid_;
+          config_->showBeacons = showBeacons_;
+          config_->gridType = gridType_;          config_->propOverlay = propOverlay_;
           config_->weatherOverlay = weatherOverlay_;
           config_->propBand = propBand_;    config_->propMode = propMode_;
     config_->propPower = propPower_;

@@ -1,5 +1,5 @@
 {
-  "version": "1.6",
+  "version": "1.8",
   "updated_at": "2026-02-17T18:00:00.000Z",
   "features": [
     {
@@ -20,7 +20,7 @@
           "checkStopwatchTouch",
           "NV_DE_CALL"
         ],
-        "notes": "clocks.cpp is 47K lines and handles all clock modes. stopwatch.cpp is 97K — very feature-rich with lap timer, countdown, etc."
+        "notes": "clocks.cpp is 47K lines and handles all clock modes. stopwatch.cpp is 97K \u2014 very feature-rich with lap timer, countdown, etc."
       },
       "next": {
         "files": [
@@ -91,7 +91,7 @@
         "Night lights overlay (NASA Black Marble 2012)",
         "Click to set DX location"
       ],
-      "notes": "MapWidget enhanced with Phase 4 Interactive Map Enhancements:\n- **Tooltips**: Priority-based hit-testing for DE/DX markers, sun, satellite, DX cluster spots with auto-positioning and 3s fade-out.\n- **Mouse Motion**: Integrated onMouseMove() for real-time cursor tracking and tooltip updates.\n- **Enriched Debug Data**: getDebugData() now reports DE/DX positions, distance/bearing, sun position, satellite info, spot counts, and current tooltip.\n- **API Endpoints**: Added GET /get_dx.txt (DX location + distance/bearing) and GET /set_mappos (programmatic DE/DX setting).\n- **Helper Functions**: screenToLatLon() inverse projection for reusable coordinate conversion.\n- **FontManager Integration**: Tooltips rendered with proper font scaling.\n\nPhase 26: High-Fidelity Map Visuals:\n- **Night Lights**: Integrated NASA Black Marble 卫星 imagery for realistic city lights at night.\n- **Grid Mesh Rendering**: Shifted to hardware-accelerated triangle strips for smoother transitions and projection accuracy.\n\nRemaining items for future phases:\n- Robinson projection\n- Mercator projection\n- Full grid overlay system (Maidenhead/lat-lon toggle)\n- City markers\n- Additional semantic actions (zoom, projection switching)"
+      "notes": "MapWidget enhanced with Phase 4 Interactive Map Enhancements:\n- **Tooltips**: Priority-based hit-testing for DE/DX markers, sun, satellite, DX cluster spots with auto-positioning and 3s fade-out.\n- **Mouse Motion**: Integrated onMouseMove() for real-time cursor tracking and tooltip updates.\n- **Enriched Debug Data**: getDebugData() now reports DE/DX positions, distance/bearing, sun position, satellite info, spot counts, and current tooltip.\n- **API Endpoints**: Added GET /get_dx.txt (DX location + distance/bearing) and GET /set_mappos (programmatic DE/DX setting).\n- **Helper Functions**: screenToLatLon() inverse projection for reusable coordinate conversion.\n- **FontManager Integration**: Tooltips rendered with proper font scaling.\n\nPhase 26: High-Fidelity Map Visuals:\n- **Night Lights**: Integrated NASA Black Marble \u536b\u661f imagery for realistic city lights at night.\n- **Grid Mesh Rendering**: Shifted to hardware-accelerated triangle strips for smoother transitions and projection accuracy.\n\nRemaining items for future phases:\n- Robinson projection\n- Mercator projection\n- Full grid overlay system (Maidenhead/lat-lon toggle)\n- City markers\n- Additional semantic actions (zoom, projection switching)"
     },
     {
       "feature_id": "de_info",
@@ -118,7 +118,7 @@
         "symbols": [
           "LocalPanel"
         ],
-        "notes": "DE info is rendered by LocalPanel (not DEInfo). src/ui/DEInfo.cpp and DEInfo.h exist but are not in CMakeLists.txt and are not wired into the app — they are an unused stub. LocalPanel shows callsign, local time, grid, sunrise/sunset, and weather."
+        "notes": "DE info is rendered by LocalPanel (not DEInfo). src/ui/DEInfo.cpp and DEInfo.h exist but are not in CMakeLists.txt and are not wired into the app \u2014 they are an unused stub. LocalPanel shows callsign, local time, grid, sunrise/sunset, and weather."
       },
       "status": "implemented",
       "acceptance": [
@@ -182,7 +182,7 @@
           "satSchedule",
           "SAT_NAME"
         ],
-        "notes": "earthsat.cpp is 76K — comprehensive satellite tracking. P13.cpp implements Plan 13 orbit propagation. sattool.cpp provides the satellite selection tool."
+        "notes": "earthsat.cpp is 76K \u2014 comprehensive satellite tracking. P13.cpp implements Plan 13 orbit propagation. sattool.cpp provides the satellite selection tool."
       },
       "next": {
         "files": [
@@ -376,7 +376,7 @@
         "Show current Kp value",
         "Storm-level indicators (G1-G5)"
       ],
-      "notes": "HistoryProvider fetches 30-day Kp from NOAA SWPC. HistoryPanel renders color-coded bar chart (red ≥5, yellow ≥4, green <4). Wired in main.cpp."
+      "notes": "HistoryProvider fetches 30-day Kp from NOAA SWPC. HistoryPanel renders color-coded bar chart (red \u22655, yellow \u22654, green <4). Wired in main.cpp."
     },
     {
       "feature_id": "sunspot_number",
@@ -450,7 +450,7 @@
         "Flare class indicators (C/M/X)",
         "Current flux level prominently shown"
       ],
-      "notes": "HistoryProvider::fetchXray() fetches 7-day GOES X-ray JSON from NOAA SWPC (1-8A channel). processXray() groups by day, takes peak flux, converts to log10 scale (range -9 to -3, covering A through X+ class flares). Rendered by HistoryPanel with seriesName='xray'. WidgetType::HISTORY_XRAY added, wired in widget pool and periodic fetch. No separate flare class label yet — log10 y-axis conveys class implicitly."
+      "notes": "HistoryProvider::fetchXray() fetches 7-day GOES X-ray JSON from NOAA SWPC (1-8A channel). processXray() groups by day, takes peak flux, converts to log10 scale (range -9 to -3, covering A through X+ class flares). Rendered by HistoryPanel with seriesName='xray'. WidgetType::HISTORY_XRAY added, wired in widget pool and periodic fetch. No separate flare class label yet \u2014 log10 y-axis conveys class implicitly."
     },
     {
       "feature_id": "solar_wind",
@@ -581,7 +581,7 @@
           "DstProvider",
           "DstPanel"
         ],
-        "notes": "DstStore.h does not exist as a separate file — Dst data struct is embedded in DstPanel/DstProvider. Both .cpp files are in CMakeLists.txt."
+        "notes": "DstStore.h does not exist as a separate file \u2014 Dst data struct is embedded in DstPanel/DstProvider. Both .cpp files are in CMakeLists.txt."
       },
       "status": "implemented",
       "acceptance": [
@@ -985,7 +985,7 @@
         "Filter by band, mode, or date range",
         "ADIF file selection/loading"
       ],
-      "notes": "ADIFProvider parses ADIF file from configDir()/logs.adif. ADIFPanel shows scrollable QSO log with band/mode filter chips — click left half of header to cycle band (All→160m→80m→...→2m), right half to cycle mode (All→CW→SSB→FT8→...). Scrollbar drag supported. No map overlay yet. File path hardcoded to logs.adif; no file selection UI."
+      "notes": "ADIFProvider parses ADIF file from configDir()/logs.adif. ADIFPanel shows scrollable QSO log with band/mode filter chips \u2014 click left half of header to cycle band (All\u2192160m\u219280m\u2192...\u21922m), right half to cycle mode (All\u2192CW\u2192SSB\u2192FT8\u2192...). Scrollbar drag supported. No map overlay yet. File path hardcoded to logs.adif; no file selection UI."
     },
     {
       "feature_id": "rss_banner",
@@ -1097,7 +1097,7 @@
         "Visual or audio alarm when countdown reaches zero",
         "Configurable event name"
       ],
-      "notes": "CountdownPanel user-configurable via click-to-edit. Target persists to config_.countdownTime / config_.countdownLabel. Displays EVENT ACTIVE! in red when reached. No audio alarm — visual only."
+      "notes": "CountdownPanel user-configurable via click-to-edit. Target persists to config_.countdownTime / config_.countdownLabel. Displays EVENT ACTIVE! in red when reached. No audio alarm \u2014 visual only."
     },
     {
       "feature_id": "rotator_gimbal",
@@ -1158,7 +1158,7 @@
           "NVReadString",
           "NVWriteString"
         ],
-        "notes": "setup.cpp is 207K — the largest file in the original. configs.cpp (28K) manages config persistence. nvram.cpp (20K) provides NV storage abstraction."
+        "notes": "setup.cpp is 207K \u2014 the largest file in the original. configs.cpp (28K) manages config persistence. nvram.cpp (20K) provides NV storage abstraction."
       },
       "next": {
         "files": [
@@ -2102,7 +2102,7 @@
           "FontManager::renderText",
           "Tooltip::cachedTexture"
         ],
-        "notes": "Phase 37 (2026-02-16): Comprehensive memory optimization for RPi KMSDRM. Key improvements: (1) Tooltip texture caching - reduced allocations from 180 per 3 seconds to 1-2 per session (99% reduction), (2) Robust NULL checks with SDL_GetError() logging after all texture operations, (3) Low-memory mode - 75% mesh density reduction (96×48 → 48×24 grids) for night overlay and Robinson projection, (4) Reduced great circle path segments (250→100) and satellite footprint (72→36), (5) Automatic KMSDRM detection and compatibility mode activation. Eliminates 'Cannot allocate memory' errors and prevents cascade segfaults."
+        "notes": "Phase 37 (2026-02-16): Comprehensive memory optimization for RPi KMSDRM. Key improvements: (1) Tooltip texture caching - reduced allocations from 180 per 3 seconds to 1-2 per session (99% reduction), (2) Robust NULL checks with SDL_GetError() logging after all texture operations, (3) Low-memory mode - 75% mesh density reduction (96\u00d748 \u2192 48\u00d724 grids) for night overlay and Robinson projection, (4) Reduced great circle path segments (250\u2192100) and satellite footprint (72\u219236), (5) Automatic KMSDRM detection and compatibility mode activation. Eliminates 'Cannot allocate memory' errors and prevents cascade segfaults."
       },
       "status": "implemented",
       "acceptance": [
@@ -2146,7 +2146,7 @@
           "AppConfig::rbnEnabled",
           "AppConfig::rbnHost"
         ],
-        "notes": "RBN feeds into DXClusterDataStore, reusing all DXC panel and map overlay rendering. Enable toggle in Setup → Spotting tab. Config persisted as rbn.enabled / rbn.host in config.json."
+        "notes": "RBN feeds into DXClusterDataStore, reusing all DXC panel and map overlay rendering. Enable toggle in Setup \u2192 Spotting tab. Config persisted as rbn.enabled / rbn.host in config.json."
       },
       "status": "implemented",
       "acceptance": [
@@ -2154,7 +2154,7 @@
         "Parse DX de lines for CW/digital beacon spots",
         "Feed spots into shared DXClusterDataStore",
         "Spots appear in DX Cluster panel and map overlay",
-        "Enable/disable toggle in Setup → Spotting tab",
+        "Enable/disable toggle in Setup \u2192 Spotting tab",
         "Config persisted across restarts",
         "30s reconnect on disconnect; thread exits cleanly on stop()"
       ]
@@ -2194,13 +2194,17 @@
         "Works in both azimuthal and Robinson projections",
         "Toggle overlay on/off without reloading map"
       ],
-      "notes": "HIGHEST PRIORITY parity gap. open-hamclock-backend/ham/HamClock/voacap_service.py has the complete physics engine (MUF/REL/TOA, vectorized NumPy, 660x330). Missing backend CGI endpoints are: fetchVOACAP-MUF.pl, fetchVOACAP-TOA.pl, fetchVOACAPArea.pl (see open-hamclock-backend/PROJECT_STATUS.md). MCP tool 'get_voacap_overlay' now documents the full request/response schema. See docs/parity.md for alignment notes (equirectangular vs azimuthal reprojection challenge)."
+      "notes": "HIGHEST PRIORITY parity gap. open-hamclock-backend/ham/HamClock/voacap_service.py has the complete physics engine (MUF/REL/TOA, vectorized NumPy, 660x330). Missing backend CGI endpoints are: fetchVOACAP-MUF.pl, fetchVOACAP-TOA.pl, fetchVOACAPArea.pl (see open-hamclock-backend/PROJECT_STATUS.md). MCP tool 'get_voacap_overlay' now documents the full request/response schema. See docs/parity.md for alignment notes (equirectangular vs azimuthal reprojection challenge).",
+      "implementation": {
+        "status": "partial",
+        "notes": "MUF (outputType=0) and Reliability (outputType=1) grids are computed by PropEngine and rendered on MapWidget via WorkerService. TOA (outputType) is exposed in MapViewMenu but PropEngine has no TOA grid; selecting TOA silently renders MUF \u2014 bug. Implemented 2026-02-20."
+      }
     },
     {
       "feature_id": "muf_rt_map_overlay",
       "name": "KC2G Real-Time MUF Map Overlay",
       "category": "map",
-      "description": "Semi-transparent overlay of the real-time Maximum Usable Frequency map derived from the global KC2G ionosonde network (prop.kc2g.com). Updated approximately every 15 minutes. No local calculation required — just fetch and display.",
+      "description": "Semi-transparent overlay of the real-time Maximum Usable Frequency map derived from the global KC2G ionosonde network (prop.kc2g.com). Updated approximately every 15 minutes. No local calculation required \u2014 just fetch and display.",
       "original": {
         "files": [
           "mapmanage.cpp"
@@ -2217,7 +2221,7 @@
           "src/ui/MapWidget.h"
         ],
         "symbols": [],
-        "notes": "No implementation yet. MapWidget already handles SDL_Texture overlays. Implementation path: (1) Fetch https://prop.kc2g.com/renders/current/mufd-normal-now.png via CORS proxy (web) or NetworkManager (native), (2) Decode PNG to SDL_Texture, (3) Blend onto map at configurable opacity, (4) Auto-refresh every 15 min. No backend required — direct fetch from KC2G. For native use, open-hamclock-backend also provides pre-generated BMP variants via its scripts/build_muf_rt.py."
+        "notes": "No implementation yet. MapWidget already handles SDL_Texture overlays. Implementation path: (1) Fetch https://prop.kc2g.com/renders/current/mufd-normal-now.png via CORS proxy (web) or NetworkManager (native), (2) Decode PNG to SDL_Texture, (3) Blend onto map at configurable opacity, (4) Auto-refresh every 15 min. No backend required \u2014 direct fetch from KC2G. For native use, open-hamclock-backend also provides pre-generated BMP variants via its scripts/build_muf_rt.py."
       },
       "status": "missing",
       "acceptance": [
@@ -2228,7 +2232,11 @@
         "Show timestamp of last update",
         "Works with CORS proxy in web/WASM mode"
       ],
-      "notes": "Simplest parity gap to close — no physics required. KC2G PNG is publicly available. Backend-free path: fetch prop.kc2g.com/renders/current/mufd-normal-now.png. Alignment: KC2G image is equirectangular; same reprojection challenge as VOACAP overlay applies for azimuthal display."
+      "notes": "Simplest parity gap to close \u2014 no physics required. KC2G PNG is publicly available. Backend-free path: fetch prop.kc2g.com/renders/current/mufd-normal-now.png. Alignment: KC2G image is equirectangular; same reprojection challenge as VOACAP overlay applies for azimuthal display.",
+      "implementation": {
+        "status": "implemented",
+        "notes": "MufRtProvider fetches KC2G image (prop.kc2g.com/renders/current/mufd-normal-now.png); blended as semi-transparent overlay on MapWidget. Label differentiated from VOACAP in 2026-02-20 refinement."
+      }
     },
     {
       "feature_id": "cloud_cover_overlay",
@@ -2268,7 +2276,7 @@
       "original": {
         "files": [],
         "symbols": [],
-        "notes": "No direct equivalent in original HamClock — new feature enabling server/Pi deployments without a connected display."
+        "notes": "No direct equivalent in original HamClock \u2014 new feature enabling server/Pi deployments without a connected display."
       },
       "next": {
         "files": [
@@ -2282,7 +2290,7 @@
           "WebServer::alwaysCapture_",
           "SDL_WINDOW_HIDDEN"
         ],
-        "notes": "Forces software renderer for reliable SDL_RenderReadPixels. Sets alwaysCapture_ so /live.jpg is always fresh. Prints web URL to stdout. Zero UI changes — all existing panels and rendering unchanged."
+        "notes": "Forces software renderer for reliable SDL_RenderReadPixels. Sets alwaysCapture_ so /live.jpg is always fresh. Prints web URL to stdout. Zero UI changes \u2014 all existing panels and rendering unchanged."
       },
       "status": "implemented",
       "acceptance": [

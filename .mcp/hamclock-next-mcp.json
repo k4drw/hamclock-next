@@ -1,7 +1,7 @@
 {
-  "mcp_version": "2.1",
+  "mcp_version": "2.2",
   "project": "hamclock-next",
-  "updated_at": "2026-02-18T22:00:00.000Z",
+  "updated_at": "2026-02-20T16:30:00.000Z",
   "project_context": {
     "title": "HamClock Next \u2014 SDL2 Rewrite",
     "callsign": "K4DRW",
@@ -174,13 +174,13 @@
     ]
   },
   "feature_status_summary": {
-    "total": 62,
-    "implemented": 60,
+    "total": 63,
+    "implemented": 61,
     "partial": 1,
     "missing": 1,
     "not_needed": 2,
-    "percent_done": "~91% (62/68 parity features per parity.md \u2014 2026-02-18)",
-    "notes": "robinson_projection completed in v0.8B sprint. 6 new enhancements added: MUF overlay, ADIF map pins, Mercator projection, contest detail popup, POTA/SOTA chip, RSS toggle, sat track toggle. 1 partial: SOTA map pins (no grid coords in API). 1 missing: bme280_sensor (hardware, deferred). 2 not_needed: seven_segment, ota_update (ESP32-specific)."
+    "percent_done": "~94% (67/71 parity features per parity.md \u2014 2026-02-20)",
+    "notes": "v0.9B sprint: WorkerService thread pool, POTA/SOTA map pins, PropEngine MUF/REL/TOA heatmaps (calculateTOA geometric model, F2 h=350km, multi-hop), SOTA coordinate resolution (summitslist.csv pre-seed + api2.sota.org.uk fallback), WxMb weather overlay (GFS GRIB2 pressure/wind from NOAA NOMADS). 0 partial. 1 missing: bme280_sensor (hardware, deferred). 2 not_needed: seven_segment, ota_update (ESP32-specific). Cloud cover overlay still pending (CloudProvider is a stub)."
   },
   "implemented_features": [
     {
