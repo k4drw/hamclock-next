@@ -11,14 +11,15 @@ cd "$REPO_ROOT" || exit 1
 IMAGE="fedora:latest"
 BUILD_DIR="build-rpm"
 
+# Get version from centralized file
+VERSION=$(cat VERSION | tr -d '[:space:]')
+
 # Clean previous build artifacts
 echo "Cleaning old build artifacts..."
 rm -rf "$BUILD_DIR"
 mkdir -p "$BUILD_DIR"
 
-echo "Starting RPM Build (Fedora)..."
-# We run as root inside the container to install packages, but we'll try to build as user if possible?
-# Actually rpmbuild is often easier as a user. We'll install deps then switch to user.
+echo "Starting RPM Build (Fedora) for v${VERSION}..."
 
 docker run --rm \
     -v "$REPO_ROOT":/src:z \
@@ -28,12 +29,11 @@ docker run --rm \
         dnf install -y rpm-build cmake gcc-c++ git libstdc++-static libX11-devel libXext-devel libXcursor-devel libXi-devel libXrandr-devel libXScrnSaver-devel libXxf86vm-devel libXinerama-devel libcurl-devel openssl-devel libdrm-devel mesa-libgbm-devel mesa-libEGL-devel mesa-libGLES-devel alsa-lib-devel tar gzip desktop-file-utils && \
         
         # Create tarball for Source0
-        # Exclude build directories to keep it small
-        tar --exclude='./build*' --exclude='./.git' -czf /src/$BUILD_DIR/hamclock-next-0.8.0.tar.gz . && \
+        tar --exclude='./build*' --exclude='./.git' -czf /src/$BUILD_DIR/hamclock-next-${VERSION}.tar.gz . && \
         
         # Setup RPM build tree
         mkdir -p /root/rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS} && \
-        cp /src/$BUILD_DIR/hamclock-next-0.8.0.tar.gz /root/rpmbuild/SOURCES/ && \
+        cp /src/$BUILD_DIR/hamclock-next-${VERSION}.tar.gz /root/rpmbuild/SOURCES/ && \
         cp /src/packaging/linux/rpm/hamclock.spec /root/rpmbuild/SPECS/ && \
         
         # Build RPM

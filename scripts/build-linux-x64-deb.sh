@@ -9,12 +9,17 @@ cd "$REPO_ROOT" || exit 1
 IMAGE="debian:bullseye"
 BUILD_DIR="build-linux-x64"
 
+# Get version from centralized files
+V_NUM=$(cat VERSION | tr -d '[:space:]')
+V_SUF=$(cat VERSION_SUFFIX | tr -d '[:space:]')
+VERSION="${V_NUM}${V_SUF}"
+
 # Clean build directory
 echo "Cleaning old build artifacts..."
 rm -rf "$BUILD_DIR"
 mkdir -p "$BUILD_DIR"
 
-echo "Starting Linux x64 DEB Build (Ubuntu 22.04)..."
+echo "Starting Linux x64 DEB Build (v${VERSION})..."
 
 docker run --rm -v "$(pwd)":/work:z -w /work $IMAGE bash -c "
     export DEBIAN_FRONTEND=noninteractive && \
@@ -51,8 +56,9 @@ if [ $? -eq 0 ]; then
     # Packaging - We create two packages with the same binary but different dependencies
     echo "Packaging Unified (Desktop) DEB..."
     chmod +x packaging/linux/create_deb.sh
-    # Version 0.8.0 to match RPM
-    export VERSION="0.8.0"
+    
+    # We export VERSION so create_deb.sh can use it
+    export VERSION="${VERSION}"
     ./packaging/linux/create_deb.sh "$BUILD_DIR/hamclock-next" "amd64" "unified" "$BUILD_DIR"
 
     echo "Packaging Lean (Kiosk/Headless) DEB..."

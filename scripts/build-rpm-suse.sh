@@ -11,12 +11,15 @@ cd "$REPO_ROOT" || exit 1
 IMAGE="registry.opensuse.org/opensuse/tumbleweed:latest"
 BUILD_DIR="build-rpm-suse"
 
+# Get version from centralized file
+VERSION=$(cat VERSION | tr -d '[:space:]')
+
 # Clean previous build artifacts
 echo "Cleaning old build artifacts..."
 rm -rf "$BUILD_DIR"
 mkdir -p "$BUILD_DIR"
 
-echo "Starting RPM Build (OpenSuSE Tumbleweed)..."
+echo "Starting RPM Build (OpenSuSE Tumbleweed) for v${VERSION}..."
 
 # Aggressively exclude all build artifacts and sync junk to keep tarball small
 echo "Creating source tarball..."
@@ -26,7 +29,7 @@ tar --exclude='./build*' \
     --exclude='./.cache' \
     --exclude='./.stversions' \
     --exclude="./$BUILD_DIR" \
-    -czf "$BUILD_DIR/hamclock-next-0.8.0.tar.gz" .
+    -czf "$BUILD_DIR/hamclock-next-${VERSION}.tar.gz" .
 
 docker run --rm \
     -v "$REPO_ROOT":/src:z \
@@ -44,7 +47,7 @@ docker run --rm \
         
         # Setup RPM build tree
         mkdir -p /root/rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS} && \
-        cp $BUILD_DIR/hamclock-next-0.8.0.tar.gz /root/rpmbuild/SOURCES/ && \
+        cp $BUILD_DIR/hamclock-next-${VERSION}.tar.gz /root/rpmbuild/SOURCES/ && \
         cp packaging/linux/rpm/hamclock.spec /root/rpmbuild/SPECS/ && \
         
         # Define _topdir via .rpmmacros for SuSE compatibility
