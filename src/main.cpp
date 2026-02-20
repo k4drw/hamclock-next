@@ -17,7 +17,6 @@
 #ifdef ENABLE_DEBUG_API
 #include "core/UIRegistry.h"
 #endif
-#include "core/MemoryMonitor.h"
 #include "core/SoundManager.h"
 #include "core/WidgetType.h"
 #include "core/WorkerService.h"
@@ -110,7 +109,6 @@
 #include <winsock2.h>
 #endif
 #include <memory>
-#include <sstream>
 #ifdef __linux__
 #include <unistd.h>
 #endif
@@ -157,6 +155,7 @@ struct AppContext {
 
   // Data Stores
   std::shared_ptr<SolarDataStore> solarStore;
+  std::shared_ptr<AuroraHistoryStore> auroraHistoryStore;
   std::shared_ptr<WatchlistStore> watchlistStore;
   std::shared_ptr<RSSDataStore> rssStore;
   std::shared_ptr<WatchlistHitStore> watchlistHitStore;
@@ -452,7 +451,7 @@ int main(int argc, char *argv[]) {
     LOG_ERROR("SDL_Init failed: {}", SDL_GetError());
     return EXIT_FAILURE;
   }
-  
+
   AE_BASE_EVENT = SDL_RegisterEvents(2);
   if (AE_BASE_EVENT == (uint32_t)-1) {
     LOG_W("Main", "Failed to reserve user events for background tasks");
@@ -582,6 +581,7 @@ int main(int argc, char *argv[]) {
   CitiesManager::getInstance().init();
 
   ctx.solarStore = std::make_shared<SolarDataStore>();
+  ctx.auroraHistoryStore = std::make_shared<AuroraHistoryStore>();
   ctx.watchlistStore = std::make_shared<WatchlistStore>();
   ctx.rssStore = std::make_shared<RSSDataStore>();
   ctx.watchlistHitStore = std::make_shared<WatchlistHitStore>();
@@ -735,7 +735,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
   auto &netManager = *ctx.netManager;
   auto &appCfg = ctx.appCfg;
 
-  auto auroraHistoryStore = std::make_shared<AuroraHistoryStore>();
+  auto auroraHistoryStore = ctx.auroraHistoryStore;
   noaaProvider = std::make_unique<NOAAProvider>(
       netManager, solarStore, auroraHistoryStore, state.get());
   noaaProvider->fetch();
@@ -793,11 +793,11 @@ DashboardContext::DashboardContext(AppContext &ctx)
   historyProvider->fetchKp();
 
   deWeatherProvider =
-      std::make_unique<WeatherProvider>(netManager, deWeatherStore);
+      std::make_unique<WeatherProvider>(netManager, deWeatherStore, 0);
   deWeatherProvider->fetch(state->deLocation.lat, state->deLocation.lon);
 
   dxWeatherProvider =
-      std::make_unique<WeatherProvider>(netManager, dxWeatherStore);
+      std::make_unique<WeatherProvider>(netManager, dxWeatherStore, 1);
   dxWeatherProvider->fetch(state->dxLocation.lat, state->dxLocation.lon);
 
   sdoProvider = std::make_unique<SDOProvider>(netManager);
@@ -1262,30 +1262,157 @@ void DashboardContext::update(AppContext &ctx) {
       }
       break;
     default:
-        // Handle custom application events
-        if (event.type >= AE_BASE_EVENT) {
-            switch (event.type - AE_BASE_EVENT) {
-                case AE_SATELLITE_TRACK_READY: {
-                    auto* track = static_cast<std::vector<GroundTrackPoint>*>(event.user.data1);
-                    if (track && ctx.dashboard && ctx.dashboard->mapArea) {
-                        ctx.dashboard->mapArea->onSatTrackReady(*track);
-                    }
-                    delete track; // Free the memory allocated by the worker thread
-                    break;
-                }
-                case AE_RSS_DATA_READY: {
-                    int feed_idx = event.user.code;
-                    auto* headlines = static_cast<std::vector<std::string>*>(event.user.data1);
-                    if (headlines && feed_idx >= 0 && feed_idx < 3) {
-                        rssHeadlines[feed_idx] = std::move(*headlines);
-                        rssDataDirty = true;
-                    }
-                    delete headlines;
-                    break;
-                }
-            }
+      // Handle custom application events
+      if (event.type >= AE_BASE_EVENT) {
+        switch (event.type - AE_BASE_EVENT) {
+        case AE_SATELLITE_TRACK_READY: {
+          auto *track =
+              static_cast<std::vector<GroundTrackPoint> *>(event.user.data1);
+          if (track && ctx.dashboard && ctx.dashboard->mapArea) {
+            ctx.dashboard->mapArea->onSatTrackReady(*track);
+          }
+          delete track; // Free the memory allocated by the worker thread
+          break;
         }
-        break;
+        case AE_RSS_DATA_READY: {
+          int feed_idx = event.user.code;
+          auto *headlines =
+              static_cast<std::vector<std::string> *>(event.user.data1);
+          if (headlines && feed_idx >= 0 && feed_idx < 3) {
+            rssHeadlines[feed_idx] = std::move(*headlines);
+            rssDataDirty = true;
+          }
+          delete headlines;
+          break;
+        }
+        case AE_SOLAR_DATA_READY: {
+          auto *update = static_cast<SolarData *>(event.user.data1);
+          if (update && ctx.solarStore) {
+            auto data = ctx.solarStore->get();
+            switch (static_cast<NOAAProvider::UpdateType>(event.user.code)) {
+            case NOAAProvider::UpdateType::KIndex:
+              data.k_index = update->k_index;
+              data.a_index = update->a_index;
+              data.noaa_g_scale = update->noaa_g_scale;
+              data.last_updated = update->last_updated;
+              data.valid = true;
+              break;
+            case NOAAProvider::UpdateType::SFI:
+              data.sfi = update->sfi;
+              data.valid = true;
+              break;
+            case NOAAProvider::UpdateType::SN:
+              data.sunspot_number = update->sunspot_number;
+              data.valid = true;
+              break;
+            case NOAAProvider::UpdateType::Plasma:
+              data.solar_wind_speed = update->solar_wind_speed;
+              data.solar_wind_density = update->solar_wind_density;
+              break;
+            case NOAAProvider::UpdateType::Mag:
+              data.bt = update->bt;
+              data.bz = update->bz;
+              break;
+            case NOAAProvider::UpdateType::DST:
+              data.dst = update->dst;
+              break;
+            case NOAAProvider::UpdateType::Aurora:
+              data.aurora = update->aurora;
+              break;
+            case NOAAProvider::UpdateType::DRAP:
+              data.drap = update->drap;
+              break;
+            case NOAAProvider::UpdateType::XRay:
+              data.xray_flux = update->xray_flux;
+              data.noaa_r_scale = update->noaa_r_scale;
+              break;
+            case NOAAProvider::UpdateType::ProtonFlux:
+              data.proton_flux = update->proton_flux;
+              data.noaa_s_scale = update->noaa_s_scale;
+              break;
+            }
+            ctx.solarStore->set(data);
+          }
+          delete update;
+          break;
+        }
+        case AE_AURORA_DATA_READY: {
+          float percent = *(static_cast<float *>(event.user.data1));
+          if (ctx.auroraHistoryStore) {
+            ctx.auroraHistoryStore->addPoint(percent);
+          }
+          delete static_cast<float *>(event.user.data1);
+          break;
+        }
+        case AE_ACTIVITY_DATA_READY: {
+          auto *update = static_cast<ActivityData *>(event.user.data1);
+          if (update && ctx.activityStore) {
+            auto data = ctx.activityStore->get();
+            switch (
+                static_cast<ActivityProvider::UpdateType>(event.user.code)) {
+            case ActivityProvider::UpdateType::DXPeds:
+              data.dxpeds = std::move(update->dxpeds);
+              break;
+            case ActivityProvider::UpdateType::POTA: {
+              auto it = std::remove_if(
+                  data.ontaSpots.begin(), data.ontaSpots.end(),
+                  [](const ONTASpot &s) { return s.program == "POTA"; });
+              data.ontaSpots.erase(it, data.ontaSpots.end());
+              data.ontaSpots.insert(data.ontaSpots.end(),
+                                    update->ontaSpots.begin(),
+                                    update->ontaSpots.end());
+              break;
+            }
+            case ActivityProvider::UpdateType::SOTA: {
+              auto it = std::remove_if(
+                  data.ontaSpots.begin(), data.ontaSpots.end(),
+                  [](const ONTASpot &s) { return s.program == "SOTA"; });
+              data.ontaSpots.erase(it, data.ontaSpots.end());
+              data.ontaSpots.insert(data.ontaSpots.end(),
+                                    update->ontaSpots.begin(),
+                                    update->ontaSpots.end());
+              break;
+            }
+            }
+            data.lastUpdated = std::chrono::system_clock::now();
+            data.valid = true;
+            ctx.activityStore->set(data);
+          }
+          delete update;
+          break;
+        }
+        case AE_WEATHER_DATA_READY: {
+          auto *update = static_cast<WeatherData *>(event.user.data1);
+          int id = event.user.code;
+          if (update) {
+            if (id == 0 && ctx.deWeatherStore) {
+              ctx.deWeatherStore->update(*update);
+            } else if (id == 1 && ctx.dxWeatherStore) {
+              ctx.dxWeatherStore->update(*update);
+            }
+          }
+          delete update;
+          break;
+        }
+        case AE_CONTEST_DATA_READY: {
+          auto *update = static_cast<ContestData *>(event.user.data1);
+          if (update && ctx.contestStore) {
+            ctx.contestStore->update(*update);
+          }
+          delete update;
+          break;
+        }
+        case AE_HISTORY_DATA_READY: {
+          auto *update = static_cast<HistorySeries *>(event.user.data1);
+          if (update && ctx.historyStore) {
+            ctx.historyStore->update(update->name, *update);
+          }
+          delete update;
+          break;
+        }
+        }
+      }
+      break;
     }
 
     // Dispatch other events
@@ -1359,7 +1486,8 @@ void DashboardContext::update(AppContext &ctx) {
   if (rssDataDirty) {
     RSSData data;
     for (int i = 0; i < 3; ++i) {
-        data.headlines.insert(data.headlines.end(), rssHeadlines[i].begin(), rssHeadlines[i].end());
+      data.headlines.insert(data.headlines.end(), rssHeadlines[i].begin(),
+                            rssHeadlines[i].end());
     }
     if (data.headlines.empty()) {
       data.headlines = {

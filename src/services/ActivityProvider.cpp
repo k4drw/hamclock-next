@@ -1,7 +1,10 @@
 #include "ActivityProvider.h"
 #include "../core/Astronomy.h"
+#include "../core/Constants.h"
 #include "../core/Logger.h"
 #include "../core/StringUtils.h"
+#include "../core/WorkerService.h"
+#include <SDL_events.h>
 #include <nlohmann/json.hpp>
 
 using json = nlohmann::json;
@@ -17,242 +20,222 @@ void ActivityProvider::fetch() {
 }
 
 void ActivityProvider::fetchDXPeds() {
-  net_.fetchAsync(DX_PEDS_URL, [this](std::string data) {
+  net_.fetchAsync(DX_PEDS_URL, [](std::string data) {
     if (data.empty()) {
       LOG_E("ActivityProvider", "Failed to fetch DXPeditions from NG3K");
       return;
     }
 
-    ActivityData current = store_->get();
-    current.dxpeds.clear();
+    WorkerService::getInstance().submitTask([data]() {
+      auto *update = new ActivityData();
+      auto now = std::chrono::system_clock::now();
 
-    // Lightweight HTML scraping
-    size_t pos = 0;
-    auto now = std::chrono::system_clock::now();
-
-    auto crackMonth = [](const std::string &m) -> int {
-      static const char *months[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun",
-                                     "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
-      for (int i = 0; i < 12; i++) {
-        if (m.find(months[i]) != std::string::npos)
-          return i + 1;
-      }
-      return 0;
-    };
-
-    while ((pos = data.find("class=\"adxoitem\"", pos)) != std::string::npos) {
-      auto findTagContent = [&](const std::string &html,
-                                const std::string &className,
-                                size_t &searchPos) -> std::string {
-        std::string target = "class=\"" + className + "\"";
-        size_t p = html.find(target, searchPos);
-        if (p == std::string::npos)
-          return "";
-        size_t start = html.find(">", p);
-        if (start == std::string::npos)
-          return "";
-        start++;
-        size_t end = html.find("<", start);
-        if (end == std::string::npos)
-          return "";
-        searchPos = end;
-        return html.substr(start, end - start);
+      auto crackMonth = [](const std::string &m) -> int {
+        static const char *months[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                                       "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+        for (int i = 0; i < 12; i++) {
+          if (m.find(months[i]) != std::string::npos)
+            return i + 1;
+        }
+        return 0;
       };
 
-      size_t rowPos = pos;
-      std::string d1 = findTagContent(data, "date", rowPos);
-      std::string d2 = findTagContent(data, "date", rowPos);
-      std::string loc = findTagContent(data, "cty", rowPos);
-      std::string call = findTagContent(data, "call", rowPos);
+      size_t pos = 0;
+      while ((pos = data.find("class=\"adxoitem\"", pos)) != std::string::npos) {
+        auto findTagContent = [&](const std::string &html,
+                                  const std::string &className,
+                                  size_t &searchPos) -> std::string {
+          std::string target = "class=\"" + className + "\"";
+          size_t p = html.find(target, searchPos);
+          if (p == std::string::npos)
+            return "";
+          size_t start = html.find(">", p);
+          if (start == std::string::npos)
+            return "";
+          start++;
+          size_t end = html.find("<", start);
+          if (end == std::string::npos)
+            return "";
+          searchPos = end;
+          return html.substr(start, end - start);
+        };
 
-      if (call.find("<a") != std::string::npos) {
-        size_t a_end = call.find(">");
-        if (a_end != std::string::npos) {
-          size_t a_close = call.find("</a", a_end);
-          if (a_close != std::string::npos) {
-            call = call.substr(a_end + 1, a_close - (a_end + 1));
-          }
-        }
-      }
+        size_t rowPos = pos;
+        std::string d1 = findTagContent(data, "date", rowPos);
+        std::string d2 = findTagContent(data, "date", rowPos);
+        std::string loc = findTagContent(data, "cty", rowPos);
+        std::string call = findTagContent(data, "call", rowPos);
 
-      if (!call.empty() && !d1.empty()) {
-        DXPedition de;
-        de.call = call;
-        de.location = loc;
-
-        int y1, dy1, y2, dy2;
-        char m1[10], m2[10];
-        if (sscanf(d1.c_str(), "%d %s %d", &y1, m1, &dy1) == 3 &&
-            sscanf(d2.c_str(), "%d %s %d", &y2, m2, &dy2) == 3) {
-
-          std::tm tm1 = {};
-          tm1.tm_year = y1 - 1900;
-          tm1.tm_mon = crackMonth(m1) - 1;
-          tm1.tm_mday = dy1;
-          de.startTime =
-              std::chrono::system_clock::from_time_t(std::mktime(&tm1));
-
-          std::tm tm2 = {};
-          tm2.tm_year = y2 - 1900;
-          tm2.tm_mon = crackMonth(m2) - 1;
-          tm2.tm_mday = dy2;
-          tm2.tm_hour = 23;
-          tm2.tm_min = 59;
-          de.endTime =
-              std::chrono::system_clock::from_time_t(std::mktime(&tm2));
-
-          auto yesterday = now - std::chrono::hours(24);
-          if (de.endTime > yesterday) {
-            current.dxpeds.push_back(de);
-          }
-        }
-      }
-      pos += 16;
-    }
-
-    current.lastUpdated = now;
-    current.valid = true;
-    store_->set(current);
-  });
-}
-
-void ActivityProvider::fetchPOTA() {
-  net_.fetchAsync(POTA_API_URL, [this](std::string data) {
-    if (data.empty())
-      return;
-    try {
-      auto j = json::parse(data);
-      if (!j.is_array())
-        return;
-
-      ActivityData current = store_->get();
-      // Only clear ONTA spots if this is the first one or we want to merge them
-      // carefully
-      // For now, let's keep it simple and just clear and re-add from both SOTA
-      // and POTA
-      // Actually, we should probably have separate lists or clear only when
-      // starting a full cycle
-
-      // Let's filter existing spots to remove POTA ones and re-add fresh
-      auto it =
-          std::remove_if(current.ontaSpots.begin(), current.ontaSpots.end(),
-                         [](const ONTASpot &s) { return s.program == "POTA"; });
-      current.ontaSpots.erase(it, current.ontaSpots.end());
-
-      for (const auto &spot : j) {
-        ONTASpot os;
-        os.program = "POTA";
-        os.call = spot.value("activator", "");
-        os.ref = spot.value("reference", "");
-        os.mode = spot.value("mode", "");
-        std::string freq = spot.value("frequency", "0");
-        os.freqKhz = StringUtils::safe_stod(freq);
-        os.spottedAt = std::chrono::system_clock::now();
-
-        if (spot.contains("latitude")) {
-          if (spot["latitude"].is_number())
-            os.lat = spot["latitude"];
-          else if (spot["latitude"].is_string())
-            os.lat = StringUtils::safe_stod(spot["latitude"]);
-        }
-        if (spot.contains("longitude")) {
-          if (spot["longitude"].is_number())
-            os.lon = spot["longitude"];
-          else if (spot["longitude"].is_string())
-            os.lon = StringUtils::safe_stod(spot["longitude"]);
-        }
-
-        // Fallback to Grid Square if Lat/Lon missing
-        if (os.lat == 0.0 && os.lon == 0.0) {
-          std::string grid = spot.value("grid", "");
-          if (grid.empty())
-            grid = spot.value("activatorGrid", "");
-          if (!grid.empty()) {
-            double glat, glon;
-            if (Astronomy::gridToLatLon(grid, glat, glon)) {
-              os.lat = glat;
-              os.lon = glon;
-              LOG_D("ActivityProvider", "POTA: Resolved {} from grid {}",
-                    os.call, grid);
+        if (call.find("<a") != std::string::npos) {
+          size_t a_end = call.find(">");
+          if (a_end != std::string::npos) {
+            size_t a_close = call.find("</a", a_end);
+            if (a_close != std::string::npos) {
+              call = call.substr(a_end + 1, a_close - (a_end + 1));
             }
           }
         }
 
-        if (os.lat == 0.0 && os.lon == 0.0) {
-          // Debug: why is this spot missing location?
-          LOG_D("ActivityProvider", "POTA JSON Missing Lat/Lon/Grid: {}",
-                spot.dump());
+        if (!call.empty() && !d1.empty()) {
+          DXPedition de;
+          de.call = call;
+          de.location = loc;
+
+          int y1, dy1, y2, dy2;
+          char m1[10], m2[10];
+          if (sscanf(d1.c_str(), "%d %s %d", &y1, m1, &dy1) == 3 &&
+              sscanf(d2.c_str(), "%d %s %d", &y2, m2, &dy2) == 3) {
+
+            std::tm tm1 = {};
+            tm1.tm_year = y1 - 1900;
+            tm1.tm_mon = crackMonth(m1) - 1;
+            tm1.tm_mday = dy1;
+            de.startTime =
+                std::chrono::system_clock::from_time_t(std::mktime(&tm1));
+
+            std::tm tm2 = {};
+            tm2.tm_year = y2 - 1900;
+            tm2.tm_mon = crackMonth(m2) - 1;
+            tm2.tm_mday = dy2;
+            tm2.tm_hour = 23;
+            tm2.tm_min = 59;
+            de.endTime =
+                std::chrono::system_clock::from_time_t(std::mktime(&tm2));
+
+            auto yesterday = now - std::chrono::hours(24);
+            if (de.endTime > yesterday) {
+              update->dxpeds.push_back(de);
+            }
+          }
+        }
+        pos += 16;
+      }
+
+      SDL_Event event;
+      SDL_zero(event);
+      event.type = HamClock::AE_BASE_EVENT + HamClock::AE_ACTIVITY_DATA_READY;
+      event.user.code = static_cast<int>(UpdateType::DXPeds);
+      event.user.data1 = update;
+      SDL_PushEvent(&event);
+    });
+  });
+}
+
+void ActivityProvider::fetchPOTA() {
+  net_.fetchAsync(POTA_API_URL, [](std::string data) {
+    if (data.empty())
+      return;
+
+    WorkerService::getInstance().submitTask([data]() {
+      try {
+        auto j = nlohmann::json::parse(data);
+        if (!j.is_array())
+          return;
+
+        auto *update = new ActivityData();
+
+        for (const auto &spot : j) {
+          ONTASpot os;
+          os.program = "POTA";
+          os.call = spot.value("activator", "");
+          os.ref = spot.value("reference", "");
+          os.mode = spot.value("mode", "");
+          std::string freq = spot.value("frequency", "0");
+          os.freqKhz = StringUtils::safe_stod(freq);
+          os.spottedAt = std::chrono::system_clock::now();
+
+          if (spot.contains("latitude")) {
+            if (spot["latitude"].is_number())
+              os.lat = spot["latitude"];
+            else if (spot["latitude"].is_string())
+              os.lat = StringUtils::safe_stod(spot["latitude"]);
+          }
+          if (spot.contains("longitude")) {
+            if (spot["longitude"].is_number())
+              os.lon = spot["longitude"];
+            else if (spot["longitude"].is_string())
+              os.lon = StringUtils::safe_stod(spot["longitude"]);
+          }
+
+          // Fallback to Grid Square if Lat/Lon missing
+          if (os.lat == 0.0 && os.lon == 0.0) {
+            std::string grid = spot.value("grid", "");
+            if (grid.empty())
+              grid = spot.value("activatorGrid", "");
+            if (!grid.empty()) {
+              double glat, glon;
+              if (Astronomy::gridToLatLon(grid, glat, glon)) {
+                os.lat = glat;
+                os.lon = glon;
+              }
+            }
+          }
+
+          if (!os.call.empty()) {
+            update->ontaSpots.push_back(os);
+          }
         }
 
-        if (!os.call.empty()) {
-          current.ontaSpots.push_back(os);
-        }
-      }
-      LOG_I("ActivityProvider", "Fetched {} POTA spots from API.",
-            current.ontaSpots.size());
-      if (!current.ontaSpots.empty()) {
-        const auto &s = current.ontaSpots.back(); // Log last added
-        LOG_I("ActivityProvider", "Sample POTA: {} @ {},{} Freq:{:.1f}", s.call,
-              s.lat, s.lon, s.freqKhz);
-      } else {
-        LOG_W("ActivityProvider", "POTA JSON array was valid but empty?");
-        LOG_W("ActivityProvider", "POTA JSON Payload: {}",
-              data.substr(0, 200)); // Log head
-      }
+        SDL_Event event;
+        SDL_zero(event);
+        event.type = HamClock::AE_BASE_EVENT + HamClock::AE_ACTIVITY_DATA_READY;
+        event.user.code = static_cast<int>(UpdateType::POTA);
+        event.user.data1 = update;
+        SDL_PushEvent(&event);
+        LOG_I("ActivityProvider", "Offloaded POTA update with {} spots.",
+              update->ontaSpots.size());
 
-      current.lastUpdated = std::chrono::system_clock::now();
-      store_->set(current);
-    } catch (const std::exception &e) {
-      LOG_E("ActivityProvider", "POTA Parse Exception: {}", e.what());
-    } catch (...) {
-      LOG_E("ActivityProvider", "POTA Unknown Parse Exception");
-    }
+      } catch (const std::exception &e) {
+        LOG_E("ActivityProvider", "POTA Parse Exception: {}", e.what());
+      } catch (...) {
+        LOG_E("ActivityProvider", "POTA Unknown Parse Exception");
+      }
+    });
   });
 }
 
 void ActivityProvider::fetchSOTA() {
-  net_.fetchAsync(SOTA_API_URL, [this](std::string data) {
+  net_.fetchAsync(SOTA_API_URL, [](std::string data) {
     if (data.empty())
       return;
-    try {
-      auto j = json::parse(data);
-      if (!j.is_array())
-        return;
 
-      ActivityData current = store_->get();
-      auto it =
-          std::remove_if(current.ontaSpots.begin(), current.ontaSpots.end(),
-                         [](const ONTASpot &s) { return s.program == "SOTA"; });
-      current.ontaSpots.erase(it, current.ontaSpots.end());
+    WorkerService::getInstance().submitTask([data]() {
+      try {
+        auto j = nlohmann::json::parse(data);
+        if (!j.is_array())
+          return;
 
-      for (const auto &spot : j) {
-        ONTASpot os;
-        os.program = "SOTA";
-        os.call = spot.value("activatorCallsign", "");
-        os.ref = spot.value("associationCode", "") + "/" +
-                 spot.value("summitCode", "");
-        os.mode = spot.value("mode", "");
-        std::string freq = spot.value("frequency", "0");
-        os.freqKhz =
-            StringUtils::safe_stod(freq) * 1000.0; // SOTA MHz to kHz? Check API
-        os.spottedAt = std::chrono::system_clock::now();
+        auto *update = new ActivityData();
 
-        // SOTA rarely has Lat/Lon in API.
-        // LatLong ll; -- removed prefix lookup
+        for (const auto &spot : j) {
+          ONTASpot os;
+          os.program = "SOTA";
+          os.call = spot.value("activatorCallsign", "");
+          os.ref = spot.value("associationCode", "") + "/" +
+                   spot.value("summitCode", "");
+          os.mode = spot.value("mode", "");
+          std::string freq = spot.value("frequency", "0");
+          os.freqKhz =
+              StringUtils::safe_stod(freq) * 1000.0; // SOTA MHz to kHz? Check API
+          os.spottedAt = std::chrono::system_clock::now();
 
-        if (!os.call.empty()) {
-          current.ontaSpots.push_back(os);
+          if (!os.call.empty()) {
+            update->ontaSpots.push_back(os);
+          }
         }
+
+        SDL_Event event;
+        SDL_zero(event);
+        event.type = HamClock::AE_BASE_EVENT + HamClock::AE_ACTIVITY_DATA_READY;
+        event.user.code = static_cast<int>(UpdateType::SOTA);
+        event.user.data1 = update;
+        SDL_PushEvent(&event);
+        LOG_I("ActivityProvider", "Offloaded SOTA update with {} spots.",
+              update->ontaSpots.size());
+
+      } catch (...) {
+        LOG_E("ActivityProvider", "SOTA Parse Error");
       }
-      LOG_I("ActivityProvider", "Fetched {} SOTA spots from API.",
-            current.ontaSpots.size());
-      if (!j.empty()) {
-        LOG_D("ActivityProvider", "First SOTA JSON: {}", j[0].dump());
-      }
-      current.lastUpdated = std::chrono::system_clock::now();
-      store_->set(current);
-    } catch (...) {
-      LOG_E("ActivityProvider", "SOTA Parse Error");
-    }
+    });
   });
 }
