@@ -149,13 +149,63 @@ void ActivityProvider::fetchPOTA() {
         os.freqKhz = StringUtils::safe_stod(freq);
         os.spottedAt = std::chrono::system_clock::now();
 
+        if (spot.contains("latitude")) {
+          if (spot["latitude"].is_number())
+            os.lat = spot["latitude"];
+          else if (spot["latitude"].is_string())
+            os.lat = StringUtils::safe_stod(spot["latitude"]);
+        }
+        if (spot.contains("longitude")) {
+          if (spot["longitude"].is_number())
+            os.lon = spot["longitude"];
+          else if (spot["longitude"].is_string())
+            os.lon = StringUtils::safe_stod(spot["longitude"]);
+        }
+
+        // Fallback to Grid Square if Lat/Lon missing
+        if (os.lat == 0.0 && os.lon == 0.0) {
+          std::string grid = spot.value("grid", "");
+          if (grid.empty())
+            grid = spot.value("activatorGrid", "");
+          if (!grid.empty()) {
+            double glat, glon;
+            if (Astronomy::gridToLatLon(grid, glat, glon)) {
+              os.lat = glat;
+              os.lon = glon;
+              LOG_D("ActivityProvider", "POTA: Resolved {} from grid {}",
+                    os.call, grid);
+            }
+          }
+        }
+
+        if (os.lat == 0.0 && os.lon == 0.0) {
+          // Debug: why is this spot missing location?
+          LOG_W("ActivityProvider", "POTA JSON Missing Lat/Lon/Grid: {}",
+                spot.dump());
+        }
+
         if (!os.call.empty()) {
           current.ontaSpots.push_back(os);
         }
       }
+      LOG_I("ActivityProvider", "Fetched {} POTA spots from API.",
+            current.ontaSpots.size());
+      if (!current.ontaSpots.empty()) {
+        const auto &s = current.ontaSpots.back(); // Log last added
+        LOG_I("ActivityProvider", "Sample POTA: {} @ {},{} Freq:{:.1f}", s.call,
+              s.lat, s.lon, s.freqKhz);
+      } else {
+        LOG_W("ActivityProvider", "POTA JSON array was valid but empty?");
+        LOG_W("ActivityProvider", "POTA JSON Payload: {}",
+              data.substr(0, 200)); // Log head
+      }
+
       current.lastUpdated = std::chrono::system_clock::now();
       store_->set(current);
+    } catch (const std::exception &e) {
+      LOG_E("ActivityProvider", "POTA Parse Exception: {}", e.what());
     } catch (...) {
+      LOG_E("ActivityProvider", "POTA Unknown Parse Exception");
     }
   });
 }
@@ -183,16 +233,26 @@ void ActivityProvider::fetchSOTA() {
                  spot.value("summitCode", "");
         os.mode = spot.value("mode", "");
         std::string freq = spot.value("frequency", "0");
-        os.freqKhz = StringUtils::safe_stod(freq) * 1000.0; // SOTA MHz to kHz? Check API
+        os.freqKhz =
+            StringUtils::safe_stod(freq) * 1000.0; // SOTA MHz to kHz? Check API
         os.spottedAt = std::chrono::system_clock::now();
+
+        // SOTA rarely has Lat/Lon in API.
+        // LatLong ll; -- removed prefix lookup
 
         if (!os.call.empty()) {
           current.ontaSpots.push_back(os);
         }
       }
+      LOG_I("ActivityProvider", "Fetched {} SOTA spots from API.",
+            current.ontaSpots.size());
+      if (!j.empty()) {
+        LOG_D("ActivityProvider", "First SOTA JSON: {}", j[0].dump());
+      }
       current.lastUpdated = std::chrono::system_clock::now();
       store_->set(current);
     } catch (...) {
+      LOG_E("ActivityProvider", "SOTA Parse Error");
     }
   });
 }

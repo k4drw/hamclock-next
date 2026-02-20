@@ -2,8 +2,6 @@
 
 #include "IonosondeData.h"
 #include "SolarData.h"
-#include <cstdint>
-#include <optional>
 #include <string>
 #include <vector>
 

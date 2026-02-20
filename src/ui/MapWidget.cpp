@@ -1,3 +1,8 @@
+#ifdef _WIN32
+#ifndef _USE_MATH_DEFINES
+#define _USE_MATH_DEFINES
+#endif
+#endif
 #include "MapWidget.h"
 #include "../core/Astronomy.h"
 #include "../core/LiveSpotData.h"
@@ -13,6 +18,9 @@
 
 #include <SDL_video.h>
 #include <chrono>
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
 #include <cmath>
 #include <cstring>
 #include <vector>
@@ -346,8 +354,8 @@ bool MapWidget::onMouseUp(int mx, int my, Uint16 mod) {
   }
 
   // Check RSS toggle button (lower-left corner)
-  if (mx >= rssRect_.x && mx < rssRect_.x + rssRect_.w &&
-      my >= rssRect_.y && my < rssRect_.y + rssRect_.h) {
+  if (mx >= rssRect_.x && mx < rssRect_.x + rssRect_.w && my >= rssRect_.y &&
+      my < rssRect_.y + rssRect_.h) {
     config_.rssEnabled = !config_.rssEnabled;
     if (onConfigChanged_)
       onConfigChanged_();
@@ -919,6 +927,7 @@ void MapWidget::render(SDL_Renderer *renderer) {
   renderSpotOverlay(renderer);
   renderDXClusterSpots(renderer);
   renderADIFPins(renderer);
+  renderONTASpots(renderer);
 
   renderMarker(renderer, sunLat_, sunLon_, 255, 255, 0, MarkerShape::Circle,
                true);
@@ -940,17 +949,18 @@ void MapWidget::renderSatellite(SDL_Renderer *renderer) {
   if (!predictor_ || !predictor_->isReady())
     return;
   SubSatPoint ssp = predictor_->subSatPoint();
-  renderSatFootprint(renderer, ssp.lat, ssp.lon, ssp.footprint);
-  if (config_.showSatTrack)
+  if (config_.showSatTrack) {
+    renderSatFootprint(renderer, ssp.lat, ssp.lon, ssp.footprint);
     renderSatGroundTrack(renderer);
 
-  SDL_FPoint pt = latLonToScreen(ssp.lat, ssp.lon);
-  int iconSz = std::max(16, std::min(mapRect_.w, mapRect_.h) / 25);
-  SDL_Texture *satTex = texMgr_.get(SAT_ICON_KEY);
-  if (satTex) {
-    SDL_FRect dst = {pt.x - iconSz / 2.0f, pt.y - iconSz / 2.0f,
-                     static_cast<float>(iconSz), static_cast<float>(iconSz)};
-    SDL_RenderCopyF(renderer, satTex, nullptr, &dst);
+    SDL_FPoint pt = latLonToScreen(ssp.lat, ssp.lon);
+    int iconSz = std::max(16, std::min(mapRect_.w, mapRect_.h) / 25);
+    SDL_Texture *satTex = texMgr_.get(SAT_ICON_KEY);
+    if (satTex) {
+      SDL_FRect dst = {pt.x - iconSz / 2.0f, pt.y - iconSz / 2.0f,
+                       static_cast<float>(iconSz), static_cast<float>(iconSz)};
+      SDL_RenderCopyF(renderer, satTex, nullptr, &dst);
+    }
   }
 }
 
@@ -1316,6 +1326,48 @@ void MapWidget::renderADIFPins(SDL_Renderer *renderer) {
 
     renderMarker(renderer, qso.lat, qso.lon, color.r, color.g, color.b,
                  MarkerShape::Circle, true);
+  }
+
+  SDL_RenderSetClipRect(renderer, nullptr);
+}
+
+void MapWidget::renderONTASpots(SDL_Renderer *renderer) {
+  if (!activityStore_)
+    return;
+
+  // Retrieve data
+  ActivityData data;
+  {
+    // Scoped lock just to copy data
+    // ActivityDataStore::get() already locks, so this is fine
+    data = activityStore_->get();
+  }
+
+  if (data.ontaSpots.empty())
+    return;
+
+  SDL_RenderSetClipRect(renderer, &mapRect_);
+
+  // POTA Color: #355e3b (Hunter Green) -> Let's use bright Lime Green for
+  // visibility on map SOTA Color: #003366 (Dark Blue) -> Let's use Cyan/Blue
+  SDL_Color potaColor = {50, 255, 50, 255};
+  SDL_Color sotaColor = {0, 200, 255, 255};
+
+  int limit = useCompatibilityRenderPath_ ? 50 : 200;
+  int count = 0;
+
+  for (const auto &spot : data.ontaSpots) {
+    if (spot.lat == 0.0 && spot.lon == 0.0)
+      continue; // SOTA spots with no coords will be skipped here
+
+    if (count++ > limit)
+      break;
+
+    SDL_Color c = (spot.program == "POTA") ? potaColor : sotaColor;
+
+    // Use Square markers for ONTA to differentiate from DX Cluster (Circle)
+    renderMarker(renderer, spot.lat, spot.lon, c.r, c.g, c.b,
+                 MarkerShape::Square, true);
   }
 
   SDL_RenderSetClipRect(renderer, nullptr);

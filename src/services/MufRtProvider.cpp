@@ -1,5 +1,4 @@
 #include "MufRtProvider.h"
-#include "../core/Logger.h"
 #include <SDL.h>
 
 MufRtProvider::MufRtProvider(NetworkManager &netMgr) : netMgr_(netMgr) {}

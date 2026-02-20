@@ -32,6 +32,7 @@ enum class WidgetType {
   EME_TOOL,
   SANTA_TRACKER,
   CPU_TEMP,
+  ASTEROID,
 };
 
 inline const char *widgetTypeToString(WidgetType t) {
@@ -92,6 +93,8 @@ inline const char *widgetTypeToString(WidgetType t) {
     return "santa_tracker";
   case WidgetType::CPU_TEMP:
     return "cpu_temp";
+  case WidgetType::ASTEROID:
+    return "asteroid";
   }
   return "solar";
 }
@@ -154,6 +157,8 @@ inline const char *widgetTypeDisplayName(WidgetType t) {
     return "Santa Tracker";
   case WidgetType::CPU_TEMP:
     return "CPU Temp";
+  case WidgetType::ASTEROID:
+    return "Asteroids";
   }
   return "Solar";
 }
@@ -216,6 +221,8 @@ inline WidgetType widgetTypeFromString(const std::string &s,
     return WidgetType::SANTA_TRACKER;
   if (s == "cpu_temp")
     return WidgetType::CPU_TEMP;
+  if (s == "asteroid")
+    return WidgetType::ASTEROID;
   std::fprintf(stderr, "WidgetType: unknown '%s', using fallback\n", s.c_str());
   return fallback;
 }

@@ -1,7 +1,7 @@
 #pragma once
 
+#include <fmt/format.h>
 #include <memory>
-#include <spdlog/fmt/fmt.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/spdlog.h>
 #include <string>
@@ -31,28 +31,38 @@ public:
   // escalation issues in lambdas.
   template <typename... Args>
   static void t(const std::string &cat, const std::string &f, Args &&...args) {
-    s_Logger->trace(spdlog::fmt_lib::runtime("[{}] " + f), cat,
-                    std::forward<Args>(args)...);
+    if (s_Logger && s_Logger->should_log(spdlog::level::trace)) {
+      s_Logger->log(spdlog::level::trace, "[{}] {}", cat,
+                    fmt::vformat(f, fmt::make_format_args(args...)));
+    }
   }
   template <typename... Args>
   static void d(const std::string &cat, const std::string &f, Args &&...args) {
-    s_Logger->debug(spdlog::fmt_lib::runtime("[{}] " + f), cat,
-                    std::forward<Args>(args)...);
+    if (s_Logger && s_Logger->should_log(spdlog::level::debug)) {
+      s_Logger->log(spdlog::level::debug, "[{}] {}", cat,
+                    fmt::vformat(f, fmt::make_format_args(args...)));
+    }
   }
   template <typename... Args>
   static void i(const std::string &cat, const std::string &f, Args &&...args) {
-    s_Logger->info(spdlog::fmt_lib::runtime("[{}] " + f), cat,
-                   std::forward<Args>(args)...);
+    if (s_Logger && s_Logger->should_log(spdlog::level::info)) {
+      s_Logger->log(spdlog::level::info, "[{}] {}", cat,
+                    fmt::vformat(f, fmt::make_format_args(args...)));
+    }
   }
   template <typename... Args>
   static void w(const std::string &cat, const std::string &f, Args &&...args) {
-    s_Logger->warn(spdlog::fmt_lib::runtime("[{}] " + f), cat,
-                   std::forward<Args>(args)...);
+    if (s_Logger && s_Logger->should_log(spdlog::level::warn)) {
+      s_Logger->log(spdlog::level::warn, "[{}] {}", cat,
+                    fmt::vformat(f, fmt::make_format_args(args...)));
+    }
   }
   template <typename... Args>
   static void e(const std::string &cat, const std::string &f, Args &&...args) {
-    s_Logger->error(spdlog::fmt_lib::runtime("[{}] " + f), cat,
-                    std::forward<Args>(args)...);
+    if (s_Logger && s_Logger->should_log(spdlog::level::err)) {
+      s_Logger->log(spdlog::level::err, "[{}] {}", cat,
+                    fmt::vformat(f, fmt::make_format_args(args...)));
+    }
   }
 
 #define LOG_T(cat, f, ...) ::Log::t(cat, f, ##__VA_ARGS__)

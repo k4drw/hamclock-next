@@ -1331,30 +1331,9 @@ server.tool(
         status: "missing",
         backend_needed: true,
         approach: "1) Implement fetchVOACAP-MUF.pl + fetchVOACAP-TOA.pl in open-hamclock-backend (uses existing voacap_service.py). 2) Add VoacapProvider in src/services/ that fetches 660x330 BMP via NetworkManager. 3) Add overlay texture to MapWidget. 4) Add overlay selector to MapViewMenu. 5) Handle equirectangular→azimuthal reprojection.",
-        backend_free_alt: "None for on-demand. KC2G MUF-RT image is static (no frequency/mode params).",
+        backend_free_alt: "None for on-demand. KC2G MUF-RT PNG overlay (muf_rt_map_overlay) is already implemented and provides real-time MUF without backend.",
         files_to_create: ["src/services/VoacapProvider.cpp", "src/services/VoacapProvider.h", "src/core/VoacapOverlayData.h"],
         files_to_modify: ["src/ui/MapWidget.cpp", "src/ui/MapViewMenu.cpp"],
-      },
-      {
-        feature_id: "muf_rt_map_overlay",
-        name: "KC2G Real-Time MUF Map Overlay",
-        priority: "HIGH",
-        status: "missing",
-        backend_needed: false,
-        approach: "1) Add MufRtProvider that fetches prop.kc2g.com/renders/current/mufd-normal-now.png every 15 min. 2) Decode PNG to SDL_Texture (SDL_image already available). 3) Blend onto MapWidget. 4) Toggle in MapViewMenu.",
-        backend_free_alt: "Yes — direct HTTPS fetch from KC2G, CORS proxy in web mode.",
-        files_to_create: ["src/services/MufRtProvider.cpp", "src/services/MufRtProvider.h"],
-        files_to_modify: ["src/ui/MapWidget.cpp", "src/ui/MapViewMenu.cpp"],
-      },
-      {
-        feature_id: "adif_map_overlay",
-        name: "ADIF QSO Pins on Map",
-        priority: "MEDIUM",
-        status: "partial",
-        backend_needed: false,
-        approach: "ADIFProvider already parses QSO records. Add renderADIFPins() to MapWidget similar to renderActivityPins(). Use PrefixManager to resolve callsign to coordinates when grid is absent.",
-        backend_free_alt: "Yes — all data is local.",
-        files_to_modify: ["src/ui/MapWidget.cpp", "src/ui/MapWidget.h", "src/ui/ADIFPanel.cpp"],
       },
       {
         feature_id: "cloud_cover_overlay",
@@ -1368,6 +1347,17 @@ server.tool(
         files_to_modify: ["src/ui/MapWidget.cpp", "src/ui/MapViewMenu.cpp"],
       },
       {
+        feature_id: "wx_precipitation_overlay",
+        name: "WX Precipitation/Radar Map Overlay",
+        priority: "MEDIUM",
+        status: "missing",
+        backend_needed: true,
+        approach: "open-hamclock-backend fetches radar/precip composites. Alternatively: NOAA/NWS radar tiles or RainViewer API. Requires equirectangular composite for overlay.",
+        backend_free_alt: "Partial — RainViewer public tile API, but compositing is complex client-side.",
+        files_to_create: ["src/services/WxRadarProvider.cpp"],
+        files_to_modify: ["src/ui/MapWidget.cpp", "src/ui/MapViewMenu.cpp"],
+      },
+      {
         feature_id: "sota_map_pins",
         name: "SOTA Activator Map Pins",
         priority: "LOW",
@@ -1376,26 +1366,6 @@ server.tool(
         approach: "SOTA API does not return coordinates. Options: (1) Use SOTA summit database to resolve summit reference to coords, (2) Omit SOTA pins until API includes coords. See ActivityProvider.cpp.",
         backend_free_alt: "Yes — local summit database or API enrichment.",
         files_to_modify: ["src/services/ActivityProvider.cpp", "src/ui/MapWidget.cpp"],
-      },
-      {
-        feature_id: "countdown_audio_alarm",
-        name: "Audio Alarm for Countdown Timer",
-        priority: "LOW",
-        status: "partial",
-        backend_needed: false,
-        approach: "CountdownPanel.cpp shows visual 'EVENT ACTIVE!' banner. Add SDL_mixer (already common SDL companion) or SDL2 audio beep via SDL_OpenAudio when countdown reaches zero.",
-        backend_free_alt: "Yes — SDL2 audio subsystem.",
-        files_to_modify: ["src/ui/CountdownPanel.cpp", "CMakeLists.txt"],
-      },
-      {
-        feature_id: "mercator_projection",
-        name: "Mercator Map Projection",
-        priority: "LOW",
-        status: "missing",
-        backend_needed: false,
-        approach: "Add MapProjection::MERCATOR to MapWidget. Implement standard Web Mercator math. VOACAP overlays would align naturally with Mercator (both equirectangular family).",
-        backend_free_alt: "Yes — pure math.",
-        files_to_modify: ["src/ui/MapWidget.cpp", "src/ui/MapViewMenu.cpp"],
       },
     ];
 
@@ -1418,12 +1388,10 @@ server.tool(
 
     lines.push(`---`);
     lines.push(`## Recommended Implementation Order`);
-    lines.push(`1. **muf_rt_map_overlay** — highest impact, no backend, just fetch + display KC2G PNG`);
-    lines.push(`2. **adif_map_overlay** — in-app, no backend, moderate effort`);
-    lines.push(`3. **voacap_map_overlay** — highest parity value but requires OHB CGI endpoints first`);
-    lines.push(`4. **countdown_audio_alarm** — quick SDL2 audio win`);
-    lines.push(`5. **cloud_cover_overlay** — backend-dependent, lower priority`);
-    lines.push(`6. **mercator_projection** — pure math, low effort, enables natural VOACAP alignment`);
+    lines.push(`1. **voacap_map_overlay** — highest remaining parity value; requires OHB fetchVOACAP-MUF.pl + fetchVOACAP-TOA.pl first`);
+    lines.push(`2. **cloud_cover_overlay** — backend-dependent; use open-hamclock-backend or NASA GIBS tiles`);
+    lines.push(`3. **wx_precipitation_overlay** — backend-dependent; RainViewer or NWS tiles`);
+    lines.push(`4. **sota_map_pins** — in-app, no backend; blocked on SOTA API providing summit coordinates`);
 
     return { content: [{ type: "text" as const, text: lines.join("\n") }] };
   }

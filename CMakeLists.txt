@@ -114,6 +114,7 @@ if(NOT EMSCRIPTEN)
         set(SDL2MIXER_MOD OFF CACHE BOOL "Disable MOD")
         set(SDL2MIXER_MIDI OFF CACHE BOOL "Disable MIDI")
         set(SDL2MIXER_MP3 OFF CACHE BOOL "Disable MP3")
+        set(SDL2MIXER_WAVPACK OFF CACHE BOOL "Disable Wavpack")
         FetchContent_Declare(
             SDL2_mixer
             GIT_REPOSITORY https://github.com/libsdl-org/SDL_mixer.git
@@ -449,10 +450,12 @@ set(HAMCLOCK_SOURCES
     src/services/RotatorService.cpp
     src/services/RigService.cpp
     src/services/GPSProvider.cpp
+    src/services/AsteroidProvider.cpp
     src/services/RBNProvider.cpp
     src/services/QRZProvider.cpp
     src/ui/ActivityPanels.cpp
     src/ui/ADIFPanel.cpp
+    src/ui/AsteroidPanel.cpp
     src/ui/AuroraPanel.cpp
     src/ui/AuroraGraphPanel.cpp
     src/ui/DXClusterPanel.cpp
@@ -573,6 +576,7 @@ else()
     )
 
     if(WIN32)
+        add_definitions(-D_WIN32_WINNT=0x0601) # Target Windows 7+
         target_link_libraries(hamclock-next PRIVATE ws2_32 psapi)
     elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
         # On Linux with GCC, link libstdc++ and libgcc statically for better portability
@@ -606,6 +610,10 @@ else()
             "${CMAKE_SOURCE_DIR}/packaging/macos/HamClockNext.icns"
         )
     endif()
+    install(TARGETS hamclock-next
+        RUNTIME DESTINATION bin
+        BUNDLE DESTINATION .
+    )
 endif()
 
 # --- Custom targets for data updates ---

@@ -1,0 +1,36 @@
+name: Build WASM (Web)
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-wasm:
+    name: WASM Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Build WASM
+        run: |
+          chmod +x scripts/build-wasm-docker.sh
+          ./scripts/build-wasm-docker.sh
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hamclock-wasm
+          path: build-wasm/hamclock-wasm.*
+
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/v')
+        with:
+          files: build-wasm/hamclock-wasm.*

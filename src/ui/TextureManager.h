@@ -155,13 +155,23 @@ public:
           cap = 1024;
         }
 #endif
-        if (maxW_ > cap) {
+        if (maxW_ == 0 || maxW_ > cap) {
           maxW_ = cap;
-          LOG_I("TextureManager",
-                "Capping texture limit to {} for stability", cap);
+          LOG_I("TextureManager", "Capping texture limit to {} for stability",
+                cap);
         }
-        if (maxH_ > cap)
+        if (maxH_ == 0 || maxH_ > cap) {
           maxH_ = cap;
+        }
+#endif
+      } else {
+#if defined(__linux__) || defined(__arm__) || defined(__aarch64__) ||          \
+    defined(__EMSCRIPTEN__)
+        maxW_ = 2048;
+        maxH_ = 2048;
+#else
+        maxW_ = 8192;
+        maxH_ = 8192;
 #endif
       }
     }
@@ -217,10 +227,6 @@ public:
     }
 
     SDL_Texture *texture = createTexture(renderer, finalSurface, key);
-    if (mustFreeFinal)
-      SDL_FreeSurface(finalSurface);
-    SDL_FreeSurface(surface);
-
     if (!texture) {
       // If we failed, try to flush fonts and try once more
       LOG_W("TextureManager",
@@ -228,8 +234,14 @@ public:
       if (lowMemCallback_)
         lowMemCallback_();
       texture = createTexture(renderer, finalSurface, key);
-      if (!texture)
-        return nullptr;
+    }
+
+    if (mustFreeFinal)
+      SDL_FreeSurface(finalSurface);
+    SDL_FreeSurface(surface);
+
+    if (!texture) {
+      return nullptr;
     }
 
     SDL_SetTextureBlendMode(texture, SDL_BLENDMODE_BLEND);

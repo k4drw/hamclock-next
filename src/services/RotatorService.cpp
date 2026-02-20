@@ -1,17 +1,27 @@
 #include "RotatorService.h"
 #include "../core/Logger.h"
+#include "../core/OrbitPredictor.h"
+#include "../core/SatelliteManager.h"
 
+#ifdef _WIN32
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#else
 #include <arpa/inet.h>
-#include <chrono>
-#include <cstring>
 #include <netinet/in.h>
 #include <sys/socket.h>
-#include <thread>
 #include <unistd.h>
+#endif
+#include <chrono>
+#include <cstring>
+#include <thread>
 
 RotatorService::RotatorService(std::shared_ptr<RotatorDataStore> store,
                                const AppConfig &config, HamClockState *state)
-    : store_(std::move(store)), config_(config), state_(state) {}
+    : store_(std::move(store)), config_(config), state_(state) {
+  // Initialize predictor location
+  predictor_.setObserver(config.lat, config.lon);
+}
 
 RotatorService::~RotatorService() { stop(); }
 
@@ -56,6 +66,41 @@ RotatorData RotatorService::getPosition() const {
   }
 #endif
   return RotatorData{};
+  return RotatorData{};
+}
+
+void RotatorService::autoTrack(const Satellite *sat) {
+  std::lock_guard<std::mutex> lock(trackMutex_);
+  currentSat_ = sat;
+  if (sat) {
+    autoTracking_ = true;
+    LOG_I("Rotator", "Auto-tracking enabled for {}", sat->getName());
+  } else {
+    autoTracking_ = false;
+    LOG_I("Rotator", "Auto-tracking disabled");
+  }
+}
+
+void RotatorService::stopAutoTrack() {
+  std::lock_guard<std::mutex> lock(trackMutex_);
+  autoTracking_ = false;
+  currentSat_ = nullptr;
+  LOG_I("Rotator", "Auto-tracking disabled");
+}
+
+bool RotatorService::isAutoTracking() const {
+  std::lock_guard<std::mutex> lock(trackMutex_);
+  return autoTracking_ && currentSat_ != nullptr;
+}
+
+void RotatorService::setAutoTrackEnabled(bool enabled) {
+  std::lock_guard<std::mutex> lock(trackMutex_);
+  autoTracking_ = enabled;
+}
+
+bool RotatorService::getAutoTrackEnabled() const {
+  std::lock_guard<std::mutex> lock(trackMutex_);
+  return autoTracking_;
 }
 
 bool RotatorService::setPosition(double azimuth, double elevation) {
@@ -186,8 +231,36 @@ void RotatorService::pollLoop() {
       continue;
     }
 
-    // Poll every 500ms (2 Hz update rate)
-    std::this_thread::sleep_for(500ms);
+    // Poll every 1000ms (1 Hz update rate)
+    std::this_thread::sleep_for(1000ms);
+
+    // Auto-tracking Loop
+    if (connected_) {
+      std::lock_guard<std::mutex> lock(trackMutex_);
+      if (autoTracking_ && currentSat_) {
+        SatObservation obs = currentSat_->predict();
+
+        // Only track if visible (elevation > 0)
+        if (obs.elevation > 0) {
+          RotatorData current = store_->get();
+          double azErr = std::abs(obs.azimuth - current.azimuth);
+          double elErr = std::abs(obs.elevation - current.elevation);
+
+          // Handle 360 wrap-around for azimuth error
+          if (azErr > 180.0)
+            azErr = 360.0 - azErr;
+
+          // Deadband: 2.0 degrees
+          if (azErr > 2.0 || elErr > 2.0) {
+            if (setAzEl(obs.azimuth, obs.elevation)) {
+              // Update store moving state
+              current.moving = true;
+              store_->set(current);
+            }
+          }
+        }
+      }
+    }
   }
 
   disconnectFromRotator();
@@ -204,11 +277,19 @@ bool RotatorService::connectToRotator() {
   }
 
   // Set socket timeout
+#ifdef _WIN32
+  DWORD timeout_ms = 2000;
+  setsockopt(sockfd_, SOL_SOCKET, SO_RCVTIMEO, (const char *)&timeout_ms,
+             sizeof(timeout_ms));
+  setsockopt(sockfd_, SOL_SOCKET, SO_SNDTIMEO, (const char *)&timeout_ms,
+             sizeof(timeout_ms));
+#else
   struct timeval timeout;
   timeout.tv_sec = 2;
   timeout.tv_usec = 0;
   setsockopt(sockfd_, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
   setsockopt(sockfd_, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
+#endif
 
   // Connect to rotctld
   struct sockaddr_in addr;

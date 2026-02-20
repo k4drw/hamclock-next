@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=HamClock Next
+Comment=Amateur Radio Clock and Solar/Space Weather Dashboard
+Exec=hamclock-next
+Icon=hamclock-next
+Terminal=false
+Type=Application
+Categories=Utility;HamRadio;
+Keywords=ham;radio;clock;solar;space;weather;

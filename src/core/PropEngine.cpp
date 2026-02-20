@@ -2,7 +2,6 @@
 #include "../services/IonosondeProvider.h"
 #include <algorithm>
 #include <cmath>
-#include <iostream>
 #include <map>
 
 #ifndef M_PI
