@@ -12,7 +12,15 @@ if [ -z "$BINARY_PATH" ] || [ -z "$ARCH" ] || [ -z "$VARIANT" ] || [ -z "$BUILD_
     exit 1
 fi
 
-VERSION="${VERSION:-0.7B}"
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+REPO_ROOT=$(dirname "$(dirname "$SCRIPT_DIR")")
+
+if [ -z "$VERSION" ]; then
+    V_NUM=$(cat "$REPO_ROOT/VERSION" | tr -d '[:space:]')
+    V_SUF=$(cat "$REPO_ROOT/VERSION_SUFFIX" | tr -d '[:space:]')
+    VERSION="${V_NUM}${V_SUF}"
+fi
+
 PKG_NAME="hamclock-next-${VARIANT}"
 PKG_DIR="${BUILD_DIR}/package"
 
@@ -29,8 +37,6 @@ cp "$BINARY_PATH" "$PKG_DIR/usr/bin/hamclock-next"
 chmod 755 "$PKG_DIR/usr/bin/hamclock-next"
 
 # 1b. Install Icon
-SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
-REPO_ROOT=$(dirname "$(dirname "$SCRIPT_DIR")")
 cp "$REPO_ROOT/packaging/icon.png" "$PKG_DIR/usr/share/icons/hicolor/256x256/apps/hamclock-next.png"
 
 # 2. Add Desktop entry (for X11 builds mainly, but useful for menu entry too)

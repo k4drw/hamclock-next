@@ -1,10 +1,20 @@
 cmake_minimum_required(VERSION 3.18)
 
+# Read version from file
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/VERSION" VER_NUM)
+string(STRIP "${VER_NUM}" VER_NUM)
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/VERSION_SUFFIX" VER_SUFFIX)
+string(STRIP "${VER_SUFFIX}" VER_SUFFIX)
+
+# Calculate short display version (e.g. 0.8B if version is 0.8.0)
+string(REGEX REPLACE "\\.0$" "" SHORT_VER "${VER_NUM}")
+set(HAMCLOCK_DISPLAY_VERSION "${SHORT_VER}${VER_SUFFIX}")
+
 # libpredict v2.0.0 uses cmake_minimum_required(VERSION 2.8) which modern CMake rejects
 set(CMAKE_POLICY_VERSION_MINIMUM 3.5 CACHE STRING "Compat for old FetchContent deps")
 
 project(HamClock-Next
-    VERSION 0.8.0
+    VERSION ${VER_NUM}
     LANGUAGES C CXX
 )
 
@@ -16,7 +26,7 @@ else()
 endif()
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-add_compile_definitions(HAMCLOCK_VERSION="0.8B")
+add_compile_definitions(HAMCLOCK_VERSION="${HAMCLOCK_DISPLAY_VERSION}")
 
 # Pthreads are not enabled for WASM: the app is single-threaded in that
 # context and enabling them would require SharedArrayBuffer + COOP/COEP HTTP

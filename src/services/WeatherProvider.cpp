@@ -11,51 +11,6 @@ WeatherProvider::WeatherProvider(NetworkManager &net,
                                  std::shared_ptr<WeatherStore> store, int id)
     : net_(net), store_(std::move(store)), id_(id) {}
 
-void WeatherProvider::fetch(double lat, double lon) {
-  char url[256];
-  std::snprintf(url, sizeof(url),
-                "https://api.open-meteo.com/v1/"
-                "forecast?latitude=%.4f&longitude=%.4f&current=temperature_2m,"
-                "relative_humidity_2m,surface_pressure,wind_speed_10m,wind_"
-                "direction_10m,weather_code",
-                lat, lon);
-
-  int id = id_;
-  net_.fetchAsync(url, [id](std::string body) {
-    if (body.empty())
-      return;
-
-    WorkerService::getInstance().submitTask([body, id]() {
-      try {
-        auto j = nlohmann::json::parse(body);
-        if (j.contains("current")) {
-          auto current = j["current"];
-          auto *update = new WeatherData();
-          update->temp = current["temperature_2m"];
-          update->humidity = current["relative_humidity_2m"];
-          update->pressure = current["surface_pressure"];
-          update->windSpeed = current["wind_speed_10m"];
-          update->windDeg = current["wind_direction_10m"];
-          update->description =
-              weatherCodeToDescription(current["weather_code"]);
-          update->valid = true;
-          update->lastUpdate = std::chrono::system_clock::now();
-
-          SDL_Event event;
-          SDL_zero(event);
-          event.type =
-              HamClock::AE_BASE_EVENT + HamClock::AE_WEATHER_DATA_READY;
-          event.user.code = id;
-          event.user.data1 = update;
-          SDL_PushEvent(&event);
-        }
-      } catch (...) {
-        // Parse error
-      }
-    });
-  });
-}
-
 // WMO Weather interpretation codes (WW)
 // https://open-meteo.com/en/docs
 static std::string weatherCodeToDescription(int code) {
@@ -104,4 +59,49 @@ static std::string weatherCodeToDescription(int code) {
   default:
     return "Unknown";
   }
+}
+
+void WeatherProvider::fetch(double lat, double lon) {
+  char url[256];
+  std::snprintf(url, sizeof(url),
+                "https://api.open-meteo.com/v1/"
+                "forecast?latitude=%.4f&longitude=%.4f&current=temperature_2m,"
+                "relative_humidity_2m,surface_pressure,wind_speed_10m,wind_"
+                "direction_10m,weather_code",
+                lat, lon);
+
+  int id = id_;
+  net_.fetchAsync(url, [id](std::string body) {
+    if (body.empty())
+      return;
+
+    WorkerService::getInstance().submitTask([body, id]() {
+      try {
+        auto j = nlohmann::json::parse(body);
+        if (j.contains("current")) {
+          auto current = j["current"];
+          auto *update = new WeatherData();
+          update->temp = current["temperature_2m"];
+          update->humidity = current["relative_humidity_2m"];
+          update->pressure = current["surface_pressure"];
+          update->windSpeed = current["wind_speed_10m"];
+          update->windDeg = current["wind_direction_10m"];
+          update->description =
+              weatherCodeToDescription(current["weather_code"]);
+          update->valid = true;
+          update->lastUpdate = std::chrono::system_clock::now();
+
+          SDL_Event event;
+          SDL_zero(event);
+          event.type =
+              HamClock::AE_BASE_EVENT + HamClock::AE_WEATHER_DATA_READY;
+          event.user.code = id;
+          event.user.data1 = update;
+          SDL_PushEvent(&event);
+        }
+      } catch (...) {
+        // Parse error
+      }
+    });
+  });
 }
