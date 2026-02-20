@@ -14,8 +14,13 @@ class TextureManager {
 public:
   TextureManager() = default;
   ~TextureManager() {
+    clearCache();
+  }
+
+  void clearCache() {
     for (auto &[key, tex] : cache_)
       destroyTexture(tex);
+    cache_.clear();
   }
 
   TextureManager(const TextureManager &) = delete;
@@ -27,6 +32,8 @@ public:
     auto it = cache_.find(key);
     if (it != cache_.end())
       return it->second;
+    
+    pruneIfNecessary();
 
     SDL_Surface *surface = SDL_LoadBMP(path.c_str());
     if (!surface) {
@@ -46,6 +53,8 @@ public:
     auto it = cache_.find(key);
     if (it != cache_.end())
       return it->second;
+
+    pruneIfNecessary();
 
     SDL_Surface *surface = IMG_Load(path.c_str());
     if (!surface) {
@@ -70,6 +79,8 @@ public:
   // Load an image from memory (e.g. embedded assets).
   SDL_Texture *loadFromMemory(SDL_Renderer *renderer, const std::string &key,
                               const unsigned char *data, unsigned int size) {
+    pruneIfNecessary();
+    
     SDL_RWops *rw = SDL_RWFromConstMem(data, static_cast<int>(size));
     if (!rw) {
       LOG_E("TextureManager", "SDL_RWFromConstMem failed");
@@ -407,6 +418,19 @@ public:
   void setLowMemCallback(std::function<void()> cb) { lowMemCallback_ = cb; }
 
 private:
+  void pruneIfNecessary() {
+    const size_t MAX_TEXTURE_CACHE_SIZE = 50;
+    if (cache_.size() >= MAX_TEXTURE_CACHE_SIZE) {
+        LOG_W("TextureManager", "Texture cache size ({}) exceeds limit ({}), pruning.", cache_.size(), MAX_TEXTURE_CACHE_SIZE);
+        pruneCache();
+    }
+  }
+
+  void pruneCache() {
+    // Crude eviction: clear the whole cache. A proper LRU would be better.
+    clearCache();
+  }
+
   SDL_Texture *createTexture(SDL_Renderer *renderer, SDL_Surface *surface,
                              const std::string &key) {
     if (!surface)
