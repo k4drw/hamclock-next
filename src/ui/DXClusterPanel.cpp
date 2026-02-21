@@ -2,6 +2,7 @@
 #include "../core/ConfigManager.h"
 #include "../core/LiveSpotData.h"
 #include "../core/Logger.h"
+#include "../core/MemoryMonitor.h"
 #include "../services/RigService.h"
 
 #include <algorithm>
@@ -13,6 +14,20 @@ DXClusterPanel::DXClusterPanel(int x, int y, int w, int h, FontManager &fontMgr,
                                RigService *rigService, const AppConfig *config)
     : ListPanel(x, y, w, h, fontMgr, "DX Cluster", {}), store_(store),
       rigService_(rigService), config_(config) {}
+
+DXClusterPanel::~DXClusterPanel() { clearSpotCache(); }
+
+void DXClusterPanel::clearSpotCache() {
+  for (auto &cs : spotCache_) {
+    if (cs.freqTex)
+      MemoryMonitor::getInstance().destroyTexture(cs.freqTex);
+    if (cs.callTex)
+      MemoryMonitor::getInstance().destroyTexture(cs.callTex);
+    if (cs.ageTex)
+      MemoryMonitor::getInstance().destroyTexture(cs.ageTex);
+  }
+  spotCache_.clear();
+}
 
 void DXClusterPanel::update() {
   auto data = store_->snapshot();
@@ -34,6 +49,7 @@ void DXClusterPanel::update() {
 
     std::vector<std::string> visible;
     visibleFreqs_.clear();
+    visibleSpots_.clear();
 
     if (allRows_.empty()) {
       visible.push_back(
@@ -44,12 +60,20 @@ void DXClusterPanel::update() {
       for (int i = 0; i < MAX_VISIBLE_ROWS; ++i) {
         int idx = scrollOffset_ + i;
         if (idx < (int)allRows_.size()) {
-          visible.push_back(allRows_[idx]);
+          // Push empty string so ListPanel draws stripes but no text
+          visible.push_back("");
           visibleFreqs_.push_back(allFreqs_[idx]);
+          visibleSpots_.push_back(allSpots_[idx]);
         }
       }
     }
     setRows(visible);
+
+    // Resize spot cache
+    if (spotCache_.size() != visibleSpots_.size()) {
+      clearSpotCache();
+      spotCache_.resize(visibleSpots_.size());
+    }
 
     // Update Highlight
     int highlighted = -1;
@@ -76,9 +100,93 @@ void DXClusterPanel::update() {
   }
 }
 
+void DXClusterPanel::render(SDL_Renderer *renderer) {
+  // Base render for BG, Title, Border
+  ListPanel::render(renderer);
+
+  if (visibleSpots_.empty())
+    return;
+
+  if (!fontMgr_.ready())
+    return;
+
+  int pad = std::max(2, static_cast<int>(width_ * 0.03f));
+  int curY = y_ + pad;
+  if (titleTex_) {
+    curY += titleH_ + pad;
+  }
+
+  // Calculate row height
+  int remaining = (y_ + height_) - curY;
+  int rowH = std::max(rowFontSize_ + 4,
+                      remaining / static_cast<int>(visibleSpots_.size()));
+
+  // Column layout: Freq (Right) | Call (Left) | Age (Right)
+  int freqColW = fontMgr_.getLogicalWidth("88888.8", rowFontSize_);
+  int callX = x_ + pad + freqColW + 10;
+  int freqXEnd = callX - 10;
+
+  for (size_t i = 0; i < visibleSpots_.size(); ++i) {
+    if (i >= spotCache_.size())
+      break;
+
+    int rowY = curY + static_cast<int>(i) * rowH;
+    const auto &spot = visibleSpots_[i];
+    auto &cache = spotCache_[i];
+    SDL_Color color = getRowColor(i, {255, 255, 255, 255});
+
+    // 1. Freq
+    if (!cache.freqTex || std::abs(cache.lastFreq - spot.freq) > 0.001) {
+      if (cache.freqTex)
+        MemoryMonitor::getInstance().destroyTexture(cache.freqTex);
+      char buf[32];
+      std::snprintf(buf, sizeof(buf), "%.1f", spot.freq);
+      cache.freqTex = fontMgr_.renderText(renderer, buf, color, rowFontSize_,
+                                          &cache.freqW, &cache.freqH);
+      cache.lastFreq = spot.freq;
+    }
+    if (cache.freqTex) {
+      int ty = rowY + (rowH - cache.freqH) / 2;
+      SDL_Rect dst = {freqXEnd - cache.freqW, ty, cache.freqW, cache.freqH};
+      SDL_RenderCopy(renderer, cache.freqTex, nullptr, &dst);
+    }
+
+    // 2. Call
+    if (!cache.callTex || cache.lastCall != spot.call) {
+      if (cache.callTex)
+        MemoryMonitor::getInstance().destroyTexture(cache.callTex);
+      cache.callTex = fontMgr_.renderText(renderer, spot.call, color,
+                                          rowFontSize_, &cache.callW, &cache.callH);
+      cache.lastCall = spot.call;
+    }
+    if (cache.callTex) {
+      int ty = rowY + (rowH - cache.callH) / 2;
+      SDL_Rect dst = {callX, ty, cache.callW, cache.callH};
+      SDL_RenderCopy(renderer, cache.callTex, nullptr, &dst);
+    }
+
+    // 3. Age
+    std::string age = formatAge(spot.time);
+    if (!cache.ageTex || cache.lastAge != age) {
+      if (cache.ageTex)
+        MemoryMonitor::getInstance().destroyTexture(cache.ageTex);
+      cache.ageTex = fontMgr_.renderText(renderer, age, color, rowFontSize_,
+                                         &cache.ageW, &cache.ageH);
+      cache.lastAge = age;
+    }
+    if (cache.ageTex) {
+      int ty = rowY + (rowH - cache.ageH) / 2;
+      SDL_Rect dst = {x_ + width_ - pad - cache.ageW, ty, cache.ageW,
+                      cache.ageH};
+      SDL_RenderCopy(renderer, cache.ageTex, nullptr, &dst);
+    }
+  }
+}
+
 void DXClusterPanel::rebuildRows(const DXClusterData &data) {
   allRows_.clear();
   allFreqs_.clear();
+  allSpots_.clear();
   auto spots = data.spots;
   // Most recent first
   std::reverse(spots.begin(), spots.end());
@@ -91,6 +199,8 @@ void DXClusterPanel::rebuildRows(const DXClusterData &data) {
        << std::setw(4) << formatAge(spot.spottedAt);
     allRows_.push_back(ss.str());
     allFreqs_.push_back(spot.freqKhz);
+    
+    allSpots_.push_back({spot.txCall, spot.freqKhz, spot.spottedAt});
   }
 }
 

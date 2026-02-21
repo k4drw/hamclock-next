@@ -17,9 +17,6 @@ MoonProvider::MoonProvider(NetworkManager &net,
     : net_(net), store_(std::move(store)) {}
 
 void MoonProvider::update(double lat, double lon) {
-  (void)lat;
-  (void)lon;
-
   auto now = std::chrono::system_clock::now();
   std::time_t now_c = std::chrono::system_clock::to_time_t(now);
   std::tm utc{};
@@ -33,7 +30,7 @@ void MoonProvider::update(double lat, double lon) {
   std::string url = "https://svs.gsfc.nasa.gov/api/dialamoon/" + isoDate;
 
   auto store = store_;
-  net_.fetchAsync(url, [isoDate, store](std::string body) {
+  net_.fetchAsync(url, [isoDate, store, lat, lon, now](std::string body) {
     if (body.empty()) {
       LOG_E("MoonProvider", "Failed to fetch NASA data for {}", isoDate);
       return;
@@ -51,7 +48,14 @@ void MoonProvider::update(double lat, double lon) {
       data.phase = age / cycle;
 
       data.imageUrl = j["image"]["url"].get<std::string>();
-      data.posangle = j.value("posangle", 0.0);
+      
+      // Calculate parallactic angle for observer-relative rotation
+      double ra = j.value("j2000_ra", 0.0);
+      double dec = j.value("j2000_dec", 0.0);
+      
+      // NASA 'posangle' is axis tilt; we replace it with parallactic angle for visual rendering
+      // data.posangle = j.value("posangle", 0.0); 
+      data.posangle = Astronomy::calculateParallacticAngle(lat, lon, ra, dec, now);
 
       // Phase naming
       if (data.illumination < 2.0)
