@@ -36,6 +36,7 @@
 #include "services/DXClusterProvider.h"
 #include "services/DstProvider.h"
 #include "services/GPSProvider.h"
+#include "services/BME280Provider.h"
 #include "services/HistoryProvider.h"
 #include "services/IonosondeProvider.h"
 #include "services/LiveSpotProvider.h"
@@ -189,6 +190,7 @@ struct AppContext {
   std::unique_ptr<WebServer> webServer;
   std::unique_ptr<GPSProvider> gpsProvider;
 #endif
+  std::unique_ptr<BME280Provider> bmeProvider;
 
   // Setup State
   enum class SetupMode { None, Loading, Main, DXCluster };
@@ -640,6 +642,9 @@ int main(int argc, char *argv[]) {
 
   ctx.gpsProvider = std::make_unique<GPSProvider>(ctx.state.get(), ctx.appCfg);
   ctx.gpsProvider->start();
+
+  ctx.bmeProvider = std::make_unique<BME280Provider>(ctx.deWeatherStore);
+  ctx.bmeProvider->start();
 #endif
 
   // Init Sound
