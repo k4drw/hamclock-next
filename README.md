@@ -163,6 +163,18 @@ We provide high-compatibility **Universal Binaries** built against a Debian Bull
 1. **`unified`**: The standard desktop package. Includes dependencies for X11, Wayland, and KMSDRM. Recommended for most users.
 2. **`fb0`**: A lean "kiosk" package. Only includes dependencies for direct framebuffer (KMSDRM) rendering. Ideal for headless Raspberry Pi Lite installs.
 
+#### How to Install (.deb)
+
+Do **not** try to execute the `.deb` file directly (e.g., `chmod +x` followed by `./file.deb`). It is a package archive, not an executable binary. Install it using `apt` or `dpkg`:
+
+```bash
+# Recommended (automatically installs dependencies):
+sudo apt install ./hamclock-next_0.9.0B_unified_arm64.deb
+
+# OR using dpkg:
+sudo dpkg -i hamclock-next_0.9.0B_unified_arm64.deb
+```
+
 For detailed technical references and remote control info, see:
 - **[API.md](API.md)** - Remote control and debugging API reference
 - **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** - Solutions for common build and runtime issues
