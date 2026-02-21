@@ -29,6 +29,14 @@ HamClock-Next is a modern, SDL2-based reconstruction of the classic HamClock. It
 - **Smart Setup**: Easy configuration of callsign and location via Maidenhead grid squares or direct map interaction (Shift-Click to set DE).
 - **RSS News Banner**: Smoothly scrolling news ticker aggregating multiple amateur radio news feeds.
 
+### Customization & Themes
+HamClock-Next features a built-in theming system with three presets:
+1. **Default (Orange)**: The classic look with dark gray backgrounds and high-contrast orange text.
+2. **Modern Dark**: A cooler palette with slate blues and neutral grays.
+3. **Glass**: Semi-transparent panels with blur effects (requires a compositor on Linux).
+
+You can switch themes via the **Setup Screen** (Appearance tab) or the remote web interface. A future update will enable custom JSON-based themes.
+
 For a detailed guide on how to navigate the new interface and use keyboard shortcuts, see **[USAGE.md](USAGE.md)**.
 
 ## Requirements & Dependencies

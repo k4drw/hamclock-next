@@ -102,6 +102,7 @@ void WebServer::run() {
 
   <div class="tabs">
     <div class="tab active" onclick="showTab('identity')">Identity</div>
+    <div class="tab" onclick="showTab('appearance')">Appearance</div>
     <div class="tab" onclick="showTab('status')">Status</div>
     <div class="tab" onclick="showTab('de-dx')">DE / DX</div>
     <div class="tab" onclick="showTab('network')">Network</div>
@@ -119,6 +120,27 @@ void WebServer::run() {
       <input type="number" id="lon" step="0.0001" min="-180" max="180">
       <button onclick="saveConfig()">Save</button>
       <div id="msg"></div>
+    </div>
+  </div>
+
+  <div id="appearance" class="panel">
+    <div class="card">
+      <label>Color Theme</label>
+      <select id="theme">
+        <option value="default">Default (Orange)</option>
+        <option value="dark">Modern Dark</option>
+        <option value="glass">Glass</option>
+      </select>
+      <button onclick="saveAppearance()" style="margin-top:10px">Save Theme</button>
+      <div id="app-msg"></div>
+    </div>
+    <div class="card">
+      <label>Display Power</label>
+      <div style="display:flex; gap:10px">
+        <button onclick="setPower('on')">ON</button>
+        <button onclick="setPower('off')" style="border-color:#884444; color:#cc8888">OFF</button>
+      </div>
+      <div id="pwr-msg" class="dim" style="margin-top:8px"></div>
     </div>
   </div>
 
@@ -160,12 +182,13 @@ void WebServer::run() {
     // Tab navigation
     function showTab(name) {
       document.querySelectorAll('.tab').forEach((t,i) => {
-        const ids = ['identity','status','de-dx','network'];
+        const ids = ['identity','appearance','status','de-dx','network'];
         t.classList.toggle('active', ids[i] === name);
       });
       document.querySelectorAll('.panel').forEach(p => {
         p.classList.toggle('active', p.id === name);
       });
+      if (name === 'appearance') loadAppearance();
       if (name === 'status') refreshStatus();
       if (name === 'de-dx') refreshDeDx();
       if (name === 'network') loadNetwork();
@@ -191,6 +214,43 @@ void WebServer::run() {
         document.getElementById('lat').value = kv['Lat'] || '';
         document.getElementById('lon').value = kv['Lon'] || '';
       } catch(e) { setMsg('Failed to load config: ' + e, true); }
+    }
+
+    async function loadAppearance() {
+      try {
+        const r = await fetch('/get_config.txt');
+        const kv = parseKV(await r.text());
+        document.getElementById('theme').value = kv['Theme'] || 'default';
+        
+        const r2 = await fetch('/api/display/status');
+        const j = await r2.json();
+        document.getElementById('pwr-msg').textContent = 'State: ' + j.power + ' (' + j.method + ')';
+      } catch(e) {}
+    }
+
+    async function saveAppearance() {
+      const theme = document.getElementById('theme').value;
+      const params = new URLSearchParams({theme});
+      try {
+        const r = await fetch('/set_config?' + params);
+        const t = await r.text();
+        const el = document.getElementById('app-msg');
+        el.textContent = 'Saved!';
+        el.className = '';
+        setTimeout(() => el.textContent = '', 3000);
+      } catch(e) {}
+    }
+
+    async function setPower(state) {
+      try {
+        const r = await fetch('/api/display/power', {
+          method: 'POST',
+          body: JSON.stringify({state}),
+          headers: {'Content-Type': 'application/json'}
+        });
+        const j = await r.json();
+        document.getElementById('pwr-msg').textContent = 'State: ' + j.state;
+      } catch(e) {}
     }
 
     async function saveConfig() {

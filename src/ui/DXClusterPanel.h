@@ -16,6 +16,7 @@ public:
                  std::shared_ptr<DXClusterDataStore> store,
                  RigService *rigService = nullptr,
                  const AppConfig *config = nullptr);
+  ~DXClusterPanel() override;
 
   void update() override;
   bool onMouseUp(int mx, int my, Uint16 mod) override;
@@ -29,6 +30,7 @@ public:
   bool performAction(const std::string &action) override;
   SDL_Rect getActionRect(const std::string &action) const override;
   nlohmann::json getDebugData() const override;
+  void render(SDL_Renderer *renderer) override;
 
 private:
   void rebuildRows(const DXClusterData &data);
@@ -47,6 +49,29 @@ private:
   std::vector<std::string> allRows_;
   std::vector<double> allFreqs_;
   std::vector<double> visibleFreqs_;
+
+  struct SpotDisplay {
+    std::string call;
+    double freq;
+    std::chrono::system_clock::time_point time;
+  };
+  std::vector<SpotDisplay> allSpots_;
+  std::vector<SpotDisplay> visibleSpots_;
+
+  struct CachedSpot {
+    SDL_Texture *freqTex = nullptr;
+    int freqW = 0, freqH = 0;
+    SDL_Texture *callTex = nullptr;
+    int callW = 0, callH = 0;
+    SDL_Texture *ageTex = nullptr;
+    int ageW = 0, ageH = 0;
+    std::string lastAge;
+    double lastFreq = -1.0;
+    std::string lastCall;
+  };
+  std::vector<CachedSpot> spotCache_;
+  void clearSpotCache();
+
   int scrollOffset_ = 0;
   static constexpr int MAX_VISIBLE_ROWS = 15;
 };

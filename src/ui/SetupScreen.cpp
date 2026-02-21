@@ -21,10 +21,10 @@ SetupScreen::SetupScreen(int x, int y, int w, int h, FontManager &fontMgr,
 
 void SetupScreen::recalcLayout() {
   int h = height_;
-  titleSize_ = std::clamp(static_cast<int>(h * 0.050f), 16, 36);
-  labelSize_ = std::clamp(static_cast<int>(h * 0.030f), 11, 20);
-  fieldSize_ = std::clamp(static_cast<int>(h * 0.038f), 13, 26);
-  hintSize_ = std::clamp(static_cast<int>(h * 0.024f), 10, 15);
+  titleSize_ = std::clamp(static_cast<int>(h * 0.050f), 14, 36);
+  labelSize_ = std::clamp(static_cast<int>(h * 0.030f), 10, 20);
+  fieldSize_ = std::clamp(static_cast<int>(h * 0.038f), 11, 26);
+  hintSize_ = std::clamp(static_cast<int>(h * 0.024f), 9, 15);
 }
 
 void SetupScreen::autoPopulateLatLon() {
@@ -312,6 +312,15 @@ void SetupScreen::render(SDL_Renderer *renderer) {
   }
 
   y = y_ + height_ - 12 - 40; // anchored: fixed 12px bottom clearance (was pad)
+  
+  // Draw footer background to prevent content bleed-through
+  SDL_Rect footerBg = {x_, y - 10, width_, height_ - (y - 10)};
+  SDL_SetRenderDrawColor(renderer, 15, 15, 25, 255); // Match bg
+  SDL_RenderFillRect(renderer, &footerBg);
+  // Optional divider line
+  SDL_SetRenderDrawColor(renderer, 40, 40, 50, 255);
+  SDL_RenderDrawLine(renderer, x_, y - 10, x_ + width_, y - 10);
+
   int btnW = 100;
   int btnH = 34;
 
