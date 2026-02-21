@@ -980,6 +980,7 @@ void MapWidget::render(SDL_Renderer *renderer) {
 
           renderPropagationOverlay(renderer);
           renderMufRtOverlay(renderer);
+          renderCloudOverlay(renderer);
           renderWxMbOverlay(renderer);
           renderNightOverlay(renderer);
           renderGridOverlay(renderer);
@@ -1639,6 +1640,33 @@ void MapWidget::renderPropagationOverlay(SDL_Renderer *renderer) {
                        (int)propIndices_.size());
   } else {
     SDL_RenderCopy(renderer, propTexture_, nullptr, &mapRect_);
+  }
+
+  SDL_RenderSetClipRect(renderer, nullptr);
+}
+
+void MapWidget::renderCloudOverlay(SDL_Renderer *renderer) {
+  if (config_.weatherOverlay != WeatherOverlayType::Clouds)
+    return;
+  if (!clouds_)
+    return;
+
+  SDL_Texture *tex = clouds_->getTexture(renderer, mapRect_.w, mapRect_.h);
+  if (!tex)
+    return;
+
+  SDL_SetTextureBlendMode(tex, SDL_BLENDMODE_BLEND);
+  SDL_SetTextureAlphaMod(tex, 76); // 30% opacity
+
+  SDL_RenderSetClipRect(renderer, &mapRect_);
+
+  if (config_.projection != "equirectangular" && !mapVerts_.empty()) {
+    // Warp cloud texture to match map projection using map geometry
+    SDL_RenderGeometry(renderer, tex, mapVerts_.data(), (int)mapVerts_.size(),
+                       nightIndices_.data(), (int)nightIndices_.size());
+  } else {
+    // Standard blit
+    SDL_RenderCopy(renderer, tex, nullptr, &mapRect_);
   }
 
   SDL_RenderSetClipRect(renderer, nullptr);

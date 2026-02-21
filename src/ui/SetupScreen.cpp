@@ -571,6 +571,20 @@ void SetupScreen::renderTabAppearance(SDL_Renderer *renderer, int cx, int pad,
                     white, labelSize_);
   y += 24 + vSpace;
 
+  fontMgr_.drawText(renderer, "Map Weather Overlay:", fieldX, y, white, labelSize_);
+  SDL_Rect weatherBtn = {fieldX + fieldW - 120, y, 120, 24};
+  SDL_SetRenderDrawColor(renderer, 40, 40, 50, 255);
+  SDL_RenderFillRect(renderer, &weatherBtn);
+  SDL_SetRenderDrawColor(renderer, 100, 100, 120, 255);
+  SDL_RenderDrawRect(renderer, &weatherBtn);
+  std::string wStr = "None";
+  if (weatherOverlay_ == WeatherOverlayType::Clouds) wStr = "Clouds";
+  else if (weatherOverlay_ == WeatherOverlayType::WxMb) wStr = "Pressure";
+  fontMgr_.drawText(renderer, wStr, weatherBtn.x + weatherBtn.w / 2,
+                    weatherBtn.y + weatherBtn.h / 2, white, hintSize_, false, true);
+  weatherOverlayRect_ = weatherBtn;
+  y += 24 + vSpace;
+
   fontMgr_.drawText(renderer, "Pane Rotation Interval (s):", fieldX, y, white,
                     labelSize_);
   int rotBtnW = 60;
@@ -904,6 +918,18 @@ bool SetupScreen::onMouseUp(int mx, int my, Uint16) {
     if (mx >= rssToggleRect_.x && mx <= rssToggleRect_.x + rssToggleRect_.w &&
         my >= rssToggleRect_.y && my <= rssToggleRect_.y + rssToggleRect_.h) {
       rssEnabled_ = !rssEnabled_;
+      return true;
+    }
+    if (mx >= weatherOverlayRect_.x &&
+        mx <= weatherOverlayRect_.x + weatherOverlayRect_.w &&
+        my >= weatherOverlayRect_.y &&
+        my <= weatherOverlayRect_.y + weatherOverlayRect_.h) {
+      if (weatherOverlay_ == WeatherOverlayType::None)
+        weatherOverlay_ = WeatherOverlayType::Clouds;
+      else if (weatherOverlay_ == WeatherOverlayType::Clouds)
+        weatherOverlay_ = WeatherOverlayType::WxMb;
+      else
+        weatherOverlay_ = WeatherOverlayType::None;
       return true;
     }
   }
@@ -1379,6 +1405,7 @@ void SetupScreen::setConfig(const AppConfig &cfg) {
   panelMode_ = cfg.panelMode;
   selectedSatellite_ = cfg.selectedSatellite;
   rssEnabled_ = cfg.rssEnabled;
+  weatherOverlay_ = cfg.weatherOverlay;
 
   qrzUsername_ = cfg.qrzUsername;
   qrzPassword_ = cfg.qrzPassword;
@@ -1433,6 +1460,7 @@ AppConfig SetupScreen::getConfig() const {
   cfg.mapNightLights = mapNightLights_;
   cfg.useMetric = useMetric_;
   cfg.rssEnabled = rssEnabled_;
+  cfg.weatherOverlay = weatherOverlay_;
   cfg.callsignColor = callsignColor_;
   cfg.panelMode = panelMode_;
   cfg.selectedSatellite = selectedSatellite_;
@@ -1472,6 +1500,7 @@ std::vector<std::string> SetupScreen::getActions() const {
   return {"tab_identity", "tab_dxcluster", "tab_appearance",
           "tab_widgets",  "field_0",       "field_1",
           "field_2",      "field_3",       "toggle_night_lights",
+          "toggle_metric", "toggle_rss",   "toggle_weather_overlay",
           "done",         "cancel"};
 }
 
@@ -1511,6 +1540,9 @@ SDL_Rect SetupScreen::getActionRect(const std::string &action) const {
   if (action == "toggle_night_lights") {
     return nightLightsRect_;
   }
+  if (action == "toggle_metric") return metricToggleRect_;
+  if (action == "toggle_rss") return rssToggleRect_;
+  if (action == "toggle_weather_overlay") return weatherOverlayRect_;
 
   if (action == "done") {
     return okBtnRect_;
