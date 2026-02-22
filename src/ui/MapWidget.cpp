@@ -4,20 +4,21 @@
 #endif
 #endif
 #include "MapWidget.h"
-#include "PaneContainer.h"
+#include "FontCatalog.h"
 #include "../core/Astronomy.h"
+#include "../core/BeaconData.h"
 #include "../core/Constants.h"
 #include "../core/LiveSpotData.h"
 #include "../core/Logger.h"
 #include "../core/PropEngine.h"
 #include "../core/WorkerService.h"
 #include "../services/BeaconProvider.h"
-#include "../core/BeaconData.h"
 #include "../services/CloudProvider.h"
-#include "../services/WxMbProvider.h"
 #include "../services/IonosondeProvider.h"
 #include "../services/MufRtProvider.h"
+#include "../services/WxMbProvider.h"
 #include "EmbeddedIcons.h"
+#include "PaneContainer.h"
 #include "RenderUtils.h"
 #include <fmt/core.h>
 
@@ -127,11 +128,11 @@ MapWidget::MapWidget(int x, int y, int w, int h, TextureManager &texMgr,
   recalcMapRect();
 }
 
-  MapWidget::~MapWidget() {
-    MemoryMonitor::getInstance().destroyTexture(nightOverlayTexture_);
-    MemoryMonitor::getInstance().destroyTexture(propTexture_);
-    MemoryMonitor::getInstance().destroyTexture(tooltip_.cachedTexture);
-  }
+MapWidget::~MapWidget() {
+  MemoryMonitor::getInstance().destroyTexture(nightOverlayTexture_);
+  MemoryMonitor::getInstance().destroyTexture(propTexture_);
+  MemoryMonitor::getInstance().destroyTexture(tooltip_.cachedTexture);
+}
 void MapWidget::recalcMapRect() {
   int mapW = width_;
   int mapH = mapW / 2;
@@ -216,16 +217,16 @@ void MapWidget::update() {
     mapViewMenu_->update();
   }
 
-      uint32_t nowMs = SDL_GetTicks();
-  
-      // General 1-second updates
-      if (nowMs - lastPosUpdateMs_ > 1000) {
-        auto now = std::chrono::system_clock::now();
-        auto sun = Astronomy::sunPosition(now);
-        sunLat_ = sun.lat;
-        sunLon_ = sun.lon;
-        lastPosUpdateMs_ = nowMs;
-      }
+  uint32_t nowMs = SDL_GetTicks();
+
+  // General 1-second updates
+  if (nowMs - lastPosUpdateMs_ > 1000) {
+    auto now = std::chrono::system_clock::now();
+    auto sun = Astronomy::sunPosition(now);
+    sunLat_ = sun.lat;
+    sunLon_ = sun.lon;
+    lastPosUpdateMs_ = nowMs;
+  }
   // Satellite ground track update (every 5 seconds)
   if (predictor_ && predictor_->isReady() && config_.showSatTrack) {
     if (nowMs - lastSatTrackUpdateMs_ > 5000) {
@@ -265,42 +266,42 @@ void MapWidget::update() {
       lastDX_ = state_->dxLocation;
       greatCircleDirty_ = true;
     }
-      } else if (!cachedGreatCircle_.empty()) {
-        cachedGreatCircle_.clear();
-        greatCircleDirty_ = true;
-      }
-  
-          // Propagation Overlay updates (every 15 mins or on change)
-          if (config_.propOverlay != PropOverlayType::None &&
-              config_.propOverlay != PropOverlayType::Muf) {
-            bool changed = (lastPropType_ != config_.propOverlay) ||
-                           (lastBand_ != config_.propBand) ||
-                           (lastMode_ != config_.propMode) ||
-                           (lastPower_ != config_.propPower);
-      
-            if (changed || (nowMs - lastPropUpdateMs_ > 900000)) {
-              updatePropagationOverlay();
-              lastPropUpdateMs_ = nowMs;
-              lastPropType_ = config_.propOverlay;
-              lastBand_ = config_.propBand;
-              lastMode_ = config_.propMode;
-              lastPower_ = config_.propPower;
-            }
-          }
-      
-          // WX pressure overlay (check every 10 minutes)
-          if (config_.weatherOverlay == WeatherOverlayType::WxMb) {
-            uint64_t nowMs64 = static_cast<uint64_t>(SDL_GetTicks());
-            if (nowMs64 - wxLastCheckMs_ > 600000ULL || wxLastCheckMs_ == 0) {
-              wxLastCheckMs_ = nowMs64;
-              wxmb_->update();
-            }
-          }
+  } else if (!cachedGreatCircle_.empty()) {
+    cachedGreatCircle_.clear();
+    greatCircleDirty_ = true;
+  }
 
-          // Monthly map texture update
-          auto now_for_month = std::chrono::system_clock::now();
-          std::time_t t = std::chrono::system_clock::to_time_t(now_for_month);
-          std::tm *tm = std::localtime(&t);
+  // Propagation Overlay updates (every 15 mins or on change)
+  if (config_.propOverlay != PropOverlayType::None &&
+      config_.propOverlay != PropOverlayType::Muf) {
+    bool changed = (lastPropType_ != config_.propOverlay) ||
+                   (lastBand_ != config_.propBand) ||
+                   (lastMode_ != config_.propMode) ||
+                   (lastPower_ != config_.propPower);
+
+    if (changed || (nowMs - lastPropUpdateMs_ > 900000)) {
+      updatePropagationOverlay();
+      lastPropUpdateMs_ = nowMs;
+      lastPropType_ = config_.propOverlay;
+      lastBand_ = config_.propBand;
+      lastMode_ = config_.propMode;
+      lastPower_ = config_.propPower;
+    }
+  }
+
+  // WX pressure overlay (check every 10 minutes)
+  if (config_.weatherOverlay == WeatherOverlayType::WxMb) {
+    uint64_t nowMs64 = static_cast<uint64_t>(SDL_GetTicks());
+    if (nowMs64 - wxLastCheckMs_ > 600000ULL || wxLastCheckMs_ == 0) {
+      wxLastCheckMs_ = nowMs64;
+      wxmb_->update();
+    }
+  }
+
+  // Monthly map texture update
+  auto now_for_month = std::chrono::system_clock::now();
+  std::time_t t = std::chrono::system_clock::to_time_t(now_for_month);
+  std::tm *tm = std::localtime(&t);
   int month = tm->tm_mon + 1; // 1-12
 
   if (month != currentMonth_) {
@@ -367,15 +368,16 @@ void MapWidget::update() {
         86400 * 365); // Cache for a year
   }
 
-      if (config_.propOverlay != PropOverlayType::None) {
-        if (iono_ && iono_->hasData()) {
-          uint32_t lastUp = iono_->getLastUpdateMs();
-          if (lastUp != lastMufUpdateMs_) {
-            updatePropagationOverlay();
-            lastMufUpdateMs_ = lastUp;
-          }
-        }
-      }}
+  if (config_.propOverlay != PropOverlayType::None) {
+    if (iono_ && iono_->hasData()) {
+      uint32_t lastUp = iono_->getLastUpdateMs();
+      if (lastUp != lastMufUpdateMs_) {
+        updatePropagationOverlay();
+        lastMufUpdateMs_ = lastUp;
+      }
+    }
+  }
+}
 bool MapWidget::onMouseUp(int mx, int my, Uint16 mod) {
   // Pass through to menu if visible
   if (mapViewMenu_->isVisible()) {
@@ -493,7 +495,29 @@ void MapWidget::onMouseMove(int mx, int my) {
     }
   }
 
-  // 5. Check DX Cluster spots
+  // 5. Check ONTA spots
+  if (tip.empty() && activityStore_) {
+    ActivityData ads = activityStore_->get();
+    // Prioritize selected spot if hovering near it
+    if (ads.hasSelection && ads.selectedSpot.lat != 0.0) {
+      if (screenDist(ads.selectedSpot.lat, ads.selectedSpot.lon) < kHitRadius) {
+        tip = ads.selectedSpot.call;
+        char buf[128];
+        int bi = freqToBandIndex(ads.selectedSpot.freqKhz);
+        std::snprintf(buf, sizeof(buf), " %.1f kHz", ads.selectedSpot.freqKhz);
+        tip += buf;
+        if (bi >= 0)
+          tip += std::string(" (") + kBands[bi].name + ")";
+        if (!ads.selectedSpot.mode.empty())
+          tip += " " + ads.selectedSpot.mode;
+
+        // Second line: Program and Reference
+        tip += "\n" + ads.selectedSpot.program + ": " + ads.selectedSpot.ref;
+      }
+    }
+  }
+
+  // 6. Check DX Cluster spots
   if (tip.empty() && dxcStore_) {
     auto data = dxcStore_->snapshot();
     if (!data->spots.empty()) {
@@ -894,15 +918,15 @@ void MapWidget::render(SDL_Renderer *renderer) {
       // Clear pending data even on failure to prevent retry loops
       pendingNightMapData_.clear();
     }
-          if (!pendingMufData_.empty()) {
-            SDL_Texture *tex =
-                texMgr_.loadFromMemory(renderer, "muf_rt_overlay", pendingMufData_);
-            if (!tex) {
-              LOG_E("MapWidget", "Failed to create MUF texture: {}", SDL_GetError());
-            }
-            pendingMufData_.clear();
-          }
-        }
+    if (!pendingMufData_.empty()) {
+      SDL_Texture *tex =
+          texMgr_.loadFromMemory(renderer, "muf_rt_overlay", pendingMufData_);
+      if (!tex) {
+        LOG_E("MapWidget", "Failed to create MUF texture: {}", SDL_GetError());
+      }
+      pendingMufData_.clear();
+    }
+  }
   if (!mapLoaded_) {
     SDL_Texture *tex = texMgr_.get(MAP_KEY);
     if (!tex) {
@@ -978,12 +1002,12 @@ void MapWidget::render(SDL_Renderer *renderer) {
     }
   }
 
-          renderPropagationOverlay(renderer);
-          renderMufRtOverlay(renderer);
-          renderCloudOverlay(renderer);
-          renderWxMbOverlay(renderer);
-          renderNightOverlay(renderer);
-          renderGridOverlay(renderer);
+  renderPropagationOverlay(renderer);
+  renderMufRtOverlay(renderer);
+  renderCloudOverlay(renderer);
+  renderWxMbOverlay(renderer);
+  renderNightOverlay(renderer);
+  renderGridOverlay(renderer);
   renderGreatCircle(renderer);
 
   renderMarker(renderer, state_->deLocation.lat, state_->deLocation.lon, 255,
@@ -997,11 +1021,12 @@ void MapWidget::render(SDL_Renderer *renderer) {
   renderSatellite(renderer);
   renderSpotOverlay(renderer);
   renderDXClusterSpots(renderer);
-      renderADIFPins(renderer);
-      renderONTASpots(renderer);
-      renderBeacons(renderer);
-  
-      renderMarker(renderer, sunLat_, sunLon_, 255, 255, 0, MarkerShape::Circle,               true);
+  renderADIFPins(renderer);
+  renderONTASpots(renderer);
+  renderBeacons(renderer);
+
+  renderMarker(renderer, sunLat_, sunLon_, 255, 255, 0, MarkerShape::Circle,
+               true);
 
   renderProjectionSelect(renderer);
   renderRssButton(renderer);
@@ -1194,7 +1219,8 @@ void MapWidget::renderSpotOverlay(SDL_Renderer *renderer) {
   for (auto *pane : panes_) {
     if (pane) {
       const auto &rotation = pane->getRotation();
-      if (std::find(rotation.begin(), rotation.end(), WidgetType::LIVE_SPOTS) != rotation.end()) {
+      if (std::find(rotation.begin(), rotation.end(), WidgetType::LIVE_SPOTS) !=
+          rotation.end()) {
         widgetEnabled = true;
         break;
       }
@@ -1476,7 +1502,8 @@ void MapWidget::renderONTASpots(SDL_Renderer *renderer) {
                                              : SDL_Color{0, 200, 255, 255};
 
   LatLon de = state_->deLocation;
-  auto path = Astronomy::calculateGreatCirclePath(de, {spot.lat, spot.lon}, 100);
+  auto path =
+      Astronomy::calculateGreatCirclePath(de, {spot.lat, spot.lon}, 100);
 
   std::vector<SDL_FPoint> segment;
   SDL_Color lineColor = {color.r, color.g, color.b, 100};
@@ -1489,7 +1516,8 @@ void MapWidget::renderONTASpots(SDL_Renderer *renderer) {
         double lon1_adj = (lon1 < 0) ? lon1 + 360.0 : lon1 - 360.0;
         double borderLon = (lon1 < 0) ? 180.0 : -180.0;
         double f = (borderLon - lon0) / (lon1_adj - lon0);
-        double borderLat = path[i - 1].lat + f * (path[i].lat - path[i - 1].lat);
+        double borderLat =
+            path[i - 1].lat + f * (path[i].lat - path[i - 1].lat);
 
         segment.push_back(latLonToScreen(borderLat, borderLon));
         if (segment.size() >= 2) {
@@ -1525,7 +1553,8 @@ void MapWidget::renderBeacons(SDL_Renderer *renderer) {
   for (auto *pane : panes_) {
     if (pane) {
       const auto &rotation = pane->getRotation();
-      if (std::find(rotation.begin(), rotation.end(), WidgetType::NCDXF) != rotation.end()) {
+      if (std::find(rotation.begin(), rotation.end(), WidgetType::NCDXF) !=
+          rotation.end()) {
         widgetEnabled = true;
         break;
       }
@@ -1607,8 +1636,9 @@ void MapWidget::renderPropagationOverlay(SDL_Renderer *renderer) {
     }
   }
 
-  // Update warped vertices if projection or sun changed (we reuse projection math from night)
-  // But unlike night, propagation isn't tied to sun, so just projection.
+  // Update warped vertices if projection or sun changed (we reuse projection
+  // math from night) But unlike night, propagation isn't tied to sun, so just
+  // projection.
   static std::string lastPropProj = "";
   if (lastPropProj != config_.projection) {
     for (int j = 0; j <= gridH; ++j) {
@@ -1697,16 +1727,26 @@ void MapWidget::updatePropagationOverlay() {
   params.txLon = state_->deLocation.lon;
 
   auto getMhz = [](const std::string &band) -> double {
-    if (band == "80m") return 3.5;
-    if (band == "60m") return 5.3;
-    if (band == "40m") return 7.0;
-    if (band == "30m") return 10.1;
-    if (band == "20m") return 14.1;
-    if (band == "17m") return 18.1;
-    if (band == "15m") return 21.1;
-    if (band == "12m") return 24.9;
-    if (band == "10m") return 28.4;
-    if (band == "6m")  return 50.1;
+    if (band == "80m")
+      return 3.5;
+    if (band == "60m")
+      return 5.3;
+    if (band == "40m")
+      return 7.0;
+    if (band == "30m")
+      return 10.1;
+    if (band == "20m")
+      return 14.1;
+    if (band == "17m")
+      return 18.1;
+    if (band == "15m")
+      return 21.1;
+    if (band == "12m")
+      return 24.9;
+    if (band == "10m")
+      return 28.4;
+    if (band == "6m")
+      return 50.1;
     return 14.1;
   };
 
@@ -1724,29 +1764,28 @@ void MapWidget::updatePropagationOverlay() {
   // outputType: 0=MUF, 1=Reliability, 2=TOA
   int outputType = 0;
   if (config_.propOverlay == PropOverlayType::Reliability) {
-      outputType = 1;
+    outputType = 1;
   } else if (config_.propOverlay == PropOverlayType::Toa) {
-      outputType = 2;
+    outputType = 2;
   }
-  
+
   PropOverlayType overlayType = config_.propOverlay;
-  
+
   // MUF (RT) uses real-time ionosonde data; VOACAP/Reliability use solar models
   auto *ionoProvider = (overlayType == PropOverlayType::Muf) ? iono_ : nullptr;
 
-  WorkerService::getInstance().submitTask(
-      [params, sw, ionoProvider, outputType, overlayType]() {
-        auto grid =
-            PropEngine::generateGrid(params, sw, ionoProvider, outputType);
+  WorkerService::getInstance().submitTask([params, sw, ionoProvider, outputType,
+                                           overlayType]() {
+    auto grid = PropEngine::generateGrid(params, sw, ionoProvider, outputType);
 
-        auto *result = new std::vector<float>(std::move(grid));
-        SDL_Event event;
-        SDL_zero(event);
-        event.type = HamClock::AE_BASE_EVENT + HamClock::AE_PROP_DATA_READY;
-        event.user.code = static_cast<int>(overlayType);
-        event.user.data1 = result;
-        SDL_PushEvent(&event);
-      });
+    auto *result = new std::vector<float>(std::move(grid));
+    SDL_Event event;
+    SDL_zero(event);
+    event.type = HamClock::AE_BASE_EVENT + HamClock::AE_PROP_DATA_READY;
+    event.user.code = static_cast<int>(overlayType);
+    event.user.data1 = result;
+    SDL_PushEvent(&event);
+  });
 }
 
 void MapWidget::onPropDataReady(PropOverlayType type,
@@ -1762,9 +1801,11 @@ void MapWidget::onPropDataReady(PropOverlayType type,
 
   // We need a renderer. We'll grab it from the window.
   SDL_Window *win = SDL_GL_GetCurrentWindow();
-  if (!win) return;
+  if (!win)
+    return;
   SDL_Renderer *renderer = SDL_GetRenderer(win);
-  if (!renderer) return;
+  if (!renderer)
+    return;
 
   if (!propTexture_) {
     propTexture_ = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32,
@@ -1774,9 +1815,12 @@ void MapWidget::onPropDataReady(PropOverlayType type,
 
   std::vector<uint32_t> pixels(grid.size());
   float maxVal;
-  if (type == PropOverlayType::Reliability) maxVal = 100.0f;
-  else if (type == PropOverlayType::Toa)    maxVal = 40.0f;
-  else                                       maxVal = 50.0f; // MUF
+  if (type == PropOverlayType::Reliability)
+    maxVal = 100.0f;
+  else if (type == PropOverlayType::Toa)
+    maxVal = 40.0f;
+  else
+    maxVal = 50.0f; // MUF
 
   for (size_t i = 0; i < grid.size(); ++i) {
     float val = grid[i];
@@ -1785,51 +1829,52 @@ void MapWidget::onPropDataReady(PropOverlayType type,
 
     uint8_t r = 0, g = 0, b = 0;
     if (type == PropOverlayType::Reliability) {
-        // Reliability: Grey -> Yellow -> Green
-        if (t < 0.5f) {
-            float f = t / 0.5f;
-            r = (uint8_t)(100 + f * 155);
-            g = (uint8_t)(100 + f * 155);
-            b = 100;
-        } else {
-            float f = (t - 0.5f) / 0.5f;
-            r = (uint8_t)(255 * (1.0f - f));
-            g = 255;
-            b = (uint8_t)(100 * (1.0f - f));
-        }
+      // Reliability: Grey -> Yellow -> Green
+      if (t < 0.5f) {
+        float f = t / 0.5f;
+        r = (uint8_t)(100 + f * 155);
+        g = (uint8_t)(100 + f * 155);
+        b = 100;
+      } else {
+        float f = (t - 0.5f) / 0.5f;
+        r = (uint8_t)(255 * (1.0f - f));
+        g = 255;
+        b = (uint8_t)(100 * (1.0f - f));
+      }
     } else if (type == PropOverlayType::Toa) {
-        // TOA: low angle = green (favorable long DX), high angle = red (steep/local)
-        // t=0 → transparent (no path); t>0 rendered green→yellow→red
-        if (t < 0.5f) {
-            float f = t * 2.0f;
-            r = (uint8_t)(f * 255.0f);
-            g = 200;
-            b = 0;
-        } else {
-            float f = (t - 0.5f) * 2.0f;
-            r = 255;
-            g = (uint8_t)((1.0f - f) * 200.0f);
-            b = 0;
-        }
+      // TOA: low angle = green (favorable long DX), high angle = red
+      // (steep/local) t=0 → transparent (no path); t>0 rendered
+      // green→yellow→red
+      if (t < 0.5f) {
+        float f = t * 2.0f;
+        r = (uint8_t)(f * 255.0f);
+        g = 200;
+        b = 0;
+      } else {
+        float f = (t - 0.5f) * 2.0f;
+        r = 255;
+        g = (uint8_t)((1.0f - f) * 200.0f);
+        b = 0;
+      }
     } else {
-        // Jet-like colormap for MUF
-        if (t < 0.25f) { // Blue -> Cyan
-          float f = t / 0.25f;
-          b = 255;
-          g = (uint8_t)(f * 255.0f);
-        } else if (t < 0.5f) { // Cyan -> Green
-          float f = (t - 0.25f) / 0.25f;
-          g = 255;
-          b = (uint8_t)((1.0f - f) * 255.0f);
-        } else if (t < 0.75f) { // Green -> Yellow
-          float f = (t - 0.5f) / 0.25f;
-          g = 255;
-          r = (uint8_t)(f * 255.0f);
-        } else { // Yellow -> Red
-          float f = (t - 0.75f) / 0.25f;
-          r = 255;
-          g = (uint8_t)((1.0f - f) * 255.0f);
-        }
+      // Jet-like colormap for MUF
+      if (t < 0.25f) { // Blue -> Cyan
+        float f = t / 0.25f;
+        b = 255;
+        g = (uint8_t)(f * 255.0f);
+      } else if (t < 0.5f) { // Cyan -> Green
+        float f = (t - 0.25f) / 0.25f;
+        g = 255;
+        b = (uint8_t)((1.0f - f) * 255.0f);
+      } else if (t < 0.75f) { // Green -> Yellow
+        float f = (t - 0.5f) / 0.25f;
+        g = 255;
+        r = (uint8_t)(f * 255.0f);
+      } else { // Yellow -> Red
+        float f = (t - 0.75f) / 0.25f;
+        r = 255;
+        g = (uint8_t)((1.0f - f) * 255.0f);
+      }
     }
 
     uint8_t a = (val > 0.1f) ? 200 : 0;
@@ -1839,7 +1884,6 @@ void MapWidget::onPropDataReady(PropOverlayType type,
   SDL_UpdateTexture(propTexture_, nullptr, pixels.data(),
                     PropEngine::MAP_W * sizeof(uint32_t));
 }
-
 
 void MapWidget::onResize(int x, int y, int w, int h) {
   Widget::onResize(x, y, w, h);
@@ -1873,8 +1917,9 @@ void MapWidget::renderTooltip(SDL_Renderer *renderer) {
     return;
   }
 
-  int tw = 0, th = 0;
-  int ptSize = std::max(9, height_ / 40);
+  int ptSize = fontMgr_.catalog()->ptSize(FontStyle::SmallRegular);
+  int tw = fontMgr_.getLogicalWidth(tooltip_.text, ptSize);
+  int th = fontMgr_.getLogicalHeight(tooltip_.text, ptSize);
 
   // Only create new texture if text changed
   if (tooltip_.text != tooltip_.cachedText || !tooltip_.cachedTexture) {
@@ -1882,8 +1927,10 @@ void MapWidget::renderTooltip(SDL_Renderer *renderer) {
     MemoryMonitor::getInstance().destroyTexture(tooltip_.cachedTexture);
 
     // Create new texture
-    tooltip_.cachedTexture = fontMgr_.renderText(
-        renderer, tooltip_.text, {255, 255, 255, 255}, ptSize, &tw, &th);
+    int actualW = 0, actualH = 0;
+    tooltip_.cachedTexture =
+        fontMgr_.renderText(renderer, tooltip_.text, {255, 255, 255, 255},
+                            ptSize, &actualW, &actualH);
 
     if (!tooltip_.cachedTexture) {
       LOG_E("MapWidget", "Failed to create tooltip texture: {}",
@@ -1892,15 +1939,15 @@ void MapWidget::renderTooltip(SDL_Renderer *renderer) {
     }
 
     tooltip_.cachedText = tooltip_.text;
-    tooltip_.cachedW = tw;
-    tooltip_.cachedH = th;
+    tooltip_.cachedW = actualW;
+    tooltip_.cachedH = actualH;
   } else {
     // Reuse cached texture
     tw = tooltip_.cachedW;
     th = tooltip_.cachedH;
   }
 
-  int padX = 6, padY = 3;
+  int padX = 8, padY = 5;
   int boxW = tw + padX * 2;
   int boxH = th + padY * 2;
 
@@ -2215,7 +2262,7 @@ void MapWidget::renderOverlayInfo(SDL_Renderer *renderer) {
   if (text.empty())
     return;
 
-  int ptSize = 14;
+  int ptSize = fontMgr_.catalog()->ptSize(FontStyle::SmallRegular);
   int textW = fontMgr_.getLogicalWidth(text, ptSize, true);
   int textH = 20; // Approx for 14pt (simplified)
   int padX = 12;

@@ -81,26 +81,27 @@ void PaneContainer::onResize(int x, int y, int w, int h) {
 }
 
 bool PaneContainer::onMouseUp(int mx, int my, Uint16 mod) {
-  // If we are acting as a modal proxy, we MUST handle clicks anywhere.
+  // 1. If we are acting as a modal proxy, we MUST handle clicks anywhere.
   if (isModalActive() && activeWidget_) {
     if (activeWidget_->onMouseUp(mx, my, mod)) {
       return true;
     }
-    // If the modal widget didn't handle it, and it's modal, we still don't
-    // want to process it as a non-modal click on the pane itself.
-    // The instruction implies that if it's modal, the event is processed
-    // by the activeWidget_ regardless of bounds. If activeWidget_ returns
-    // false, it means it didn't handle it, and we should not then
-    // fall through to the pane's own click handling.
-    return false; // Modal widget didn't handle it, so no further processing by
-                  // PaneContainer
+    return false;
   }
 
+  // 2. Bounds check
   SDL_Rect r = getRect();
   if (mx < r.x || mx >= r.x + r.w || my < r.y || my >= r.y + r.h) {
     return false;
   }
 
+  // 3. Give active widget first crack at internal elements (header buttons,
+  // etc)
+  if (activeWidget_ && activeWidget_->onMouseUp(mx, my, mod)) {
+    return true;
+  }
+
+  // 4. Pane level logic - top 10% transitions to widget selection
   int relativeY = my - r.y;
   int titleThreshold = r.h / 10; // Top 10%
 
@@ -111,13 +112,6 @@ bool PaneContainer::onMouseUp(int mx, int my, Uint16 mod) {
     }
     return true;
   } else {
-    // Config or normal widget interaction
-    if (activeWidget_) {
-      if (activeWidget_->onMouseUp(mx, my, mod)) {
-        return true;
-      }
-    }
-
     // If widget didn't handle it, maybe bring up config if clicked in lower 90%
     if (onConfigRequested_) {
       onConfigRequested_(currentType_);
