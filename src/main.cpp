@@ -1018,7 +1018,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
 
   // Wire DX Panel spot-selection callbacks
   {
-    auto restoreMapDx = [&state]() {
+    auto restoreMapDx = [state]() {
       if (state->mapDxActive) {
         state->dxLocation = state->mapDxLocation;
         state->dxGrid     = state->mapDxGrid;
@@ -1031,7 +1031,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
 
     if (auto *dxcPanel = dynamic_cast<DXClusterPanel *>(
             widgetPool[WidgetType::DX_CLUSTER].get())) {
-      dxcPanel->setOnSpotActivated([&state, activityStore](const DXClusterSpot &spot) {
+      dxcPanel->setOnSpotActivated([state, activityStore](const DXClusterSpot &spot) {
         state->dxCallsign = spot.txCall;
         state->dxLocation = {spot.txLat, spot.txLon};
         state->dxGrid     = spot.txGrid;
@@ -1045,7 +1045,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
 
     if (auto *ontaPanel = dynamic_cast<ONTAPanel *>(
             widgetPool[WidgetType::ON_THE_AIR].get())) {
-      ontaPanel->setOnSpotActivated([&state, dxcStore](const ONTASpot &spot) {
+      ontaPanel->setOnSpotActivated([state, dxcStore](const ONTASpot &spot) {
         state->dxCallsign = spot.call;
         state->dxLocation = {spot.lat, spot.lon};
         state->dxGrid     = (spot.lat != 0.0 || spot.lon != 0.0)
