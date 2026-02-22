@@ -1025,7 +1025,6 @@ void MapWidget::render(SDL_Renderer *renderer) {
 
   renderPropagationOverlay(renderer);
   renderMufRtOverlay(renderer);
-  renderCloudOverlay(renderer);
   renderWxMbOverlay(renderer);
   renderNightOverlay(renderer);
   renderGridOverlay(renderer);
@@ -2307,11 +2306,7 @@ void MapWidget::renderOverlayInfo(SDL_Renderer *renderer) {
     text = "TOA Overlay";
   }
 
-  if (config_.weatherOverlay == WeatherOverlayType::Clouds) {
-    if (!text.empty())
-      text += " + ";
-    text += "Clouds";
-  } else if (config_.weatherOverlay == WeatherOverlayType::WxMb) {
+  if (config_.weatherOverlay == WeatherOverlayType::WxMb) {
     if (!text.empty())
       text += " + ";
     text += "WX/Pressure";
