@@ -222,11 +222,18 @@ void ONTAPanel::render(SDL_Renderer *renderer) {
   int rowCount = static_cast<int>(currentSpots_.size());
   int rowH = std::max(rowFontSize_ + 4, remaining / rowCount);
 
-  // Column layout: Mode (Left) | Call (Left) | Ref (Left) | Program (Right)
+  // P/S column only shown in ALL mode; in POTA/SOTA the space goes to Ref
+  bool showProg = (filter_ == Filter::ALL);
+
+  // Column layout: Mode | Call | Ref | [P/S in ALL mode]
+  // Use "SSB" (widest mode) and "WB2LJK/P" (wide portable call) as anchors
   int modeX = x_ + pad;
-  int callX = modeX + fontMgr_.getLogicalWidth("CW", rowFontSize_) + 10;
-  int refX = callX + fontMgr_.getLogicalWidth("W7UUU", rowFontSize_) + 10;
+  int callX = modeX + fontMgr_.getLogicalWidth("SSB", rowFontSize_) + 8;
+  int refX  = callX + fontMgr_.getLogicalWidth("WB2LJK/P", rowFontSize_) + 6;
   int progXEnd = x_ + width_ - pad;
+  // Ref extends to full right edge when P/S column is hidden
+  int refXEnd = showProg ? (progXEnd - fontMgr_.getLogicalWidth("S", rowFontSize_) - 4)
+                         : progXEnd;
 
   for (size_t i = 0; i < currentSpots_.size(); ++i) {
     if (i >= spotCache_.size())
@@ -248,7 +255,10 @@ void ONTAPanel::render(SDL_Renderer *renderer) {
     if (cache.modeTex) {
       int ty = rowY + (rowH - cache.modeH) / 2;
       SDL_Rect dst = {modeX, ty, cache.modeW, cache.modeH};
+      SDL_Rect clip = {modeX, rowY, callX - modeX - 2, rowH};
+      SDL_RenderSetClipRect(renderer, &clip);
       SDL_RenderCopy(renderer, cache.modeTex, nullptr, &dst);
+      SDL_RenderSetClipRect(renderer, nullptr);
     }
 
     // 2. Call
@@ -262,7 +272,10 @@ void ONTAPanel::render(SDL_Renderer *renderer) {
     if (cache.callTex) {
       int ty = rowY + (rowH - cache.callH) / 2;
       SDL_Rect dst = {callX, ty, cache.callW, cache.callH};
+      SDL_Rect clip = {callX, rowY, refX - callX - 2, rowH};
+      SDL_RenderSetClipRect(renderer, &clip);
       SDL_RenderCopy(renderer, cache.callTex, nullptr, &dst);
+      SDL_RenderSetClipRect(renderer, nullptr);
     }
 
     // 3. Ref
@@ -276,23 +289,28 @@ void ONTAPanel::render(SDL_Renderer *renderer) {
     if (cache.refTex) {
       int ty = rowY + (rowH - cache.refH) / 2;
       SDL_Rect dst = {refX, ty, cache.refW, cache.refH};
+      SDL_Rect clip = {refX, rowY, refXEnd - refX, rowH};
+      SDL_RenderSetClipRect(renderer, &clip);
       SDL_RenderCopy(renderer, cache.refTex, nullptr, &dst);
+      SDL_RenderSetClipRect(renderer, nullptr);
     }
 
-    // 4. Program (POTA/SOTA -> P/S)
-    std::string shortProg =
-        spot.program.empty() ? "" : spot.program.substr(0, 1);
-    if (!cache.progTex || cache.lastProg != shortProg) {
-      if (cache.progTex)
-        MemoryMonitor::getInstance().destroyTexture(cache.progTex);
-      cache.progTex = fontMgr_.renderText(
-          renderer, shortProg, color, rowFontSize_, &cache.progW, &cache.progH);
-      cache.lastProg = shortProg;
-    }
-    if (cache.progTex) {
-      int ty = rowY + (rowH - cache.progH) / 2;
-      SDL_Rect dst = {progXEnd - cache.progW, ty, cache.progW, cache.progH};
-      SDL_RenderCopy(renderer, cache.progTex, nullptr, &dst);
+    // 4. Program (P/S) — only in ALL mode
+    if (showProg) {
+      std::string shortProg =
+          spot.program.empty() ? "" : spot.program.substr(0, 1);
+      if (!cache.progTex || cache.lastProg != shortProg) {
+        if (cache.progTex)
+          MemoryMonitor::getInstance().destroyTexture(cache.progTex);
+        cache.progTex = fontMgr_.renderText(
+            renderer, shortProg, color, rowFontSize_, &cache.progW, &cache.progH);
+        cache.lastProg = shortProg;
+      }
+      if (cache.progTex) {
+        int ty = rowY + (rowH - cache.progH) / 2;
+        SDL_Rect dst = {progXEnd - cache.progW, ty, cache.progW, cache.progH};
+        SDL_RenderCopy(renderer, cache.progTex, nullptr, &dst);
+      }
     }
   }
 }
