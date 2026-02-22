@@ -1016,6 +1016,47 @@ DashboardContext::DashboardContext(AppContext &ctx)
   for (auto t : allTypes)
     addToPool(t);
 
+  // Wire DX Panel spot-selection callbacks
+  {
+    auto restoreMapDx = [&state]() {
+      if (state->mapDxActive) {
+        state->dxLocation = state->mapDxLocation;
+        state->dxGrid     = state->mapDxGrid;
+        state->dxActive   = true;
+      } else {
+        state->dxActive = false;
+      }
+      state->dxCallsign.clear();
+    };
+
+    if (auto *dxcPanel = dynamic_cast<DXClusterPanel *>(
+            widgetPool[WidgetType::DX_CLUSTER].get())) {
+      dxcPanel->setOnSpotActivated([&state, activityStore](const DXClusterSpot &spot) {
+        state->dxCallsign = spot.txCall;
+        state->dxLocation = {spot.txLat, spot.txLon};
+        state->dxGrid     = spot.txGrid;
+        state->dxActive   = (spot.txLat != 0.0 || spot.txLon != 0.0);
+        auto ad = activityStore->get();
+        ad.hasSelection = false;
+        activityStore->set(ad);
+      });
+      dxcPanel->setOnSpotDeactivated(restoreMapDx);
+    }
+
+    if (auto *ontaPanel = dynamic_cast<ONTAPanel *>(
+            widgetPool[WidgetType::ON_THE_AIR].get())) {
+      ontaPanel->setOnSpotActivated([&state, dxcStore](const ONTASpot &spot) {
+        state->dxCallsign = spot.call;
+        state->dxLocation = {spot.lat, spot.lon};
+        state->dxGrid     = (spot.lat != 0.0 || spot.lon != 0.0)
+                                ? Astronomy::latLonToGrid(spot.lat, spot.lon) : "";
+        state->dxActive   = (spot.lat != 0.0 || spot.lon != 0.0);
+        dxcStore->clearSelection();
+      });
+      ontaPanel->setOnSpotDeactivated(restoreMapDx);
+    }
+  }
+
   for (int i = 0; i < 4; ++i) {
     panes.push_back(std::make_unique<PaneContainer>(
         0, 0, 0, 0, WidgetType::SOLAR, fontMgr));

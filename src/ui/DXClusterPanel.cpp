@@ -296,6 +296,8 @@ bool DXClusterPanel::onMouseUp(int mx, int my, Uint16 /*mod*/) {
 
       if (isSame) {
         store_->clearSelection();
+        if (onSpotDeactivated_)
+          onSpotDeactivated_();
       } else {
         store_->selectSpot(spot);
 
@@ -304,6 +306,8 @@ bool DXClusterPanel::onMouseUp(int mx, int my, Uint16 /*mod*/) {
           long long freqHz = static_cast<long long>(spot.freqKhz * 1000.0);
           rigService_->setFrequency(freqHz);
         }
+        if (onSpotActivated_)
+          onSpotActivated_(spot);
       }
       return true;
     }

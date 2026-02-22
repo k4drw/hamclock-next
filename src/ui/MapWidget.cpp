@@ -429,6 +429,21 @@ bool MapWidget::onMouseUp(int mx, int my, Uint16 mod) {
     state_->dxLocation = {lat, lon};
     state_->dxGrid = Astronomy::latLonToGrid(lat, lon);
     state_->dxActive = true;
+
+    // Save as map-click state and clear any panel-driven selection
+    state_->mapDxLocation = state_->dxLocation;
+    state_->mapDxGrid = state_->dxGrid;
+    state_->mapDxActive = true;
+    state_->dxCallsign.clear();
+
+    // Clear both panel selections so they don't conflict
+    if (dxcStore_)
+      dxcStore_->clearSelection();
+    if (activityStore_) {
+      auto ad = activityStore_->get();
+      ad.hasSelection = false;
+      activityStore_->set(ad);
+    }
   }
 
   return true;

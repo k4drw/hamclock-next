@@ -4,6 +4,7 @@
 #include "ListPanel.h"
 #include <SDL.h>
 #include <chrono>
+#include <functional>
 #include <memory>
 
 // Forward declarations
@@ -26,6 +27,13 @@ public:
   bool isSetupRequested() const { return setupRequested_; }
   void clearSetupRequest() { setupRequested_ = false; }
 
+  void setOnSpotActivated(std::function<void(const DXClusterSpot &)> cb) {
+    onSpotActivated_ = std::move(cb);
+  }
+  void setOnSpotDeactivated(std::function<void()> cb) {
+    onSpotDeactivated_ = std::move(cb);
+  }
+
   std::string getName() const override { return "DXCluster"; }
   std::vector<std::string> getActions() const override;
   bool performAction(const std::string &action) override;
@@ -40,6 +48,9 @@ private:
 
   SDL_Color getRowColor(int index,
                         const SDL_Color &defaultColor) const override;
+
+  std::function<void(const DXClusterSpot &)> onSpotActivated_;
+  std::function<void()> onSpotDeactivated_;
 
   std::shared_ptr<DXClusterDataStore> store_;
   RigService *rigService_;
