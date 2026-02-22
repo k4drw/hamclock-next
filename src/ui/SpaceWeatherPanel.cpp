@@ -285,8 +285,11 @@ void SpaceWeatherPanel::onResize(int x, int y, int w, int h) {
 
 bool SpaceWeatherPanel::onMouseUp(int mx, int my, Uint16 mod) {
   (void)mx;
-  (void)my;
   (void)mod;
+  // Don't consume clicks in the top 10% — let PaneContainer handle them
+  // as widget-selection requests (same threshold used by PaneContainer).
+  if (my - y_ < height_ / 10)
+    return false;
   currentPage_ = (currentPage_ + 1) % 4;
   lastPageUpdate_ = SDL_GetTicks();
   destroyCache();
