@@ -1,6 +1,7 @@
 #include "ActivityPanels.h"
 #include "../core/LiveSpotData.h" // For kBands and freqToBandIndex
 #include "../core/MemoryMonitor.h"
+#include "../core/StringUtils.h"
 #include "../core/Theme.h"
 #include "RenderUtils.h" // ADDED
 #include <algorithm>
@@ -313,6 +314,19 @@ bool ONTAPanel::onMouseUp(int mx, int my, Uint16 mod) {
     else
       filter_ = Filter::ALL;
 
+    // Clear selection if it no longer matches the new filter
+    auto data = store_->get();
+    if (data.hasSelection) {
+      std::string lowerProg = StringUtils::toLower(data.selectedSpot.program);
+      bool match = (filter_ == Filter::ALL) ||
+                   (filter_ == Filter::POTA && lowerProg == "pota") ||
+                   (filter_ == Filter::SOTA && lowerProg == "sota");
+      if (!match) {
+        data.hasSelection = false;
+        store_->set(data);
+      }
+    }
+
     // Force row rebuild on next update
     lastUpdate_ = {};
 
@@ -338,29 +352,38 @@ bool ONTAPanel::onMouseUp(int mx, int my, Uint16 mod) {
   if (mx < x_ || mx >= x_ + width_ || my < y_ || my >= y_ + height_)
     return false;
 
-  // 2. Check title hit (left of chip) to open setup modal
   int pad = std::max(2, static_cast<int>(width_ * 0.03f));
   int titleAreaH = pad * 2;
   if (titleTex_)
     titleAreaH += titleH_;
-  if (my >= y_ && my <= y_ + titleAreaH) {
-    showSetup_ = true;
-    pendingFilter_ = filter_;
-    return true;
-  }
+
+  // Title area clicks (outside the chip) are intentionally not consumed here
+  // so they bubble up to PaneContainer for widget selection menu.
 
   if (my > y_ + titleAreaH) {
     int rowY = my - (y_ + titleAreaH);
-    int rowH =
-        rowFontSize_ + pad; // rowFontSize_ is ListPanel's protected member
+    int remaining = (y_ + height_) - (y_ + titleAreaH);
+    int rowCount = static_cast<int>(currentSpots_.size());
+    int rowH = (rowCount > 0) ? std::max(rowFontSize_ + 4, remaining / rowCount)
+                              : rowFontSize_ + 4;
     if (rowH > 0) {
       size_t idx = rowY / rowH;
       if (idx < currentSpots_.size()) {
         auto data = store_->get();
-        data.hasSelection = true;
-        data.selectedSpot = currentSpots_[idx];
-        store_->set(data);
-        setHighlightedIndex(static_cast<int>(idx));
+        const auto &clicked = currentSpots_[idx];
+        bool isSame = data.hasSelection &&
+                      data.selectedSpot.call == clicked.call &&
+                      data.selectedSpot.ref  == clicked.ref;
+        if (isSame) {
+          data.hasSelection = false;
+          store_->set(data);
+          setHighlightedIndex(-1);
+        } else {
+          data.hasSelection = true;
+          data.selectedSpot = clicked;
+          store_->set(data);
+          setHighlightedIndex(static_cast<int>(idx));
+        }
         return true;
       }
     }

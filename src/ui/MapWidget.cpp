@@ -4,13 +4,13 @@
 #endif
 #endif
 #include "MapWidget.h"
-#include "FontCatalog.h"
 #include "../core/Astronomy.h"
 #include "../core/BeaconData.h"
 #include "../core/Constants.h"
 #include "../core/LiveSpotData.h"
 #include "../core/Logger.h"
 #include "../core/PropEngine.h"
+#include "../core/StringUtils.h"
 #include "../core/WorkerService.h"
 #include "../services/BeaconProvider.h"
 #include "../services/CloudProvider.h"
@@ -18,6 +18,7 @@
 #include "../services/MufRtProvider.h"
 #include "../services/WxMbProvider.h"
 #include "EmbeddedIcons.h"
+#include "FontCatalog.h"
 #include "PaneContainer.h"
 #include "RenderUtils.h"
 #include <fmt/core.h>
@@ -495,47 +496,52 @@ void MapWidget::onMouseMove(int mx, int my) {
     }
   }
 
-  // 5. Check ONTA spots
+  // 5. Check ONTA selected spot only
   if (tip.empty() && activityStore_) {
     ActivityData ads = activityStore_->get();
-    // Prioritize selected spot if hovering near it
-    if (ads.hasSelection && ads.selectedSpot.lat != 0.0) {
-      if (screenDist(ads.selectedSpot.lat, ads.selectedSpot.lon) < kHitRadius) {
-        tip = ads.selectedSpot.call;
+    if (ads.hasSelection) {
+      const auto &sel = ads.selectedSpot;
+      // Resolve lat/lon: use selectedSpot coords, or fall back to ontaSpots list
+      double sLat = sel.lat, sLon = sel.lon;
+      if (sLat == 0.0 && sLon == 0.0) {
+        for (const auto &s : ads.ontaSpots) {
+          if (s.call == sel.call && s.ref == sel.ref && (s.lat != 0.0 || s.lon != 0.0)) {
+            sLat = s.lat;
+            sLon = s.lon;
+            break;
+          }
+        }
+      }
+      if (sLat != 0.0 && screenDist(sLat, sLon) < kHitRadius) {
+        tip = sel.call;
         char buf[128];
-        int bi = freqToBandIndex(ads.selectedSpot.freqKhz);
-        std::snprintf(buf, sizeof(buf), " %.1f kHz", ads.selectedSpot.freqKhz);
+        int bi = freqToBandIndex(sel.freqKhz);
+        std::snprintf(buf, sizeof(buf), " %.1f kHz", sel.freqKhz);
         tip += buf;
         if (bi >= 0)
           tip += std::string(" (") + kBands[bi].name + ")";
-        if (!ads.selectedSpot.mode.empty())
-          tip += " " + ads.selectedSpot.mode;
-
-        // Second line: Program and Reference
-        tip += "\n" + ads.selectedSpot.program + ": " + ads.selectedSpot.ref;
+        if (!sel.mode.empty())
+          tip += " " + sel.mode;
+        tip += "\n" + sel.program + ": " + sel.ref;
       }
     }
   }
 
-  // 6. Check DX Cluster spots
+  // 6. Check DX Cluster selected spot only (mirrors renderDXClusterSpots logic)
   if (tip.empty() && dxcStore_) {
     auto data = dxcStore_->snapshot();
-    if (!data->spots.empty()) {
-      for (const auto &spot : data->spots) {
-        if (spot.txLat == 0.0 && spot.txLon == 0.0)
-          continue;
-        if (screenDist(spot.txLat, spot.txLon) < kHitRadius) {
-          tip = spot.txCall;
-          char buf[64];
-          std::snprintf(buf, sizeof(buf), " %.1f kHz", spot.freqKhz);
-          tip += buf;
-          int bi = freqToBandIndex(spot.freqKhz);
-          if (bi >= 0)
-            tip += std::string(" (") + kBands[bi].name + ")";
-          if (!spot.mode.empty())
-            tip += " " + spot.mode;
-          break;
-        }
+    if (data->hasSelection && data->selectedSpot.txLat != 0.0) {
+      const auto &spot = data->selectedSpot;
+      if (screenDist(spot.txLat, spot.txLon) < kHitRadius) {
+        tip = spot.txCall;
+        char buf[64];
+        std::snprintf(buf, sizeof(buf), " %.1f kHz", spot.freqKhz);
+        tip += buf;
+        int bi = freqToBandIndex(spot.freqKhz);
+        if (bi >= 0)
+          tip += std::string(" (") + kBands[bi].name + ")";
+        if (!spot.mode.empty())
+          tip += " " + spot.mode;
       }
     }
   }
@@ -1491,19 +1497,40 @@ void MapWidget::renderONTASpots(SDL_Renderer *renderer) {
     return;
 
   const auto &spot = data.selectedSpot;
-  if (spot.lat == 0.0 && spot.lon == 0.0)
+
+  // Sync with active filter
+  if (config_.ontaFilter != "all") {
+    if (StringUtils::toLower(spot.program) != config_.ontaFilter) {
+      return;
+    }
+  }
+
+  // Use coords from selectedSpot; if 0,0 (e.g. POTA parks CSV not yet loaded),
+  // try to find updated coords in the live ontaSpots list.
+  double spotLat = spot.lat, spotLon = spot.lon;
+  if (spotLat == 0.0 && spotLon == 0.0) {
+    for (const auto &s : data.ontaSpots) {
+      if (s.call == spot.call && s.ref == spot.ref && (s.lat != 0.0 || s.lon != 0.0)) {
+        spotLat = s.lat;
+        spotLon = s.lon;
+        break;
+      }
+    }
+  }
+  if (spotLat == 0.0 && spotLon == 0.0)
     return;
 
   SDL_RenderSetClipRect(renderer, &mapRect_);
   SDL_Texture *lineTex = texMgr_.get(LINE_AA_KEY);
 
-  // Lime Green for POTA, Cyan for SOTA
-  SDL_Color color = (spot.program == "POTA") ? SDL_Color{50, 255, 50, 255}
-                                             : SDL_Color{0, 200, 255, 255};
+  // Case-insensitive program check for color
+  std::string lowerProg = StringUtils::toLower(spot.program);
+  SDL_Color color = (lowerProg == "pota") ? SDL_Color{50, 255, 50, 255}
+                                          : SDL_Color{0, 200, 255, 255};
 
   LatLon de = state_->deLocation;
   auto path =
-      Astronomy::calculateGreatCirclePath(de, {spot.lat, spot.lon}, 100);
+      Astronomy::calculateGreatCirclePath(de, {spotLat, spotLon}, 100);
 
   std::vector<SDL_FPoint> segment;
   SDL_Color lineColor = {color.r, color.g, color.b, 100};
@@ -1538,7 +1565,7 @@ void MapWidget::renderONTASpots(SDL_Renderer *renderer) {
   }
 
   // Use Square markers for ONTA to differentiate from DX Cluster (Circle)
-  renderMarker(renderer, spot.lat, spot.lon, color.r, color.g, color.b,
+  renderMarker(renderer, spotLat, spotLon, color.r, color.g, color.b,
                MarkerShape::Square, true);
 
   SDL_RenderSetClipRect(renderer, nullptr);
@@ -1941,6 +1968,8 @@ void MapWidget::renderTooltip(SDL_Renderer *renderer) {
     tooltip_.cachedText = tooltip_.text;
     tooltip_.cachedW = actualW;
     tooltip_.cachedH = actualH;
+    tw = actualW;
+    th = actualH;
   } else {
     // Reuse cached texture
     tw = tooltip_.cachedW;
