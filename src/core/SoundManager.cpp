@@ -15,10 +15,25 @@ SoundManager &SoundManager::getInstance() {
 
 SoundManager::~SoundManager() { cleanup(); }
 
+void SoundManager::disable() {
+  std::lock_guard<std::mutex> lock(mutex_);
+  disabled_ = true;
+  if (alarmChunk_) {
+    Mix_FreeChunk(alarmChunk_);
+    alarmChunk_ = nullptr;
+  }
+  if (initialized_) {
+    Mix_CloseAudio();
+    initialized_ = false;
+  }
+}
+
 bool SoundManager::init() {
   std::lock_guard<std::mutex> lock(mutex_);
   if (initialized_)
     return true;
+  if (disabled_)
+    return false;
 
   // Initialize SDL audio subsystem if not already done
   if (SDL_WasInit(SDL_INIT_AUDIO) == 0) {
@@ -52,8 +67,15 @@ void SoundManager::cleanup() {
 }
 
 void SoundManager::playAlarm() {
+  // Lazy init: open audio device only when a sound is actually needed.
+  // This prevents Mix_OpenAudio() from activating HDMI audio hardware at
+  // startup, which causes noise on displays with built-in buzzer speakers.
+  if (!initialized_) {
+    if (!init())
+      return;
+  }
   std::lock_guard<std::mutex> lock(mutex_);
-  if (!initialized_ || !alarmChunk_)
+  if (!alarmChunk_)
     return;
   Mix_PlayChannel(-1, alarmChunk_, 0);
 }
