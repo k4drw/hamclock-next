@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../core/ActivityData.h"
 #include "../services/ActivityProvider.h"
 #include "ListPanel.h"
 #include <SDL.h>
@@ -45,6 +46,13 @@ public:
     onFilterChanged_ = std::move(cb);
   }
 
+  void setOnSpotActivated(std::function<void(const ONTASpot &)> cb) {
+    onSpotActivated_ = std::move(cb);
+  }
+  void setOnSpotDeactivated(std::function<void()> cb) {
+    onSpotDeactivated_ = std::move(cb);
+  }
+
   std::string getName() const override { return "ONTAPanel"; }
 
   // Modal setup screen
@@ -80,6 +88,8 @@ private:
   SDL_Rect footerRect_ = {0, 0, 0, 0};
 
   std::function<void(const std::string &)> onFilterChanged_;
+  std::function<void(const ONTASpot &)> onSpotActivated_;
+  std::function<void()> onSpotDeactivated_;
   std::vector<ONTASpot> currentSpots_;
 
   struct CachedOntaSpot {

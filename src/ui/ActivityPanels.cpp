@@ -396,11 +396,15 @@ bool ONTAPanel::onMouseUp(int mx, int my, Uint16 mod) {
           data.hasSelection = false;
           store_->set(data);
           setHighlightedIndex(-1);
+          if (onSpotDeactivated_)
+            onSpotDeactivated_();
         } else {
           data.hasSelection = true;
           data.selectedSpot = clicked;
           store_->set(data);
           setHighlightedIndex(static_cast<int>(idx));
+          if (onSpotActivated_)
+            onSpotActivated_(clicked);
         }
         return true;
       }
