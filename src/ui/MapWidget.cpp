@@ -1445,6 +1445,20 @@ void MapWidget::renderDXClusterSpots(SDL_Renderer *renderer) {
     // Plot transmitter as a small circle with band color
     renderMarker(renderer, spot.txLat, spot.txLon, color.r, color.g, color.b,
                  MarkerShape::Circle, true);
+
+    // Always show spot label next to selected spot (no hover required)
+    SDL_FPoint sp = latLonToScreen(spot.txLat, spot.txLon);
+    char labelBuf[64];
+    int bi = freqToBandIndex(spot.freqKhz);
+    if (bi >= 0)
+      std::snprintf(labelBuf, sizeof(labelBuf), "%s %.1f %s",
+                    spot.txCall.c_str(), spot.freqKhz, kBands[bi].name);
+    else
+      std::snprintf(labelBuf, sizeof(labelBuf), "%s %.1f kHz",
+                    spot.txCall.c_str(), spot.freqKhz);
+    int labelSize = std::max(8, std::min(width_ / 30, 12));
+    fontMgr_.drawText(renderer, labelBuf, static_cast<int>(sp.x) + 8,
+                      static_cast<int>(sp.y), color, labelSize, false, false);
   }
   SDL_RenderSetClipRect(renderer, nullptr);
 }

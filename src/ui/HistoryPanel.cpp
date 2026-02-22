@@ -3,6 +3,8 @@
 #include "RenderUtils.h"
 #include <SDL.h>
 #include <algorithm>
+#include <chrono>
+#include <string>
 #include <vector>
 
 HistoryPanel::HistoryPanel(int x, int y, int w, int h, FontManager &fontMgr,
@@ -33,8 +35,10 @@ void HistoryPanel::render(SDL_Renderer *renderer) {
   SDL_RenderDrawRect(renderer, &rect);
 
   int pad = 10;
+  int hintSize = std::max(8, height_ / 10);
+  int axisLabelH = hintSize + 4; // reserve space for X-axis time labels
   int graphW = width_ - 2 * pad;
-  int graphH = height_ - 2 * pad - 12;
+  int graphH = height_ - 2 * pad - 12 - axisLabelH;
   int graphX = x_ + pad;
   int graphY = y_ + pad + 12;
 
@@ -124,11 +128,40 @@ void HistoryPanel::render(SDL_Renderer *renderer) {
                                 {255, 255, 0, 255});
     }
 
-    // Show current value (scaled to panel height for readability)
+    // Show current value inside graph area (right edge, top of graph)
     char buf[16];
     std::snprintf(buf, sizeof(buf), "%.0f", currentSeries_.points.back().value);
     int valFontSize = std::max(12, std::min(height_ / 5, 24));
-    fontMgr_.drawText(renderer, buf, x_ + width_ - pad, y_ + 5,
-                      {255, 255, 255, 255}, valFontSize, true, true);
+    fontMgr_.drawText(renderer, buf, graphX + graphW,
+                      graphY + valFontSize / 2 + 2, {255, 255, 255, 255},
+                      valFontSize, true, true);
+  }
+
+  // X-axis time labels at 4 evenly-spaced positions
+  if (n >= 2) {
+    auto now = std::chrono::system_clock::now();
+    int timeY = graphY + graphH + 3;
+    for (int i = 0; i <= 3; ++i) {
+      int idx = (i * (n - 1)) / 3;
+      int lx = graphX + static_cast<int>(idx * stepX);
+
+      // Tick mark
+      SDL_SetRenderDrawColor(renderer, 60, 60, 60, 255);
+      SDL_RenderDrawLine(renderer, lx, graphY + graphH, lx, graphY + graphH + 3);
+
+      // Label
+      auto ageMins = std::chrono::duration_cast<std::chrono::minutes>(
+                         now - currentSeries_.points[idx].time)
+                         .count();
+      std::string label;
+      if (i == 3 || ageMins <= 30) {
+        label = "Now";
+      } else {
+        long ageH = ageMins / 60;
+        label = "-" + std::to_string(ageH) + "h";
+      }
+      fontMgr_.drawText(renderer, label, lx, timeY, themes.textDim, hintSize,
+                        false, true);
+    }
   }
 }
