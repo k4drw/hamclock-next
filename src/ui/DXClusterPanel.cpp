@@ -126,10 +126,13 @@ void DXClusterPanel::render(SDL_Renderer *renderer) {
   int rowH = std::max(rowFontSize_ + 4,
                       remaining / static_cast<int>(visibleSpots_.size()));
 
-  // Column layout: Freq (Right) | Call (Left) | Age (Right)
+  // Column layout: Freq (Right-aligned) | Call (Left) | Age (Right-anchored)
+  // Use worst-case sample strings to anchor fixed column boundaries
   int freqColW = fontMgr_.getLogicalWidth("88888.8", rowFontSize_);
-  int callX = x_ + pad + freqColW + 10;
-  int freqXEnd = callX - 10;
+  int ageColW  = fontMgr_.getLogicalWidth("999m", rowFontSize_);
+  int callX    = x_ + pad + freqColW + 6;
+  int freqXEnd = callX - 6;
+  int ageX     = x_ + width_ - pad - ageColW;
 
   for (size_t i = 0; i < visibleSpots_.size(); ++i) {
     if (i >= spotCache_.size())
@@ -140,7 +143,7 @@ void DXClusterPanel::render(SDL_Renderer *renderer) {
     auto &cache = spotCache_[i];
     SDL_Color color = getRowColor(i, {255, 255, 255, 255});
 
-    // 1. Freq
+    // 1. Freq (right-aligned within freq column)
     if (!cache.freqTex || std::abs(cache.lastFreq - spot.freq) > 0.001) {
       if (cache.freqTex)
         MemoryMonitor::getInstance().destroyTexture(cache.freqTex);
@@ -153,10 +156,13 @@ void DXClusterPanel::render(SDL_Renderer *renderer) {
     if (cache.freqTex) {
       int ty = rowY + (rowH - cache.freqH) / 2;
       SDL_Rect dst = {freqXEnd - cache.freqW, ty, cache.freqW, cache.freqH};
+      SDL_Rect clip = {x_ + pad, rowY, freqColW, rowH};
+      SDL_RenderSetClipRect(renderer, &clip);
       SDL_RenderCopy(renderer, cache.freqTex, nullptr, &dst);
+      SDL_RenderSetClipRect(renderer, nullptr);
     }
 
-    // 2. Call
+    // 2. Call (left-aligned, clipped before age column)
     if (!cache.callTex || cache.lastCall != spot.call) {
       if (cache.callTex)
         MemoryMonitor::getInstance().destroyTexture(cache.callTex);
@@ -167,10 +173,13 @@ void DXClusterPanel::render(SDL_Renderer *renderer) {
     if (cache.callTex) {
       int ty = rowY + (rowH - cache.callH) / 2;
       SDL_Rect dst = {callX, ty, cache.callW, cache.callH};
+      SDL_Rect clip = {callX, rowY, ageX - callX - 2, rowH};
+      SDL_RenderSetClipRect(renderer, &clip);
       SDL_RenderCopy(renderer, cache.callTex, nullptr, &dst);
+      SDL_RenderSetClipRect(renderer, nullptr);
     }
 
-    // 3. Age
+    // 3. Age (right-anchored, always visible)
     std::string age = formatAge(spot.time);
     if (!cache.ageTex || cache.lastAge != age) {
       if (cache.ageTex)
@@ -181,9 +190,11 @@ void DXClusterPanel::render(SDL_Renderer *renderer) {
     }
     if (cache.ageTex) {
       int ty = rowY + (rowH - cache.ageH) / 2;
-      SDL_Rect dst = {x_ + width_ - pad - cache.ageW, ty, cache.ageW,
-                      cache.ageH};
+      SDL_Rect dst = {x_ + width_ - pad - cache.ageW, ty, cache.ageW, cache.ageH};
+      SDL_Rect clip = {ageX, rowY, ageColW, rowH};
+      SDL_RenderSetClipRect(renderer, &clip);
       SDL_RenderCopy(renderer, cache.ageTex, nullptr, &dst);
+      SDL_RenderSetClipRect(renderer, nullptr);
     }
   }
 }
@@ -302,7 +313,9 @@ bool DXClusterPanel::onMouseUp(int mx, int my, Uint16 /*mod*/) {
     }
   }
 
-  return false;
+  // Absorb all clicks in the content area so they don't fall through to
+  // PaneContainer's onSelectionRequested_ and open the adjacent pane's editor.
+  return true;
 }
 
 std::vector<std::string> DXClusterPanel::getActions() const {
