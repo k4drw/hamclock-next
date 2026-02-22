@@ -10,6 +10,10 @@ public:
   bool init();
   void cleanup();
 
+  // Permanently disable audio (e.g. --no-audio flag). Prevents Mix_OpenAudio
+  // from ever being called, so hardware audio devices are never activated.
+  void disable();
+
   // Play the countdown alarm (a series of chirps)
   void playAlarm();
 
@@ -18,6 +22,7 @@ private:
   ~SoundManager();
 
   bool initialized_ = false;
+  bool disabled_ = false;
   Mix_Chunk *alarmChunk_ = nullptr;
   std::mutex mutex_;
 

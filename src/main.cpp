@@ -399,6 +399,8 @@ int main(int argc, char *argv[]) {
       forceFullscreen = true;
     } else if (arg == "-s" || arg == "--software") {
       forceSoftware = true;
+    } else if (arg == "--no-audio") {
+      SoundManager::getInstance().disable();
     } else if (arg == "--log-level" && i + 1 < argc) {
       logLevel = argv[++i];
     } else if (arg == "-h" || arg == "--help") {
@@ -647,8 +649,8 @@ int main(int argc, char *argv[]) {
   ctx.bmeProvider->start();
 #endif
 
-  // Init Sound
-  SoundManager::getInstance().init();
+  // Audio device is opened lazily on first playAlarm() call.
+  // Use --no-audio to permanently suppress audio (e.g. displays with buzzers).
 
   // --- Main Loop ---
 #ifdef __EMSCRIPTEN__
