@@ -149,9 +149,7 @@ void MapViewMenu::render(SDL_Renderer *renderer) {
   fontMgr_.drawText(renderer, "Weather Overlay", weatherRec_.x, weatherHeaderY_,
                     themes.text, 16, false);
   std::string weatherLabel = "None";
-  if (weatherOverlay_ == WeatherOverlayType::Clouds)
-    weatherLabel = "Clouds";
-  else if (weatherOverlay_ == WeatherOverlayType::WxMb)
+  if (weatherOverlay_ == WeatherOverlayType::WxMb)
     weatherLabel = "WX/Pressure";
   drawDropdown(renderer, weatherRec_, weatherLabel,
                openCombo_ == COMBO_WEATHER);
