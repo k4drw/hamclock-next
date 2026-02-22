@@ -66,6 +66,8 @@ private:
   std::string clusterLogin_;
   bool clusterEnabled_ = true;
   bool clusterWSJTX_ = false;
+  std::string wsjtxPort_;
+  SDL_Rect wsjtxPortRect_ = {0, 0, 0, 0};
   bool rbnEnabled_ = false;
   bool pskOfDe_ = true;
   bool pskUseCall_ = true;
