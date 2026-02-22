@@ -264,24 +264,20 @@ bool DXClusterPanel::onMouseWheel(int scrollY) {
 }
 
 bool DXClusterPanel::onMouseUp(int mx, int my, Uint16 /*mod*/) {
+  // Top 10% is the PaneContainer widget-selection zone — match its threshold
+  // exactly so that clicking the title area opens the widget selector, while
+  // clicking anywhere in the content area is absorbed by this widget.
+  if (my < y_ + height_ / 10)
+    return false;
+
   // Check if we clicked on a row
   int rowH = 14;
   auto font = fontMgr_.getFont(rowFontSize_);
   if (font)
     rowH = TTF_FontLineSkip(font);
 
-  // ListPanel starts rendering after title. Adjust my.
-  // We can just hit test visible rows from y_ + something.
-  // For simplicity, let's use the same logic as ListPanel::render.
   int pad = std::max(2, static_cast<int>(width_ * 0.03f));
-  int curY = y_ + pad;
-  // If we had a titleTex_, we add pad.
-  // Let's assume title height is ~titleFontSize_ + pad.
-  curY +=
-      rowFontSize_ + pad; // Title is usually same font size as row or larger
-
-  if (my < curY)
-    return false;
+  int curY = y_ + pad + rowFontSize_ + pad; // content start (below title)
 
   int clickedRow = (my - curY) / rowH;
 
