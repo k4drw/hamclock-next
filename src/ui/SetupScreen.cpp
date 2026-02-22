@@ -531,7 +531,10 @@ void SetupScreen::renderTabAppearance(SDL_Renderer *renderer, int cx, int pad,
                                       int textPad) {
   int y =
       (y_ + titleSize_ + 2 * pad + fieldH); // tightened: removed extra pad/2
-  int vSpace = pad / 2;
+  // Cap vSpace so Appearance tab fits above the button bar on small screens
+  // (e.g. 1024x600 7" display). Available height / ~26 keeps all rows visible.
+  int availH = (y_ + height_ - 52) - y;
+  int vSpace = std::min(pad / 2, std::max(2, availH / 26));
   SDL_Color white = {255, 255, 255, 255};
   SDL_Color orange = {255, 165, 0, 255};
   SDL_Color gray = {140, 140, 140, 255};
