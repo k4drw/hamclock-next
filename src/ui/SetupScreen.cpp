@@ -1020,6 +1020,9 @@ bool SetupScreen::onMouseUp(int mx, int my, Uint16) {
 
   // Handle generic field clicks for active tab
   int yStart = y_ + titleSize_ + 2 * pad + fieldH + pad / 2;
+  // Rig tab has a section header ("Rig / CAT Control:") before the first field
+  if (activeTab_ == Tab::Rig)
+    yStart += labelSize_ + pad / 2;
   int nFields = 0;
   if (activeTab_ == Tab::Identity)
     nFields = 4;
@@ -1083,7 +1086,7 @@ bool SetupScreen::onMouseUp(int mx, int my, Uint16) {
   return true;
 }
 
-bool SetupScreen::onKeyDown(SDL_Keycode key, Uint16) {
+bool SetupScreen::onKeyDown(SDL_Keycode key, Uint16 mod) {
   std::string *text = nullptr;
   int nFields = 1;
 
@@ -1198,6 +1201,17 @@ bool SetupScreen::onKeyDown(SDL_Keycode key, Uint16) {
   case SDLK_END:
     if (text)
       cursorPos_ = static_cast<int>(text->size());
+    return true;
+  case SDLK_v:
+    if (mod & (KMOD_CTRL | KMOD_GUI)) {
+      char *clip = SDL_GetClipboardText();
+      if (clip) {
+        for (char c : std::string(clip))
+          onTextInput(std::string(1, c).c_str());
+        SDL_free(clip);
+      }
+      return true;
+    }
     return true;
   default:
     return true;
