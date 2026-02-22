@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../network/NetworkManager.h"
+#include <functional>
 #include <string>
 #include <vector>
 #include <mutex>
@@ -40,6 +41,10 @@ public:
 
     bool isReady() const { return ready_.load(); }
 
+    // Called from a worker thread when the POTA parks CSV has been parsed.
+    // Use to trigger an immediate POTA spot re-fetch so spots get coordinates.
+    void setOnParksReady(std::function<void()> cb) { onParksReady_ = std::move(cb); }
+
 private:
     ActivityLocationManager() = default;
     ~ActivityLocationManager() = default;
@@ -63,6 +68,7 @@ private:
     mutable std::mutex mutex_;
     std::atomic<bool> ready_{false};
     std::filesystem::path cacheDir_;
+    std::function<void()> onParksReady_;
 
     static constexpr const char* POTA_CSV_URL = "https://pota.app/all_parks_ext.csv";
     static constexpr const char* SOTA_CSV_URL = "https://storage.sota.org.uk/summitslist.csv";

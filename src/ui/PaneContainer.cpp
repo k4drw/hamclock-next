@@ -69,8 +69,27 @@ void PaneContainer::render(SDL_Renderer *renderer) {
   SDL_Rect border = {x_, y_, width_, height_};
   SDL_RenderDrawRect(renderer, &border);
 
-  // Draw title area indicator (top 10%) if debug or hovered?
-  // For now just handle the click logic.
+  // Draw manual navigation arrows when rotation has multiple widgets
+  if (rotation_.size() > 1) {
+    int arrowW = std::min(18, width_ / 8);
+    int arrowH = std::min(36, height_ / 5);
+    int cy = y_ + height_ / 2;
+    SDL_Rect lArr = {x_,                    cy - arrowH / 2, arrowW, arrowH};
+    SDL_Rect rArr = {x_ + width_ - arrowW,  cy - arrowH / 2, arrowW, arrowH};
+
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 140);
+    SDL_RenderFillRect(renderer, &lArr);
+    SDL_RenderFillRect(renderer, &rArr);
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+
+    fontMgr_.drawText(renderer, "<",
+                      lArr.x + lArr.w / 2, lArr.y + lArr.h / 2,
+                      {220, 220, 220, 255}, 14, false, true);
+    fontMgr_.drawText(renderer, ">",
+                      rArr.x + rArr.w / 2, rArr.y + rArr.h / 2,
+                      {220, 220, 220, 255}, 14, false, true);
+  }
 }
 
 void PaneContainer::onResize(int x, int y, int w, int h) {
@@ -93,6 +112,26 @@ bool PaneContainer::onMouseUp(int mx, int my, Uint16 mod) {
   SDL_Rect r = getRect();
   if (mx < r.x || mx >= r.x + r.w || my < r.y || my >= r.y + r.h) {
     return false;
+  }
+
+  // 2a. Check manual navigation arrows (intercept before widget)
+  if (rotation_.size() > 1) {
+    int arrowW = std::min(18, width_ / 8);
+    int arrowH = std::min(36, height_ / 5);
+    int cy = y_ + height_ / 2;
+    SDL_Rect lArr = {x_,                    cy - arrowH / 2, arrowW, arrowH};
+    SDL_Rect rArr = {x_ + width_ - arrowW,  cy - arrowH / 2, arrowW, arrowH};
+
+    if (mx >= lArr.x && mx < lArr.x + lArr.w &&
+        my >= lArr.y && my < lArr.y + lArr.h) {
+      activateRotationIndex((rotationIdx_ + rotation_.size() - 1) % rotation_.size());
+      return true;
+    }
+    if (mx >= rArr.x && mx < rArr.x + rArr.w &&
+        my >= rArr.y && my < rArr.y + rArr.h) {
+      activateRotationIndex((rotationIdx_ + 1) % rotation_.size());
+      return true;
+    }
   }
 
   // 3. Give active widget first crack at internal elements (header buttons,
@@ -118,6 +157,19 @@ bool PaneContainer::onMouseUp(int mx, int my, Uint16 mod) {
     }
     return true;
   }
+}
+
+void PaneContainer::activateRotationIndex(size_t idx) {
+  rotationIdx_ = idx;
+  currentType_ = rotation_[rotationIdx_];
+  if (widgetFactory_) {
+    activeWidget_ = widgetFactory_(currentType_);
+    if (activeWidget_) {
+      activeWidget_->onResize(x_, y_, width_, height_);
+      activeWidget_->setTheme(theme_);
+    }
+  }
+  lastRotateMs_ = SDL_GetTicks();
 }
 
 bool PaneContainer::onKeyDown(SDL_Keycode key, Uint16 mod) {

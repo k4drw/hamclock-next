@@ -778,6 +778,13 @@ DashboardContext::DashboardContext(AppContext &ctx)
       std::make_unique<ActivityProvider>(netManager, activityStore);
   activityProvider->fetch();
 
+  // Re-fetch POTA spots once the parks CSV is parsed so spots get coordinates.
+  // The CSV is read/parsed in a background thread; spots often arrive first.
+  ActivityLocationManager::getInstance().setOnParksReady([this]() {
+    if (activityProvider)
+      activityProvider->fetch();
+  });
+
   dxcProvider = std::make_unique<DXClusterProvider>(
       dxcStore, ctx.prefixMgr, watchlistStore, watchlistHitStore, state.get());
 #ifndef __EMSCRIPTEN__

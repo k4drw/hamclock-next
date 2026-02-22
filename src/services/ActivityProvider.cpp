@@ -32,8 +32,9 @@ void ActivityProvider::fetchDXPeds() {
       auto now = std::chrono::system_clock::now();
 
       auto crackMonth = [](const std::string &m) -> int {
-        static const char *months[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun",
-                                       "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+        static const char *months[] = {"Jan", "Feb", "Mar", "Apr",
+                                       "May", "Jun", "Jul", "Aug",
+                                       "Sep", "Oct", "Nov", "Dec"};
         for (int i = 0; i < 12; i++) {
           if (m.find(months[i]) != std::string::npos)
             return i + 1;
@@ -42,7 +43,8 @@ void ActivityProvider::fetchDXPeds() {
       };
 
       size_t pos = 0;
-      while ((pos = data.find("class=\"adxoitem\"", pos)) != std::string::npos) {
+      while ((pos = data.find("class=\"adxoitem\"", pos)) !=
+             std::string::npos) {
         auto findTagContent = [&](const std::string &html,
                                   const std::string &className,
                                   size_t &searchPos) -> std::string {
@@ -142,7 +144,7 @@ void ActivityProvider::fetchPOTA() {
           os.ref = spot.value("reference", "");
           os.mode = spot.value("mode", "");
           std::string freq = spot.value("frequency", "0");
-          os.freqKhz = StringUtils::safe_stod(freq);
+          os.freqKhz = StringUtils::safe_stod(freq) * 1000.0;
           os.spottedAt = std::chrono::system_clock::now();
 
           if (spot.contains("latitude")) {
@@ -161,20 +163,21 @@ void ActivityProvider::fetchPOTA() {
           // Fallback to Manager or Grid Square if Lat/Lon missing
           if (os.lat == 0.0 && os.lon == 0.0) {
             float plat, plon;
-            if (ActivityLocationManager::getInstance().getPOTALocation(os.ref, plat, plon)) {
-                os.lat = plat;
-                os.lon = plon;
+            if (ActivityLocationManager::getInstance().getPOTALocation(
+                    os.ref, plat, plon)) {
+              os.lat = plat;
+              os.lon = plon;
             } else {
-                std::string grid = spot.value("grid", "");
-                if (grid.empty())
-                  grid = spot.value("activatorGrid", "");
-                if (!grid.empty()) {
-                  double glat, glon;
-                  if (Astronomy::gridToLatLon(grid, glat, glon)) {
-                    os.lat = glat;
-                    os.lon = glon;
-                  }
+              std::string grid = spot.value("grid", "");
+              if (grid.empty())
+                grid = spot.value("activatorGrid", "");
+              if (!grid.empty()) {
+                double glat, glon;
+                if (Astronomy::gridToLatLon(grid, glat, glon)) {
+                  os.lat = glat;
+                  os.lon = glon;
                 }
+              }
             }
           }
 
@@ -222,17 +225,18 @@ void ActivityProvider::fetchSOTA() {
                    spot.value("summitCode", "");
           os.mode = spot.value("mode", "");
           std::string freq = spot.value("frequency", "0");
-          os.freqKhz =
-              StringUtils::safe_stod(freq) * 1000.0; // SOTA MHz to kHz? Check API
+          os.freqKhz = StringUtils::safe_stod(freq) *
+                       1000.0; // SOTA MHz to kHz? Check API
           os.spottedAt = std::chrono::system_clock::now();
 
           float slat, slon;
-          if (ActivityLocationManager::getInstance().getSOTALocation(os.ref, slat, slon)) {
-              os.lat = slat;
-              os.lon = slon;
+          if (ActivityLocationManager::getInstance().getSOTALocation(
+                  os.ref, slat, slon)) {
+            os.lat = slat;
+            os.lon = slon;
           } else {
-              // Trigger async per-summit API lookup for next refresh cycle
-              ActivityLocationManager::getInstance().resolveSummitAsync(os.ref);
+            // Trigger async per-summit API lookup for next refresh cycle
+            ActivityLocationManager::getInstance().resolveSummitAsync(os.ref);
           }
 
           if (!os.call.empty()) {

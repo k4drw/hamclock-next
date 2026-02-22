@@ -2,6 +2,7 @@
 #include "../core/Astronomy.h"
 #include "../core/Logger.h"
 #include "../core/StringUtils.h"
+#include <SDL.h>
 
 #include <algorithm>
 #include <cmath>
@@ -312,7 +313,7 @@ void SetupScreen::render(SDL_Renderer *renderer) {
   }
 
   y = y_ + height_ - 12 - 40; // anchored: fixed 12px bottom clearance (was pad)
-  
+
   // Draw footer background to prevent content bleed-through
   SDL_Rect footerBg = {x_, y - 10, width_, height_ - (y - 10)};
   SDL_SetRenderDrawColor(renderer, 15, 15, 25, 255); // Match bg
@@ -580,17 +581,21 @@ void SetupScreen::renderTabAppearance(SDL_Renderer *renderer, int cx, int pad,
                     white, labelSize_);
   y += 24 + vSpace;
 
-  fontMgr_.drawText(renderer, "Map Weather Overlay:", fieldX, y, white, labelSize_);
+  fontMgr_.drawText(renderer, "Map Weather Overlay:", fieldX, y, white,
+                    labelSize_);
   SDL_Rect weatherBtn = {fieldX + fieldW - 120, y, 120, 24};
   SDL_SetRenderDrawColor(renderer, 40, 40, 50, 255);
   SDL_RenderFillRect(renderer, &weatherBtn);
   SDL_SetRenderDrawColor(renderer, 100, 100, 120, 255);
   SDL_RenderDrawRect(renderer, &weatherBtn);
   std::string wStr = "None";
-  if (weatherOverlay_ == WeatherOverlayType::Clouds) wStr = "Clouds";
-  else if (weatherOverlay_ == WeatherOverlayType::WxMb) wStr = "Pressure";
+  if (weatherOverlay_ == WeatherOverlayType::Clouds)
+    wStr = "Clouds";
+  else if (weatherOverlay_ == WeatherOverlayType::WxMb)
+    wStr = "Pressure";
   fontMgr_.drawText(renderer, wStr, weatherBtn.x + weatherBtn.w / 2,
-                    weatherBtn.y + weatherBtn.h / 2, white, hintSize_, false, true);
+                    weatherBtn.y + weatherBtn.h / 2, white, hintSize_, false,
+                    true);
   weatherOverlayRect_ = weatherBtn;
   y += 24 + vSpace;
 
@@ -1506,11 +1511,11 @@ AppConfig SetupScreen::getConfig() const {
 }
 
 std::vector<std::string> SetupScreen::getActions() const {
-  return {"tab_identity", "tab_dxcluster", "tab_appearance",
-          "tab_widgets",  "field_0",       "field_1",
-          "field_2",      "field_3",       "toggle_night_lights",
-          "toggle_metric", "toggle_rss",   "toggle_weather_overlay",
-          "done",         "cancel"};
+  return {"tab_identity",  "tab_dxcluster", "tab_appearance",
+          "tab_widgets",   "field_0",       "field_1",
+          "field_2",       "field_3",       "toggle_night_lights",
+          "toggle_metric", "toggle_rss",    "toggle_weather_overlay",
+          "done",          "cancel"};
 }
 
 SDL_Rect SetupScreen::getActionRect(const std::string &action) const {
@@ -1549,9 +1554,12 @@ SDL_Rect SetupScreen::getActionRect(const std::string &action) const {
   if (action == "toggle_night_lights") {
     return nightLightsRect_;
   }
-  if (action == "toggle_metric") return metricToggleRect_;
-  if (action == "toggle_rss") return rssToggleRect_;
-  if (action == "toggle_weather_overlay") return weatherOverlayRect_;
+  if (action == "toggle_metric")
+    return metricToggleRect_;
+  if (action == "toggle_rss")
+    return rssToggleRect_;
+  if (action == "toggle_weather_overlay")
+    return weatherOverlayRect_;
 
   if (action == "done") {
     return okBtnRect_;
