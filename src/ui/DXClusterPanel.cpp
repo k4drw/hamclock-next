@@ -100,6 +100,11 @@ void DXClusterPanel::update() {
   }
 }
 
+void DXClusterPanel::onResize(int x, int y, int w, int h) {
+  ListPanel::onResize(x, y, w, h);
+  clearSpotCache();
+}
+
 void DXClusterPanel::render(SDL_Renderer *renderer) {
   // Base render for BG, Title, Border
   ListPanel::render(renderer);

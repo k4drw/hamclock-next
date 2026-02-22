@@ -19,6 +19,7 @@ public:
   ~DXClusterPanel() override;
 
   void update() override;
+  void onResize(int x, int y, int w, int h) override;
   bool onMouseUp(int mx, int my, Uint16 mod) override;
   bool onMouseWheel(int scrollY) override;
 
