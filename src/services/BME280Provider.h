@@ -19,6 +19,7 @@ public:
 private:
   void worker();
   bool initI2C();
+  bool readCalibration();
   bool readSensor();
 
   std::shared_ptr<WeatherStore> store_;
@@ -27,6 +28,7 @@ private:
   std::thread thread_;
   int fd_ = -1;
   uint8_t addr_ = 0x76; // Default BME280 address
+  int32_t t_fine_ = 0;  // Shared intermediate used by pressure/humidity compensation
 
   // Calibration data
   struct CalibData {
