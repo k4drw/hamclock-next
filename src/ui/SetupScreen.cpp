@@ -74,6 +74,8 @@ std::string *SetupScreen::getActiveFieldText() {
       return &clusterPort_;
     case 2:
       return &clusterLogin_;
+    case 3:
+      return &wsjtxPort_;
     }
   } else if (activeTab_ == Tab::Appearance) {
     switch (activeField_) {
@@ -484,10 +486,24 @@ void SetupScreen::renderTabDXCluster(SDL_Renderer *renderer, int cx, int pad,
     SDL_Rect check = {fieldX + 4, y + 4, 12, 12};
     SDL_RenderFillRect(renderer, &check);
   }
-  fontMgr_.drawText(renderer, "Use WSJ-TX (UDP Port 2237)", fieldX + 30, y + 2,
+  fontMgr_.drawText(renderer, "Use WSJT-X (UDP)", fieldX + 30, y + 2,
                     white, labelSize_);
   toggleRect_ = toggle;
   y += 30;
+
+  if (clusterWSJTX_) {
+    fontMgr_.drawText(renderer, "WSJT-X UDP Port:", fieldX, y, white, labelSize_);
+    y += labelSize_ + 4;
+    int wPortW = std::min(120, halfW);
+    wsjtxPortRect_ = {fieldX, y, wPortW, fieldH};
+    int tmpY = y;
+    renderField(renderer, fontMgr_, wsjtxPort_, "2237", fieldX, tmpY, wPortW,
+                fieldH, fieldSize_, textPad, activeField_ == 3,
+                !wsjtxPort_.empty(), cursorPos_, orange, gray, white, white, gray);
+    y += fieldH + vSpace;
+  } else {
+    wsjtxPortRect_ = {0, 0, 0, 0};
+  }
 
   // --- RBN SECTION ---
   fontMgr_.drawText(renderer, "--- Reverse Beacon Network ---", cx, y, cyan,
@@ -902,6 +918,13 @@ bool SetupScreen::onMouseUp(int mx, int my, Uint16) {
       rbnEnabled_ = !rbnEnabled_;
       return true;
     }
+    if (clusterWSJTX_ && wsjtxPortRect_.w > 0 &&
+        mx >= wsjtxPortRect_.x && mx <= wsjtxPortRect_.x + wsjtxPortRect_.w &&
+        my >= wsjtxPortRect_.y && my <= wsjtxPortRect_.y + wsjtxPortRect_.h) {
+      activeField_ = 3;
+      cursorPos_ = static_cast<int>(wsjtxPort_.size());
+      return true;
+    }
   }
 
   if (activeTab_ == Tab::Appearance) {
@@ -1107,7 +1130,7 @@ bool SetupScreen::onKeyDown(SDL_Keycode key, Uint16 mod) {
       break;
     }
   } else if (activeTab_ == Tab::Spotting) {
-    nFields = 3;
+    nFields = clusterWSJTX_ ? 4 : 3;
     switch (activeField_) {
     case 0:
       text = &clusterHost_;
@@ -1117,6 +1140,9 @@ bool SetupScreen::onKeyDown(SDL_Keycode key, Uint16 mod) {
       break;
     case 2:
       text = &clusterLogin_;
+      break;
+    case 3:
+      text = &wsjtxPort_;
       break;
     }
   } else if (activeTab_ == Tab::Appearance) {
@@ -1255,6 +1281,10 @@ bool SetupScreen::onTextInput(const char *inputText) {
       field = &clusterLogin_;
       maxLen = 12;
       break;
+    case 3:
+      field = &wsjtxPort_;
+      maxLen = 5;
+      break;
     }
   } else if (activeTab_ == Tab::Appearance) {
     if (activeField_ == 0) {
@@ -1377,8 +1407,8 @@ bool SetupScreen::onTextInput(const char *inputText) {
     latLonManual_ = true;
   }
 
-  // === PORT VALIDATION (Spotting Tab, Field 1) ===
-  if (activeTab_ == Tab::Spotting && activeField_ == 1) {
+  // === PORT VALIDATION (Spotting Tab, Fields 1 and 3) ===
+  if (activeTab_ == Tab::Spotting && (activeField_ == 1 || activeField_ == 3)) {
     // Port: digits only, validate 1-65535
     for (const char *p = inputText; *p; ++p) {
       if (!(*p >= '0' && *p <= '9')) {
@@ -1420,6 +1450,7 @@ void SetupScreen::setConfig(const AppConfig &cfg) {
   clusterLogin_ = cfg.dxClusterLogin;
   clusterEnabled_ = cfg.dxClusterEnabled;
   clusterWSJTX_ = cfg.dxClusterUseWSJTX;
+  wsjtxPort_ = std::to_string(cfg.wsjtxPort);
   rbnEnabled_ = cfg.rbnEnabled;
   pskOfDe_ = cfg.liveSpotsOfDe;
   pskUseCall_ = cfg.liveSpotsUseCall;
@@ -1478,6 +1509,9 @@ AppConfig SetupScreen::getConfig() const {
   cfg.dxClusterLogin = clusterLogin_;
   cfg.dxClusterEnabled = clusterEnabled_;
   cfg.dxClusterUseWSJTX = clusterWSJTX_;
+  cfg.wsjtxPort = std::atoi(wsjtxPort_.c_str());
+  if (cfg.wsjtxPort == 0)
+    cfg.wsjtxPort = 2237;
   cfg.rbnEnabled = rbnEnabled_;
   cfg.liveSpotsOfDe = pskOfDe_;
   cfg.liveSpotsUseCall = pskUseCall_;
