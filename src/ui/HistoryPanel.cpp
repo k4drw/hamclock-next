@@ -92,6 +92,19 @@ void HistoryPanel::render(SDL_Renderer *renderer) {
       fontMgr_.drawText(renderer, labels[i], graphX - 2, ly, themes.textDim, 8,
                         false, true);
     }
+
+    // Current Kp value as large overlay
+    {
+      float kpNow = currentSeries_.points.back().value;
+      char kpBuf[8];
+      std::snprintf(kpBuf, sizeof(kpBuf), "%.1f", kpNow);
+      SDL_Color kpCol = (kpNow >= 5.0f) ? SDL_Color{255, 0, 0, 255}
+                      : (kpNow >= 4.0f) ? SDL_Color{255, 255, 0, 255}
+                      :                    SDL_Color{0, 255, 0, 255};
+      int kpFontSize = std::max(14, std::min(height_ / 3, 40));
+      fontMgr_.drawText(renderer, kpBuf, graphX + graphW / 2,
+                        graphY + graphH / 2, kpCol, kpFontSize, false, true);
+    }
   } else {
     // Line chart for Flux and SSN (Anti-Aliased)
     SDL_Texture *lineTex = texMgr_.get("line_aa");
@@ -111,10 +124,11 @@ void HistoryPanel::render(SDL_Renderer *renderer) {
                                 {255, 255, 0, 255});
     }
 
-    // Show current value
+    // Show current value (scaled to panel height for readability)
     char buf[16];
     std::snprintf(buf, sizeof(buf), "%.0f", currentSeries_.points.back().value);
+    int valFontSize = std::max(12, std::min(height_ / 5, 24));
     fontMgr_.drawText(renderer, buf, x_ + width_ - pad, y_ + 5,
-                      {255, 255, 255, 255}, 10, true, true);
+                      {255, 255, 255, 255}, valFontSize, true, true);
   }
 }
