@@ -15,6 +15,7 @@ class ConfigManager;
 class WatchlistStore;
 class SolarDataStore;
 class DisplayPower;
+class FrameCapture;
 
 class WebServer {
 public:
@@ -29,6 +30,8 @@ public:
   void start();
   void stop();
 
+  void setFrameCapture(FrameCapture *fc) { frameCapture_ = fc; }
+
 private:
   void run();
 
@@ -40,6 +43,7 @@ private:
   std::shared_ptr<SolarDataStore> solar_;
   std::shared_ptr<DisplayPower> displayPower_;
   std::atomic<bool> *reloadFlag_; // points to AppContext::configReloadRequested
+  FrameCapture *frameCapture_ = nullptr;
   int port_;
   std::thread thread_;
   std::atomic<bool> running_{false};

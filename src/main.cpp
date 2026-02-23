@@ -22,8 +22,10 @@
 #include "core/WidgetType.h"
 #include "core/WorkerService.h"
 
+#include "network/FrameCapture.h"
 #include "network/NetworkManager.h"
 #include "network/WebServer.h"
+#include "services/UpdateChecker.h"
 #include "services/ADIFProvider.h"
 #include "services/ActivityProvider.h"
 #include "services/AsteroidProvider.h"
@@ -188,6 +190,8 @@ struct AppContext {
 
 #ifndef __EMSCRIPTEN__
   std::unique_ptr<WebServer> webServer;
+  std::unique_ptr<FrameCapture> frameCapture;
+  std::unique_ptr<UpdateChecker> updateChecker;
   std::unique_ptr<GPSProvider> gpsProvider;
 #endif
   std::unique_ptr<BME280Provider> bmeProvider;
@@ -636,10 +640,14 @@ int main(int argc, char *argv[]) {
   }
 
 #ifndef __EMSCRIPTEN__
+  ctx.frameCapture = std::make_unique<FrameCapture>();
+  ctx.updateChecker = std::make_unique<UpdateChecker>(*ctx.netManager);
+  ctx.updateChecker->fetch();
   ctx.webServer = std::make_unique<WebServer>(
       ctx.renderer, ctx.appCfg, *ctx.state, ctx.cfgMgr, ctx.displayPower,
       ctx.configReloadRequested, ctx.watchlistStore, ctx.solarStore,
       DEFAULT_WEB_SERVER_PORT);
+  ctx.webServer->setFrameCapture(ctx.frameCapture.get());
   ctx.webServer->start();
 
   ctx.gpsProvider = std::make_unique<GPSProvider>(ctx.state.get(), ctx.appCfg);
@@ -1249,8 +1257,20 @@ void DashboardContext::update(AppContext &ctx) {
     mufRtProvider->update();
     ionosondeProvider->update();
     asteroidProvider->update();
+#ifndef __EMSCRIPTEN__
+    if (ctx.updateChecker)
+      ctx.updateChecker->fetch();
+#endif
     lastFetchMs = now;
   }
+
+#ifndef __EMSCRIPTEN__
+  // Propagate update-available state to TimePanel on every tick (cheap).
+  if (ctx.updateChecker && timePanel) {
+    timePanel->setUpdateInfo(ctx.updateChecker->updateAvailable(),
+                             ctx.updateChecker->latestVersion());
+  }
+#endif
 
   SDL_Event event;
   while (SDL_PollEvent(&event)) {
@@ -1666,6 +1686,10 @@ void DashboardContext::render(AppContext &ctx) {
     activeModal->renderModal(ctx.renderer);
   }
 
+#ifndef __EMSCRIPTEN__
+  if (ctx.frameCapture)
+    ctx.frameCapture->capture(ctx.renderer);
+#endif
   SDL_RenderPresent(ctx.renderer);
   if (FIDELITY_MODE) {
     SDL_RenderSetScale(ctx.renderer, 1.0f, 1.0f);

@@ -238,10 +238,16 @@ void TimePanel::render(SDL_Renderer *renderer) {
       fontMgr_.drawText(renderer, centerText, x_ + (width_ - tw) * 0.58f, infoY,
                         gray, infoFontSize_);
 
-      // Right: version
-      TTF_SizeUTF8(infoFont, kVersion, &tw, &th);
-      fontMgr_.drawText(renderer, kVersion, x_ + width_ - pad - tw, infoY, gray,
-                        infoFontSize_);
+      // Right: version (amber + asterisk when update available)
+      std::string verStr = kVersion;
+      SDL_Color verColor = gray;
+      if (updateAvailable_) {
+        verStr += "*";
+        verColor = {255, 200, 0, 255}; // amber
+      }
+      TTF_SizeUTF8(infoFont, verStr.c_str(), &tw, &th);
+      fontMgr_.drawText(renderer, verStr, x_ + width_ - pad - tw, infoY,
+                        verColor, infoFontSize_);
     }
   }
 

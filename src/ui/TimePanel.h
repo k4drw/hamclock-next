@@ -50,6 +50,12 @@ public:
   bool isSetupRequested() const { return setupRequested_; }
   void clearSetupRequest() { setupRequested_ = false; }
 
+  // Called whenever the update checker has new information.
+  void setUpdateInfo(bool available, const std::string &latestVersion) {
+    updateAvailable_ = available;
+    latestVersion_ = latestVersion;
+  }
+
   // Callback invoked when callsign text or color is changed via the editor.
   using ConfigChangedCb =
       std::function<void(const std::string &callsign, SDL_Color color)>;
@@ -121,6 +127,8 @@ private:
 
   ConfigChangedCb onConfigChanged_;
   bool setupRequested_ = false;
+  bool updateAvailable_ = false;
+  std::string latestVersion_;
   SDL_Rect gearRect_ = {};
   int gearSize_ = 12;
 

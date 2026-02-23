@@ -12,12 +12,13 @@
 
 #include "../core/Logger.h"
 
-#ifdef ENABLE_DEBUG_API
 #include "../core/Astronomy.h"
-#include "../core/UIRegistry.h"
+#include "../core/DisplayPower.h"
+#include "FrameCapture.h"
 #include <iomanip>
-#include <iostream>
 #include <sstream>
+#ifdef ENABLE_DEBUG_API
+#include "../core/UIRegistry.h"
 #endif
 
 using namespace HamClock;
@@ -82,7 +83,12 @@ void WebServer::run() {
     .panel.active { display: block; }
     .card { background: var(--card); border: 1px solid var(--dim); padding: 12px; margin-bottom: 12px; }
     label { display: block; color: #aaa; margin-bottom: 4px; font-size: 0.85em; text-transform: uppercase; }
-    input[type=text], input[type=number] { width: 100%; padding: 6px 8px; background: #222; border: 1px solid var(--dim); color: #eee; font-family: monospace; font-size: 14px; margin-bottom: 10px; }
+    input[type=text], input[type=number], input[type=password], select { width: 100%; padding: 6px 8px; background: #222; border: 1px solid var(--dim); color: #eee; font-family: monospace; font-size: 14px; margin-bottom: 10px; }
+    input[type=range] { width: 100%; margin-bottom: 10px; accent-color: var(--green); }
+    input[type=checkbox] { margin-right: 6px; accent-color: var(--green); }
+    .chip { display: inline-block; padding: 3px 8px; border: 1px solid var(--dim); color: #aaa; cursor: pointer; font-size: 0.85em; }
+    .chip.active { border-color: var(--green); color: var(--green); }
+    .section-hdr { color: var(--green); font-size: 0.9em; margin-bottom: 8px; }
     input:focus { outline: 1px solid var(--green); border-color: var(--green); }
     button { padding: 8px 20px; background: #003300; border: 1px solid var(--green); color: var(--green); cursor: pointer; font-family: monospace; }
     button:hover { background: #004400; }
@@ -100,12 +106,16 @@ void WebServer::run() {
     html += HAMCLOCK_VERSION;
     html += R"HTML(</h1>
 
-  <div class="tabs">
+  <div class="tabs" style="flex-wrap:wrap">
     <div class="tab active" onclick="showTab('identity')">Identity</div>
     <div class="tab" onclick="showTab('appearance')">Appearance</div>
     <div class="tab" onclick="showTab('status')">Status</div>
     <div class="tab" onclick="showTab('de-dx')">DE / DX</div>
     <div class="tab" onclick="showTab('network')">Network</div>
+    <div class="tab" onclick="showTab('cluster')">Cluster</div>
+    <div class="tab" onclick="showTab('radio')">Radio</div>
+    <div class="tab" onclick="showTab('services')">Services</div>
+    <div class="tab" onclick="showTab('brightness')">Brightness</div>
   </div>
 
   <div id="identity" class="panel active">
@@ -178,23 +188,113 @@ void WebServer::run() {
     </div>
   </div>
 
+  <div id="cluster" class="panel">
+    <div class="card">
+      <div class="section-hdr">DX Cluster</div>
+      <label><input type="checkbox" id="dx-enabled"> Enable DX Cluster</label>
+      <label>Host</label>
+      <input type="text" id="dx-host" placeholder="dxusa.net">
+      <label>Port</label>
+      <input type="number" id="dx-port" min="1" max="65535">
+      <label>Login Callsign</label>
+      <input type="text" id="dx-login" placeholder="NOCALL">
+      <label style="margin-top:4px"><input type="checkbox" id="dx-wsjtx"> Use WSJT-X (UDP) instead</label>
+      <label>WSJT-X UDP Port</label>
+      <input type="number" id="wsjtx-port" min="1" max="65535">
+      <button onclick="saveCluster()">Save</button>
+      <div id="cluster-msg"></div>
+    </div>
+  </div>
+
+  <div id="radio" class="panel">
+    <div class="card">
+      <div class="section-hdr">Rig (rigctld)</div>
+      <label>Host</label>
+      <input type="text" id="rig-host" placeholder="localhost">
+      <label>Port</label>
+      <input type="number" id="rig-port" min="1" max="65535">
+      <label><input type="checkbox" id="rig-autotune"> Auto-Tune on DX Spot click</label>
+    </div>
+    <div class="card">
+      <div class="section-hdr">Rotator (rotctld)</div>
+      <label>Host</label>
+      <input type="text" id="rot-host" placeholder="localhost">
+      <label>Port</label>
+      <input type="number" id="rot-port" min="1" max="65535">
+      <label><input type="checkbox" id="rot-autotrack"> Auto-Track Satellite</label>
+      <button onclick="saveRadio()">Save</button>
+      <div id="radio-msg"></div>
+    </div>
+  </div>
+
+  <div id="services" class="panel">
+    <div class="card">
+      <div class="section-hdr">QRZ Callsign Lookup</div>
+      <label>Username</label>
+      <input type="text" id="qrz-user">
+      <label>Password</label>
+      <input type="password" id="qrz-pass" placeholder="(unchanged if blank)">
+    </div>
+    <div class="card">
+      <div class="section-hdr">Live Spots</div>
+      <label>Source</label>
+      <select id="spot-source">
+        <option value="PSK">PSK Reporter</option>
+        <option value="RBN">Reverse Beacon Network</option>
+        <option value="WSPR">WSPR</option>
+      </select>
+      <label>Max Age (minutes)</label>
+      <input type="number" id="spot-age" min="5" max="120">
+      <label>Bands</label>
+      <div id="band-chips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px"></div>
+    </div>
+    <div class="card">
+      <div class="section-hdr">Toggles</div>
+      <label><input type="checkbox" id="gps-enabled"> GPS Auto-Location</label>
+      <label><input type="checkbox" id="rss-enabled"> RSS News Banner</label>
+      <label>POTA/SOTA Filter</label>
+      <select id="onta-filter">
+        <option value="all">All Spots</option>
+        <option value="pota">POTA Only</option>
+        <option value="sota">SOTA Only</option>
+      </select>
+      <button onclick="saveServices()">Save</button>
+      <div id="services-msg"></div>
+    </div>
+  </div>
+
+  <div id="brightness" class="panel">
+    <div class="card">
+      <label>Brightness: <span id="bright-pct">100</span>%</label>
+      <input type="range" id="bright-level" min="10" max="100" value="100"
+             oninput="document.getElementById('bright-pct').textContent=this.value">
+      <label style="margin-top:4px"><input type="checkbox" id="bright-schedule"> Enable Day/Night Schedule</label>
+      <label>Dim At (HH:MM)</label>
+      <input type="text" id="dim-time" placeholder="22:00" maxlength="5">
+      <label>Bright At (HH:MM)</label>
+      <input type="text" id="bright-time" placeholder="06:00" maxlength="5">
+      <button onclick="saveBrightness()">Save</button>
+      <div id="bright-msg"></div>
+    </div>
+  </div>
+
   <script>
     // Tab navigation
     function showTab(name) {
-      document.querySelectorAll('.tab').forEach((t,i) => {
-        const ids = ['identity','appearance','status','de-dx','network'];
-        t.classList.toggle('active', ids[i] === name);
-      });
-      document.querySelectorAll('.panel').forEach(p => {
-        p.classList.toggle('active', p.id === name);
-      });
+      const ids = ['identity','appearance','status','de-dx','network','cluster','radio','services','brightness'];
+      document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', ids[i] === name));
+      document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id === name));
       if (name === 'appearance') loadAppearance();
       if (name === 'status') refreshStatus();
       if (name === 'de-dx') refreshDeDx();
       if (name === 'network') loadNetwork();
+      if (name === 'cluster') loadCluster();
+      if (name === 'radio') loadRadio();
+      if (name === 'services') loadServices();
+      if (name === 'brightness') loadBrightness();
     }
 
-    // Parse key-value text format ("Key   Value\n")
+    // Parse key-value text format ("Key   Value\n") — kept for Status/DE-DX tabs
     function parseKV(text) {
       const obj = {};
       text.split('\n').forEach(line => {
@@ -207,21 +307,20 @@ void WebServer::run() {
     // Load config on startup
     async function loadConfig() {
       try {
-        const r = await fetch('/get_config.txt');
-        const kv = parseKV(await r.text());
-        document.getElementById('call').value = kv['Callsign'] || '';
-        document.getElementById('grid').value = kv['Grid'] || '';
-        document.getElementById('lat').value = kv['Lat'] || '';
-        document.getElementById('lon').value = kv['Lon'] || '';
+        const r = await fetch('/api/config');
+        const c = await r.json();
+        document.getElementById('call').value = c.callsign || '';
+        document.getElementById('grid').value = c.grid || '';
+        document.getElementById('lat').value = c.lat || '';
+        document.getElementById('lon').value = c.lon || '';
       } catch(e) { setMsg('Failed to load config: ' + e, true); }
     }
 
     async function loadAppearance() {
       try {
-        const r = await fetch('/get_config.txt');
-        const kv = parseKV(await r.text());
-        document.getElementById('theme').value = kv['Theme'] || 'default';
-        
+        const r = await fetch('/api/config');
+        const c = await r.json();
+        document.getElementById('theme').value = c.theme || 'default';
         const r2 = await fetch('/api/display/status');
         const j = await r2.json();
         document.getElementById('pwr-msg').textContent = 'State: ' + j.power + ' (' + j.method + ')';
@@ -337,9 +436,9 @@ void WebServer::run() {
 
     async function loadNetwork() {
       try {
-        const r = await fetch('/get_config.txt');
-        const kv = parseKV(await r.text());
-        document.getElementById('cors-proxy-url').value = kv['CorsProxyUrl'] || '';
+        const r = await fetch('/api/config');
+        const c = await r.json();
+        document.getElementById('cors-proxy-url').value = c.corsProxyUrl || '';
       } catch(e) {}
     }
 
@@ -356,7 +455,155 @@ void WebServer::run() {
       } catch(e) {}
     }
 
+    function showTabMsg(id, ok) {
+      const el = document.getElementById(id);
+      el.textContent = ok ? 'Saved!' : 'Error saving';
+      el.className = ok ? '' : 'err';
+      if (ok) setTimeout(() => el.textContent = '', 3000);
+    }
+
+    async function loadCluster() {
+      try {
+        const r = await fetch('/api/config');
+        const c = await r.json();
+        document.getElementById('dx-enabled').checked = !!c.dxClusterEnabled;
+        document.getElementById('dx-host').value = c.dxClusterHost || '';
+        document.getElementById('dx-port').value = c.dxClusterPort || 7300;
+        document.getElementById('dx-login').value = c.dxClusterLogin || '';
+        document.getElementById('dx-wsjtx').checked = !!c.dxClusterUseWSJTX;
+        document.getElementById('wsjtx-port').value = c.wsjtxPort || 2237;
+      } catch(e) {}
+    }
+
+    async function saveCluster() {
+      const params = new URLSearchParams({
+        dx_enabled: document.getElementById('dx-enabled').checked ? '1' : '0',
+        dx_host: document.getElementById('dx-host').value.trim(),
+        dx_port: document.getElementById('dx-port').value,
+        dx_login: document.getElementById('dx-login').value.trim(),
+        dx_use_wsjtx: document.getElementById('dx-wsjtx').checked ? '1' : '0',
+        wsjtx_port: document.getElementById('wsjtx-port').value
+      });
+      try {
+        const r = await fetch('/set_config?' + params);
+        showTabMsg('cluster-msg', await r.text() === 'ok');
+      } catch(e) { showTabMsg('cluster-msg', false); }
+    }
+
+    async function loadRadio() {
+      try {
+        const r = await fetch('/api/config');
+        const c = await r.json();
+        document.getElementById('rig-host').value = c.rigHost || '';
+        document.getElementById('rig-port').value = c.rigPort || 4532;
+        document.getElementById('rig-autotune').checked = !!c.rigAutoTune;
+        document.getElementById('rot-host').value = c.rotatorHost || '';
+        document.getElementById('rot-port').value = c.rotatorPort || 4533;
+        document.getElementById('rot-autotrack').checked = !!c.rotatorAutoTrack;
+      } catch(e) {}
+    }
+
+    async function saveRadio() {
+      const params = new URLSearchParams({
+        rig_host: document.getElementById('rig-host').value.trim(),
+        rig_port: document.getElementById('rig-port').value,
+        rig_auto_tune: document.getElementById('rig-autotune').checked ? '1' : '0',
+        rot_host: document.getElementById('rot-host').value.trim(),
+        rot_port: document.getElementById('rot-port').value,
+        rot_auto_track: document.getElementById('rot-autotrack').checked ? '1' : '0'
+      });
+      try {
+        const r = await fetch('/set_config?' + params);
+        showTabMsg('radio-msg', await r.text() === 'ok');
+      } catch(e) { showTabMsg('radio-msg', false); }
+    }
+
+    async function loadServices() {
+      try {
+        const r = await fetch('/api/config');
+        const c = await r.json();
+        document.getElementById('qrz-user').value = c.qrzUsername || '';
+        document.getElementById('spot-source').value = c.liveSpotSource || 'PSK';
+        document.getElementById('spot-age').value = c.liveSpotsMaxAge || 30;
+        const bitmask = (c.liveSpotsBands !== undefined) ? c.liveSpotsBands : 0xFFF;
+        document.querySelectorAll('#band-chips .chip').forEach((ch, i) => {
+          ch.classList.toggle('active', !!(bitmask & (1 << i)));
+        });
+        document.getElementById('gps-enabled').checked = !!c.gpsEnabled;
+        document.getElementById('rss-enabled').checked = !!c.rssEnabled;
+        document.getElementById('onta-filter').value = c.ontaFilter || 'all';
+      } catch(e) {}
+    }
+
+    async function saveServices() {
+      let bitmask = 0;
+      document.querySelectorAll('#band-chips .chip').forEach((ch, i) => {
+        if (ch.classList.contains('active')) bitmask |= (1 << i);
+      });
+      const params = new URLSearchParams({
+        qrz_user: document.getElementById('qrz-user').value.trim(),
+        spot_source: document.getElementById('spot-source').value,
+        spot_max_age: document.getElementById('spot-age').value,
+        spot_bands: bitmask,
+        gps_enabled: document.getElementById('gps-enabled').checked ? '1' : '0',
+        rss_enabled: document.getElementById('rss-enabled').checked ? '1' : '0',
+        onta_filter: document.getElementById('onta-filter').value
+      });
+      const pass = document.getElementById('qrz-pass').value;
+      if (pass) params.set('qrz_pass', pass);
+      try {
+        const r = await fetch('/set_config?' + params);
+        showTabMsg('services-msg', await r.text() === 'ok');
+      } catch(e) { showTabMsg('services-msg', false); }
+    }
+
+    async function loadBrightness() {
+      try {
+        const r = await fetch('/api/config');
+        const c = await r.json();
+        const lvl = c.brightness || 100;
+        document.getElementById('bright-level').value = lvl;
+        document.getElementById('bright-pct').textContent = lvl;
+        document.getElementById('bright-schedule').checked = !!c.brightnessSchedule;
+        const dh = String(c.dimHour !== undefined ? c.dimHour : 22).padStart(2,'0');
+        const dm = String(c.dimMinute !== undefined ? c.dimMinute : 0).padStart(2,'0');
+        document.getElementById('dim-time').value = dh + ':' + dm;
+        const bh = String(c.brightHour !== undefined ? c.brightHour : 6).padStart(2,'0');
+        const bm = String(c.brightMinute !== undefined ? c.brightMinute : 0).padStart(2,'0');
+        document.getElementById('bright-time').value = bh + ':' + bm;
+      } catch(e) {}
+    }
+
+    async function saveBrightness() {
+      const dimParts = (document.getElementById('dim-time').value || '22:00').split(':');
+      const brightParts = (document.getElementById('bright-time').value || '06:00').split(':');
+      const params = new URLSearchParams({
+        brightness: document.getElementById('bright-level').value,
+        brightness_schedule: document.getElementById('bright-schedule').checked ? '1' : '0',
+        dim_hour: dimParts[0] || '22',
+        dim_min: dimParts[1] || '0',
+        bright_hour: brightParts[0] || '6',
+        bright_min: brightParts[1] || '0'
+      });
+      try {
+        const r = await fetch('/set_config?' + params);
+        showTabMsg('bright-msg', await r.text() === 'ok');
+      } catch(e) { showTabMsg('bright-msg', false); }
+    }
+
     // Init
+    // Build band chips (160m→2m, bit 0=160m, bit 11=2m)
+    (function() {
+      const bands = ['160m','80m','60m','40m','30m','20m','17m','15m','12m','10m','6m','2m'];
+      const container = document.getElementById('band-chips');
+      bands.forEach((b, i) => {
+        const ch = document.createElement('span');
+        ch.className = 'chip active';
+        ch.textContent = b;
+        ch.onclick = () => ch.classList.toggle('active');
+        container.appendChild(ch);
+      });
+    })();
     loadConfig();
     loadNetwork();
   </script>
@@ -636,6 +883,102 @@ void WebServer::run() {
     res.set_content(j.dump(2), "application/json");
   });
 
+  // -------------------------------------------------------------------------
+  // Live Web Viewer — MJPEG stream and viewer page
+  // -------------------------------------------------------------------------
+
+  svr.Get("/live", [](const httplib::Request &, httplib::Response &res) {
+    static const char kPage[] = R"(<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>HamClock Live View</title>
+  <style>
+    body { margin: 0; background: #000; display: flex; justify-content: center;
+           align-items: center; min-height: 100vh; }
+    img  { max-width: 100%; max-height: 100vh; display: block; }
+  </style>
+</head>
+<body>
+  <img src="/stream.mjpeg" alt="HamClock Live">
+</body>
+</html>
+)";
+    res.set_content(kPage, "text/html");
+  });
+
+  svr.Get(
+      "/stream.mjpeg",
+      [this](const httplib::Request &, httplib::Response &res) {
+        if (!frameCapture_) {
+          res.status = 503;
+          res.set_content("Frame capture not available", "text/plain");
+          return;
+        }
+        uint64_t lastSeq = frameCapture_->latestSeq();
+        res.set_chunked_content_provider(
+            "multipart/x-mixed-replace;boundary=frame",
+            [this, lastSeq](size_t, httplib::DataSink &sink) mutable -> bool {
+              if (!sink.is_writable())
+                return false;
+              uint64_t outSeq = lastSeq;
+              auto frame = frameCapture_->waitFrame(lastSeq, 500, outSeq);
+              if (frame.empty())
+                return sink.is_writable();
+              lastSeq = outSeq;
+              std::string hdr =
+                  "--frame\r\nContent-Type: image/jpeg\r\nContent-Length: " +
+                  std::to_string(frame.size()) + "\r\n\r\n";
+              if (!sink.write(hdr.data(), hdr.size()))
+                return false;
+              if (!sink.write(reinterpret_cast<const char *>(frame.data()),
+                              frame.size()))
+                return false;
+              return sink.write("\r\n", 2);
+            });
+      });
+
+  svr.Get("/api/config", [this](const httplib::Request &, httplib::Response &res) {
+    if (!cfg_) { res.status = 503; return; }
+    nlohmann::json j;
+    j["callsign"] = cfg_->callsign;
+    j["grid"] = cfg_->grid;
+    j["lat"] = cfg_->lat;
+    j["lon"] = cfg_->lon;
+    j["theme"] = cfg_->theme;
+    j["dxClusterEnabled"] = cfg_->dxClusterEnabled;
+    j["dxClusterHost"] = cfg_->dxClusterHost;
+    j["dxClusterPort"] = cfg_->dxClusterPort;
+    j["dxClusterLogin"] = cfg_->dxClusterLogin;
+    j["dxClusterUseWSJTX"] = cfg_->dxClusterUseWSJTX;
+    j["wsjtxPort"] = cfg_->wsjtxPort;
+    j["rigHost"] = cfg_->rigHost;
+    j["rigPort"] = cfg_->rigPort;
+    j["rigAutoTune"] = cfg_->rigAutoTune;
+    j["rotatorHost"] = cfg_->rotatorHost;
+    j["rotatorPort"] = cfg_->rotatorPort;
+    j["rotatorAutoTrack"] = cfg_->rotatorAutoTrack;
+    j["qrzUsername"] = cfg_->qrzUsername;
+    // qrzPassword intentionally omitted (write-only)
+    std::string src = "PSK";
+    if (cfg_->liveSpotSource == LiveSpotSource::RBN) src = "RBN";
+    else if (cfg_->liveSpotSource == LiveSpotSource::WSPR) src = "WSPR";
+    j["liveSpotSource"] = src;
+    j["liveSpotsMaxAge"] = cfg_->liveSpotsMaxAge;
+    j["liveSpotsBands"] = cfg_->liveSpotsBands;
+    j["brightness"] = cfg_->brightness;
+    j["brightnessSchedule"] = cfg_->brightnessSchedule;
+    j["dimHour"] = cfg_->dimHour;
+    j["dimMinute"] = cfg_->dimMinute;
+    j["brightHour"] = cfg_->brightHour;
+    j["brightMinute"] = cfg_->brightMinute;
+    j["gpsEnabled"] = cfg_->gpsEnabled;
+    j["rssEnabled"] = cfg_->rssEnabled;
+    j["ontaFilter"] = cfg_->ontaFilter;
+    j["corsProxyUrl"] = cfg_->corsProxyUrl;
+    res.set_content(j.dump(2), "application/json");
+  });
+
 #ifdef ENABLE_DEBUG_API
   svr.Get("/debug/widgets",
           [](const httplib::Request &, httplib::Response &res) {
@@ -720,6 +1063,7 @@ void WebServer::run() {
     res.status = 400;
     res.set_content("missing parameters", "text/plain");
   });
+#endif // ENABLE_DEBUG_API
 
   svr.Get("/get_config.txt",
           [this](const httplib::Request &, httplib::Response &res) {
@@ -907,6 +1251,69 @@ void WebServer::run() {
               cfg_->lon = StringUtils::safe_stod(req.get_param_value("lon"));
             if (req.has_param("cors_proxy_url"))
               cfg_->corsProxyUrl = req.get_param_value("cors_proxy_url");
+            // DX Cluster
+            if (req.has_param("dx_enabled"))
+              cfg_->dxClusterEnabled = req.get_param_value("dx_enabled") == "1";
+            if (req.has_param("dx_host"))
+              cfg_->dxClusterHost = req.get_param_value("dx_host");
+            if (req.has_param("dx_port"))
+              cfg_->dxClusterPort = StringUtils::safe_stoi(req.get_param_value("dx_port"));
+            if (req.has_param("dx_login"))
+              cfg_->dxClusterLogin = req.get_param_value("dx_login");
+            if (req.has_param("dx_use_wsjtx"))
+              cfg_->dxClusterUseWSJTX = req.get_param_value("dx_use_wsjtx") == "1";
+            if (req.has_param("wsjtx_port"))
+              cfg_->wsjtxPort = StringUtils::safe_stoi(req.get_param_value("wsjtx_port"));
+            // Rig
+            if (req.has_param("rig_host"))
+              cfg_->rigHost = req.get_param_value("rig_host");
+            if (req.has_param("rig_port"))
+              cfg_->rigPort = StringUtils::safe_stoi(req.get_param_value("rig_port"));
+            if (req.has_param("rig_auto_tune"))
+              cfg_->rigAutoTune = req.get_param_value("rig_auto_tune") == "1";
+            // Rotator
+            if (req.has_param("rot_host"))
+              cfg_->rotatorHost = req.get_param_value("rot_host");
+            if (req.has_param("rot_port"))
+              cfg_->rotatorPort = StringUtils::safe_stoi(req.get_param_value("rot_port"));
+            if (req.has_param("rot_auto_track"))
+              cfg_->rotatorAutoTrack = req.get_param_value("rot_auto_track") == "1";
+            // QRZ
+            if (req.has_param("qrz_user"))
+              cfg_->qrzUsername = req.get_param_value("qrz_user");
+            if (req.has_param("qrz_pass"))
+              cfg_->qrzPassword = req.get_param_value("qrz_pass");
+            // Live Spots
+            if (req.has_param("spot_source")) {
+              const std::string &s = req.get_param_value("spot_source");
+              if (s == "RBN") cfg_->liveSpotSource = LiveSpotSource::RBN;
+              else if (s == "WSPR") cfg_->liveSpotSource = LiveSpotSource::WSPR;
+              else cfg_->liveSpotSource = LiveSpotSource::PSK;
+            }
+            if (req.has_param("spot_max_age"))
+              cfg_->liveSpotsMaxAge = StringUtils::safe_stoi(req.get_param_value("spot_max_age"));
+            if (req.has_param("spot_bands"))
+              cfg_->liveSpotsBands = (uint32_t)StringUtils::safe_stoi(req.get_param_value("spot_bands"));
+            // Brightness
+            if (req.has_param("brightness"))
+              cfg_->brightness = StringUtils::safe_stoi(req.get_param_value("brightness"));
+            if (req.has_param("brightness_schedule"))
+              cfg_->brightnessSchedule = req.get_param_value("brightness_schedule") == "1";
+            if (req.has_param("dim_hour"))
+              cfg_->dimHour = StringUtils::safe_stoi(req.get_param_value("dim_hour"));
+            if (req.has_param("dim_min"))
+              cfg_->dimMinute = StringUtils::safe_stoi(req.get_param_value("dim_min"));
+            if (req.has_param("bright_hour"))
+              cfg_->brightHour = StringUtils::safe_stoi(req.get_param_value("bright_hour"));
+            if (req.has_param("bright_min"))
+              cfg_->brightMinute = StringUtils::safe_stoi(req.get_param_value("bright_min"));
+            // Toggles
+            if (req.has_param("gps_enabled"))
+              cfg_->gpsEnabled = req.get_param_value("gps_enabled") == "1";
+            if (req.has_param("rss_enabled"))
+              cfg_->rssEnabled = req.get_param_value("rss_enabled") == "1";
+            if (req.has_param("onta_filter"))
+              cfg_->ontaFilter = req.get_param_value("onta_filter");
 
             if (cfgMgr_)
               cfgMgr_->save(*cfg_);
@@ -1037,7 +1444,6 @@ void WebServer::run() {
              }
              res.set_content(j.dump(), "application/json");
            });
-#endif
   LOG_I("WebServer", "Listening on port {}...", port_);
   svr.listen("0.0.0.0", port_);
   svrPtr_ = nullptr;
