@@ -101,7 +101,9 @@ public:
       TTF_SetFontStyle(font, prevStyle | TTF_STYLE_BOLD);
     }
 
-    SDL_Surface *surface = TTF_RenderUTF8_Blended(font, text.c_str(), color);
+    // Use Wrapped version to support newlines if present
+    SDL_Surface *surface =
+        TTF_RenderUTF8_Blended_Wrapped(font, text.c_str(), color, 2048);
 
     // Restore previous style
     if (bold) {
@@ -173,14 +175,16 @@ public:
       return;
 
     int basePt = ptSize > 0 ? ptSize : defaultSize_;
-    
+
     // Heuristic for volatile text (timers, etc.) that changes every frame
     bool volatileText =
         forceVolatile ||
-        (text.length() >= 5 && ((text.find(':') != std::string::npos && text.find(':', text.find(':') + 1) != std::string::npos) ||
-                                text.find("Up ") != std::string::npos ||
-                                (text.find('s') != std::string::npos &&
-                                 text.find('m') != std::string::npos)));
+        (text.length() >= 5 &&
+         ((text.find(':') != std::string::npos &&
+           text.find(':', text.find(':') + 1) != std::string::npos) ||
+          text.find("Up ") != std::string::npos ||
+          (text.find('s') != std::string::npos &&
+           text.find('m') != std::string::npos)));
 
     if (volatileText) {
       VolatileCacheKey key{x, y, basePt, bold};
@@ -200,7 +204,8 @@ public:
 
       // Text has changed or is new, we need to re-render.
       int w = 0, h = 0;
-      SDL_Texture *tex = renderText(renderer, text, color, basePt, &w, &h, bold);
+      SDL_Texture *tex =
+          renderText(renderer, text, color, basePt, &w, &h, bold);
       if (!tex)
         return;
 
@@ -208,7 +213,7 @@ public:
       if (it != volatileCache_.end()) {
         MemoryMonitor::getInstance().destroyTexture(it->second.texture);
       }
-      
+
       // Store the new texture and its text content in the volatile cache.
       volatileCache_[key] = {tex, w, h, SDL_GetTicks(), text};
 
@@ -233,10 +238,11 @@ public:
         SDL_RenderCopy(renderer, it->second.texture, nullptr, &dst);
         return;
       }
-      
+
       // Not in cache - render new texture
       int w = 0, h = 0;
-      SDL_Texture *tex = renderText(renderer, text, color, ptSize, &w, &h, bold);
+      SDL_Texture *tex =
+          renderText(renderer, text, color, ptSize, &w, &h, bold);
       if (!tex)
         return;
 
@@ -275,13 +281,63 @@ public:
     if (bold) {
       TTF_SetFontStyle(font, prevStyle | TTF_STYLE_BOLD);
     }
-    int w = 0, h = 0;
-    TTF_SizeText(font, text.c_str(), &w, &h);
+    int maxW = 0;
+    size_t start = 0;
+    while (start < text.length()) {
+      size_t end = text.find('\n', start);
+      std::string line =
+          text.substr(start, (end == std::string::npos) ? std::string::npos
+                                                        : (end - start));
+      int w = 0, h = 0;
+      TTF_SizeUTF8(font, line.c_str(), &w, &h);
+      if (w > maxW)
+        maxW = w;
+      if (end == std::string::npos)
+        break;
+      start = end + 1;
+    }
+
     if (bold) {
       TTF_SetFontStyle(font, prevStyle);
     }
 
-    return static_cast<int>(w / renderScale_);
+    return static_cast<int>(maxW / renderScale_);
+  }
+
+  // Returns the height of the text in logical units.
+  // Correctly accounts for multi-line text and renderScale_.
+  int getLogicalHeight(const std::string &text, int ptSize = 0,
+                       bool bold = false, int wrapWidth = 2048) {
+    if (text.empty())
+      return 0;
+    int basePt = ptSize > 0 ? ptSize : defaultSize_;
+    int renderPt = basePt;
+    if (renderScale_ > 1.01f) {
+      renderPt = std::clamp(static_cast<int>(basePt * renderScale_), 8, 600);
+    }
+    TTF_Font *font = getFont(renderPt);
+    if (!font)
+      return 0;
+
+    int prevStyle = TTF_GetFontStyle(font);
+    if (bold) {
+      TTF_SetFontStyle(font, prevStyle | TTF_STYLE_BOLD);
+    }
+    int w = 0, h = 0;
+    TTF_SizeUTF8(font, text.c_str(), &w, &h);
+
+    // Count newlines to manually calculate height for multi-line text
+    int lines = 1;
+    for (char c : text) {
+      if (c == '\n')
+        lines++;
+    }
+
+    if (bold) {
+      TTF_SetFontStyle(font, prevStyle);
+    }
+
+    return static_cast<int>((h * lines) / renderScale_);
   }
 
   void clearCache() {
@@ -324,9 +380,12 @@ private:
     bool bold;
 
     bool operator<(const VolatileCacheKey &other) const {
-      if (x != other.x) return x < other.x;
-      if (y != other.y) return y < other.y;
-      if (ptSize != other.ptSize) return ptSize < other.ptSize;
+      if (x != other.x)
+        return x < other.x;
+      if (y != other.y)
+        return y < other.y;
+      if (ptSize != other.ptSize)
+        return ptSize < other.ptSize;
       return bold < other.bold;
     }
   };

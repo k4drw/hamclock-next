@@ -1,6 +1,6 @@
 %define _unpackaged_files_terminate_build 0
 Name:           hamclock-next
-Version:        0.9.0
+Version:        0.9.5
 Release:        1%{?dist}
 Summary:        Amateur Radio Clock and Solar/Space Weather Dashboard
 

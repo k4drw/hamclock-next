@@ -73,4 +73,6 @@ private:
   int paneIndex_ = 0;
   std::function<void(int, int, int)> onSelectionRequested_;
   std::function<void(WidgetType)> onConfigRequested_;
+
+  void activateRotationIndex(size_t idx);
 };

@@ -2,6 +2,7 @@
 #include "../core/Astronomy.h"
 #include "../core/Logger.h"
 #include "../core/StringUtils.h"
+#include <SDL.h>
 
 #include <algorithm>
 #include <cmath>
@@ -21,10 +22,10 @@ SetupScreen::SetupScreen(int x, int y, int w, int h, FontManager &fontMgr,
 
 void SetupScreen::recalcLayout() {
   int h = height_;
-  titleSize_ = std::clamp(static_cast<int>(h * 0.050f), 16, 36);
-  labelSize_ = std::clamp(static_cast<int>(h * 0.030f), 11, 20);
-  fieldSize_ = std::clamp(static_cast<int>(h * 0.038f), 13, 26);
-  hintSize_ = std::clamp(static_cast<int>(h * 0.024f), 10, 15);
+  titleSize_ = std::clamp(static_cast<int>(h * 0.050f), 14, 36);
+  labelSize_ = std::clamp(static_cast<int>(h * 0.030f), 10, 20);
+  fieldSize_ = std::clamp(static_cast<int>(h * 0.038f), 11, 26);
+  hintSize_ = std::clamp(static_cast<int>(h * 0.024f), 9, 15);
 }
 
 void SetupScreen::autoPopulateLatLon() {
@@ -73,6 +74,8 @@ std::string *SetupScreen::getActiveFieldText() {
       return &clusterPort_;
     case 2:
       return &clusterLogin_;
+    case 3:
+      return &wsjtxPort_;
     }
   } else if (activeTab_ == Tab::Appearance) {
     switch (activeField_) {
@@ -312,6 +315,15 @@ void SetupScreen::render(SDL_Renderer *renderer) {
   }
 
   y = y_ + height_ - 12 - 40; // anchored: fixed 12px bottom clearance (was pad)
+
+  // Draw footer background to prevent content bleed-through
+  SDL_Rect footerBg = {x_, y - 10, width_, height_ - (y - 10)};
+  SDL_SetRenderDrawColor(renderer, 15, 15, 25, 255); // Match bg
+  SDL_RenderFillRect(renderer, &footerBg);
+  // Optional divider line
+  SDL_SetRenderDrawColor(renderer, 40, 40, 50, 255);
+  SDL_RenderDrawLine(renderer, x_, y - 10, x_ + width_, y - 10);
+
   int btnW = 100;
   int btnH = 34;
 
@@ -474,10 +486,24 @@ void SetupScreen::renderTabDXCluster(SDL_Renderer *renderer, int cx, int pad,
     SDL_Rect check = {fieldX + 4, y + 4, 12, 12};
     SDL_RenderFillRect(renderer, &check);
   }
-  fontMgr_.drawText(renderer, "Use WSJ-TX (UDP Port 2237)", fieldX + 30, y + 2,
+  fontMgr_.drawText(renderer, "Use WSJT-X (UDP)", fieldX + 30, y + 2,
                     white, labelSize_);
   toggleRect_ = toggle;
   y += 30;
+
+  if (clusterWSJTX_) {
+    fontMgr_.drawText(renderer, "WSJT-X UDP Port:", fieldX, y, white, labelSize_);
+    y += labelSize_ + 4;
+    int wPortW = std::min(120, halfW);
+    wsjtxPortRect_ = {fieldX, y, wPortW, fieldH};
+    int tmpY = y;
+    renderField(renderer, fontMgr_, wsjtxPort_, "2237", fieldX, tmpY, wPortW,
+                fieldH, fieldSize_, textPad, activeField_ == 3,
+                !wsjtxPort_.empty(), cursorPos_, orange, gray, white, white, gray);
+    y += fieldH + vSpace;
+  } else {
+    wsjtxPortRect_ = {0, 0, 0, 0};
+  }
 
   // --- RBN SECTION ---
   fontMgr_.drawText(renderer, "--- Reverse Beacon Network ---", cx, y, cyan,
@@ -505,7 +531,10 @@ void SetupScreen::renderTabAppearance(SDL_Renderer *renderer, int cx, int pad,
                                       int textPad) {
   int y =
       (y_ + titleSize_ + 2 * pad + fieldH); // tightened: removed extra pad/2
-  int vSpace = pad / 2;
+  // Cap vSpace so Appearance tab fits above the button bar on small screens
+  // (e.g. 1024x600 7" display). Available height / ~26 keeps all rows visible.
+  int availH = (y_ + height_ - 52) - y;
+  int vSpace = std::min(pad / 2, std::max(2, availH / 26));
   SDL_Color white = {255, 255, 255, 255};
   SDL_Color orange = {255, 165, 0, 255};
   SDL_Color gray = {140, 140, 140, 255};
@@ -569,6 +598,24 @@ void SetupScreen::renderTabAppearance(SDL_Renderer *renderer, int cx, int pad,
   }
   fontMgr_.drawText(renderer, "Enable News (RSS) Banner", fieldX + 30, y + 2,
                     white, labelSize_);
+  y += 24 + vSpace;
+
+  fontMgr_.drawText(renderer, "Map Weather Overlay:", fieldX, y, white,
+                    labelSize_);
+  SDL_Rect weatherBtn = {fieldX + fieldW - 120, y, 120, 24};
+  SDL_SetRenderDrawColor(renderer, 40, 40, 50, 255);
+  SDL_RenderFillRect(renderer, &weatherBtn);
+  SDL_SetRenderDrawColor(renderer, 100, 100, 120, 255);
+  SDL_RenderDrawRect(renderer, &weatherBtn);
+  std::string wStr = "None";
+  if (weatherOverlay_ == WeatherOverlayType::Clouds)
+    wStr = "Clouds";
+  else if (weatherOverlay_ == WeatherOverlayType::WxMb)
+    wStr = "Pressure";
+  fontMgr_.drawText(renderer, wStr, weatherBtn.x + weatherBtn.w / 2,
+                    weatherBtn.y + weatherBtn.h / 2, white, hintSize_, false,
+                    true);
+  weatherOverlayRect_ = weatherBtn;
   y += 24 + vSpace;
 
   fontMgr_.drawText(renderer, "Pane Rotation Interval (s):", fieldX, y, white,
@@ -874,6 +921,13 @@ bool SetupScreen::onMouseUp(int mx, int my, Uint16) {
       rbnEnabled_ = !rbnEnabled_;
       return true;
     }
+    if (clusterWSJTX_ && wsjtxPortRect_.w > 0 &&
+        mx >= wsjtxPortRect_.x && mx <= wsjtxPortRect_.x + wsjtxPortRect_.w &&
+        my >= wsjtxPortRect_.y && my <= wsjtxPortRect_.y + wsjtxPortRect_.h) {
+      activeField_ = 3;
+      cursorPos_ = static_cast<int>(wsjtxPort_.size());
+      return true;
+    }
   }
 
   if (activeTab_ == Tab::Appearance) {
@@ -904,6 +958,18 @@ bool SetupScreen::onMouseUp(int mx, int my, Uint16) {
     if (mx >= rssToggleRect_.x && mx <= rssToggleRect_.x + rssToggleRect_.w &&
         my >= rssToggleRect_.y && my <= rssToggleRect_.y + rssToggleRect_.h) {
       rssEnabled_ = !rssEnabled_;
+      return true;
+    }
+    if (mx >= weatherOverlayRect_.x &&
+        mx <= weatherOverlayRect_.x + weatherOverlayRect_.w &&
+        my >= weatherOverlayRect_.y &&
+        my <= weatherOverlayRect_.y + weatherOverlayRect_.h) {
+      if (weatherOverlay_ == WeatherOverlayType::None)
+        weatherOverlay_ = WeatherOverlayType::Clouds;
+      else if (weatherOverlay_ == WeatherOverlayType::Clouds)
+        weatherOverlay_ = WeatherOverlayType::WxMb;
+      else
+        weatherOverlay_ = WeatherOverlayType::None;
       return true;
     }
   }
@@ -980,6 +1046,9 @@ bool SetupScreen::onMouseUp(int mx, int my, Uint16) {
 
   // Handle generic field clicks for active tab
   int yStart = y_ + titleSize_ + 2 * pad + fieldH + pad / 2;
+  // Rig tab has a section header ("Rig / CAT Control:") before the first field
+  if (activeTab_ == Tab::Rig)
+    yStart += labelSize_ + pad / 2;
   int nFields = 0;
   if (activeTab_ == Tab::Identity)
     nFields = 4;
@@ -1043,7 +1112,7 @@ bool SetupScreen::onMouseUp(int mx, int my, Uint16) {
   return true;
 }
 
-bool SetupScreen::onKeyDown(SDL_Keycode key, Uint16) {
+bool SetupScreen::onKeyDown(SDL_Keycode key, Uint16 mod) {
   std::string *text = nullptr;
   int nFields = 1;
 
@@ -1064,7 +1133,7 @@ bool SetupScreen::onKeyDown(SDL_Keycode key, Uint16) {
       break;
     }
   } else if (activeTab_ == Tab::Spotting) {
-    nFields = 3;
+    nFields = clusterWSJTX_ ? 4 : 3;
     switch (activeField_) {
     case 0:
       text = &clusterHost_;
@@ -1074,6 +1143,9 @@ bool SetupScreen::onKeyDown(SDL_Keycode key, Uint16) {
       break;
     case 2:
       text = &clusterLogin_;
+      break;
+    case 3:
+      text = &wsjtxPort_;
       break;
     }
   } else if (activeTab_ == Tab::Appearance) {
@@ -1159,6 +1231,17 @@ bool SetupScreen::onKeyDown(SDL_Keycode key, Uint16) {
     if (text)
       cursorPos_ = static_cast<int>(text->size());
     return true;
+  case SDLK_v:
+    if (mod & (KMOD_CTRL | KMOD_GUI)) {
+      char *clip = SDL_GetClipboardText();
+      if (clip) {
+        for (char c : std::string(clip))
+          onTextInput(std::string(1, c).c_str());
+        SDL_free(clip);
+      }
+      return true;
+    }
+    return true;
   default:
     return true;
   }
@@ -1200,6 +1283,10 @@ bool SetupScreen::onTextInput(const char *inputText) {
     case 2:
       field = &clusterLogin_;
       maxLen = 12;
+      break;
+    case 3:
+      field = &wsjtxPort_;
+      maxLen = 5;
       break;
     }
   } else if (activeTab_ == Tab::Appearance) {
@@ -1323,8 +1410,8 @@ bool SetupScreen::onTextInput(const char *inputText) {
     latLonManual_ = true;
   }
 
-  // === PORT VALIDATION (Spotting Tab, Field 1) ===
-  if (activeTab_ == Tab::Spotting && activeField_ == 1) {
+  // === PORT VALIDATION (Spotting Tab, Fields 1 and 3) ===
+  if (activeTab_ == Tab::Spotting && (activeField_ == 1 || activeField_ == 3)) {
     // Port: digits only, validate 1-65535
     for (const char *p = inputText; *p; ++p) {
       if (!(*p >= '0' && *p <= '9')) {
@@ -1366,6 +1453,7 @@ void SetupScreen::setConfig(const AppConfig &cfg) {
   clusterLogin_ = cfg.dxClusterLogin;
   clusterEnabled_ = cfg.dxClusterEnabled;
   clusterWSJTX_ = cfg.dxClusterUseWSJTX;
+  wsjtxPort_ = std::to_string(cfg.wsjtxPort);
   rbnEnabled_ = cfg.rbnEnabled;
   pskOfDe_ = cfg.liveSpotsOfDe;
   pskUseCall_ = cfg.liveSpotsUseCall;
@@ -1379,6 +1467,7 @@ void SetupScreen::setConfig(const AppConfig &cfg) {
   panelMode_ = cfg.panelMode;
   selectedSatellite_ = cfg.selectedSatellite;
   rssEnabled_ = cfg.rssEnabled;
+  weatherOverlay_ = cfg.weatherOverlay;
 
   qrzUsername_ = cfg.qrzUsername;
   qrzPassword_ = cfg.qrzPassword;
@@ -1423,6 +1512,9 @@ AppConfig SetupScreen::getConfig() const {
   cfg.dxClusterLogin = clusterLogin_;
   cfg.dxClusterEnabled = clusterEnabled_;
   cfg.dxClusterUseWSJTX = clusterWSJTX_;
+  cfg.wsjtxPort = std::atoi(wsjtxPort_.c_str());
+  if (cfg.wsjtxPort == 0)
+    cfg.wsjtxPort = 2237;
   cfg.rbnEnabled = rbnEnabled_;
   cfg.liveSpotsOfDe = pskOfDe_;
   cfg.liveSpotsUseCall = pskUseCall_;
@@ -1433,6 +1525,7 @@ AppConfig SetupScreen::getConfig() const {
   cfg.mapNightLights = mapNightLights_;
   cfg.useMetric = useMetric_;
   cfg.rssEnabled = rssEnabled_;
+  cfg.weatherOverlay = weatherOverlay_;
   cfg.callsignColor = callsignColor_;
   cfg.panelMode = panelMode_;
   cfg.selectedSatellite = selectedSatellite_;
@@ -1469,10 +1562,11 @@ AppConfig SetupScreen::getConfig() const {
 }
 
 std::vector<std::string> SetupScreen::getActions() const {
-  return {"tab_identity", "tab_dxcluster", "tab_appearance",
-          "tab_widgets",  "field_0",       "field_1",
-          "field_2",      "field_3",       "toggle_night_lights",
-          "done",         "cancel"};
+  return {"tab_identity",  "tab_dxcluster", "tab_appearance",
+          "tab_widgets",   "field_0",       "field_1",
+          "field_2",       "field_3",       "toggle_night_lights",
+          "toggle_metric", "toggle_rss",    "toggle_weather_overlay",
+          "done",          "cancel"};
 }
 
 SDL_Rect SetupScreen::getActionRect(const std::string &action) const {
@@ -1511,6 +1605,12 @@ SDL_Rect SetupScreen::getActionRect(const std::string &action) const {
   if (action == "toggle_night_lights") {
     return nightLightsRect_;
   }
+  if (action == "toggle_metric")
+    return metricToggleRect_;
+  if (action == "toggle_rss")
+    return rssToggleRect_;
+  if (action == "toggle_weather_overlay")
+    return weatherOverlayRect_;
 
   if (action == "done") {
     return okBtnRect_;

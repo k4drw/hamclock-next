@@ -390,12 +390,16 @@ bool TimePanel::onMouseUp(int mx, int my, Uint16 /*mod*/) {
     return true;
   }
 
-  // Not editing: check if click is near the callsign text
+  // Not editing: check if click is near the callsign text.
+  // Clamp hit area to TimePanel bounds so a wide callsign + generous pad
+  // cannot bleed into the adjacent pane to the right.
   int callRowH = height_ * 42 / 148;
   if (my >= y_ && my < y_ + callRowH && callW_ > 0) {
     int textX = x_ + (width_ - callW_) / 2;
     int pad = std::max(8, callW_ / 4);
-    if (mx >= textX - pad && mx < textX + callW_ + pad) {
+    int hitL = std::max(x_, textX - pad);
+    int hitR = std::min(x_ + width_, textX + callW_ + pad);
+    if (mx >= hitL && mx < hitR) {
       startEditing();
       return true;
     }
