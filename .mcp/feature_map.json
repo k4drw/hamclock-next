@@ -1,6 +1,6 @@
 {
   "version": "1.9",
-  "updated_at": "2026-02-17T18:00:00.000Z",
+  "updated_at": "2026-02-23T00:00:00.000Z",
   "features": [
     {
       "feature_id": "clock_callsign",
@@ -1970,9 +1970,9 @@
         "files": [],
         "symbols": []
       },
-      "status": "partial",
+      "status": "implemented",
       "acceptance": [],
-      "notes": "Original was ESP32 flash-in-place OTA \u2014 not applicable to desktop. Partial: update *notification* is needed. App should query GitHub Releases API (https://api.github.com/repos/ORG/REPO/releases/latest) at most once per day, compare tag to HAMCLOCK_VERSION, and surface a badge/banner when a newer release is available. No auto-download or auto-install. See plan: working_docs/plan/2026-02-23_update_notification.md"
+      "notes": "Desktop equivalent: UpdateChecker service polls GitHub Releases API (repos/k4drw/hamclock-next/releases/latest) at startup and every 6h. When newer tag found, TimePanel version string turns amber and appends *. No auto-download/install. Implemented 2026-02-23."
     },
     {
       "feature_id": "cpu_temp",
@@ -2271,7 +2271,7 @@
         "symbols": [],
         "notes": "Not implemented. open-hamclock-backend/scripts/update_cloud_maps.sh generates cloud composites. For a backend-free approach: NASA GIBS tiles (https://gibs.earthdata.nasa.gov) provide near-real-time cloud imagery as XYZ tiles or WMS. Alternative: Open Meteo provides weather data but not cloud imagery. Implementation requires tile fetching + projection warping."
       },
-      "status": "partial",
+      "status": "implemented",
       "acceptance": [
         "Fetch near-real-time cloud cover imagery",
         "Display as semi-transparent overlay on world map",
@@ -2279,7 +2279,7 @@
         "Toggle on/off in MapViewMenu",
         "Day-side only (cloud cover irrelevant at night)"
       ],
-      "notes": "CloudProvider implemented (NASA GIBS fetch). Render call removed from MapWidget pending display issues. Not selectable in MapViewMenu. Provider code present and functional; display layer disabled."
+      "notes": "VIIRS SNPP (NASA GIBS WMS). renderCloudOverlay() active in MapWidget; selectable in MapViewMenu as \"Clouds\". Implemented 2026-02-23."
     },
     {
       "feature_id": "web_only",
@@ -2335,14 +2335,14 @@
         "symbols": [],
         "notes": "Not implemented. Requires radar imagery source (e.g. NOAA NOMADS or RainyView)."
       },
-      "status": "partial",
+      "status": "implemented",
       "acceptance": [
         "Fetch real-time radar/precipitation imagery",
         "Display as semi-transparent overlay on world map",
         "Auto-refresh interval",
         "Toggle on/off in MapViewMenu"
       ],
-      "notes": "WxMbProvider implemented (NOAA NOMADS GRIB2 fetch + Marching Squares decoder). Selectable in MapViewMenu but display quality unsatisfactory. Provider and decoder present; render quality improvement deferred."
+      "notes": "NOAA NOMADS GRIB2 decoder with bicubic interpolation and 1px AA marching-squares contours. Selectable in MapViewMenu as \"WX/Pressure\". Implemented 2026-02-23."
     }
   ]
 }
