@@ -1,15 +1,17 @@
 #include "AuroraGraphPanel.h"
 #include "../core/Theme.h"
 
+#include "RenderUtils.h"
 #include <SDL.h>
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
 
 AuroraGraphPanel::AuroraGraphPanel(int x, int y, int w, int h,
-                                   FontManager &fontMgr,
+                                   FontManager &fontMgr, TextureManager &texMgr,
                                    std::shared_ptr<AuroraHistoryStore> store)
-    : Widget(x, y, w, h), fontMgr_(fontMgr), store_(std::move(store)) {}
+    : Widget(x, y, w, h), fontMgr_(fontMgr), texMgr_(texMgr),
+      store_(std::move(store)) {}
 
 void AuroraGraphPanel::update() {
   // Data is updated by NOAAProvider
@@ -136,7 +138,15 @@ void AuroraGraphPanel::render(SDL_Renderer *renderer) {
     y1 = std::max(graphY, std::min(graphY + graphH, y1));
     y2 = std::max(graphY, std::min(graphY + graphH, y2));
 
-    SDL_RenderDrawLine(renderer, x1, y1, x2, y2);
+    SDL_Texture *lineAA = texMgr_.get("line_aa");
+    if (lineAA) {
+      RenderUtils::drawThickLineTextured(renderer, lineAA, (float)x1, (float)y1,
+                                         (float)x2, (float)y2, 2.0f,
+                                         {0, 255, 128, 255});
+    } else {
+      RenderUtils::drawThickLine(renderer, (float)x1, (float)y1, (float)x2,
+                                 (float)y2, 2.0f, {0, 255, 128, 255});
+    }
   }
 
   if (tooltip_.visible) {

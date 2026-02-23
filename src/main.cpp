@@ -765,6 +765,12 @@ DashboardContext::DashboardContext(AppContext &ctx)
   float rs = static_cast<float>(drawH) / LOGICAL_HEIGHT;
   fontMgr.setRenderScale(rs);
 
+  // Generate procedural textures
+  texMgr.generateLineTexture(ctx.renderer, "line_aa");
+  texMgr.generateMarkerTextures(ctx.renderer);
+  texMgr.generateWhiteTexture(ctx.renderer);
+  texMgr.generateBlackTexture(ctx.renderer);
+
   // Initializers
   auto solarStore = ctx.solarStore;
   auto watchlistStore = ctx.watchlistStore;
@@ -939,7 +945,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
       break;
     case WidgetType::DST_INDEX:
       widgetPool[type] =
-          std::make_unique<DstPanel>(0, 0, 0, 0, fontMgr, dstStore);
+          std::make_unique<DstPanel>(0, 0, 0, 0, fontMgr, texMgr, dstStore);
       break;
     case WidgetType::WATCHLIST:
       widgetPool[type] = std::make_unique<WatchlistPanel>(
@@ -1000,8 +1006,8 @@ DashboardContext::DashboardContext(AppContext &ctx)
                                                        texMgr, *auroraProvider);
       break;
     case WidgetType::AURORA_GRAPH:
-      widgetPool[type] = std::make_unique<AuroraGraphPanel>(0, 0, 0, 0, fontMgr,
-                                                            auroraHistoryStore);
+      widgetPool[type] = std::make_unique<AuroraGraphPanel>(
+          0, 0, 0, 0, fontMgr, texMgr, auroraHistoryStore);
       break;
     case WidgetType::ADIF:
       widgetPool[type] =

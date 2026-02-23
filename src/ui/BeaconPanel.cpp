@@ -78,7 +78,7 @@ void BeaconPanel::render(SDL_Renderer *renderer) {
                          themes.border.b, themes.border.a);
   SDL_RenderDrawRect(renderer, &rect);
 
-  bool isNarrow = (width_ < 100);
+  bool isNarrow = (width_ < 100 || height_ < 140);
 
   if (isNarrow) {
     // Narrow Layout (Fidelity Mode style)
@@ -226,12 +226,12 @@ void BeaconPanel::onResize(int x, int y, int w, int h) {
   labelFontSize_ = cat->ptSize(FontStyle::FastBold);
   callfontSize_ = cat->ptSize(FontStyle::MediumBold);
 
-  if (w < 100) {
+  if (w < 100 || h < 140) {
     labelFontSize_ = cat->ptSize(FontStyle::Micro); // "NCDXF"
     callfontSize_ =
         cat->ptSize(FontStyle::Micro); // Frequencies (12px fits ~24px row)
-  } else if (h < 120) {
-    labelFontSize_ = cat->ptSize(FontStyle::Micro);
+  } else {
+    labelFontSize_ = cat->ptSize(FontStyle::FastBold);
     callfontSize_ = cat->ptSize(FontStyle::Micro);
   }
 }

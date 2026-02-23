@@ -36,12 +36,12 @@ void EMEToolPanel::render(SDL_Renderer *renderer) {
   }
 
   auto drawRow = [&](const char *label, const char *value, SDL_Color valCol) {
-    fontMgr_.drawText(renderer, label, x_ + pad, curY, themes.text, 10);
-    // Draw value left-aligned from the right side (rough approximation of
-    // right-align)
-    int valX = x_ + width_ - pad - 60;
-    fontMgr_.drawText(renderer, value, valX, curY, valCol, 10);
-    curY += 20;
+    int fontSize = 9;
+    fontMgr_.drawText(renderer, label, x_ + 10, curY, themes.text, fontSize);
+    int valW = fontMgr_.getLogicalWidth(value, fontSize);
+    int valX = x_ + width_ - 10 - valW;
+    fontMgr_.drawText(renderer, value, valX, curY, valCol, fontSize);
+    curY += 18;
   };
 
   char buf[64];
