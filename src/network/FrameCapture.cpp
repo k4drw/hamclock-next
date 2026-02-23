@@ -74,7 +74,17 @@ static SDL_RWops *makeGrowBufRW(GrowBuf *g) {
 
 // ---------------------------------------------------------------------------
 
+void FrameCapture::setMaxFps(int fps) { maxFps_ = fps; }
+
 void FrameCapture::capture(SDL_Renderer *renderer) {
+  if (maxFps_ > 0) {
+    Uint32 minInterval = 1000u / static_cast<Uint32>(maxFps_);
+    Uint32 now = SDL_GetTicks();
+    if (now - lastCaptureMs_ < minInterval)
+      return;
+    lastCaptureMs_ = now;
+  }
+
   int w, h;
   SDL_GetRendererOutputSize(renderer, &w, &h);
   if (w <= 0 || h <= 0)

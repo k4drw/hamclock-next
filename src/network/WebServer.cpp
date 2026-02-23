@@ -887,24 +887,349 @@ void WebServer::run() {
   // Live Web Viewer — MJPEG stream and viewer page
   // -------------------------------------------------------------------------
 
-  svr.Get("/live", [](const httplib::Request &, httplib::Response &res) {
-    static const char kPage[] = R"(<!DOCTYPE html>
+  // -------------------------------------------------------------------------
+  // /live/status — always 200, reports whether interactive input is enabled
+  // -------------------------------------------------------------------------
+  svr.Get("/live/status",
+          [this](const httplib::Request &, httplib::Response &res) {
+            nlohmann::json j;
+            j["liveWebEnabled"] = liveWebEnabled_;
+            res.set_content(j.dump(), "application/json");
+          });
+
+  // -------------------------------------------------------------------------
+  // /live/touch — inject pointer click at logical (x,y)
+  // GET /live/touch?x=<int>&y=<int>&button=<0|1>
+  // -------------------------------------------------------------------------
+  svr.Get("/live/touch", [this](const httplib::Request &req,
+                                httplib::Response &res) {
+    if (!liveWebEnabled_) {
+      res.status = 403;
+      res.set_content("Live web not enabled", "text/plain");
+      return;
+    }
+    if (!req.has_param("x") || !req.has_param("y")) {
+      res.status = 400;
+      res.set_content("missing x/y", "text/plain");
+      return;
+    }
+    int lx = StringUtils::safe_stoi(req.get_param_value("x"));
+    int ly = StringUtils::safe_stoi(req.get_param_value("y"));
+    int button = req.has_param("button")
+                     ? StringUtils::safe_stoi(req.get_param_value("button"))
+                     : 0;
+
+    // Convert logical coords → draw-pixel coords (same pattern as /debug/click)
+    int drawW = HamClock::LOGICAL_WIDTH, drawH = HamClock::LOGICAL_HEIGHT;
+    SDL_GetRendererOutputSize(renderer_, &drawW, &drawH);
+    int px = static_cast<int>(static_cast<float>(lx) / HamClock::LOGICAL_WIDTH *
+                              drawW);
+    int py = static_cast<int>(static_cast<float>(ly) / HamClock::LOGICAL_HEIGHT *
+                              drawH);
+
+    SDL_Event down{}, up{};
+    SDL_zero(down);
+    down.type = SDL_MOUSEBUTTONDOWN;
+    down.button.button =
+        (button == 1) ? SDL_BUTTON_RIGHT : SDL_BUTTON_LEFT;
+    down.button.x = px;
+    down.button.y = py;
+    down.button.state = SDL_PRESSED;
+    up = down;
+    up.type = SDL_MOUSEBUTTONUP;
+    up.button.state = SDL_RELEASED;
+    SDL_PushEvent(&down);
+    SDL_PushEvent(&up);
+    res.set_content("ok", "text/plain");
+  });
+
+  // -------------------------------------------------------------------------
+  // /live/key — inject keyboard input
+  // GET /live/key?key=<name>&ctrl=<0|1>&shift=<0|1>
+  // -------------------------------------------------------------------------
+  svr.Get(
+      "/live/key", [this](const httplib::Request &req, httplib::Response &res) {
+        if (!liveWebEnabled_) {
+          res.status = 403;
+          res.set_content("Live web not enabled", "text/plain");
+          return;
+        }
+        if (!req.has_param("key")) {
+          res.status = 400;
+          res.set_content("missing key", "text/plain");
+          return;
+        }
+        std::string k = req.get_param_value("key");
+        bool ctrl = req.has_param("ctrl") &&
+                    req.get_param_value("ctrl") == "1";
+        bool shift = req.has_param("shift") &&
+                     req.get_param_value("shift") == "1";
+
+        SDL_Keycode code = SDLK_UNKNOWN;
+        if (k == "enter" || k == "return")
+          code = SDLK_RETURN;
+        else if (k == "tab")
+          code = SDLK_TAB;
+        else if (k == "escape" || k == "esc")
+          code = SDLK_ESCAPE;
+        else if (k == "backspace")
+          code = SDLK_BACKSPACE;
+        else if (k == "delete" || k == "del")
+          code = SDLK_DELETE;
+        else if (k == "left")
+          code = SDLK_LEFT;
+        else if (k == "right")
+          code = SDLK_RIGHT;
+        else if (k == "up")
+          code = SDLK_UP;
+        else if (k == "down")
+          code = SDLK_DOWN;
+        else if (k == "home")
+          code = SDLK_HOME;
+        else if (k == "end")
+          code = SDLK_END;
+        else if (k == "space")
+          code = SDLK_SPACE;
+        else if (k == "f11")
+          code = SDLK_F11;
+
+        SDL_Keymod mod = KMOD_NONE;
+        if (ctrl)
+          mod = static_cast<SDL_Keymod>(mod | KMOD_CTRL);
+        if (shift)
+          mod = static_cast<SDL_Keymod>(mod | KMOD_SHIFT);
+
+        if (code != SDLK_UNKNOWN) {
+          SDL_Event event;
+          SDL_zero(event);
+          event.type = SDL_KEYDOWN;
+          event.key.keysym.sym = code;
+          event.key.keysym.mod = mod;
+          event.key.state = SDL_PRESSED;
+          SDL_PushEvent(&event);
+          event.type = SDL_KEYUP;
+          event.key.state = SDL_RELEASED;
+          SDL_PushEvent(&event);
+        } else if (k.size() == 1 && !ctrl) {
+          // Printable character — inject as text input
+          SDL_Event event;
+          SDL_zero(event);
+          event.type = SDL_TEXTINPUT;
+          event.text.text[0] = k[0];
+          SDL_PushEvent(&event);
+        } else {
+          res.status = 404;
+          res.set_content("unknown key", "text/plain");
+          return;
+        }
+        res.set_content("ok", "text/plain");
+      });
+
+  // -------------------------------------------------------------------------
+  // /live/mouse — inject mouse motion (hover)
+  // GET /live/mouse?x=<int>&y=<int>
+  // -------------------------------------------------------------------------
+  svr.Get("/live/mouse",
+          [this](const httplib::Request &req, httplib::Response &res) {
+            if (!liveWebEnabled_) {
+              res.status = 403;
+              res.set_content("Live web not enabled", "text/plain");
+              return;
+            }
+            if (!req.has_param("x") || !req.has_param("y")) {
+              res.status = 400;
+              res.set_content("missing x/y", "text/plain");
+              return;
+            }
+            int lx = StringUtils::safe_stoi(req.get_param_value("x"));
+            int ly = StringUtils::safe_stoi(req.get_param_value("y"));
+
+            int drawW = HamClock::LOGICAL_WIDTH, drawH = HamClock::LOGICAL_HEIGHT;
+            SDL_GetRendererOutputSize(renderer_, &drawW, &drawH);
+            int px = static_cast<int>(static_cast<float>(lx) /
+                                      HamClock::LOGICAL_WIDTH * drawW);
+            int py = static_cast<int>(static_cast<float>(ly) /
+                                      HamClock::LOGICAL_HEIGHT * drawH);
+
+            SDL_Event event;
+            SDL_zero(event);
+            event.type = SDL_MOUSEMOTION;
+            event.motion.x = px;
+            event.motion.y = py;
+            SDL_PushEvent(&event);
+            res.set_content("ok", "text/plain");
+          });
+
+  // -------------------------------------------------------------------------
+  // /live — interactive canvas-based viewer (always available)
+  // -------------------------------------------------------------------------
+  svr.Get("/live", [this](const httplib::Request &, httplib::Response &res) {
+    // Inject LOGICAL dimensions into the JS constants
+    char appW[16], appH[16];
+    std::snprintf(appW, sizeof(appW), "%d", HamClock::LOGICAL_WIDTH);
+    std::snprintf(appH, sizeof(appH), "%d", HamClock::LOGICAL_HEIGHT);
+
+    std::string page = R"html(<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>HamClock Live View</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+  <title>HamClock Live</title>
   <style>
-    body { margin: 0; background: #000; display: flex; justify-content: center;
-           align-items: center; min-height: 100vh; }
-    img  { max-width: 100%; max-height: 100vh; display: block; }
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{background:#000;overflow:hidden;width:100vw;height:100vh}
+    canvas{display:block;cursor:crosshair;touch-action:none}
+    #badge{position:fixed;top:8px;right:8px;background:#c00;color:#fff;
+           font:bold 11px monospace;padding:2px 6px;border-radius:2px;pointer-events:none}
+    #iobadge{position:fixed;top:8px;right:54px;background:#333;color:#aaa;
+             font:bold 11px monospace;padding:2px 6px;border-radius:2px;pointer-events:none}
   </style>
 </head>
 <body>
-  <img src="/stream.mjpeg" alt="HamClock Live">
+  <canvas id="hc"></canvas>
+  <img id="feed" src="/stream.mjpeg"
+       style="visibility:hidden;position:absolute;width:0;height:0"
+       crossorigin="anonymous">
+  <div id="badge">LIVE</div>
+  <div id="iobadge">...</div>
+  <script>
+    var APP_W = )html";
+    page += appW;
+    page += R"html(;
+    var APP_H = )html";
+    page += appH;
+    page += R"html(;
+    var THROTTLE_MS = 100;
+
+    var canvas = document.getElementById('hc');
+    var ctx2d = canvas.getContext('2d');
+    var feed = document.getElementById('feed');
+    var iobadge = document.getElementById('iobadge');
+
+    var liveEnabled = false;
+    var offsetX = 0, offsetY = 0, imgW = APP_W, imgH = APP_H;
+    var lastMouseMs = 0;
+
+    // Probe live/status
+    fetch('/live/status').then(function(r){return r.json();}).then(function(j){
+      liveEnabled = !!j.liveWebEnabled;
+      iobadge.textContent = liveEnabled ? 'R/W' : 'R/O';
+      iobadge.style.background = liveEnabled ? '#003300' : '#330000';
+      iobadge.style.color = liveEnabled ? '#0f0' : '#f44';
+    }).catch(function(){
+      iobadge.textContent = 'R/O';
+    });
+
+    function resize() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      var scale = Math.min(window.innerWidth / APP_W, window.innerHeight / APP_H);
+      imgW = Math.round(APP_W * scale);
+      imgH = Math.round(APP_H * scale);
+      offsetX = Math.round((window.innerWidth  - imgW) / 2);
+      offsetY = Math.round((window.innerHeight - imgH) / 2);
+    }
+    resize();
+    window.addEventListener('resize', resize);
+
+    function drawLoop() {
+      if (feed.naturalWidth > 0) {
+        ctx2d.fillStyle = '#000';
+        ctx2d.fillRect(0, 0, canvas.width, canvas.height);
+        ctx2d.drawImage(feed, offsetX, offsetY, imgW, imgH);
+      }
+      requestAnimationFrame(drawLoop);
+    }
+    drawLoop();
+
+    // Reconnect on stream error
+    feed.onerror = function() {
+      setTimeout(function(){ location.reload(); }, 3000);
+    };
+
+    function toApp(cx, cy) {
+      return {
+        x: Math.round((cx - offsetX) * APP_W / imgW),
+        y: Math.round((cy - offsetY) * APP_H / imgH)
+      };
+    }
+    function inBounds(p) { return p.x >= 0 && p.x < APP_W && p.y >= 0 && p.y < APP_H; }
+
+    function sendTouch(ax, ay, btn) {
+      if (!liveEnabled) return;
+      fetch('/live/touch?x=' + ax + '&y=' + ay + '&button=' + btn);
+    }
+    function sendMouse(ax, ay) {
+      if (!liveEnabled) return;
+      var now = Date.now();
+      if (now - lastMouseMs < THROTTLE_MS) return;
+      lastMouseMs = now;
+      fetch('/live/mouse?x=' + ax + '&y=' + ay);
+    }
+    function sendKey(key, ctrl, shift) {
+      if (!liveEnabled) return;
+      fetch('/live/key?key=' + encodeURIComponent(key) + '&ctrl=' + (ctrl?1:0) + '&shift=' + (shift?1:0));
+    }
+
+    // Pointer events
+    canvas.addEventListener('pointerdown', function(e) {
+      if (!liveEnabled) return;
+      var r = canvas.getBoundingClientRect();
+      var p = toApp(e.clientX - r.left, e.clientY - r.top);
+      if (inBounds(p)) sendTouch(p.x, p.y, e.button === 2 ? 1 : 0);
+    });
+    canvas.addEventListener('pointermove', function(e) {
+      if (!liveEnabled) return;
+      var r = canvas.getBoundingClientRect();
+      var p = toApp(e.clientX - r.left, e.clientY - r.top);
+      if (inBounds(p)) sendMouse(p.x, p.y);
+    });
+    canvas.addEventListener('contextmenu', function(e) { e.preventDefault(); });
+
+    // Keyboard
+    document.addEventListener('keydown', function(e) {
+      if (!liveEnabled) return;
+      var keyMap = {
+        'escape':'escape','enter':'enter','tab':'tab','backspace':'backspace',
+        'delete':'delete',' ':'space',
+        'arrowleft':'left','arrowright':'right','arrowup':'up','arrowdown':'down',
+        'home':'home','end':'end','f11':'f11'
+      };
+      var lk = e.key.toLowerCase();
+      var mapped = keyMap[lk];
+      if (mapped) {
+        e.preventDefault();
+        sendKey(mapped, e.ctrlKey, e.shiftKey);
+      } else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey) {
+        sendKey(e.key, false, e.shiftKey);
+      } else if (e.ctrlKey && e.key.length === 1) {
+        e.preventDefault();
+        sendKey(e.key.toLowerCase(), true, e.shiftKey);
+      }
+    });
+
+    // Touch (mobile)
+    canvas.addEventListener('touchstart', function(e) {
+      if (!liveEnabled) return;
+      e.preventDefault();
+      var r = canvas.getBoundingClientRect();
+      var t = e.changedTouches[0];
+      var p = toApp(t.clientX - r.left, t.clientY - r.top);
+      if (inBounds(p)) sendTouch(p.x, p.y, 0);
+    }, {passive:false});
+    canvas.addEventListener('touchend', function(e) { e.preventDefault(); }, {passive:false});
+    canvas.addEventListener('touchmove', function(e) {
+      if (!liveEnabled) return;
+      e.preventDefault();
+      var r = canvas.getBoundingClientRect();
+      var t = e.changedTouches[0];
+      var p = toApp(t.clientX - r.left, t.clientY - r.top);
+      if (inBounds(p)) sendMouse(p.x, p.y);
+    }, {passive:false});
+  </script>
 </body>
-</html>
-)";
-    res.set_content(kPage, "text/html");
+</html>)html";
+    res.set_content(page, "text/html");
   });
 
   svr.Get(
@@ -1444,6 +1769,8 @@ void WebServer::run() {
              }
              res.set_content(j.dump(), "application/json");
            });
+  if (liveWebEnabled_)
+    LOG_I("WebServer", "Live web interface ENABLED (interactive /live)");
   LOG_I("WebServer", "Listening on port {}...", port_);
   svr.listen("0.0.0.0", port_);
   svrPtr_ = nullptr;

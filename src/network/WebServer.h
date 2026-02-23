@@ -31,6 +31,8 @@ public:
   void stop();
 
   void setFrameCapture(FrameCapture *fc) { frameCapture_ = fc; }
+  void setLiveWebEnabled(bool enabled) { liveWebEnabled_ = enabled; }
+  bool isLiveWebEnabled() const { return liveWebEnabled_; }
 
 private:
   void run();
@@ -44,6 +46,7 @@ private:
   std::shared_ptr<DisplayPower> displayPower_;
   std::atomic<bool> *reloadFlag_; // points to AppContext::configReloadRequested
   FrameCapture *frameCapture_ = nullptr;
+  bool liveWebEnabled_ = false;
   int port_;
   std::thread thread_;
   std::atomic<bool> running_{false};

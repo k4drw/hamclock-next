@@ -395,6 +395,7 @@ int main(int argc, char *argv[]) {
   // Parse command-line
   bool forceFullscreen = false;
   bool forceSoftware = false;
+  bool forceLiveWeb = false;
   std::string logLevel = "warn";
 
   for (int i = 1; i < argc; ++i) {
@@ -403,6 +404,8 @@ int main(int argc, char *argv[]) {
       forceFullscreen = true;
     } else if (arg == "-s" || arg == "--software") {
       forceSoftware = true;
+    } else if (arg == "--live-web") {
+      forceLiveWeb = true;
     } else if (arg == "--no-audio") {
       SoundManager::getInstance().disable();
     } else if (arg == "--log-level" && i + 1 < argc) {
@@ -411,6 +414,27 @@ int main(int argc, char *argv[]) {
       std::printf("Usage: hamclock-next [options]\n");
       return EXIT_SUCCESS;
     }
+  }
+
+  // Headless detection: offscreen/dummy SDL driver or Docker environment
+  bool headlessMode = false;
+  {
+    const char *vd = SDL_GetHint(SDL_HINT_VIDEODRIVER);
+    if (!vd)
+      vd = getenv("SDL_VIDEODRIVER");
+    if (vd && (strcmp(vd, "offscreen") == 0 || strcmp(vd, "dummy") == 0))
+      headlessMode = true;
+  }
+  if (!headlessMode) {
+    if (std::filesystem::exists("/.dockerenv"))
+      headlessMode = true;
+  }
+  bool liveWebEnabled = forceLiveWeb || headlessMode;
+
+  // When headless, force the offscreen SDL video driver before SDL_Init
+  if (headlessMode) {
+    SDL_SetHint(SDL_HINT_VIDEODRIVER, "offscreen");
+    LOG_I("Main", "Headless mode: using offscreen SDL driver");
   }
 
   // Set log level
@@ -645,6 +669,8 @@ int main(int argc, char *argv[]) {
 
 #ifndef __EMSCRIPTEN__
   ctx.frameCapture = std::make_unique<FrameCapture>();
+  if (headlessMode)
+    ctx.frameCapture->setMaxFps(30);
   ctx.updateChecker = std::make_unique<UpdateChecker>(*ctx.netManager);
   ctx.updateChecker->fetch();
   ctx.webServer = std::make_unique<WebServer>(
@@ -652,6 +678,7 @@ int main(int argc, char *argv[]) {
       ctx.configReloadRequested, ctx.watchlistStore, ctx.solarStore,
       DEFAULT_WEB_SERVER_PORT);
   ctx.webServer->setFrameCapture(ctx.frameCapture.get());
+  ctx.webServer->setLiveWebEnabled(liveWebEnabled);
   ctx.webServer->start();
 
   ctx.gpsProvider = std::make_unique<GPSProvider>(ctx.state.get(), ctx.appCfg);

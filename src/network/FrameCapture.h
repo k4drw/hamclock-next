@@ -26,6 +26,9 @@ public:
   // Return the current frame sequence number (non-blocking).
   uint64_t latestSeq() const;
 
+  // Cap capture rate. 0 = no cap (default).
+  void setMaxFps(int fps);
+
   int quality = 70; // JPEG quality 1-100
 
 private:
@@ -33,4 +36,6 @@ private:
   mutable std::condition_variable cv_;
   std::vector<uint8_t> jpegData_;
   uint64_t seq_{0};
+  int maxFps_ = 0;
+  uint32_t lastCaptureMs_ = 0;
 };
