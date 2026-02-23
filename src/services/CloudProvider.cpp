@@ -16,9 +16,11 @@ CloudProvider::~CloudProvider() {
 }
 
 void CloudProvider::update() {
-  // NASA GIBS WMS URL for MODIS Terra TrueColor
-  // We use "yesterday" to ensure better global coverage as "today" is being built in real-time.
-  
+  // NASA GIBS WMS URL for VIIRS SNPP TrueColor.
+  // VIIRS has a wider swath (~3000 km vs MODIS 2330 km) producing fewer
+  // orbital gaps than MODIS Terra. We use "yesterday" to ensure the daily
+  // composite is complete before requesting it.
+
   auto now = std::chrono::system_clock::now();
   auto yesterday = now - std::chrono::hours(24);
   std::time_t t = std::chrono::system_clock::to_time_t(yesterday);
@@ -27,7 +29,7 @@ void CloudProvider::update() {
   std::ostringstream oss;
   oss << "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?"
       << "SERVICE=WMS&REQUEST=GetMap&VERSION=1.3.0"
-      << "&LAYERS=MODIS_Terra_CorrectedReflectance_TrueColor"
+      << "&LAYERS=VIIRS_SNPP_CorrectedReflectance_TrueColor"
       << "&STYLES=&FORMAT=image/jpeg&CRS=CRS:84"
       << "&BBOX=-180,-90,180,90"
       << "&WIDTH=2048&HEIGHT=1024"

@@ -165,6 +165,16 @@ bool ConfigManager::load(AppConfig &config) const {
           showMuf ? PropOverlayType::Muf : PropOverlayType::None;
     }
 
+    if (ap.contains("weather_overlay")) {
+      std::string wo = ap.value("weather_overlay", "none");
+      if (wo == "clouds")
+        config.weatherOverlay = WeatherOverlayType::Clouds;
+      else if (wo == "wxmb")
+        config.weatherOverlay = WeatherOverlayType::WxMb;
+      else
+        config.weatherOverlay = WeatherOverlayType::None;
+    }
+
     config.propBand = ap.value("prop_band", "20m");
     config.propMode = ap.value("prop_mode", "SSB");
     config.propPower = ap.value("prop_power", 100);
@@ -357,6 +367,14 @@ bool ConfigManager::save(const AppConfig &config) const {
   else if (config.propOverlay == PropOverlayType::Voacap)
     po = "voacap";
   json["appearance"]["prop_overlay"] = po;
+  {
+    std::string wo = "none";
+    if (config.weatherOverlay == WeatherOverlayType::Clouds)
+      wo = "clouds";
+    else if (config.weatherOverlay == WeatherOverlayType::WxMb)
+      wo = "wxmb";
+    json["appearance"]["weather_overlay"] = wo;
+  }
   json["appearance"]["prop_band"] = config.propBand;
   json["appearance"]["prop_mode"] = config.propMode;
   json["appearance"]["prop_power"] = config.propPower;

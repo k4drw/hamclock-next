@@ -35,7 +35,7 @@ void HistoryPanel::render(SDL_Renderer *renderer) {
   SDL_RenderDrawRect(renderer, &rect);
 
   int pad = 10;
-  int hintSize = std::max(8, height_ / 10);
+  int hintSize = std::max(7, std::min(height_ / 12, 9));
   int axisLabelH = hintSize + 4; // reserve space for X-axis time labels
   int graphW = width_ - 2 * pad;
   int graphH = height_ - 2 * pad - 12 - axisLabelH;
@@ -73,7 +73,7 @@ void HistoryPanel::render(SDL_Renderer *renderer) {
     // Bar chart for Kp
     float barW = (float)graphW / (float)n;
     for (int i = 0; i < n; ++i) {
-      float val = currentSeries_.points[i].value;
+      float val = std::max(0.0f, currentSeries_.points[i].value);
       int bh = (int)((val / 9.0f) * graphH);
       SDL_Rect bar = {(int)(graphX + i * barW + 1), graphY + graphH - bh,
                       (int)barW - 1, bh};
@@ -100,14 +100,16 @@ void HistoryPanel::render(SDL_Renderer *renderer) {
     // Current Kp value as large overlay
     {
       float kpNow = currentSeries_.points.back().value;
-      char kpBuf[8];
-      std::snprintf(kpBuf, sizeof(kpBuf), "%.1f", kpNow);
-      SDL_Color kpCol = (kpNow >= 5.0f) ? SDL_Color{255, 0, 0, 255}
-                      : (kpNow >= 4.0f) ? SDL_Color{255, 255, 0, 255}
-                      :                    SDL_Color{0, 255, 0, 255};
-      int kpFontSize = std::max(14, std::min(height_ / 3, 40));
-      fontMgr_.drawText(renderer, kpBuf, graphX + graphW / 2,
-                        graphY + graphH / 2, kpCol, kpFontSize, false, true);
+      if (kpNow >= 0.0f) {
+        char kpBuf[8];
+        std::snprintf(kpBuf, sizeof(kpBuf), "%.1f", kpNow);
+        SDL_Color kpCol = (kpNow >= 5.0f) ? SDL_Color{255, 0, 0, 255}
+                        : (kpNow >= 4.0f) ? SDL_Color{255, 255, 0, 255}
+                        :                    SDL_Color{0, 255, 0, 255};
+        int kpFontSize = std::max(14, std::min(height_ / 3, 40));
+        fontMgr_.drawText(renderer, kpBuf, graphX + graphW / 2,
+                          graphY + graphH / 3, kpCol, kpFontSize, false, true);
+      }
     }
   } else {
     // Line chart for Flux and SSN (Anti-Aliased)
@@ -132,7 +134,7 @@ void HistoryPanel::render(SDL_Renderer *renderer) {
     char buf[16];
     std::snprintf(buf, sizeof(buf), "%.0f", currentSeries_.points.back().value);
     int valFontSize = std::max(12, std::min(height_ / 5, 24));
-    fontMgr_.drawText(renderer, buf, graphX + graphW,
+    fontMgr_.drawText(renderer, buf, graphX + graphW - valFontSize * 2,
                       graphY + valFontSize / 2 + 2, {255, 255, 255, 255},
                       valFontSize, true, true);
   }
