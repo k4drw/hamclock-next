@@ -106,7 +106,9 @@ MapWidget::MapWidget(int x, int y, int w, int h, TextureManager &texMgr,
                      FontManager &fontMgr, NetworkManager &netMgr,
                      std::shared_ptr<HamClockState> state, AppConfig &config)
     : Widget(x, y, w, h), texMgr_(texMgr), fontMgr_(fontMgr), netMgr_(netMgr),
-      state_(std::move(state)), config_(config) {
+      state_(std::move(state)), config_(config), lastPosUpdateMs_(0),
+      lastSatTrackUpdateMs_(0), wxLastCheckMs_(0), lastPropUpdateMs_(0),
+      lastMufUpdateMs_(0) {
 
   const char *driver = SDL_GetCurrentVideoDriver();
   LOG_D("MapWidget", "SDL Video Driver: {}", driver ? driver : "unknown");
@@ -292,9 +294,8 @@ void MapWidget::update() {
 
   // WX pressure overlay (check every 10 minutes)
   if (config_.weatherOverlay == WeatherOverlayType::WxMb) {
-    uint64_t nowMs64 = static_cast<uint64_t>(SDL_GetTicks());
-    if (nowMs64 - wxLastCheckMs_ > 600000ULL || wxLastCheckMs_ == 0) {
-      wxLastCheckMs_ = nowMs64;
+    if (nowMs - (uint32_t)wxLastCheckMs_ > 600000 || wxLastCheckMs_ == 0) {
+      wxLastCheckMs_ = (uint64_t)nowMs;
       wxmb_->update();
     }
   }
@@ -516,11 +517,13 @@ void MapWidget::onMouseMove(int mx, int my) {
     ActivityData ads = activityStore_->get();
     if (ads.hasSelection) {
       const auto &sel = ads.selectedSpot;
-      // Resolve lat/lon: use selectedSpot coords, or fall back to ontaSpots list
+      // Resolve lat/lon: use selectedSpot coords, or fall back to ontaSpots
+      // list
       double sLat = sel.lat, sLon = sel.lon;
       if (sLat == 0.0 && sLon == 0.0) {
         for (const auto &s : ads.ontaSpots) {
-          if (s.call == sel.call && s.ref == sel.ref && (s.lat != 0.0 || s.lon != 0.0)) {
+          if (s.call == sel.call && s.ref == sel.ref &&
+              (s.lat != 0.0 || s.lon != 0.0)) {
             sLat = s.lat;
             sLon = s.lon;
             break;
@@ -1026,6 +1029,7 @@ void MapWidget::render(SDL_Renderer *renderer) {
   renderPropagationOverlay(renderer);
   renderMufRtOverlay(renderer);
   renderWxMbOverlay(renderer);
+  renderCloudOverlay(renderer);
   renderNightOverlay(renderer);
   renderGridOverlay(renderer);
   renderGreatCircle(renderer);
@@ -1538,7 +1542,8 @@ void MapWidget::renderONTASpots(SDL_Renderer *renderer) {
   double spotLat = spot.lat, spotLon = spot.lon;
   if (spotLat == 0.0 && spotLon == 0.0) {
     for (const auto &s : data.ontaSpots) {
-      if (s.call == spot.call && s.ref == spot.ref && (s.lat != 0.0 || s.lon != 0.0)) {
+      if (s.call == spot.call && s.ref == spot.ref &&
+          (s.lat != 0.0 || s.lon != 0.0)) {
         spotLat = s.lat;
         spotLon = s.lon;
         break;
@@ -1557,8 +1562,7 @@ void MapWidget::renderONTASpots(SDL_Renderer *renderer) {
                                           : SDL_Color{0, 200, 255, 255};
 
   LatLon de = state_->deLocation;
-  auto path =
-      Astronomy::calculateGreatCirclePath(de, {spotLat, spotLon}, 100);
+  auto path = Astronomy::calculateGreatCirclePath(de, {spotLat, spotLon}, 100);
 
   std::vector<SDL_FPoint> segment;
   SDL_Color lineColor = {color.r, color.g, color.b, 100};
@@ -1766,7 +1770,7 @@ void MapWidget::renderWxMbOverlay(SDL_Renderer *renderer) {
   if (!tex)
     return;
   SDL_SetTextureBlendMode(tex, SDL_BLENDMODE_BLEND);
-  SDL_SetTextureAlphaMod(tex, 180);
+  SDL_SetTextureAlphaMod(tex, 255);
   SDL_RenderSetClipRect(renderer, &mapRect_);
   SDL_RenderCopy(renderer, tex, nullptr, &mapRect_);
   SDL_RenderSetClipRect(renderer, nullptr);
@@ -2310,6 +2314,10 @@ void MapWidget::renderOverlayInfo(SDL_Renderer *renderer) {
     if (!text.empty())
       text += " + ";
     text += "WX/Pressure";
+  } else if (config_.weatherOverlay == WeatherOverlayType::Clouds) {
+    if (!text.empty())
+      text += " + ";
+    text += "Clouds";
   }
 
   if (text.empty())

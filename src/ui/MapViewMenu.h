@@ -51,7 +51,7 @@ private:
   std::vector<std::string> gridOpts_ = {"Off", "Lat/Lon", "Maidenhead"};
   std::vector<std::string> overlayOpts_ = {"None", "MUF", "VOACAP",
                                            "Reliability", "TOA"};
-  std::vector<std::string> weatherOpts_ = {"None", "WX/Pressure"};
+  std::vector<std::string> weatherOpts_ = {"None", "WX/Pressure", "Clouds"};
   std::vector<std::string> bandOpts_ = {"80m", "60m", "40m", "30m", "20m",
                                         "17m", "15m", "12m", "10m", "6m"};
   std::vector<std::string> modeOpts_ = {"SSB", "CW", "FT8", "AM", "WSPR"};

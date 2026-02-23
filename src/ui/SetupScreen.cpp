@@ -489,21 +489,18 @@ void SetupScreen::renderTabDXCluster(SDL_Renderer *renderer, int cx, int pad,
   fontMgr_.drawText(renderer, "Use WSJT-X (UDP)", fieldX + 30, y + 2,
                     white, labelSize_);
   toggleRect_ = toggle;
-  y += 30;
-
   if (clusterWSJTX_) {
-    fontMgr_.drawText(renderer, "WSJT-X UDP Port:", fieldX, y, white, labelSize_);
-    y += labelSize_ + 4;
     int wPortW = std::min(120, halfW);
-    wsjtxPortRect_ = {fieldX, y, wPortW, fieldH};
+    int portX = fieldX + halfW + pad;
+    wsjtxPortRect_ = {portX, y, wPortW, fieldH};
     int tmpY = y;
-    renderField(renderer, fontMgr_, wsjtxPort_, "2237", fieldX, tmpY, wPortW,
+    renderField(renderer, fontMgr_, wsjtxPort_, "2237", portX, tmpY, wPortW,
                 fieldH, fieldSize_, textPad, activeField_ == 3,
                 !wsjtxPort_.empty(), cursorPos_, orange, gray, white, white, gray);
-    y += fieldH + vSpace;
   } else {
     wsjtxPortRect_ = {0, 0, 0, 0};
   }
+  y += 30;
 
   // --- RBN SECTION ---
   fontMgr_.drawText(renderer, "--- Reverse Beacon Network ---", cx, y, cyan,
