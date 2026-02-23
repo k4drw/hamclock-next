@@ -239,15 +239,16 @@ void TimePanel::render(SDL_Renderer *renderer) {
                         gray, infoFontSize_);
 
       // Right: version (amber + asterisk when update available)
-      std::string verStr = kVersion;
+      std::string verStr = HAMCLOCK_VERSION;
       SDL_Color verColor = gray;
       if (updateAvailable_) {
         verStr += "*";
         verColor = {255, 200, 0, 255}; // amber
       }
       TTF_SizeUTF8(infoFont, verStr.c_str(), &tw, &th);
-      fontMgr_.drawText(renderer, verStr, x_ + width_ - pad - tw, infoY,
-                        verColor, infoFontSize_);
+      int vx = x_ + width_ - pad - tw;
+      fontMgr_.drawText(renderer, verStr, vx, infoY, verColor, infoFontSize_);
+      versionRect_ = {vx, infoY, tw, th};
     }
   }
 
@@ -396,7 +397,15 @@ bool TimePanel::onMouseUp(int mx, int my, Uint16 /*mod*/) {
     return true;
   }
 
-  // Not editing: check if click is near the callsign text.
+  // Version click -> update request
+  if (mx >= versionRect_.x && mx <= versionRect_.x + versionRect_.w &&
+      my >= versionRect_.y && my <= versionRect_.y + versionRect_.h) {
+    updateRequested_ = true;
+    return true;
+  }
+
+  // Callsign area -> edit
+  // ing: check if click is near the callsign text.
   // Clamp hit area to TimePanel bounds so a wide callsign + generous pad
   // cannot bleed into the adjacent pane to the right.
   int callRowH = height_ * 42 / 148;

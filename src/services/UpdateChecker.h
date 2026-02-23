@@ -24,9 +24,17 @@ public:
   // not yet fetched.
   std::string latestVersion() const;
 
+  // Returns the release notes (GitHub release body)
+  std::string releaseNotes() const;
+
+  // Returns system info strings defined at compile time
+  std::string installType() const { return HAMCLOCK_INSTALL_TYPE; }
+  std::string arch() const { return HAMCLOCK_ARCH; }
+
 private:
   NetworkManager &net_;
   mutable std::mutex mutex_;
   bool updateAvailable_{false};
   std::string latestVersion_;
+  std::string releaseNotes_;
 };

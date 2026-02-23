@@ -56,6 +56,9 @@ public:
     latestVersion_ = latestVersion;
   }
 
+  bool isUpdateRequested() const { return updateRequested_; }
+  void clearUpdateRequest() { updateRequested_ = false; }
+
   // Callback invoked when callsign text or color is changed via the editor.
   using ConfigChangedCb =
       std::function<void(const std::string &callsign, SDL_Color color)>;
@@ -130,7 +133,9 @@ private:
   bool updateAvailable_ = false;
   std::string latestVersion_;
   SDL_Rect gearRect_ = {};
+  SDL_Rect versionRect_ = {};
   int gearSize_ = 12;
+  bool updateRequested_ = false;
 
   // Info bar state (uptime, rotating center, version)
   std::string currentUptime_;

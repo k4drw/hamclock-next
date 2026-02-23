@@ -91,6 +91,7 @@
 #include "ui/SpaceWeatherPanel.h"
 #include "ui/TextureManager.h"
 #include "ui/TimePanel.h"
+#include "ui/UpdateOverlay.h"
 #include "ui/WatchlistPanel.h"
 #include "ui/WeatherPanel.h"
 #include "ui/WidgetSelector.h"
@@ -207,6 +208,7 @@ struct AppContext {
   // it, then re-applies the in-memory config to live state (callsign, proxy,
   // themes, etc.) without tearing down the dashboard.
   std::atomic<bool> configReloadRequested{false};
+  bool startOnUpdateTab = false;
 
   // Dashboard State (Transient)
   std::unique_ptr<DashboardContext> dashboard;
@@ -263,6 +265,7 @@ struct DashboardContext {
   std::unique_ptr<DXSatPane> dxSatPane;
   std::unique_ptr<MapWidget> mapArea;
   std::unique_ptr<RSSBanner> rssBanner;
+  std::unique_ptr<UpdateOverlay> updateOverlay;
   LayoutManager layout;
 
   // Collections
@@ -738,7 +741,6 @@ void AppContext::updateLayoutMetrics() {
     case AlignMode::Right:
       layLogicalOffX = xSpace;
       layLogicalOffY = ySpace / 2;
-      break;
     }
   } else {
     layScale = 1.0f;
@@ -1311,12 +1313,34 @@ void DashboardContext::update(AppContext &ctx) {
   }
 
 #ifndef __EMSCRIPTEN__
-  // Propagate update-available state to TimePanel on every tick (cheap).
+  // Propagate update-available state to TimePanel.
+  // Respect user's choice to skip a specific version.
   if (ctx.updateChecker && timePanel) {
-    timePanel->setUpdateInfo(ctx.updateChecker->updateAvailable(),
-                             ctx.updateChecker->latestVersion());
+    bool available = ctx.updateChecker->updateAvailable();
+    if (available &&
+        ctx.updateChecker->latestVersion() == appCfg.skippedVersion) {
+      available = false;
+    }
+    timePanel->setUpdateInfo(available, ctx.updateChecker->latestVersion());
   }
 #endif
+
+  // Handle UpdateOverlay trigger from TimePanel version click
+  if (timePanel && timePanel->isUpdateRequested()) {
+    timePanel->clearUpdateRequest();
+    if (!updateOverlay) {
+      int w = 760;
+      int h = 440;
+      int x = (LOGICAL_WIDTH - w) / 2;
+      int y = (LOGICAL_HEIGHT - h) / 2;
+      updateOverlay = std::make_unique<UpdateOverlay>(x, y, w, h, fontMgr,
+                                                      *ctx.updateChecker);
+    }
+  }
+
+  if (updateOverlay) {
+    updateOverlay->update();
+  }
 
   SDL_Event event;
   while (SDL_PollEvent(&event)) {
@@ -1397,6 +1421,39 @@ void DashboardContext::update(AppContext &ctx) {
         render(ctx); // renderFrame
       } else if (event.window.event == SDL_WINDOWEVENT_EXPOSED) {
         render(ctx);
+      }
+      break;
+    case SDL_MOUSEWHEEL:
+      if (updateOverlay) {
+        updateOverlay->onMouseWheel(event.wheel.y);
+      }
+      break;
+    case SDL_MOUSEBUTTONUP:
+      if (updateOverlay) {
+        int smx = event.button.x, smy = event.button.y;
+        if (FIDELITY_MODE) {
+          float pixX = event.button.x * static_cast<float>(ctx.globalDrawW) /
+                       ctx.globalWinW;
+          float pixY = event.button.y * static_cast<float>(ctx.globalDrawH) /
+                       ctx.globalWinH;
+          smx = static_cast<int>(pixX / ctx.layScale);
+          smy = static_cast<int>(pixY / ctx.layScale);
+        }
+        if (updateOverlay->onMouseUp(smx, smy, SDL_GetModState())) {
+          auto res = updateOverlay->getResult();
+          if (res == UpdateOverlay::Result::Skip) {
+            ctx.appCfg.skippedVersion = ctx.updateChecker->latestVersion();
+            ctx.cfgMgr.save(ctx.appCfg);
+            updateOverlay.reset();
+          } else if (res == UpdateOverlay::Result::NotNow) {
+            updateOverlay.reset();
+          } else if (res == UpdateOverlay::Result::Update) {
+            updateOverlay.reset();
+            ctx.activeSetup = AppContext::SetupMode::Main;
+            ctx.startOnUpdateTab = true;
+          }
+          continue; // Event consumed, don't pass to other widgets
+        }
       }
       break;
     default:
@@ -1563,8 +1620,9 @@ void DashboardContext::update(AppContext &ctx) {
     }
 
     // Dispatch other events
-    if (event.type == SDL_MOUSEMOTION || event.type == SDL_MOUSEBUTTONUP ||
-        event.type == SDL_MOUSEWHEEL) {
+    if (!updateOverlay &&
+        (event.type == SDL_MOUSEMOTION || event.type == SDL_MOUSEBUTTONUP ||
+         event.type == SDL_MOUSEWHEEL)) {
       // ... logic from main ...
       // MOUSEMOTION
       if (event.type == SDL_MOUSEMOTION) {
@@ -1733,6 +1791,10 @@ void DashboardContext::render(AppContext &ctx) {
     activeModal->renderModal(ctx.renderer);
   }
 
+  if (updateOverlay) {
+    updateOverlay->render(ctx.renderer);
+  }
+
 #ifndef __EMSCRIPTEN__
   if (ctx.frameCapture)
     ctx.frameCapture->capture(ctx.renderer);
@@ -1785,6 +1847,10 @@ void main_tick() {
                                                *ctx.setupFontMgr,
                                                *ctx.brightnessMgr);
         s->setConfig(ctx.appCfg);
+        if (ctx.startOnUpdateTab) {
+          s->setStartTab(SetupScreen::Tab::Update);
+          ctx.startOnUpdateTab = false;
+        }
         ctx.setupWidget = std::move(s);
       } else if (ctx.activeSetup == AppContext::SetupMode::DXCluster) {
         auto s = std::make_unique<DXClusterSetup>(setupX, setupY, setupW,

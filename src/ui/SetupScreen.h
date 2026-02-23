@@ -30,6 +30,17 @@ public:
   bool wasCancelled() const { return cancelled_; }
   AppConfig getConfig() const;
 
+  enum class Tab {
+    Identity,
+    Spotting,
+    Appearance,
+    Rig,
+    Services,
+    Widgets,
+    Update
+  };
+  void setStartTab(Tab tab) { activeTab_ = tab; }
+
 private:
   void recalcLayout();
   void autoPopulateLatLon();
@@ -48,13 +59,14 @@ private:
                          int fieldH, int fieldX, int textPad);
   void renderTabRig(SDL_Renderer *renderer, int cx, int pad, int fieldW,
                     int fieldH, int fieldX, int textPad);
+  void renderTabUpdate(SDL_Renderer *renderer, int cx, int pad, int fieldW,
+                       int fieldH, int fieldX, int textPad);
 
   FontManager &fontMgr_;
   BrightnessManager &brightnessMgr_;
 
   // Appearance tab absorbs the old Display tab (brightness/schedule now live
   // there)
-  enum class Tab { Identity, Spotting, Appearance, Rig, Services, Widgets };
   Tab activeTab_ = Tab::Identity;
   bool gpsEnabled_ = false;
   std::string callsignText_;

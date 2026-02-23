@@ -26,17 +26,19 @@ struct AppConfig {
   bool useMetric = true;
   std::string projection = "equirectangular"; // or "robinson"
   std::string mapStyle = "nasa";              // "nasa", "terrain", "countries"
-      bool showGrid = false;
-      std::string gridType = "latlon"; // "latlon" or "maidenhead"
-      PropOverlayType propOverlay = PropOverlayType::None;
-      WeatherOverlayType weatherOverlay = WeatherOverlayType::None;
-      std::string propBand = "20m";  std::string propMode = "SSB";
-  int propPower = 100;   // Watts
-      int mufRtOpacity = 40; // percentage
-      bool showSatTrack = true; // Show satellite ground track line on world map
-      bool showBeacons = true; // Show NCDXF beacons on world map
-      
-      // Pane widget selection (top bar panes 1–3)  // Pane widget selection (rotation sets)
+  bool showGrid = false;
+  std::string gridType = "latlon"; // "latlon" or "maidenhead"
+  PropOverlayType propOverlay = PropOverlayType::None;
+  WeatherOverlayType weatherOverlay = WeatherOverlayType::None;
+  std::string propBand = "20m";
+  std::string propMode = "SSB";
+  int propPower = 100;      // Watts
+  int mufRtOpacity = 40;    // percentage
+  bool showSatTrack = true; // Show satellite ground track line on world map
+  bool showBeacons = true;  // Show NCDXF beacons on world map
+
+  // Pane widget selection (top bar panes 1–3)  // Pane widget selection
+  // (rotation sets)
   std::vector<WidgetType> pane1Rotation = {WidgetType::SOLAR};
   std::vector<WidgetType> pane2Rotation = {WidgetType::DX_CLUSTER};
   std::vector<WidgetType> pane3Rotation = {WidgetType::LIVE_SPOTS};
@@ -109,6 +111,9 @@ struct AppConfig {
 
   // Security
   bool gpsEnabled = false;
+
+  // Update
+  std::string skippedVersion;
 
   // Network (WASM)
   // CORS proxy prefix prepended to all external URLs in the WASM build.

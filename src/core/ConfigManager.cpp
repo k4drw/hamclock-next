@@ -100,7 +100,7 @@ bool ConfigManager::init() {
                 console.log('[IDBFS] Sync-from-IDB complete' +
                             (mounted ? '' : ' (no IDBFS — session only)'));
               }
-              if (typeof Module._hamclock_after_idbfs === 'function')
+              if (typeof Module._hamclock_after_idbfs == = 'function')
                 Module._hamclock_after_idbfs();
             });
       },
@@ -306,12 +306,12 @@ bool ConfigManager::load(AppConfig &config) const {
       config.liveSpotsBands = psk.value("bands_mask", 0xFFF);
     }
   }
-
   // Power
   if (json.contains("power")) {
     auto &p = json["power"];
     config.preventSleep = p.value("prevent_sleep", true);
     config.gpsEnabled = p.value("gps_enabled", false);
+    config.skippedVersion = p.value("skipped_version", "");
   }
 
   // Rotator (Hamlib rotctld)
@@ -398,6 +398,7 @@ bool ConfigManager::save(const AppConfig &config) const {
 
   json["power"]["prevent_sleep"] = config.preventSleep;
   json["power"]["gps_enabled"] = config.gpsEnabled;
+  json["power"]["skipped_version"] = config.skippedVersion;
 
   json["network"]["cors_proxy_url"] = config.corsProxyUrl;
 

@@ -15,7 +15,6 @@
 #include "../services/BeaconProvider.h"
 #include "../services/CloudProvider.h"
 #include "../services/IonosondeProvider.h"
-#include "../services/MufRtProvider.h"
 #include "../services/WxMbProvider.h"
 #include "EmbeddedIcons.h"
 #include "FontCatalog.h"

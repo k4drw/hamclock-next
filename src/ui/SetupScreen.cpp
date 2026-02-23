@@ -254,10 +254,10 @@ void SetupScreen::render(SDL_Renderer *renderer) {
                     true, true);
   y += titleSize_ + pad / 2; // tightened: was +pad, halved gap to tab bar
 
-  // Appearance tab absorbs brightness/display settings — 6 tabs total
-  const char *tabs[] = {"Identity", "Spotting", "Display",
-                        "Rig",      "Services", "Widgets"};
-  int numTabs = 6;
+  // Appearance tab absorbs brightness/display settings — 7 tabs total
+  const char *tabs[] = {"Identity", "Spotting", "Display", "Rig",
+                        "Services", "Widgets",  "Update"};
+  int numTabs = 7;
   int tabW = fieldW / numTabs;
 
   // Calculate safe font size for tabs to prevent overflow
@@ -311,6 +311,9 @@ void SetupScreen::render(SDL_Renderer *renderer) {
     break;
   case Tab::Widgets:
     renderTabWidgets(renderer, cx, pad, fieldW, fieldH, fieldX, textPad);
+    break;
+  case Tab::Update:
+    renderTabUpdate(renderer, cx, pad, fieldW, fieldH, fieldX, textPad);
     break;
   }
 
@@ -486,8 +489,8 @@ void SetupScreen::renderTabDXCluster(SDL_Renderer *renderer, int cx, int pad,
     SDL_Rect check = {fieldX + 4, y + 4, 12, 12};
     SDL_RenderFillRect(renderer, &check);
   }
-  fontMgr_.drawText(renderer, "Use WSJT-X (UDP)", fieldX + 30, y + 2,
-                    white, labelSize_);
+  fontMgr_.drawText(renderer, "Use WSJT-X (UDP)", fieldX + 30, y + 2, white,
+                    labelSize_);
   toggleRect_ = toggle;
   if (clusterWSJTX_) {
     int wPortW = std::min(120, halfW);
@@ -496,7 +499,8 @@ void SetupScreen::renderTabDXCluster(SDL_Renderer *renderer, int cx, int pad,
     int tmpY = y;
     renderField(renderer, fontMgr_, wsjtxPort_, "2237", portX, tmpY, wPortW,
                 fieldH, fieldSize_, textPad, activeField_ == 3,
-                !wsjtxPort_.empty(), cursorPos_, orange, gray, white, white, gray);
+                !wsjtxPort_.empty(), cursorPos_, orange, gray, white, white,
+                gray);
   } else {
     wsjtxPortRect_ = {0, 0, 0, 0};
   }
@@ -847,6 +851,58 @@ void SetupScreen::renderTabWidgets(SDL_Renderer *renderer, int cx, int pad,
   }
 }
 
+void SetupScreen::renderTabUpdate(SDL_Renderer *renderer, int cx, int pad,
+                                  int fieldW, int fieldH, int fieldX, int) {
+  int y = (y_ + titleSize_ + 2 * pad + fieldH);
+  SDL_Color white = {255, 255, 255, 255};
+  SDL_Color gray = {140, 140, 140, 255};
+  SDL_Color cyan = {0, 200, 255, 255};
+
+  fontMgr_.drawText(renderer, "--- Update Status ---", cx, y, cyan, labelSize_,
+                    true, true);
+  y += labelSize_ + pad;
+
+  fontMgr_.drawText(renderer, "Current Version:", fieldX, y, white, labelSize_);
+  fontMgr_.drawText(renderer, HAMCLOCK_VERSION, fieldX + fieldW, y, gray,
+                    labelSize_, false, false);
+  y += labelSize_ + 8;
+
+  fontMgr_.drawText(renderer, "Platform Architecture:", fieldX, y, white,
+                    labelSize_);
+  fontMgr_.drawText(renderer, HAMCLOCK_ARCH, fieldX + fieldW, y, gray,
+                    labelSize_, false, false);
+  y += labelSize_ + 8;
+
+  fontMgr_.drawText(renderer, "Installation Type:", fieldX, y, white,
+                    labelSize_);
+  fontMgr_.drawText(renderer, HAMCLOCK_INSTALL_TYPE, fieldX + fieldW, y, gray,
+                    labelSize_, false, false);
+  y += labelSize_ + pad * 2;
+
+  // Implementation-specific instructions
+  std::string instr;
+  std::string cmd;
+  std::string type = HAMCLOCK_INSTALL_TYPE;
+
+  if (type == "RPM") {
+    instr = "An update is available via DNF.";
+    cmd = "sudo dnf update hamclock-next";
+  } else if (type == "DEB") {
+    instr = "Download the latest .deb and install it.";
+    cmd = "sudo apt install ./hamclock-next.deb";
+  } else if (type == "WASM") {
+    instr = "A new version of HamClock-Next is available.";
+    cmd = "Please reload the page to update.";
+  } else {
+    instr = "Binary update available.";
+    cmd = "Download the latest release from GitHub.";
+  }
+
+  fontMgr_.drawText(renderer, instr, cx, y, white, fieldSize_, false, true);
+  y += fieldSize_ + 8;
+  fontMgr_.drawText(renderer, cmd, cx, y, cyan, fieldSize_, true, true);
+}
+
 void SetupScreen::onResize(int x, int y, int w, int h) {
   Widget::onResize(x, y, w, h);
   recalcLayout();
@@ -858,7 +914,7 @@ bool SetupScreen::onMouseUp(int mx, int my, Uint16) {
   int fieldW = std::min(400, width_ - 2 * pad);
   int fieldX = cx - fieldW / 2;
   int fieldH = fieldSize_ + 14;
-  int y = y_ + titleSize_ + 2 * pad;
+  int y = y_ + titleSize_ + 3 * pad / 2;
 
   // Check Footer Buttons
   if (mx >= cancelBtnRect_.x && mx <= cancelBtnRect_.x + cancelBtnRect_.w &&
@@ -877,10 +933,11 @@ bool SetupScreen::onMouseUp(int mx, int my, Uint16) {
   }
 
   const Tab tabValues[] = {Tab::Identity, Tab::Spotting, Tab::Appearance,
-                           Tab::Rig,      Tab::Services, Tab::Widgets};
-  int numTabs = 6;
+                           Tab::Rig,      Tab::Services, Tab::Widgets,
+                           Tab::Update};
+  int numTabs = 7;
   int tabW = fieldW / numTabs;
-  y = y_ + titleSize_ + 3 * pad / 2; // matches render(): pad/2 gap after title
+
   if (my >= y && my <= y + fieldH) {
     for (int i = 0; i < numTabs; ++i) {
       if (mx >= fieldX + i * tabW && mx <= fieldX + (i + 1) * tabW) {
@@ -918,9 +975,9 @@ bool SetupScreen::onMouseUp(int mx, int my, Uint16) {
       rbnEnabled_ = !rbnEnabled_;
       return true;
     }
-    if (clusterWSJTX_ && wsjtxPortRect_.w > 0 &&
-        mx >= wsjtxPortRect_.x && mx <= wsjtxPortRect_.x + wsjtxPortRect_.w &&
-        my >= wsjtxPortRect_.y && my <= wsjtxPortRect_.y + wsjtxPortRect_.h) {
+    if (clusterWSJTX_ && wsjtxPortRect_.w > 0 && mx >= wsjtxPortRect_.x &&
+        mx <= wsjtxPortRect_.x + wsjtxPortRect_.w && my >= wsjtxPortRect_.y &&
+        my <= wsjtxPortRect_.y + wsjtxPortRect_.h) {
       activeField_ = 3;
       cursorPos_ = static_cast<int>(wsjtxPort_.size());
       return true;

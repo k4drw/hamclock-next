@@ -26,7 +26,23 @@ else()
 endif()
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-add_compile_definitions(HAMCLOCK_VERSION="${HAMCLOCK_DISPLAY_VERSION}")
+# Target architecture detection
+if(NOT HAMCLOCK_ARCH)
+    set(HAMCLOCK_ARCH "${CMAKE_SYSTEM_PROCESSOR}")
+endif()
+
+# Installation type awareness (default to BIN if not specified)
+if(NOT HAMCLOCK_INSTALL_TYPE)
+    if(EMSCRIPTEN)
+        set(HAMCLOCK_INSTALL_TYPE "WASM")
+    else()
+        set(HAMCLOCK_INSTALL_TYPE "BIN")
+    endif()
+endif()
+
+add_compile_definitions(HAMCLOCK_VERSION="v${HAMCLOCK_DISPLAY_VERSION}")
+add_compile_definitions(HAMCLOCK_INSTALL_TYPE="${HAMCLOCK_INSTALL_TYPE}")
+add_compile_definitions(HAMCLOCK_ARCH="${HAMCLOCK_ARCH}")
 
 # Pthreads are not enabled for WASM: the app is single-threaded in that
 # context and enabling them would require SharedArrayBuffer + COOP/COEP HTTP
@@ -504,6 +520,7 @@ set(HAMCLOCK_SOURCES
     src/ui/SetupScreen.cpp
     src/ui/SpaceWeatherPanel.cpp
     src/ui/TimePanel.cpp
+    src/ui/UpdateOverlay.cpp
     src/ui/WidgetSelector.cpp
     src/ui/CallbookPanel.cpp
     src/ui/DstPanel.cpp
