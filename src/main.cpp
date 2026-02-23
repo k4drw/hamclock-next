@@ -36,6 +36,7 @@
 #include "services/DXClusterProvider.h"
 #include "services/DstProvider.h"
 #include "services/GPSProvider.h"
+#include "services/BME280Provider.h"
 #include "services/HistoryProvider.h"
 #include "services/IonosondeProvider.h"
 #include "services/LiveSpotProvider.h"
@@ -189,6 +190,7 @@ struct AppContext {
   std::unique_ptr<WebServer> webServer;
   std::unique_ptr<GPSProvider> gpsProvider;
 #endif
+  std::unique_ptr<BME280Provider> bmeProvider;
 
   // Setup State
   enum class SetupMode { None, Loading, Main, DXCluster };
@@ -397,6 +399,8 @@ int main(int argc, char *argv[]) {
       forceFullscreen = true;
     } else if (arg == "-s" || arg == "--software") {
       forceSoftware = true;
+    } else if (arg == "--no-audio") {
+      SoundManager::getInstance().disable();
     } else if (arg == "--log-level" && i + 1 < argc) {
       logLevel = argv[++i];
     } else if (arg == "-h" || arg == "--help") {
@@ -640,10 +644,13 @@ int main(int argc, char *argv[]) {
 
   ctx.gpsProvider = std::make_unique<GPSProvider>(ctx.state.get(), ctx.appCfg);
   ctx.gpsProvider->start();
+
+  ctx.bmeProvider = std::make_unique<BME280Provider>(ctx.deWeatherStore);
+  ctx.bmeProvider->start();
 #endif
 
-  // Init Sound
-  SoundManager::getInstance().init();
+  // Audio device is opened lazily on first playAlarm() call.
+  // Use --no-audio to permanently suppress audio (e.g. displays with buzzers).
 
   // --- Main Loop ---
 #ifdef __EMSCRIPTEN__
@@ -772,6 +779,13 @@ DashboardContext::DashboardContext(AppContext &ctx)
   activityProvider =
       std::make_unique<ActivityProvider>(netManager, activityStore);
   activityProvider->fetch();
+
+  // Re-fetch POTA spots once the parks CSV is parsed so spots get coordinates.
+  // The CSV is read/parsed in a background thread; spots often arrive first.
+  ActivityLocationManager::getInstance().setOnParksReady([this]() {
+    if (activityProvider)
+      activityProvider->fetch();
+  });
 
   dxcProvider = std::make_unique<DXClusterProvider>(
       dxcStore, ctx.prefixMgr, watchlistStore, watchlistHitStore, state.get());
@@ -1003,6 +1017,47 @@ DashboardContext::DashboardContext(AppContext &ctx)
       WidgetType::ASTEROID};
   for (auto t : allTypes)
     addToPool(t);
+
+  // Wire DX Panel spot-selection callbacks
+  {
+    auto restoreMapDx = [state]() {
+      if (state->mapDxActive) {
+        state->dxLocation = state->mapDxLocation;
+        state->dxGrid     = state->mapDxGrid;
+        state->dxActive   = true;
+      } else {
+        state->dxActive = false;
+      }
+      state->dxCallsign.clear();
+    };
+
+    if (auto *dxcPanel = dynamic_cast<DXClusterPanel *>(
+            widgetPool[WidgetType::DX_CLUSTER].get())) {
+      dxcPanel->setOnSpotActivated([state, activityStore](const DXClusterSpot &spot) {
+        state->dxCallsign = spot.txCall;
+        state->dxLocation = {spot.txLat, spot.txLon};
+        state->dxGrid     = spot.txGrid;
+        state->dxActive   = (spot.txLat != 0.0 || spot.txLon != 0.0);
+        auto ad = activityStore->get();
+        ad.hasSelection = false;
+        activityStore->set(ad);
+      });
+      dxcPanel->setOnSpotDeactivated(restoreMapDx);
+    }
+
+    if (auto *ontaPanel = dynamic_cast<ONTAPanel *>(
+            widgetPool[WidgetType::ON_THE_AIR].get())) {
+      ontaPanel->setOnSpotActivated([state, dxcStore](const ONTASpot &spot) {
+        state->dxCallsign = spot.call;
+        state->dxLocation = {spot.lat, spot.lon};
+        state->dxGrid     = (spot.lat != 0.0 || spot.lon != 0.0)
+                                ? Astronomy::latLonToGrid(spot.lat, spot.lon) : "";
+        state->dxActive   = (spot.lat != 0.0 || spot.lon != 0.0);
+        dxcStore->clearSelection();
+      });
+      ontaPanel->setOnSpotDeactivated(restoreMapDx);
+    }
+  }
 
   for (int i = 0; i < 4; ++i) {
     panes.push_back(std::make_unique<PaneContainer>(

@@ -51,7 +51,7 @@ void DXClusterProvider::stop() {
 void DXClusterProvider::run() {
   while (!stopClicked_) {
     if (config_.dxClusterUseWSJTX) {
-      runUDP(config_.dxClusterPort);
+      runUDP(config_.wsjtxPort);
     } else {
       runTelnet(config_.dxClusterHost, config_.dxClusterPort,
                 config_.dxClusterLogin);

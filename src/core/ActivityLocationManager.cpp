@@ -166,6 +166,8 @@ void ActivityLocationManager::parsePOTA(const std::string& data) {
     }
     LOG_I("ActivityLoc", "Loaded {} POTA parks", potaParks_.size());
     ready_ = true;
+    if (onParksReady_)
+        onParksReady_();
 }
 
 void ActivityLocationManager::parseSOTA(const std::string& data) {

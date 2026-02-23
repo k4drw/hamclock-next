@@ -34,7 +34,13 @@ void DXPanel::update() {
     return;
   }
 
-  lineText_[1] = state_->dxGrid;
+  if (!state_->dxCallsign.empty()) {
+    lineText_[1] = state_->dxCallsign;
+    lineText_[5] = state_->dxGrid;
+  } else {
+    lineText_[1] = state_->dxGrid;
+    lineText_[5].clear();
+  }
 
   char buf[64];
   std::snprintf(buf, sizeof(buf), "%.1f%c  %.1f%c",
@@ -66,7 +72,6 @@ void DXPanel::update() {
     }
   }
   lineText_[4] = buf;
-  lineText_[5].clear(); // Was Miles equivalent, now empty
 
   // Weather
   if (weatherStore_) {
@@ -119,7 +124,7 @@ void DXPanel::render(SDL_Renderer *renderer) {
       {180, 180, 180, 255}, // Coords gray
       {255, 255, 0, 255},   // Bearing yellow
       {0, 200, 255, 255},   // Distance cyan
-      {0, 200, 255, 255},   // Miles cyan
+      {0, 255, 128, 255},   // Grid (panel-driven) green
       {0, 255, 0, 255},     // Weather 1 (Green)
       {0, 255, 0, 255},     // Weather 2 (Green)
   };

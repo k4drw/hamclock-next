@@ -188,45 +188,20 @@ void NetworkManager::fetchAsync(const std::string &url,
     }
 #endif
 
-    // If we have cache, do a HEAD request first to verify
-    if (hasCache && !cached.lastModified.empty()) {
-      curl_easy_setopt(curl, CURLOPT_NOBODY, 1L);
-      CURLcode res = curl_easy_perform(curl);
-      if (res == CURLE_OK) {
-        long responseCode = 0;
-        curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &responseCode);
-        if (responseCode >= 200 && responseCode < 300) {
-          if (headers.count("last-modified") &&
-              headers.at("last-modified") == cached.lastModified) {
-            LOG_T("NetworkManager", "Cache validated (HEAD) for {}", url);
-            // Still valid! Update timestamp and return cached
-
-            std::string retData = cached.data;
-            if (retData.empty()) {
-              std::filesystem::path p = cacheDir_ / hashUrl(url);
-              std::ifstream ifs(p, std::ios::binary);
-              if (ifs) {
-                std::string line;
-                for (int i = 0; i < 5; ++i)
-                  std::getline(ifs, line);
-                retData.assign((std::istreambuf_iterator<char>(ifs)),
-                               (std::istreambuf_iterator<char>()));
-              }
-            }
-
-            {
-              std::lock_guard<std::mutex> lock(cacheMutex_);
-              cache_[url].timestamp = std::time(nullptr);
-              saveToDisk(url, cache_[url], retData);
-            }
-            curl_easy_cleanup(curl);
-            callback(std::move(retData));
-            return;
-          }
-        }
+    // Use Conditional GET (If-Modified-Since / If-None-Match) to save bandwidth
+    struct curl_slist *chunk = NULL;
+    if (hasCache) {
+      if (!cached.etag.empty()) {
+        std::string h = "If-None-Match: " + cached.etag;
+        chunk = curl_slist_append(chunk, h.c_str());
       }
-      // Reset for full GET if HEAD failed or was different
-      curl_easy_setopt(curl, CURLOPT_NOBODY, 0L);
+      if (!cached.lastModified.empty()) {
+        std::string h = "If-Modified-Since: " + cached.lastModified;
+        chunk = curl_slist_append(chunk, h.c_str());
+      }
+      if (chunk) {
+        curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
+      }
     }
 
     std::string response;
@@ -235,6 +210,10 @@ void NetworkManager::fetchAsync(const std::string &url,
 
     LOG_D("NetworkManager", "Fetching from network: {}", url);
     CURLcode res = curl_easy_perform(curl);
+
+    if (chunk) {
+      curl_slist_free_all(chunk);
+    }
 
     long responseCode = 0;
     curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &responseCode);
@@ -247,13 +226,39 @@ void NetworkManager::fetchAsync(const std::string &url,
       return;
     }
 
+    // Handle 304 Not Modified
+    if (responseCode == 304) {
+      LOG_D("NetworkManager", "304 Not Modified for {}", url);
+      // Return cached data
+      std::string retData = cached.data;
+      if (retData.empty()) {
+        // Load from disk if not in memory
+        std::filesystem::path p = cacheDir_ / hashUrl(url);
+        std::ifstream ifs(p, std::ios::binary);
+        if (ifs) {
+          std::string line;
+          for (int i = 0; i < 5; ++i) std::getline(ifs, line); // Skip header
+          retData.assign((std::istreambuf_iterator<char>(ifs)),
+                         (std::istreambuf_iterator<char>()));
+        }
+      }
+      // Update timestamp to extend cache life
+      {
+        std::lock_guard<std::mutex> lock(cacheMutex_);
+        cache_[url].timestamp = std::time(nullptr);
+        // We don't need to re-save to disk if it's already there and valid
+      }
+      callback(std::move(retData));
+      return;
+    }
+
     if (responseCode != 200) {
       LOG_E("NetworkManager", "HTTP error {} for {}", responseCode, url);
       callback("");
       return;
     }
 
-    // Update cache on success
+    // Update cache on success (200 OK)
     {
       std::lock_guard<std::mutex> lock(cacheMutex_);
       std::time_t now = std::time(nullptr);

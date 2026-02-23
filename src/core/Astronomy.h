@@ -361,4 +361,68 @@ public:
     az = std::fmod(az * kRad2Deg + 360.0, 360.0);
     el *= kRad2Deg;
   }
+
+  // Calculate Greenwich Sidereal Time (GST) in hours [0, 24)
+  // t: system_clock time_point
+  static double calculateGST(std::chrono::system_clock::time_point tp) {
+    std::time_t t = std::chrono::system_clock::to_time_t(tp);
+    std::tm utc{};
+    portable_gmtime(&t, &utc);
+
+    // Julian Date
+    // Simplified J2000 calculation
+    int y = utc.tm_year + 1900;
+    int m = utc.tm_mon + 1;
+    int d = utc.tm_mday;
+    double ut = utc.tm_hour + utc.tm_min / 60.0 + utc.tm_sec / 3600.0;
+
+    if (m <= 2) {
+      y -= 1;
+      m += 12;
+    }
+    int A = y / 100;
+    int B = 2 - A + A / 4;
+    double JD = static_cast<int>(365.25 * (y + 4716)) +
+                static_cast<int>(30.6001 * (m + 1)) + d + B - 1524.5;
+    
+    double D0 = JD - 2451545.0; // Days since J2000.0
+    double T = D0 / 36525.0;
+
+    // GMST at 0h UT
+    double GMST0 = 6.697374558 + 2400.051336 * T + 0.000025862 * T * T;
+    
+    // GMST at UT
+    double GMST = GMST0 + 1.00273790935 * ut;
+    
+    while (GMST >= 24.0) GMST -= 24.0;
+    while (GMST < 0.0) GMST += 24.0;
+    
+    return GMST;
+  }
+
+  // Calculate Parallactic Angle (q)
+  // lat: observer latitude (degrees)
+  // lon: observer longitude (degrees)
+  // ra: object RA (hours)
+  // dec: object Dec (degrees)
+  // time: UTC time
+  // Returns degrees
+  static double calculateParallacticAngle(double lat, double lon, double ra, double dec, std::chrono::system_clock::time_point time) {
+    double gst = calculateGST(time);
+    double lst = gst + lon / 15.0; // Local Sidereal Time (hours)
+    while (lst >= 24.0) lst -= 24.0;
+    while (lst < 0.0) lst += 24.0;
+
+    double ha = (lst - ra) * 15.0; // Hour Angle (degrees)
+    while (ha >= 180.0) ha -= 360.0;
+    while (ha < -180.0) ha += 360.0;
+
+    double phi = lat * kDeg2Rad;
+    double h = ha * kDeg2Rad;
+    double d = dec * kDeg2Rad;
+
+    double y = std::sin(h);
+    double x = std::tan(phi) * std::cos(d) - std::sin(d) * std::cos(h);
+    return std::atan2(y, x) * kRad2Deg;
+  }
 };

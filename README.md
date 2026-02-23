@@ -1,9 +1,9 @@
-# HamClock-Next (v0.9B)
+# HamClock-Next (v0.9.5B)
 
 HamClock-Next is a modern, SDL2-based reconstruction of the classic HamClock. It focuses on visual fidelity, high-DPI support, and a smooth user experience while maintaining the essential functionality loved by amateur radio operators.
 
 > [!WARNING]
-> **BETA RELEASE NOTICE**: This is a Beta release (**v0.9B**). While functional, it is still under active development and contains known bugs. Breaking changes and refinements are ongoing. Please report issues on GitHub.
+> **BETA RELEASE NOTICE**: This is a Beta release (**v0.9.5B**). While functional, it is still under active development and contains known bugs. Breaking changes and refinements are ongoing. Please report issues on GitHub.
 
 ## Key Accomplishments
 
@@ -28,6 +28,14 @@ HamClock-Next is a modern, SDL2-based reconstruction of the classic HamClock. It
   - **Propagation Model**: Solar flux, sunspot numbers, and band-specific condition estimates.
 - **Smart Setup**: Easy configuration of callsign and location via Maidenhead grid squares or direct map interaction (Shift-Click to set DE).
 - **RSS News Banner**: Smoothly scrolling news ticker aggregating multiple amateur radio news feeds.
+
+### Customization & Themes
+HamClock-Next features a built-in theming system with three presets:
+1. **Default (Orange)**: The classic look with dark gray backgrounds and high-contrast orange text.
+2. **Modern Dark**: A cooler palette with slate blues and neutral grays.
+3. **Glass**: Semi-transparent panels with blur effects (requires a compositor on Linux).
+
+You can switch themes via the **Setup Screen** (Appearance tab) or the remote web interface. A future update will enable custom JSON-based themes.
 
 For a detailed guide on how to navigate the new interface and use keyboard shortcuts, see **[USAGE.md](USAGE.md)**.
 
@@ -162,6 +170,18 @@ We provide high-compatibility **Universal Binaries** built against a Debian Bull
 
 1. **`unified`**: The standard desktop package. Includes dependencies for X11, Wayland, and KMSDRM. Recommended for most users.
 2. **`fb0`**: A lean "kiosk" package. Only includes dependencies for direct framebuffer (KMSDRM) rendering. Ideal for headless Raspberry Pi Lite installs.
+
+#### How to Install (.deb)
+
+Do **not** try to execute the `.deb` file directly (e.g., `chmod +x` followed by `./file.deb`). It is a package archive, not an executable binary. Install it using `apt` or `dpkg`:
+
+```bash
+# Recommended (automatically installs dependencies):
+sudo apt install ./hamclock-next_0.9.0B_unified_arm64.deb
+
+# OR using dpkg:
+sudo dpkg -i hamclock-next_0.9.0B_unified_arm64.deb
+```
 
 For detailed technical references and remote control info, see:
 - **[API.md](API.md)** - Remote control and debugging API reference

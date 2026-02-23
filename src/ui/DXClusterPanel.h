@@ -4,6 +4,7 @@
 #include "ListPanel.h"
 #include <SDL.h>
 #include <chrono>
+#include <functional>
 #include <memory>
 
 // Forward declarations
@@ -16,19 +17,29 @@ public:
                  std::shared_ptr<DXClusterDataStore> store,
                  RigService *rigService = nullptr,
                  const AppConfig *config = nullptr);
+  ~DXClusterPanel() override;
 
   void update() override;
+  void onResize(int x, int y, int w, int h) override;
   bool onMouseUp(int mx, int my, Uint16 mod) override;
   bool onMouseWheel(int scrollY) override;
 
   bool isSetupRequested() const { return setupRequested_; }
   void clearSetupRequest() { setupRequested_ = false; }
 
+  void setOnSpotActivated(std::function<void(const DXClusterSpot &)> cb) {
+    onSpotActivated_ = std::move(cb);
+  }
+  void setOnSpotDeactivated(std::function<void()> cb) {
+    onSpotDeactivated_ = std::move(cb);
+  }
+
   std::string getName() const override { return "DXCluster"; }
   std::vector<std::string> getActions() const override;
   bool performAction(const std::string &action) override;
   SDL_Rect getActionRect(const std::string &action) const override;
   nlohmann::json getDebugData() const override;
+  void render(SDL_Renderer *renderer) override;
 
 private:
   void rebuildRows(const DXClusterData &data);
@@ -37,6 +48,9 @@ private:
 
   SDL_Color getRowColor(int index,
                         const SDL_Color &defaultColor) const override;
+
+  std::function<void(const DXClusterSpot &)> onSpotActivated_;
+  std::function<void()> onSpotDeactivated_;
 
   std::shared_ptr<DXClusterDataStore> store_;
   RigService *rigService_;
@@ -47,6 +61,29 @@ private:
   std::vector<std::string> allRows_;
   std::vector<double> allFreqs_;
   std::vector<double> visibleFreqs_;
+
+  struct SpotDisplay {
+    std::string call;
+    double freq;
+    std::chrono::system_clock::time_point time;
+  };
+  std::vector<SpotDisplay> allSpots_;
+  std::vector<SpotDisplay> visibleSpots_;
+
+  struct CachedSpot {
+    SDL_Texture *freqTex = nullptr;
+    int freqW = 0, freqH = 0;
+    SDL_Texture *callTex = nullptr;
+    int callW = 0, callH = 0;
+    SDL_Texture *ageTex = nullptr;
+    int ageW = 0, ageH = 0;
+    std::string lastAge;
+    double lastFreq = -1.0;
+    std::string lastCall;
+  };
+  std::vector<CachedSpot> spotCache_;
+  void clearSpotCache();
+
   int scrollOffset_ = 0;
   static constexpr int MAX_VISIBLE_ROWS = 15;
 };

@@ -2,6 +2,7 @@
 #include "../core/ConfigManager.h"
 #include "../core/LiveSpotData.h"
 #include "../core/Logger.h"
+#include "../core/MemoryMonitor.h"
 #include "../services/RigService.h"
 
 #include <algorithm>
@@ -13,6 +14,20 @@ DXClusterPanel::DXClusterPanel(int x, int y, int w, int h, FontManager &fontMgr,
                                RigService *rigService, const AppConfig *config)
     : ListPanel(x, y, w, h, fontMgr, "DX Cluster", {}), store_(store),
       rigService_(rigService), config_(config) {}
+
+DXClusterPanel::~DXClusterPanel() { clearSpotCache(); }
+
+void DXClusterPanel::clearSpotCache() {
+  for (auto &cs : spotCache_) {
+    if (cs.freqTex)
+      MemoryMonitor::getInstance().destroyTexture(cs.freqTex);
+    if (cs.callTex)
+      MemoryMonitor::getInstance().destroyTexture(cs.callTex);
+    if (cs.ageTex)
+      MemoryMonitor::getInstance().destroyTexture(cs.ageTex);
+  }
+  spotCache_.clear();
+}
 
 void DXClusterPanel::update() {
   auto data = store_->snapshot();
@@ -34,6 +49,7 @@ void DXClusterPanel::update() {
 
     std::vector<std::string> visible;
     visibleFreqs_.clear();
+    visibleSpots_.clear();
 
     if (allRows_.empty()) {
       visible.push_back(
@@ -44,12 +60,20 @@ void DXClusterPanel::update() {
       for (int i = 0; i < MAX_VISIBLE_ROWS; ++i) {
         int idx = scrollOffset_ + i;
         if (idx < (int)allRows_.size()) {
-          visible.push_back(allRows_[idx]);
+          // Push empty string so ListPanel draws stripes but no text
+          visible.push_back("");
           visibleFreqs_.push_back(allFreqs_[idx]);
+          visibleSpots_.push_back(allSpots_[idx]);
         }
       }
     }
     setRows(visible);
+
+    // Resize spot cache
+    if (spotCache_.size() != visibleSpots_.size()) {
+      clearSpotCache();
+      spotCache_.resize(visibleSpots_.size());
+    }
 
     // Update Highlight
     int highlighted = -1;
@@ -76,9 +100,109 @@ void DXClusterPanel::update() {
   }
 }
 
+void DXClusterPanel::onResize(int x, int y, int w, int h) {
+  ListPanel::onResize(x, y, w, h);
+  clearSpotCache();
+}
+
+void DXClusterPanel::render(SDL_Renderer *renderer) {
+  // Base render for BG, Title, Border
+  ListPanel::render(renderer);
+
+  if (visibleSpots_.empty())
+    return;
+
+  if (!fontMgr_.ready())
+    return;
+
+  int pad = std::max(2, static_cast<int>(width_ * 0.03f));
+  int curY = y_ + pad;
+  if (titleTex_) {
+    curY += titleH_ + pad;
+  }
+
+  // Calculate row height
+  int remaining = (y_ + height_) - curY;
+  int rowH = std::max(rowFontSize_ + 4,
+                      remaining / static_cast<int>(visibleSpots_.size()));
+
+  // Column layout: Freq (Right-aligned) | Call (Left) | Age (Right-anchored)
+  // Use worst-case sample strings to anchor fixed column boundaries
+  int freqColW = fontMgr_.getLogicalWidth("88888.8", rowFontSize_);
+  int ageColW  = fontMgr_.getLogicalWidth("999m", rowFontSize_);
+  int callX    = x_ + pad + freqColW + 6;
+  int freqXEnd = callX - 6;
+  int ageX     = x_ + width_ - pad - ageColW;
+
+  for (size_t i = 0; i < visibleSpots_.size(); ++i) {
+    if (i >= spotCache_.size())
+      break;
+
+    int rowY = curY + static_cast<int>(i) * rowH;
+    const auto &spot = visibleSpots_[i];
+    auto &cache = spotCache_[i];
+    SDL_Color color = getRowColor(i, {255, 255, 255, 255});
+
+    // 1. Freq (right-aligned within freq column)
+    if (!cache.freqTex || std::abs(cache.lastFreq - spot.freq) > 0.001) {
+      if (cache.freqTex)
+        MemoryMonitor::getInstance().destroyTexture(cache.freqTex);
+      char buf[32];
+      std::snprintf(buf, sizeof(buf), "%.1f", spot.freq);
+      cache.freqTex = fontMgr_.renderText(renderer, buf, color, rowFontSize_,
+                                          &cache.freqW, &cache.freqH);
+      cache.lastFreq = spot.freq;
+    }
+    if (cache.freqTex) {
+      int ty = rowY + (rowH - cache.freqH) / 2;
+      SDL_Rect dst = {freqXEnd - cache.freqW, ty, cache.freqW, cache.freqH};
+      SDL_Rect clip = {x_ + pad, rowY, freqColW, rowH};
+      SDL_RenderSetClipRect(renderer, &clip);
+      SDL_RenderCopy(renderer, cache.freqTex, nullptr, &dst);
+      SDL_RenderSetClipRect(renderer, nullptr);
+    }
+
+    // 2. Call (left-aligned, clipped before age column)
+    if (!cache.callTex || cache.lastCall != spot.call) {
+      if (cache.callTex)
+        MemoryMonitor::getInstance().destroyTexture(cache.callTex);
+      cache.callTex = fontMgr_.renderText(renderer, spot.call, color,
+                                          rowFontSize_, &cache.callW, &cache.callH);
+      cache.lastCall = spot.call;
+    }
+    if (cache.callTex) {
+      int ty = rowY + (rowH - cache.callH) / 2;
+      SDL_Rect dst = {callX, ty, cache.callW, cache.callH};
+      SDL_Rect clip = {callX, rowY, ageX - callX - 2, rowH};
+      SDL_RenderSetClipRect(renderer, &clip);
+      SDL_RenderCopy(renderer, cache.callTex, nullptr, &dst);
+      SDL_RenderSetClipRect(renderer, nullptr);
+    }
+
+    // 3. Age (right-anchored, always visible)
+    std::string age = formatAge(spot.time);
+    if (!cache.ageTex || cache.lastAge != age) {
+      if (cache.ageTex)
+        MemoryMonitor::getInstance().destroyTexture(cache.ageTex);
+      cache.ageTex = fontMgr_.renderText(renderer, age, color, rowFontSize_,
+                                         &cache.ageW, &cache.ageH);
+      cache.lastAge = age;
+    }
+    if (cache.ageTex) {
+      int ty = rowY + (rowH - cache.ageH) / 2;
+      SDL_Rect dst = {x_ + width_ - pad - cache.ageW, ty, cache.ageW, cache.ageH};
+      SDL_Rect clip = {ageX, rowY, ageColW, rowH};
+      SDL_RenderSetClipRect(renderer, &clip);
+      SDL_RenderCopy(renderer, cache.ageTex, nullptr, &dst);
+      SDL_RenderSetClipRect(renderer, nullptr);
+    }
+  }
+}
+
 void DXClusterPanel::rebuildRows(const DXClusterData &data) {
   allRows_.clear();
   allFreqs_.clear();
+  allSpots_.clear();
   auto spots = data.spots;
   // Most recent first
   std::reverse(spots.begin(), spots.end());
@@ -91,6 +215,8 @@ void DXClusterPanel::rebuildRows(const DXClusterData &data) {
        << std::setw(4) << formatAge(spot.spottedAt);
     allRows_.push_back(ss.str());
     allFreqs_.push_back(spot.freqKhz);
+    
+    allSpots_.push_back({spot.txCall, spot.freqKhz, spot.spottedAt});
   }
 }
 
@@ -138,24 +264,20 @@ bool DXClusterPanel::onMouseWheel(int scrollY) {
 }
 
 bool DXClusterPanel::onMouseUp(int mx, int my, Uint16 /*mod*/) {
+  // Top 10% is the PaneContainer widget-selection zone — match its threshold
+  // exactly so that clicking the title area opens the widget selector, while
+  // clicking anywhere in the content area is absorbed by this widget.
+  if (my < y_ + height_ / 10)
+    return false;
+
   // Check if we clicked on a row
   int rowH = 14;
   auto font = fontMgr_.getFont(rowFontSize_);
   if (font)
     rowH = TTF_FontLineSkip(font);
 
-  // ListPanel starts rendering after title. Adjust my.
-  // We can just hit test visible rows from y_ + something.
-  // For simplicity, let's use the same logic as ListPanel::render.
   int pad = std::max(2, static_cast<int>(width_ * 0.03f));
-  int curY = y_ + pad;
-  // If we had a titleTex_, we add pad.
-  // Let's assume title height is ~titleFontSize_ + pad.
-  curY +=
-      rowFontSize_ + pad; // Title is usually same font size as row or larger
-
-  if (my < curY)
-    return false;
+  int curY = y_ + pad + rowFontSize_ + pad; // content start (below title)
 
   int clickedRow = (my - curY) / rowH;
 
@@ -174,6 +296,8 @@ bool DXClusterPanel::onMouseUp(int mx, int my, Uint16 /*mod*/) {
 
       if (isSame) {
         store_->clearSelection();
+        if (onSpotDeactivated_)
+          onSpotDeactivated_();
       } else {
         store_->selectSpot(spot);
 
@@ -182,12 +306,16 @@ bool DXClusterPanel::onMouseUp(int mx, int my, Uint16 /*mod*/) {
           long long freqHz = static_cast<long long>(spot.freqKhz * 1000.0);
           rigService_->setFrequency(freqHz);
         }
+        if (onSpotActivated_)
+          onSpotActivated_(spot);
       }
       return true;
     }
   }
 
-  return false;
+  // Absorb all clicks in the content area so they don't fall through to
+  // PaneContainer's onSelectionRequested_ and open the adjacent pane's editor.
+  return true;
 }
 
 std::vector<std::string> DXClusterPanel::getActions() const {

@@ -259,6 +259,7 @@ bool ConfigManager::load(AppConfig &config) const {
     config.dxClusterPort = dxc.value("port", 7300);
     config.dxClusterLogin = dxc.value("login", "");
     config.dxClusterUseWSJTX = dxc.value("use_wsjtx", false);
+    config.wsjtxPort = dxc.value("wsjtx_port", 2237);
   }
 
   // Live Spots (Combined RBN, PSK Reporter, WSPR)
@@ -413,6 +414,7 @@ bool ConfigManager::save(const AppConfig &config) const {
   json["dx_cluster"]["port"] = config.dxClusterPort;
   json["dx_cluster"]["login"] = config.dxClusterLogin;
   json["dx_cluster"]["use_wsjtx"] = config.dxClusterUseWSJTX;
+  json["dx_cluster"]["wsjtx_port"] = config.wsjtxPort;
 
   json["live_spots"]["source"] =
       (config.liveSpotSource == LiveSpotSource::RBN)    ? "rbn"

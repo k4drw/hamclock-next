@@ -66,6 +66,8 @@ private:
   std::string clusterLogin_;
   bool clusterEnabled_ = true;
   bool clusterWSJTX_ = false;
+  std::string wsjtxPort_;
+  SDL_Rect wsjtxPortRect_ = {0, 0, 0, 0};
   bool rbnEnabled_ = false;
   bool pskOfDe_ = true;
   bool pskUseCall_ = true;
@@ -78,6 +80,7 @@ private:
   bool mapNightLights_ = true;
   bool useMetric_ = true;
   bool rssEnabled_ = true;
+  WeatherOverlayType weatherOverlay_ = WeatherOverlayType::None;
 
   // Services & Rig
   std::string qrzUsername_;
@@ -114,6 +117,7 @@ private:
   SDL_Rect nightLightsRect_ = {0, 0, 0, 0};
   SDL_Rect metricToggleRect_ = {0, 0, 0, 0};
   SDL_Rect rssToggleRect_ = {0, 0, 0, 0};
+  SDL_Rect weatherOverlayRect_ = {0, 0, 0, 0};
   SDL_Rect okBtnRect_ = {0, 0, 0, 0};
   SDL_Rect cancelBtnRect_ = {0, 0, 0, 0};
   SDL_Rect brightnessSliderRect_ = {0, 0, 0, 0};
