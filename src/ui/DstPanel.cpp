@@ -87,6 +87,95 @@ void DstPanel::render(SDL_Renderer *renderer) {
   std::snprintf(buf, sizeof(buf), "%.0f nT", currentData_.current_val);
   fontMgr_.drawText(renderer, buf, x_ + width_ - pad, y_ + 5,
                     {255, 255, 255, 255}, 10, true, true);
+
+  if (tooltip_.visible) {
+    renderTooltip(renderer);
+  }
+}
+
+void DstPanel::onMouseMove(int mx, int my) {
+  if (!currentData_.valid || currentData_.points.empty()) {
+    tooltip_.visible = false;
+    return;
+  }
+
+  // Graph area (must match render() logic)
+  int pad = 10;
+  int graphW = width_ - 2 * pad;
+  int graphH = height_ - 2 * pad - 12;
+  int graphX = x_ + pad;
+  int graphY = y_ + pad + 12;
+
+  if (mx < graphX || mx > graphX + graphW || my < graphY ||
+      my > graphY + graphH) {
+    tooltip_.visible = false;
+    return;
+  }
+
+  // Find nearest data point based on age_hrs
+  // age_hrs is -48 to 0
+  float bestDist = 99999.0f;
+  const DstPoint *bestPoint = nullptr;
+
+  for (const auto &p : currentData_.points) {
+    int px = graphX + (int)((p.age_hrs + 48.0f) / 48.0f * graphW);
+    float dist = std::abs(static_cast<float>(mx - px));
+    if (dist < bestDist) {
+      bestDist = dist;
+      bestPoint = &p;
+    }
+  }
+
+  if (bestPoint && bestDist < 10.0f) {
+    char buf[64];
+    int age = (int)std::abs(bestPoint->age_hrs);
+    if (age == 0) {
+      std::snprintf(buf, sizeof(buf), "%.0f nT (Now)", bestPoint->value);
+    } else {
+      std::snprintf(buf, sizeof(buf), "%.0f nT (-%dh)", bestPoint->value, age);
+    }
+    tooltip_.text = buf;
+    tooltip_.x = mx;
+    tooltip_.y = my;
+    tooltip_.visible = true;
+    tooltip_.timestamp = SDL_GetTicks();
+  } else {
+    tooltip_.visible = false;
+  }
+}
+
+void DstPanel::renderTooltip(SDL_Renderer *renderer) {
+  if (tooltip_.text.empty())
+    return;
+
+  int ptSize = 10;
+  int tw = fontMgr_.getLogicalWidth(tooltip_.text, ptSize);
+  int th = fontMgr_.getLogicalHeight(tooltip_.text, ptSize);
+
+  int padX = 8;
+  int padY = 4;
+  int boxW = tw + padX * 2;
+  int boxH = th + padY * 2;
+
+  int bx = tooltip_.x - boxW / 2;
+  int by = tooltip_.y - boxH - 12;
+
+  if (by < y_)
+    by = tooltip_.y + 16;
+  if (bx < x_)
+    bx = x_;
+  if (bx + boxW > x_ + width_)
+    bx = x_ + width_ - boxW;
+
+  SDL_Rect box = {bx, by, boxW, boxH};
+  SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+  SDL_SetRenderDrawColor(renderer, 20, 20, 20, 200);
+  SDL_RenderFillRect(renderer, &box);
+  SDL_SetRenderDrawColor(renderer, 100, 100, 100, 255);
+  SDL_RenderDrawRect(renderer, &box);
+
+  fontMgr_.drawText(renderer, tooltip_.text, bx + padX, by + padY,
+                    {255, 255, 255, 255}, ptSize);
 }
 
 nlohmann::json DstPanel::getDebugData() const {

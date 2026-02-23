@@ -138,4 +138,113 @@ void AuroraGraphPanel::render(SDL_Renderer *renderer) {
 
     SDL_RenderDrawLine(renderer, x1, y1, x2, y2);
   }
+
+  if (tooltip_.visible) {
+    renderTooltip(renderer);
+  }
+}
+
+void AuroraGraphPanel::onMouseMove(int mx, int my) {
+  if (!store_ || !store_->hasData()) {
+    tooltip_.visible = false;
+    return;
+  }
+
+  // Graph area (must match render() logic)
+  int graphX = x_ + 30;
+  int graphY = y_ + height_ / 2;
+  int graphW = width_ - 40;
+  int graphH = height_ / 2 - 30;
+
+  if (mx < graphX || mx > graphX + graphW || my < graphY ||
+      my > graphY + graphH) {
+    tooltip_.visible = false;
+    return;
+  }
+
+  auto history = store_->getHistory();
+  if (history.size() < 2) {
+    tooltip_.visible = false;
+    return;
+  }
+
+  auto now = std::chrono::system_clock::now();
+
+  // Find nearest data point based on X coordinate
+  float bestDist = 99999.0f;
+  const AuroraDataPoint *bestPoint = nullptr;
+
+  for (const auto &p : history) {
+    auto age =
+        std::chrono::duration_cast<std::chrono::minutes>(now - p.timestamp)
+            .count() /
+        60.0f;
+
+    if (age > 24.0f)
+      continue;
+
+    int px = graphX + graphW - static_cast<int>(age * graphW / 24.0f);
+    float dist = std::abs(static_cast<float>(mx - px));
+    if (dist < bestDist) {
+      bestDist = dist;
+      bestPoint = &p;
+    }
+  }
+
+  if (bestPoint && bestDist < 15.0f) {
+    auto ageMins = std::chrono::duration_cast<std::chrono::minutes>(
+                       now - bestPoint->timestamp)
+                       .count();
+    char buf[64];
+    if (ageMins < 30) {
+      std::snprintf(buf, sizeof(buf), "%.0f%% (Now)", bestPoint->percent);
+    } else {
+      std::snprintf(buf, sizeof(buf), "%.0f%% (-%ldh %ldm)", bestPoint->percent,
+                    ageMins / 60, ageMins % 60);
+    }
+    tooltip_.text = buf;
+    tooltip_.x = mx;
+    tooltip_.y = my;
+    tooltip_.visible = true;
+    tooltip_.timestamp = SDL_GetTicks();
+  } else {
+    tooltip_.visible = false;
+  }
+}
+
+void AuroraGraphPanel::renderTooltip(SDL_Renderer *renderer) {
+  if (tooltip_.text.empty())
+    return;
+
+  int ptSize = 10;
+  int tw = fontMgr_.getLogicalWidth(tooltip_.text, ptSize);
+  int th = fontMgr_.getLogicalHeight(tooltip_.text, ptSize);
+
+  int padX = 8;
+  int padY = 4;
+  int boxW = tw + padX * 2;
+  int boxH = th + padY * 2;
+
+  int bx = tooltip_.x - boxW / 2;
+  int by = tooltip_.y - boxH - 12;
+
+  // Flip if too close to top
+  if (by < y_) {
+    by = tooltip_.y + 16;
+  }
+  // Clamp to widget bounds
+  if (bx < x_)
+    bx = x_;
+  if (bx + boxW > x_ + width_)
+    bx = x_ + width_ - boxW;
+
+  SDL_Rect box = {bx, by, boxW, boxH};
+  SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+  SDL_SetRenderDrawColor(renderer, 20, 20, 20, 200);
+  SDL_RenderFillRect(renderer, &box);
+  SDL_SetRenderDrawColor(renderer, 100, 100, 100, 255);
+  SDL_RenderDrawRect(renderer, &box);
+
+  fontMgr_.drawText(renderer, tooltip_.text, bx + padX, by + padY,
+                    {255, 255, 255, 255}, ptSize);
 }

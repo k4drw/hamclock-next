@@ -355,6 +355,7 @@ void NOAAProvider::fetchAurora() {
 
           // Push to AuroraHistoryStore
           if (auroraStore) {
+            LOG_I("NOAAProvider", "Aurora updated: {}%%", max_percent);
             // If this is the first point, add a duplicate
             if (!auroraStore->hasData()) {
               auto *percent1 = new float(max_percent);

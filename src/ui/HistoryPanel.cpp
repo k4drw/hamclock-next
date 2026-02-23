@@ -1,4 +1,5 @@
 #include "HistoryPanel.h"
+#include "../core/StringUtils.h"
 #include "../core/Theme.h"
 #include "RenderUtils.h"
 #include <SDL.h>
@@ -103,9 +104,9 @@ void HistoryPanel::render(SDL_Renderer *renderer) {
       if (kpNow >= 0.0f) {
         char kpBuf[8];
         std::snprintf(kpBuf, sizeof(kpBuf), "%.1f", kpNow);
-        SDL_Color kpCol = (kpNow >= 5.0f) ? SDL_Color{255, 0, 0, 255}
-                        : (kpNow >= 4.0f) ? SDL_Color{255, 255, 0, 255}
-                        :                    SDL_Color{0, 255, 0, 255};
+        SDL_Color kpCol = (kpNow >= 5.0f)   ? SDL_Color{255, 0, 0, 255}
+                          : (kpNow >= 4.0f) ? SDL_Color{255, 255, 0, 255}
+                                            : SDL_Color{0, 255, 0, 255};
         int kpFontSize = std::max(14, std::min(height_ / 3, 40));
         fontMgr_.drawText(renderer, kpBuf, graphX + graphW / 2,
                           graphY + graphH / 3, kpCol, kpFontSize, false, true);
@@ -149,7 +150,8 @@ void HistoryPanel::render(SDL_Renderer *renderer) {
 
       // Tick mark
       SDL_SetRenderDrawColor(renderer, 60, 60, 60, 255);
-      SDL_RenderDrawLine(renderer, lx, graphY + graphH, lx, graphY + graphH + 3);
+      SDL_RenderDrawLine(renderer, lx, graphY + graphH, lx,
+                         graphY + graphH + 3);
 
       // Label
       auto ageMins = std::chrono::duration_cast<std::chrono::minutes>(
@@ -166,4 +168,118 @@ void HistoryPanel::render(SDL_Renderer *renderer) {
                         false, true);
     }
   }
+
+  if (tooltip_.visible) {
+    renderTooltip(renderer);
+  }
+}
+
+void HistoryPanel::onMouseMove(int mx, int my) {
+  if (!currentSeries_.valid || currentSeries_.points.empty()) {
+    tooltip_.visible = false;
+    return;
+  }
+
+  // Graph area (must match render() logic)
+  int pad = 10;
+  int hintSize = std::max(7, std::min(height_ / 12, 9));
+  int axisLabelH = hintSize + 4;
+  int graphW = width_ - 2 * pad;
+  int graphH = height_ - 2 * pad - 12 - axisLabelH;
+  int graphX = x_ + pad;
+  int graphY = y_ + pad + 12;
+
+  if (mx < graphX || mx > graphX + graphW || my < graphY ||
+      my > graphY + graphH) {
+    tooltip_.visible = false;
+    return;
+  }
+
+  int n = static_cast<int>(currentSeries_.points.size());
+  auto now = std::chrono::system_clock::now();
+
+  const HistoryPoint *bestPoint = nullptr;
+  float bestDist = 99999.0f;
+
+  if (seriesName_ == "kp") {
+    // Bar chart
+    float barW = (float)graphW / (float)n;
+    int idx = (int)((mx - graphX) / barW);
+    if (idx >= 0 && idx < n) {
+      bestPoint = &currentSeries_.points[idx];
+      bestDist = 0.0f;
+    }
+  } else {
+    // Line chart
+    float stepX = (float)graphW / (std::max(1, n - 1));
+    int idx = (int)((mx - graphX + stepX / 2.0f) / stepX);
+    if (idx >= 0 && idx < n) {
+      bestPoint = &currentSeries_.points[idx];
+      int px = graphX + (int)(idx * stepX);
+      bestDist = std::abs(static_cast<float>(mx - px));
+    }
+  }
+
+  if (bestPoint && bestDist < 15.0f) {
+    auto ageMins =
+        std::chrono::duration_cast<std::chrono::minutes>(now - bestPoint->time)
+            .count();
+    char buf[64];
+    std::string unit =
+        (seriesName_ == "kp") ? "" : (seriesName_ == "flux" ? " sfu" : "");
+    char valStr[32];
+    if (seriesName_ == "kp") {
+      std::snprintf(valStr, sizeof(valStr), "%.1f", bestPoint->value);
+    } else {
+      std::snprintf(valStr, sizeof(valStr), "%.0f", bestPoint->value);
+    }
+
+    if (ageMins < 30) {
+      std::snprintf(buf, sizeof(buf), "%s%s (Now)", valStr, unit.c_str());
+    } else {
+      std::snprintf(buf, sizeof(buf), "%s%s (-%ldh %ldm)", valStr, unit.c_str(),
+                    ageMins / 60, ageMins % 60);
+    }
+    tooltip_.text = buf;
+    tooltip_.x = mx;
+    tooltip_.y = my;
+    tooltip_.visible = true;
+    tooltip_.timestamp = SDL_GetTicks();
+  } else {
+    tooltip_.visible = false;
+  }
+}
+
+void HistoryPanel::renderTooltip(SDL_Renderer *renderer) {
+  if (tooltip_.text.empty())
+    return;
+
+  int ptSize = 10;
+  int tw = fontMgr_.getLogicalWidth(tooltip_.text, ptSize);
+  int th = fontMgr_.getLogicalHeight(tooltip_.text, ptSize);
+
+  int padX = 8;
+  int padY = 4;
+  int boxW = tw + padX * 2;
+  int boxH = th + padY * 2;
+
+  int bx = tooltip_.x - boxW / 2;
+  int by = tooltip_.y - boxH - 12;
+
+  if (by < y_)
+    by = tooltip_.y + 16;
+  if (bx < x_)
+    bx = x_;
+  if (bx + boxW > x_ + width_)
+    bx = x_ + width_ - boxW;
+
+  SDL_Rect box = {bx, by, boxW, boxH};
+  SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+  SDL_SetRenderDrawColor(renderer, 20, 20, 20, 200);
+  SDL_RenderFillRect(renderer, &box);
+  SDL_SetRenderDrawColor(renderer, 100, 100, 100, 255);
+  SDL_RenderDrawRect(renderer, &box);
+
+  fontMgr_.drawText(renderer, tooltip_.text, bx + padX, by + padY,
+                    {255, 255, 255, 255}, ptSize);
 }

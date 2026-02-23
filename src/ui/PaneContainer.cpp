@@ -74,8 +74,8 @@ void PaneContainer::render(SDL_Renderer *renderer) {
     int arrowW = std::min(18, width_ / 8);
     int arrowH = std::min(36, height_ / 5);
     int cy = y_ + height_ / 2;
-    SDL_Rect lArr = {x_,                    cy - arrowH / 2, arrowW, arrowH};
-    SDL_Rect rArr = {x_ + width_ - arrowW,  cy - arrowH / 2, arrowW, arrowH};
+    SDL_Rect lArr = {x_, cy - arrowH / 2, arrowW, arrowH};
+    SDL_Rect rArr = {x_ + width_ - arrowW, cy - arrowH / 2, arrowW, arrowH};
 
     SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 140);
@@ -83,11 +83,9 @@ void PaneContainer::render(SDL_Renderer *renderer) {
     SDL_RenderFillRect(renderer, &rArr);
     SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
 
-    fontMgr_.drawText(renderer, "<",
-                      lArr.x + lArr.w / 2, lArr.y + lArr.h / 2,
+    fontMgr_.drawText(renderer, "<", lArr.x + lArr.w / 2, lArr.y + lArr.h / 2,
                       {220, 220, 220, 255}, 14, false, true);
-    fontMgr_.drawText(renderer, ">",
-                      rArr.x + rArr.w / 2, rArr.y + rArr.h / 2,
+    fontMgr_.drawText(renderer, ">", rArr.x + rArr.w / 2, rArr.y + rArr.h / 2,
                       {220, 220, 220, 255}, 14, false, true);
   }
 }
@@ -96,6 +94,12 @@ void PaneContainer::onResize(int x, int y, int w, int h) {
   Widget::onResize(x, y, w, h);
   if (activeWidget_) {
     activeWidget_->onResize(x, y, w, h);
+  }
+}
+
+void PaneContainer::onMouseMove(int mx, int my) {
+  if (activeWidget_) {
+    activeWidget_->onMouseMove(mx, my);
   }
 }
 
@@ -119,16 +123,17 @@ bool PaneContainer::onMouseUp(int mx, int my, Uint16 mod) {
     int arrowW = std::min(18, width_ / 8);
     int arrowH = std::min(36, height_ / 5);
     int cy = y_ + height_ / 2;
-    SDL_Rect lArr = {x_,                    cy - arrowH / 2, arrowW, arrowH};
-    SDL_Rect rArr = {x_ + width_ - arrowW,  cy - arrowH / 2, arrowW, arrowH};
+    SDL_Rect lArr = {x_, cy - arrowH / 2, arrowW, arrowH};
+    SDL_Rect rArr = {x_ + width_ - arrowW, cy - arrowH / 2, arrowW, arrowH};
 
-    if (mx >= lArr.x && mx < lArr.x + lArr.w &&
-        my >= lArr.y && my < lArr.y + lArr.h) {
-      activateRotationIndex((rotationIdx_ + rotation_.size() - 1) % rotation_.size());
+    if (mx >= lArr.x && mx < lArr.x + lArr.w && my >= lArr.y &&
+        my < lArr.y + lArr.h) {
+      activateRotationIndex((rotationIdx_ + rotation_.size() - 1) %
+                            rotation_.size());
       return true;
     }
-    if (mx >= rArr.x && mx < rArr.x + rArr.w &&
-        my >= rArr.y && my < rArr.y + rArr.h) {
+    if (mx >= rArr.x && mx < rArr.x + rArr.w && my >= rArr.y &&
+        my < rArr.y + rArr.h) {
       activateRotationIndex((rotationIdx_ + 1) % rotation_.size());
       return true;
     }

@@ -81,4 +81,17 @@ protected:
   int height_;
   std::string theme_ = "default";
   bool useMetric_ = true;
+
+  // Tooltip shared state
+  struct Tooltip {
+    bool visible = false;
+    std::string text;
+    int x = 0;
+    int y = 0;
+    uint32_t timestamp = 0;
+    SDL_Texture *cachedTexture = nullptr;
+    std::string cachedText;
+    int cachedW = 0;
+    int cachedH = 0;
+  } tooltip_;
 };

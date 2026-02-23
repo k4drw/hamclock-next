@@ -25,26 +25,25 @@
 #include "network/FrameCapture.h"
 #include "network/NetworkManager.h"
 #include "network/WebServer.h"
-#include "services/UpdateChecker.h"
 #include "services/ADIFProvider.h"
 #include "services/ActivityProvider.h"
 #include "services/AsteroidProvider.h"
 #include "services/AuroraProvider.h"
+#include "services/BME280Provider.h"
 #include "services/BandConditionsProvider.h"
 #include "services/BeaconProvider.h"
 #include "services/CallbookProvider.h"
+#include "services/CloudProvider.h"
 #include "services/ContestProvider.h"
 #include "services/DRAPProvider.h"
 #include "services/DXClusterProvider.h"
 #include "services/DstProvider.h"
 #include "services/GPSProvider.h"
-#include "services/BME280Provider.h"
 #include "services/HistoryProvider.h"
 #include "services/IonosondeProvider.h"
 #include "services/LiveSpotProvider.h"
 #include "services/MoonProvider.h"
 #include "services/MufRtProvider.h"
-#include "services/CloudProvider.h"
 #include "services/NOAAProvider.h"
 #include "services/RBNProvider.h"
 #include "services/RSSProvider.h"
@@ -52,6 +51,7 @@
 #include "services/RotatorService.h"
 #include "services/SDOProvider.h"
 #include "services/SantaProvider.h"
+#include "services/UpdateChecker.h"
 #include "services/WeatherProvider.h"
 #include "ui/ADIFPanel.h"
 #include "ui/ActivityPanels.h"
@@ -590,14 +590,18 @@ int main(int argc, char *argv[]) {
   ctx.netManager =
       std::make_unique<NetworkManager>(ctx.cfgMgr.configDir() / "cache");
   ctx.netManager->setCorsProxyUrl(ctx.appCfg.corsProxyUrl);
-  
-  ActivityLocationManager::getInstance().init(*ctx.netManager, ctx.cfgMgr.configDir() / "cache");
+
+  ActivityLocationManager::getInstance().init(*ctx.netManager,
+                                              ctx.cfgMgr.configDir() / "cache");
 
   ctx.prefixMgr.init();
   CitiesManager::getInstance().init();
 
   ctx.solarStore = std::make_shared<SolarDataStore>();
   ctx.auroraHistoryStore = std::make_shared<AuroraHistoryStore>();
+  ctx.auroraHistoryStore->setStoragePath(ctx.cfgMgr.configDir() / "cache" /
+                                         "aurora_history.json");
+  ctx.auroraHistoryStore->load();
   ctx.watchlistStore = std::make_shared<WatchlistStore>();
   ctx.rssStore = std::make_shared<RSSDataStore>();
   ctx.watchlistHitStore = std::make_shared<WatchlistHitStore>();
@@ -844,20 +848,22 @@ DashboardContext::DashboardContext(AppContext &ctx)
   adifProvider = std::make_unique<ADIFProvider>(adifStore, ctx.prefixMgr);
   adifProvider->fetch(ctx.cfgMgr.configDir() / "logs.adif");
 
-      mufRtProvider = std::make_unique<MufRtProvider>(netManager);
-      mufRtProvider->update();
-  
-      cloudProvider = std::make_unique<CloudProvider>(netManager);
-      cloudProvider->update();
-  
-      ionosondeProvider = std::make_unique<IonosondeProvider>(netManager);  ionosondeProvider->update();
+  mufRtProvider = std::make_unique<MufRtProvider>(netManager);
+  mufRtProvider->update();
 
-      asteroidProvider = std::make_unique<AsteroidProvider>(netManager);
-      asteroidProvider->update();
-  
-      beaconProvider = std::make_unique<BeaconProvider>();
-  
-      santaProvider = std::make_unique<SantaProvider>(santaStore);  santaProvider->update();
+  cloudProvider = std::make_unique<CloudProvider>(netManager);
+  cloudProvider->update();
+
+  ionosondeProvider = std::make_unique<IonosondeProvider>(netManager);
+  ionosondeProvider->update();
+
+  asteroidProvider = std::make_unique<AsteroidProvider>(netManager);
+  asteroidProvider->update();
+
+  beaconProvider = std::make_unique<BeaconProvider>();
+
+  santaProvider = std::make_unique<SantaProvider>(santaStore);
+  santaProvider->update();
 
   SDL_Color cyan = {0, 200, 255, 255};
   timePanel =
@@ -986,9 +992,11 @@ DashboardContext::DashboardContext(AppContext &ctx)
       widgetPool[type] = std::make_unique<WeatherPanel>(
           0, 0, 0, 0, fontMgr, dxWeatherStore, "DX Weather");
       break;
-          case WidgetType::NCDXF:
-            widgetPool[type] = std::make_unique<BeaconPanel>(0, 0, 0, 0, fontMgr, *beaconProvider);
-            break;    case WidgetType::SDO:
+    case WidgetType::NCDXF:
+      widgetPool[type] =
+          std::make_unique<BeaconPanel>(0, 0, 0, 0, fontMgr, *beaconProvider);
+      break;
+    case WidgetType::SDO:
       widgetPool[type] =
           std::make_unique<SDOPanel>(0, 0, 0, 0, fontMgr, texMgr, *sdoProvider);
       break;
@@ -1031,8 +1039,8 @@ DashboardContext::DashboardContext(AppContext &ctx)
     auto restoreMapDx = [state]() {
       if (state->mapDxActive) {
         state->dxLocation = state->mapDxLocation;
-        state->dxGrid     = state->mapDxGrid;
-        state->dxActive   = true;
+        state->dxGrid = state->mapDxGrid;
+        state->dxActive = true;
       } else {
         state->dxActive = false;
       }
@@ -1041,15 +1049,16 @@ DashboardContext::DashboardContext(AppContext &ctx)
 
     if (auto *dxcPanel = dynamic_cast<DXClusterPanel *>(
             widgetPool[WidgetType::DX_CLUSTER].get())) {
-      dxcPanel->setOnSpotActivated([state, activityStore](const DXClusterSpot &spot) {
-        state->dxCallsign = spot.txCall;
-        state->dxLocation = {spot.txLat, spot.txLon};
-        state->dxGrid     = spot.txGrid;
-        state->dxActive   = (spot.txLat != 0.0 || spot.txLon != 0.0);
-        auto ad = activityStore->get();
-        ad.hasSelection = false;
-        activityStore->set(ad);
-      });
+      dxcPanel->setOnSpotActivated(
+          [state, activityStore](const DXClusterSpot &spot) {
+            state->dxCallsign = spot.txCall;
+            state->dxLocation = {spot.txLat, spot.txLon};
+            state->dxGrid = spot.txGrid;
+            state->dxActive = (spot.txLat != 0.0 || spot.txLon != 0.0);
+            auto ad = activityStore->get();
+            ad.hasSelection = false;
+            activityStore->set(ad);
+          });
       dxcPanel->setOnSpotDeactivated(restoreMapDx);
     }
 
@@ -1058,9 +1067,10 @@ DashboardContext::DashboardContext(AppContext &ctx)
       ontaPanel->setOnSpotActivated([state, dxcStore](const ONTASpot &spot) {
         state->dxCallsign = spot.call;
         state->dxLocation = {spot.lat, spot.lon};
-        state->dxGrid     = (spot.lat != 0.0 || spot.lon != 0.0)
-                                ? Astronomy::latLonToGrid(spot.lat, spot.lon) : "";
-        state->dxActive   = (spot.lat != 0.0 || spot.lon != 0.0);
+        state->dxGrid = (spot.lat != 0.0 || spot.lon != 0.0)
+                            ? Astronomy::latLonToGrid(spot.lat, spot.lon)
+                            : "";
+        state->dxActive = (spot.lat != 0.0 || spot.lon != 0.0);
         dxcStore->clearSelection();
       });
       ontaPanel->setOnSpotDeactivated(restoreMapDx);
@@ -1140,14 +1150,15 @@ DashboardContext::DashboardContext(AppContext &ctx)
   mapArea->setAuroraStore(auroraHistoryStore);
   mapArea->setIonosondeProvider(ionosondeProvider.get());
   mapArea->setSolarDataStore(ctx.solarStore.get());
-      mapArea->setActivityStore(ctx.activityStore);
-  
-      std::vector<PaneContainer *> panePtrs;
-      for (const auto &p : panes)
-        panePtrs.push_back(p.get());
-      mapArea->setPanes(panePtrs);
-  
-      // NOAAProvider seems to populate solar data?  // Let's check main.cpp earlier.
+  mapArea->setActivityStore(ctx.activityStore);
+
+  std::vector<PaneContainer *> panePtrs;
+  for (const auto &p : panes)
+    panePtrs.push_back(p.get());
+  mapArea->setPanes(panePtrs);
+
+  // NOAAProvider seems to populate solar data?  // Let's check main.cpp
+  // earlier.
 
   rssBanner = std::make_unique<RSSBanner>(139, 412, 660, 68, fontMgr, rssStore);
   rssBanner->setEnabled(appCfg.rssEnabled);
@@ -1253,6 +1264,8 @@ void DashboardContext::update(AppContext &ctx) {
     historyProvider->fetchFlux();
     historyProvider->fetchSSN();
     historyProvider->fetchKp();
+    if (dstProvider)
+      dstProvider->fetch();
     adifProvider->fetch(ctx.cfgMgr.configDir() / "logs.adif");
     mufRtProvider->update();
     ionosondeProvider->update();
@@ -1494,24 +1507,25 @@ void DashboardContext::update(AppContext &ctx) {
           delete update;
           break;
         }
-                  case AE_HISTORY_DATA_READY: {
-                    auto *update = static_cast<HistorySeries *>(event.user.data1);
-                    if (update && ctx.historyStore) {
-                      ctx.historyStore->update(update->name, *update);
-                    }
-                    delete update;
-                    break;
-                  }
-                  case AE_PROP_DATA_READY: {
-                    auto *grid = static_cast<std::vector<float> *>(event.user.data1);
-                    if (grid && ctx.dashboard && ctx.dashboard->mapArea) {
-                      ctx.dashboard->mapArea->onPropDataReady(
-                          static_cast<PropOverlayType>(event.user.code), *grid);
-                    }
-                    delete grid;
-                    break;
-                  }
-                  }      }
+        case AE_HISTORY_DATA_READY: {
+          auto *update = static_cast<HistorySeries *>(event.user.data1);
+          if (update && ctx.historyStore) {
+            ctx.historyStore->update(update->name, *update);
+          }
+          delete update;
+          break;
+        }
+        case AE_PROP_DATA_READY: {
+          auto *grid = static_cast<std::vector<float> *>(event.user.data1);
+          if (grid && ctx.dashboard && ctx.dashboard->mapArea) {
+            ctx.dashboard->mapArea->onPropDataReady(
+                static_cast<PropOverlayType>(event.user.code), *grid);
+          }
+          delete grid;
+          break;
+        }
+        }
+      }
       break;
     }
 
