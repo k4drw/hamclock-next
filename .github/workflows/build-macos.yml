@@ -23,6 +23,11 @@ jobs:
           brew install sdl2 sdl2_image sdl2_ttf curl
 
       - name: Build MacOS Binary
+        env:
+          MACOS_SIGN_MODE: ${{ secrets.MACOS_CODESIGN_IDENTITY != '' && 'auto' || 'adhoc' }}
+          MACOS_CODESIGN_IDENTITY: ${{ secrets.MACOS_CODESIGN_IDENTITY }}
+          MACOS_NOTARIZE: ${{ secrets.MACOS_NOTARY_KEYCHAIN_PROFILE != '' && '1' || '0' }}
+          MACOS_NOTARY_KEYCHAIN_PROFILE: ${{ secrets.MACOS_NOTARY_KEYCHAIN_PROFILE }}
         run: |
           chmod +x scripts/build-macos.sh
           ./scripts/build-macos.sh
