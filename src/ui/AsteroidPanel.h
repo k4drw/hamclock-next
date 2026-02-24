@@ -17,6 +17,7 @@ public:
   ~AsteroidPanel() override = default;
 
   void update() override;
+  void render(SDL_Renderer *renderer) override;
   void onResize(int x, int y, int w, int h) override;
   bool onMouseUp(int mx, int my, Uint16 mod) override;
 

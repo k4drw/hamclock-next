@@ -111,6 +111,7 @@ struct AppConfig {
 
   // Asteroid widget
   std::string asteroidIcon = "☄";
+  SDL_Color asteroidColor = {255, 140, 0, 255}; // default orange
 
   // Security
   bool gpsEnabled = false;

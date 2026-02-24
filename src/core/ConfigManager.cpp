@@ -207,6 +207,13 @@ bool ConfigManager::load(AppConfig &config) const {
 
   if (json.contains("asteroid")) {
     config.asteroidIcon = json["asteroid"].value("icon", std::string("☄"));
+    if (json["asteroid"].contains("color")) {
+      auto &c = json["asteroid"]["color"];
+      config.asteroidColor.r = c.value("r", uint8_t(255));
+      config.asteroidColor.g = c.value("g", uint8_t(140));
+      config.asteroidColor.b = c.value("b", uint8_t(0));
+      config.asteroidColor.a = 255;
+    }
   }
 
   // Network (WASM proxy URL)
@@ -453,6 +460,9 @@ bool ConfigManager::save(const AppConfig &config) const {
   json["rss"]["enabled"] = config.rssEnabled;
   json["activity"]["onta_filter"] = config.ontaFilter;
   json["asteroid"]["icon"] = config.asteroidIcon;
+  json["asteroid"]["color"]["r"] = config.asteroidColor.r;
+  json["asteroid"]["color"]["g"] = config.asteroidColor.g;
+  json["asteroid"]["color"]["b"] = config.asteroidColor.b;
 
   std::ofstream ofs(configPath_);
   if (!ofs) {

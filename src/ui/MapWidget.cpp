@@ -582,7 +582,30 @@ void MapWidget::onMouseMove(int mx, int my) {
     }
   }
 
-  // 6. Check DX Cluster selected spot only (mirrors renderDXClusterSpots logic)
+  // 6. Check asteroid icon
+  if (tip.empty() && asteroidProvider_ && !state_->selectedAsteroidName.empty()
+      && !cachedAsteroidTrack_.empty()) {
+    size_t mid = cachedAsteroidTrack_.size() / 2;
+    if (screenDist(cachedAsteroidTrack_[mid].lat,
+                   cachedAsteroidTrack_[mid].lon) < kHitRadius + 4) {
+      AsteroidData data = asteroidProvider_->getLatest();
+      for (const auto &ast : data.asteroids) {
+        if (ast.name == state_->selectedAsteroidName) {
+          std::string name = ast.name;
+          if (name.size() > 2 && name.front() == '(' && name.back() == ')')
+            name = name.substr(1, name.size() - 2);
+          char buf[256];
+          std::snprintf(buf, sizeof(buf), "%s\n%.2f LD  %.1f km/s%s",
+                        name.c_str(), ast.missDistanceLD, ast.velocityKmS,
+                        ast.isHazardous ? "\n\u26a0 Potentially Hazardous" : "");
+          tip = buf;
+          break;
+        }
+      }
+    }
+  }
+
+  // 7. Check DX Cluster selected spot only (mirrors renderDXClusterSpots logic)
   if (tip.empty() && dxcStore_) {
     auto data = dxcStore_->snapshot();
     if (data->hasSelection && data->selectedSpot.txLat != 0.0) {
@@ -1297,7 +1320,8 @@ void MapWidget::renderAsteroidOverlay(SDL_Renderer *renderer) {
     if (cachedAsteroidTrack_.size() >= 2) {
       float thickness = 1.5f;
       float r = thickness / 2.0f;
-      SDL_Color color = {255, 140, 0, 200};
+      SDL_Color color = {config_.asteroidColor.r, config_.asteroidColor.g,
+                         config_.asteroidColor.b, 200};
 
       std::vector<SDL_FPoint> segment;
       auto add_segment_geom = [&](const std::vector<SDL_FPoint> &seg) {
@@ -1369,8 +1393,10 @@ void MapWidget::renderAsteroidOverlay(SDL_Renderer *renderer) {
     const std::string &icon = config_.asteroidIcon.empty() ? "☄" : config_.asteroidIcon;
     int ptSize = fontMgr_.catalog()->ptSize(FontStyle::SmallRegular);
     int iw = 0, ih = 0;
+    SDL_Color icnColor = {config_.asteroidColor.r, config_.asteroidColor.g,
+                          config_.asteroidColor.b, 220};
     SDL_Texture *iconTex = fontMgr_.renderText(renderer, icon,
-                                               {255, 140, 0, 220},
+                                               icnColor,
                                                ptSize, &iw, &ih);
     if (iconTex) {
       SDL_Rect dst = {static_cast<int>(sp.x) - iw / 2,
