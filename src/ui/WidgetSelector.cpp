@@ -149,7 +149,7 @@ void WidgetSelector::render(SDL_Renderer *renderer) {
                     okRect_.y + okRect_.h / 2, themes.accent, 14, true, true);
 }
 
-bool WidgetSelector::onMouseUp(int mx, int my, Uint16 /*mod*/) {
+bool WidgetSelector::onMouseUp(int mx, int my, Uint16 /*mod*/, int clicks) {
   if (!visible_)
     return false;
 

@@ -17,6 +17,11 @@
 #include "FrameCapture.h"
 #include <iomanip>
 #include <sstream>
+
+#include "../core/CPUMonitor.h"
+#include "../core/ContestData.h"
+#include "../core/DXClusterData.h"
+#include "../core/LiveSpotData.h"
 #ifdef ENABLE_DEBUG_API
 #include "../core/UIRegistry.h"
 #endif
@@ -28,9 +33,14 @@ WebServer::WebServer(SDL_Renderer *renderer, AppConfig &cfg,
                      std::shared_ptr<DisplayPower> displayPower,
                      std::atomic<bool> &reloadFlag,
                      std::shared_ptr<WatchlistStore> watchlist,
-                     std::shared_ptr<SolarDataStore> solar, int port)
+                     std::shared_ptr<SolarDataStore> solar,
+                     std::shared_ptr<ContestStore> contests,
+                     std::shared_ptr<DXClusterDataStore> dxc,
+                     std::shared_ptr<LiveSpotDataStore> spots,
+                     std::shared_ptr<CPUMonitor> cpu, int port)
     : renderer_(renderer), cfg_(&cfg), state_(&state), cfgMgr_(&cfgMgr),
-      watchlist_(watchlist), solar_(solar), displayPower_(displayPower),
+      watchlist_(watchlist), solar_(solar), contests_(contests), dxc_(dxc),
+      spots_(spots), cpu_(cpu), displayPower_(displayPower),
       reloadFlag_(&reloadFlag), port_(port) {}
 
 WebServer::~WebServer() { stop(); }
@@ -924,14 +934,13 @@ void WebServer::run() {
     SDL_GetRendererOutputSize(renderer_, &drawW, &drawH);
     int px = static_cast<int>(static_cast<float>(lx) / HamClock::LOGICAL_WIDTH *
                               drawW);
-    int py = static_cast<int>(static_cast<float>(ly) / HamClock::LOGICAL_HEIGHT *
-                              drawH);
+    int py = static_cast<int>(static_cast<float>(ly) /
+                              HamClock::LOGICAL_HEIGHT * drawH);
 
     SDL_Event down{}, up{};
     SDL_zero(down);
     down.type = SDL_MOUSEBUTTONDOWN;
-    down.button.button =
-        (button == 1) ? SDL_BUTTON_RIGHT : SDL_BUTTON_LEFT;
+    down.button.button = (button == 1) ? SDL_BUTTON_RIGHT : SDL_BUTTON_LEFT;
     down.button.x = px;
     down.button.y = py;
     down.button.state = SDL_PRESSED;
@@ -947,118 +956,116 @@ void WebServer::run() {
   // /live/key — inject keyboard input
   // GET /live/key?key=<name>&ctrl=<0|1>&shift=<0|1>
   // -------------------------------------------------------------------------
-  svr.Get(
-      "/live/key", [this](const httplib::Request &req, httplib::Response &res) {
-        if (!liveWebEnabled_) {
-          res.status = 403;
-          res.set_content("Live web not enabled", "text/plain");
-          return;
-        }
-        if (!req.has_param("key")) {
-          res.status = 400;
-          res.set_content("missing key", "text/plain");
-          return;
-        }
-        std::string k = req.get_param_value("key");
-        bool ctrl = req.has_param("ctrl") &&
-                    req.get_param_value("ctrl") == "1";
-        bool shift = req.has_param("shift") &&
-                     req.get_param_value("shift") == "1";
+  svr.Get("/live/key", [this](const httplib::Request &req,
+                              httplib::Response &res) {
+    if (!liveWebEnabled_) {
+      res.status = 403;
+      res.set_content("Live web not enabled", "text/plain");
+      return;
+    }
+    if (!req.has_param("key")) {
+      res.status = 400;
+      res.set_content("missing key", "text/plain");
+      return;
+    }
+    std::string k = req.get_param_value("key");
+    bool ctrl = req.has_param("ctrl") && req.get_param_value("ctrl") == "1";
+    bool shift = req.has_param("shift") && req.get_param_value("shift") == "1";
 
-        SDL_Keycode code = SDLK_UNKNOWN;
-        if (k == "enter" || k == "return")
-          code = SDLK_RETURN;
-        else if (k == "tab")
-          code = SDLK_TAB;
-        else if (k == "escape" || k == "esc")
-          code = SDLK_ESCAPE;
-        else if (k == "backspace")
-          code = SDLK_BACKSPACE;
-        else if (k == "delete" || k == "del")
-          code = SDLK_DELETE;
-        else if (k == "left")
-          code = SDLK_LEFT;
-        else if (k == "right")
-          code = SDLK_RIGHT;
-        else if (k == "up")
-          code = SDLK_UP;
-        else if (k == "down")
-          code = SDLK_DOWN;
-        else if (k == "home")
-          code = SDLK_HOME;
-        else if (k == "end")
-          code = SDLK_END;
-        else if (k == "space")
-          code = SDLK_SPACE;
-        else if (k == "f11")
-          code = SDLK_F11;
+    SDL_Keycode code = SDLK_UNKNOWN;
+    if (k == "enter" || k == "return")
+      code = SDLK_RETURN;
+    else if (k == "tab")
+      code = SDLK_TAB;
+    else if (k == "escape" || k == "esc")
+      code = SDLK_ESCAPE;
+    else if (k == "backspace")
+      code = SDLK_BACKSPACE;
+    else if (k == "delete" || k == "del")
+      code = SDLK_DELETE;
+    else if (k == "left")
+      code = SDLK_LEFT;
+    else if (k == "right")
+      code = SDLK_RIGHT;
+    else if (k == "up")
+      code = SDLK_UP;
+    else if (k == "down")
+      code = SDLK_DOWN;
+    else if (k == "home")
+      code = SDLK_HOME;
+    else if (k == "end")
+      code = SDLK_END;
+    else if (k == "space")
+      code = SDLK_SPACE;
+    else if (k == "f11")
+      code = SDLK_F11;
 
-        SDL_Keymod mod = KMOD_NONE;
-        if (ctrl)
-          mod = static_cast<SDL_Keymod>(mod | KMOD_CTRL);
-        if (shift)
-          mod = static_cast<SDL_Keymod>(mod | KMOD_SHIFT);
+    SDL_Keymod mod = KMOD_NONE;
+    if (ctrl)
+      mod = static_cast<SDL_Keymod>(mod | KMOD_CTRL);
+    if (shift)
+      mod = static_cast<SDL_Keymod>(mod | KMOD_SHIFT);
 
-        if (code != SDLK_UNKNOWN) {
-          SDL_Event event;
-          SDL_zero(event);
-          event.type = SDL_KEYDOWN;
-          event.key.keysym.sym = code;
-          event.key.keysym.mod = mod;
-          event.key.state = SDL_PRESSED;
-          SDL_PushEvent(&event);
-          event.type = SDL_KEYUP;
-          event.key.state = SDL_RELEASED;
-          SDL_PushEvent(&event);
-        } else if (k.size() == 1 && !ctrl) {
-          // Printable character — inject as text input
-          SDL_Event event;
-          SDL_zero(event);
-          event.type = SDL_TEXTINPUT;
-          event.text.text[0] = k[0];
-          SDL_PushEvent(&event);
-        } else {
-          res.status = 404;
-          res.set_content("unknown key", "text/plain");
-          return;
-        }
-        res.set_content("ok", "text/plain");
-      });
+    if (code != SDLK_UNKNOWN) {
+      SDL_Event event;
+      SDL_zero(event);
+      event.type = SDL_KEYDOWN;
+      event.key.keysym.sym = code;
+      event.key.keysym.mod = mod;
+      event.key.state = SDL_PRESSED;
+      SDL_PushEvent(&event);
+      event.type = SDL_KEYUP;
+      event.key.state = SDL_RELEASED;
+      SDL_PushEvent(&event);
+    } else if (k.size() == 1 && !ctrl) {
+      // Printable character — inject as text input
+      SDL_Event event;
+      SDL_zero(event);
+      event.type = SDL_TEXTINPUT;
+      event.text.text[0] = k[0];
+      SDL_PushEvent(&event);
+    } else {
+      res.status = 404;
+      res.set_content("unknown key", "text/plain");
+      return;
+    }
+    res.set_content("ok", "text/plain");
+  });
 
   // -------------------------------------------------------------------------
   // /live/mouse — inject mouse motion (hover)
   // GET /live/mouse?x=<int>&y=<int>
   // -------------------------------------------------------------------------
-  svr.Get("/live/mouse",
-          [this](const httplib::Request &req, httplib::Response &res) {
-            if (!liveWebEnabled_) {
-              res.status = 403;
-              res.set_content("Live web not enabled", "text/plain");
-              return;
-            }
-            if (!req.has_param("x") || !req.has_param("y")) {
-              res.status = 400;
-              res.set_content("missing x/y", "text/plain");
-              return;
-            }
-            int lx = StringUtils::safe_stoi(req.get_param_value("x"));
-            int ly = StringUtils::safe_stoi(req.get_param_value("y"));
+  svr.Get("/live/mouse", [this](const httplib::Request &req,
+                                httplib::Response &res) {
+    if (!liveWebEnabled_) {
+      res.status = 403;
+      res.set_content("Live web not enabled", "text/plain");
+      return;
+    }
+    if (!req.has_param("x") || !req.has_param("y")) {
+      res.status = 400;
+      res.set_content("missing x/y", "text/plain");
+      return;
+    }
+    int lx = StringUtils::safe_stoi(req.get_param_value("x"));
+    int ly = StringUtils::safe_stoi(req.get_param_value("y"));
 
-            int drawW = HamClock::LOGICAL_WIDTH, drawH = HamClock::LOGICAL_HEIGHT;
-            SDL_GetRendererOutputSize(renderer_, &drawW, &drawH);
-            int px = static_cast<int>(static_cast<float>(lx) /
-                                      HamClock::LOGICAL_WIDTH * drawW);
-            int py = static_cast<int>(static_cast<float>(ly) /
-                                      HamClock::LOGICAL_HEIGHT * drawH);
+    int drawW = HamClock::LOGICAL_WIDTH, drawH = HamClock::LOGICAL_HEIGHT;
+    SDL_GetRendererOutputSize(renderer_, &drawW, &drawH);
+    int px = static_cast<int>(static_cast<float>(lx) / HamClock::LOGICAL_WIDTH *
+                              drawW);
+    int py = static_cast<int>(static_cast<float>(ly) /
+                              HamClock::LOGICAL_HEIGHT * drawH);
 
-            SDL_Event event;
-            SDL_zero(event);
-            event.type = SDL_MOUSEMOTION;
-            event.motion.x = px;
-            event.motion.y = py;
-            SDL_PushEvent(&event);
-            res.set_content("ok", "text/plain");
-          });
+    SDL_Event event;
+    SDL_zero(event);
+    event.type = SDL_MOUSEMOTION;
+    event.motion.x = px;
+    event.motion.y = py;
+    SDL_PushEvent(&event);
+    res.set_content("ok", "text/plain");
+  });
 
   // -------------------------------------------------------------------------
   // /live — interactive canvas-based viewer (always available)
@@ -1232,77 +1239,82 @@ void WebServer::run() {
     res.set_content(page, "text/html");
   });
 
-  svr.Get(
-      "/stream.mjpeg",
-      [this](const httplib::Request &, httplib::Response &res) {
-        if (!frameCapture_) {
-          res.status = 503;
-          res.set_content("Frame capture not available", "text/plain");
-          return;
-        }
-        uint64_t lastSeq = frameCapture_->latestSeq();
-        res.set_chunked_content_provider(
-            "multipart/x-mixed-replace;boundary=frame",
-            [this, lastSeq](size_t, httplib::DataSink &sink) mutable -> bool {
-              if (!sink.is_writable())
-                return false;
-              uint64_t outSeq = lastSeq;
-              auto frame = frameCapture_->waitFrame(lastSeq, 500, outSeq);
-              if (frame.empty())
-                return sink.is_writable();
-              lastSeq = outSeq;
-              std::string hdr =
-                  "--frame\r\nContent-Type: image/jpeg\r\nContent-Length: " +
-                  std::to_string(frame.size()) + "\r\n\r\n";
-              if (!sink.write(hdr.data(), hdr.size()))
-                return false;
-              if (!sink.write(reinterpret_cast<const char *>(frame.data()),
-                              frame.size()))
-                return false;
-              return sink.write("\r\n", 2);
-            });
-      });
-
-  svr.Get("/api/config", [this](const httplib::Request &, httplib::Response &res) {
-    if (!cfg_) { res.status = 503; return; }
-    nlohmann::json j;
-    j["callsign"] = cfg_->callsign;
-    j["grid"] = cfg_->grid;
-    j["lat"] = cfg_->lat;
-    j["lon"] = cfg_->lon;
-    j["theme"] = cfg_->theme;
-    j["dxClusterEnabled"] = cfg_->dxClusterEnabled;
-    j["dxClusterHost"] = cfg_->dxClusterHost;
-    j["dxClusterPort"] = cfg_->dxClusterPort;
-    j["dxClusterLogin"] = cfg_->dxClusterLogin;
-    j["dxClusterUseWSJTX"] = cfg_->dxClusterUseWSJTX;
-    j["wsjtxPort"] = cfg_->wsjtxPort;
-    j["rigHost"] = cfg_->rigHost;
-    j["rigPort"] = cfg_->rigPort;
-    j["rigAutoTune"] = cfg_->rigAutoTune;
-    j["rotatorHost"] = cfg_->rotatorHost;
-    j["rotatorPort"] = cfg_->rotatorPort;
-    j["rotatorAutoTrack"] = cfg_->rotatorAutoTrack;
-    j["qrzUsername"] = cfg_->qrzUsername;
-    // qrzPassword intentionally omitted (write-only)
-    std::string src = "PSK";
-    if (cfg_->liveSpotSource == LiveSpotSource::RBN) src = "RBN";
-    else if (cfg_->liveSpotSource == LiveSpotSource::WSPR) src = "WSPR";
-    j["liveSpotSource"] = src;
-    j["liveSpotsMaxAge"] = cfg_->liveSpotsMaxAge;
-    j["liveSpotsBands"] = cfg_->liveSpotsBands;
-    j["brightness"] = cfg_->brightness;
-    j["brightnessSchedule"] = cfg_->brightnessSchedule;
-    j["dimHour"] = cfg_->dimHour;
-    j["dimMinute"] = cfg_->dimMinute;
-    j["brightHour"] = cfg_->brightHour;
-    j["brightMinute"] = cfg_->brightMinute;
-    j["gpsEnabled"] = cfg_->gpsEnabled;
-    j["rssEnabled"] = cfg_->rssEnabled;
-    j["ontaFilter"] = cfg_->ontaFilter;
-    j["corsProxyUrl"] = cfg_->corsProxyUrl;
-    res.set_content(j.dump(2), "application/json");
+  svr.Get("/stream.mjpeg", [this](const httplib::Request &,
+                                  httplib::Response &res) {
+    if (!frameCapture_) {
+      res.status = 503;
+      res.set_content("Frame capture not available", "text/plain");
+      return;
+    }
+    uint64_t lastSeq = frameCapture_->latestSeq();
+    res.set_chunked_content_provider(
+        "multipart/x-mixed-replace;boundary=frame",
+        [this, lastSeq](size_t, httplib::DataSink &sink) mutable -> bool {
+          if (!sink.is_writable())
+            return false;
+          uint64_t outSeq = lastSeq;
+          auto frame = frameCapture_->waitFrame(lastSeq, 500, outSeq);
+          if (frame.empty())
+            return sink.is_writable();
+          lastSeq = outSeq;
+          std::string hdr =
+              "--frame\r\nContent-Type: image/jpeg\r\nContent-Length: " +
+              std::to_string(frame.size()) + "\r\n\r\n";
+          if (!sink.write(hdr.data(), hdr.size()))
+            return false;
+          if (!sink.write(reinterpret_cast<const char *>(frame.data()),
+                          frame.size()))
+            return false;
+          return sink.write("\r\n", 2);
+        });
   });
+
+  svr.Get("/api/config",
+          [this](const httplib::Request &, httplib::Response &res) {
+            if (!cfg_) {
+              res.status = 503;
+              return;
+            }
+            nlohmann::json j;
+            j["callsign"] = cfg_->callsign;
+            j["grid"] = cfg_->grid;
+            j["lat"] = cfg_->lat;
+            j["lon"] = cfg_->lon;
+            j["theme"] = cfg_->theme;
+            j["dxClusterEnabled"] = cfg_->dxClusterEnabled;
+            j["dxClusterHost"] = cfg_->dxClusterHost;
+            j["dxClusterPort"] = cfg_->dxClusterPort;
+            j["dxClusterLogin"] = cfg_->dxClusterLogin;
+            j["dxClusterUseWSJTX"] = cfg_->dxClusterUseWSJTX;
+            j["wsjtxPort"] = cfg_->wsjtxPort;
+            j["rigHost"] = cfg_->rigHost;
+            j["rigPort"] = cfg_->rigPort;
+            j["rigAutoTune"] = cfg_->rigAutoTune;
+            j["rotatorHost"] = cfg_->rotatorHost;
+            j["rotatorPort"] = cfg_->rotatorPort;
+            j["rotatorAutoTrack"] = cfg_->rotatorAutoTrack;
+            j["qrzUsername"] = cfg_->qrzUsername;
+            // qrzPassword intentionally omitted (write-only)
+            std::string src = "PSK";
+            if (cfg_->liveSpotSource == LiveSpotSource::RBN)
+              src = "RBN";
+            else if (cfg_->liveSpotSource == LiveSpotSource::WSPR)
+              src = "WSPR";
+            j["liveSpotSource"] = src;
+            j["liveSpotsMaxAge"] = cfg_->liveSpotsMaxAge;
+            j["liveSpotsBands"] = cfg_->liveSpotsBands;
+            j["brightness"] = cfg_->brightness;
+            j["brightnessSchedule"] = cfg_->brightnessSchedule;
+            j["dimHour"] = cfg_->dimHour;
+            j["dimMinute"] = cfg_->dimMinute;
+            j["brightHour"] = cfg_->brightHour;
+            j["brightMinute"] = cfg_->brightMinute;
+            j["gpsEnabled"] = cfg_->gpsEnabled;
+            j["rssEnabled"] = cfg_->rssEnabled;
+            j["ontaFilter"] = cfg_->ontaFilter;
+            j["corsProxyUrl"] = cfg_->corsProxyUrl;
+            res.set_content(j.dump(2), "application/json");
+          });
 
 #ifdef ENABLE_DEBUG_API
   svr.Get("/debug/widgets",
@@ -1431,6 +1443,95 @@ void WebServer::run() {
         res.set_content(out, "text/plain");
       });
 
+  svr.Get("/get_spacewx.txt", [this](const httplib::Request &,
+                                     httplib::Response &res) {
+    if (!solar_) {
+      res.status = 503;
+      return;
+    }
+    SolarData sd = solar_->get();
+    std::string out;
+    out += "SFI     " + std::to_string(sd.sfi) + "\n";
+    out += "SSN     " + std::to_string(sd.sunspot_number) + "\n";
+    out += "Kp      " + std::to_string(sd.k_index) + "\n";
+    out += "Ap      " + std::to_string(sd.a_index) + "\n";
+    out += "Bz      " + std::to_string(sd.bz) + "\n";
+    out += "Bt      " + std::to_string(sd.bt) + "\n";
+    out += "Wind    " + std::to_string((int)sd.solar_wind_speed) + "\n";
+    out += "Density " + std::to_string((int)sd.solar_wind_density) + "\n";
+    out += "Aurora  " + std::to_string(sd.aurora) + "\n";
+    out += "Dst     " + std::to_string(sd.dst) + "\n";
+    res.set_content(out, "text/plain");
+  });
+
+  svr.Get("/get_sys.txt", [this](const httplib::Request &,
+                                 httplib::Response &res) {
+    if (!cpu_) {
+      res.status = 503;
+      return;
+    }
+    std::string out;
+    if (cpu_->isAvailable()) {
+      out += "Temp_C      " + std::to_string(cpu_->getTemperature()) + "\n";
+      out += "Temp_F      " + std::to_string(cpu_->getTemperatureF()) + "\n";
+    }
+    auto now = std::chrono::system_clock::now();
+    auto uptimeS =
+        std::chrono::duration_cast<std::chrono::seconds>(now - startTime_)
+            .count();
+    out += "Uptime_S    " + std::to_string(uptimeS) + "\n";
+    // Load is currently not exposed via CPUMonitor
+    res.set_content(out, "text/plain");
+  });
+
+  svr.Get("/get_contests.txt",
+          [this](const httplib::Request &, httplib::Response &res) {
+            if (!contests_) {
+              res.status = 503;
+              return;
+            }
+            auto data = contests_->get();
+            std::string out;
+            for (const auto &c : data.contests) {
+              out += c.title + " | " + c.dateDesc + "\n";
+            }
+            res.set_content(out, "text/plain");
+          });
+
+  svr.Get("/get_dxpots.txt", [this](const httplib::Request &,
+                                    httplib::Response &res) {
+    if (!dxc_) {
+      res.status = 503;
+      return;
+    }
+    auto snap = dxc_->snapshot();
+    std::string out;
+    int count = 0;
+    // Iterate in reverse to show newest first
+    for (auto it = snap->spots.rbegin(); it != snap->spots.rend() && count < 20;
+         ++it, ++count) {
+      out += it->txCall + " at " + std::to_string((int)it->freqKhz) + " kHz\n";
+    }
+    res.set_content(out, "text/plain");
+  });
+
+  svr.Get("/get_livespots.txt",
+          [this](const httplib::Request &, httplib::Response &res) {
+            if (!spots_) {
+              res.status = 503;
+              return;
+            }
+            auto snap = spots_->snapshot();
+            std::string out;
+            int count = 0;
+            for (auto it = snap->spots.rbegin();
+                 it != snap->spots.rend() && count < 20; ++it, ++count) {
+              out += it->senderCallsign + " at " +
+                     std::to_string((int)it->freqKhz) + " kHz\n";
+            }
+            res.set_content(out, "text/plain");
+          });
+
   svr.Get("/get_dx.txt", [this](const httplib::Request &,
                                 httplib::Response &res) {
     if (!state_) {
@@ -1484,8 +1585,107 @@ void WebServer::run() {
             j["target"] = target;
             j["lat"] = lat;
             j["lon"] = lon;
-            j["grid"] = Astronomy::latLonToGrid(lat, lon);
             res.set_content(j.dump(), "application/json");
+          });
+
+  // --- LEGACY COMPATIBILITY API ---
+
+  // GET /set_displayOnOff?on|off
+  svr.Get("/set_displayOnOff",
+          [this](const httplib::Request &req, httplib::Response &res) {
+            bool on = true;
+            if (req.has_param("off"))
+              on = false;
+            else if (req.has_param("on"))
+              on = true;
+
+            if (displayPower_) {
+              displayPower_->setPower(on);
+            }
+            res.set_content("ok", "text/plain");
+          });
+
+  // GET /set_newde?lat=...&lon=... OR /set_newde?grid=...
+  svr.Get("/set_newde", [this](const httplib::Request &req,
+                               httplib::Response &res) {
+    if (!state_) {
+      res.status = 503;
+      return;
+    }
+    double lat = 0, lon = 0;
+    bool found = false;
+    if (req.has_param("lat") && req.has_param("lon")) {
+      lat = StringUtils::safe_stod(req.get_param_value("lat"));
+      lon = StringUtils::safe_stod(req.get_param_value("lon"));
+      found = true;
+    } else if (req.has_param("grid")) {
+      found = Astronomy::gridToLatLon(req.get_param_value("grid"), lat, lon);
+    }
+    if (found) {
+      state_->deLocation = {lat, lon};
+      state_->deGrid = Astronomy::latLonToGrid(lat, lon);
+      res.set_content("ok", "text/plain");
+    } else {
+      res.status = 400;
+      res.set_content("missing or invalid location", "text/plain");
+    }
+  });
+
+  // GET /set_newdx?lat=...&lon=... OR /set_newdx?grid=...
+  svr.Get("/set_newdx", [this](const httplib::Request &req,
+                               httplib::Response &res) {
+    if (!state_) {
+      res.status = 503;
+      return;
+    }
+    double lat = 0, lon = 0;
+    bool found = false;
+    if (req.has_param("lat") && req.has_param("lon")) {
+      lat = StringUtils::safe_stod(req.get_param_value("lat"));
+      lon = StringUtils::safe_stod(req.get_param_value("lon"));
+      found = true;
+    } else if (req.has_param("grid")) {
+      found = Astronomy::gridToLatLon(req.get_param_value("grid"), lat, lon);
+    }
+    if (found) {
+      state_->dxLocation = {lat, lon};
+      state_->dxGrid = Astronomy::latLonToGrid(lat, lon);
+      state_->dxActive = true;
+      res.set_content("ok", "text/plain");
+    } else {
+      res.status = 400;
+      res.set_content("missing or invalid location", "text/plain");
+    }
+  });
+
+  // GET /set_cluster?host=...&port=...&user=...
+  svr.Get("/set_cluster", [this](const httplib::Request &req,
+                                 httplib::Response &res) {
+    if (req.has_param("host"))
+      cfg_->dxClusterHost = req.get_param_value("host");
+    if (req.has_param("port"))
+      cfg_->dxClusterPort = StringUtils::safe_stoi(req.get_param_value("port"));
+    if (req.has_param("user"))
+      cfg_->dxClusterLogin = req.get_param_value("user");
+
+    if (cfgMgr_)
+      cfgMgr_->save(*cfg_);
+    if (reloadFlag_)
+      reloadFlag_->store(true, std::memory_order_release);
+    res.set_content("ok", "text/plain");
+  });
+
+  // GET /set_title?call=...
+  svr.Get("/set_title",
+          [this](const httplib::Request &req, httplib::Response &res) {
+            if (req.has_param("call"))
+              cfg_->callsign = req.get_param_value("call");
+
+            if (cfgMgr_)
+              cfgMgr_->save(*cfg_);
+            if (reloadFlag_)
+              reloadFlag_->store(true, std::memory_order_release);
+            res.set_content("ok", "text/plain");
           });
 
   svr.Get(
@@ -1562,91 +1762,103 @@ void WebServer::run() {
             }
           });
 
-  svr.Get("/set_config",
-          [this](const httplib::Request &req, httplib::Response &res) {
-            if (req.has_param("call"))
-              cfg_->callsign = req.get_param_value("call");
-            if (req.has_param("grid"))
-              cfg_->grid = req.get_param_value("grid");
-            if (req.has_param("theme"))
-              cfg_->theme = req.get_param_value("theme");
-            if (req.has_param("lat"))
-              cfg_->lat = StringUtils::safe_stod(req.get_param_value("lat"));
-            if (req.has_param("lon"))
-              cfg_->lon = StringUtils::safe_stod(req.get_param_value("lon"));
-            if (req.has_param("cors_proxy_url"))
-              cfg_->corsProxyUrl = req.get_param_value("cors_proxy_url");
-            // DX Cluster
-            if (req.has_param("dx_enabled"))
-              cfg_->dxClusterEnabled = req.get_param_value("dx_enabled") == "1";
-            if (req.has_param("dx_host"))
-              cfg_->dxClusterHost = req.get_param_value("dx_host");
-            if (req.has_param("dx_port"))
-              cfg_->dxClusterPort = StringUtils::safe_stoi(req.get_param_value("dx_port"));
-            if (req.has_param("dx_login"))
-              cfg_->dxClusterLogin = req.get_param_value("dx_login");
-            if (req.has_param("dx_use_wsjtx"))
-              cfg_->dxClusterUseWSJTX = req.get_param_value("dx_use_wsjtx") == "1";
-            if (req.has_param("wsjtx_port"))
-              cfg_->wsjtxPort = StringUtils::safe_stoi(req.get_param_value("wsjtx_port"));
-            // Rig
-            if (req.has_param("rig_host"))
-              cfg_->rigHost = req.get_param_value("rig_host");
-            if (req.has_param("rig_port"))
-              cfg_->rigPort = StringUtils::safe_stoi(req.get_param_value("rig_port"));
-            if (req.has_param("rig_auto_tune"))
-              cfg_->rigAutoTune = req.get_param_value("rig_auto_tune") == "1";
-            // Rotator
-            if (req.has_param("rot_host"))
-              cfg_->rotatorHost = req.get_param_value("rot_host");
-            if (req.has_param("rot_port"))
-              cfg_->rotatorPort = StringUtils::safe_stoi(req.get_param_value("rot_port"));
-            if (req.has_param("rot_auto_track"))
-              cfg_->rotatorAutoTrack = req.get_param_value("rot_auto_track") == "1";
-            // QRZ
-            if (req.has_param("qrz_user"))
-              cfg_->qrzUsername = req.get_param_value("qrz_user");
-            if (req.has_param("qrz_pass"))
-              cfg_->qrzPassword = req.get_param_value("qrz_pass");
-            // Live Spots
-            if (req.has_param("spot_source")) {
-              const std::string &s = req.get_param_value("spot_source");
-              if (s == "RBN") cfg_->liveSpotSource = LiveSpotSource::RBN;
-              else if (s == "WSPR") cfg_->liveSpotSource = LiveSpotSource::WSPR;
-              else cfg_->liveSpotSource = LiveSpotSource::PSK;
-            }
-            if (req.has_param("spot_max_age"))
-              cfg_->liveSpotsMaxAge = StringUtils::safe_stoi(req.get_param_value("spot_max_age"));
-            if (req.has_param("spot_bands"))
-              cfg_->liveSpotsBands = (uint32_t)StringUtils::safe_stoi(req.get_param_value("spot_bands"));
-            // Brightness
-            if (req.has_param("brightness"))
-              cfg_->brightness = StringUtils::safe_stoi(req.get_param_value("brightness"));
-            if (req.has_param("brightness_schedule"))
-              cfg_->brightnessSchedule = req.get_param_value("brightness_schedule") == "1";
-            if (req.has_param("dim_hour"))
-              cfg_->dimHour = StringUtils::safe_stoi(req.get_param_value("dim_hour"));
-            if (req.has_param("dim_min"))
-              cfg_->dimMinute = StringUtils::safe_stoi(req.get_param_value("dim_min"));
-            if (req.has_param("bright_hour"))
-              cfg_->brightHour = StringUtils::safe_stoi(req.get_param_value("bright_hour"));
-            if (req.has_param("bright_min"))
-              cfg_->brightMinute = StringUtils::safe_stoi(req.get_param_value("bright_min"));
-            // Toggles
-            if (req.has_param("gps_enabled"))
-              cfg_->gpsEnabled = req.get_param_value("gps_enabled") == "1";
-            if (req.has_param("rss_enabled"))
-              cfg_->rssEnabled = req.get_param_value("rss_enabled") == "1";
-            if (req.has_param("onta_filter"))
-              cfg_->ontaFilter = req.get_param_value("onta_filter");
+  svr.Get("/set_config", [this](const httplib::Request &req,
+                                httplib::Response &res) {
+    if (req.has_param("call"))
+      cfg_->callsign = req.get_param_value("call");
+    if (req.has_param("grid"))
+      cfg_->grid = req.get_param_value("grid");
+    if (req.has_param("theme"))
+      cfg_->theme = req.get_param_value("theme");
+    if (req.has_param("lat"))
+      cfg_->lat = StringUtils::safe_stod(req.get_param_value("lat"));
+    if (req.has_param("lon"))
+      cfg_->lon = StringUtils::safe_stod(req.get_param_value("lon"));
+    if (req.has_param("cors_proxy_url"))
+      cfg_->corsProxyUrl = req.get_param_value("cors_proxy_url");
+    // DX Cluster
+    if (req.has_param("dx_enabled"))
+      cfg_->dxClusterEnabled = req.get_param_value("dx_enabled") == "1";
+    if (req.has_param("dx_host"))
+      cfg_->dxClusterHost = req.get_param_value("dx_host");
+    if (req.has_param("dx_port"))
+      cfg_->dxClusterPort =
+          StringUtils::safe_stoi(req.get_param_value("dx_port"));
+    if (req.has_param("dx_login"))
+      cfg_->dxClusterLogin = req.get_param_value("dx_login");
+    if (req.has_param("dx_use_wsjtx"))
+      cfg_->dxClusterUseWSJTX = req.get_param_value("dx_use_wsjtx") == "1";
+    if (req.has_param("wsjtx_port"))
+      cfg_->wsjtxPort =
+          StringUtils::safe_stoi(req.get_param_value("wsjtx_port"));
+    // Rig
+    if (req.has_param("rig_host"))
+      cfg_->rigHost = req.get_param_value("rig_host");
+    if (req.has_param("rig_port"))
+      cfg_->rigPort = StringUtils::safe_stoi(req.get_param_value("rig_port"));
+    if (req.has_param("rig_auto_tune"))
+      cfg_->rigAutoTune = req.get_param_value("rig_auto_tune") == "1";
+    // Rotator
+    if (req.has_param("rot_host"))
+      cfg_->rotatorHost = req.get_param_value("rot_host");
+    if (req.has_param("rot_port"))
+      cfg_->rotatorPort =
+          StringUtils::safe_stoi(req.get_param_value("rot_port"));
+    if (req.has_param("rot_auto_track"))
+      cfg_->rotatorAutoTrack = req.get_param_value("rot_auto_track") == "1";
+    // QRZ
+    if (req.has_param("qrz_user"))
+      cfg_->qrzUsername = req.get_param_value("qrz_user");
+    if (req.has_param("qrz_pass"))
+      cfg_->qrzPassword = req.get_param_value("qrz_pass");
+    // Live Spots
+    if (req.has_param("spot_source")) {
+      const std::string &s = req.get_param_value("spot_source");
+      if (s == "RBN")
+        cfg_->liveSpotSource = LiveSpotSource::RBN;
+      else if (s == "WSPR")
+        cfg_->liveSpotSource = LiveSpotSource::WSPR;
+      else
+        cfg_->liveSpotSource = LiveSpotSource::PSK;
+    }
+    if (req.has_param("spot_max_age"))
+      cfg_->liveSpotsMaxAge =
+          StringUtils::safe_stoi(req.get_param_value("spot_max_age"));
+    if (req.has_param("spot_bands"))
+      cfg_->liveSpotsBands =
+          (uint32_t)StringUtils::safe_stoi(req.get_param_value("spot_bands"));
+    // Brightness
+    if (req.has_param("brightness"))
+      cfg_->brightness =
+          StringUtils::safe_stoi(req.get_param_value("brightness"));
+    if (req.has_param("brightness_schedule"))
+      cfg_->brightnessSchedule =
+          req.get_param_value("brightness_schedule") == "1";
+    if (req.has_param("dim_hour"))
+      cfg_->dimHour = StringUtils::safe_stoi(req.get_param_value("dim_hour"));
+    if (req.has_param("dim_min"))
+      cfg_->dimMinute = StringUtils::safe_stoi(req.get_param_value("dim_min"));
+    if (req.has_param("bright_hour"))
+      cfg_->brightHour =
+          StringUtils::safe_stoi(req.get_param_value("bright_hour"));
+    if (req.has_param("bright_min"))
+      cfg_->brightMinute =
+          StringUtils::safe_stoi(req.get_param_value("bright_min"));
+    // Toggles
+    if (req.has_param("gps_enabled"))
+      cfg_->gpsEnabled = req.get_param_value("gps_enabled") == "1";
+    if (req.has_param("rss_enabled"))
+      cfg_->rssEnabled = req.get_param_value("rss_enabled") == "1";
+    if (req.has_param("onta_filter"))
+      cfg_->ontaFilter = req.get_param_value("onta_filter");
 
-            if (cfgMgr_)
-              cfgMgr_->save(*cfg_);
-            // Signal the main thread to re-apply the new config to live state.
-            if (reloadFlag_)
-              reloadFlag_->store(true, std::memory_order_release);
-            res.set_content("ok", "text/plain");
-          });
+    if (cfgMgr_)
+      cfgMgr_->save(*cfg_);
+    // Signal the main thread to re-apply the new config to live state.
+    if (reloadFlag_)
+      reloadFlag_->store(true, std::memory_order_release);
+    res.set_content("ok", "text/plain");
+  });
 
   // POST /api/reload — re-applies the current in-memory config to live app
   // state without restarting.  Useful after a remote /set_config call on a

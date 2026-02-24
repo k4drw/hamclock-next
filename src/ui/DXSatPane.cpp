@@ -129,7 +129,7 @@ void DXSatPane::onResize(int x, int y, int w, int h) {
     destroyMenuTextures();
 }
 
-bool DXSatPane::onMouseUp(int mx, int my, Uint16 mod) {
+bool DXSatPane::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
   // Modal: when menu is open, consume all clicks
   if (menuState_ != MenuState::Closed) {
     if (mx >= x_ && mx < x_ + width_ && my >= y_ && my < y_ + height_) {

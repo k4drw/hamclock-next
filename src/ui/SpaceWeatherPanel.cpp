@@ -312,7 +312,7 @@ void SpaceWeatherPanel::onResize(int x, int y, int w, int h) {
   destroyCache();
 }
 
-bool SpaceWeatherPanel::onMouseUp(int mx, int my, Uint16 mod) {
+bool SpaceWeatherPanel::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
   (void)mx;
   (void)mod;
   // Don't consume clicks in the top 10% — let PaneContainer handle them

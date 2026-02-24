@@ -180,7 +180,7 @@ void AsteroidPanel::render(SDL_Renderer *renderer) {
   }
 }
 
-bool AsteroidPanel::onMouseUp(int mx, int my, Uint16 /*mod*/) {
+bool AsteroidPanel::onMouseUp(int mx, int my, Uint16 /*mod*/, int clicks) {
   if (!state_ || lastData_.asteroids.empty())
     return false;
 

@@ -30,11 +30,6 @@
 #include "services/AlertsProvider.h"
 #include "services/AsteroidProvider.h"
 #include "services/AuroraProvider.h"
-#include "services/ForecastProvider.h"
-#include "services/HurricaneProvider.h"
-#include "services/MarineProvider.h"
-#include "services/RepeaterProvider.h"
-#include "services/WinlinkProvider.h"
 #include "services/BME280Provider.h"
 #include "services/BandConditionsProvider.h"
 #include "services/BeaconProvider.h"
@@ -44,30 +39,30 @@
 #include "services/DRAPProvider.h"
 #include "services/DXClusterProvider.h"
 #include "services/DstProvider.h"
+#include "services/ForecastProvider.h"
 #include "services/GPSProvider.h"
 #include "services/HistoryProvider.h"
+#include "services/HurricaneProvider.h"
 #include "services/IonosondeProvider.h"
 #include "services/LiveSpotProvider.h"
+#include "services/MarineProvider.h"
 #include "services/MoonProvider.h"
 #include "services/MufRtProvider.h"
 #include "services/NOAAProvider.h"
 #include "services/RBNProvider.h"
 #include "services/RSSProvider.h"
+#include "services/RepeaterProvider.h"
 #include "services/RigService.h"
 #include "services/RotatorService.h"
 #include "services/SDOProvider.h"
 #include "services/SantaProvider.h"
 #include "services/UpdateChecker.h"
 #include "services/WeatherProvider.h"
+#include "services/WinlinkProvider.h"
 #include "ui/ADIFPanel.h"
 #include "ui/ActivityPanels.h"
 #include "ui/AlertsPanel.h"
 #include "ui/AsteroidPanel.h"
-#include "ui/ForecastPanel.h"
-#include "ui/HurricanePanel.h"
-#include "ui/MarinePanel.h"
-#include "ui/RepeaterPanel.h"
-#include "ui/WinlinkPanel.h"
 #include "ui/AuroraGraphPanel.h"
 #include "ui/AuroraPanel.h"
 #include "ui/BandConditionsPanel.h"
@@ -87,16 +82,20 @@
 #include "ui/EmbeddedFont.h"
 #include "ui/FontCatalog.h"
 #include "ui/FontManager.h"
+#include "ui/ForecastPanel.h"
 #include "ui/GimbalPanel.h"
 #include "ui/HistoryPanel.h"
+#include "ui/HurricanePanel.h"
 #include "ui/LayoutManager.h"
 #include "ui/LiveSpotPanel.h"
 #include "ui/LocalPanel.h"
 #include "ui/MapWidget.h"
+#include "ui/MarinePanel.h"
 #include "ui/MoonPanel.h"
 #include "ui/PaneContainer.h"
 #include "ui/PlaceholderWidget.h"
 #include "ui/RSSBanner.h"
+#include "ui/RepeaterPanel.h"
 #include "ui/SDOPanel.h"
 #include "ui/SantaPanel.h"
 #include "ui/SetupScreen.h"
@@ -107,6 +106,7 @@
 #include "ui/WatchlistPanel.h"
 #include "ui/WeatherPanel.h"
 #include "ui/WidgetSelector.h"
+#include "ui/WinlinkPanel.h"
 #include "ui/icon_png.h"
 
 #include "core/Constants.h"
@@ -477,7 +477,7 @@ int main(int argc, char *argv[]) {
     Log::setLevel(spdlog::level::warn);
   }
 
-  LOG_INFO("Starting HamClock-Next v{}...", HAMCLOCK_VERSION);
+  LOG_INFO("Starting HamClock-Next {}...", HAMCLOCK_VERSION);
 
 #ifdef __EMSCRIPTEN__
   // In WASM, IDBFS sync is async. Config is loaded later by
@@ -709,6 +709,7 @@ int main(int argc, char *argv[]) {
   ctx.webServer = std::make_unique<WebServer>(
       ctx.renderer, ctx.appCfg, *ctx.state, ctx.cfgMgr, ctx.displayPower,
       ctx.configReloadRequested, ctx.watchlistStore, ctx.solarStore,
+      ctx.contestStore, ctx.dxcStore, ctx.spotStore, ctx.cpuMonitor,
       DEFAULT_WEB_SERVER_PORT);
   ctx.webServer->setFrameCapture(ctx.frameCapture.get());
   ctx.webServer->setLiveWebEnabled(liveWebEnabled);
@@ -1123,8 +1124,8 @@ DashboardContext::DashboardContext(AppContext &ctx)
           std::make_unique<MarinePanel>(0, 0, 0, 0, fontMgr, ctx.marineStore);
       break;
     case WidgetType::WINLINK:
-      widgetPool[type] = std::make_unique<WinlinkPanel>(0, 0, 0, 0, fontMgr,
-                                                        ctx.winlinkStore);
+      widgetPool[type] =
+          std::make_unique<WinlinkPanel>(0, 0, 0, 0, fontMgr, ctx.winlinkStore);
       break;
     default:
       widgetPool[type] = std::make_unique<PlaceholderWidget>(
@@ -1148,8 +1149,8 @@ DashboardContext::DashboardContext(AppContext &ctx)
       WidgetType::CALLBOOK,      WidgetType::DST_INDEX,
       WidgetType::WATCHLIST,     WidgetType::EME_TOOL,
       WidgetType::SANTA_TRACKER, WidgetType::CPU_TEMP,
-      WidgetType::ASTEROID, WidgetType::ALERTS,
-      WidgetType::FORECAST, WidgetType::HURRICANE,
+      WidgetType::ASTEROID,      WidgetType::ALERTS,
+      WidgetType::FORECAST,      WidgetType::HURRICANE,
       WidgetType::MARINE};
   // Note: REPEATER_DIR omitted — RepeaterBook API requires auth key (TODO).
   // Note: WINLINK omitted — Winlink API requires access key (TODO).
@@ -1526,7 +1527,8 @@ void DashboardContext::update(AppContext &ctx) {
           smx = static_cast<int>(pixX / ctx.layScale);
           smy = static_cast<int>(pixY / ctx.layScale);
         }
-        if (updateOverlay->onMouseUp(smx, smy, SDL_GetModState())) {
+        if (updateOverlay->onMouseUp(smx, smy, SDL_GetModState(),
+                                     event.button.clicks)) {
           auto res = updateOverlay->getResult();
           if (res == UpdateOverlay::Result::Skip) {
             ctx.appCfg.skippedVersion = ctx.updateChecker->latestVersion();
@@ -1702,8 +1704,9 @@ void DashboardContext::update(AppContext &ctx) {
           break;
         }
         case AE_ASTEROID_ELEMENTS_READY: {
-          auto *payload = static_cast<std::pair<std::string, OrbitalElements> *>(
-              event.user.data1);
+          auto *payload =
+              static_cast<std::pair<std::string, OrbitalElements> *>(
+                  event.user.data1);
           if (payload && ctx.dashboard && ctx.dashboard->mapArea) {
             ctx.dashboard->mapArea->onAsteroidElementsReady(payload->first,
                                                             payload->second);
@@ -1805,10 +1808,11 @@ void DashboardContext::update(AppContext &ctx) {
               break;
             }
           if (activeModal)
-            activeModal->onMouseUp(mx, my, SDL_GetModState());
+            activeModal->onMouseUp(mx, my, SDL_GetModState(),
+                                   event.button.clicks);
           else
             for (auto *w : eventWidgets)
-              if (w->onMouseUp(mx, my, SDL_GetModState()))
+              if (w->onMouseUp(mx, my, SDL_GetModState(), event.button.clicks))
                 break;
         }
       }
@@ -2030,7 +2034,8 @@ void main_tick() {
             smx = static_cast<int>(pixX / ctx.layScale);
             smy = static_cast<int>(pixY / ctx.layScale);
           }
-          ctx.setupWidget->onMouseUp(smx, smy, SDL_GetModState());
+          ctx.setupWidget->onMouseUp(smx, smy, SDL_GetModState(),
+                                     event.button.clicks);
         } else if (event.type == SDL_WINDOWEVENT &&
                    event.window.event == SDL_WINDOWEVENT_SIZE_CHANGED) {
           ctx.updateLayoutMetrics();

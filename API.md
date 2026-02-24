@@ -40,6 +40,8 @@ Returns the current display power state and the control methodology being used (
 
 ---
 
+---
+
 ## Reporting API
 
 ### `GET /get_config.txt`
@@ -58,6 +60,53 @@ Returns current DE (Designated Entry) location information.
 Returns current DX (target) location and path information.
 - Fields: `DX_Grid`, `DX_Lat`, `DX_Lon`, `DX_Dist_km`, `DX_Bearing`
 - Returns "DX not set" if no DX location is active.
+
+### `GET /get_spacewx.txt` [Legacy-Compatible]
+Returns current space weather indices in plain-text format.
+- Fields: `SFI`, `SSN`, `Kp`, `Ap`, `Bz`, `Bt`, `Wind`, `Density`, `Aurora`, `Dst`.
+
+### `GET /get_sys.txt` [Legacy-Compatible]
+Returns system telemetry.
+- Fields: `Temp_C`, `Temp_F`, `Uptime_S`.
+
+### `GET /get_contests.txt` [Legacy-Compatible]
+Returns a list of upcoming contests.
+
+### `GET /get_dxpots.txt` [Legacy-Compatible]
+Returns the latest 20 DX spots.
+
+### `GET /get_livespots.txt` [Legacy-Compatible]
+Returns the latest 20 live spots (PSK/RBN/WSPR).
+
+---
+
+## Legacy Control Aliases (HamClock-Original Parity)
+
+These endpoints are provided for compatibility with existing automation scripts and hardware controllers designed for the original HamClock.
+
+### `GET /set_displayOnOff?[on|off]`
+Legacy alias for display power control.
+- `on`: Turn display on.
+- `off`: Turn display off.
+- **Example**: `GET /set_displayOnOff?off`
+
+### `GET /set_newde?lat=F&lon=F` or `GET /set_newde?grid=S`
+Legacy alias for setting the DE location.
+- **Example**: `GET /set_newde?grid=FN20`
+
+### `GET /set_newdx?lat=F&lon=F` or `GET /set_newdx?grid=S`
+Legacy alias for setting the DX location.
+- **Example**: `GET /set_newdx?lat=35.0&lon=139.0`
+
+### `GET /set_cluster?host=S&port=N&user=S`
+Legacy alias for updating DX Cluster settings.
+
+### `GET /set_title?call=S`
+Legacy alias for updating the station callsign.
+
+---
+
+## Remote Control & Navigation
 
 ### `GET /set_mappos?lat=F&lon=F[&target=S]`
 Programmatically sets the DE or DX location on the map.
@@ -103,28 +152,6 @@ programmatically adds a callsign to the monitor watchlist.
 ### `GET /debug/type?text=T`
 Simulates typing a full string into the application.
 - **Example**: `GET /debug/type?text=K4DRW`
-
----
-
----
-
-## Configuration Notes
-
-### config.json Structure (02-17-2026)
-
-Operators who manually edit `config.json` should be aware of the following structure changes introduced in the 02-17-2026 session:
-
-- **Countdown timer fields** are now stored under a `countdown` section:
-  ```json
-  { "countdown": { "enabled": true, "duration_sec": 300, "label": "QSO Timer" } }
-  ```
-- **Web password** is now stored under a `security` section:
-  ```json
-  { "security": { "web_password": "" } }
-  ```
-- Backward-compatibility fallback reads legacy flat keys on first load and migrates them automatically.
-
-No GPS-specific REST endpoints exist yet. GPS provider status is internal; DE auto-set from gpsd is pending.
 
 ---
 

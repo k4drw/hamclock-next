@@ -18,7 +18,7 @@ public:
   void update() override;
   void render(SDL_Renderer *renderer) override;
   void onResize(int x, int y, int w, int h) override;
-  bool onMouseUp(int mx, int my, Uint16 mod) override;
+  bool onMouseUp(int mx, int my, Uint16 mod, int clicks) override;
 
   std::string getName() const override { return "SpaceWeather"; }
   std::vector<std::string> getActions() const override;

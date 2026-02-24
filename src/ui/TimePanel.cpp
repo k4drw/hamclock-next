@@ -22,7 +22,7 @@
 
 namespace {
 
-static constexpr const char *kVersion = "V" HAMCLOCK_VERSION;
+static constexpr const char *kVersion = "v" HAMCLOCK_VERSION;
 static constexpr Uint32 kInfoRotateMs = 3000;
 
 std::string getSystemUptime() {
@@ -350,7 +350,7 @@ void TimePanel::stopEditing(bool apply) {
   SDL_StopTextInput();
 }
 
-bool TimePanel::onMouseUp(int mx, int my, Uint16 /*mod*/) {
+bool TimePanel::onMouseUp(int mx, int my, Uint16 /*mod*/, int clicks) {
   // Gear icon click → request setup
   SDL_Rect hit = gearRect_;
   int margin = 5;

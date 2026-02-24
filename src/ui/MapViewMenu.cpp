@@ -299,7 +299,7 @@ void MapViewMenu::drawDropdownList(SDL_Renderer *renderer,
   }
 }
 
-bool MapViewMenu::onMouseUp(int mx, int my, Uint16) {
+bool MapViewMenu::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
   if (!visible_)
     return false;
   SDL_Point pt = {mx, my};

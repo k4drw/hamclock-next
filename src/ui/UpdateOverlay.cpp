@@ -241,7 +241,7 @@ void UpdateOverlay::onResize(int x, int y, int w, int h) {
   lastWidth_ = 0; // Trigger re-wrap
 }
 
-bool UpdateOverlay::onMouseUp(int mx, int my, Uint16 mod) {
+bool UpdateOverlay::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
   auto inRect = [&](SDL_Rect r) {
     return mx >= r.x && mx < r.x + r.w && my >= r.y && my < r.y + r.h;
   };

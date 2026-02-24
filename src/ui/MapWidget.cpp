@@ -417,7 +417,7 @@ void MapWidget::update() {
     }
   }
 }
-bool MapWidget::onMouseUp(int mx, int my, Uint16 mod) {
+bool MapWidget::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
   // Pass through to menu if visible
   if (mapViewMenu_->isVisible()) {
     return mapViewMenu_->onMouseUp(mx, my, mod);

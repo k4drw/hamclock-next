@@ -503,15 +503,6 @@
       "notes": "Hamlib rigctld TCP client. Set frequency from DX spot click when auto-tune enabled. Config in Setup \u2192 Rig tab (host/port). Windows-compatible via Winsock2 guards."
     },
     {
-      "feature_id": "password_auth",
-      "name": "Web Server Password Auth",
-      "next_files": [
-        "src/network/WebServer.cpp",
-        "src/core/ConfigManager.h"
-      ],
-      "notes": "config.webPassword (empty = no auth). set_pre_routing_handler checks Basic auth on control endpoints. Stored in config.json under security.web_password."
-    },
-    {
       "feature_id": "cpu_temp",
       "name": "CPU Temperature Monitor",
       "next_files": [

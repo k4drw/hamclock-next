@@ -283,7 +283,7 @@ void ADIFPanel::onMouseMove(int mx, int my) {
   }
 }
 
-bool ADIFPanel::onMouseUp(int mx, int my, Uint16 /*mod*/) {
+bool ADIFPanel::onMouseUp(int mx, int my, Uint16 /*mod*/, int clicks) {
   if (draggingScrollbar_) {
     draggingScrollbar_ = false;
     return true;

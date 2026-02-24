@@ -91,7 +91,7 @@ void CountdownPanel::render(SDL_Renderer *renderer) {
   }
 }
 
-bool CountdownPanel::onMouseUp(int mx, int my, Uint16) {
+bool CountdownPanel::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
   if (editing_) {
     int pad = 10;
     int boxH = 24;

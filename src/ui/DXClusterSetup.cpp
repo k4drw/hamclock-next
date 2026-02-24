@@ -173,7 +173,7 @@ void DXClusterSetup::onResize(int x, int y, int w, int h) {
   recalcLayout();
 }
 
-bool DXClusterSetup::onMouseUp(int mx, int my, Uint16) {
+bool DXClusterSetup::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
   if (mx >= toggleRect_.x && mx < toggleRect_.x + toggleRect_.w &&
       my >= toggleRect_.y && my < toggleRect_.y + toggleRect_.h) {
     useWSJTX_ = !useWSJTX_;

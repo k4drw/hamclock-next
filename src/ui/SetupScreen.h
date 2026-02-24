@@ -19,7 +19,7 @@ public:
   void update() override;
   void render(SDL_Renderer *renderer) override;
   void onResize(int x, int y, int w, int h) override;
-  bool onMouseUp(int mx, int my, Uint16 mod) override;
+  bool onMouseUp(int mx, int my, Uint16 mod, int clicks) override;
   bool onKeyDown(SDL_Keycode key, Uint16 mod) override;
   bool onTextInput(const char *text) override;
   std::string getName() const override { return "SetupScreen"; }
@@ -45,6 +45,7 @@ private:
   void recalcLayout();
   void autoPopulateLatLon();
   std::string *getActiveFieldText();
+  bool deleteSelection(std::string *text);
   int calculateCursorPosFromClick(int clickX, int fieldStartX,
                                   const std::string &text, int fontSize);
   void renderTabIdentity(SDL_Renderer *renderer, int cx, int pad, int fieldW,
@@ -99,7 +100,6 @@ private:
   std::string qrzPassword_;
   std::string countdownLabel_;
   std::string countdownTime_; // YYYY-MM-DD HH:MM
-  std::string webPasswordText_;
   std::string dimTime_;
   std::string brightTime_;
   std::string rigHost_;
@@ -110,6 +110,7 @@ private:
   int activePane_ = 0;
   int activeField_ = 0;
   int cursorPos_ = 0;
+  int selectionAnchor_ = 0;
   bool complete_ = false;
   bool cancelled_ = false;
   bool latLonManual_ = false;

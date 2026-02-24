@@ -102,6 +102,17 @@ std::string *SetupScreen::getActiveFieldText() {
   return nullptr;
 }
 
+bool SetupScreen::deleteSelection(std::string *text) {
+  if (!text || cursorPos_ == selectionAnchor_)
+    return false;
+  int start = std::min(cursorPos_, selectionAnchor_);
+  int end = std::max(cursorPos_, selectionAnchor_);
+  text->erase(start, end - start);
+  cursorPos_ = start;
+  selectionAnchor_ = cursorPos_;
+  return true;
+}
+
 int SetupScreen::calculateCursorPosFromClick(int clickX, int fieldStartX,
                                              const std::string &text,
                                              int fontSize) {
@@ -162,9 +173,10 @@ static void renderField(SDL_Renderer *renderer, FontManager &fontMgr,
                         const std::string &text, const std::string &placeholder,
                         int fieldX, int &y, int fieldW, int fieldH,
                         int fieldSize, int textPad, bool active, bool valid,
-                        int cursorPos, SDL_Color activeBorder,
-                        SDL_Color inactiveBorder, SDL_Color validColor,
-                        SDL_Color textColor, SDL_Color placeholderColor) {
+                        int cursorPos, int selectionAnchor,
+                        SDL_Color activeBorder, SDL_Color inactiveBorder,
+                        SDL_Color validColor, SDL_Color textColor,
+                        SDL_Color placeholderColor) {
   SDL_Color border = active ? activeBorder : inactiveBorder;
 
   SDL_SetRenderDrawColor(renderer, 30, 30, 40, 255);
@@ -182,6 +194,22 @@ static void renderField(SDL_Renderer *renderer, FontManager &fontMgr,
   // Set clipping rectangle to prevent text overflow
   SDL_Rect clipRect = {fieldX + 2, y + 2, fieldW - 4, fieldH - 4};
   SDL_RenderSetClipRect(renderer, &clipRect);
+
+  // Selection highlight
+  if (active && cursorPos != selectionAnchor && !text.empty()) {
+    int start = std::min(cursorPos, selectionAnchor);
+    int end = std::max(cursorPos, selectionAnchor);
+    int selX = fieldX + textPad;
+    if (start > 0) {
+      selX += fontMgr.getLogicalWidth(text.substr(0, start), fieldSize);
+    }
+    int selW =
+        fontMgr.getLogicalWidth(text.substr(start, end - start), fieldSize);
+
+    SDL_Rect selRect = {selX, y + 4, selW, fieldH - 8};
+    SDL_SetRenderDrawColor(renderer, 60, 60, 100, 255);
+    SDL_RenderFillRect(renderer, &selRect);
+  }
 
   if (!text.empty()) {
     SDL_Color color = valid ? validColor : textColor;
@@ -367,8 +395,8 @@ void SetupScreen::renderTabIdentity(SDL_Renderer *renderer, int, int pad,
   y += labelSize_ + 4;
   renderField(renderer, fontMgr_, callsignText_, "e.g. K4DRW", fieldX, y,
               fieldW, fieldH, fieldSize_, textPad, activeField_ == 0,
-              !callsignText_.empty(), cursorPos_, orange, gray, white, white,
-              gray);
+              !callsignText_.empty(), cursorPos_, selectionAnchor_, orange,
+              gray, white, white, gray);
   y += vSpace;
 
   fontMgr_.drawText(renderer, "Grid Square:", fieldX, y, white, labelSize_,
@@ -376,7 +404,7 @@ void SetupScreen::renderTabIdentity(SDL_Renderer *renderer, int, int pad,
   y += labelSize_ + 4;
   renderField(renderer, fontMgr_, gridText_, "e.g. EL87qr", fieldX, y, fieldW,
               fieldH, fieldSize_, textPad, activeField_ == 1, gridValid_,
-              cursorPos_, orange, gray, green, white, gray);
+              cursorPos_, selectionAnchor_, orange, gray, green, white, gray);
   y += vSpace;
 
   int halfFieldW = (fieldW - pad) / 2;
@@ -388,13 +416,14 @@ void SetupScreen::renderTabIdentity(SDL_Renderer *renderer, int, int pad,
   int latY = y;
   renderField(renderer, fontMgr_, latText_, "e.g. 27.76", fieldX, latY,
               halfFieldW, fieldH, fieldSize_, textPad, activeField_ == 2,
-              !latText_.empty(), cursorPos_, orange, gray, white, white, gray);
+              !latText_.empty(), cursorPos_, selectionAnchor_, orange, gray,
+              white, white, gray);
 
   int lonY = y;
   renderField(renderer, fontMgr_, lonText_, "e.g. -82.64",
               fieldX + halfFieldW + pad, lonY, halfFieldW, fieldH, fieldSize_,
-              textPad, activeField_ == 3, !lonText_.empty(), cursorPos_, orange,
-              gray, white, white, gray);
+              textPad, activeField_ == 3, !lonText_.empty(), cursorPos_,
+              selectionAnchor_, orange, gray, white, white, gray);
   y = std::max(latY, lonY) + pad / 2;
 
   if (mismatchWarning_) {
@@ -445,21 +474,21 @@ void SetupScreen::renderTabDXCluster(SDL_Renderer *renderer, int cx, int pad,
   int hostY = y;
   renderField(renderer, fontMgr_, clusterHost_, "dxusa.net", fieldX, hostY,
               halfW, fieldH, fieldSize_, textPad, activeField_ == 0,
-              !clusterHost_.empty(), cursorPos_, orange, gray, white, white,
-              gray);
+              !clusterHost_.empty(), cursorPos_, selectionAnchor_, orange, gray,
+              white, white, gray);
   int portY = y;
   renderField(renderer, fontMgr_, clusterPort_, "7300", fieldX + halfW + pad,
               portY, halfW, fieldH, fieldSize_, textPad, activeField_ == 1,
-              !clusterPort_.empty(), cursorPos_, orange, gray, white, white,
-              gray);
+              !clusterPort_.empty(), cursorPos_, selectionAnchor_, orange, gray,
+              white, white, gray);
   y += fieldH + vSpace;
 
   fontMgr_.drawText(renderer, "Login:", fieldX, y, white, labelSize_, true);
   y += labelSize_ + 4;
   renderField(renderer, fontMgr_, clusterLogin_, "NOCALL", fieldX, y, fieldW,
               fieldH, fieldSize_, textPad, activeField_ == 2,
-              !clusterLogin_.empty(), cursorPos_, orange, gray, white, white,
-              gray);
+              !clusterLogin_.empty(), cursorPos_, selectionAnchor_, orange,
+              gray, white, white, gray);
   y += fieldH + vSpace;
 
   // Toggles row 1
@@ -499,8 +528,8 @@ void SetupScreen::renderTabDXCluster(SDL_Renderer *renderer, int cx, int pad,
     int tmpY = y;
     renderField(renderer, fontMgr_, wsjtxPort_, "2237", portX, tmpY, wPortW,
                 fieldH, fieldSize_, textPad, activeField_ == 3,
-                !wsjtxPort_.empty(), cursorPos_, orange, gray, white, white,
-                gray);
+                !wsjtxPort_.empty(), cursorPos_, selectionAnchor_, orange, gray,
+                white, white, gray);
   } else {
     wsjtxPortRect_ = {0, 0, 0, 0};
   }
@@ -677,12 +706,13 @@ void SetupScreen::renderTabAppearance(SDL_Renderer *renderer, int cx, int pad,
     int dimY = y;
     renderField(renderer, fontMgr_, dimTime_, "HH:MM", fieldX, dimY, halfW,
                 fieldH, fieldSize_, textPad, activeField_ == 1, true,
-                cursorPos_, orange, gray, white, white, gray);
+                cursorPos_, selectionAnchor_, orange, gray, white, white, gray);
     dimTimeRect_ = {fieldX, dimY, halfW, fieldH};
     int brightY = y;
     renderField(renderer, fontMgr_, brightTime_, "HH:MM", fieldX + halfW + pad,
                 brightY, halfW, fieldH, fieldSize_, textPad, activeField_ == 2,
-                true, cursorPos_, orange, gray, white, white, gray);
+                true, cursorPos_, selectionAnchor_, orange, gray, white, white,
+                gray);
     brightTimeRect_ = {fieldX + halfW + pad, brightY, halfW, fieldH};
   } else {
     dimTimeRect_ = {0, 0, 0, 0};
@@ -705,7 +735,7 @@ void SetupScreen::renderTabServices(SDL_Renderer *renderer, int, int pad,
   y += labelSize_ + 4;
   renderField(renderer, fontMgr_, qrzUsername_, "e.g. K4DRW", fieldX, y, fieldW,
               fieldH, fieldSize_, textPad, activeField_ == 0, true, cursorPos_,
-              orange, gray, white, white, gray);
+              selectionAnchor_, orange, gray, white, white, gray);
   y += vSpace;
 
   fontMgr_.drawText(renderer, "QRZ Password:", fieldX, y, white, labelSize_,
@@ -714,7 +744,7 @@ void SetupScreen::renderTabServices(SDL_Renderer *renderer, int, int pad,
   std::string passMask(qrzPassword_.length(), '*');
   renderField(renderer, fontMgr_, passMask, "********", fieldX, y, fieldW,
               fieldH, fieldSize_, textPad, activeField_ == 1, true, cursorPos_,
-              orange, gray, white, white, gray);
+              selectionAnchor_, orange, gray, white, white, gray);
   y += vSpace;
 }
 
@@ -737,14 +767,14 @@ void SetupScreen::renderTabRig(SDL_Renderer *renderer, int cx, int pad,
   y += labelSize_ + 4;
   renderField(renderer, fontMgr_, rigHost_, "e.g. localhost", fieldX, y, fieldW,
               fieldH, fieldSize_, textPad, activeField_ == 0, true, cursorPos_,
-              orange, gray, white, white, gray);
+              selectionAnchor_, orange, gray, white, white, gray);
   y += vSpace;
 
   fontMgr_.drawText(renderer, "rigctld Port:", fieldX, y, white, labelSize_);
   y += labelSize_ + 4;
   renderField(renderer, fontMgr_, rigPort_, "4532", fieldX, y, fieldW, fieldH,
-              fieldSize_, textPad, activeField_ == 1, true, cursorPos_, orange,
-              gray, white, white, gray);
+              fieldSize_, textPad, activeField_ == 1, true, cursorPos_,
+              selectionAnchor_, orange, gray, white, white, gray);
   y += vSpace;
 
   // Auto-tune Toggle
@@ -908,7 +938,7 @@ void SetupScreen::onResize(int x, int y, int w, int h) {
   recalcLayout();
 }
 
-bool SetupScreen::onMouseUp(int mx, int my, Uint16) {
+bool SetupScreen::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
   int cx = x_ + width_ / 2;
   int pad = std::max(16, width_ / 24);
   int fieldW = std::min(400, width_ - 2 * pad);
@@ -1050,7 +1080,13 @@ bool SetupScreen::onMouseUp(int mx, int my, Uint16) {
       if (mx >= r.x && mx < r.x + r.w && my >= r.y && my < r.y + r.h) {
         activeField_ = fieldIdx;
         std::string *ft = getActiveFieldText();
-        cursorPos_ = ft ? (int)ft->size() : 0;
+        if (clicks == 2 && ft) {
+          selectionAnchor_ = 0;
+          cursorPos_ = static_cast<int>(ft->size());
+        } else {
+          cursorPos_ = ft ? static_cast<int>(ft->size()) : 0;
+          selectionAnchor_ = cursorPos_;
+        }
         return true;
       }
       return false;
@@ -1140,23 +1176,28 @@ bool SetupScreen::onMouseUp(int mx, int my, Uint16) {
       int oldField = activeField_;
       activeField_ = i;
 
-      // Calculate cursor position from click if clicking in same field
-      if (oldField == i) {
-        std::string *fieldText = getActiveFieldText();
-        if (fieldText && !fieldText->empty()) {
-          cursorPos_ = calculateCursorPosFromClick(mx, fx + textPad, *fieldText,
-                                                   fieldSize_);
-        } else {
-          cursorPos_ = 0;
-        }
+      std::string *fieldText = getActiveFieldText();
+      if (clicks == 2 && fieldText) {
+        selectionAnchor_ = 0;
+        cursorPos_ = static_cast<int>(fieldText->size());
       } else {
-        // New field - position at end of text
-        std::string *fieldText = getActiveFieldText();
-        if (fieldText) {
-          cursorPos_ = fieldText->size();
+        // Calculate cursor position from click if clicking in same field
+        if (oldField == i) {
+          if (fieldText && !fieldText->empty()) {
+            cursorPos_ = calculateCursorPosFromClick(mx, fx + textPad,
+                                                     *fieldText, fieldSize_);
+          } else {
+            cursorPos_ = 0;
+          }
         } else {
-          cursorPos_ = 0;
+          // New field - position at end of text
+          if (fieldText) {
+            cursorPos_ = static_cast<int>(fieldText->size());
+          } else {
+            cursorPos_ = 0;
+          }
         }
+        selectionAnchor_ = cursorPos_;
       }
 
       return true;
@@ -1242,7 +1283,8 @@ bool SetupScreen::onKeyDown(SDL_Keycode key, Uint16 mod) {
   case SDLK_TAB: {
     activeField_ = (activeField_ + 1) % nFields;
     std::string *nf = getActiveFieldText();
-    cursorPos_ = nf ? (int)nf->size() : 0;
+    cursorPos_ = nf ? static_cast<int>(nf->size()) : 0;
+    selectionAnchor_ = cursorPos_;
     return true;
   }
   case SDLK_RETURN:
@@ -1252,9 +1294,14 @@ bool SetupScreen::onKeyDown(SDL_Keycode key, Uint16 mod) {
     }
     return true;
   case SDLK_BACKSPACE:
-    if (text && cursorPos_ > 0) {
+    if (deleteSelection(text)) {
+      if (activeTab_ == Tab::Identity &&
+          (activeField_ == 2 || activeField_ == 3))
+        latLonManual_ = true;
+    } else if (text && cursorPos_ > 0) {
       text->erase(cursorPos_ - 1, 1);
       --cursorPos_;
+      selectionAnchor_ = cursorPos_;
       if (activeTab_ == Tab::Identity &&
           (activeField_ == 2 || activeField_ == 3))
         latLonManual_ = true;
@@ -1263,8 +1310,13 @@ bool SetupScreen::onKeyDown(SDL_Keycode key, Uint16 mod) {
     }
     return true;
   case SDLK_DELETE:
-    if (text && cursorPos_ < static_cast<int>(text->size())) {
+    if (deleteSelection(text)) {
+      if (activeTab_ == Tab::Identity &&
+          (activeField_ == 2 || activeField_ == 3))
+        latLonManual_ = true;
+    } else if (text && cursorPos_ < static_cast<int>(text->size())) {
       text->erase(cursorPos_, 1);
+      selectionAnchor_ = cursorPos_;
       if (activeTab_ == Tab::Identity &&
           (activeField_ == 2 || activeField_ == 3))
         latLonManual_ = true;
@@ -1273,17 +1325,31 @@ bool SetupScreen::onKeyDown(SDL_Keycode key, Uint16 mod) {
   case SDLK_LEFT:
     if (cursorPos_ > 0)
       --cursorPos_;
+    selectionAnchor_ = cursorPos_;
     return true;
   case SDLK_RIGHT:
     if (text && cursorPos_ < static_cast<int>(text->size()))
       ++cursorPos_;
+    selectionAnchor_ = cursorPos_;
     return true;
   case SDLK_HOME:
     cursorPos_ = 0;
+    selectionAnchor_ = cursorPos_;
     return true;
   case SDLK_END:
     if (text)
       cursorPos_ = static_cast<int>(text->size());
+    selectionAnchor_ = cursorPos_;
+    return true;
+  case SDLK_a:
+    if (mod & (KMOD_CTRL | KMOD_GUI)) {
+      std::string *txt = getActiveFieldText();
+      if (txt) {
+        selectionAnchor_ = 0;
+        cursorPos_ = static_cast<int>(txt->size());
+      }
+      return true;
+    }
     return true;
   case SDLK_v:
     if (mod & (KMOD_CTRL | KMOD_GUI)) {
@@ -1390,6 +1456,9 @@ bool SetupScreen::onTextInput(const char *inputText) {
 
   if (!field)
     return true;
+
+  deleteSelection(field);
+
   if (static_cast<int>(field->size()) >= maxLen)
     return true;
 

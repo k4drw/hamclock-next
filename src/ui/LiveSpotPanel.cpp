@@ -370,7 +370,7 @@ void LiveSpotPanel::renderSetup(SDL_Renderer *renderer) {
   }
 }
 
-bool LiveSpotPanel::onMouseUp(int mx, int my, Uint16 /*mod*/) {
+bool LiveSpotPanel::onMouseUp(int mx, int my, Uint16 /*mod*/, int clicks) {
   if (mx < x_ || mx >= x_ + width_ || my < y_ || my >= y_ + height_)
     return false;
 

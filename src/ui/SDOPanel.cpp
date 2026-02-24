@@ -271,7 +271,7 @@ void SDOPanel::recalcMenuLayout() {
                  btnH};
 }
 
-bool SDOPanel::onMouseUp(int mx, int my, Uint16 mod) {
+bool SDOPanel::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
   if (menuVisible_) {
     // 1. Check buttons FIRST to avoid overlap issues
     if (mx >= okRect_.x && mx < okRect_.x + okRect_.w && my >= okRect_.y &&

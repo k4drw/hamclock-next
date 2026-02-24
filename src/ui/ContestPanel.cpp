@@ -292,7 +292,7 @@ void ContestPanel::onResize(int x, int y, int w, int h) {
   }
 }
 
-bool ContestPanel::onMouseUp(int mx, int my, Uint16 mod) {
+bool ContestPanel::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
   (void)mod;
 
   // Bounds check
