@@ -734,6 +734,8 @@ int main(int argc, char *argv[]) {
 #else
   while (ctx.appRunning) {
     main_tick();
+    if (headlessMode)
+      SDL_Delay(10);  // ~100 ticks/s cap when vsync unavailable
   }
 #endif
 

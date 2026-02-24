@@ -1108,7 +1108,8 @@ void WebServer::run() {
   <style>
     *{margin:0;padding:0;box-sizing:border-box}
     body{background:#000;overflow:hidden;width:100vw;height:100vh}
-    canvas{display:block;cursor:crosshair;touch-action:none}
+    #feed{display:block;width:100vw;height:100vh;object-fit:contain}
+    #overlay{position:fixed;top:0;left:0;width:100vw;height:100vh;cursor:crosshair;touch-action:none}
     #badge{position:fixed;top:8px;right:8px;background:#c00;color:#fff;
            font:bold 11px monospace;padding:2px 6px;border-radius:2px;pointer-events:none}
     #iobadge{position:fixed;top:8px;right:54px;background:#333;color:#aaa;
@@ -1116,10 +1117,8 @@ void WebServer::run() {
   </style>
 </head>
 <body>
-  <canvas id="hc"></canvas>
-  <img id="feed" src="/stream.mjpeg"
-       style="visibility:hidden;position:absolute;width:0;height:0"
-       crossorigin="anonymous">
+  <img id="feed" src="/stream.mjpeg" crossorigin="anonymous">
+  <div id="overlay"></div>
   <div id="badge">LIVE</div>
   <div id="iobadge">...</div>
   <script>
@@ -1131,13 +1130,11 @@ void WebServer::run() {
     page += R"html(;
     var THROTTLE_MS = 100;
 
-    var canvas = document.getElementById('hc');
-    var ctx2d = canvas.getContext('2d');
     var feed = document.getElementById('feed');
+    var overlay = document.getElementById('overlay');
     var iobadge = document.getElementById('iobadge');
 
     var liveEnabled = false;
-    var offsetX = 0, offsetY = 0, imgW = APP_W, imgH = APP_H;
     var lastMouseMs = 0;
 
     // Probe live/status
@@ -1150,37 +1147,20 @@ void WebServer::run() {
       iobadge.textContent = 'R/O';
     });
 
-    function resize() {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-      var scale = Math.min(window.innerWidth / APP_W, window.innerHeight / APP_H);
-      imgW = Math.round(APP_W * scale);
-      imgH = Math.round(APP_H * scale);
-      offsetX = Math.round((window.innerWidth  - imgW) / 2);
-      offsetY = Math.round((window.innerHeight - imgH) / 2);
-    }
-    resize();
-    window.addEventListener('resize', resize);
-
-    function drawLoop() {
-      if (feed.naturalWidth > 0) {
-        ctx2d.fillStyle = '#000';
-        ctx2d.fillRect(0, 0, canvas.width, canvas.height);
-        ctx2d.drawImage(feed, offsetX, offsetY, imgW, imgH);
-      }
-      requestAnimationFrame(drawLoop);
-    }
-    drawLoop();
-
     // Reconnect on stream error
     feed.onerror = function() {
       setTimeout(function(){ location.reload(); }, 3000);
     };
 
-    function toApp(cx, cy) {
+    function getCoords(clientX, clientY) {
+      var scale = Math.min(window.innerWidth / APP_W, window.innerHeight / APP_H);
+      var imgW  = APP_W * scale;
+      var imgH  = APP_H * scale;
+      var offX  = (window.innerWidth  - imgW) / 2;
+      var offY  = (window.innerHeight - imgH) / 2;
       return {
-        x: Math.round((cx - offsetX) * APP_W / imgW),
-        y: Math.round((cy - offsetY) * APP_H / imgH)
+        x: Math.round((clientX - offX) / scale),
+        y: Math.round((clientY - offY) / scale)
       };
     }
     function inBounds(p) { return p.x >= 0 && p.x < APP_W && p.y >= 0 && p.y < APP_H; }
@@ -1202,19 +1182,17 @@ void WebServer::run() {
     }
 
     // Pointer events
-    canvas.addEventListener('pointerdown', function(e) {
+    overlay.addEventListener('pointerdown', function(e) {
       if (!liveEnabled) return;
-      var r = canvas.getBoundingClientRect();
-      var p = toApp(e.clientX - r.left, e.clientY - r.top);
+      var p = getCoords(e.clientX, e.clientY);
       if (inBounds(p)) sendTouch(p.x, p.y, e.button === 2 ? 1 : 0);
     });
-    canvas.addEventListener('pointermove', function(e) {
+    overlay.addEventListener('pointermove', function(e) {
       if (!liveEnabled) return;
-      var r = canvas.getBoundingClientRect();
-      var p = toApp(e.clientX - r.left, e.clientY - r.top);
+      var p = getCoords(e.clientX, e.clientY);
       if (inBounds(p)) sendMouse(p.x, p.y);
     });
-    canvas.addEventListener('contextmenu', function(e) { e.preventDefault(); });
+    overlay.addEventListener('contextmenu', function(e) { e.preventDefault(); });
 
     // Keyboard
     document.addEventListener('keydown', function(e) {
@@ -1239,21 +1217,19 @@ void WebServer::run() {
     });
 
     // Touch (mobile)
-    canvas.addEventListener('touchstart', function(e) {
+    overlay.addEventListener('touchstart', function(e) {
       if (!liveEnabled) return;
       e.preventDefault();
-      var r = canvas.getBoundingClientRect();
       var t = e.changedTouches[0];
-      var p = toApp(t.clientX - r.left, t.clientY - r.top);
+      var p = getCoords(t.clientX, t.clientY);
       if (inBounds(p)) sendTouch(p.x, p.y, 0);
     }, {passive:false});
-    canvas.addEventListener('touchend', function(e) { e.preventDefault(); }, {passive:false});
-    canvas.addEventListener('touchmove', function(e) {
+    overlay.addEventListener('touchend', function(e) { e.preventDefault(); }, {passive:false});
+    overlay.addEventListener('touchmove', function(e) {
       if (!liveEnabled) return;
       e.preventDefault();
-      var r = canvas.getBoundingClientRect();
       var t = e.changedTouches[0];
-      var p = toApp(t.clientX - r.left, t.clientY - r.top);
+      var p = getCoords(t.clientX, t.clientY);
       if (inBounds(p)) sendMouse(p.x, p.y);
     }, {passive:false});
   </script>
