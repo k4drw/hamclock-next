@@ -1,5 +1,5 @@
 {
-  "mcp_version": "2.3",
+  "mcp_version": "2.4",
   "project": "hamclock-next",
   "updated_at": "2026-02-24T00:00:00.000Z",
   "project_context": {
@@ -176,8 +176,8 @@
     ]
   },
   "feature_status_summary": {
-    "total": 83,
-    "implemented": 79,
+    "total": 84,
+    "implemented": 80,
     "partial": 3,
     "missing": 1,
     "not_needed": 2,
@@ -643,6 +643,22 @@
         "src/core/AuroraHistoryStore.h"
       ],
       "notes": "JSON persistence in SDL pref dir. Survives restart."
+    },
+    {
+      "feature_id": "local_data_hub",
+      "name": "Local Data Hub (LAN Rate-Limit Sharing)",
+      "next_files": [
+        "src/core/ConfigManager.h",
+        "src/core/ConfigManager.cpp",
+        "src/network/NetworkManager.h",
+        "src/network/NetworkManager.cpp",
+        "src/network/WebServer.h",
+        "src/network/WebServer.cpp",
+        "src/ui/SetupScreen.h",
+        "src/ui/SetupScreen.cpp",
+        "src/main.cpp"
+      ],
+      "notes": "HubMode enum (Off/Master/Client) in AppConfig. Master exposes /api/hub/fetch (base64-encoded target URL, max_age param). Client proxies all fetchAsync calls through hub with 2s curl timeout; falls back silently to direct fetch on failure. SetupScreen Network tab: mode cycle button + conditional IP/Port fields for Client mode. Config persists in hub.{mode,ip,port} JSON section."
     },
     {
       "feature_id": "asteroid_enhancements",
@@ -1363,6 +1379,19 @@
         "Established pattern: bool fetched flag in data structs \u2014 distinguishes 'still loading' from 'fetch attempted / API error'"
       ]
     },
+    "phase_54": {
+      "name": "Local Data Hub Phase 1 — Master/Client LAN Mode",
+      "completed": "2026-02-24",
+      "summary": "Multiple HamClock instances on the same LAN now share NetworkManager fetch cache via hub mode. Master instance exposes /api/hub/fetch (base64 URL, max_age). Client instances proxy all fetchAsync calls through the hub with a 2s curl timeout and automatic silent fallback to direct fetch. SetupScreen gains a new 'Network' tab (8 tabs total) with Off/Master/Client mode cycle and conditional IP+Port fields. Config persists in hub.{mode,ip,port} JSON section.",
+      "key_changes": [
+        "ConfigManager.h: HubMode enum (Off/Master/Client); hubMode/hubIp/hubPort in AppConfig",
+        "ConfigManager.cpp: hub JSON section in load()/save()",
+        "NetworkManager.h/cpp: setHubConfig(), fetchFromHubSync() (2s curl), fetchDirect() extracted; hub proxy branch in fetchAsync with silent 2s fallback",
+        "WebServer.h/cpp: netMgr_ member + setNetworkManager(); base64Decode(); /api/hub/fetch endpoint (Master-only, 403 otherwise, 501 WASM); hub fields in /api/config; hub_mode/hub_ip/hub_port in /set_config",
+        "SetupScreen.h/cpp: Network tab added (8 tabs); renderTabNetwork() with mode button + conditional IP/Port fields; setConfig/getConfig hub round-trip",
+        "main.cpp: setHubConfig() at 3 setCorsProxyUrl sites; setNetworkManager() after webServer init"
+      ]
+    },
     "phase_53": {
       "name": "v1.0B01 Version Bump + API Parity",
       "completed": "2026-02-24",
@@ -1712,6 +1741,13 @@
           "description": "Legacy alias for setting DX cluster host/port.",
           "curl": "curl 'http://localhost:8080/set_cluster?host=dxc.k0xm.net&port=7300'",
           "notes": "Legacy API parity alias added in Phase 53."
+        },
+        {
+          "endpoint": "/api/hub/fetch",
+          "method": "GET",
+          "description": "Local Data Hub master endpoint. Proxies a URL through the master instance's NetworkManager cache. Requires hub mode = Master (403 otherwise). Returns raw response body as application/octet-stream. Returns 501 on WASM.",
+          "curl": "# Encode target URL in base64 first:\nURL=$(echo -n 'https://services.swpc.noaa.gov/json/planetary_k_index_1m.json' | base64 -w0)\ncurl \"http://192.168.1.10:8080/api/hub/fetch?url=${URL}&max_age=300\"",
+          "notes": "Params: url (base64-encoded target URL, must start with http), max_age (seconds, default 3600). Client instances proxy fetchAsync through this endpoint with 2s timeout; fall back to direct fetch on failure."
         }
       ]
     }

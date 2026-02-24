@@ -54,6 +54,58 @@ static size_t headerCallback(char *ptr, size_t size, size_t nmemb,
 
 // ... (existing includes)
 
+static const char kB64Chars[] =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+static std::string base64Encode(const std::string &in) {
+  std::string out;
+  int val = 0, valb = -6;
+  for (unsigned char c : in) {
+    val = (val << 8) + c;
+    valb += 8;
+    while (valb >= 0) {
+      out.push_back(kB64Chars[(val >> valb) & 0x3F]);
+      valb -= 6;
+    }
+  }
+  if (valb > -6)
+    out.push_back(kB64Chars[((val << 8) >> (valb + 8)) & 0x3F]);
+  while (out.size() % 4)
+    out.push_back('=');
+  return out;
+}
+
+void NetworkManager::setHubConfig(HubMode mode, const std::string &ip,
+                                   int port) {
+  std::lock_guard<std::mutex> lk(hubMutex_);
+  hubMode_ = mode;
+  hubIp_   = ip;
+  hubPort_ = port;
+}
+
+std::string NetworkManager::fetchFromHubSync(const std::string &hubUrl) {
+#ifdef __EMSCRIPTEN__
+  return "";
+#else
+  std::string result;
+  CURL *curl = curl_easy_init();
+  if (!curl)
+    return "";
+  curl_easy_setopt(curl, CURLOPT_URL, hubUrl.c_str());
+  curl_easy_setopt(curl, CURLOPT_TIMEOUT, 2L);
+  curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+  curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeCallback);
+  curl_easy_setopt(curl, CURLOPT_WRITEDATA, &result);
+  CURLcode rc = curl_easy_perform(curl);
+  long httpCode = 0;
+  curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &httpCode);
+  curl_easy_cleanup(curl);
+  if (rc != CURLE_OK || httpCode != 200)
+    return "";
+  return result;
+#endif
+}
+
 // Basic in-memory cache to prevent accidental tight-loop fetches
 void NetworkManager::fetchAsync(const std::string &url,
                                 std::function<void(std::string)> callback,
@@ -157,138 +209,170 @@ void NetworkManager::fetchAsync(const std::string &url,
 
   emscripten_fetch(&attr, fetchUrl.c_str());
 #else
-  std::thread([this, url, callback = std::move(callback), hasCache, cached]() {
-    CURL *curl = curl_easy_init();
-    if (!curl) {
-      LOG_E("NetworkManager", "curl_easy_init failed");
-      callback("");
+  // --- Hub client proxy ---
+  {
+    std::lock_guard<std::mutex> lk(hubMutex_);
+    if (hubMode_ == HubMode::Client && !hubIp_.empty()) {
+      std::string encoded = base64Encode(url);
+      std::string hubUrl  = "http://" + hubIp_ + ":" + std::to_string(hubPort_)
+                          + "/api/hub/fetch?url=" + encoded
+                          + "&max_age=" + std::to_string(cacheAgeSeconds);
+      std::thread([this, hubUrl, url, callback = std::move(callback),
+                   hasCache, cached]() mutable {
+        std::string body = fetchFromHubSync(hubUrl);
+        if (!body.empty()) {
+          {
+            std::lock_guard<std::mutex> lock(cacheMutex_);
+            CacheEntry entry;
+            entry.timestamp = std::time(nullptr);
+            if (body.size() < 512 * 1024)
+              entry.data = body;
+            cache_[url] = entry;
+          }
+          callback(std::move(body));
+          return;
+        }
+        LOG_D("NetworkManager", "Hub miss for {}, falling back to direct", url);
+        fetchDirect(url, std::move(callback), hasCache, cached);
+      }).detach();
       return;
     }
+  }
+  // --- Direct fetch ---
+  std::thread([this, url, callback = std::move(callback), hasCache,
+               cached]() mutable {
+    fetchDirect(url, std::move(callback), hasCache, cached);
+  }).detach();
+#endif
+}
 
-    std::unordered_map<std::string, std::string> headers;
-    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 15L);
-    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
-    curl_easy_setopt(curl, CURLOPT_USERAGENT, "HamClock-Next/1.0");
-    curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, headerCallback);
-    curl_easy_setopt(curl, CURLOPT_HEADERDATA, &headers);
+void NetworkManager::fetchDirect(const std::string &url,
+                                  std::function<void(std::string)> callback,
+                                  bool hasCache, const CacheEntry &cached) {
+  CURL *curl = curl_easy_init();
+  if (!curl) {
+    LOG_E("NetworkManager", "curl_easy_init failed");
+    callback("");
+    return;
+  }
+
+  std::unordered_map<std::string, std::string> headers;
+  curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+  curl_easy_setopt(curl, CURLOPT_TIMEOUT, 15L);
+  curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+  curl_easy_setopt(curl, CURLOPT_USERAGENT, "HamClock-Next/1.0");
+  curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, headerCallback);
+  curl_easy_setopt(curl, CURLOPT_HEADERDATA, &headers);
 
 // On Linux with static mbedTLS, we often need to point CURL to the CA
 // bundle. However, for system libcurl (dynamic), this is usually automatic.
 // We remove the hardcoded path to let libcurl decide.
 #ifdef __linux__
-    if (std::filesystem::exists("/etc/ssl/certs/ca-certificates.crt")) {
-      curl_easy_setopt(curl, CURLOPT_CAINFO,
-                       "/etc/ssl/certs/ca-certificates.crt");
-    } else if (std::filesystem::exists("/etc/pki/tls/certs/ca-bundle.crt")) {
-      curl_easy_setopt(curl, CURLOPT_CAINFO,
-                       "/etc/pki/tls/certs/ca-bundle.crt");
-    } else if (std::filesystem::exists("/etc/ssl/ca-bundle.pem")) {
-      curl_easy_setopt(curl, CURLOPT_CAINFO, "/etc/ssl/ca-bundle.pem");
-    }
+  if (std::filesystem::exists("/etc/ssl/certs/ca-certificates.crt")) {
+    curl_easy_setopt(curl, CURLOPT_CAINFO,
+                     "/etc/ssl/certs/ca-certificates.crt");
+  } else if (std::filesystem::exists("/etc/pki/tls/certs/ca-bundle.crt")) {
+    curl_easy_setopt(curl, CURLOPT_CAINFO,
+                     "/etc/pki/tls/certs/ca-bundle.crt");
+  } else if (std::filesystem::exists("/etc/ssl/ca-bundle.pem")) {
+    curl_easy_setopt(curl, CURLOPT_CAINFO, "/etc/ssl/ca-bundle.pem");
+  }
 #endif
 
-    // Use Conditional GET (If-Modified-Since / If-None-Match) to save bandwidth
-    struct curl_slist *chunk = NULL;
-    if (hasCache) {
-      if (!cached.etag.empty()) {
-        std::string h = "If-None-Match: " + cached.etag;
-        chunk = curl_slist_append(chunk, h.c_str());
-      }
-      if (!cached.lastModified.empty()) {
-        std::string h = "If-Modified-Since: " + cached.lastModified;
-        chunk = curl_slist_append(chunk, h.c_str());
-      }
-      if (chunk) {
-        curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
-      }
+  // Use Conditional GET (If-Modified-Since / If-None-Match) to save bandwidth
+  struct curl_slist *chunk = NULL;
+  if (hasCache) {
+    if (!cached.etag.empty()) {
+      std::string h = "If-None-Match: " + cached.etag;
+      chunk = curl_slist_append(chunk, h.c_str());
     }
-
-    std::string response;
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeCallback);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
-
-    LOG_D("NetworkManager", "Fetching from network: {}", url);
-    CURLcode res = curl_easy_perform(curl);
-
+    if (!cached.lastModified.empty()) {
+      std::string h = "If-Modified-Since: " + cached.lastModified;
+      chunk = curl_slist_append(chunk, h.c_str());
+    }
     if (chunk) {
-      curl_slist_free_all(chunk);
+      curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
     }
+  }
 
-    long responseCode = 0;
-    curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &responseCode);
-    curl_easy_cleanup(curl);
+  std::string response;
+  curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeCallback);
+  curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
 
-    if (res != CURLE_OK) {
-      LOG_E("NetworkManager", "Fetch failed for {}: {}", url,
-            curl_easy_strerror(res));
-      callback("");
-      return;
-    }
+  LOG_D("NetworkManager", "Fetching from network: {}", url);
+  CURLcode res = curl_easy_perform(curl);
 
-    // Handle 304 Not Modified
-    if (responseCode == 304) {
-      LOG_D("NetworkManager", "304 Not Modified for {}", url);
-      // Return cached data
-      std::string retData = cached.data;
-      if (retData.empty()) {
-        // Load from disk if not in memory
-        std::filesystem::path p = cacheDir_ / hashUrl(url);
-        std::ifstream ifs(p, std::ios::binary);
-        if (ifs) {
-          std::string line;
-          for (int i = 0; i < 5; ++i) std::getline(ifs, line); // Skip header
-          retData.assign((std::istreambuf_iterator<char>(ifs)),
-                         (std::istreambuf_iterator<char>()));
-        }
+  if (chunk) {
+    curl_slist_free_all(chunk);
+  }
+
+  long responseCode = 0;
+  curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &responseCode);
+  curl_easy_cleanup(curl);
+
+  if (res != CURLE_OK) {
+    LOG_E("NetworkManager", "Fetch failed for {}: {}", url,
+          curl_easy_strerror(res));
+    callback("");
+    return;
+  }
+
+  // Handle 304 Not Modified
+  if (responseCode == 304) {
+    LOG_D("NetworkManager", "304 Not Modified for {}", url);
+    std::string retData = cached.data;
+    if (retData.empty()) {
+      std::filesystem::path p = cacheDir_ / hashUrl(url);
+      std::ifstream ifs(p, std::ios::binary);
+      if (ifs) {
+        std::string line;
+        for (int i = 0; i < 5; ++i)
+          std::getline(ifs, line);
+        retData.assign((std::istreambuf_iterator<char>(ifs)),
+                       (std::istreambuf_iterator<char>()));
       }
-      // Update timestamp to extend cache life
-      {
-        std::lock_guard<std::mutex> lock(cacheMutex_);
-        cache_[url].timestamp = std::time(nullptr);
-        // We don't need to re-save to disk if it's already there and valid
-      }
-      callback(std::move(retData));
-      return;
     }
-
-    if (responseCode != 200) {
-      LOG_E("NetworkManager", "HTTP error {} for {}", responseCode, url);
-      callback("");
-      return;
-    }
-
-    // Update cache on success (200 OK)
     {
       std::lock_guard<std::mutex> lock(cacheMutex_);
-      std::time_t now = std::time(nullptr);
-      CacheEntry entry;
-      entry.timestamp = now;
-      if (headers.count("last-modified"))
-        entry.lastModified = headers.at("last-modified");
-      if (headers.count("etag"))
-        entry.etag = headers.at("etag");
+      cache_[url].timestamp = std::time(nullptr);
+    }
+    callback(std::move(retData));
+    return;
+  }
 
-      // Memory-Optimization: Only store small data in RAM cache.
-      // Large maps (50MB+) should only live on disk.
-      bool isLarge = response.size() > 512 * 1024; // 512 KB
-      if (!isLarge) {
-        entry.data = response;
-      } else {
-        LOG_D("NetworkManager",
-              "Data for {} is large ({:.1f} MB), skipping RAM cache", url,
-              response.size() / 1024.0 / 1024.0);
-      }
+  if (responseCode != 200) {
+    LOG_E("NetworkManager", "HTTP error {} for {}", responseCode, url);
+    callback("");
+    return;
+  }
 
-      cache_[url] = entry;
-      if (!cacheDir_.empty()) {
-        saveToDisk(url, entry, response);
-      }
+  // Update cache on success (200 OK)
+  {
+    std::lock_guard<std::mutex> lock(cacheMutex_);
+    std::time_t now = std::time(nullptr);
+    CacheEntry entry;
+    entry.timestamp = now;
+    if (headers.count("last-modified"))
+      entry.lastModified = headers.at("last-modified");
+    if (headers.count("etag"))
+      entry.etag = headers.at("etag");
+
+    bool isLarge = response.size() > 512 * 1024;
+    if (!isLarge) {
+      entry.data = response;
+    } else {
+      LOG_D("NetworkManager",
+            "Data for {} is large ({:.1f} MB), skipping RAM cache", url,
+            response.size() / 1024.0 / 1024.0);
     }
 
-    callback(std::move(response));
-  }).detach();
-#endif
+    cache_[url] = entry;
+    if (!cacheDir_.empty()) {
+      saveToDisk(url, entry, response);
+    }
+  }
+
+  callback(std::move(response));
 }
 
 NetworkManager::NetworkManager(const std::filesystem::path &cacheDir)

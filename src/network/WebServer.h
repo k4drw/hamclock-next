@@ -19,6 +19,7 @@ class ContestStore;
 class DXClusterDataStore;
 class LiveSpotDataStore;
 class CPUMonitor;
+class NetworkManager;
 
 class WebServer {
 public:
@@ -40,6 +41,7 @@ public:
   void setFrameCapture(FrameCapture *fc) { frameCapture_ = fc; }
   void setLiveWebEnabled(bool enabled) { liveWebEnabled_ = enabled; }
   bool isLiveWebEnabled() const { return liveWebEnabled_; }
+  void setNetworkManager(NetworkManager *nm) { netMgr_ = nm; }
 
 private:
   void run();
@@ -57,6 +59,7 @@ private:
   std::shared_ptr<DisplayPower> displayPower_;
   std::atomic<bool> *reloadFlag_; // points to AppContext::configReloadRequested
   FrameCapture *frameCapture_ = nullptr;
+  NetworkManager *netMgr_ = nullptr;
   bool liveWebEnabled_ = false;
   int port_;
   std::thread thread_;

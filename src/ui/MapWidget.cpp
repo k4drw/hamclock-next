@@ -420,7 +420,7 @@ void MapWidget::update() {
 bool MapWidget::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
   // Pass through to menu if visible
   if (mapViewMenu_->isVisible()) {
-    return mapViewMenu_->onMouseUp(mx, my, mod);
+    return mapViewMenu_->onMouseUp(mx, my, mod, clicks);
   }
 
   // Check RSS toggle button (lower-left corner)
@@ -583,8 +583,8 @@ void MapWidget::onMouseMove(int mx, int my) {
   }
 
   // 6. Check asteroid icon
-  if (tip.empty() && asteroidProvider_ && !state_->selectedAsteroidName.empty()
-      && !cachedAsteroidTrack_.empty()) {
+  if (tip.empty() && asteroidProvider_ &&
+      !state_->selectedAsteroidName.empty() && !cachedAsteroidTrack_.empty()) {
     size_t mid = cachedAsteroidTrack_.size() / 2;
     if (screenDist(cachedAsteroidTrack_[mid].lat,
                    cachedAsteroidTrack_[mid].lon) < kHitRadius + 4) {
@@ -597,7 +597,8 @@ void MapWidget::onMouseMove(int mx, int my) {
           char buf[256];
           std::snprintf(buf, sizeof(buf), "%s\n%.2f LD  %.1f km/s%s",
                         name.c_str(), ast.missDistanceLD, ast.velocityKmS,
-                        ast.isHazardous ? "\n\u26a0 Potentially Hazardous" : "");
+                        ast.isHazardous ? "\n\u26a0 Potentially Hazardous"
+                                        : "");
           tip = buf;
           break;
         }
@@ -1313,7 +1314,8 @@ void MapWidget::renderAsteroidOverlay(SDL_Renderer *renderer) {
     return;
 
   if (asteroidTrackDirty_ || cachedAsteroidTrack_.size() < 2) {
-    // Rebuild geometry when dirty (track may be empty if elements not yet arrived)
+    // Rebuild geometry when dirty (track may be empty if elements not yet
+    // arrived)
     asteroidTrackVerts_.clear();
     asteroidTrackIndices_.clear();
 
@@ -1336,10 +1338,14 @@ void MapWidget::renderAsteroidOverlay(SDL_Renderer *renderer) {
           float nx = -dy / len * r;
           float ny = dx / len * r;
           int base = static_cast<int>(asteroidTrackVerts_.size());
-          asteroidTrackVerts_.push_back({{p1.x + nx, p1.y + ny}, color, {0, 0}});
-          asteroidTrackVerts_.push_back({{p1.x - nx, p1.y - ny}, color, {0, 1}});
-          asteroidTrackVerts_.push_back({{p2.x + nx, p2.y + ny}, color, {1, 0}});
-          asteroidTrackVerts_.push_back({{p2.x - nx, p2.y - ny}, color, {1, 1}});
+          asteroidTrackVerts_.push_back(
+              {{p1.x + nx, p1.y + ny}, color, {0, 0}});
+          asteroidTrackVerts_.push_back(
+              {{p1.x - nx, p1.y - ny}, color, {0, 1}});
+          asteroidTrackVerts_.push_back(
+              {{p2.x + nx, p2.y + ny}, color, {1, 0}});
+          asteroidTrackVerts_.push_back(
+              {{p2.x - nx, p2.y - ny}, color, {1, 1}});
           asteroidTrackIndices_.push_back(base + 0);
           asteroidTrackIndices_.push_back(base + 1);
           asteroidTrackIndices_.push_back(base + 2);
@@ -1390,14 +1396,14 @@ void MapWidget::renderAsteroidOverlay(SDL_Renderer *renderer) {
     size_t mid = cachedAsteroidTrack_.size() / 2;
     SDL_FPoint sp = latLonToScreen(cachedAsteroidTrack_[mid].lat,
                                    cachedAsteroidTrack_[mid].lon);
-    const std::string &icon = config_.asteroidIcon.empty() ? "☄" : config_.asteroidIcon;
+    const std::string &icon =
+        config_.asteroidIcon.empty() ? "☄" : config_.asteroidIcon;
     int ptSize = fontMgr_.catalog()->ptSize(FontStyle::SmallRegular);
     int iw = 0, ih = 0;
     SDL_Color icnColor = {config_.asteroidColor.r, config_.asteroidColor.g,
                           config_.asteroidColor.b, 220};
-    SDL_Texture *iconTex = fontMgr_.renderText(renderer, icon,
-                                               icnColor,
-                                               ptSize, &iw, &ih);
+    SDL_Texture *iconTex =
+        fontMgr_.renderText(renderer, icon, icnColor, ptSize, &iw, &ih);
     if (iconTex) {
       SDL_Rect dst = {static_cast<int>(sp.x) - iw / 2,
                       static_cast<int>(sp.y) - ih / 2, iw, ih};

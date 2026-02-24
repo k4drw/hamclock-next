@@ -36,6 +36,7 @@ public:
     Appearance,
     Rig,
     Services,
+    Network,
     Widgets,
     Update
   };
@@ -60,6 +61,8 @@ private:
                          int fieldH, int fieldX, int textPad);
   void renderTabRig(SDL_Renderer *renderer, int cx, int pad, int fieldW,
                     int fieldH, int fieldX, int textPad);
+  void renderTabNetwork(SDL_Renderer *renderer, int cx, int pad, int fieldW,
+                        int fieldH, int fieldX, int textPad);
   void renderTabUpdate(SDL_Renderer *renderer, int cx, int pad, int fieldW,
                        int fieldH, int fieldX, int textPad);
 
@@ -143,6 +146,14 @@ private:
     SDL_Rect rect;
   };
   std::vector<WidgetClickRect> widgetRects_;
+
+  // Network / Hub tab
+  HubMode     hubMode_     = HubMode::Off;
+  std::string hubIp_;
+  std::string hubPortStr_  = "8080";
+  SDL_Rect    hubModeRect_ = {0, 0, 0, 0};
+  SDL_Rect    hubIpRect_   = {0, 0, 0, 0};
+  SDL_Rect    hubPortRect_ = {0, 0, 0, 0};
 
   // Track dimensions to detect size changes
   int lastRenderWidth_ = 0;

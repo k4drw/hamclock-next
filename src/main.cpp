@@ -373,6 +373,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void hamclock_after_idbfs() {
     ctx.state->deGrid = ctx.appCfg.grid;
     ctx.state->deLocation = {ctx.appCfg.lat, ctx.appCfg.lon};
     ctx.netManager->setCorsProxyUrl(ctx.appCfg.corsProxyUrl);
+    ctx.netManager->setHubConfig(ctx.appCfg.hubMode, ctx.appCfg.hubIp, ctx.appCfg.hubPort);
     ctx.activeSetup = AppContext::SetupMode::None;
   } else {
     LOG_I("Main", "No saved config found — showing setup screen");
@@ -641,6 +642,7 @@ int main(int argc, char *argv[]) {
   ctx.netManager =
       std::make_unique<NetworkManager>(ctx.cfgMgr.configDir() / "cache");
   ctx.netManager->setCorsProxyUrl(ctx.appCfg.corsProxyUrl);
+  ctx.netManager->setHubConfig(ctx.appCfg.hubMode, ctx.appCfg.hubIp, ctx.appCfg.hubPort);
 
   ActivityLocationManager::getInstance().init(*ctx.netManager,
                                               ctx.cfgMgr.configDir() / "cache");
@@ -713,6 +715,7 @@ int main(int argc, char *argv[]) {
       DEFAULT_WEB_SERVER_PORT);
   ctx.webServer->setFrameCapture(ctx.frameCapture.get());
   ctx.webServer->setLiveWebEnabled(liveWebEnabled);
+  ctx.webServer->setNetworkManager(ctx.netManager.get());
   ctx.webServer->start();
 
   ctx.gpsProvider = std::make_unique<GPSProvider>(ctx.state.get(), ctx.appCfg);
@@ -2105,6 +2108,7 @@ void main_tick() {
       ctx.state->deGrid = ctx.appCfg.grid;
       ctx.state->deLocation = {ctx.appCfg.lat, ctx.appCfg.lon};
       ctx.netManager->setCorsProxyUrl(ctx.appCfg.corsProxyUrl);
+      ctx.netManager->setHubConfig(ctx.appCfg.hubMode, ctx.appCfg.hubIp, ctx.appCfg.hubPort);
       // Re-apply theme/metric to all live widgets without rebuilding dashboard
       if (ctx.dashboard) {
         for (auto const &[type, widget] : ctx.dashboard->widgetPool)

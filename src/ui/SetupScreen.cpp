@@ -98,6 +98,13 @@ std::string *SetupScreen::getActiveFieldText() {
     case 1:
       return &rigPort_;
     }
+  } else if (activeTab_ == Tab::Network) {
+    switch (activeField_) {
+    case 0:
+      return &hubIp_;
+    case 1:
+      return &hubPortStr_;
+    }
   }
   return nullptr;
 }
@@ -282,10 +289,10 @@ void SetupScreen::render(SDL_Renderer *renderer) {
                     true, true);
   y += titleSize_ + pad / 2; // tightened: was +pad, halved gap to tab bar
 
-  // Appearance tab absorbs brightness/display settings — 7 tabs total
+  // Appearance tab absorbs brightness/display settings — 8 tabs total
   const char *tabs[] = {"Identity", "Spotting", "Display", "Rig",
-                        "Services", "Widgets",  "Update"};
-  int numTabs = 7;
+                        "Services", "Network",  "Widgets", "Update"};
+  int numTabs = 8;
   int tabW = fieldW / numTabs;
 
   // Calculate safe font size for tabs to prevent overflow
@@ -336,6 +343,9 @@ void SetupScreen::render(SDL_Renderer *renderer) {
     break;
   case Tab::Services:
     renderTabServices(renderer, cx, pad, fieldW, fieldH, fieldX, textPad);
+    break;
+  case Tab::Network:
+    renderTabNetwork(renderer, cx, pad, fieldW, fieldH, fieldX, textPad);
     break;
   case Tab::Widgets:
     renderTabWidgets(renderer, cx, pad, fieldW, fieldH, fieldX, textPad);
@@ -748,6 +758,71 @@ void SetupScreen::renderTabServices(SDL_Renderer *renderer, int, int pad,
   y += vSpace;
 }
 
+void SetupScreen::renderTabNetwork(SDL_Renderer *renderer, int /*cx*/, int pad,
+                                    int fieldW, int fieldH, int fieldX,
+                                    int textPad) {
+  int y = (y_ + titleSize_ + 2 * pad + fieldH);
+  int vSpace = pad / 2;
+  SDL_Color white = {255, 255, 255, 255};
+  SDL_Color orange = {255, 165, 0, 255};
+  SDL_Color gray = {140, 140, 140, 255};
+
+  fontMgr_.drawText(renderer, "--- Local Data Hub ---", fieldX, y, orange,
+                    labelSize_, true);
+  y += labelSize_ + pad;
+
+  // Mode cycle button
+  const char *modeLabel = (hubMode_ == HubMode::Master) ? "Master"
+                        : (hubMode_ == HubMode::Client)  ? "Client" : "Off";
+  int btnW = 80;
+  hubModeRect_ = {fieldX + fieldW - btnW, y, btnW, fieldH};
+  fontMgr_.drawText(renderer, "Mode:", fieldX, y + fieldH / 2, white,
+                    labelSize_, false, true);
+  SDL_SetRenderDrawColor(renderer, 40, 40, 60, 255);
+  SDL_RenderFillRect(renderer, &hubModeRect_);
+  SDL_SetRenderDrawColor(renderer, orange.r, orange.g, orange.b, 255);
+  SDL_RenderDrawRect(renderer, &hubModeRect_);
+  fontMgr_.drawText(renderer, modeLabel,
+                    hubModeRect_.x + hubModeRect_.w / 2,
+                    hubModeRect_.y + hubModeRect_.h / 2,
+                    orange, labelSize_, false, true);
+  y += fieldH + vSpace;
+
+  if (hubMode_ == HubMode::Client) {
+    fontMgr_.drawText(renderer, "Hub IP:", fieldX, y, white, labelSize_);
+    y += labelSize_ + 4;
+    hubIpRect_ = {fieldX, y, fieldW, fieldH};
+    renderField(renderer, fontMgr_, hubIp_, "e.g. 192.168.1.100", fieldX, y,
+                fieldW, fieldH, fieldSize_, textPad, activeField_ == 0, true,
+                cursorPos_, selectionAnchor_, orange, gray, white, white, gray);
+    y += vSpace;
+
+    fontMgr_.drawText(renderer, "Hub Port:", fieldX, y, white, labelSize_);
+    y += labelSize_ + 4;
+    hubPortRect_ = {fieldX, y, fieldW, fieldH};
+    renderField(renderer, fontMgr_, hubPortStr_, "8080", fieldX, y, fieldW,
+                fieldH, fieldSize_, textPad, activeField_ == 1, true,
+                cursorPos_, selectionAnchor_, orange, gray, white, white, gray);
+    y += vSpace;
+  } else {
+    hubIpRect_   = {0, 0, 0, 0};
+    hubPortRect_ = {0, 0, 0, 0};
+  }
+
+  if (hubMode_ == HubMode::Master) {
+    fontMgr_.drawText(renderer,
+                      "This instance serves cached data to hub clients.",
+                      fieldX, y + vSpace, gray, hintSize_);
+  } else if (hubMode_ == HubMode::Client) {
+    fontMgr_.drawText(renderer,
+                      "Fetches via hub; falls back to direct after 2s.",
+                      fieldX, y + vSpace, gray, hintSize_);
+  } else {
+    fontMgr_.drawText(renderer, "Hub mode disabled.", fieldX, y + vSpace, gray,
+                      hintSize_);
+  }
+}
+
 void SetupScreen::renderTabRig(SDL_Renderer *renderer, int cx, int pad,
                                int fieldW, int fieldH, int fieldX,
                                int textPad) {
@@ -963,9 +1038,9 @@ bool SetupScreen::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
   }
 
   const Tab tabValues[] = {Tab::Identity, Tab::Spotting, Tab::Appearance,
-                           Tab::Rig,      Tab::Services, Tab::Widgets,
-                           Tab::Update};
-  int numTabs = 7;
+                           Tab::Rig,      Tab::Services, Tab::Network,
+                           Tab::Widgets,  Tab::Update};
+  int numTabs = 8;
   int tabW = fieldW / numTabs;
 
   if (my >= y && my <= y + fieldH) {
@@ -1105,6 +1180,35 @@ bool SetupScreen::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
     }
   }
 
+  if (activeTab_ == Tab::Network) {
+    if (mx >= hubModeRect_.x && mx <= hubModeRect_.x + hubModeRect_.w &&
+        my >= hubModeRect_.y && my <= hubModeRect_.y + hubModeRect_.h) {
+      if (hubMode_ == HubMode::Off)         hubMode_ = HubMode::Master;
+      else if (hubMode_ == HubMode::Master) hubMode_ = HubMode::Client;
+      else                                  hubMode_ = HubMode::Off;
+      activeField_ = 0;
+      return true;
+    }
+    if (hubMode_ == HubMode::Client) {
+      if (hubIpRect_.w > 0 && mx >= hubIpRect_.x &&
+          mx <= hubIpRect_.x + hubIpRect_.w && my >= hubIpRect_.y &&
+          my <= hubIpRect_.y + hubIpRect_.h) {
+        activeField_ = 0;
+        cursorPos_ = static_cast<int>(hubIp_.size());
+        selectionAnchor_ = cursorPos_;
+        return true;
+      }
+      if (hubPortRect_.w > 0 && mx >= hubPortRect_.x &&
+          mx <= hubPortRect_.x + hubPortRect_.w && my >= hubPortRect_.y &&
+          my <= hubPortRect_.y + hubPortRect_.h) {
+        activeField_ = 1;
+        cursorPos_ = static_cast<int>(hubPortStr_.size());
+        selectionAnchor_ = cursorPos_;
+        return true;
+      }
+    }
+  }
+
   if (activeTab_ == Tab::Widgets) {
     int yTabBase = y_ + titleSize_ + 2 * pad + fieldH; // matches content start
     int ySelector = yTabBase + labelSize_ + pad / 2;
@@ -1150,6 +1254,8 @@ bool SetupScreen::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
     nFields = 2;
   else if (activeTab_ == Tab::Services)
     nFields = 2;
+  else if (activeTab_ == Tab::Network)
+    nFields = 0; // handled entirely via explicit rects above
 
   for (int i = 0; i < nFields; ++i) {
     int fy = yStart;
@@ -1613,6 +1719,10 @@ void SetupScreen::setConfig(const AppConfig &cfg) {
   rigPort_ = std::to_string(cfg.rigPort);
   rigAutoTune_ = cfg.rigAutoTune;
 
+  hubMode_    = cfg.hubMode;
+  hubIp_      = cfg.hubIp;
+  hubPortStr_ = std::to_string(cfg.hubPort);
+
   paneRotations_[0] = cfg.pane1Rotation;
   paneRotations_[1] = cfg.pane2Rotation;
   paneRotations_[2] = cfg.pane3Rotation;
@@ -1681,6 +1791,12 @@ AppConfig SetupScreen::getConfig() const {
     cfg.rigPort = 4532;
   cfg.rigAutoTune = rigAutoTune_;
 
+  cfg.hubMode = hubMode_;
+  cfg.hubIp   = hubIp_;
+  cfg.hubPort = std::atoi(hubPortStr_.c_str());
+  if (cfg.hubPort == 0)
+    cfg.hubPort = 8080;
+
   return cfg;
 }
 
@@ -1699,7 +1815,7 @@ SDL_Rect SetupScreen::getActionRect(const std::string &action) const {
   int fieldX = cx - fieldW / 2;
   int fieldH = fieldSize_ + 14;
   int tabY = y_ + titleSize_ + 2 * pad;
-  int numTabs = 7;
+  int numTabs = 8;
   int tabW = fieldW / numTabs;
 
   if (action == "tab_identity")

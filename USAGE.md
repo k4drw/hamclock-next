@@ -46,6 +46,17 @@ The map is the primary tool for propagation and location tracking.
 ### Setup → Services Tab
 - **GPS Toggle**: Enable the GPS toggle to synchronize the DE location from a running `gpsd` daemon (Linux/Raspberry Pi). Requires `gpsd` to be installed and running with a connected GPS receiver.
 
+### Setup → Network Tab (Local Data Hub)
+Reduces external API rate-limit consumption when multiple HamClock-Next instances share a LAN.
+
+| Mode | Behavior |
+| :--- | :------- |
+| **Off** | Default — each instance fetches directly from the internet. |
+| **Master** | This instance caches API responses and serves them to clients via `GET /api/hub/fetch`. No IP to configure. |
+| **Client** | This instance proxies its data fetches through the Master. Enter the Master's **IP** and **Port** (default `8080`). Falls back to a direct internet fetch automatically after a 2-second timeout if the master is unreachable. |
+
+**Typical LAN setup**: Run one instance in Master mode on a always-on Pi, configure all other HamClock instances as Clients pointing to that Pi's IP.
+
 ---
 
 ## ⌨️ Keyboard Shortcuts

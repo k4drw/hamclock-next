@@ -11,6 +11,7 @@
 enum class LiveSpotSource { PSK, RBN, WSPR };
 enum class PropOverlayType { None, Muf, Voacap, Reliability, Toa };
 enum class WeatherOverlayType { None, Clouds, WxMb };
+enum class HubMode { Off, Master, Client };
 
 struct AppConfig {
   // Identity
@@ -118,6 +119,11 @@ struct AppConfig {
 
   // Update
   std::string skippedVersion;
+
+  // Local Data Hub
+  HubMode     hubMode = HubMode::Off;
+  std::string hubIp   = "";
+  int         hubPort = 8080;
 
   // Network (WASM)
   // CORS proxy prefix prepended to all external URLs in the WASM build.

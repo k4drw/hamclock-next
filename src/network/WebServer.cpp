@@ -1,4 +1,5 @@
 #include "WebServer.h"
+#include "NetworkManager.h"
 
 #include <SDL.h>
 
@@ -15,6 +16,7 @@
 #include "../core/Astronomy.h"
 #include "../core/DisplayPower.h"
 #include "FrameCapture.h"
+#include <future>
 #include <iomanip>
 #include <sstream>
 
@@ -27,6 +29,27 @@
 #endif
 
 using namespace HamClock;
+
+static std::string base64Decode(const std::string &in) {
+  static const std::string chars =
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+  std::vector<int> T(256, -1);
+  for (int i = 0; i < 64; i++)
+    T[(unsigned char)chars[i]] = i;
+  std::string out;
+  int val = 0, valb = -8;
+  for (unsigned char c : in) {
+    if (T[c] == -1)
+      break;
+    val = (val << 6) + T[c];
+    valb += 6;
+    if (valb >= 0) {
+      out.push_back(char((val >> valb) & 0xFF));
+      valb -= 8;
+    }
+  }
+  return out;
+}
 
 WebServer::WebServer(SDL_Renderer *renderer, AppConfig &cfg,
                      HamClockState &state, ConfigManager &cfgMgr,
@@ -1313,8 +1336,57 @@ void WebServer::run() {
             j["rssEnabled"] = cfg_->rssEnabled;
             j["ontaFilter"] = cfg_->ontaFilter;
             j["corsProxyUrl"] = cfg_->corsProxyUrl;
+            j["hubMode"] = (cfg_->hubMode == HubMode::Master) ? "master"
+                         : (cfg_->hubMode == HubMode::Client)  ? "client" : "off";
+            j["hubIp"]   = cfg_->hubIp;
+            j["hubPort"] = cfg_->hubPort;
             res.set_content(j.dump(2), "application/json");
           });
+
+  svr.Get("/api/hub/fetch", [this](const httplib::Request &req,
+                                    httplib::Response &res) {
+#ifdef __EMSCRIPTEN__
+    res.status = 501;
+    res.set_content("not supported on WASM", "text/plain");
+    return;
+#else
+    if (!cfg_ || cfg_->hubMode != HubMode::Master) {
+      res.status = 403;
+      res.set_content("hub not in master mode", "text/plain");
+      return;
+    }
+    if (!req.has_param("url")) {
+      res.status = 400;
+      res.set_content("missing url", "text/plain");
+      return;
+    }
+    std::string targetUrl = base64Decode(req.get_param_value("url"));
+    if (targetUrl.empty() || targetUrl.find("http") != 0) {
+      res.status = 400;
+      res.set_content("bad url", "text/plain");
+      return;
+    }
+    int maxAge = req.has_param("max_age")
+        ? StringUtils::safe_stoi(req.get_param_value("max_age")) : 3600;
+    if (!netMgr_) {
+      res.status = 503;
+      res.set_content("network manager unavailable", "text/plain");
+      return;
+    }
+    std::promise<std::string> prom;
+    auto fut = prom.get_future();
+    netMgr_->fetchAsync(targetUrl, [&prom](std::string body) {
+      prom.set_value(std::move(body));
+    }, maxAge);
+    std::string body = fut.get();
+    if (body.empty()) {
+      res.status = 502;
+      res.set_content("upstream fetch failed", "text/plain");
+      return;
+    }
+    res.set_content(body, "application/octet-stream");
+#endif
+  });
 
 #ifdef ENABLE_DEBUG_API
   svr.Get("/debug/widgets",
@@ -1851,9 +1923,21 @@ void WebServer::run() {
       cfg_->rssEnabled = req.get_param_value("rss_enabled") == "1";
     if (req.has_param("onta_filter"))
       cfg_->ontaFilter = req.get_param_value("onta_filter");
+    // Hub
+    if (req.has_param("hub_mode")) {
+      const auto &m = req.get_param_value("hub_mode");
+      cfg_->hubMode = (m == "master") ? HubMode::Master
+                    : (m == "client") ? HubMode::Client : HubMode::Off;
+    }
+    if (req.has_param("hub_ip"))
+      cfg_->hubIp = req.get_param_value("hub_ip");
+    if (req.has_param("hub_port"))
+      cfg_->hubPort = StringUtils::safe_stoi(req.get_param_value("hub_port"));
 
     if (cfgMgr_)
       cfgMgr_->save(*cfg_);
+    if (netMgr_)
+      netMgr_->setHubConfig(cfg_->hubMode, cfg_->hubIp, cfg_->hubPort);
     // Signal the main thread to re-apply the new config to live state.
     if (reloadFlag_)
       reloadFlag_->store(true, std::memory_order_release);

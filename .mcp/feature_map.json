@@ -1,5 +1,5 @@
 {
-  "version": "2.0",
+  "version": "2.1",
   "updated_at": "2026-02-24T00:00:00.000Z",
   "features": [
     {
@@ -2786,6 +2786,48 @@
         "Access key configured in Setup"
       ],
       "notes": "Blocked on Winlink API access key. Code complete as of Phase 52."
+    },
+    {
+      "feature_id": "local_data_hub",
+      "name": "Local Data Hub (LAN Rate-Limit Sharing)",
+      "category": "network",
+      "description": "One HamClock instance acts as Master and caches API responses; other instances on the same LAN act as Clients and proxy their fetches through the master, reducing external API quota consumption. 2s timeout with automatic fallback to direct fetch.",
+      "original": {
+        "files": [],
+        "symbols": [],
+        "notes": "No equivalent in original HamClock."
+      },
+      "next": {
+        "files": [
+          "src/core/ConfigManager.h",
+          "src/core/ConfigManager.cpp",
+          "src/network/NetworkManager.h",
+          "src/network/NetworkManager.cpp",
+          "src/network/WebServer.h",
+          "src/network/WebServer.cpp",
+          "src/ui/SetupScreen.h",
+          "src/ui/SetupScreen.cpp",
+          "src/main.cpp"
+        ],
+        "symbols": [
+          "HubMode",
+          "NetworkManager::setHubConfig",
+          "NetworkManager::fetchFromHubSync",
+          "NetworkManager::fetchDirect",
+          "WebServer::setNetworkManager",
+          "SetupScreen::renderTabNetwork"
+        ],
+        "notes": "HubMode enum (Off/Master/Client). Master: /api/hub/fetch endpoint with base64 URL + max_age. Client: fetchAsync proxy branch with 2s curl, silent fallback. SetupScreen Network tab: mode cycle + conditional IP/Port. Config: hub.{mode,ip,port}."
+      },
+      "status": "implemented",
+      "acceptance": [
+        "Master mode: /api/hub/fetch returns upstream response; 403 when not in master mode",
+        "Client mode: fetchAsync routes through hub IP:port; falls back to direct on 2s timeout",
+        "Off mode: no change to existing fetch behavior",
+        "SetupScreen Network tab: mode cycles Off→Master→Client; IP+Port fields shown only in Client mode",
+        "Config persists across restart; hub section in config.json",
+        "WASM: /api/hub/fetch returns 501; client branch absent from WASM build"
+      ]
     }
   ]
 }

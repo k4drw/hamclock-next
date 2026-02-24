@@ -222,6 +222,17 @@ bool ConfigManager::load(AppConfig &config) const {
     config.corsProxyUrl = n.value("cors_proxy_url", config.corsProxyUrl);
   }
 
+  // Local Data Hub
+  if (json.contains("hub")) {
+    const auto &h = json["hub"];
+    std::string mode = h.value("mode", "off");
+    if (mode == "master")      config.hubMode = HubMode::Master;
+    else if (mode == "client") config.hubMode = HubMode::Client;
+    else                       config.hubMode = HubMode::Off;
+    config.hubIp   = h.value("ip",   "");
+    config.hubPort = h.value("port", 8080);
+  }
+
   // Brightness
   if (json.contains("brightness")) {
     auto &br = json["brightness"];
@@ -412,6 +423,11 @@ bool ConfigManager::save(const AppConfig &config) const {
   json["power"]["skipped_version"] = config.skippedVersion;
 
   json["network"]["cors_proxy_url"] = config.corsProxyUrl;
+
+  json["hub"]["mode"] = (config.hubMode == HubMode::Master) ? "master"
+                      : (config.hubMode == HubMode::Client)  ? "client" : "off";
+  json["hub"]["ip"]   = config.hubIp;
+  json["hub"]["port"] = config.hubPort;
 
   json["rotator"]["host"] = config.rotatorHost;
   json["rotator"]["port"] = config.rotatorPort;

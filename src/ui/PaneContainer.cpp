@@ -106,7 +106,7 @@ void PaneContainer::onMouseMove(int mx, int my) {
 bool PaneContainer::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
   // 1. If we are acting as a modal proxy, we MUST handle clicks anywhere.
   if (isModalActive() && activeWidget_) {
-    if (activeWidget_->onMouseUp(mx, my, mod)) {
+    if (activeWidget_->onMouseUp(mx, my, mod, clicks)) {
       return true;
     }
     return false;
@@ -141,7 +141,7 @@ bool PaneContainer::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
 
   // 3. Give active widget first crack at internal elements (header buttons,
   // etc)
-  if (activeWidget_ && activeWidget_->onMouseUp(mx, my, mod)) {
+  if (activeWidget_ && activeWidget_->onMouseUp(mx, my, mod, clicks)) {
     return true;
   }
 

@@ -251,8 +251,9 @@ To get started with AI-assisted contributions, see the **[MCP_GUIDE.md](MCP_GUID
 - ✅ **Phase 6: Hardware Control** (RigService CAT, RotatorService, CPUMonitor) — DONE
 - ✅ **Windows x64 cross-build** (dockcross) — DONE (02-17-2026)
 - ✅ **GPS/NMEA**: GPSProvider integrated; time/location sync supported. — DONE (02-17-2026)
+- ✅ **Local Data Hub (Phase 1)**: Master/Client hub mode — one instance serves its API cache to other clocks on the same LAN via `/api/hub/fetch`, reducing external rate-limit consumption. Configurable in Setup → Network tab. — DONE (02-24-2026)
 - [ ] **World Map Overlays** — CQ/ITU Zones, Prefix overlays
-- [ ] **Multi-Instance Sync** — Sharing state between multiple clocks on the same network
+- [ ] **Multi-Instance Sync (Phase 2+)** — Full bidirectional state sharing (spots, DX target, map position) between multiple clocks on the same network
 
 ---
 *Created by the HamClock-Next team.*
