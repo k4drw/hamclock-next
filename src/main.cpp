@@ -373,7 +373,8 @@ extern "C" EMSCRIPTEN_KEEPALIVE void hamclock_after_idbfs() {
     ctx.state->deGrid = ctx.appCfg.grid;
     ctx.state->deLocation = {ctx.appCfg.lat, ctx.appCfg.lon};
     ctx.netManager->setCorsProxyUrl(ctx.appCfg.corsProxyUrl);
-    ctx.netManager->setHubConfig(ctx.appCfg.hubMode, ctx.appCfg.hubIp, ctx.appCfg.hubPort);
+    ctx.netManager->setHubConfig(ctx.appCfg.hubMode, ctx.appCfg.hubIp,
+                                 ctx.appCfg.hubPort);
     ctx.activeSetup = AppContext::SetupMode::None;
   } else {
     LOG_I("Main", "No saved config found — showing setup screen");
@@ -642,7 +643,8 @@ int main(int argc, char *argv[]) {
   ctx.netManager =
       std::make_unique<NetworkManager>(ctx.cfgMgr.configDir() / "cache");
   ctx.netManager->setCorsProxyUrl(ctx.appCfg.corsProxyUrl);
-  ctx.netManager->setHubConfig(ctx.appCfg.hubMode, ctx.appCfg.hubIp, ctx.appCfg.hubPort);
+  ctx.netManager->setHubConfig(ctx.appCfg.hubMode, ctx.appCfg.hubIp,
+                               ctx.appCfg.hubPort);
 
   ActivityLocationManager::getInstance().init(*ctx.netManager,
                                               ctx.cfgMgr.configDir() / "cache");
@@ -706,6 +708,7 @@ int main(int argc, char *argv[]) {
   ctx.frameCapture = std::make_unique<FrameCapture>();
   if (headlessMode)
     ctx.frameCapture->setMaxFps(30);
+  ctx.frameCapture->start();
   ctx.updateChecker = std::make_unique<UpdateChecker>(*ctx.netManager);
   ctx.updateChecker->fetch();
   ctx.webServer = std::make_unique<WebServer>(
@@ -735,7 +738,7 @@ int main(int argc, char *argv[]) {
   while (ctx.appRunning) {
     main_tick();
     if (headlessMode)
-      SDL_Delay(10);  // ~100 ticks/s cap when vsync unavailable
+      SDL_Delay(10); // ~100 ticks/s cap when vsync unavailable
   }
 #endif
 
@@ -1375,8 +1378,11 @@ void DashboardContext::update(AppContext &ctx) {
 
   Uint32 now = SDL_GetTicks();
 
-  // Background refresh every 15 minutes
-  if (now - lastFetchMs > 15 * 60 * 1000) {
+  // If display is off (software sleep), skip updates and logic
+  bool isPowerOn = ctx.displayPower->getPower();
+
+  // Background refresh every 15 minutes, but only if power is on
+  if (isPowerOn && (now - lastFetchMs > 15 * 60 * 1000)) {
     noaaProvider->fetch();
     rssProvider->fetch();
     spotProvider->fetch();
@@ -1444,6 +1450,11 @@ void DashboardContext::update(AppContext &ctx) {
       if (!cursorVisible) {
         SDL_ShowCursor(SDL_ENABLE);
         cursorVisible = true;
+      }
+      // Wake up if screen is off
+      if (!isPowerOn) {
+        ctx.displayPower->setPower(true);
+        isPowerOn = true;
       }
     }
 
@@ -1907,10 +1918,12 @@ void DashboardContext::update(AppContext &ctx) {
     lastSleepAssert = now;
   }
 
-  for (auto *w : widgets)
-    w->update();
-  // satMgr->update(); // Deprecated: Auto-tracking handled by RotatorService
-  ctx.brightnessMgr->update();
+  if (isPowerOn) {
+    for (auto *w : widgets)
+      w->update();
+    // satMgr->update(); // Deprecated: Auto-tracking handled by RotatorService
+    ctx.brightnessMgr->update();
+  }
 }
 
 void DashboardContext::render(AppContext &ctx) {
@@ -1920,6 +1933,10 @@ void DashboardContext::render(AppContext &ctx) {
   if (FIDELITY_MODE) {
     SDL_RenderSetViewport(ctx.renderer, nullptr);
     SDL_RenderSetScale(ctx.renderer, ctx.layScale, ctx.layScale);
+  }
+
+  if (!ctx.displayPower->getPower()) {
+    return; // Stay black
   }
 
   Widget *activeModal = nullptr;
@@ -2110,7 +2127,8 @@ void main_tick() {
       ctx.state->deGrid = ctx.appCfg.grid;
       ctx.state->deLocation = {ctx.appCfg.lat, ctx.appCfg.lon};
       ctx.netManager->setCorsProxyUrl(ctx.appCfg.corsProxyUrl);
-      ctx.netManager->setHubConfig(ctx.appCfg.hubMode, ctx.appCfg.hubIp, ctx.appCfg.hubPort);
+      ctx.netManager->setHubConfig(ctx.appCfg.hubMode, ctx.appCfg.hubIp,
+                                   ctx.appCfg.hubPort);
       // Re-apply theme/metric to all live widgets without rebuilding dashboard
       if (ctx.dashboard) {
         for (auto const &[type, widget] : ctx.dashboard->widgetPool)

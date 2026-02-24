@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 class DisplayPower {
 public:
@@ -8,6 +9,7 @@ public:
     VCGENCMD,    // vcgencmd display_power (RPi preferred)
     BL_POWER,    // /sys/class/backlight/*/bl_power (DSI)
     FRAMEBUFFER, // Write black to /dev/fb0 (visual fallback)
+    SOFTWARE,    // Software-controlled blanking (e.g., SDL)
     NONE
   };
 
@@ -17,11 +19,11 @@ public:
   void init(); // Detect available method
   bool setPower(bool on);
   bool getPower() const;
-  Method getMethod() const { return method_; }
+  const std::vector<Method> &getMethods() const { return methods_; }
   std::string getMethodName() const;
 
 private:
-  Method method_ = Method::NONE;
+  std::vector<Method> methods_;
   std::string blPowerPath_;
   bool currentPower_ = true;
 

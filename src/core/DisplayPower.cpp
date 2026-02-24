@@ -23,34 +23,34 @@ DisplayPower::DisplayPower() { init(); }
 
 void DisplayPower::init() {
 #ifndef __EMSCRIPTEN__
+  methods_.clear();
+
   // 1. Test vcgencmd (RPi preferred)
   if (std::system("vcgencmd display_power -1 > /dev/null 2>&1") == 0) {
-    method_ = Method::VCGENCMD;
+    methods_.push_back(Method::VCGENCMD);
     LOG_I("Display", "Detected screen control: vcgencmd");
-    return;
   }
 
   // 2. Test bl_power sysfs (DSI displays)
   blPowerPath_ = findBacklightPowerPath();
   if (!blPowerPath_.empty()) {
-    method_ = Method::BL_POWER;
+    methods_.push_back(Method::BL_POWER);
     LOG_I("Display", "Detected screen control: sysfs bl_power ({})",
           blPowerPath_);
-    return;
   }
 
   // 3. Fallback to framebuffer blanking
   if (access("/dev/fb0", W_OK) == 0) {
-    method_ = Method::FRAMEBUFFER;
+    methods_.push_back(Method::FRAMEBUFFER);
     LOG_I("Display",
           "Detected screen control: Framebuffer blanking (visual only)");
-    return;
   }
 
-  method_ = Method::NONE;
-  LOG_W("Display", "No hardware screen control detected.");
+  // 4. Always add SOFTWARE blanking as a robust fallback
+  methods_.push_back(Method::SOFTWARE);
+  LOG_I("Display", "Detected screen control: Software blanking");
 #else
-  method_ = Method::NONE;
+  methods_.push_back(Method::NONE);
 #endif
 }
 
@@ -61,19 +61,30 @@ bool DisplayPower::setPower(bool on) {
   (void)on;
   success = false;
 #else
-  switch (method_) {
-  case Method::VCGENCMD:
-    success = runVcgencmd(on);
-    break;
-  case Method::BL_POWER:
-    success = writeSysfs(blPowerPath_, on ? "0" : "1");
-    break;
-  case Method::FRAMEBUFFER:
-    success = blankFramebuffer(!on);
-    break;
-  case Method::NONE:
-    success = false;
-    break;
+  for (auto method : methods_) {
+    bool m_success = false;
+    switch (method) {
+    case Method::VCGENCMD:
+      m_success = runVcgencmd(on);
+      break;
+    case Method::BL_POWER:
+      m_success = writeSysfs(blPowerPath_, on ? "0" : "1");
+      break;
+    case Method::FRAMEBUFFER:
+      m_success = blankFramebuffer(!on);
+      break;
+    case Method::SOFTWARE:
+      // Software power state is always "successful" from DisplayPower's
+      // perspective. The application (main.cpp) will check getPower() to
+      // perform actual blanking.
+      m_success = true;
+      break;
+    case Method::NONE:
+      m_success = false;
+      break;
+    }
+    if (m_success)
+      success = true; // At least one method "worked"
   }
 #endif
 #else
@@ -93,42 +104,33 @@ bool DisplayPower::setPower(bool on) {
   return success;
 }
 
-bool DisplayPower::getPower() const {
-#ifndef __EMSCRIPTEN__
-#ifdef _WIN32
-  return currentPower_; // On Windows, we can only return the last known state
-#else
-  if (method_ == Method::VCGENCMD) {
-    // We can actually query hardware for vcgencmd
-    FILE *pipe = popen("vcgencmd display_power", "r");
-    if (pipe) {
-      char buf[128];
-      if (fgets(buf, sizeof(buf), pipe)) {
-        pclose(pipe);
-        return strstr(buf, "=1") != nullptr;
-      }
-      pclose(pipe);
-    }
-  }
-  return currentPower_;
-#endif
-#else
-  return true;
-#endif
-}
+bool DisplayPower::getPower() const { return currentPower_; }
 
 std::string DisplayPower::getMethodName() const {
 #ifndef __EMSCRIPTEN__
-  switch (method_) {
-  case Method::VCGENCMD:
-    return "vcgencmd";
-  case Method::BL_POWER:
-    return "sysfs (bl_power)";
-  case Method::FRAMEBUFFER:
-    return "framebuffer blank";
-  case Method::NONE:
-    return "none";
+  std::string name;
+  for (auto m : methods_) {
+    if (!name.empty())
+      name += ", ";
+    switch (m) {
+    case Method::VCGENCMD:
+      name += "vcgencmd";
+      break;
+    case Method::BL_POWER:
+      name += "sysfs (bl_power)";
+      break;
+    case Method::FRAMEBUFFER:
+      name += "framebuffer blank";
+      break;
+    case Method::SOFTWARE:
+      name += "software";
+      break;
+    case Method::NONE:
+      name += "none";
+      break;
+    }
   }
+  return name.empty() ? "none" : name;
 #endif
   return "none";
 }

@@ -1,0 +1,9 @@
+Implement robust screen power control with software blanking fallback
+
+- Refactored DisplayPower to attempt multiple power control methods sequentially
+- Added SOFTWARE method as a guaranteed fallback for systems where hardware commands fail
+- Implemented "Software Sleep" mode in main loop:
+    - Skips widget and background updates when screen is off
+    - Clears screen to black and skips rendering when screen is off
+- Added wake-on-event logic for keyboard, mouse, and touch interaction
+- Optimized getPower() to return intended state for software blanking reliability
