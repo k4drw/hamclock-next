@@ -52,7 +52,7 @@ void DXPanel::update() {
 
   double bearing =
       Astronomy::calculateBearing(state_->deLocation, state_->dxLocation);
-  std::snprintf(buf, sizeof(buf), "Az: %.0f%c", bearing, '\xB0'); // degree sign
+  std::snprintf(buf, sizeof(buf), "Az: %.0f°", bearing); // degree sign
   lineText_[3] = buf;
 
   double dist =
