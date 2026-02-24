@@ -74,9 +74,32 @@ static SDL_RWops *makeGrowBufRW(GrowBuf *g) {
 
 // ---------------------------------------------------------------------------
 
+FrameCapture::FrameCapture() : running_(false) {}
+
+void FrameCapture::start() {
+  if (running_)
+    return;
+  running_ = true;
+  worker_ = std::thread(&FrameCapture::workerLoop, this);
+}
+
+FrameCapture::~FrameCapture() {
+  running_ = false;
+  workerCv_.notify_all();
+  if (worker_.joinable())
+    worker_.join();
+  if (pendingSurface_)
+    SDL_FreeSurface(pendingSurface_);
+  if (cachedSurface_)
+    SDL_FreeSurface(cachedSurface_);
+}
+
 void FrameCapture::setMaxFps(int fps) { maxFps_ = fps; }
 
 void FrameCapture::capture(SDL_Renderer *renderer) {
+  if (subscribers_ == 0 || busy_)
+    return;
+
   if (maxFps_ > 0) {
     Uint32 minInterval = 1000u / static_cast<Uint32>(maxFps_);
     Uint32 now = SDL_GetTicks();
@@ -90,39 +113,72 @@ void FrameCapture::capture(SDL_Renderer *renderer) {
   if (w <= 0 || h <= 0)
     return;
 
-  SDL_Surface *surf =
-      SDL_CreateRGBSurfaceWithFormat(0, w, h, 24, SDL_PIXELFORMAT_RGB24);
+  // Use cached surface if dimensions match, otherwise recreate
+  if (!cachedSurface_ || cachedSurface_->w != w || cachedSurface_->h != h) {
+    if (cachedSurface_)
+      SDL_FreeSurface(cachedSurface_);
+    cachedSurface_ =
+        SDL_CreateRGBSurfaceWithFormat(0, w, h, 24, SDL_PIXELFORMAT_RGB24);
+    if (!cachedSurface_)
+      return;
+  }
+
+  if (SDL_RenderReadPixels(renderer, nullptr, SDL_PIXELFORMAT_RGB24,
+                           cachedSurface_->pixels,
+                           cachedSurface_->pitch) != 0) {
+    return;
+  }
+
+  // Create a COPY of the surface to send to the worker thread.
+  // The worker thread frees its copy when done.
+  SDL_Surface *surf = SDL_DuplicateSurface(cachedSurface_);
   if (!surf)
     return;
 
-  if (SDL_RenderReadPixels(renderer, nullptr, SDL_PIXELFORMAT_RGB24,
-                           surf->pixels, surf->pitch) != 0) {
-    SDL_FreeSurface(surf);
-    return;
+  {
+    std::lock_guard<std::mutex> lock(workerMutex_);
+    if (pendingSurface_)
+      SDL_FreeSurface(pendingSurface_);
+    pendingSurface_ = surf;
+    busy_ = true;
+    workerCv_.notify_all();
   }
+}
 
-  GrowBuf gb;
-  SDL_RWops *rw = makeGrowBufRW(&gb);
-  if (!rw) {
-    SDL_FreeSurface(surf);
-    return;
+void FrameCapture::workerLoop() {
+  while (running_) {
+    SDL_Surface *surf = nullptr;
+    {
+      std::unique_lock<std::mutex> lock(workerMutex_);
+      workerCv_.wait(lock, [this] { return !running_ || pendingSurface_; });
+      if (!running_)
+        break;
+      surf = pendingSurface_;
+      pendingSurface_ = nullptr;
+    }
+
+    if (surf) {
+      GrowBuf gb;
+      SDL_RWops *rw = makeGrowBufRW(&gb);
+      if (rw) {
+        if (IMG_SaveJPG_RW(surf, rw, 0, quality) == 0) {
+          std::lock_guard<std::mutex> lock(mutex_);
+          jpegData_ = std::move(gb.data);
+          ++seq_;
+          cv_.notify_all();
+        } else {
+          LOG_W("FrameCapture", "JPEG encode failed: {}", IMG_GetError());
+        }
+        SDL_FreeRW(rw);
+      }
+      SDL_FreeSurface(surf);
+    }
+    busy_ = false;
   }
-
-  if (IMG_SaveJPG_RW(surf, rw, 0, quality) == 0) {
-    std::lock_guard<std::mutex> lock(mutex_);
-    jpegData_ = std::move(gb.data);
-    ++seq_;
-    cv_.notify_all();
-  } else {
-    LOG_W("FrameCapture", "JPEG encode failed: {}", IMG_GetError());
-  }
-
-  SDL_FreeRW(rw);
-  SDL_FreeSurface(surf);
 }
 
 std::vector<uint8_t> FrameCapture::waitFrame(uint64_t afterSeq, int timeoutMs,
-                                              uint64_t &outSeq) const {
+                                             uint64_t &outSeq) const {
   std::unique_lock<std::mutex> lock(mutex_);
   bool ready = cv_.wait_for(lock, std::chrono::milliseconds(timeoutMs),
                             [this, afterSeq] { return seq_ > afterSeq; });

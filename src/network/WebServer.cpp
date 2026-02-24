@@ -51,6 +51,35 @@ static std::string base64Decode(const std::string &in) {
   return out;
 }
 
+// Returns true if the URL targets a private/loopback address (SSRF guard)
+static bool isPrivateOrLoopbackUrl(const std::string &url) {
+  size_t pos = url.find("://");
+  if (pos == std::string::npos)
+    return true;
+  pos += 3;
+  size_t end = url.find_first_of("/:?#", pos);
+  std::string host =
+      (end == std::string::npos) ? url.substr(pos) : url.substr(pos, end - pos);
+  if (!host.empty() && host.front() == '[')
+    host = host.substr(1, host.size() >= 2 ? host.size() - 2 : 0);
+  if (host == "localhost" || host == "::1")
+    return true;
+  unsigned int a = 0, b = 0, c = 0, d = 0;
+  if (std::sscanf(host.c_str(), "%u.%u.%u.%u", &a, &b, &c, &d) == 4) {
+    if (a == 127)
+      return true;
+    if (a == 10)
+      return true;
+    if (a == 192 && b == 168)
+      return true;
+    if (a == 172 && b >= 16 && b <= 31)
+      return true;
+    if (a == 169 && b == 254)
+      return true;
+  }
+  return false;
+}
+
 WebServer::WebServer(SDL_Renderer *renderer, AppConfig &cfg,
                      HamClockState &state, ConfigManager &cfgMgr,
                      std::shared_ptr<DisplayPower> displayPower,
@@ -951,6 +980,7 @@ void WebServer::run() {
     int button = req.has_param("button")
                      ? StringUtils::safe_stoi(req.get_param_value("button"))
                      : 0;
+    bool shift = req.has_param("shift") && req.get_param_value("shift") == "1";
 
     // Convert logical coords → draw-pixel coords (same pattern as /debug/click)
     int drawW = HamClock::LOGICAL_WIDTH, drawH = HamClock::LOGICAL_HEIGHT;
@@ -960,6 +990,15 @@ void WebServer::run() {
     int py = static_cast<int>(static_cast<float>(ly) /
                               HamClock::LOGICAL_HEIGHT * drawH);
 
+    if (shift) {
+      SDL_Event sdown{};
+      SDL_zero(sdown);
+      sdown.type = SDL_KEYDOWN;
+      sdown.key.keysym.sym = SDLK_LSHIFT;
+      sdown.key.state = SDL_PRESSED;
+      SDL_PushEvent(&sdown);
+    }
+
     SDL_Event down{}, up{};
     SDL_zero(down);
     down.type = SDL_MOUSEBUTTONDOWN;
@@ -967,11 +1006,23 @@ void WebServer::run() {
     down.button.x = px;
     down.button.y = py;
     down.button.state = SDL_PRESSED;
+    down.button.clicks = 1;
     up = down;
     up.type = SDL_MOUSEBUTTONUP;
     up.button.state = SDL_RELEASED;
+    up.button.clicks = 1;
     SDL_PushEvent(&down);
     SDL_PushEvent(&up);
+
+    if (shift) {
+      SDL_Event sup{};
+      SDL_zero(sup);
+      sup.type = SDL_KEYUP;
+      sup.key.keysym.sym = SDLK_LSHIFT;
+      sup.key.state = SDL_RELEASED;
+      SDL_PushEvent(&sup);
+    }
+
     res.set_content("ok", "text/plain");
   });
 
@@ -1093,7 +1144,7 @@ void WebServer::run() {
   // -------------------------------------------------------------------------
   // /live — interactive canvas-based viewer (always available)
   // -------------------------------------------------------------------------
-  svr.Get("/live", [this](const httplib::Request &, httplib::Response &res) {
+  svr.Get("/live", [](const httplib::Request &, httplib::Response &res) {
     // Inject LOGICAL dimensions into the JS constants
     char appW[16], appH[16];
     std::snprintf(appW, sizeof(appW), "%d", HamClock::LOGICAL_WIDTH);
@@ -1165,9 +1216,9 @@ void WebServer::run() {
     }
     function inBounds(p) { return p.x >= 0 && p.x < APP_W && p.y >= 0 && p.y < APP_H; }
 
-    function sendTouch(ax, ay, btn) {
+    function sendTouch(ax, ay, btn, shift) {
       if (!liveEnabled) return;
-      fetch('/live/touch?x=' + ax + '&y=' + ay + '&button=' + btn);
+      fetch('/live/touch?x=' + ax + '&y=' + ay + '&button=' + btn + (shift ? '&shift=1' : ''));
     }
     function sendMouse(ax, ay) {
       if (!liveEnabled) return;
@@ -1185,7 +1236,7 @@ void WebServer::run() {
     overlay.addEventListener('pointerdown', function(e) {
       if (!liveEnabled) return;
       var p = getCoords(e.clientX, e.clientY);
-      if (inBounds(p)) sendTouch(p.x, p.y, e.button === 2 ? 1 : 0);
+      if (inBounds(p)) sendTouch(p.x, p.y, e.button === 2 ? 1 : 0, e.shiftKey);
     });
     overlay.addEventListener('pointermove', function(e) {
       if (!liveEnabled) return;
@@ -1222,7 +1273,7 @@ void WebServer::run() {
       e.preventDefault();
       var t = e.changedTouches[0];
       var p = getCoords(t.clientX, t.clientY);
-      if (inBounds(p)) sendTouch(p.x, p.y, 0);
+      if (inBounds(p)) sendTouch(p.x, p.y, 0, e.shiftKey);
     }, {passive:false});
     overlay.addEventListener('touchend', function(e) { e.preventDefault(); }, {passive:false});
     overlay.addEventListener('touchmove', function(e) {
@@ -1245,10 +1296,19 @@ void WebServer::run() {
       res.set_content("Frame capture not available", "text/plain");
       return;
     }
-    uint64_t lastSeq = frameCapture_->latestSeq();
+    uint64_t startSeq = frameCapture_->latestSeq();
+
+    // Subscriber tracking: capturing this shared_ptr in the provider lambda
+    // ensures the count is decremented exactly when the connection is
+    // closed and the lambda is destroyed.
+    auto guard = std::shared_ptr<void>(
+        nullptr, [fc = frameCapture_](void *) { fc->removeSubscriber(); });
+    frameCapture_->addSubscriber();
+
     res.set_chunked_content_provider(
         "multipart/x-mixed-replace;boundary=frame",
-        [this, lastSeq](size_t, httplib::DataSink &sink) mutable -> bool {
+        [this, lastSeq = startSeq,
+         guard](size_t, httplib::DataSink &sink) mutable -> bool {
           if (!sink.is_writable())
             return false;
           uint64_t outSeq = lastSeq;
@@ -1312,19 +1372,20 @@ void WebServer::run() {
             j["rssEnabled"] = cfg_->rssEnabled;
             j["ontaFilter"] = cfg_->ontaFilter;
             j["corsProxyUrl"] = cfg_->corsProxyUrl;
-            j["hubMode"] = (cfg_->hubMode == HubMode::Master) ? "master"
-                         : (cfg_->hubMode == HubMode::Client)  ? "client" : "off";
-            j["hubIp"]   = cfg_->hubIp;
+            j["hubMode"] = (cfg_->hubMode == HubMode::Master)   ? "master"
+                           : (cfg_->hubMode == HubMode::Client) ? "client"
+                                                                : "off";
+            j["hubIp"] = cfg_->hubIp;
             j["hubPort"] = cfg_->hubPort;
             res.set_content(j.dump(2), "application/json");
           });
 
-  svr.Get("/api/hub/fetch", [this](const httplib::Request &req,
-                                    httplib::Response &res) {
+  svr.Get("/api/hub/fetch",
+          [this](const httplib::Request &req, httplib::Response &res) {
 #ifdef __EMSCRIPTEN__
-    res.status = 501;
-    res.set_content("not supported on WASM", "text/plain");
-    return;
+            res.status = 501;
+            res.set_content("not supported on WASM", "text/plain");
+            return;
 #else
     if (!cfg_ || cfg_->hubMode != HubMode::Master) {
       res.status = 403;
@@ -1337,9 +1398,20 @@ void WebServer::run() {
       return;
     }
     std::string targetUrl = base64Decode(req.get_param_value("url"));
-    if (targetUrl.empty() || targetUrl.find("http") != 0) {
+    if (targetUrl.size() > 2048) {
       res.status = 400;
-      res.set_content("bad url", "text/plain");
+      res.set_content("url too long", "text/plain");
+      return;
+    }
+    if (targetUrl.empty() ||
+        (targetUrl.find("http://") != 0 && targetUrl.find("https://") != 0)) {
+      res.status = 400;
+      res.set_content("bad url: must start with http:// or https://", "text/plain");
+      return;
+    }
+    if (isPrivateOrLoopbackUrl(targetUrl)) {
+      res.status = 403;
+      res.set_content("forbidden: private/loopback addresses not allowed", "text/plain");
       return;
     }
     int maxAge = req.has_param("max_age")
@@ -1362,7 +1434,7 @@ void WebServer::run() {
     }
     res.set_content(body, "application/octet-stream");
 #endif
-  });
+          });
 
 #ifdef ENABLE_DEBUG_API
   svr.Get("/debug/widgets",
@@ -1604,37 +1676,44 @@ void WebServer::run() {
   });
 
   // Programmatic set DE/DX via lat/lon
-  svr.Get("/set_mappos",
-          [this](const httplib::Request &req, httplib::Response &res) {
-            if (!state_) {
-              res.status = 503;
-              return;
-            }
-            if (!req.has_param("lat") || !req.has_param("lon")) {
-              res.status = 400;
-              res.set_content("missing lat/lon", "text/plain");
-              return;
-            }
-            double lat = StringUtils::safe_stod(req.get_param_value("lat"));
-            double lon = StringUtils::safe_stod(req.get_param_value("lon"));
-            std::string target = "dx"; // default
-            if (req.has_param("target"))
-              target = req.get_param_value("target");
+  svr.Get("/set_mappos", [this](const httplib::Request &req,
+                                httplib::Response &res) {
+    if (!state_) {
+      res.status = 503;
+      return;
+    }
+    if (!req.has_param("lat") || !req.has_param("lon")) {
+      res.status = 400;
+      res.set_content("missing lat/lon", "text/plain");
+      return;
+    }
+    double lat = StringUtils::safe_stod(req.get_param_value("lat"));
+    double lon = StringUtils::safe_stod(req.get_param_value("lon"));
+    if (lat < -90.0 || lat > 90.0 || lon < -180.0 || lon > 180.0) {
+      res.status = 400;
+      res.set_content(
+          R"({"error":"lat out of range [-90,90] or lon out of range [-180,180]"})",
+          "application/json");
+      return;
+    }
+    std::string target = "dx"; // default
+    if (req.has_param("target"))
+      target = req.get_param_value("target");
 
-            if (target == "de") {
-              state_->deLocation = {lat, lon};
-              state_->deGrid = Astronomy::latLonToGrid(lat, lon);
-            } else {
-              state_->dxLocation = {lat, lon};
-              state_->dxGrid = Astronomy::latLonToGrid(lat, lon);
-              state_->dxActive = true;
-            }
-            nlohmann::json j;
-            j["target"] = target;
-            j["lat"] = lat;
-            j["lon"] = lon;
-            res.set_content(j.dump(), "application/json");
-          });
+    if (target == "de") {
+      state_->deLocation = {lat, lon};
+      state_->deGrid = Astronomy::latLonToGrid(lat, lon);
+    } else {
+      state_->dxLocation = {lat, lon};
+      state_->dxGrid = Astronomy::latLonToGrid(lat, lon);
+      state_->dxActive = true;
+    }
+    nlohmann::json j;
+    j["target"] = target;
+    j["lat"] = lat;
+    j["lon"] = lon;
+    res.set_content(j.dump(), "application/json");
+  });
 
   // --- LEGACY COMPATIBILITY API ---
 
@@ -1665,6 +1744,11 @@ void WebServer::run() {
     if (req.has_param("lat") && req.has_param("lon")) {
       lat = StringUtils::safe_stod(req.get_param_value("lat"));
       lon = StringUtils::safe_stod(req.get_param_value("lon"));
+      if (lat < -90.0 || lat > 90.0 || lon < -180.0 || lon > 180.0) {
+        res.status = 400;
+        res.set_content("lat/lon out of range", "text/plain");
+        return;
+      }
       found = true;
     } else if (req.has_param("grid")) {
       found = Astronomy::gridToLatLon(req.get_param_value("grid"), lat, lon);
@@ -1691,6 +1775,11 @@ void WebServer::run() {
     if (req.has_param("lat") && req.has_param("lon")) {
       lat = StringUtils::safe_stod(req.get_param_value("lat"));
       lon = StringUtils::safe_stod(req.get_param_value("lon"));
+      if (lat < -90.0 || lat > 90.0 || lon < -180.0 || lon > 180.0) {
+        res.status = 400;
+        res.set_content("lat/lon out of range", "text/plain");
+        return;
+      }
       found = true;
     } else if (req.has_param("grid")) {
       found = Astronomy::gridToLatLon(req.get_param_value("grid"), lat, lon);
@@ -1707,21 +1796,28 @@ void WebServer::run() {
   });
 
   // GET /set_cluster?host=...&port=...&user=...
-  svr.Get("/set_cluster", [this](const httplib::Request &req,
-                                 httplib::Response &res) {
-    if (req.has_param("host"))
-      cfg_->dxClusterHost = req.get_param_value("host");
-    if (req.has_param("port"))
-      cfg_->dxClusterPort = StringUtils::safe_stoi(req.get_param_value("port"));
-    if (req.has_param("user"))
-      cfg_->dxClusterLogin = req.get_param_value("user");
+  svr.Get("/set_cluster",
+          [this](const httplib::Request &req, httplib::Response &res) {
+            if (req.has_param("host"))
+              cfg_->dxClusterHost = req.get_param_value("host");
+            if (req.has_param("port")) {
+              int p = StringUtils::safe_stoi(req.get_param_value("port"));
+              if (p < 1 || p > 65535) {
+                res.status = 400;
+                res.set_content("port out of range [1,65535]", "text/plain");
+                return;
+              }
+              cfg_->dxClusterPort = p;
+            }
+            if (req.has_param("user"))
+              cfg_->dxClusterLogin = req.get_param_value("user");
 
-    if (cfgMgr_)
-      cfgMgr_->save(*cfg_);
-    if (reloadFlag_)
-      reloadFlag_->store(true, std::memory_order_release);
-    res.set_content("ok", "text/plain");
-  });
+            if (cfgMgr_)
+              cfgMgr_->save(*cfg_);
+            if (reloadFlag_)
+              reloadFlag_->store(true, std::memory_order_release);
+            res.set_content("ok", "text/plain");
+          });
 
   // GET /set_title?call=...
   svr.Get("/set_title",
@@ -1818,10 +1914,26 @@ void WebServer::run() {
       cfg_->grid = req.get_param_value("grid");
     if (req.has_param("theme"))
       cfg_->theme = req.get_param_value("theme");
-    if (req.has_param("lat"))
-      cfg_->lat = StringUtils::safe_stod(req.get_param_value("lat"));
-    if (req.has_param("lon"))
-      cfg_->lon = StringUtils::safe_stod(req.get_param_value("lon"));
+    if (req.has_param("lat")) {
+      double v = StringUtils::safe_stod(req.get_param_value("lat"));
+      if (v < -90.0 || v > 90.0) {
+        res.status = 400;
+        res.set_content(R"({"error":"lat out of range [-90,90]"})",
+                        "application/json");
+        return;
+      }
+      cfg_->lat = v;
+    }
+    if (req.has_param("lon")) {
+      double v = StringUtils::safe_stod(req.get_param_value("lon"));
+      if (v < -180.0 || v > 180.0) {
+        res.status = 400;
+        res.set_content(R"({"error":"lon out of range [-180,180]"})",
+                        "application/json");
+        return;
+      }
+      cfg_->lon = v;
+    }
     if (req.has_param("cors_proxy_url"))
       cfg_->corsProxyUrl = req.get_param_value("cors_proxy_url");
     // DX Cluster
@@ -1829,29 +1941,54 @@ void WebServer::run() {
       cfg_->dxClusterEnabled = req.get_param_value("dx_enabled") == "1";
     if (req.has_param("dx_host"))
       cfg_->dxClusterHost = req.get_param_value("dx_host");
-    if (req.has_param("dx_port"))
-      cfg_->dxClusterPort =
-          StringUtils::safe_stoi(req.get_param_value("dx_port"));
+    if (req.has_param("dx_port")) {
+      int p = StringUtils::safe_stoi(req.get_param_value("dx_port"));
+      if (p < 1 || p > 65535) {
+        res.status = 400;
+        res.set_content("dx_port out of range", "text/plain");
+        return;
+      }
+      cfg_->dxClusterPort = p;
+    }
     if (req.has_param("dx_login"))
       cfg_->dxClusterLogin = req.get_param_value("dx_login");
     if (req.has_param("dx_use_wsjtx"))
       cfg_->dxClusterUseWSJTX = req.get_param_value("dx_use_wsjtx") == "1";
-    if (req.has_param("wsjtx_port"))
-      cfg_->wsjtxPort =
-          StringUtils::safe_stoi(req.get_param_value("wsjtx_port"));
+    if (req.has_param("wsjtx_port")) {
+      int p = StringUtils::safe_stoi(req.get_param_value("wsjtx_port"));
+      if (p < 1 || p > 65535) {
+        res.status = 400;
+        res.set_content("wsjtx_port out of range", "text/plain");
+        return;
+      }
+      cfg_->wsjtxPort = p;
+    }
     // Rig
     if (req.has_param("rig_host"))
       cfg_->rigHost = req.get_param_value("rig_host");
-    if (req.has_param("rig_port"))
-      cfg_->rigPort = StringUtils::safe_stoi(req.get_param_value("rig_port"));
+    if (req.has_param("rig_port")) {
+      int p = StringUtils::safe_stoi(req.get_param_value("rig_port"));
+      if (p < 1 || p > 65535) {
+        res.status = 400;
+        res.set_content("rig_port out of range", "text/plain");
+        return;
+      }
+      cfg_->rigPort = p;
+    }
     if (req.has_param("rig_auto_tune"))
       cfg_->rigAutoTune = req.get_param_value("rig_auto_tune") == "1";
     // Rotator
     if (req.has_param("rot_host"))
       cfg_->rotatorHost = req.get_param_value("rot_host");
-    if (req.has_param("rot_port"))
-      cfg_->rotatorPort =
-          StringUtils::safe_stoi(req.get_param_value("rot_port"));
+    if (req.has_param("rot_port")) {
+      int p = StringUtils::safe_stoi(req.get_param_value("rot_port"));
+      if (p < 1 || p > 65535) {
+        res.status = 400;
+        res.set_content("rot_port out of range", "text/plain");
+        return;
+      }
+      cfg_->rotatorPort = p;
+    }
     if (req.has_param("rot_auto_track"))
       cfg_->rotatorAutoTrack = req.get_param_value("rot_auto_track") == "1";
     // QRZ
@@ -1902,8 +2039,9 @@ void WebServer::run() {
     // Hub
     if (req.has_param("hub_mode")) {
       const auto &m = req.get_param_value("hub_mode");
-      cfg_->hubMode = (m == "master") ? HubMode::Master
-                    : (m == "client") ? HubMode::Client : HubMode::Off;
+      cfg_->hubMode = (m == "master")   ? HubMode::Master
+                      : (m == "client") ? HubMode::Client
+                                        : HubMode::Off;
     }
     if (req.has_param("hub_ip"))
       cfg_->hubIp = req.get_param_value("hub_ip");

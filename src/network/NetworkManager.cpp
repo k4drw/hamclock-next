@@ -161,7 +161,8 @@ void NetworkManager::fetchAsync(const std::string &url,
 
   emscripten_fetch_attr_t attr;
   emscripten_fetch_attr_init(&attr);
-  std::strcpy(attr.requestMethod, "GET");
+  std::strncpy(attr.requestMethod, "GET", sizeof(attr.requestMethod) - 1);
+  attr.requestMethod[sizeof(attr.requestMethod) - 1] = '\0';
   attr.attributes = EMSCRIPTEN_FETCH_LOAD_TO_MEMORY;
 
   // Capture callback in a heap-allocated wrapper

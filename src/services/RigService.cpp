@@ -305,8 +305,12 @@ void RigService::commandWorker() {
 bool RigService::connectToRig() {
 #ifndef __EMSCRIPTEN__
   // Create TCP socket
-  sockfd_ = (int)socket(AF_INET, SOCK_STREAM, 0);
-  if (sockfd_ < 0) {
+  int newFd = (int)socket(AF_INET, SOCK_STREAM, 0);
+  {
+    std::lock_guard<std::mutex> lock(sockMutex_);
+    sockfd_ = newFd;
+  }
+  if (newFd < 0) {
     LOG_E("Rig", "Failed to create socket");
     return false;
   }
@@ -314,16 +318,16 @@ bool RigService::connectToRig() {
   // Set socket timeout (platform-specific)
 #ifdef _WIN32
   DWORD timeout_ms = 2000;
-  setsockopt(sockfd_, SOL_SOCKET, SO_RCVTIMEO, (const char *)&timeout_ms,
+  setsockopt(newFd, SOL_SOCKET, SO_RCVTIMEO, (const char *)&timeout_ms,
              sizeof(timeout_ms));
-  setsockopt(sockfd_, SOL_SOCKET, SO_SNDTIMEO, (const char *)&timeout_ms,
+  setsockopt(newFd, SOL_SOCKET, SO_SNDTIMEO, (const char *)&timeout_ms,
              sizeof(timeout_ms));
 #else
   struct timeval timeout;
   timeout.tv_sec = 2;
   timeout.tv_usec = 0;
-  setsockopt(sockfd_, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
-  setsockopt(sockfd_, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
+  setsockopt(newFd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+  setsockopt(newFd, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
 #endif
 
   // Connect to rigctld
@@ -335,21 +339,23 @@ bool RigService::connectToRig() {
   if (inet_pton(AF_INET, config_.rigHost.c_str(), &addr.sin_addr) <= 0) {
     LOG_E("Rig", "Invalid address: {}", config_.rigHost);
 #ifdef _WIN32
-    closesocket(sockfd_);
+    closesocket(newFd);
 #else
-    close(sockfd_);
+    close(newFd);
 #endif
+    std::lock_guard<std::mutex> lock(sockMutex_);
     sockfd_ = -1;
     return false;
   }
 
-  if (connect(sockfd_, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
+  if (connect(newFd, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
     LOG_E("Rig", "Connection failed");
 #ifdef _WIN32
-    closesocket(sockfd_);
+    closesocket(newFd);
 #else
-    close(sockfd_);
+    close(newFd);
 #endif
+    std::lock_guard<std::mutex> lock(sockMutex_);
     sockfd_ = -1;
     return false;
   }
@@ -362,13 +368,16 @@ bool RigService::connectToRig() {
 
 void RigService::disconnectFromRig() {
 #ifndef __EMSCRIPTEN__
-  if (sockfd_ >= 0) {
+  {
+    std::lock_guard<std::mutex> lock(sockMutex_);
+    if (sockfd_ >= 0) {
 #ifdef _WIN32
-    closesocket(sockfd_);
+      closesocket(sockfd_);
 #else
-    close(sockfd_);
+      close(sockfd_);
 #endif
-    sockfd_ = -1;
+      sockfd_ = -1;
+    }
   }
   connected_ = false;
 #endif
@@ -376,12 +385,17 @@ void RigService::disconnectFromRig() {
 
 bool RigService::sendCommand(const std::string &cmd, std::string &response) {
 #ifndef __EMSCRIPTEN__
-  if (sockfd_ < 0) {
+  int fd;
+  {
+    std::lock_guard<std::mutex> lock(sockMutex_);
+    fd = sockfd_;
+  }
+  if (fd < 0) {
     return false;
   }
 
   // Send command
-  ssize_t sent = send(sockfd_, cmd.c_str(), cmd.length(), 0);
+  ssize_t sent = send(fd, cmd.c_str(), cmd.length(), 0);
   if (sent < 0) {
     LOG_E("Rig", "Send failed: {}", strerror(errno));
     return false;
@@ -390,7 +404,7 @@ bool RigService::sendCommand(const std::string &cmd, std::string &response) {
   // Read response
   char buffer[512];
   std::memset(buffer, 0, sizeof(buffer));
-  ssize_t received = recv(sockfd_, buffer, sizeof(buffer) - 1, 0);
+  ssize_t received = recv(fd, buffer, sizeof(buffer) - 1, 0);
 
   if (received <= 0) {
     LOG_E("Rig", "Receive failed: {}", strerror(errno));

@@ -107,9 +107,9 @@ MapWidget::MapWidget(int x, int y, int w, int h, TextureManager &texMgr,
                      FontManager &fontMgr, NetworkManager &netMgr,
                      std::shared_ptr<HamClockState> state, AppConfig &config)
     : Widget(x, y, w, h), texMgr_(texMgr), fontMgr_(fontMgr), netMgr_(netMgr),
-      state_(std::move(state)), config_(config), lastPosUpdateMs_(0),
-      lastSatTrackUpdateMs_(0), wxLastCheckMs_(0), lastPropUpdateMs_(0),
-      lastMufUpdateMs_(0) {
+      state_(std::move(state)), lastPosUpdateMs_(0), lastSatTrackUpdateMs_(0),
+      config_(config), lastMufUpdateMs_(0), wxLastCheckMs_(0),
+      lastPropUpdateMs_(0) {
 
   const char *driver = SDL_GetCurrentVideoDriver();
   LOG_D("MapWidget", "SDL Video Driver: {}", driver ? driver : "unknown");
@@ -1039,9 +1039,10 @@ void MapWidget::render(SDL_Renderer *renderer) {
       // Low-memory mode: reduce mesh density on KMSDRM
       const int gridW = useCompatibilityRenderPath_ ? 48 : 96;
       const int gridH = useCompatibilityRenderPath_ ? 24 : 48;
-      bool needsMeshUpdate = mapVerts_.empty() ||
-                             (mapVerts_.size() != (gridW + 1) * (gridH + 1)) ||
-                             (lastProjection_ != config_.projection);
+      bool needsMeshUpdate =
+          mapVerts_.empty() ||
+          (mapVerts_.size() != (size_t)(gridW + 1) * (gridH + 1)) ||
+          (lastProjection_ != config_.projection);
 
       if (needsMeshUpdate) {
         lastProjection_ = config_.projection;
@@ -1161,7 +1162,6 @@ void MapWidget::renderSatFootprint(SDL_Renderer *renderer, double lat,
   const int kSegments = useCompatibilityRenderPath_ ? 36 : 72;
   SDL_RenderSetClipRect(renderer, &mapRect_);
   std::vector<SDL_FPoint> segment;
-  SDL_FPoint prev{};
   SDL_Texture *lineTex = texMgr_.get(LINE_AA_KEY);
 
   for (int i = 0; i <= kSegments; ++i) {

@@ -408,7 +408,7 @@ bool TimePanel::onMouseUp(int mx, int my, Uint16 /*mod*/, int clicks) {
   // ing: check if click is near the callsign text.
   // Clamp hit area to TimePanel bounds so a wide callsign + generous pad
   // cannot bleed into the adjacent pane to the right.
-  int callRowH = height_ * 42 / 148;
+  int callRowH = height_ * 50 / 148;
   if (my >= y_ && my < y_ + callRowH && callW_ > 0) {
     int textX = x_ + (width_ - callW_) / 2;
     int pad = std::max(8, callW_ / 4);
@@ -583,7 +583,7 @@ SDL_Rect TimePanel::getActionRect(const std::string &action) const {
     return gearRect_;
   }
   if (action == "edit_callsign") {
-    int callRowH = height_ * 42 / 148;
+    int callRowH = height_ * 50 / 148;
     return {x_, y_, width_, callRowH};
   }
 

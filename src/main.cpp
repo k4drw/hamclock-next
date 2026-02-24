@@ -972,7 +972,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
       std::make_unique<TimePanel>(0, 0, 0, 0, fontMgr, texMgr, appCfg.callsign);
   timePanel->setCallColor(appCfg.callsignColor);
   timePanel->setOnConfigChanged(
-      [&ctx, this](const std::string &call, SDL_Color color) {
+      [&ctx](const std::string &call, SDL_Color color) {
         ctx.appCfg.callsign = call;
         ctx.appCfg.callsignColor = color;
         ctx.cfgMgr.save(ctx.appCfg);
@@ -980,8 +980,11 @@ DashboardContext::DashboardContext(AppContext &ctx)
 
   widgetSelector = std::make_unique<WidgetSelector>(fontMgr);
 
-  // Helper for pool
-  auto addToPool = [&](WidgetType type) {
+  // Helper for pool (Lazy loading)
+  auto getOrAddWidget = [&](WidgetType type) -> Widget * {
+    if (widgetPool.count(type) && widgetPool[type])
+      return widgetPool[type].get();
+
     switch (type) {
     case WidgetType::SOLAR:
       widgetPool[type] =
@@ -1140,6 +1143,63 @@ DashboardContext::DashboardContext(AppContext &ctx)
           0, 0, 0, 0, fontMgr, widgetTypeDisplayName(type), cyan);
       break;
     }
+
+    // Wire callbacks for newly created widgets
+    if (type == WidgetType::DX_CLUSTER) {
+      auto *dxcPanel = dynamic_cast<DXClusterPanel *>(widgetPool[type].get());
+      if (dxcPanel) {
+        dxcPanel->setOnSpotActivated(
+            [state, activityStore](const DXClusterSpot &spot) {
+              state->dxCallsign = spot.txCall;
+              state->dxLocation = {spot.txLat, spot.txLon};
+              state->dxGrid = spot.txGrid;
+              state->dxActive = (spot.txLat != 0.0 || spot.txLon != 0.0);
+              auto ad = activityStore->get();
+              ad.hasSelection = false;
+              activityStore->set(ad);
+            });
+        dxcPanel->setOnSpotDeactivated([state]() {
+          if (state->mapDxActive) {
+            state->dxLocation = state->mapDxLocation;
+            state->dxGrid = state->mapDxGrid;
+            state->dxActive = true;
+          } else {
+            state->dxActive = false;
+          }
+          state->dxCallsign.clear();
+        });
+      }
+    } else if (type == WidgetType::ON_THE_AIR) {
+      auto *ontaPanel = dynamic_cast<ONTAPanel *>(widgetPool[type].get());
+      if (ontaPanel) {
+        ontaPanel->setOnSpotActivated([state, dxcStore](const ONTASpot &spot) {
+          state->dxCallsign = spot.call;
+          state->dxLocation = {spot.lat, spot.lon};
+          state->dxGrid = (spot.lat != 0.0 || spot.lon != 0.0)
+                              ? Astronomy::latLonToGrid(spot.lat, spot.lon)
+                              : "";
+          state->dxActive = (spot.lat != 0.0 || spot.lon != 0.0);
+          dxcStore->clearSelection();
+        });
+        ontaPanel->setOnSpotDeactivated([state]() {
+          if (state->mapDxActive) {
+            state->dxLocation = state->mapDxLocation;
+            state->dxGrid = state->mapDxGrid;
+            state->dxActive = true;
+          } else {
+            state->dxActive = false;
+          }
+          state->dxCallsign.clear();
+        });
+      }
+    }
+
+    if (widgetPool[type]) {
+      widgetPool[type]->setTheme(appCfg.theme);
+      widgetPool[type]->setMetric(appCfg.useMetric);
+    }
+
+    return widgetPool[type].get();
   };
 
   std::vector<WidgetType> allTypes = {
@@ -1162,57 +1222,18 @@ DashboardContext::DashboardContext(AppContext &ctx)
       WidgetType::MARINE};
   // Note: REPEATER_DIR omitted — RepeaterBook API requires auth key (TODO).
   // Note: WINLINK omitted — Winlink API requires access key (TODO).
-  for (auto t : allTypes)
-    addToPool(t);
 
-  // Wire DX Panel spot-selection callbacks
-  {
-    auto restoreMapDx = [state]() {
-      if (state->mapDxActive) {
-        state->dxLocation = state->mapDxLocation;
-        state->dxGrid = state->mapDxGrid;
-        state->dxActive = true;
-      } else {
-        state->dxActive = false;
-      }
-      state->dxCallsign.clear();
-    };
+  // Remove eager loading loop
+  // for (auto t : allTypes)
+  //   addToPool(t);
 
-    if (auto *dxcPanel = dynamic_cast<DXClusterPanel *>(
-            widgetPool[WidgetType::DX_CLUSTER].get())) {
-      dxcPanel->setOnSpotActivated(
-          [state, activityStore](const DXClusterSpot &spot) {
-            state->dxCallsign = spot.txCall;
-            state->dxLocation = {spot.txLat, spot.txLon};
-            state->dxGrid = spot.txGrid;
-            state->dxActive = (spot.txLat != 0.0 || spot.txLon != 0.0);
-            auto ad = activityStore->get();
-            ad.hasSelection = false;
-            activityStore->set(ad);
-          });
-      dxcPanel->setOnSpotDeactivated(restoreMapDx);
-    }
-
-    if (auto *ontaPanel = dynamic_cast<ONTAPanel *>(
-            widgetPool[WidgetType::ON_THE_AIR].get())) {
-      ontaPanel->setOnSpotActivated([state, dxcStore](const ONTASpot &spot) {
-        state->dxCallsign = spot.call;
-        state->dxLocation = {spot.lat, spot.lon};
-        state->dxGrid = (spot.lat != 0.0 || spot.lon != 0.0)
-                            ? Astronomy::latLonToGrid(spot.lat, spot.lon)
-                            : "";
-        state->dxActive = (spot.lat != 0.0 || spot.lon != 0.0);
-        dxcStore->clearSelection();
-      });
-      ontaPanel->setOnSpotDeactivated(restoreMapDx);
-    }
-  }
+  // Callback wiring moved to getOrAddWidget for lazy compatibility
 
   for (int i = 0; i < 4; ++i) {
     panes.push_back(std::make_unique<PaneContainer>(
         0, 0, 0, 0, WidgetType::SOLAR, fontMgr));
     panes.back()->setWidgetFactory(
-        [&](WidgetType t) { return widgetPool[t].get(); });
+        [&](WidgetType t) { return getOrAddWidget(t); });
   }
 
   panes[0]->setRotation(appCfg.pane1Rotation, appCfg.rotationIntervalS);
@@ -1320,6 +1341,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
 
   // Apply Theme
 
+  // Apply Theme to existing widgets
   for (auto const &[type, widget] : widgetPool) {
     if (widget) {
       widget->setTheme(appCfg.theme);
@@ -1347,6 +1369,16 @@ DashboardContext::DashboardContext(AppContext &ctx)
     LOG_W("Main", "Low memory signal: flushing FontManager cache");
     fontMgr.clearCache();
   });
+
+  if (layout.fidelityMode()) {
+    // Desktop/High-end: keep 50 textures
+    texMgr.setMaxCacheSize(50);
+  } else {
+    // RPi/Low-end: cap at 20 textures to preserve VRAM
+    texMgr.setMaxCacheSize(20);
+    LOG_I("Main",
+          "Low-memory environment detected: capping texture cache to 20");
+  }
 
   // Populate widgets/eventWidgets vector
   widgets = {timePanel.get(),     panes[0].get(), panes[1].get(),
@@ -1383,23 +1415,51 @@ void DashboardContext::update(AppContext &ctx) {
 
   // Background refresh every 15 minutes, but only if power is on
   if (isPowerOn && (now - lastFetchMs > 15 * 60 * 1000)) {
+    auto isWidgetActive = [&](WidgetType type) {
+      for (auto &p : panes) {
+        if (p->getActiveType() == type)
+          return true;
+      }
+      return false;
+    };
+
+    // Always fetch core/background providers
     noaaProvider->fetch();
     rssProvider->fetch();
-    spotProvider->fetch();
     satMgr->fetch();
-    activityProvider->fetch();
-    bandProvider->update();
-    contestProvider->fetch();
-    moonProvider->update(appCfg.lat, appCfg.lon);
     deWeatherProvider->fetch(ctx.state->deLocation.lat,
                              ctx.state->deLocation.lon);
     dxWeatherProvider->fetch(ctx.state->dxLocation.lat,
                              ctx.state->dxLocation.lon);
-    historyProvider->fetchFlux();
-    historyProvider->fetchSSN();
-    historyProvider->fetchKp();
+
+    // Context-sensitive fetches (gate only what was in the original loop)
+    if (isWidgetActive(WidgetType::LIVE_SPOTS) ||
+        appCfg.propOverlay != PropOverlayType::None)
+      spotProvider->fetch();
+
+    if (isWidgetActive(WidgetType::ON_THE_AIR) ||
+        isWidgetActive(WidgetType::DX_PEDITIONS) || appCfg.ontaFilter != "Off")
+      activityProvider->fetch();
+
+    if (isWidgetActive(WidgetType::BAND_CONDITIONS))
+      bandProvider->update();
+
+    if (isWidgetActive(WidgetType::CONTESTS))
+      contestProvider->fetch();
+
+    if (isWidgetActive(WidgetType::MOON))
+      moonProvider->update(appCfg.lat, appCfg.lon);
+
+    if (isWidgetActive(WidgetType::HISTORY_FLUX))
+      historyProvider->fetchFlux();
+    if (isWidgetActive(WidgetType::HISTORY_SSN))
+      historyProvider->fetchSSN();
+    if (isWidgetActive(WidgetType::HISTORY_KP))
+      historyProvider->fetchKp();
+
     if (dstProvider)
       dstProvider->fetch();
+
     adifProvider->fetch(ctx.cfgMgr.configDir() / "logs.adif");
     mufRtProvider->update();
     ionosondeProvider->update();

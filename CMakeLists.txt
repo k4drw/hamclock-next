@@ -60,6 +60,7 @@ set(SDL2IMAGE_BUILD_SHARED_LIBS OFF CACHE BOOL "Build shared SDL2_image library"
 
 # --- Build Options ---
 option(ENABLE_DEBUG_API "Enable debug API endpoints and live view (increases CPU usage)" OFF)
+option(ENABLE_ASAN "Enable AddressSanitizer + UBSan (Debug only)" OFF)
 
 if(ENABLE_DEBUG_API)
     add_compile_definitions(ENABLE_DEBUG_API)
@@ -628,6 +629,20 @@ else()
     elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
         # On Linux with GCC, link libstdc++ and libgcc statically for better portability
         target_link_options(hamclock-next PRIVATE -static-libstdc++ -static-libgcc)
+    endif()
+
+    # Compiler warnings (non-Emscripten only; -Werror omitted until warnings are resolved)
+    if(MSVC)
+        target_compile_options(hamclock-next PRIVATE /W4)
+    else()
+        target_compile_options(hamclock-next PRIVATE -Wall -Wextra -Wno-unused-parameter)
+    endif()
+
+    # AddressSanitizer + UBSan (opt-in, Debug builds only, Linux/macOS)
+    if(ENABLE_ASAN AND NOT WIN32)
+        target_compile_options(hamclock-next PRIVATE -fsanitize=address,undefined -fno-omit-frame-pointer)
+        target_link_options(hamclock-next PRIVATE -fsanitize=address,undefined)
+        message(STATUS "AddressSanitizer + UBSan enabled")
     endif()
 
     if(APPLE)
