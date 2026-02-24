@@ -4,6 +4,7 @@
 #endif
 #endif
 #include "MapWidget.h"
+#include "../core/AsteroidPropagator.h"
 #include "../core/Astronomy.h"
 #include "../core/BeaconData.h"
 #include "../core/Constants.h"
@@ -12,6 +13,7 @@
 #include "../core/PropEngine.h"
 #include "../core/StringUtils.h"
 #include "../core/WorkerService.h"
+#include "../services/AsteroidProvider.h"
 #include "../services/BeaconProvider.h"
 #include "../services/CloudProvider.h"
 #include "../services/IonosondeProvider.h"
@@ -253,6 +255,42 @@ void MapWidget::update() {
   } else if (!cachedSatTrack_.empty()) {
     cachedSatTrack_.clear();
     satTrackDirty_ = true;
+  }
+
+  // Asteroid ground track update
+  if (asteroidProvider_ && state_) {
+    const std::string &sel = state_->selectedAsteroidName;
+    if (sel != lastSelectedAsteroidName_) {
+      lastSelectedAsteroidName_ = sel;
+      asteroidTrackDirty_ = true;
+      cachedAsteroidTrack_.clear();
+      asteroidTrackVerts_.clear();
+      asteroidTrackIndices_.clear();
+    }
+    if (!sel.empty() && asteroidTrackDirty_) {
+      OrbitalElements elem = asteroidProvider_->getOrbitalElements(sel);
+      if (elem.valid) {
+        // Find approach JD for the selected asteroid
+        double jd_approach = 0;
+        AsteroidData latest = asteroidProvider_->getLatest();
+        for (const auto &ast : latest.asteroids) {
+          if (ast.name == sel) {
+            jd_approach = ast.julianDate;
+            break;
+          }
+        }
+        if (jd_approach > 0) {
+          cachedAsteroidTrack_ = AsteroidPropagator::computeGroundTrack(
+              elem, jd_approach - 0.5, jd_approach + 0.5, 48);
+          asteroidTrackDirty_ = false;
+        }
+      }
+    }
+  } else if (!cachedAsteroidTrack_.empty()) {
+    cachedAsteroidTrack_.clear();
+    asteroidTrackDirty_ = true;
+    asteroidTrackVerts_.clear();
+    asteroidTrackIndices_.clear();
   }
 
   // Great Circle update (on change)
@@ -1042,6 +1080,7 @@ void MapWidget::render(SDL_Renderer *renderer) {
 
   renderAuroraOverlay(renderer);
   renderSatellite(renderer);
+  renderAsteroidOverlay(renderer);
   renderSpotOverlay(renderer);
   renderDXClusterSpots(renderer);
   renderADIFPins(renderer);
@@ -1228,6 +1267,117 @@ void MapWidget::renderSatGroundTrack(SDL_Renderer *renderer) {
     SDL_RenderGeometry(renderer, lineTex, satTrackVerts_.data(),
                        (int)satTrackVerts_.size(), satTrackIndices_.data(),
                        (int)satTrackIndices_.size());
+  }
+
+  SDL_RenderSetClipRect(renderer, nullptr);
+}
+
+void MapWidget::onAsteroidElementsReady(const std::string &des,
+                                        const OrbitalElements & /*elem*/) {
+  if (state_ && des == state_->selectedAsteroidName) {
+    asteroidTrackDirty_ = true;
+    asteroidTrackVerts_.clear();
+    asteroidTrackIndices_.clear();
+  }
+}
+
+void MapWidget::renderAsteroidOverlay(SDL_Renderer *renderer) {
+  if (!state_ || state_->selectedAsteroidName.empty())
+    return;
+
+  SDL_Texture *lineTex = texMgr_.get(LINE_AA_KEY);
+  if (!lineTex)
+    return;
+
+  if (asteroidTrackDirty_ || cachedAsteroidTrack_.size() < 2) {
+    // Rebuild geometry when dirty (track may be empty if elements not yet arrived)
+    asteroidTrackVerts_.clear();
+    asteroidTrackIndices_.clear();
+
+    if (cachedAsteroidTrack_.size() >= 2) {
+      float thickness = 1.5f;
+      float r = thickness / 2.0f;
+      SDL_Color color = {255, 140, 0, 200};
+
+      std::vector<SDL_FPoint> segment;
+      auto add_segment_geom = [&](const std::vector<SDL_FPoint> &seg) {
+        for (size_t i = 1; i < seg.size(); i++) {
+          SDL_FPoint p1 = seg[i - 1];
+          SDL_FPoint p2 = seg[i];
+          float dx = p2.x - p1.x;
+          float dy = p2.y - p1.y;
+          float len = std::sqrt(dx * dx + dy * dy);
+          if (len < 0.1f)
+            continue;
+          float nx = -dy / len * r;
+          float ny = dx / len * r;
+          int base = static_cast<int>(asteroidTrackVerts_.size());
+          asteroidTrackVerts_.push_back({{p1.x + nx, p1.y + ny}, color, {0, 0}});
+          asteroidTrackVerts_.push_back({{p1.x - nx, p1.y - ny}, color, {0, 1}});
+          asteroidTrackVerts_.push_back({{p2.x + nx, p2.y + ny}, color, {1, 0}});
+          asteroidTrackVerts_.push_back({{p2.x - nx, p2.y - ny}, color, {1, 1}});
+          asteroidTrackIndices_.push_back(base + 0);
+          asteroidTrackIndices_.push_back(base + 1);
+          asteroidTrackIndices_.push_back(base + 2);
+          asteroidTrackIndices_.push_back(base + 1);
+          asteroidTrackIndices_.push_back(base + 2);
+          asteroidTrackIndices_.push_back(base + 3);
+        }
+      };
+
+      for (size_t i = 0; i < cachedAsteroidTrack_.size(); ++i) {
+        if (i > 0) {
+          double lon0 = cachedAsteroidTrack_[i - 1].lon;
+          double lon1 = cachedAsteroidTrack_[i].lon;
+          if (std::fabs(lon0 - lon1) > 180.0) {
+            double lon1_adj = (lon1 < 0) ? lon1 + 360.0 : lon1 - 360.0;
+            double borderLon = (lon1 < 0) ? 180.0 : -180.0;
+            double f = (borderLon - lon0) / (lon1_adj - lon0);
+            double borderLat = cachedAsteroidTrack_[i - 1].lat +
+                               f * (cachedAsteroidTrack_[i].lat -
+                                    cachedAsteroidTrack_[i - 1].lat);
+            segment.push_back(latLonToScreen(borderLat, borderLon));
+            add_segment_geom(segment);
+            segment.clear();
+            segment.push_back(latLonToScreen(borderLat, -borderLon));
+          }
+        }
+        segment.push_back(latLonToScreen(cachedAsteroidTrack_[i].lat,
+                                         cachedAsteroidTrack_[i].lon));
+      }
+      if (segment.size() >= 2) {
+        add_segment_geom(segment);
+      }
+      asteroidTrackDirty_ = false;
+    }
+  }
+
+  SDL_RenderSetClipRect(renderer, &mapRect_);
+
+  if (!asteroidTrackVerts_.empty()) {
+    SDL_RenderGeometry(renderer, lineTex, asteroidTrackVerts_.data(),
+                       (int)asteroidTrackVerts_.size(),
+                       asteroidTrackIndices_.data(),
+                       (int)asteroidTrackIndices_.size());
+  }
+
+  // Draw icon glyph at closest-approach point (center of track)
+  if (!cachedAsteroidTrack_.empty()) {
+    size_t mid = cachedAsteroidTrack_.size() / 2;
+    SDL_FPoint sp = latLonToScreen(cachedAsteroidTrack_[mid].lat,
+                                   cachedAsteroidTrack_[mid].lon);
+    const std::string &icon = config_.asteroidIcon.empty() ? "☄" : config_.asteroidIcon;
+    int ptSize = fontMgr_.catalog()->ptSize(FontStyle::SmallRegular);
+    int iw = 0, ih = 0;
+    SDL_Texture *iconTex = fontMgr_.renderText(renderer, icon,
+                                               {255, 140, 0, 220},
+                                               ptSize, &iw, &ih);
+    if (iconTex) {
+      SDL_Rect dst = {static_cast<int>(sp.x) - iw / 2,
+                      static_cast<int>(sp.y) - ih / 2, iw, ih};
+      SDL_RenderCopy(renderer, iconTex, nullptr, &dst);
+      SDL_DestroyTexture(iconTex);
+    }
   }
 
   SDL_RenderSetClipRect(renderer, nullptr);

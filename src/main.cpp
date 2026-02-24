@@ -1040,8 +1040,9 @@ DashboardContext::DashboardContext(AppContext &ctx)
           0, 0, 0, 0, fontMgr, ctx.cpuMonitor, appCfg.useMetric);
       break;
     case WidgetType::ASTEROID:
-      widgetPool[type] = std::make_unique<AsteroidPanel>(0, 0, 0, 0, fontMgr,
-                                                         *asteroidProvider);
+      widgetPool[type] = std::make_unique<AsteroidPanel>(
+          0, 0, 0, 0, fontMgr, *asteroidProvider, ctx.state, &appCfg,
+          [&ctx]() { ctx.cfgMgr.save(ctx.appCfg); });
       break;
     default:
       widgetPool[type] = std::make_unique<PlaceholderWidget>(
@@ -1614,6 +1615,16 @@ void DashboardContext::update(AppContext &ctx) {
           delete grid;
           break;
         }
+        case AE_ASTEROID_ELEMENTS_READY: {
+          auto *payload = static_cast<std::pair<std::string, OrbitalElements> *>(
+              event.user.data1);
+          if (payload && ctx.dashboard && ctx.dashboard->mapArea) {
+            ctx.dashboard->mapArea->onAsteroidElementsReady(payload->first,
+                                                            payload->second);
+          }
+          delete payload;
+          break;
+        }
         }
       }
       break;
@@ -1722,6 +1733,7 @@ void DashboardContext::update(AppContext &ctx) {
   }
 
   mapArea->setPredictor(dxSatPane->activePredictor());
+  mapArea->setAsteroidProvider(asteroidProvider.get());
   auto *gimbal =
       dynamic_cast<GimbalPanel *>(widgetPool[WidgetType::GIMBAL].get());
   if (gimbal) {

@@ -1,7 +1,10 @@
 #include "AsteroidProvider.h"
+#include "../core/Constants.h"
 #include "../core/Logger.h"
 #include "../core/StringUtils.h"
+#include <SDL.h>
 #include <algorithm>
+#include <cctype>
 #include <cstdio>
 #include <ctime>
 #include <nlohmann/json.hpp>
@@ -167,4 +170,110 @@ void AsteroidProvider::processResponse(const std::string &body) {
 AsteroidData AsteroidProvider::getLatest() const {
   std::lock_guard<std::mutex> lock(mutex_);
   return cachedData_;
+}
+
+std::string AsteroidProvider::urlEncode(const std::string &s) {
+  std::string out;
+  out.reserve(s.size() * 3);
+  for (unsigned char c : s) {
+    if (std::isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~') {
+      out += static_cast<char>(c);
+    } else {
+      char buf[4];
+      std::snprintf(buf, sizeof(buf), "%%%02X", c);
+      out += buf;
+    }
+  }
+  return out;
+}
+
+void AsteroidProvider::fetchOrbitalElements(const std::string &des) {
+#ifdef __EMSCRIPTEN__
+  (void)des;
+  return; // SBDB fetch not available in WASM
+#else
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (orbitalElementsCache_.count(des))
+      return; // already cached
+  }
+
+  std::string url =
+      std::string("https://ssd-api.jpl.nasa.gov/sbdb.api?sstr=") +
+      urlEncode(des);
+
+  LOG_I("AsteroidProvider", "Fetching orbital elements for '{}'", des);
+
+  netMgr_.fetchAsync(url, [this, des](std::string body) {
+    if (body.empty()) {
+      LOG_E("AsteroidProvider", "Empty SBDB response for '{}'", des);
+      return;
+    }
+    processElementsResponse(des, body);
+  });
+#endif
+}
+
+void AsteroidProvider::processElementsResponse(const std::string &des,
+                                               const std::string &body) {
+  OrbitalElements elem;
+  try {
+    auto j = nlohmann::json::parse(body);
+
+    if (!j.contains("orbit") || !j["orbit"].contains("elements") ||
+        !j["orbit"].contains("epoch")) {
+      LOG_E("AsteroidProvider", "SBDB response missing orbit data for '{}'", des);
+      return;
+    }
+
+    elem.epoch_jd =
+        StringUtils::safe_stod(j["orbit"]["epoch"].get<std::string>());
+
+    for (const auto &el : j["orbit"]["elements"]) {
+      std::string label = el["label"].get<std::string>();
+      double val = StringUtils::safe_stod(el["value"].get<std::string>());
+      if (label == "e")
+        elem.e = val;
+      else if (label == "a")
+        elem.a = val;
+      else if (label == "i")
+        elem.i = val;
+      else if (label == "om")
+        elem.om = val;
+      else if (label == "w")
+        elem.w = val;
+      else if (label == "ma")
+        elem.ma = val;
+    }
+
+    elem.valid = (elem.a > 0 && elem.epoch_jd > 0);
+
+    LOG_I("AsteroidProvider", "Got orbital elements for '{}': a={:.4f} e={:.4f}",
+          des, elem.a, elem.e);
+  } catch (const std::exception &e) {
+    LOG_E("AsteroidProvider", "SBDB parse error for '{}': {}", des, e.what());
+    return;
+  }
+
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    orbitalElementsCache_[des] = elem;
+  }
+
+  // Notify map widget via SDL event
+  auto *payload =
+      new std::pair<std::string, OrbitalElements>(des, elem);
+  SDL_Event ev;
+  SDL_zero(ev);
+  ev.type = HamClock::AE_BASE_EVENT + HamClock::AE_ASTEROID_ELEMENTS_READY;
+  ev.user.data1 = payload;
+  SDL_PushEvent(&ev);
+}
+
+OrbitalElements AsteroidProvider::getOrbitalElements(const std::string &des) const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  auto it = orbitalElementsCache_.find(des);
+  if (it != orbitalElementsCache_.end())
+    return it->second;
+  return OrbitalElements{};
 }

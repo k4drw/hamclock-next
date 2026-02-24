@@ -484,6 +484,7 @@ set(HAMCLOCK_SOURCES
     src/services/RigService.cpp
     src/services/GPSProvider.cpp
     src/services/AsteroidProvider.cpp
+    src/core/AsteroidPropagator.cpp
     src/services/RBNProvider.cpp
     src/services/QRZProvider.cpp
     src/ui/ActivityPanels.cpp

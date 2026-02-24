@@ -109,6 +109,9 @@ struct AppConfig {
   // Activity panels
   std::string ontaFilter = "all"; // "all", "pota", or "sota"
 
+  // Asteroid widget
+  std::string asteroidIcon = "☄";
+
   // Security
   bool gpsEnabled = false;
 

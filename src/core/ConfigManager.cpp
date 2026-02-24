@@ -205,6 +205,10 @@ bool ConfigManager::load(AppConfig &config) const {
     config.ontaFilter = json["activity"].value("onta_filter", "all");
   }
 
+  if (json.contains("asteroid")) {
+    config.asteroidIcon = json["asteroid"].value("icon", std::string("☄"));
+  }
+
   // Network (WASM proxy URL)
   if (json.contains("network")) {
     const auto &n = json["network"];
@@ -448,6 +452,7 @@ bool ConfigManager::save(const AppConfig &config) const {
 
   json["rss"]["enabled"] = config.rssEnabled;
   json["activity"]["onta_filter"] = config.ontaFilter;
+  json["asteroid"]["icon"] = config.asteroidIcon;
 
   std::ofstream ofs(configPath_);
   if (!ofs) {
