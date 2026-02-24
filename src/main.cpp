@@ -27,8 +27,14 @@
 #include "network/WebServer.h"
 #include "services/ADIFProvider.h"
 #include "services/ActivityProvider.h"
+#include "services/AlertsProvider.h"
 #include "services/AsteroidProvider.h"
 #include "services/AuroraProvider.h"
+#include "services/ForecastProvider.h"
+#include "services/HurricaneProvider.h"
+#include "services/MarineProvider.h"
+#include "services/RepeaterProvider.h"
+#include "services/WinlinkProvider.h"
 #include "services/BME280Provider.h"
 #include "services/BandConditionsProvider.h"
 #include "services/BeaconProvider.h"
@@ -55,7 +61,13 @@
 #include "services/WeatherProvider.h"
 #include "ui/ADIFPanel.h"
 #include "ui/ActivityPanels.h"
+#include "ui/AlertsPanel.h"
 #include "ui/AsteroidPanel.h"
+#include "ui/ForecastPanel.h"
+#include "ui/HurricanePanel.h"
+#include "ui/MarinePanel.h"
+#include "ui/RepeaterPanel.h"
+#include "ui/WinlinkPanel.h"
 #include "ui/AuroraGraphPanel.h"
 #include "ui/AuroraPanel.h"
 #include "ui/BandConditionsPanel.h"
@@ -181,6 +193,12 @@ struct AppContext {
   std::shared_ptr<SantaStore> santaStore;
   std::shared_ptr<RotatorDataStore> rotatorStore;
   std::shared_ptr<RigDataStore> rigStore;
+  std::shared_ptr<AlertsStore> alertsStore;
+  std::shared_ptr<ForecastStore> forecastStore;
+  std::shared_ptr<RepeaterStore> repeaterStore;
+  std::shared_ptr<HurricaneStore> hurricaneStore;
+  std::shared_ptr<MarineStore> marineStore;
+  std::shared_ptr<WinlinkStore> winlinkStore;
 
   // Managers & Services
   std::unique_ptr<NetworkManager> netManager;
@@ -250,6 +268,12 @@ struct DashboardContext {
   std::unique_ptr<SatelliteManager> satMgr;
   std::unique_ptr<AsteroidProvider> asteroidProvider;
   std::unique_ptr<BeaconProvider> beaconProvider;
+  std::unique_ptr<AlertsProvider> alertsProvider;
+  std::unique_ptr<ForecastProvider> forecastProvider;
+  std::unique_ptr<RepeaterProvider> repeaterProvider;
+  std::unique_ptr<HurricaneProvider> hurricaneProvider;
+  std::unique_ptr<MarineProvider> marineProvider;
+  std::unique_ptr<WinlinkProvider> winlinkProvider;
 
   // Services
 #ifndef __EMSCRIPTEN__
@@ -648,6 +672,12 @@ int main(int argc, char *argv[]) {
   ctx.santaStore = std::make_shared<SantaStore>();
   ctx.rotatorStore = std::make_shared<RotatorDataStore>();
   ctx.rigStore = std::make_shared<RigDataStore>();
+  ctx.alertsStore = std::make_shared<AlertsStore>();
+  ctx.forecastStore = std::make_shared<ForecastStore>();
+  ctx.repeaterStore = std::make_shared<RepeaterStore>();
+  ctx.hurricaneStore = std::make_shared<HurricaneStore>();
+  ctx.marineStore = std::make_shared<MarineStore>();
+  ctx.winlinkStore = std::make_shared<WinlinkStore>();
   ctx.state = std::make_shared<HamClockState>();
 
   ctx.state->deCallsign = ctx.appCfg.callsign;
@@ -897,6 +927,34 @@ DashboardContext::DashboardContext(AppContext &ctx)
 
   beaconProvider = std::make_unique<BeaconProvider>();
 
+  alertsProvider =
+      std::make_unique<AlertsProvider>(netManager, ctx.alertsStore);
+  alertsProvider->fetch(appCfg.lat, appCfg.lon);
+
+  forecastProvider =
+      std::make_unique<ForecastProvider>(netManager, ctx.forecastStore);
+  forecastProvider->fetch(appCfg.lat, appCfg.lon);
+
+  repeaterProvider =
+      std::make_unique<RepeaterProvider>(netManager, ctx.repeaterStore);
+  // RepeaterBook API requires auth key — fetch disabled until configured.
+  // repeaterProvider->fetch(appCfg.lat, appCfg.lon);
+
+  hurricaneProvider =
+      std::make_unique<HurricaneProvider>(netManager, ctx.hurricaneStore);
+  hurricaneProvider->fetch();
+
+  marineProvider =
+      std::make_unique<MarineProvider>(netManager, ctx.marineStore);
+  // Default NOAA tide station (Lake Worth FL) + NDBC buoy 41114 (FL Atlantic).
+  // TODO: make configurable via settings.
+  marineProvider->fetch("8722670", "41114");
+
+  winlinkProvider =
+      std::make_unique<WinlinkProvider>(netManager, ctx.winlinkStore);
+  // Winlink API requires access key — fetch disabled until configured.
+  // winlinkProvider->fetch(appCfg.lat, appCfg.lon);
+
   santaProvider = std::make_unique<SantaProvider>(santaStore);
   santaProvider->update();
 
@@ -1044,6 +1102,30 @@ DashboardContext::DashboardContext(AppContext &ctx)
           0, 0, 0, 0, fontMgr, *asteroidProvider, ctx.state, &appCfg,
           [&ctx]() { ctx.cfgMgr.save(ctx.appCfg); });
       break;
+    case WidgetType::ALERTS:
+      widgetPool[type] =
+          std::make_unique<AlertsPanel>(0, 0, 0, 0, fontMgr, ctx.alertsStore);
+      break;
+    case WidgetType::FORECAST:
+      widgetPool[type] = std::make_unique<ForecastPanel>(0, 0, 0, 0, fontMgr,
+                                                         ctx.forecastStore);
+      break;
+    case WidgetType::REPEATER_DIR:
+      widgetPool[type] = std::make_unique<RepeaterPanel>(0, 0, 0, 0, fontMgr,
+                                                         ctx.repeaterStore);
+      break;
+    case WidgetType::HURRICANE:
+      widgetPool[type] = std::make_unique<HurricanePanel>(0, 0, 0, 0, fontMgr,
+                                                          ctx.hurricaneStore);
+      break;
+    case WidgetType::MARINE:
+      widgetPool[type] =
+          std::make_unique<MarinePanel>(0, 0, 0, 0, fontMgr, ctx.marineStore);
+      break;
+    case WidgetType::WINLINK:
+      widgetPool[type] = std::make_unique<WinlinkPanel>(0, 0, 0, 0, fontMgr,
+                                                        ctx.winlinkStore);
+      break;
     default:
       widgetPool[type] = std::make_unique<PlaceholderWidget>(
           0, 0, 0, 0, fontMgr, widgetTypeDisplayName(type), cyan);
@@ -1066,7 +1148,11 @@ DashboardContext::DashboardContext(AppContext &ctx)
       WidgetType::CALLBOOK,      WidgetType::DST_INDEX,
       WidgetType::WATCHLIST,     WidgetType::EME_TOOL,
       WidgetType::SANTA_TRACKER, WidgetType::CPU_TEMP,
-      WidgetType::ASTEROID};
+      WidgetType::ASTEROID, WidgetType::ALERTS,
+      WidgetType::FORECAST, WidgetType::HURRICANE,
+      WidgetType::MARINE};
+  // Note: REPEATER_DIR omitted — RepeaterBook API requires auth key (TODO).
+  // Note: WINLINK omitted — Winlink API requires access key (TODO).
   for (auto t : allTypes)
     addToPool(t);
 
@@ -1623,6 +1709,48 @@ void DashboardContext::update(AppContext &ctx) {
                                                             payload->second);
           }
           delete payload;
+          break;
+        }
+        case AE_ALERTS_DATA_READY: {
+          auto *update = static_cast<AlertsData *>(event.user.data1);
+          if (update && ctx.alertsStore)
+            ctx.alertsStore->update(*update);
+          delete update;
+          break;
+        }
+        case AE_FORECAST_DATA_READY: {
+          auto *update = static_cast<ForecastData *>(event.user.data1);
+          if (update && ctx.forecastStore)
+            ctx.forecastStore->update(*update);
+          delete update;
+          break;
+        }
+        case AE_REPEATER_DATA_READY: {
+          auto *update = static_cast<RepeaterData *>(event.user.data1);
+          if (update && ctx.repeaterStore)
+            ctx.repeaterStore->update(*update);
+          delete update;
+          break;
+        }
+        case AE_HURRICANE_DATA_READY: {
+          auto *update = static_cast<HurricaneData *>(event.user.data1);
+          if (update && ctx.hurricaneStore)
+            ctx.hurricaneStore->update(*update);
+          delete update;
+          break;
+        }
+        case AE_MARINE_DATA_READY: {
+          auto *update = static_cast<MarineData *>(event.user.data1);
+          if (update && ctx.marineStore)
+            ctx.marineStore->update(*update);
+          delete update;
+          break;
+        }
+        case AE_WINLINK_DATA_READY: {
+          auto *update = static_cast<WinlinkData *>(event.user.data1);
+          if (update && ctx.winlinkStore)
+            ctx.winlinkStore->update(*update);
+          delete update;
           break;
         }
         }

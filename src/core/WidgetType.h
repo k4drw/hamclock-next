@@ -33,6 +33,12 @@ enum class WidgetType {
   SANTA_TRACKER,
   CPU_TEMP,
   ASTEROID,
+  ALERTS,
+  FORECAST,
+  REPEATER_DIR,
+  HURRICANE,
+  MARINE,
+  WINLINK,
 };
 
 inline const char *widgetTypeToString(WidgetType t) {
@@ -95,6 +101,18 @@ inline const char *widgetTypeToString(WidgetType t) {
     return "cpu_temp";
   case WidgetType::ASTEROID:
     return "asteroid";
+  case WidgetType::ALERTS:
+    return "alerts";
+  case WidgetType::FORECAST:
+    return "forecast";
+  case WidgetType::REPEATER_DIR:
+    return "repeater_dir";
+  case WidgetType::HURRICANE:
+    return "hurricane";
+  case WidgetType::MARINE:
+    return "marine";
+  case WidgetType::WINLINK:
+    return "winlink";
   }
   return "solar";
 }
@@ -159,6 +177,18 @@ inline const char *widgetTypeDisplayName(WidgetType t) {
     return "CPU Temp";
   case WidgetType::ASTEROID:
     return "Asteroids";
+  case WidgetType::ALERTS:
+    return "WX Alerts";
+  case WidgetType::FORECAST:
+    return "Forecast";
+  case WidgetType::REPEATER_DIR:
+    return "Repeaters";
+  case WidgetType::HURRICANE:
+    return "Tropics";
+  case WidgetType::MARINE:
+    return "Marine";
+  case WidgetType::WINLINK:
+    return "Winlink";
   }
   return "Solar";
 }
@@ -223,6 +253,18 @@ inline WidgetType widgetTypeFromString(const std::string &s,
     return WidgetType::CPU_TEMP;
   if (s == "asteroid")
     return WidgetType::ASTEROID;
+  if (s == "alerts")
+    return WidgetType::ALERTS;
+  if (s == "forecast")
+    return WidgetType::FORECAST;
+  if (s == "repeater_dir")
+    return WidgetType::REPEATER_DIR;
+  if (s == "hurricane")
+    return WidgetType::HURRICANE;
+  if (s == "marine")
+    return WidgetType::MARINE;
+  if (s == "winlink")
+    return WidgetType::WINLINK;
   std::fprintf(stderr, "WidgetType: unknown '%s', using fallback\n", s.c_str());
   return fallback;
 }

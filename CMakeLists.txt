@@ -487,9 +487,21 @@ set(HAMCLOCK_SOURCES
     src/core/AsteroidPropagator.cpp
     src/services/RBNProvider.cpp
     src/services/QRZProvider.cpp
+    src/services/AlertsProvider.cpp
+    src/services/ForecastProvider.cpp
+    src/services/RepeaterProvider.cpp
+    src/services/HurricaneProvider.cpp
+    src/services/MarineProvider.cpp
+    src/services/WinlinkProvider.cpp
     src/ui/ActivityPanels.cpp
     src/ui/ADIFPanel.cpp
+    src/ui/AlertsPanel.cpp
     src/ui/AsteroidPanel.cpp
+    src/ui/ForecastPanel.cpp
+    src/ui/HurricanePanel.cpp
+    src/ui/MarinePanel.cpp
+    src/ui/RepeaterPanel.cpp
+    src/ui/WinlinkPanel.cpp
     src/ui/AuroraPanel.cpp
     src/ui/AuroraGraphPanel.cpp
     src/ui/DXClusterPanel.cpp

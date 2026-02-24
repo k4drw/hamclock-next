@@ -42,5 +42,11 @@ static constexpr uint32_t AE_CONTEST_DATA_READY = 7;
 static constexpr uint32_t AE_HISTORY_DATA_READY = 8;
 static constexpr uint32_t AE_PROP_DATA_READY = 9;
 static constexpr uint32_t AE_ASTEROID_ELEMENTS_READY = 10;
+static constexpr uint32_t AE_ALERTS_DATA_READY = 11;
+static constexpr uint32_t AE_FORECAST_DATA_READY = 12;
+static constexpr uint32_t AE_REPEATER_DATA_READY = 13;
+static constexpr uint32_t AE_HURRICANE_DATA_READY = 14;
+static constexpr uint32_t AE_MARINE_DATA_READY = 15;
+static constexpr uint32_t AE_WINLINK_DATA_READY = 16;
 
 } // namespace HamClock

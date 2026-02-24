@@ -58,4 +58,11 @@ private:
   int lastLabelFontSize_ = 0;
   int lastValueFontSize_ = 0;
   bool dataValid_ = false;
+
+  // Alert badge: shown when any NOAA scale >= 3 (Strong or above).
+  struct AlertBadge {
+    bool active = false;
+    std::string text; // e.g. "G3!" or "R4!"
+    SDL_Color color = {255, 50, 50, 255};
+  } alertBadge_;
 };

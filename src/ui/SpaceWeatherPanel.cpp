@@ -143,6 +143,25 @@ void SpaceWeatherPanel::update() {
   std::snprintf(buf, sizeof(buf), "G%d", data.noaa_g_scale);
   items_[14].value = buf;
   items_[14].valueColor = colorForNOAAScale(data.noaa_g_scale, themes);
+
+  // Alert badge: activate when any scale >= 3 (Strong or above).
+  alertBadge_.active = false;
+  if (data.noaa_g_scale >= 3) {
+    alertBadge_.active = true;
+    std::snprintf(buf, sizeof(buf), "G%d!", data.noaa_g_scale);
+    alertBadge_.text = buf;
+    alertBadge_.color = colorForNOAAScale(data.noaa_g_scale, themes);
+  } else if (data.noaa_r_scale >= 3) {
+    alertBadge_.active = true;
+    std::snprintf(buf, sizeof(buf), "R%d!", data.noaa_r_scale);
+    alertBadge_.text = buf;
+    alertBadge_.color = colorForNOAAScale(data.noaa_r_scale, themes);
+  } else if (data.noaa_s_scale >= 3) {
+    alertBadge_.active = true;
+    std::snprintf(buf, sizeof(buf), "S%d!", data.noaa_s_scale);
+    alertBadge_.text = buf;
+    alertBadge_.color = colorForNOAAScale(data.noaa_s_scale, themes);
+  }
 }
 
 void SpaceWeatherPanel::render(SDL_Renderer *renderer) {
@@ -269,6 +288,16 @@ void SpaceWeatherPanel::render(SDL_Renderer *renderer) {
       SDL_SetRenderDrawColor(renderer, 60, 60, 60, 255); // Muted gray
     }
     SDL_RenderFillRect(renderer, &seg);
+  }
+
+  // Alert badge (top-right corner): flash at 1 Hz when active.
+  if (alertBadge_.active) {
+    uint32_t ticks = SDL_GetTicks();
+    bool visible = (ticks / 500) % 2 == 0; // Blink every 500 ms
+    if (visible) {
+      fontMgr_.drawText(renderer, alertBadge_.text, x_ + width_ - 4,
+                        y_ + 3, alertBadge_.color, labelFontSize_, true, true);
+    }
   }
 
   lastLabelFontSize_ = labelFontSize_;
