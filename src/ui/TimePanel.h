@@ -21,7 +21,7 @@ public:
   void render(SDL_Renderer *renderer) override;
   void onResize(int x, int y, int w, int h) override;
 
-  bool onMouseUp(int mx, int my, Uint16 mod) override;
+  bool onMouseUp(int mx, int my, Uint16 mod, int clicks) override;
   bool onKeyDown(SDL_Keycode key, Uint16 mod) override;
   bool onTextInput(const char *text) override;
 
@@ -49,6 +49,15 @@ public:
 
   bool isSetupRequested() const { return setupRequested_; }
   void clearSetupRequest() { setupRequested_ = false; }
+
+  // Called whenever the update checker has new information.
+  void setUpdateInfo(bool available, const std::string &latestVersion) {
+    updateAvailable_ = available;
+    latestVersion_ = latestVersion;
+  }
+
+  bool isUpdateRequested() const { return updateRequested_; }
+  void clearUpdateRequest() { updateRequested_ = false; }
 
   // Callback invoked when callsign text or color is changed via the editor.
   using ConfigChangedCb =
@@ -121,8 +130,12 @@ private:
 
   ConfigChangedCb onConfigChanged_;
   bool setupRequested_ = false;
+  bool updateAvailable_ = false;
+  std::string latestVersion_;
   SDL_Rect gearRect_ = {};
+  SDL_Rect versionRect_ = {};
   int gearSize_ = 12;
+  bool updateRequested_ = false;
 
   // Info bar state (uptime, rotating center, version)
   std::string currentUptime_;

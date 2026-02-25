@@ -26,7 +26,23 @@ else()
 endif()
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-add_compile_definitions(HAMCLOCK_VERSION="${HAMCLOCK_DISPLAY_VERSION}")
+# Target architecture detection
+if(NOT HAMCLOCK_ARCH)
+    set(HAMCLOCK_ARCH "${CMAKE_SYSTEM_PROCESSOR}")
+endif()
+
+# Installation type awareness (default to BIN if not specified)
+if(NOT HAMCLOCK_INSTALL_TYPE)
+    if(EMSCRIPTEN)
+        set(HAMCLOCK_INSTALL_TYPE "WASM")
+    else()
+        set(HAMCLOCK_INSTALL_TYPE "BIN")
+    endif()
+endif()
+
+add_compile_definitions(HAMCLOCK_VERSION="v${HAMCLOCK_DISPLAY_VERSION}")
+add_compile_definitions(HAMCLOCK_INSTALL_TYPE="${HAMCLOCK_INSTALL_TYPE}")
+add_compile_definitions(HAMCLOCK_ARCH="${HAMCLOCK_ARCH}")
 
 # Pthreads are not enabled for WASM: the app is single-threaded in that
 # context and enabling them would require SharedArrayBuffer + COOP/COEP HTTP
@@ -44,6 +60,7 @@ set(SDL2IMAGE_BUILD_SHARED_LIBS OFF CACHE BOOL "Build shared SDL2_image library"
 
 # --- Build Options ---
 option(ENABLE_DEBUG_API "Enable debug API endpoints and live view (increases CPU usage)" OFF)
+option(ENABLE_ASAN "Enable AddressSanitizer + UBSan (Debug only)" OFF)
 
 if(ENABLE_DEBUG_API)
     add_compile_definitions(ENABLE_DEBUG_API)
@@ -146,6 +163,16 @@ if(NOT WIN32 AND NOT EMSCRIPTEN)
         GIT_SHALLOW    TRUE
     )
     FetchContent_MakeAvailable(mbedtls)
+    # Explicitly suppress warnings for mbedtls targets
+    foreach(target mbedtls mbedx509 mbedcrypto)
+        if(TARGET ${target})
+            if(MSVC)
+                target_compile_options(${target} PRIVATE /w)
+            else()
+                target_compile_options(${target} PRIVATE -w)
+            endif()
+        endif()
+    endforeach()
     # Export paths for CURL's FindMbedTLS using absolute paths to bypass export set checks
     set(MBEDTLS_INCLUDE_DIR "${mbedtls_SOURCE_DIR}/include" CACHE PATH "" FORCE)
     set(MBEDTLS_LIBRARY "${mbedtls_BINARY_DIR}/library/libmbedtls.a" CACHE FILEPATH "" FORCE)
@@ -337,7 +364,12 @@ if(NOT TARGET sqlite3)
     add_library(sqlite3 STATIC 
         ${sqlite3_amalgamation_SOURCE_DIR}/sqlite3.c
     )
-    target_include_directories(sqlite3 PUBLIC ${sqlite3_amalgamation_SOURCE_DIR})
+    target_include_directories(sqlite3 SYSTEM PUBLIC ${sqlite3_amalgamation_SOURCE_DIR})
+    if(MSVC)
+        target_compile_options(sqlite3 PRIVATE /w)
+    else()
+        target_compile_options(sqlite3 PRIVATE -w)
+    endif()
     if(UNIX)
         target_link_libraries(sqlite3 PRIVATE m dl)
     endif()
@@ -391,6 +423,17 @@ if(NOT TARGET SDL2_mixer::SDL2_mixer-static)
     endif()
 endif()
 
+# Explicitly suppress warnings for SDL2 targets
+foreach(target SDL2-static SDL2_ttf SDL2_image SDL2_mixer)
+    if(TARGET ${target})
+        if(MSVC)
+            target_compile_options(${target} PRIVATE /w)
+        else()
+            target_compile_options(${target} PRIVATE -w)
+        endif()
+    endif()
+endforeach()
+
 # Special handling for libpredict (skipping tests)
 FetchContent_GetProperties(libpredict)
 if(NOT libpredict_POPULATED)
@@ -437,8 +480,10 @@ set(HAMCLOCK_SOURCES
     src/core/WorkerService.cpp
     src/core/PropEngine.cpp
     src/core/ActivityLocationManager.cpp
+    src/network/FrameCapture.cpp
     src/network/NetworkManager.cpp
     src/network/WebServer.cpp
+    src/services/UpdateChecker.cpp
     src/services/NOAAProvider.cpp
     src/services/RSSProvider.cpp
     src/services/BME280Provider.cpp
@@ -466,11 +511,24 @@ set(HAMCLOCK_SOURCES
     src/services/RigService.cpp
     src/services/GPSProvider.cpp
     src/services/AsteroidProvider.cpp
+    src/core/AsteroidPropagator.cpp
     src/services/RBNProvider.cpp
     src/services/QRZProvider.cpp
+    src/services/AlertsProvider.cpp
+    src/services/ForecastProvider.cpp
+    src/services/RepeaterProvider.cpp
+    src/services/HurricaneProvider.cpp
+    src/services/MarineProvider.cpp
+    src/services/WinlinkProvider.cpp
     src/ui/ActivityPanels.cpp
     src/ui/ADIFPanel.cpp
+    src/ui/AlertsPanel.cpp
     src/ui/AsteroidPanel.cpp
+    src/ui/ForecastPanel.cpp
+    src/ui/HurricanePanel.cpp
+    src/ui/MarinePanel.cpp
+    src/ui/RepeaterPanel.cpp
+    src/ui/WinlinkPanel.cpp
     src/ui/AuroraPanel.cpp
     src/ui/AuroraGraphPanel.cpp
     src/ui/DXClusterPanel.cpp
@@ -479,7 +537,7 @@ set(HAMCLOCK_SOURCES
     src/ui/BeaconPanel.cpp
     src/ui/ContestPanel.cpp
     src/ui/CountdownPanel.cpp
-    src/ui/CPUTempPanel.cpp
+    src/ui/SysInfoPanel.cpp
     src/ui/DRAPPanel.cpp
     src/ui/GimbalPanel.cpp
     src/ui/HistoryPanel.cpp
@@ -502,6 +560,7 @@ set(HAMCLOCK_SOURCES
     src/ui/SetupScreen.cpp
     src/ui/SpaceWeatherPanel.cpp
     src/ui/TimePanel.cpp
+    src/ui/UpdateOverlay.cpp
     src/ui/WidgetSelector.cpp
     src/ui/CallbookPanel.cpp
     src/ui/DstPanel.cpp
@@ -570,6 +629,8 @@ else()
 
     target_include_directories(hamclock-next PRIVATE
         ${CMAKE_SOURCE_DIR}/include
+    )
+    target_include_directories(hamclock-next SYSTEM PRIVATE
         ${libpredict_BINARY_DIR}/include
         ${SDL2_INCLUDE_DIRS}
     )
@@ -592,10 +653,24 @@ else()
 
     if(WIN32)
         add_definitions(-D_WIN32_WINNT=0x0601) # Target Windows 7+
-        target_link_libraries(hamclock-next PRIVATE ws2_32 psapi)
+        target_link_libraries(hamclock-next PRIVATE ws2_32 psapi iphlpapi)
     elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
         # On Linux with GCC, link libstdc++ and libgcc statically for better portability
         target_link_options(hamclock-next PRIVATE -static-libstdc++ -static-libgcc)
+    endif()
+
+    # Compiler warnings (non-Emscripten only; -Werror omitted until warnings are resolved)
+    if(MSVC)
+        target_compile_options(hamclock-next PRIVATE /W4)
+    else()
+        target_compile_options(hamclock-next PRIVATE -Wall -Wextra -Wno-unused-parameter)
+    endif()
+
+    # AddressSanitizer + UBSan (opt-in, Debug builds only, Linux/macOS)
+    if(ENABLE_ASAN AND NOT WIN32)
+        target_compile_options(hamclock-next PRIVATE -fsanitize=address,undefined -fno-omit-frame-pointer)
+        target_link_options(hamclock-next PRIVATE -fsanitize=address,undefined)
+        message(STATUS "AddressSanitizer + UBSan enabled")
     endif()
 
     if(APPLE)

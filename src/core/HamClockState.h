@@ -35,4 +35,7 @@ struct HamClockState {
   // Telemetry
   float fps = 0.0f;
   std::map<std::string, ServiceStatus> services;
+
+  // Asteroid selection — "" means none selected
+  std::string selectedAsteroidName;
 };

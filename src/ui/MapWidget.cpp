@@ -4,6 +4,7 @@
 #endif
 #endif
 #include "MapWidget.h"
+#include "../core/AsteroidPropagator.h"
 #include "../core/Astronomy.h"
 #include "../core/BeaconData.h"
 #include "../core/Constants.h"
@@ -12,10 +13,10 @@
 #include "../core/PropEngine.h"
 #include "../core/StringUtils.h"
 #include "../core/WorkerService.h"
+#include "../services/AsteroidProvider.h"
 #include "../services/BeaconProvider.h"
 #include "../services/CloudProvider.h"
 #include "../services/IonosondeProvider.h"
-#include "../services/MufRtProvider.h"
 #include "../services/WxMbProvider.h"
 #include "EmbeddedIcons.h"
 #include "FontCatalog.h"
@@ -106,7 +107,9 @@ MapWidget::MapWidget(int x, int y, int w, int h, TextureManager &texMgr,
                      FontManager &fontMgr, NetworkManager &netMgr,
                      std::shared_ptr<HamClockState> state, AppConfig &config)
     : Widget(x, y, w, h), texMgr_(texMgr), fontMgr_(fontMgr), netMgr_(netMgr),
-      state_(std::move(state)), config_(config) {
+      state_(std::move(state)), lastPosUpdateMs_(0), lastSatTrackUpdateMs_(0),
+      config_(config), lastMufUpdateMs_(0), wxLastCheckMs_(0),
+      lastPropUpdateMs_(0) {
 
   const char *driver = SDL_GetCurrentVideoDriver();
   LOG_D("MapWidget", "SDL Video Driver: {}", driver ? driver : "unknown");
@@ -254,6 +257,42 @@ void MapWidget::update() {
     satTrackDirty_ = true;
   }
 
+  // Asteroid ground track update
+  if (asteroidProvider_ && state_) {
+    const std::string &sel = state_->selectedAsteroidName;
+    if (sel != lastSelectedAsteroidName_) {
+      lastSelectedAsteroidName_ = sel;
+      asteroidTrackDirty_ = true;
+      cachedAsteroidTrack_.clear();
+      asteroidTrackVerts_.clear();
+      asteroidTrackIndices_.clear();
+    }
+    if (!sel.empty() && asteroidTrackDirty_) {
+      OrbitalElements elem = asteroidProvider_->getOrbitalElements(sel);
+      if (elem.valid) {
+        // Find approach JD for the selected asteroid
+        double jd_approach = 0;
+        AsteroidData latest = asteroidProvider_->getLatest();
+        for (const auto &ast : latest.asteroids) {
+          if (ast.name == sel) {
+            jd_approach = ast.julianDate;
+            break;
+          }
+        }
+        if (jd_approach > 0) {
+          cachedAsteroidTrack_ = AsteroidPropagator::computeGroundTrack(
+              elem, jd_approach - 0.5, jd_approach + 0.5, 48);
+          asteroidTrackDirty_ = false;
+        }
+      }
+    }
+  } else if (!cachedAsteroidTrack_.empty()) {
+    cachedAsteroidTrack_.clear();
+    asteroidTrackDirty_ = true;
+    asteroidTrackVerts_.clear();
+    asteroidTrackIndices_.clear();
+  }
+
   // Great Circle update (on change)
   if (state_->dxActive) {
     if (state_->deLocation.lat != lastDE_.lat ||
@@ -292,9 +331,8 @@ void MapWidget::update() {
 
   // WX pressure overlay (check every 10 minutes)
   if (config_.weatherOverlay == WeatherOverlayType::WxMb) {
-    uint64_t nowMs64 = static_cast<uint64_t>(SDL_GetTicks());
-    if (nowMs64 - wxLastCheckMs_ > 600000ULL || wxLastCheckMs_ == 0) {
-      wxLastCheckMs_ = nowMs64;
+    if (nowMs - (uint32_t)wxLastCheckMs_ > 600000 || wxLastCheckMs_ == 0) {
+      wxLastCheckMs_ = (uint64_t)nowMs;
       wxmb_->update();
     }
   }
@@ -379,10 +417,10 @@ void MapWidget::update() {
     }
   }
 }
-bool MapWidget::onMouseUp(int mx, int my, Uint16 mod) {
+bool MapWidget::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
   // Pass through to menu if visible
   if (mapViewMenu_->isVisible()) {
-    return mapViewMenu_->onMouseUp(mx, my, mod);
+    return mapViewMenu_->onMouseUp(mx, my, mod, clicks);
   }
 
   // Check RSS toggle button (lower-left corner)
@@ -516,11 +554,13 @@ void MapWidget::onMouseMove(int mx, int my) {
     ActivityData ads = activityStore_->get();
     if (ads.hasSelection) {
       const auto &sel = ads.selectedSpot;
-      // Resolve lat/lon: use selectedSpot coords, or fall back to ontaSpots list
+      // Resolve lat/lon: use selectedSpot coords, or fall back to ontaSpots
+      // list
       double sLat = sel.lat, sLon = sel.lon;
       if (sLat == 0.0 && sLon == 0.0) {
         for (const auto &s : ads.ontaSpots) {
-          if (s.call == sel.call && s.ref == sel.ref && (s.lat != 0.0 || s.lon != 0.0)) {
+          if (s.call == sel.call && s.ref == sel.ref &&
+              (s.lat != 0.0 || s.lon != 0.0)) {
             sLat = s.lat;
             sLon = s.lon;
             break;
@@ -542,7 +582,31 @@ void MapWidget::onMouseMove(int mx, int my) {
     }
   }
 
-  // 6. Check DX Cluster selected spot only (mirrors renderDXClusterSpots logic)
+  // 6. Check asteroid icon
+  if (tip.empty() && asteroidProvider_ &&
+      !state_->selectedAsteroidName.empty() && !cachedAsteroidTrack_.empty()) {
+    size_t mid = cachedAsteroidTrack_.size() / 2;
+    if (screenDist(cachedAsteroidTrack_[mid].lat,
+                   cachedAsteroidTrack_[mid].lon) < kHitRadius + 4) {
+      AsteroidData data = asteroidProvider_->getLatest();
+      for (const auto &ast : data.asteroids) {
+        if (ast.name == state_->selectedAsteroidName) {
+          std::string name = ast.name;
+          if (name.size() > 2 && name.front() == '(' && name.back() == ')')
+            name = name.substr(1, name.size() - 2);
+          char buf[256];
+          std::snprintf(buf, sizeof(buf), "%s\n%.2f LD  %.1f km/s%s",
+                        name.c_str(), ast.missDistanceLD, ast.velocityKmS,
+                        ast.isHazardous ? "\n\u26a0 Potentially Hazardous"
+                                        : "");
+          tip = buf;
+          break;
+        }
+      }
+    }
+  }
+
+  // 7. Check DX Cluster selected spot only (mirrors renderDXClusterSpots logic)
   if (tip.empty() && dxcStore_) {
     auto data = dxcStore_->snapshot();
     if (data->hasSelection && data->selectedSpot.txLat != 0.0) {
@@ -975,9 +1039,10 @@ void MapWidget::render(SDL_Renderer *renderer) {
       // Low-memory mode: reduce mesh density on KMSDRM
       const int gridW = useCompatibilityRenderPath_ ? 48 : 96;
       const int gridH = useCompatibilityRenderPath_ ? 24 : 48;
-      bool needsMeshUpdate = mapVerts_.empty() ||
-                             (mapVerts_.size() != (gridW + 1) * (gridH + 1)) ||
-                             (lastProjection_ != config_.projection);
+      bool needsMeshUpdate =
+          mapVerts_.empty() ||
+          (mapVerts_.size() != (size_t)(gridW + 1) * (gridH + 1)) ||
+          (lastProjection_ != config_.projection);
 
       if (needsMeshUpdate) {
         lastProjection_ = config_.projection;
@@ -1026,6 +1091,7 @@ void MapWidget::render(SDL_Renderer *renderer) {
   renderPropagationOverlay(renderer);
   renderMufRtOverlay(renderer);
   renderWxMbOverlay(renderer);
+  renderCloudOverlay(renderer);
   renderNightOverlay(renderer);
   renderGridOverlay(renderer);
   renderGreatCircle(renderer);
@@ -1039,6 +1105,7 @@ void MapWidget::render(SDL_Renderer *renderer) {
 
   renderAuroraOverlay(renderer);
   renderSatellite(renderer);
+  renderAsteroidOverlay(renderer);
   renderSpotOverlay(renderer);
   renderDXClusterSpots(renderer);
   renderADIFPins(renderer);
@@ -1095,7 +1162,6 @@ void MapWidget::renderSatFootprint(SDL_Renderer *renderer, double lat,
   const int kSegments = useCompatibilityRenderPath_ ? 36 : 72;
   SDL_RenderSetClipRect(renderer, &mapRect_);
   std::vector<SDL_FPoint> segment;
-  SDL_FPoint prev{};
   SDL_Texture *lineTex = texMgr_.get(LINE_AA_KEY);
 
   for (int i = 0; i <= kSegments; ++i) {
@@ -1225,6 +1291,125 @@ void MapWidget::renderSatGroundTrack(SDL_Renderer *renderer) {
     SDL_RenderGeometry(renderer, lineTex, satTrackVerts_.data(),
                        (int)satTrackVerts_.size(), satTrackIndices_.data(),
                        (int)satTrackIndices_.size());
+  }
+
+  SDL_RenderSetClipRect(renderer, nullptr);
+}
+
+void MapWidget::onAsteroidElementsReady(const std::string &des,
+                                        const OrbitalElements & /*elem*/) {
+  if (state_ && des == state_->selectedAsteroidName) {
+    asteroidTrackDirty_ = true;
+    asteroidTrackVerts_.clear();
+    asteroidTrackIndices_.clear();
+  }
+}
+
+void MapWidget::renderAsteroidOverlay(SDL_Renderer *renderer) {
+  if (!state_ || state_->selectedAsteroidName.empty())
+    return;
+
+  SDL_Texture *lineTex = texMgr_.get(LINE_AA_KEY);
+  if (!lineTex)
+    return;
+
+  if (asteroidTrackDirty_ || cachedAsteroidTrack_.size() < 2) {
+    // Rebuild geometry when dirty (track may be empty if elements not yet
+    // arrived)
+    asteroidTrackVerts_.clear();
+    asteroidTrackIndices_.clear();
+
+    if (cachedAsteroidTrack_.size() >= 2) {
+      float thickness = 1.5f;
+      float r = thickness / 2.0f;
+      SDL_Color color = {config_.asteroidColor.r, config_.asteroidColor.g,
+                         config_.asteroidColor.b, 200};
+
+      std::vector<SDL_FPoint> segment;
+      auto add_segment_geom = [&](const std::vector<SDL_FPoint> &seg) {
+        for (size_t i = 1; i < seg.size(); i++) {
+          SDL_FPoint p1 = seg[i - 1];
+          SDL_FPoint p2 = seg[i];
+          float dx = p2.x - p1.x;
+          float dy = p2.y - p1.y;
+          float len = std::sqrt(dx * dx + dy * dy);
+          if (len < 0.1f)
+            continue;
+          float nx = -dy / len * r;
+          float ny = dx / len * r;
+          int base = static_cast<int>(asteroidTrackVerts_.size());
+          asteroidTrackVerts_.push_back(
+              {{p1.x + nx, p1.y + ny}, color, {0, 0}});
+          asteroidTrackVerts_.push_back(
+              {{p1.x - nx, p1.y - ny}, color, {0, 1}});
+          asteroidTrackVerts_.push_back(
+              {{p2.x + nx, p2.y + ny}, color, {1, 0}});
+          asteroidTrackVerts_.push_back(
+              {{p2.x - nx, p2.y - ny}, color, {1, 1}});
+          asteroidTrackIndices_.push_back(base + 0);
+          asteroidTrackIndices_.push_back(base + 1);
+          asteroidTrackIndices_.push_back(base + 2);
+          asteroidTrackIndices_.push_back(base + 1);
+          asteroidTrackIndices_.push_back(base + 2);
+          asteroidTrackIndices_.push_back(base + 3);
+        }
+      };
+
+      for (size_t i = 0; i < cachedAsteroidTrack_.size(); ++i) {
+        if (i > 0) {
+          double lon0 = cachedAsteroidTrack_[i - 1].lon;
+          double lon1 = cachedAsteroidTrack_[i].lon;
+          if (std::fabs(lon0 - lon1) > 180.0) {
+            double lon1_adj = (lon1 < 0) ? lon1 + 360.0 : lon1 - 360.0;
+            double borderLon = (lon1 < 0) ? 180.0 : -180.0;
+            double f = (borderLon - lon0) / (lon1_adj - lon0);
+            double borderLat = cachedAsteroidTrack_[i - 1].lat +
+                               f * (cachedAsteroidTrack_[i].lat -
+                                    cachedAsteroidTrack_[i - 1].lat);
+            segment.push_back(latLonToScreen(borderLat, borderLon));
+            add_segment_geom(segment);
+            segment.clear();
+            segment.push_back(latLonToScreen(borderLat, -borderLon));
+          }
+        }
+        segment.push_back(latLonToScreen(cachedAsteroidTrack_[i].lat,
+                                         cachedAsteroidTrack_[i].lon));
+      }
+      if (segment.size() >= 2) {
+        add_segment_geom(segment);
+      }
+      asteroidTrackDirty_ = false;
+    }
+  }
+
+  SDL_RenderSetClipRect(renderer, &mapRect_);
+
+  if (!asteroidTrackVerts_.empty()) {
+    SDL_RenderGeometry(renderer, lineTex, asteroidTrackVerts_.data(),
+                       (int)asteroidTrackVerts_.size(),
+                       asteroidTrackIndices_.data(),
+                       (int)asteroidTrackIndices_.size());
+  }
+
+  // Draw icon glyph at closest-approach point (center of track)
+  if (!cachedAsteroidTrack_.empty()) {
+    size_t mid = cachedAsteroidTrack_.size() / 2;
+    SDL_FPoint sp = latLonToScreen(cachedAsteroidTrack_[mid].lat,
+                                   cachedAsteroidTrack_[mid].lon);
+    const std::string &icon =
+        config_.asteroidIcon.empty() ? "☄" : config_.asteroidIcon;
+    int ptSize = fontMgr_.catalog()->ptSize(FontStyle::SmallRegular);
+    int iw = 0, ih = 0;
+    SDL_Color icnColor = {config_.asteroidColor.r, config_.asteroidColor.g,
+                          config_.asteroidColor.b, 220};
+    SDL_Texture *iconTex =
+        fontMgr_.renderText(renderer, icon, icnColor, ptSize, &iw, &ih);
+    if (iconTex) {
+      SDL_Rect dst = {static_cast<int>(sp.x) - iw / 2,
+                      static_cast<int>(sp.y) - ih / 2, iw, ih};
+      SDL_RenderCopy(renderer, iconTex, nullptr, &dst);
+      SDL_DestroyTexture(iconTex);
+    }
   }
 
   SDL_RenderSetClipRect(renderer, nullptr);
@@ -1538,7 +1723,8 @@ void MapWidget::renderONTASpots(SDL_Renderer *renderer) {
   double spotLat = spot.lat, spotLon = spot.lon;
   if (spotLat == 0.0 && spotLon == 0.0) {
     for (const auto &s : data.ontaSpots) {
-      if (s.call == spot.call && s.ref == spot.ref && (s.lat != 0.0 || s.lon != 0.0)) {
+      if (s.call == spot.call && s.ref == spot.ref &&
+          (s.lat != 0.0 || s.lon != 0.0)) {
         spotLat = s.lat;
         spotLon = s.lon;
         break;
@@ -1557,8 +1743,7 @@ void MapWidget::renderONTASpots(SDL_Renderer *renderer) {
                                           : SDL_Color{0, 200, 255, 255};
 
   LatLon de = state_->deLocation;
-  auto path =
-      Astronomy::calculateGreatCirclePath(de, {spotLat, spotLon}, 100);
+  auto path = Astronomy::calculateGreatCirclePath(de, {spotLat, spotLon}, 100);
 
   std::vector<SDL_FPoint> segment;
   SDL_Color lineColor = {color.r, color.g, color.b, 100};
@@ -1766,7 +1951,7 @@ void MapWidget::renderWxMbOverlay(SDL_Renderer *renderer) {
   if (!tex)
     return;
   SDL_SetTextureBlendMode(tex, SDL_BLENDMODE_BLEND);
-  SDL_SetTextureAlphaMod(tex, 180);
+  SDL_SetTextureAlphaMod(tex, 255);
   SDL_RenderSetClipRect(renderer, &mapRect_);
   SDL_RenderCopy(renderer, tex, nullptr, &mapRect_);
   SDL_RenderSetClipRect(renderer, nullptr);
@@ -2222,9 +2407,8 @@ void MapWidget::renderAuroraOverlay(SDL_Renderer *renderer) {
         SDL_FPoint screenPos = latLonToScreen(lat, longitude);
 
         // Calculate alpha based on value (0-100)
-        Uint8 alpha = static_cast<Uint8>((val * 255) / 100);
-        if (alpha > 255)
-          alpha = 255;
+        int calculatedAlpha = (val * 255) / 100;
+        Uint8 alpha = static_cast<Uint8>(std::clamp(calculatedAlpha, 0, 255));
 
         // Draw green glow
         SDL_SetRenderDrawColor(renderer, 0, 255, 0, alpha);
@@ -2310,6 +2494,10 @@ void MapWidget::renderOverlayInfo(SDL_Renderer *renderer) {
     if (!text.empty())
       text += " + ";
     text += "WX/Pressure";
+  } else if (config_.weatherOverlay == WeatherOverlayType::Clouds) {
+    if (!text.empty())
+      text += " + ";
+    text += "Clouds";
   }
 
   if (text.empty())

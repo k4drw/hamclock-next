@@ -263,7 +263,7 @@ bool DXClusterPanel::onMouseWheel(int scrollY) {
   return false;
 }
 
-bool DXClusterPanel::onMouseUp(int mx, int my, Uint16 /*mod*/) {
+bool DXClusterPanel::onMouseUp(int mx, int my, Uint16 /*mod*/, int clicks) {
   // Top 10% is the PaneContainer widget-selection zone — match its threshold
   // exactly so that clicking the title area opens the widget selector, while
   // clicking anywhere in the content area is absorbed by this widget.

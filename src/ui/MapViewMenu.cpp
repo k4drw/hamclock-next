@@ -151,6 +151,8 @@ void MapViewMenu::render(SDL_Renderer *renderer) {
   std::string weatherLabel = "None";
   if (weatherOverlay_ == WeatherOverlayType::WxMb)
     weatherLabel = "WX/Pressure";
+  else if (weatherOverlay_ == WeatherOverlayType::Clouds)
+    weatherLabel = "Clouds";
   drawDropdown(renderer, weatherRec_, weatherLabel,
                openCombo_ == COMBO_WEATHER);
 
@@ -297,7 +299,7 @@ void MapViewMenu::drawDropdownList(SDL_Renderer *renderer,
   }
 }
 
-bool MapViewMenu::onMouseUp(int mx, int my, Uint16) {
+bool MapViewMenu::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
   if (!visible_)
     return false;
   SDL_Point pt = {mx, my};
@@ -390,6 +392,8 @@ bool MapViewMenu::onMouseUp(int mx, int my, Uint16) {
                       weatherOverlay_ = WeatherOverlayType::None;
                     else if (idx == 1)
                       weatherOverlay_ = WeatherOverlayType::WxMb;
+                    else if (idx == 2)
+                      weatherOverlay_ = WeatherOverlayType::Clouds;
                   }))
                 return true;
           

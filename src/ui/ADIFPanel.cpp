@@ -91,7 +91,7 @@ void ADIFPanel::renderLogView(SDL_Renderer *renderer) {
   char chipBuf[32];
   std::snprintf(chipBuf, sizeof(chipBuf), "[%s %s]",
                 kFilterBands[filterBandIdx_], kFilterModes[filterModeIdx_]);
-  fontMgr_.drawText(renderer, chipBuf, x_ + width_ - pad, headerY, themes.info,
+  fontMgr_.drawText(renderer, chipBuf, x_ + width_ - 65, headerY, themes.info,
                     9, true, false, true);
   headerY += headerHeight_;
 
@@ -283,30 +283,39 @@ void ADIFPanel::onMouseMove(int mx, int my) {
   }
 }
 
-bool ADIFPanel::onMouseUp(int mx, int my, Uint16 /*mod*/) {
+bool ADIFPanel::onMouseUp(int mx, int my, Uint16 /*mod*/, int clicks) {
   if (draggingScrollbar_) {
     draggingScrollbar_ = false;
     return true;
   }
 
-  // Click in header row: left half cycles band filter, right half cycles mode
-  if (my >= y_ && my < y_ + headerHeight_) {
-    if (mx < x_ + width_ / 2) {
-      // Count filter bands
-      int n = 0;
-      while (kFilterBands[n])
-        n++;
-      filterBandIdx_ = (filterBandIdx_ + 1) % n;
-    } else {
-      int n = 0;
-      while (kFilterModes[n])
-        n++;
-      filterModeIdx_ = (filterModeIdx_ + 1) % n;
+  // Click in header row: check if in the filter box (chip)
+  if (showLogView_ && my >= y_ && my < y_ + headerHeight_) {
+    int chipX = x_ + width_ - 65;
+    char chipBuf[32];
+    std::snprintf(chipBuf, sizeof(chipBuf), "[%s %s]",
+                  kFilterBands[filterBandIdx_], kFilterModes[filterModeIdx_]);
+    int chipW = fontMgr_.getLogicalWidth(chipBuf, 9, true);
+
+    if (mx >= chipX && mx < chipX + chipW) {
+      if (mx < chipX + chipW / 2) {
+        // Left half of chip cycles band
+        int n = 0;
+        while (kFilterBands[n])
+          n++;
+        filterBandIdx_ = (filterBandIdx_ + 1) % n;
+      } else {
+        // Right half of chip cycles mode
+        int n = 0;
+        while (kFilterModes[n])
+          n++;
+        filterModeIdx_ = (filterModeIdx_ + 1) % n;
+      }
+      scrollOffset_ = 0;
+      store_->setFilters(kFilterBands[filterBandIdx_],
+                         kFilterModes[filterModeIdx_]);
+      return true;
     }
-    scrollOffset_ = 0;
-    store_->setFilters(kFilterBands[filterBandIdx_],
-                       kFilterModes[filterModeIdx_]);
-    return true;
   }
 
   // Check if clicking on scrollbar to start drag

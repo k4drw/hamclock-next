@@ -39,15 +39,32 @@ void WeatherPanel::render(SDL_Renderer *renderer) {
                          themes.border.b, themes.border.a);
   SDL_RenderDrawRect(renderer, &rect);
 
-  int centerX = x_ + width_ / 2;
+  int titleH = 20;
   bool isNarrow = (width_ < 100);
+
+  // Title - Abbreviate in narrow mode
+  std::string displayTitle = title_;
+  if (isNarrow) {
+    if (title_.find("DE") != std::string::npos)
+      displayTitle = "DE WX";
+    else if (title_.find("DX") != std::string::npos)
+      displayTitle = "DX WX";
+  }
+  int titleFontSize = isNarrow ? 9 : 10;
+  fontMgr_.drawText(renderer, displayTitle, x_ + 10, y_ + 5, themes.accent,
+                    titleFontSize, true);
+
+  int centerX = x_ + width_ / 2;
 
   if (isNarrow) {
     // Vertical stack layout (Fidelity Mode style)
-    int rowH = height_ / 4;
+    int availableH = height_ - titleH;
+    int rowH = availableH / 4;
+    int curY = y_ + titleH;
+
     auto drawNarrowRow = [&](const char *val, const char *lbl, int rowIdx,
                              SDL_Color valColor) {
-      int ry = y_ + rowIdx * rowH;
+      int ry = curY + rowIdx * rowH;
       // Value (Large)
       fontMgr_.drawText(renderer, val, centerX, ry + rowH * 0.35f, valColor,
                         tempFontSize_, true, true);
@@ -87,9 +104,7 @@ void WeatherPanel::render(SDL_Renderer *renderer) {
   int curY = y_ + pad;
 
   // Title
-  fontMgr_.drawText(renderer, title_, centerX, curY, themes.accent,
-                    labelFontSize_, true, true);
-  curY += labelFontSize_ + 10;
+  curY = y_ + titleH + 4;
 
   if (!dataValid_) {
     fontMgr_.drawText(renderer, "Waiting for data...", centerX,
@@ -128,7 +143,13 @@ void WeatherPanel::render(SDL_Renderer *renderer) {
   std::snprintf(buf, sizeof(buf), "%d%%", currentData_.humidity);
   drawDetail("HUMID", buf, x_ + pad + colWidth / 2, detailY);
 
-  std::snprintf(buf, sizeof(buf), "%.0f hPa", currentData_.pressure);
+  // Pressure: hPa (metric) or inHg (imperial, 1 hPa = 0.02953 inHg)
+  if (useMetric_) {
+    std::snprintf(buf, sizeof(buf), "%.0f hPa", currentData_.pressure);
+  } else {
+    std::snprintf(buf, sizeof(buf), "%.2f inHg",
+                  currentData_.pressure * 0.02953f);
+  }
   drawDetail("PRESS", buf, x_ + width_ - pad - colWidth / 2, detailY);
 
   detailY += infoFontSize_ * 2 + 8;

@@ -21,27 +21,27 @@ void EMEToolPanel::render(SDL_Renderer *renderer) {
                          themes.border.b, themes.border.a);
   SDL_RenderDrawRect(renderer, &rect);
 
-  int curY = y_ + 10;
-  int centerX = x_ + width_ / 2;
-  int pad = 20;
+  int titleH = 20;
+  fontMgr_.drawText(renderer, "EME Planning Tool", x_ + 10, y_ + 5,
+                    themes.accent, 10, true);
 
-  fontMgr_.drawText(renderer, "EME Planning Tool", x_ + 10, curY, themes.accent,
-                    10, true);
-  curY += 25;
+  int curY = y_ + titleH + 10;
+  int centerX = x_ + width_ / 2;
 
   if (!currentData_.valid) {
-    fontMgr_.drawText(renderer, "Calculating...", centerX, y_ + height_ / 2,
-                      themes.textDim, 10, false, true);
+    fontMgr_.drawText(renderer, "Calculating...", centerX,
+                      y_ + titleH + (height_ - titleH) / 2, themes.textDim, 10,
+                      false, true);
     return;
   }
 
   auto drawRow = [&](const char *label, const char *value, SDL_Color valCol) {
-    fontMgr_.drawText(renderer, label, x_ + pad, curY, themes.text, 10);
-    // Draw value left-aligned from the right side (rough approximation of
-    // right-align)
-    int valX = x_ + width_ - pad - 60;
-    fontMgr_.drawText(renderer, value, valX, curY, valCol, 10);
-    curY += 20;
+    int fontSize = 9;
+    fontMgr_.drawText(renderer, label, x_ + 10, curY, themes.text, fontSize);
+    int valW = fontMgr_.getLogicalWidth(value, fontSize);
+    int valX = x_ + width_ - 10 - valW;
+    fontMgr_.drawText(renderer, value, valX, curY, valCol, fontSize);
+    curY += 18;
   };
 
   char buf[64];

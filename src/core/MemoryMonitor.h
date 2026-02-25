@@ -41,6 +41,10 @@ BOOL WINAPI K32GetProcessMemoryInfo(HANDLE Process,
 
 #if defined(__linux__)
 #include <unistd.h>
+#elif defined(__APPLE__)
+#include <mach/mach.h>
+#include <sys/sysctl.h>
+#include <unistd.h>
 #endif
 
 class MemoryMonitor {
@@ -79,6 +83,16 @@ public:
     }
     fclose(fp);
     return (size_t)rss * (size_t)sysconf(_SC_PAGESIZE);
+#elif defined(__APPLE__)
+    // Use mach task_info to get resident set size
+    struct mach_task_basic_info info;
+    mach_msg_type_number_t count = MACH_TASK_BASIC_INFO_COUNT;
+    if (task_info(mach_task_self(), MACH_TASK_BASIC_INFO,
+                  reinterpret_cast<task_info_t>(&info),
+                  &count) == KERN_SUCCESS) {
+      return static_cast<size_t>(info.resident_size);
+    }
+    return 0;
 #elif defined(_WIN32)
     HC_PROCESS_MEMORY_COUNTERS pmc;
     pmc.cb = sizeof(pmc);
@@ -94,13 +108,50 @@ public:
 #endif
   }
 
+  // Get total physical RAM in bytes
+  size_t getTotalRAM() {
+#if defined(__linux__)
+    long pages = sysconf(_SC_PHYS_PAGES);
+    long page_size = sysconf(_SC_PAGESIZE);
+    return (size_t)pages * (size_t)page_size;
+#elif defined(__APPLE__)
+    // sysctlbyname("hw.memsize") returns uint64_t total physical bytes
+    uint64_t memsize = 0;
+    size_t len = sizeof(memsize);
+    if (sysctlbyname("hw.memsize", &memsize, &len, nullptr, 0) == 0) {
+      return static_cast<size_t>(memsize);
+    }
+    return 0;
+#elif defined(_WIN32)
+    MEMORYSTATUSEX status;
+    status.dwLength = sizeof(status);
+    if (GlobalMemoryStatusEx(&status)) {
+      return (size_t)status.ullTotalPhys;
+    }
+    return 0;
+#else
+    return 0;
+#endif
+  }
+
+  bool isLowMemoryDevice() {
+    size_t total = getTotalRAM();
+    if (total == 0)
+      return false; // Unknown, assume normal
+    // Threshold: 1.5 GB. RPi3B has 1GB, RPi4 has 1, 2, 4 or 8GB.
+    return total < (1536ULL * 1024 * 1024);
+  }
+
   void logStats(const std::string &context = "") {
     size_t rss = getRSS();
     int64_t vram = getVramEstimated();
+    size_t total = getTotalRAM();
 
     std::string ctxStr = context.empty() ? "" : "[" + context + "] ";
-    LOG_I("Memory", "{}: SYS RSS: {:.2f} MB, Est. VRAM: {:.2f} MB", ctxStr,
-          rss / 1024.0 / 1024.0, vram / 1024.0 / 1024.0);
+    LOG_I("Memory",
+          "{}: SYS RSS: {:.2f} MB, Est. VRAM: {:.2f} MB, Total RAM: {:.2f} MB",
+          ctxStr, rss / 1024.0 / 1024.0, vram / 1024.0 / 1024.0,
+          total / 1024.0 / 1024.0);
   }
 
 private:

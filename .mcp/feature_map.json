@@ -1,6 +1,6 @@
 {
-  "version": "1.9",
-  "updated_at": "2026-02-17T18:00:00.000Z",
+  "version": "2.2",
+  "updated_at": "2026-02-25T00:00:00.000Z",
   "features": [
     {
       "feature_id": "clock_callsign",
@@ -943,7 +943,7 @@
         "Spots on map",
         "Toggle between POTA and SOTA views"
       ],
-      "notes": "ActivityProvider fetches POTA/SOTA spots every 5 min. ONTAPanel shows scrollable list with POTA/SOTA/ALL filter toggle (click title area to cycle). POTA lat/lon resolved from grid4 field via Astronomy::gridToLatLon(). Map overlay: MapWidget::renderActivityPins() draws green squares for POTA, orange for SOTA. SOTA coordinates not resolved (no grid in SOTA spot API)."
+      "notes": "ActivityProvider fetches POTA/SOTA spots every 5 min. ONTAPanel shows scrollable list with POTA/SOTA/ALL filter toggle (click title area to cycle). POTA lat/lon resolved from grid4 field via Astronomy::gridToLatLon(). Map overlay: MapWidget::renderActivityPins() draws green squares for POTA, orange squares for SOTA. SOTA coordinates fully resolved via ActivityLocationManager: (1) binary-search on summitslist.csv (50K+ summits, 7-day cache, pre-seeded CSV at configDir or cwd), (2) resolveSummitAsync() per-summit API fallback with sota_api_cache.csv persistence (30-day cache)."
     },
     {
       "feature_id": "adif",
@@ -1970,9 +1970,9 @@
         "files": [],
         "symbols": []
       },
-      "status": "partial",
+      "status": "implemented",
       "acceptance": [],
-      "notes": "Original was ESP32 flash-in-place OTA \u2014 not applicable to desktop. Partial: update *notification* is needed. App should query GitHub Releases API (https://api.github.com/repos/ORG/REPO/releases/latest) at most once per day, compare tag to HAMCLOCK_VERSION, and surface a badge/banner when a newer release is available. No auto-download or auto-install. See plan: working_docs/plan/2026-02-23_update_notification.md"
+      "notes": "Desktop equivalent: UpdateChecker service polls GitHub Releases API (repos/k4drw/hamclock-next/releases/latest) at startup and every 6h. When newer tag found, TimePanel version string turns amber and appends *. No auto-download/install. Implemented 2026-02-23."
     },
     {
       "feature_id": "cpu_temp",
@@ -2271,7 +2271,7 @@
         "symbols": [],
         "notes": "Not implemented. open-hamclock-backend/scripts/update_cloud_maps.sh generates cloud composites. For a backend-free approach: NASA GIBS tiles (https://gibs.earthdata.nasa.gov) provide near-real-time cloud imagery as XYZ tiles or WMS. Alternative: Open Meteo provides weather data but not cloud imagery. Implementation requires tile fetching + projection warping."
       },
-      "status": "partial",
+      "status": "implemented",
       "acceptance": [
         "Fetch near-real-time cloud cover imagery",
         "Display as semi-transparent overlay on world map",
@@ -2279,7 +2279,7 @@
         "Toggle on/off in MapViewMenu",
         "Day-side only (cloud cover irrelevant at night)"
       ],
-      "notes": "CloudProvider implemented (NASA GIBS fetch). Render call removed from MapWidget pending display issues. Not selectable in MapViewMenu. Provider code present and functional; display layer disabled."
+      "notes": "VIIRS SNPP (NASA GIBS WMS). renderCloudOverlay() active in MapWidget; selectable in MapViewMenu as \"Clouds\". Implemented 2026-02-23."
     },
     {
       "feature_id": "web_only",
@@ -2335,14 +2335,534 @@
         "symbols": [],
         "notes": "Not implemented. Requires radar imagery source (e.g. NOAA NOMADS or RainyView)."
       },
-      "status": "partial",
+      "status": "implemented",
       "acceptance": [
         "Fetch real-time radar/precipitation imagery",
         "Display as semi-transparent overlay on world map",
         "Auto-refresh interval",
         "Toggle on/off in MapViewMenu"
       ],
-      "notes": "WxMbProvider implemented (NOAA NOMADS GRIB2 fetch + Marching Squares decoder). Selectable in MapViewMenu but display quality unsatisfactory. Provider and decoder present; render quality improvement deferred."
+      "notes": "NOAA NOMADS GRIB2 decoder with bicubic interpolation and 1px AA marching-squares contours. Selectable in MapViewMenu as \"WX/Pressure\". Implemented 2026-02-23."
+    },
+    {
+      "feature_id": "nws_severe_weather_alerts",
+      "name": "NWS Severe Weather Alerts",
+      "category": "weather",
+      "description": "Displays active NWS severe weather alerts polled from api.weather.gov/alerts. Severity-coded rows: Extreme=red, Severe=orange, Moderate=yellow, Minor=light green.",
+      "original": {
+        "files": [],
+        "symbols": [],
+        "notes": "No direct equivalent in original HamClock."
+      },
+      "next": {
+        "files": [
+          "src/services/AlertsProvider.h",
+          "src/services/AlertsProvider.cpp",
+          "src/ui/AlertsPanel.h",
+          "src/ui/AlertsPanel.cpp"
+        ],
+        "symbols": [
+          "AlertsProvider",
+          "AlertsPanel"
+        ],
+        "notes": "Polls api.weather.gov/alerts every 5 min. Uses bool fetched pattern for API error distinction."
+      },
+      "status": "implemented",
+      "acceptance": [
+        "Fetch active NWS alerts every 5 minutes",
+        "Display severity-coded rows",
+        "Show alert headline and expiry time",
+        "Panel gracefully handles no-alert state"
+      ]
+    },
+    {
+      "feature_id": "nws_7day_forecast",
+      "name": "NWS 7-Day Forecast",
+      "category": "weather",
+      "description": "Displays NWS 7-day forecast via two-step API: /points to get forecast URL, then /forecast for periods. Scrollable list with temp, precip %, wind.",
+      "original": {
+        "files": [],
+        "symbols": [],
+        "notes": "No direct equivalent in original HamClock."
+      },
+      "next": {
+        "files": [
+          "src/services/ForecastProvider.h",
+          "src/services/ForecastProvider.cpp",
+          "src/ui/ForecastPanel.h",
+          "src/ui/ForecastPanel.cpp"
+        ],
+        "symbols": [
+          "ForecastProvider",
+          "ForecastPanel"
+        ],
+        "notes": "Two-step NWS API: /points\u2192/forecast. Uses DE lat/lon for location. Scrollable period list."
+      },
+      "status": "implemented",
+      "acceptance": [
+        "Fetch 7-day forecast for DE location",
+        "Display period name, temp, precip %, wind",
+        "Scrollable if more periods than fit on screen",
+        "Refreshes when DE location changes"
+      ]
+    },
+    {
+      "feature_id": "hurricane_tracker",
+      "name": "Hurricane / Tropical Storm Tracker",
+      "category": "weather",
+      "description": "Displays active tropical storms and hurricanes from NHC CurrentStorms.json. Category-colored storm cards.",
+      "original": {
+        "files": [],
+        "symbols": [],
+        "notes": "No direct equivalent in original HamClock."
+      },
+      "next": {
+        "files": [
+          "src/services/HurricaneProvider.h",
+          "src/services/HurricaneProvider.cpp",
+          "src/ui/HurricanePanel.h",
+          "src/ui/HurricanePanel.cpp"
+        ],
+        "symbols": [
+          "HurricaneProvider",
+          "HurricanePanel"
+        ],
+        "notes": "nhc.noaa.gov/CurrentStorms.json. Cat5=red, Cat4=orange, Cat3=yellow, Cat2/1=green, TD/TS=blue. Shows storm name, category, position, max wind."
+      },
+      "status": "implemented",
+      "acceptance": [
+        "Fetch NHC current storms JSON",
+        "Display category-colored storm cards",
+        "Show storm name, category, max wind, position",
+        "Empty state when no active storms"
+      ]
+    },
+    {
+      "feature_id": "marine_coastal",
+      "name": "Marine / Coastal Conditions",
+      "category": "weather",
+      "description": "Displays NOAA CO-OPS tide predictions (hi/lo) and NDBC buoy observations for configurable station and buoy IDs.",
+      "original": {
+        "files": [],
+        "symbols": [],
+        "notes": "No direct equivalent in original HamClock."
+      },
+      "next": {
+        "files": [
+          "src/services/MarineProvider.h",
+          "src/services/MarineProvider.cpp",
+          "src/ui/MarinePanel.h",
+          "src/ui/MarinePanel.cpp"
+        ],
+        "symbols": [
+          "MarineProvider",
+          "MarinePanel"
+        ],
+        "notes": "Default station 8722670 (Lake Worth FL), buoy 41114 (FL Atlantic). CO-OPS tide predictions + NDBC water temp/wave/wind."
+      },
+      "status": "implemented",
+      "acceptance": [
+        "Fetch NOAA CO-OPS hi/lo tide predictions",
+        "Fetch NDBC buoy observations",
+        "Configurable station and buoy IDs",
+        "Show tide times and buoy conditions"
+      ]
+    },
+    {
+      "feature_id": "space_weather_alert_badge",
+      "name": "Space Weather Alert Badge",
+      "category": "space_weather",
+      "description": "Blinking G/R/S alert badge on SpaceWeatherPanel when any NOAA space weather scale is \u2265 3. Blinks at 1 Hz.",
+      "original": {
+        "files": [],
+        "symbols": [],
+        "notes": "Original HamClock had geomagnetic storm alerts in the solar data display."
+      },
+      "next": {
+        "files": [
+          "src/ui/SpaceWeatherPanel.h",
+          "src/ui/SpaceWeatherPanel.cpp"
+        ],
+        "symbols": [
+          "AlertBadge",
+          "SpaceWeatherPanel"
+        ],
+        "notes": "AlertBadge struct. G=geomagnetic, R=radio blackout, S=solar radiation. Badge blinks at 1 Hz."
+      },
+      "status": "implemented",
+      "acceptance": [
+        "Show G/R/S badge when corresponding NOAA scale \u2265 3",
+        "Badge blinks at 1 Hz",
+        "Correct color coding per scale level",
+        "No badge shown when all scales < 3"
+      ]
+    },
+    {
+      "feature_id": "update_checker",
+      "name": "Update Checker & Update Overlay",
+      "category": "infrastructure",
+      "description": "Polls GitHub Releases API every 6h to detect new versions. TimePanel shows amber version string with * when update available. UpdateOverlay renders release notes with Markdown formatting.",
+      "original": {
+        "files": [],
+        "symbols": [],
+        "notes": "No equivalent in original HamClock (ESP32 OTA is in ota_update, not applicable)."
+      },
+      "next": {
+        "files": [
+          "src/services/UpdateChecker.h",
+          "src/services/UpdateChecker.cpp",
+          "src/ui/UpdateOverlay.h",
+          "src/ui/UpdateOverlay.cpp",
+          "src/ui/TimePanel.cpp",
+          "src/ui/SetupScreen.cpp"
+        ],
+        "symbols": [
+          "UpdateChecker",
+          "UpdateOverlay"
+        ],
+        "notes": "Robust version comparison: normalizes dots and v-prefix, handles internal (0.9.5) vs release (0.95) format, numeric segment + beta suffix. UpdateOverlay: 760x440px, H1/H2/H3/bullet Markdown, Skip/Not Now/Update enum."
+      },
+      "status": "implemented",
+      "acceptance": [
+        "Poll GitHub Releases API every 6 hours",
+        "Show amber version string + * when update available",
+        "UpdateOverlay renders release notes with basic Markdown",
+        "Skip / Not Now / Update actions wired in SetupScreen"
+      ]
+    },
+    {
+      "feature_id": "mjpeg_live_stream",
+      "name": "MJPEG Live Display Stream",
+      "category": "web_interface",
+      "description": "Streams the SDL display as a MJPEG stream via /stream.mjpeg. FrameCapture converts SDL renderer frames to JPEG. /live serves an MJPEG viewer page.",
+      "original": {
+        "files": [],
+        "symbols": [],
+        "notes": "No equivalent in original HamClock."
+      },
+      "next": {
+        "files": [
+          "src/network/FrameCapture.h",
+          "src/network/FrameCapture.cpp",
+          "src/network/WebServer.h",
+          "src/network/WebServer.cpp"
+        ],
+        "symbols": [
+          "FrameCapture",
+          "WebServer"
+        ],
+        "notes": "FrameCapture: SDL_RenderReadPixels \u2192 SDL_Surface \u2192 JPEG via SDL_image. setMaxFps(30) caps rate in headless mode. /stream.mjpeg endpoint returns multipart/x-mixed-replace."
+      },
+      "status": "implemented",
+      "acceptance": [
+        "/stream.mjpeg returns valid MJPEG stream",
+        "/live serves browser-viewable MJPEG player page",
+        "Max 30 FPS in headless mode",
+        "Works in browser without plugins"
+      ]
+    },
+    {
+      "feature_id": "live_web_interface",
+      "name": "Interactive Live Web Interface",
+      "category": "web_interface",
+      "description": "Interactive canvas viewer over MJPEG stream with pointer/touch/keyboard injection. --live-web flag or headless auto-detection. R/W vs R/O badge.",
+      "original": {
+        "files": [],
+        "symbols": [],
+        "notes": "No equivalent in original HamClock."
+      },
+      "next": {
+        "files": [
+          "src/network/WebServer.h",
+          "src/network/WebServer.cpp",
+          "src/main.cpp"
+        ],
+        "symbols": [
+          "WebServer::setLiveWebEnabled",
+          "WebServer::isLiveWebEnabled"
+        ],
+        "notes": "--live-web auto-detects headless (offscreen driver or /.dockerenv). /live/touch, /live/key, /live/mouse, /live/status. 403 when disabled. All guarded by #ifndef __EMSCRIPTEN__."
+      },
+      "status": "implemented",
+      "acceptance": [
+        "--live-web flag enables interactive mode",
+        "Auto-detects headless environment",
+        "/live shows canvas viewer with R/W or R/O badge",
+        "Pointer, touch, keyboard events injected correctly",
+        "Returns 403 on input endpoints when disabled"
+      ]
+    },
+    {
+      "feature_id": "web_config_ui",
+      "name": "Web Config UI",
+      "category": "web_interface",
+      "description": "Browser-based config UI with 4 new tabs (Cluster, Radio, Services, Brightness). /api/config GET for reading all settings. /set_config extended with 25 new params.",
+      "original": {
+        "files": [],
+        "symbols": [],
+        "notes": "No equivalent in original HamClock."
+      },
+      "next": {
+        "files": [
+          "src/network/WebServer.h",
+          "src/network/WebServer.cpp"
+        ],
+        "symbols": [
+          "WebServer"
+        ],
+        "notes": "/api/config returns 30+ AppConfig fields. /set_config params include DX Cluster host/port, Rig host/port, Rotator host/port, QRZ key, Live Spots source, Brightness schedule, GPS/RSS/ONTA toggles. Routes moved outside #ifdef ENABLE_DEBUG_API."
+      },
+      "status": "implemented",
+      "acceptance": [
+        "/api/config GET returns all AppConfig fields as JSON",
+        "/set_config accepts 25 new params",
+        "4 new browser config tabs render correctly",
+        "Config changes persist via ConfigManager"
+      ]
+    },
+    {
+      "feature_id": "graph_hover_tooltips",
+      "name": "Graph Hover Tooltips & AA Lines",
+      "category": "ui_polish",
+      "description": "Hover tooltips on Aurora, Dst, and History graph panels. 2px anti-aliased lines with Gaussian falloff. Shared Tooltip infrastructure in Widget base class.",
+      "original": {
+        "files": [],
+        "symbols": [],
+        "notes": "Original HamClock had no hover tooltips on graphs."
+      },
+      "next": {
+        "files": [
+          "src/ui/Widget.h",
+          "src/ui/AuroraGraphPanel.h",
+          "src/ui/AuroraGraphPanel.cpp",
+          "src/ui/DstPanel.h",
+          "src/ui/DstPanel.cpp",
+          "src/ui/HistoryPanel.h",
+          "src/ui/HistoryPanel.cpp",
+          "src/ui/PaneContainer.cpp",
+          "src/main.cpp"
+        ],
+        "symbols": [
+          "Widget::Tooltip",
+          "AuroraGraphPanel",
+          "DstPanel",
+          "HistoryPanel"
+        ],
+        "notes": "Gaussian falloff for AA line rendering. PaneContainer mouse motion forwarding fixed. Procedural texture generation for line_aa in main.cpp."
+      },
+      "status": "implemented",
+      "acceptance": [
+        "Hover over Aurora graph shows Kp value and timestamp tooltip",
+        "Hover over Dst graph shows nT value and timestamp",
+        "Hover over History graph shows SFI/SN/Kp and timestamp",
+        "Lines render with 2px AA (Gaussian falloff)",
+        "Tooltip follows cursor without jitter"
+      ]
+    },
+    {
+      "feature_id": "aurora_history_persistence",
+      "name": "Aurora History Persistence",
+      "category": "data",
+      "description": "AuroraHistoryStore persists Aurora Kp history to JSON in SDL pref dir. Survives application restart.",
+      "original": {
+        "files": [],
+        "symbols": [],
+        "notes": "Original HamClock fetched fresh data on each start."
+      },
+      "next": {
+        "files": [
+          "src/core/AuroraHistoryStore.h"
+        ],
+        "symbols": [
+          "AuroraHistoryStore"
+        ],
+        "notes": "JSON persistence in SDL_GetPrefPath() directory. Loaded on startup; merged with fresh fetch data."
+      },
+      "status": "implemented",
+      "acceptance": [
+        "Aurora history loaded from disk on startup",
+        "Aurora history saved to disk on update",
+        "History survives restart without re-fetching",
+        "Stale entries pruned to rolling window"
+      ]
+    },
+    {
+      "feature_id": "asteroid_enhancements",
+      "name": "Asteroid Panel Enhancements",
+      "category": "astronomy",
+      "description": "AsteroidPropagator for ground track propagation, AsteroidProvider data fetching layer, compact 7-row layout, icon cycling (12 symbols), configurable color (6 swatches), map icon with hover tooltip.",
+      "original": {
+        "files": [],
+        "symbols": [],
+        "notes": "No equivalent in original HamClock."
+      },
+      "next": {
+        "files": [
+          "src/core/AsteroidPropagator.h",
+          "src/core/AsteroidPropagator.cpp",
+          "src/services/AsteroidProvider.h",
+          "src/services/AsteroidProvider.cpp",
+          "src/ui/AsteroidPanel.h",
+          "src/ui/AsteroidPanel.cpp",
+          "src/ui/MapWidget.cpp"
+        ],
+        "symbols": [
+          "AsteroidPropagator",
+          "AsteroidProvider",
+          "AsteroidPanel",
+          "MapWidget::renderAsteroidOverlay"
+        ],
+        "notes": "Title-area tap cycles icons \u2604\u2192\u2295\u2192\u25c8\u2192\u2b21\u2192\u2726\u2192\u2604 (12 total). Color swatches: 6 presets, default orange. ConfigManager persists asteroid.icon and asteroid.color.r/g/b. Map hover tooltip: name, miss distance LD, velocity km/s, hazardous flag."
+      },
+      "status": "implemented",
+      "acceptance": [
+        "7 asteroids shown in compact 1-row format",
+        "Title-area tap cycles through 12 icon symbols",
+        "Settings footer shows icon picker and 6 color swatches",
+        "Selected color applies to map ground track and icon",
+        "Map icon shows hover tooltip with miss distance and velocity"
+      ]
+    },
+    {
+      "feature_id": "repeater_directory",
+      "name": "Repeater Directory (RepeaterBook)",
+      "category": "ham_radio",
+      "description": "Nearby repeater listing from RepeaterBook API. Code complete; fetch disabled pending API key.",
+      "original": {
+        "files": [],
+        "symbols": [],
+        "notes": "No direct equivalent in original HamClock."
+      },
+      "next": {
+        "files": [
+          "src/services/RepeaterProvider.h",
+          "src/services/RepeaterProvider.cpp",
+          "src/ui/RepeaterPanel.h",
+          "src/ui/RepeaterPanel.cpp"
+        ],
+        "symbols": [
+          "RepeaterProvider",
+          "RepeaterPanel"
+        ],
+        "notes": "RepeaterBook API returns HTTP 401 without API key. Panel displays 'API key required' via bool fetched pattern. Selector disabled in main.cpp until key is available."
+      },
+      "status": "partial",
+      "acceptance": [
+        "Fetch repeaters near DE location from RepeaterBook",
+        "Display frequency, offset, tone, mode, callsign",
+        "Filter by band",
+        "API key configured in Setup"
+      ],
+      "notes": "Blocked on RepeaterBook API key. Code complete as of Phase 52."
+    },
+    {
+      "feature_id": "winlink_gateways",
+      "name": "Winlink Gateway Listing",
+      "category": "ham_radio",
+      "description": "Nearby Winlink gateway listing. Code complete; fetch disabled pending access key. API: api.winlink.org/json/metadata?op=GatewayListing",
+      "original": {
+        "files": [],
+        "symbols": [],
+        "notes": "No direct equivalent in original HamClock."
+      },
+      "next": {
+        "files": [
+          "src/services/WinlinkProvider.h",
+          "src/services/WinlinkProvider.cpp",
+          "src/ui/WinlinkPanel.h",
+          "src/ui/WinlinkPanel.cpp"
+        ],
+        "symbols": [
+          "WinlinkProvider",
+          "WinlinkPanel"
+        ],
+        "notes": "Correct URL: https://api.winlink.org/json/metadata?op=GatewayListing. Requires access key. Panel displays 'Access key required' via bool fetched pattern. Selector disabled in main.cpp."
+      },
+      "status": "partial",
+      "acceptance": [
+        "Fetch Winlink gateways near DE location",
+        "Display callsign, frequency, mode, last heard",
+        "Filter by mode (Pactor, Winmor, Vara, etc.)",
+        "Access key configured in Setup"
+      ],
+      "notes": "Blocked on Winlink API access key. Code complete as of Phase 52."
+    },
+    {
+      "feature_id": "local_data_hub",
+      "name": "Local Data Hub (LAN Rate-Limit Sharing)",
+      "category": "network",
+      "description": "One HamClock instance acts as Master and caches API responses; other instances on the same LAN act as Clients and proxy their fetches through the master, reducing external API quota consumption. 2s timeout with automatic fallback to direct fetch.",
+      "original": {
+        "files": [],
+        "symbols": [],
+        "notes": "No equivalent in original HamClock."
+      },
+      "next": {
+        "files": [
+          "src/core/ConfigManager.h",
+          "src/core/ConfigManager.cpp",
+          "src/network/NetworkManager.h",
+          "src/network/NetworkManager.cpp",
+          "src/network/WebServer.h",
+          "src/network/WebServer.cpp",
+          "src/ui/SetupScreen.h",
+          "src/ui/SetupScreen.cpp",
+          "src/main.cpp"
+        ],
+        "symbols": [
+          "HubMode",
+          "NetworkManager::setHubConfig",
+          "NetworkManager::fetchFromHubSync",
+          "NetworkManager::fetchDirect",
+          "WebServer::setNetworkManager",
+          "SetupScreen::renderTabNetwork"
+        ],
+        "notes": "HubMode enum (Off/Master/Client). Master: /api/hub/fetch endpoint with base64 URL + max_age. Client: fetchAsync proxy branch with 2s curl, silent fallback. SetupScreen Network tab: mode cycle + conditional IP/Port. Config: hub.{mode,ip,port}."
+      },
+      "status": "implemented",
+      "acceptance": [
+        "Master mode: /api/hub/fetch returns upstream response; 403 when not in master mode",
+        "Client mode: fetchAsync routes through hub IP:port; falls back to direct on 2s timeout",
+        "Off mode: no change to existing fetch behavior",
+        "SetupScreen Network tab: mode cycles Off→Master→Client; IP+Port fields shown only in Client mode",
+        "Config persists across restart; hub section in config.json",
+        "WASM: /api/hub/fetch returns 501; client branch absent from WASM build"
+      ]
+    },
+    {
+      "feature_id": "rpi_low_memory_mode",
+      "name": "RPi 1GB Adaptive Memory Mode",
+      "category": "infrastructure",
+      "description": "Automatic memory limit reduction on devices with ≤ 1536 MB RAM. Corrects a bug where fidelityMode() was used instead of isLowMemoryDevice() to gate cache sizes, causing the RPi to always use high-memory settings.",
+      "original": {
+        "files": [],
+        "symbols": [],
+        "notes": "No equivalent in original. Original targeted fixed-memory ESP32/RPi hardware without dynamic adaptation."
+      },
+      "next": {
+        "files": [
+          "src/main.cpp",
+          "src/ui/TextureManager.h",
+          "src/ui/FontManager.h",
+          "src/core/MemoryMonitor.h"
+        ],
+        "symbols": [
+          "MemoryMonitor::isLowMemoryDevice",
+          "TextureManager::setMaxCacheSize",
+          "FontManager::setTextCacheLimit",
+          "MemoryMonitor::logStats"
+        ],
+        "notes": "isLowMemoryDevice() reads /proc/meminfo MemTotal, returns true if ≤ 1536 MB. Low-memory path: texture cache 50→15, font text cache 300→100, texture dimension cap 2048→1024px for (Linux && ARM) only. 60s RSS heartbeat. Startup log confirms mode."
+      },
+      "status": "implemented",
+      "acceptance": [
+        "Startup log reports total RAM and low-memory mode status",
+        "RPi 3B: texture cache capped at 15, font cache at 100",
+        "Dev machine (64 GB): no capping applied",
+        "60-second RSS heartbeat appears in logs",
+        "macOS Apple Silicon not affected by texture dimension cap"
+      ],
+      "notes": "Implemented 2026-02-25. Confirmed on RPi 3B (972 MB, LOW) and 64 GB dev machine (NO). Saves ~220 MB RSS headroom."
     }
   ]
 }

@@ -42,7 +42,8 @@ void DstProvider::fetch() {
           val = row[1].get<float>();
 
         // Parse YYYY-MM-DD HH:MM:SS
-        struct tm t = {0};
+        struct tm t;
+        std::memset(&t, 0, sizeof(t));
         int y, mon, day, hr, min, sec;
         if (std::sscanf(time_str.c_str(), "%d-%d-%d %d:%d:%d", &y, &mon, &day,
                         &hr, &min, &sec) == 6) {

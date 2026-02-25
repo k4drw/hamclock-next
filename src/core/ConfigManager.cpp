@@ -31,7 +31,7 @@ static SDL_Color hexToColor(const std::string &hex, SDL_Color fallback) {
 bool ConfigManager::init() {
   // Use SDL_GetPrefPath for cross-platform data directory
   // On Linux: ~/.local/share/HamClock/HamClock-Next/
-  // On Windows: %APPDATA%\HamClock\HamClock-Next\
+  // On Windows: %APPDATA%\HamClock\HamClock-Next
   // On MacOS: ~/Library/Application Support/HamClock/HamClock-Next/
   char *prefPath = SDL_GetPrefPath("HamClock", "HamClock-Next");
   if (!prefPath) {
@@ -53,7 +53,7 @@ bool ConfigManager::init() {
   std::filesystem::create_directories(configDir_, ec);
   if (ec) {
     std::fprintf(stderr, "ConfigManager: failed to create dir %s: %s\n",
-                 configDir_.c_str(), ec.message().c_str());
+                 configDir_.string().c_str(), ec.message().c_str());
     return false;
   }
 
@@ -98,7 +98,7 @@ bool ConfigManager::init() {
                 console.error('[IDBFS] Sync-from-IDB failed:', err);
               } else {
                 console.log('[IDBFS] Sync-from-IDB complete' +
-                            (mounted ? '' : ' (no IDBFS — session only)'));
+                            (mounted ? "" : " (no IDBFS — session only)"));
               }
               if (typeof Module._hamclock_after_idbfs === 'function')
                 Module._hamclock_after_idbfs();
@@ -122,7 +122,7 @@ bool ConfigManager::load(AppConfig &config) const {
   auto json = nlohmann::json::parse(ifs, nullptr, false);
   if (json.is_discarded()) {
     std::fprintf(stderr, "ConfigManager: invalid JSON in %s\n",
-                 configPath_.c_str());
+                 configPath_.string().c_str());
     return false;
   }
 
@@ -165,6 +165,16 @@ bool ConfigManager::load(AppConfig &config) const {
           showMuf ? PropOverlayType::Muf : PropOverlayType::None;
     }
 
+    if (ap.contains("weather_overlay")) {
+      std::string wo = ap.value("weather_overlay", "none");
+      if (wo == "clouds")
+        config.weatherOverlay = WeatherOverlayType::Clouds;
+      else if (wo == "wxmb")
+        config.weatherOverlay = WeatherOverlayType::WxMb;
+      else
+        config.weatherOverlay = WeatherOverlayType::None;
+    }
+
     config.propBand = ap.value("prop_band", "20m");
     config.propMode = ap.value("prop_mode", "SSB");
     config.propPower = ap.value("prop_power", 100);
@@ -195,10 +205,35 @@ bool ConfigManager::load(AppConfig &config) const {
     config.ontaFilter = json["activity"].value("onta_filter", "all");
   }
 
+  if (json.contains("asteroid")) {
+    config.asteroidIcon = json["asteroid"].value("icon", std::string("☄"));
+    if (json["asteroid"].contains("color")) {
+      auto &c = json["asteroid"]["color"];
+      config.asteroidColor.r = c.value("r", uint8_t(255));
+      config.asteroidColor.g = c.value("g", uint8_t(140));
+      config.asteroidColor.b = c.value("b", uint8_t(0));
+      config.asteroidColor.a = 255;
+    }
+  }
+
   // Network (WASM proxy URL)
   if (json.contains("network")) {
     const auto &n = json["network"];
     config.corsProxyUrl = n.value("cors_proxy_url", config.corsProxyUrl);
+  }
+
+  // Local Data Hub
+  if (json.contains("hub")) {
+    const auto &h = json["hub"];
+    std::string mode = h.value("mode", "off");
+    if (mode == "master")
+      config.hubMode = HubMode::Master;
+    else if (mode == "client")
+      config.hubMode = HubMode::Client;
+    else
+      config.hubMode = HubMode::Off;
+    config.hubIp = h.value("ip", "");
+    config.hubPort = h.value("port", 8080);
   }
 
   // Brightness
@@ -296,12 +331,12 @@ bool ConfigManager::load(AppConfig &config) const {
       config.liveSpotsBands = psk.value("bands_mask", 0xFFF);
     }
   }
-
   // Power
   if (json.contains("power")) {
     auto &p = json["power"];
     config.preventSleep = p.value("prevent_sleep", true);
     config.gpsEnabled = p.value("gps_enabled", false);
+    config.skippedVersion = p.value("skipped_version", "");
   }
 
   // Rotator (Hamlib rotctld)
@@ -333,7 +368,7 @@ bool ConfigManager::save(const AppConfig &config) const {
   std::filesystem::create_directories(configDir_, ec);
   if (ec) {
     std::fprintf(stderr, "ConfigManager: cannot create %s: %s\n",
-                 configDir_.c_str(), ec.message().c_str());
+                 configDir_.string().c_str(), ec.message().c_str());
     return false;
   }
 
@@ -357,6 +392,14 @@ bool ConfigManager::save(const AppConfig &config) const {
   else if (config.propOverlay == PropOverlayType::Voacap)
     po = "voacap";
   json["appearance"]["prop_overlay"] = po;
+  {
+    std::string wo = "none";
+    if (config.weatherOverlay == WeatherOverlayType::Clouds)
+      wo = "clouds";
+    else if (config.weatherOverlay == WeatherOverlayType::WxMb)
+      wo = "wxmb";
+    json["appearance"]["weather_overlay"] = wo;
+  }
   json["appearance"]["prop_band"] = config.propBand;
   json["appearance"]["prop_mode"] = config.propMode;
   json["appearance"]["prop_power"] = config.propPower;
@@ -380,8 +423,15 @@ bool ConfigManager::save(const AppConfig &config) const {
 
   json["power"]["prevent_sleep"] = config.preventSleep;
   json["power"]["gps_enabled"] = config.gpsEnabled;
+  json["power"]["skipped_version"] = config.skippedVersion;
 
   json["network"]["cors_proxy_url"] = config.corsProxyUrl;
+
+  json["hub"]["mode"] = (config.hubMode == HubMode::Master)   ? "master"
+                        : (config.hubMode == HubMode::Client) ? "client"
+                                                              : "off";
+  json["hub"]["ip"] = config.hubIp;
+  json["hub"]["port"] = config.hubPort;
 
   json["rotator"]["host"] = config.rotatorHost;
   json["rotator"]["port"] = config.rotatorPort;
@@ -429,11 +479,15 @@ bool ConfigManager::save(const AppConfig &config) const {
 
   json["rss"]["enabled"] = config.rssEnabled;
   json["activity"]["onta_filter"] = config.ontaFilter;
+  json["asteroid"]["icon"] = config.asteroidIcon;
+  json["asteroid"]["color"]["r"] = config.asteroidColor.r;
+  json["asteroid"]["color"]["g"] = config.asteroidColor.g;
+  json["asteroid"]["color"]["b"] = config.asteroidColor.b;
 
   std::ofstream ofs(configPath_);
   if (!ofs) {
     std::fprintf(stderr, "ConfigManager: cannot write %s\n",
-                 configPath_.c_str());
+                 configPath_.string().c_str());
     return false;
   }
 

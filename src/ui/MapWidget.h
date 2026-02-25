@@ -2,6 +2,7 @@
 
 #include "../core/ADIFData.h"
 #include "../core/ActivityData.h"
+#include "../core/AsteroidData.h"
 #include "../core/AuroraHistoryStore.h"
 #include "../core/ConfigManager.h"
 #include "../core/DXClusterData.h"
@@ -20,6 +21,7 @@
 #include <mutex>
 #include <string>
 
+class AsteroidProvider;
 class MufRtProvider;
 class CloudProvider;
 class WxMbProvider;
@@ -39,13 +41,20 @@ public:
   void update() override;
   void render(SDL_Renderer *renderer) override;
   void onResize(int x, int y, int w, int h) override;
-  bool onMouseUp(int mx, int my, Uint16 mod) override;
+  bool onMouseUp(int mx, int my, Uint16 mod, int clicks) override;
   void onMouseMove(int mx, int my) override;
   bool onMouseWheel(int scrollY) override;
 
   // Set the satellite predictor for map overlays (non-owning). nullptr to
   // clear.
   void setPredictor(OrbitPredictor *pred) { predictor_ = pred; }
+
+  // Set the asteroid provider for ground track overlay (non-owning).
+  void setAsteroidProvider(AsteroidProvider *p) { asteroidProvider_ = p; }
+
+  // Called when orbital elements are ready (from background thread via SDL event).
+  void onAsteroidElementsReady(const std::string &des,
+                               const OrbitalElements &elem);
 
   // Set the live spot data store for map spot overlays.
   void setSpotStore(std::shared_ptr<LiveSpotDataStore> store) {
@@ -134,6 +143,7 @@ private:
   IonosondeProvider *iono_ = nullptr;
   SolarDataStore *solar_ = nullptr;
   OrbitPredictor *predictor_ = nullptr;
+  AsteroidProvider *asteroidProvider_ = nullptr;
   std::vector<PaneContainer *> panes_;
 
   std::unique_ptr<MapViewMenu> mapViewMenu_;
@@ -168,6 +178,11 @@ private:
   bool satTrackDirty_ = true;
   std::vector<SDL_Vertex> satTrackVerts_;
   std::vector<int> satTrackIndices_;
+  std::vector<GroundTrackPoint> cachedAsteroidTrack_;
+  bool asteroidTrackDirty_ = true;
+  std::string lastSelectedAsteroidName_;
+  std::vector<SDL_Vertex> asteroidTrackVerts_;
+  std::vector<int> asteroidTrackIndices_;
   bool gridDirty_ = true;
   std::vector<SDL_Vertex> gridVerts_;
 
@@ -218,6 +233,7 @@ private:
 
   void renderOverlayInfo(SDL_Renderer *renderer);
   void renderRssButton(SDL_Renderer *renderer);
+  void renderAsteroidOverlay(SDL_Renderer *renderer);
 
   SDL_Rect rssRect_ = {};
 };

@@ -4,8 +4,6 @@
 #include "../core/WorkerService.h"
 #include <SDL_events.h>
 #include <algorithm>
-#include <cmath>
-#include <map>
 #include <nlohmann/json.hpp>
 #include <sstream>
 
@@ -32,7 +30,8 @@ void HistoryProvider::fetchFlux() {
         int y, m, d, ssn, flux;
         if (std::sscanf(line.c_str(), "%d %d %d %d %d", &y, &m, &d, &ssn,
                         &flux) == 5) {
-          struct tm t = {0};
+          struct tm t;
+          std::memset(&t, 0, sizeof(t));
           t.tm_year = y - 1900;
           t.tm_mon = m - 1;
           t.tm_mday = d;
@@ -85,7 +84,8 @@ void HistoryProvider::fetchSSN() {
         int y, m, d, ssn, flux;
         if (std::sscanf(line.c_str(), "%d %d %d %d %d", &y, &m, &d, &ssn,
                         &flux) == 5) {
-          struct tm t = {0};
+          struct tm t;
+          std::memset(&t, 0, sizeof(t));
           t.tm_year = y - 1900;
           t.tm_mon = m - 1;
           t.tm_mday = d;
@@ -137,7 +137,8 @@ void HistoryProvider::fetchKp() {
         int y, m, d, aIndex, kIndex;
         if (std::sscanf(line.c_str(), "%d %d %d %d %d", &y, &m, &d, &aIndex,
                         &kIndex) == 5) {
-          struct tm t = {0};
+          struct tm t;
+          std::memset(&t, 0, sizeof(t));
           t.tm_year = y - 1900;
           t.tm_mon = m - 1;
           t.tm_mday = d;

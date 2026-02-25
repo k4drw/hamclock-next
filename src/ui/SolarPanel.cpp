@@ -39,13 +39,18 @@ void SolarPanel::render(SDL_Renderer *renderer) {
   bool isNarrow = (width_ < 100);
   SolarData data = store_->get();
 
+  int titleH = 20;
+  fontMgr_.drawText(renderer, "Solar", x_ + 10, y_ + 5, themes.accent, 10,
+                    true);
+
   if (isNarrow) {
     // Vertical stack (Fidelity Mode style)
-    int rowH = height_ / 3;
+    int availableH = height_ - titleH;
+    int rowH = availableH / 3;
     int centerX = x_ + width_ / 2;
 
     auto drawSolarRow = [&](const char *lbl, int val, int rowIdx) {
-      int ry = y_ + rowIdx * rowH;
+      int ry = y_ + titleH + rowIdx * rowH;
       // Value (Large, Green)
       char valBuf[16];
       std::snprintf(valBuf, sizeof(valBuf), "%d", val);
@@ -61,7 +66,7 @@ void SolarPanel::render(SDL_Renderer *renderer) {
       drawSolarRow("Sunspots", data.sunspot_number, 1);
 
       // Mixed A/K row
-      int ry = y_ + 2 * rowH;
+      int ry = y_ + titleH + 2 * rowH;
       char akBuf[32];
       std::snprintf(akBuf, sizeof(akBuf), "A%d K%d", data.a_index,
                     data.k_index);
@@ -77,6 +82,7 @@ void SolarPanel::render(SDL_Renderer *renderer) {
   bool needRedraw = (currentText_ != lastText_) || (fontSize_ != lastFontSize_);
   if (needRedraw) {
     destroyCache();
+    // Slightly smaller font if title is present? Or just keep it.
     cached_ = fontMgr_.renderText(renderer, currentText_, themes.accent,
                                   fontSize_, &texW_, &texH_);
     lastText_ = currentText_;
@@ -84,9 +90,9 @@ void SolarPanel::render(SDL_Renderer *renderer) {
   }
 
   if (cached_) {
-    // Left-aligned with 2% padding, vertically centered
+    // Left-aligned with 2% padding, vertically centered in remaining space
     int drawX = x_ + static_cast<int>(width_ * 0.02f);
-    int drawY = y_ + (height_ - texH_) / 2;
+    int drawY = y_ + titleH + (height_ - titleH - texH_) / 2;
     SDL_Rect dst = {drawX, drawY, texW_, texH_};
     SDL_RenderCopy(renderer, cached_, nullptr, &dst);
   }

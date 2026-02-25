@@ -30,7 +30,11 @@ void CallbookPanel::render(SDL_Renderer *renderer) {
     return;
   }
 
-  int curY = y_ + 10;
+  int titleH = 20;
+  fontMgr_.drawText(renderer, "Callbook", x_ + 10, y_ + 5, themes.accent, 10,
+                    true);
+
+  int curY = y_ + titleH + 10;
   int centerX = x_ + width_ / 2;
 
   // Callsign & Name

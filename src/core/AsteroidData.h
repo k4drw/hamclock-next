@@ -20,3 +20,14 @@ struct AsteroidData {
   std::string lastFetchTime;
   bool valid = false;
 };
+
+struct OrbitalElements {
+  double e        = 0; // eccentricity
+  double a        = 0; // semi-major axis (AU)
+  double i        = 0; // inclination (deg)
+  double om       = 0; // longitude of ascending node Ω (deg)
+  double w        = 0; // argument of perihelion ω (deg)
+  double ma       = 0; // mean anomaly at epoch M₀ (deg)
+  double epoch_jd = 0; // epoch (Julian Date)
+  bool valid      = false;
+};

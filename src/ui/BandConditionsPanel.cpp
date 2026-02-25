@@ -77,17 +77,25 @@ void BandConditionsPanel::render(SDL_Renderer *renderer) {
                          themes.border.b, themes.border.a);
   SDL_RenderDrawRect(renderer, &rect);
 
+  int titleH = 20;
+  // Standard Title
+  fontMgr_.drawText(renderer, "Band Conditions", x_ + 10, y_ + 5, themes.accent,
+                    10, true);
+
   if (!dataValid_) {
-    fontMgr_.drawText(renderer, "No Data", x_ + width_ / 2, y_ + height_ / 2,
+    fontMgr_.drawText(renderer, "No Data", x_ + width_ / 2,
+                      y_ + titleH + (height_ - titleH) / 2,
                       {150, 150, 150, 255}, tableFontSize_, false, true);
     return;
   }
 
   int pad = 4;
+
   int colWidth = (width_ - 2 * pad) / 3;
   int numRows =
       static_cast<int>(currentData_.statuses.size()) + 1; // +1 for header
-  int rowHeight = (height_ - 2 * pad) / numRows;
+  int availableH = height_ - titleH - 2 * pad;
+  int rowHeight = availableH / numRows;
 
   // Dynamically scale font if rowHeight is too small
   int dynamicFontSize = tableFontSize_;
@@ -98,7 +106,7 @@ void BandConditionsPanel::render(SDL_Renderer *renderer) {
   SDL_Color headerColor = themes.accent;
   SDL_Color labelColor = themes.text;
 
-  int curY = y_ + pad;
+  int curY = y_ + titleH + pad;
 
   auto drawInCol = [&](const std::string &text, int colIdx, SDL_Color color,
                        int fontSize, bool bold = false) {

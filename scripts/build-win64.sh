@@ -41,6 +41,11 @@ if [ $? -eq 0 ]; then
     echo "Binary: build-win64/hamclock-next.exe"
     echo "Installer: build-win64/HamClock-Next-Setup.exe"
     echo "--------------------------------------------------"
+
+    # Cleanup intermediate artifacts if successful
+    echo "Cleaning up intermediate build artifacts (saving disk space)..."
+    find build-win64 -maxdepth 1 -type f ! -name "hamclock-next.exe" ! -name "HamClock-Next-Setup.exe" -delete
+    find build-win64 -maxdepth 1 -type d ! -name "build-win64" -exec rm -rf {} + 2>/dev/null
 else
     echo "ERROR: Build failed!"
     exit 1

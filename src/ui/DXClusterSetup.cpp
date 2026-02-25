@@ -173,7 +173,7 @@ void DXClusterSetup::onResize(int x, int y, int w, int h) {
   recalcLayout();
 }
 
-bool DXClusterSetup::onMouseUp(int mx, int my, Uint16) {
+bool DXClusterSetup::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
   if (mx >= toggleRect_.x && mx < toggleRect_.x + toggleRect_.w &&
       my >= toggleRect_.y && my < toggleRect_.y + toggleRect_.h) {
     useWSJTX_ = !useWSJTX_;
@@ -242,19 +242,15 @@ bool DXClusterSetup::onMouseUp(int mx, int my, Uint16) {
 
 bool DXClusterSetup::onKeyDown(SDL_Keycode key, Uint16) {
   std::string *text = nullptr;
-  int maxLen = 0;
   switch (activeField_) {
   case 0:
     text = &hostText_;
-    maxLen = 64;
     break;
   case 1:
     text = &portText_;
-    maxLen = 5;
     break;
   case 2:
     text = &loginText_;
-    maxLen = 32;
     break;
   }
   if (!text)

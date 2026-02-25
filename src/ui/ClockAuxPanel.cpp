@@ -24,13 +24,12 @@ void ClockAuxPanel::render(SDL_Renderer *renderer) {
   std::time_t now_c = std::chrono::system_clock::to_time_t(now);
   struct tm *gmt = std::gmtime(&now_c);
 
-  int centerX = x_ + width_ / 2;
-  int curY = y_ + 10;
+  int titleH = 20;
+  fontMgr_.drawText(renderer, "UTC Time", x_ + 10, y_ + 5, {0, 200, 255, 255},
+                    10, true);
 
-  // Header
-  fontMgr_.drawText(renderer, "UTC Time", centerX, curY, {0, 200, 255, 255},
-                    labelFontSize_, true, true);
-  curY += labelFontSize_ + 8;
+  int curY = y_ + titleH + 10;
+  int centerX = x_ + width_ / 2;
 
   // Time
   char buf[64];

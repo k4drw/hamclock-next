@@ -59,6 +59,9 @@ private:
   std::condition_variable queueCV_;
   std::thread workerThread_;
 
+  // Protects sockfd_ against concurrent read/write from worker and stop()
+  std::mutex sockMutex_;
+
   // Worker thread that processes commands from queue
   void commandWorker();
 

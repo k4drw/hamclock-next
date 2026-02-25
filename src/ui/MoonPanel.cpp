@@ -1,4 +1,5 @@
 #include "MoonPanel.h"
+#include "../core/Theme.h"
 #include "FontCatalog.h"
 #include "RenderUtils.h"
 #include <cmath>
@@ -77,23 +78,31 @@ void MoonPanel::render(SDL_Renderer *renderer) {
     }
   }
 
+  ThemeColors themes = getThemeColors(theme_);
+
   // Background
-  SDL_SetRenderDrawColor(renderer, 10, 10, 15, 255);
+  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b,
+                         themes.bg.a);
   SDL_Rect rect = {x_, y_, width_, height_};
   SDL_RenderFillRect(renderer, &rect);
-  SDL_SetRenderDrawColor(renderer, 60, 60, 60, 255);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
+                         themes.border.b, themes.border.a);
   SDL_RenderDrawRect(renderer, &rect);
 
+  int titleH = 20;
+  fontMgr_.drawText(renderer, "Moon", x_ + 10, y_ + 5, themes.accent, 10, true);
+
   if (!dataValid_) {
-    fontMgr_.drawText(renderer, "No Data", x_ + 10, y_ + height_ / 2 - 8,
-                      {100, 100, 100, 255}, valueFontSize_);
+    fontMgr_.drawText(renderer, "No Data", x_ + 10,
+                      y_ + titleH + (height_ - titleH) / 2 - 8, themes.textDim,
+                      valueFontSize_);
     return;
   }
 
-  int moonR = std::min(width_, height_) / 3 - 2;
+  int moonR = std::min(width_, height_ - titleH) / 3 - 2;
   if (moonR > 42)
     moonR = 42;
-  int moonY = y_ + moonR + 8;
+  int moonY = y_ + titleH + moonR + 4;
   int centerX = x_ + width_ / 2;
 
   drawMoon(renderer, centerX, moonY, moonR);
@@ -101,7 +110,7 @@ void MoonPanel::render(SDL_Renderer *renderer) {
   // Labels
   int textY = moonY + moonR + 8;
   fontMgr_.drawText(renderer, currentData_.phaseName, centerX, textY,
-                    {255, 255, 255, 255}, labelFontSize_, true, true);
+                    themes.text, labelFontSize_, true, true);
 
   char buf[32];
   std::snprintf(buf, sizeof(buf), "%.0f%% Illum", currentData_.illumination);

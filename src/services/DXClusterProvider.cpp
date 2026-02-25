@@ -83,20 +83,23 @@ void DXClusterProvider::runTelnet(const std::string &host, int port,
     return;
   }
 
-  // Set non-blocking for connect timeout if needed, but for now just simple
-  struct hostent *he = gethostbyname(host.c_str());
-  if (!he) {
+  // Resolve hostname using getaddrinfo (thread-safe, IPv4/IPv6 capable)
+  struct addrinfo hints{};
+  hints.ai_family = AF_INET;
+  hints.ai_socktype = SOCK_STREAM;
+  struct addrinfo *res = nullptr;
+  std::string portStr = std::to_string(port);
+  if (getaddrinfo(host.c_str(), portStr.c_str(), &hints, &res) != 0 || !res) {
     LOG_E("DXCluster", "Could not resolve {}", host);
     if (state_)
       state_->services["DXCluster"].lastError = "DNS failed";
     close(sock);
     return;
   }
-
   struct sockaddr_in server_addr{};
-  server_addr.sin_family = AF_INET;
+  std::memcpy(&server_addr, res->ai_addr, res->ai_addrlen);
   server_addr.sin_port = htons(port);
-  std::memcpy(&server_addr.sin_addr, he->h_addr_list[0], he->h_length);
+  freeaddrinfo(res);
 
   if (connect(sock, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
     LOG_E("DXCluster", "Connect to {} failed: {}", host, std::strerror(errno));
@@ -127,7 +130,12 @@ void DXClusterProvider::runTelnet(const std::string &host, int port,
   // not have newlines
   if (!login.empty()) {
     std::string cmd = login + "\r\n";
-    send(sock, cmd.c_str(), cmd.length(), 0);
+    ssize_t sent = send(sock, cmd.c_str(), cmd.length(), 0);
+    if (sent < 0) {
+      LOG_E("DXCluster", "send login failed: {}", strerror(errno));
+      close(sock);
+      return;
+    }
     // Note: Don't set loggedIn = true yet, we want to see if we get a "Welcome"
     // or prompt
   }
@@ -190,7 +198,9 @@ void DXClusterProvider::runTelnet(const std::string &host, int port,
             }
             if (!initialRequestSent) {
               const char *req = "sh/dx 30\r\n";
-              send(sock, req, std::strlen(req), 0);
+              ssize_t sent2 = send(sock, req, std::strlen(req), 0);
+              if (sent2 < 0)
+                LOG_E("DXCluster", "send sh/dx failed: {}", strerror(errno));
               initialRequestSent = true;
             }
           }

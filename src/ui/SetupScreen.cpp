@@ -98,8 +98,26 @@ std::string *SetupScreen::getActiveFieldText() {
     case 1:
       return &rigPort_;
     }
+  } else if (activeTab_ == Tab::Network) {
+    switch (activeField_) {
+    case 0:
+      return &hubIp_;
+    case 1:
+      return &hubPortStr_;
+    }
   }
   return nullptr;
+}
+
+bool SetupScreen::deleteSelection(std::string *text) {
+  if (!text || cursorPos_ == selectionAnchor_)
+    return false;
+  int start = std::min(cursorPos_, selectionAnchor_);
+  int end = std::max(cursorPos_, selectionAnchor_);
+  text->erase(start, end - start);
+  cursorPos_ = start;
+  selectionAnchor_ = cursorPos_;
+  return true;
 }
 
 int SetupScreen::calculateCursorPosFromClick(int clickX, int fieldStartX,
@@ -162,9 +180,10 @@ static void renderField(SDL_Renderer *renderer, FontManager &fontMgr,
                         const std::string &text, const std::string &placeholder,
                         int fieldX, int &y, int fieldW, int fieldH,
                         int fieldSize, int textPad, bool active, bool valid,
-                        int cursorPos, SDL_Color activeBorder,
-                        SDL_Color inactiveBorder, SDL_Color validColor,
-                        SDL_Color textColor, SDL_Color placeholderColor) {
+                        int cursorPos, int selectionAnchor,
+                        SDL_Color activeBorder, SDL_Color inactiveBorder,
+                        SDL_Color validColor, SDL_Color textColor,
+                        SDL_Color placeholderColor) {
   SDL_Color border = active ? activeBorder : inactiveBorder;
 
   SDL_SetRenderDrawColor(renderer, 30, 30, 40, 255);
@@ -182,6 +201,22 @@ static void renderField(SDL_Renderer *renderer, FontManager &fontMgr,
   // Set clipping rectangle to prevent text overflow
   SDL_Rect clipRect = {fieldX + 2, y + 2, fieldW - 4, fieldH - 4};
   SDL_RenderSetClipRect(renderer, &clipRect);
+
+  // Selection highlight
+  if (active && cursorPos != selectionAnchor && !text.empty()) {
+    int start = std::min(cursorPos, selectionAnchor);
+    int end = std::max(cursorPos, selectionAnchor);
+    int selX = fieldX + textPad;
+    if (start > 0) {
+      selX += fontMgr.getLogicalWidth(text.substr(0, start), fieldSize);
+    }
+    int selW =
+        fontMgr.getLogicalWidth(text.substr(start, end - start), fieldSize);
+
+    SDL_Rect selRect = {selX, y + 4, selW, fieldH - 8};
+    SDL_SetRenderDrawColor(renderer, 60, 60, 100, 255);
+    SDL_RenderFillRect(renderer, &selRect);
+  }
 
   if (!text.empty()) {
     SDL_Color color = valid ? validColor : textColor;
@@ -215,9 +250,6 @@ void SetupScreen::render(SDL_Renderer *renderer) {
   if (!fontMgr_.ready())
     return;
 
-  LOG_D("SetupScreen", "render(): width={}, height={}, last=({},{})", width_,
-        height_, lastRenderWidth_, lastRenderHeight_);
-
   // Ensure layout is up-to-date if dimensions changed
   // Fixes case where setup is launched after window resize
   if (width_ != lastRenderWidth_ || height_ != lastRenderHeight_) {
@@ -241,9 +273,6 @@ void SetupScreen::render(SDL_Renderer *renderer) {
   int fieldH = fieldSize_ + 14;
   int textPad = 7;
 
-  LOG_D("SetupScreen", "Layout: pad={}, fieldW={}, fieldX={}, fieldH={}", pad,
-        fieldW, fieldX, fieldH);
-
   SDL_Color white = {255, 255, 255, 255};
   SDL_Color cyan = {0, 200, 255, 255};
   SDL_Color gray = {120, 120, 120, 255};
@@ -254,10 +283,10 @@ void SetupScreen::render(SDL_Renderer *renderer) {
                     true, true);
   y += titleSize_ + pad / 2; // tightened: was +pad, halved gap to tab bar
 
-  // Appearance tab absorbs brightness/display settings — 6 tabs total
-  const char *tabs[] = {"Identity", "Spotting", "Display",
-                        "Rig",      "Services", "Widgets"};
-  int numTabs = 6;
+  // Appearance tab absorbs brightness/display settings — 8 tabs total
+  const char *tabs[] = {"Identity", "Spotting", "Display", "Rig",
+                        "Services", "Network",  "Widgets", "Update"};
+  int numTabs = 8;
   int tabW = fieldW / numTabs;
 
   // Calculate safe font size for tabs to prevent overflow
@@ -309,8 +338,14 @@ void SetupScreen::render(SDL_Renderer *renderer) {
   case Tab::Services:
     renderTabServices(renderer, cx, pad, fieldW, fieldH, fieldX, textPad);
     break;
+  case Tab::Network:
+    renderTabNetwork(renderer, cx, pad, fieldW, fieldH, fieldX, textPad);
+    break;
   case Tab::Widgets:
     renderTabWidgets(renderer, cx, pad, fieldW, fieldH, fieldX, textPad);
+    break;
+  case Tab::Update:
+    renderTabUpdate(renderer, cx, pad, fieldW, fieldH, fieldX, textPad);
     break;
   }
 
@@ -364,8 +399,8 @@ void SetupScreen::renderTabIdentity(SDL_Renderer *renderer, int, int pad,
   y += labelSize_ + 4;
   renderField(renderer, fontMgr_, callsignText_, "e.g. K4DRW", fieldX, y,
               fieldW, fieldH, fieldSize_, textPad, activeField_ == 0,
-              !callsignText_.empty(), cursorPos_, orange, gray, white, white,
-              gray);
+              !callsignText_.empty(), cursorPos_, selectionAnchor_, orange,
+              gray, white, white, gray);
   y += vSpace;
 
   fontMgr_.drawText(renderer, "Grid Square:", fieldX, y, white, labelSize_,
@@ -373,7 +408,7 @@ void SetupScreen::renderTabIdentity(SDL_Renderer *renderer, int, int pad,
   y += labelSize_ + 4;
   renderField(renderer, fontMgr_, gridText_, "e.g. EL87qr", fieldX, y, fieldW,
               fieldH, fieldSize_, textPad, activeField_ == 1, gridValid_,
-              cursorPos_, orange, gray, green, white, gray);
+              cursorPos_, selectionAnchor_, orange, gray, green, white, gray);
   y += vSpace;
 
   int halfFieldW = (fieldW - pad) / 2;
@@ -385,13 +420,14 @@ void SetupScreen::renderTabIdentity(SDL_Renderer *renderer, int, int pad,
   int latY = y;
   renderField(renderer, fontMgr_, latText_, "e.g. 27.76", fieldX, latY,
               halfFieldW, fieldH, fieldSize_, textPad, activeField_ == 2,
-              !latText_.empty(), cursorPos_, orange, gray, white, white, gray);
+              !latText_.empty(), cursorPos_, selectionAnchor_, orange, gray,
+              white, white, gray);
 
   int lonY = y;
   renderField(renderer, fontMgr_, lonText_, "e.g. -82.64",
               fieldX + halfFieldW + pad, lonY, halfFieldW, fieldH, fieldSize_,
-              textPad, activeField_ == 3, !lonText_.empty(), cursorPos_, orange,
-              gray, white, white, gray);
+              textPad, activeField_ == 3, !lonText_.empty(), cursorPos_,
+              selectionAnchor_, orange, gray, white, white, gray);
   y = std::max(latY, lonY) + pad / 2;
 
   if (mismatchWarning_) {
@@ -442,21 +478,21 @@ void SetupScreen::renderTabDXCluster(SDL_Renderer *renderer, int cx, int pad,
   int hostY = y;
   renderField(renderer, fontMgr_, clusterHost_, "dxusa.net", fieldX, hostY,
               halfW, fieldH, fieldSize_, textPad, activeField_ == 0,
-              !clusterHost_.empty(), cursorPos_, orange, gray, white, white,
-              gray);
+              !clusterHost_.empty(), cursorPos_, selectionAnchor_, orange, gray,
+              white, white, gray);
   int portY = y;
   renderField(renderer, fontMgr_, clusterPort_, "7300", fieldX + halfW + pad,
               portY, halfW, fieldH, fieldSize_, textPad, activeField_ == 1,
-              !clusterPort_.empty(), cursorPos_, orange, gray, white, white,
-              gray);
+              !clusterPort_.empty(), cursorPos_, selectionAnchor_, orange, gray,
+              white, white, gray);
   y += fieldH + vSpace;
 
   fontMgr_.drawText(renderer, "Login:", fieldX, y, white, labelSize_, true);
   y += labelSize_ + 4;
   renderField(renderer, fontMgr_, clusterLogin_, "NOCALL", fieldX, y, fieldW,
               fieldH, fieldSize_, textPad, activeField_ == 2,
-              !clusterLogin_.empty(), cursorPos_, orange, gray, white, white,
-              gray);
+              !clusterLogin_.empty(), cursorPos_, selectionAnchor_, orange,
+              gray, white, white, gray);
   y += fieldH + vSpace;
 
   // Toggles row 1
@@ -486,24 +522,22 @@ void SetupScreen::renderTabDXCluster(SDL_Renderer *renderer, int cx, int pad,
     SDL_Rect check = {fieldX + 4, y + 4, 12, 12};
     SDL_RenderFillRect(renderer, &check);
   }
-  fontMgr_.drawText(renderer, "Use WSJT-X (UDP)", fieldX + 30, y + 2,
-                    white, labelSize_);
+  fontMgr_.drawText(renderer, "Use WSJT-X (UDP)", fieldX + 30, y + 2, white,
+                    labelSize_);
   toggleRect_ = toggle;
-  y += 30;
-
   if (clusterWSJTX_) {
-    fontMgr_.drawText(renderer, "WSJT-X UDP Port:", fieldX, y, white, labelSize_);
-    y += labelSize_ + 4;
     int wPortW = std::min(120, halfW);
-    wsjtxPortRect_ = {fieldX, y, wPortW, fieldH};
+    int portX = fieldX + halfW + pad;
+    wsjtxPortRect_ = {portX, y, wPortW, fieldH};
     int tmpY = y;
-    renderField(renderer, fontMgr_, wsjtxPort_, "2237", fieldX, tmpY, wPortW,
+    renderField(renderer, fontMgr_, wsjtxPort_, "2237", portX, tmpY, wPortW,
                 fieldH, fieldSize_, textPad, activeField_ == 3,
-                !wsjtxPort_.empty(), cursorPos_, orange, gray, white, white, gray);
-    y += fieldH + vSpace;
+                !wsjtxPort_.empty(), cursorPos_, selectionAnchor_, orange, gray,
+                white, white, gray);
   } else {
     wsjtxPortRect_ = {0, 0, 0, 0};
   }
+  y += 30;
 
   // --- RBN SECTION ---
   fontMgr_.drawText(renderer, "--- Reverse Beacon Network ---", cx, y, cyan,
@@ -676,12 +710,13 @@ void SetupScreen::renderTabAppearance(SDL_Renderer *renderer, int cx, int pad,
     int dimY = y;
     renderField(renderer, fontMgr_, dimTime_, "HH:MM", fieldX, dimY, halfW,
                 fieldH, fieldSize_, textPad, activeField_ == 1, true,
-                cursorPos_, orange, gray, white, white, gray);
+                cursorPos_, selectionAnchor_, orange, gray, white, white, gray);
     dimTimeRect_ = {fieldX, dimY, halfW, fieldH};
     int brightY = y;
     renderField(renderer, fontMgr_, brightTime_, "HH:MM", fieldX + halfW + pad,
                 brightY, halfW, fieldH, fieldSize_, textPad, activeField_ == 2,
-                true, cursorPos_, orange, gray, white, white, gray);
+                true, cursorPos_, selectionAnchor_, orange, gray, white, white,
+                gray);
     brightTimeRect_ = {fieldX + halfW + pad, brightY, halfW, fieldH};
   } else {
     dimTimeRect_ = {0, 0, 0, 0};
@@ -704,7 +739,7 @@ void SetupScreen::renderTabServices(SDL_Renderer *renderer, int, int pad,
   y += labelSize_ + 4;
   renderField(renderer, fontMgr_, qrzUsername_, "e.g. K4DRW", fieldX, y, fieldW,
               fieldH, fieldSize_, textPad, activeField_ == 0, true, cursorPos_,
-              orange, gray, white, white, gray);
+              selectionAnchor_, orange, gray, white, white, gray);
   y += vSpace;
 
   fontMgr_.drawText(renderer, "QRZ Password:", fieldX, y, white, labelSize_,
@@ -713,8 +748,73 @@ void SetupScreen::renderTabServices(SDL_Renderer *renderer, int, int pad,
   std::string passMask(qrzPassword_.length(), '*');
   renderField(renderer, fontMgr_, passMask, "********", fieldX, y, fieldW,
               fieldH, fieldSize_, textPad, activeField_ == 1, true, cursorPos_,
-              orange, gray, white, white, gray);
+              selectionAnchor_, orange, gray, white, white, gray);
   y += vSpace;
+}
+
+void SetupScreen::renderTabNetwork(SDL_Renderer *renderer, int /*cx*/, int pad,
+                                   int fieldW, int fieldH, int fieldX,
+                                   int textPad) {
+  int y = (y_ + titleSize_ + 2 * pad + fieldH);
+  int vSpace = pad / 2;
+  SDL_Color white = {255, 255, 255, 255};
+  SDL_Color orange = {255, 165, 0, 255};
+  SDL_Color gray = {140, 140, 140, 255};
+
+  fontMgr_.drawText(renderer, "--- Local Data Hub ---", fieldX, y, orange,
+                    labelSize_, true);
+  y += labelSize_ + pad;
+
+  // Mode cycle button
+  const char *modeLabel = (hubMode_ == HubMode::Master)   ? "Master"
+                          : (hubMode_ == HubMode::Client) ? "Client"
+                                                          : "Off";
+  int btnW = 80;
+  hubModeRect_ = {fieldX + fieldW - btnW, y, btnW, fieldH};
+  fontMgr_.drawText(renderer, "Mode:", fieldX, y + fieldH / 2, white,
+                    labelSize_, false, true);
+  SDL_SetRenderDrawColor(renderer, 40, 40, 60, 255);
+  SDL_RenderFillRect(renderer, &hubModeRect_);
+  SDL_SetRenderDrawColor(renderer, orange.r, orange.g, orange.b, 255);
+  SDL_RenderDrawRect(renderer, &hubModeRect_);
+  fontMgr_.drawText(renderer, modeLabel, hubModeRect_.x + hubModeRect_.w / 2,
+                    hubModeRect_.y + hubModeRect_.h / 2, orange, labelSize_,
+                    false, true);
+  y += fieldH + vSpace;
+
+  if (hubMode_ == HubMode::Client) {
+    fontMgr_.drawText(renderer, "Hub IP:", fieldX, y, white, labelSize_);
+    y += labelSize_ + 4;
+    hubIpRect_ = {fieldX, y, fieldW, fieldH};
+    renderField(renderer, fontMgr_, hubIp_, "e.g. 192.168.1.100", fieldX, y,
+                fieldW, fieldH, fieldSize_, textPad, activeField_ == 0, true,
+                cursorPos_, selectionAnchor_, orange, gray, white, white, gray);
+    y += vSpace;
+
+    fontMgr_.drawText(renderer, "Hub Port:", fieldX, y, white, labelSize_);
+    y += labelSize_ + 4;
+    hubPortRect_ = {fieldX, y, fieldW, fieldH};
+    renderField(renderer, fontMgr_, hubPortStr_, "8080", fieldX, y, fieldW,
+                fieldH, fieldSize_, textPad, activeField_ == 1, true,
+                cursorPos_, selectionAnchor_, orange, gray, white, white, gray);
+    y += vSpace;
+  } else {
+    hubIpRect_ = {0, 0, 0, 0};
+    hubPortRect_ = {0, 0, 0, 0};
+  }
+
+  if (hubMode_ == HubMode::Master) {
+    fontMgr_.drawText(renderer,
+                      "This instance serves cached data to hub clients.",
+                      fieldX, y + vSpace, gray, hintSize_);
+  } else if (hubMode_ == HubMode::Client) {
+    fontMgr_.drawText(renderer,
+                      "Fetches via hub; falls back to direct after 2s.", fieldX,
+                      y + vSpace, gray, hintSize_);
+  } else {
+    fontMgr_.drawText(renderer, "Hub mode disabled.", fieldX, y + vSpace, gray,
+                      hintSize_);
+  }
 }
 
 void SetupScreen::renderTabRig(SDL_Renderer *renderer, int cx, int pad,
@@ -736,14 +836,14 @@ void SetupScreen::renderTabRig(SDL_Renderer *renderer, int cx, int pad,
   y += labelSize_ + 4;
   renderField(renderer, fontMgr_, rigHost_, "e.g. localhost", fieldX, y, fieldW,
               fieldH, fieldSize_, textPad, activeField_ == 0, true, cursorPos_,
-              orange, gray, white, white, gray);
+              selectionAnchor_, orange, gray, white, white, gray);
   y += vSpace;
 
   fontMgr_.drawText(renderer, "rigctld Port:", fieldX, y, white, labelSize_);
   y += labelSize_ + 4;
   renderField(renderer, fontMgr_, rigPort_, "4532", fieldX, y, fieldW, fieldH,
-              fieldSize_, textPad, activeField_ == 1, true, cursorPos_, orange,
-              gray, white, white, gray);
+              fieldSize_, textPad, activeField_ == 1, true, cursorPos_,
+              selectionAnchor_, orange, gray, white, white, gray);
   y += vSpace;
 
   // Auto-tune Toggle
@@ -802,25 +902,39 @@ void SetupScreen::renderTabWidgets(SDL_Renderer *renderer, int cx, int pad,
   int rowH = hintSize_ + 4; // Tighter vertical spacing
 
   WidgetType allTypes[] = {
-      WidgetType::SOLAR,         WidgetType::DX_CLUSTER,
-      WidgetType::LIVE_SPOTS,    WidgetType::BAND_CONDITIONS,
-      WidgetType::CONTESTS,      WidgetType::ON_THE_AIR,
-      WidgetType::GIMBAL,        WidgetType::MOON,
-      WidgetType::CLOCK_AUX,     WidgetType::DX_PEDITIONS,
-      WidgetType::DE_WEATHER,    WidgetType::DX_WEATHER,
-      WidgetType::NCDXF,         WidgetType::SDO,
-      WidgetType::HISTORY_FLUX,  WidgetType::HISTORY_KP,
-      WidgetType::HISTORY_SSN,   WidgetType::DRAP,
-      WidgetType::AURORA,        WidgetType::AURORA_GRAPH,
-      WidgetType::ADIF,          WidgetType::COUNTDOWN,
-      WidgetType::CALLBOOK,      WidgetType::DST_INDEX,
-      WidgetType::WATCHLIST,     WidgetType::EME_TOOL,
-      WidgetType::SANTA_TRACKER, WidgetType::CPU_TEMP};
+      WidgetType::ADIF,          WidgetType::ALERTS,
+      WidgetType::ASTEROID,      WidgetType::AURORA,
+      WidgetType::AURORA_GRAPH,  WidgetType::BAND_CONDITIONS,
+      WidgetType::CALLBOOK,      WidgetType::CLOCK_AUX,
+      WidgetType::CONTESTS,      WidgetType::COUNTDOWN,
+      WidgetType::DE_WEATHER,    WidgetType::DRAP,
+      WidgetType::DST_INDEX,     WidgetType::DX_CLUSTER,
+      WidgetType::DX_PEDITIONS,  WidgetType::DX_WEATHER,
+      WidgetType::EME_TOOL,      WidgetType::FORECAST,
+      WidgetType::GIMBAL,        WidgetType::HISTORY_FLUX,
+      WidgetType::HISTORY_KP,    WidgetType::HISTORY_SSN,
+      WidgetType::HURRICANE,     WidgetType::LIVE_SPOTS,
+      WidgetType::MARINE,        WidgetType::MOON,
+      WidgetType::NCDXF,         WidgetType::ON_THE_AIR,
+      WidgetType::SANTA_TRACKER, WidgetType::SDO,
+      WidgetType::SOLAR,         WidgetType::SYS_INFO,
+      WidgetType::WATCHLIST};
 
   const auto &currentPane = paneRotations_[activePane_];
 
-  for (size_t i = 0; i < sizeof(allTypes) / sizeof(allTypes[0]); ++i) {
+  const int nWidgets = sizeof(allTypes) / sizeof(allTypes[0]);
+  const int itemsPerCol = (nWidgets + 2) / 3;
+
+  for (size_t i = 0; i < nWidgets; ++i) {
     WidgetType t = allTypes[i];
+
+    // Pane 4 (index 3) is restricted to small widgets only
+    bool allowed = true;
+    if (activePane_ == 3) {
+      allowed = (t == WidgetType::NCDXF || t == WidgetType::SOLAR ||
+                 t == WidgetType::DX_WEATHER || t == WidgetType::DE_WEATHER);
+    }
+
     SDL_Rect r = {curX, y, 16, 16};
     // Neutral dark background (prevents 'blue' look)
     SDL_SetRenderDrawColor(renderer, 45, 45, 48, 255);
@@ -828,26 +942,83 @@ void SetupScreen::renderTabWidgets(SDL_Renderer *renderer, int cx, int pad,
     SDL_SetRenderDrawColor(renderer, 100, 100, 120, 255);
     SDL_RenderDrawRect(renderer, &r);
 
-    bool selected = std::find(currentPane.begin(), currentPane.end(), t) !=
-                    currentPane.end();
-    if (selected) {
-      SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
-      SDL_Rect check = {r.x + 3, r.y + 3, 10, 10};
-      SDL_RenderFillRect(renderer, &check);
+    if (allowed) {
+      bool selected = std::find(currentPane.begin(), currentPane.end(), t) !=
+                      currentPane.end();
+      if (selected) {
+        SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
+        SDL_Rect check = {r.x + 3, r.y + 3, 10, 10};
+        SDL_RenderFillRect(renderer, &check);
+      }
+      fontMgr_.drawText(renderer, widgetTypeDisplayName(t), r.x + 22, r.y,
+                        white, hintSize_);
+      widgetRects_.push_back({t, r});
+    } else {
+      // Draw disabled text
+      fontMgr_.drawText(renderer, widgetTypeDisplayName(t), r.x + 22, r.y,
+                        {60, 60, 70, 255}, hintSize_);
+      // Do not add to widgetRects_ so it is not clickable
     }
 
-    fontMgr_.drawText(renderer, widgetTypeDisplayName(t), r.x + 22, r.y, white,
-                      hintSize_);
-
-    widgetRects_.push_back({t, r});
-
     y += rowH;
-    // Break into columns every 10 items
-    if ((i + 1) % 10 == 0) {
+    // Break into columns
+    if ((i + 1) % itemsPerCol == 0) {
       y = startY;
       curX += colW;
     }
   }
+}
+
+void SetupScreen::renderTabUpdate(SDL_Renderer *renderer, int cx, int pad,
+                                  int fieldW, int fieldH, int fieldX, int) {
+  int y = (y_ + titleSize_ + 2 * pad + fieldH);
+  SDL_Color white = {255, 255, 255, 255};
+  SDL_Color gray = {140, 140, 140, 255};
+  SDL_Color cyan = {0, 200, 255, 255};
+
+  fontMgr_.drawText(renderer, "--- Update Status ---", cx, y, cyan, labelSize_,
+                    true, true);
+  y += labelSize_ + pad;
+
+  fontMgr_.drawText(renderer, "Current Version:", fieldX, y, white, labelSize_);
+  fontMgr_.drawText(renderer, HAMCLOCK_VERSION, fieldX + fieldW, y, gray,
+                    labelSize_, false, false);
+  y += labelSize_ + 8;
+
+  fontMgr_.drawText(renderer, "Platform Architecture:", fieldX, y, white,
+                    labelSize_);
+  fontMgr_.drawText(renderer, HAMCLOCK_ARCH, fieldX + fieldW, y, gray,
+                    labelSize_, false, false);
+  y += labelSize_ + 8;
+
+  fontMgr_.drawText(renderer, "Installation Type:", fieldX, y, white,
+                    labelSize_);
+  fontMgr_.drawText(renderer, HAMCLOCK_INSTALL_TYPE, fieldX + fieldW, y, gray,
+                    labelSize_, false, false);
+  y += labelSize_ + pad * 2;
+
+  // Implementation-specific instructions
+  std::string instr;
+  std::string cmd;
+  std::string type = HAMCLOCK_INSTALL_TYPE;
+
+  if (type == "RPM") {
+    instr = "An update is available via DNF.";
+    cmd = "sudo dnf update hamclock-next";
+  } else if (type == "DEB") {
+    instr = "Download the latest .deb and install it.";
+    cmd = "sudo apt install ./hamclock-next.deb";
+  } else if (type == "WASM") {
+    instr = "A new version of HamClock-Next is available.";
+    cmd = "Please reload the page to update.";
+  } else {
+    instr = "Binary update available.";
+    cmd = "Download the latest release from GitHub.";
+  }
+
+  fontMgr_.drawText(renderer, instr, cx, y, white, fieldSize_, false, true);
+  y += fieldSize_ + 8;
+  fontMgr_.drawText(renderer, cmd, cx, y, cyan, fieldSize_, true, true);
 }
 
 void SetupScreen::onResize(int x, int y, int w, int h) {
@@ -855,13 +1026,13 @@ void SetupScreen::onResize(int x, int y, int w, int h) {
   recalcLayout();
 }
 
-bool SetupScreen::onMouseUp(int mx, int my, Uint16) {
+bool SetupScreen::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
   int cx = x_ + width_ / 2;
   int pad = std::max(16, width_ / 24);
   int fieldW = std::min(400, width_ - 2 * pad);
   int fieldX = cx - fieldW / 2;
   int fieldH = fieldSize_ + 14;
-  int y = y_ + titleSize_ + 2 * pad;
+  int y = y_ + titleSize_ + 3 * pad / 2;
 
   // Check Footer Buttons
   if (mx >= cancelBtnRect_.x && mx <= cancelBtnRect_.x + cancelBtnRect_.w &&
@@ -880,10 +1051,11 @@ bool SetupScreen::onMouseUp(int mx, int my, Uint16) {
   }
 
   const Tab tabValues[] = {Tab::Identity, Tab::Spotting, Tab::Appearance,
-                           Tab::Rig,      Tab::Services, Tab::Widgets};
-  int numTabs = 6;
+                           Tab::Rig,      Tab::Services, Tab::Network,
+                           Tab::Widgets,  Tab::Update};
+  int numTabs = 8;
   int tabW = fieldW / numTabs;
-  y = y_ + titleSize_ + 3 * pad / 2; // matches render(): pad/2 gap after title
+
   if (my >= y && my <= y + fieldH) {
     for (int i = 0; i < numTabs; ++i) {
       if (mx >= fieldX + i * tabW && mx <= fieldX + (i + 1) * tabW) {
@@ -921,9 +1093,9 @@ bool SetupScreen::onMouseUp(int mx, int my, Uint16) {
       rbnEnabled_ = !rbnEnabled_;
       return true;
     }
-    if (clusterWSJTX_ && wsjtxPortRect_.w > 0 &&
-        mx >= wsjtxPortRect_.x && mx <= wsjtxPortRect_.x + wsjtxPortRect_.w &&
-        my >= wsjtxPortRect_.y && my <= wsjtxPortRect_.y + wsjtxPortRect_.h) {
+    if (clusterWSJTX_ && wsjtxPortRect_.w > 0 && mx >= wsjtxPortRect_.x &&
+        mx <= wsjtxPortRect_.x + wsjtxPortRect_.w && my >= wsjtxPortRect_.y &&
+        my <= wsjtxPortRect_.y + wsjtxPortRect_.h) {
       activeField_ = 3;
       cursorPos_ = static_cast<int>(wsjtxPort_.size());
       return true;
@@ -996,7 +1168,13 @@ bool SetupScreen::onMouseUp(int mx, int my, Uint16) {
       if (mx >= r.x && mx < r.x + r.w && my >= r.y && my < r.y + r.h) {
         activeField_ = fieldIdx;
         std::string *ft = getActiveFieldText();
-        cursorPos_ = ft ? (int)ft->size() : 0;
+        if (clicks == 2 && ft) {
+          selectionAnchor_ = 0;
+          cursorPos_ = static_cast<int>(ft->size());
+        } else {
+          cursorPos_ = ft ? static_cast<int>(ft->size()) : 0;
+          selectionAnchor_ = cursorPos_;
+        }
         return true;
       }
       return false;
@@ -1012,6 +1190,38 @@ bool SetupScreen::onMouseUp(int mx, int my, Uint16) {
         my >= toggleRect_.y && my <= toggleRect_.y + toggleRect_.h) {
       rigAutoTune_ = !rigAutoTune_;
       return true;
+    }
+  }
+
+  if (activeTab_ == Tab::Network) {
+    if (mx >= hubModeRect_.x && mx <= hubModeRect_.x + hubModeRect_.w &&
+        my >= hubModeRect_.y && my <= hubModeRect_.y + hubModeRect_.h) {
+      if (hubMode_ == HubMode::Off)
+        hubMode_ = HubMode::Master;
+      else if (hubMode_ == HubMode::Master)
+        hubMode_ = HubMode::Client;
+      else
+        hubMode_ = HubMode::Off;
+      activeField_ = 0;
+      return true;
+    }
+    if (hubMode_ == HubMode::Client) {
+      if (hubIpRect_.w > 0 && mx >= hubIpRect_.x &&
+          mx <= hubIpRect_.x + hubIpRect_.w && my >= hubIpRect_.y &&
+          my <= hubIpRect_.y + hubIpRect_.h) {
+        activeField_ = 0;
+        cursorPos_ = static_cast<int>(hubIp_.size());
+        selectionAnchor_ = cursorPos_;
+        return true;
+      }
+      if (hubPortRect_.w > 0 && mx >= hubPortRect_.x &&
+          mx <= hubPortRect_.x + hubPortRect_.w && my >= hubPortRect_.y &&
+          my <= hubPortRect_.y + hubPortRect_.h) {
+        activeField_ = 1;
+        cursorPos_ = static_cast<int>(hubPortStr_.size());
+        selectionAnchor_ = cursorPos_;
+        return true;
+      }
     }
   }
 
@@ -1060,6 +1270,8 @@ bool SetupScreen::onMouseUp(int mx, int my, Uint16) {
     nFields = 2;
   else if (activeTab_ == Tab::Services)
     nFields = 2;
+  else if (activeTab_ == Tab::Network)
+    nFields = 0; // handled entirely via explicit rects above
 
   for (int i = 0; i < nFields; ++i) {
     int fy = yStart;
@@ -1086,23 +1298,28 @@ bool SetupScreen::onMouseUp(int mx, int my, Uint16) {
       int oldField = activeField_;
       activeField_ = i;
 
-      // Calculate cursor position from click if clicking in same field
-      if (oldField == i) {
-        std::string *fieldText = getActiveFieldText();
-        if (fieldText && !fieldText->empty()) {
-          cursorPos_ = calculateCursorPosFromClick(mx, fx + textPad, *fieldText,
-                                                   fieldSize_);
-        } else {
-          cursorPos_ = 0;
-        }
+      std::string *fieldText = getActiveFieldText();
+      if (clicks == 2 && fieldText) {
+        selectionAnchor_ = 0;
+        cursorPos_ = static_cast<int>(fieldText->size());
       } else {
-        // New field - position at end of text
-        std::string *fieldText = getActiveFieldText();
-        if (fieldText) {
-          cursorPos_ = fieldText->size();
+        // Calculate cursor position from click if clicking in same field
+        if (oldField == i) {
+          if (fieldText && !fieldText->empty()) {
+            cursorPos_ = calculateCursorPosFromClick(mx, fx + textPad,
+                                                     *fieldText, fieldSize_);
+          } else {
+            cursorPos_ = 0;
+          }
         } else {
-          cursorPos_ = 0;
+          // New field - position at end of text
+          if (fieldText) {
+            cursorPos_ = static_cast<int>(fieldText->size());
+          } else {
+            cursorPos_ = 0;
+          }
         }
+        selectionAnchor_ = cursorPos_;
       }
 
       return true;
@@ -1188,7 +1405,8 @@ bool SetupScreen::onKeyDown(SDL_Keycode key, Uint16 mod) {
   case SDLK_TAB: {
     activeField_ = (activeField_ + 1) % nFields;
     std::string *nf = getActiveFieldText();
-    cursorPos_ = nf ? (int)nf->size() : 0;
+    cursorPos_ = nf ? static_cast<int>(nf->size()) : 0;
+    selectionAnchor_ = cursorPos_;
     return true;
   }
   case SDLK_RETURN:
@@ -1198,9 +1416,14 @@ bool SetupScreen::onKeyDown(SDL_Keycode key, Uint16 mod) {
     }
     return true;
   case SDLK_BACKSPACE:
-    if (text && cursorPos_ > 0) {
+    if (deleteSelection(text)) {
+      if (activeTab_ == Tab::Identity &&
+          (activeField_ == 2 || activeField_ == 3))
+        latLonManual_ = true;
+    } else if (text && cursorPos_ > 0) {
       text->erase(cursorPos_ - 1, 1);
       --cursorPos_;
+      selectionAnchor_ = cursorPos_;
       if (activeTab_ == Tab::Identity &&
           (activeField_ == 2 || activeField_ == 3))
         latLonManual_ = true;
@@ -1209,8 +1432,13 @@ bool SetupScreen::onKeyDown(SDL_Keycode key, Uint16 mod) {
     }
     return true;
   case SDLK_DELETE:
-    if (text && cursorPos_ < static_cast<int>(text->size())) {
+    if (deleteSelection(text)) {
+      if (activeTab_ == Tab::Identity &&
+          (activeField_ == 2 || activeField_ == 3))
+        latLonManual_ = true;
+    } else if (text && cursorPos_ < static_cast<int>(text->size())) {
       text->erase(cursorPos_, 1);
+      selectionAnchor_ = cursorPos_;
       if (activeTab_ == Tab::Identity &&
           (activeField_ == 2 || activeField_ == 3))
         latLonManual_ = true;
@@ -1219,17 +1447,31 @@ bool SetupScreen::onKeyDown(SDL_Keycode key, Uint16 mod) {
   case SDLK_LEFT:
     if (cursorPos_ > 0)
       --cursorPos_;
+    selectionAnchor_ = cursorPos_;
     return true;
   case SDLK_RIGHT:
     if (text && cursorPos_ < static_cast<int>(text->size()))
       ++cursorPos_;
+    selectionAnchor_ = cursorPos_;
     return true;
   case SDLK_HOME:
     cursorPos_ = 0;
+    selectionAnchor_ = cursorPos_;
     return true;
   case SDLK_END:
     if (text)
       cursorPos_ = static_cast<int>(text->size());
+    selectionAnchor_ = cursorPos_;
+    return true;
+  case SDLK_a:
+    if (mod & (KMOD_CTRL | KMOD_GUI)) {
+      std::string *txt = getActiveFieldText();
+      if (txt) {
+        selectionAnchor_ = 0;
+        cursorPos_ = static_cast<int>(txt->size());
+      }
+      return true;
+    }
     return true;
   case SDLK_v:
     if (mod & (KMOD_CTRL | KMOD_GUI)) {
@@ -1336,6 +1578,9 @@ bool SetupScreen::onTextInput(const char *inputText) {
 
   if (!field)
     return true;
+
+  deleteSelection(field);
+
   if (static_cast<int>(field->size()) >= maxLen)
     return true;
 
@@ -1490,6 +1735,10 @@ void SetupScreen::setConfig(const AppConfig &cfg) {
   rigPort_ = std::to_string(cfg.rigPort);
   rigAutoTune_ = cfg.rigAutoTune;
 
+  hubMode_ = cfg.hubMode;
+  hubIp_ = cfg.hubIp;
+  hubPortStr_ = std::to_string(cfg.hubPort);
+
   paneRotations_[0] = cfg.pane1Rotation;
   paneRotations_[1] = cfg.pane2Rotation;
   paneRotations_[2] = cfg.pane3Rotation;
@@ -1558,6 +1807,12 @@ AppConfig SetupScreen::getConfig() const {
     cfg.rigPort = 4532;
   cfg.rigAutoTune = rigAutoTune_;
 
+  cfg.hubMode = hubMode_;
+  cfg.hubIp = hubIp_;
+  cfg.hubPort = std::atoi(hubPortStr_.c_str());
+  if (cfg.hubPort == 0)
+    cfg.hubPort = 8080;
+
   return cfg;
 }
 
@@ -1576,7 +1831,7 @@ SDL_Rect SetupScreen::getActionRect(const std::string &action) const {
   int fieldX = cx - fieldW / 2;
   int fieldH = fieldSize_ + 14;
   int tabY = y_ + titleSize_ + 2 * pad;
-  int numTabs = 7;
+  int numTabs = 8;
   int tabW = fieldW / numTabs;
 
   if (action == "tab_identity")

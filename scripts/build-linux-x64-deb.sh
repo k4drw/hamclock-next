@@ -65,6 +65,11 @@ if [ $? -eq 0 ]; then
     ./packaging/linux/create_deb.sh "$BUILD_DIR/hamclock-next" "amd64" "fb0" "$BUILD_DIR"
     
     echo "--------------------------------------------------"
+
+    # Cleanup intermediate artifacts if successful
+    echo "Cleaning up intermediate build artifacts (saving disk space)..."
+    find "$BUILD_DIR" -maxdepth 1 -type f ! -name "hamclock-next*" -delete
+    find "$BUILD_DIR" -maxdepth 1 -type d ! -name "$BUILD_DIR" -exec rm -rf {} + 2>/dev/null
 else
     echo "ERROR: Build failed!"
     exit 1

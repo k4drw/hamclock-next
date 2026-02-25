@@ -7,68 +7,65 @@
 
 #include <algorithm>
 #include <cmath>
-#include <map>
+#include <functional>
+#include <list>
 #include <string>
+#include <unordered_map>
 
 class TextureManager {
 public:
   TextureManager() = default;
-  ~TextureManager() {
-    clearCache();
-  }
+  ~TextureManager() { clearCache(); }
 
   void clearCache() {
-    for (auto &[key, tex] : cache_)
-      destroyTexture(tex);
+    for (auto &[key, entry] : cache_) {
+      if (entry.texture) {
+        destroyTexture(entry.texture);
+      }
+    }
     cache_.clear();
+    lru_.clear();
   }
 
   TextureManager(const TextureManager &) = delete;
   TextureManager &operator=(const TextureManager &) = delete;
 
-  // Load a BMP texture from disk, cache by key. Returns nullptr on failure.
   SDL_Texture *loadBMP(SDL_Renderer *renderer, const std::string &key,
                        const std::string &path) {
     auto it = cache_.find(key);
-    if (it != cache_.end())
-      return it->second;
-    
-    pruneIfNecessary();
-
-    SDL_Surface *surface = SDL_LoadBMP(path.c_str());
-    if (!surface) {
-      LOG_E("TextureManager", "Failed to load {}: {}", path, SDL_GetError());
-      return nullptr;
+    if (it != cache_.end()) {
+      touch(key);
+      return it->second.texture;
     }
+    pruneIfNecessary();
+    SDL_Surface *surface = SDL_LoadBMP(path.c_str());
+    if (!surface)
+      return nullptr;
     SDL_Texture *texture = createTexture(renderer, surface, key);
     SDL_FreeSurface(surface);
     if (texture)
-      cache_[key] = texture;
+      insert(key, texture);
     return texture;
   }
 
-  // Load any image (PNG, JPG, BMP, etc.) via SDL_image, cache by key.
   SDL_Texture *loadImage(SDL_Renderer *renderer, const std::string &key,
                          const std::string &path) {
     auto it = cache_.find(key);
-    if (it != cache_.end())
-      return it->second;
-
-    pruneIfNecessary();
-
-    SDL_Surface *surface = IMG_Load(path.c_str());
-    if (!surface) {
-      LOG_E("TextureManager", "Failed to load {}: {}", path, IMG_GetError());
-      return nullptr;
+    if (it != cache_.end()) {
+      touch(key);
+      return it->second.texture;
     }
+    pruneIfNecessary();
+    SDL_Surface *surface = IMG_Load(path.c_str());
+    if (!surface)
+      return nullptr;
     SDL_Texture *texture = createTexture(renderer, surface, key);
     SDL_FreeSurface(surface);
     if (texture)
-      cache_[key] = texture;
+      insert(key, texture);
     return texture;
   }
 
-  // Load an image from memory (e.g. bytes from NetworkManager).
   SDL_Texture *loadFromMemory(SDL_Renderer *renderer, const std::string &key,
                               const std::string &data) {
     return loadFromMemory(renderer, key,
@@ -76,16 +73,11 @@ public:
                           static_cast<unsigned int>(data.size()));
   }
 
-  // Load an image from memory (e.g. embedded assets).
   SDL_Texture *loadFromMemory(SDL_Renderer *renderer, const std::string &key,
                               const unsigned char *data, unsigned int size) {
-    pruneIfNecessary();
-    
     SDL_RWops *rw = SDL_RWFromConstMem(data, static_cast<int>(size));
-    if (!rw) {
-      LOG_E("TextureManager", "SDL_RWFromConstMem failed");
+    if (!rw)
       return nullptr;
-    }
 
     SDL_Surface *surface = IMG_Load_RW(rw, 0);
     if (!surface) {
@@ -97,26 +89,16 @@ public:
       surface = IMG_LoadTyped_RW(rw, 0, "JPG");
     }
     SDL_RWclose(rw);
-
-    if (!surface) {
-      LOG_E("TextureManager", "IMG_Load failed for {}: {}", key,
-            IMG_GetError());
+    if (!surface)
       return nullptr;
-    }
 
-    // Always convert to a consistent 32-bit format (RGBA32) to ensure
-    // AlphaMod and BlendMode support across all drivers.
     SDL_Surface *rgbaSurface =
         SDL_ConvertSurfaceFormat(surface, SDL_PIXELFORMAT_RGBA32, 0);
     SDL_FreeSurface(surface);
-    if (!rgbaSurface) {
-      LOG_E("TextureManager", "SDL_ConvertSurfaceFormat failed for {}", key);
+    if (!rgbaSurface)
       return nullptr;
-    }
     surface = rgbaSurface;
 
-    // Specialized Logic: Generate alpha channel from pixel brightness for
-    // certain textures.
     if (key == "nasa_moon" || key == "sdo_latest") {
       uint8_t *pixels = (uint8_t *)surface->pixels;
       for (int y = 0; y < surface->h; ++y) {
@@ -125,125 +107,67 @@ public:
           uint32_t p = row[x];
           uint8_t r, g, b, a;
           SDL_GetRGBA(p, surface->format, &r, &g, &b, &a);
-
-          // Calculate brightness
           uint8_t br = std::max({r, g, b});
-
-          // For the moon, we want to be more aggressive with black to avoid
-          // JPEG artifacts around the edges showing up on non-black
-          // backgrounds.
           if (key == "nasa_moon") {
             if (br < 20)
               br = 0;
-            else if (br < 100) {
-              // Smooth transition but faster than linear
-              float f = (br - 20) / 80.0f;
-              br = static_cast<uint8_t>(f * br);
-            }
+            else if (br < 100)
+              br = (uint8_t)(((br - 20) / 80.0f) * br);
           }
-
           row[x] = SDL_MapRGBA(surface->format, r, g, b, br);
         }
       }
-      LOG_I("TextureManager", "Generated alpha channel from brightness for {}",
-            key);
     }
 
-    // Hardware Limit Check: Downscale if surface exceeds GPU's max texture size
-    if (maxW_ == 0 || maxH_ == 0) {
+    if (maxW_ == 0) {
       SDL_RendererInfo info;
       if (SDL_GetRendererInfo(renderer, &info) == 0) {
         maxW_ = info.max_texture_width;
         maxH_ = info.max_texture_height;
-        LOG_I("TextureManager", "GPU Max Texture Size: {}x{}", maxW_, maxH_);
-#if defined(__linux__) || defined(__arm__) || defined(__aarch64__) ||          \
-    defined(__EMSCRIPTEN__)
-        // On RPi and WASM, GPU memory is limited.
-        // Cap at 2048 to save memory. 5400x2700 RGBA32 is ~58MB!
-        int cap = 2048;
 #ifdef __EMSCRIPTEN__
-        if (key == "earth_map" || key == "night_map") {
-          cap = 1024;
-        }
-#endif
-        if (maxW_ == 0 || maxW_ > cap) {
-          maxW_ = cap;
-          LOG_I("TextureManager", "Capping texture limit to {} for stability",
-                cap);
-        }
-        if (maxH_ == 0 || maxH_ > cap) {
-          maxH_ = cap;
-        }
+        maxW_ = std::min(maxW_, 1024);
+        maxH_ = std::min(maxH_, 1024);
+#elif (defined(__arm__) || defined(__aarch64__)) && defined(__linux__)
+        // RPi/Linux ARM only — keeps worst-case texture at 4 MB vs 16 MB.
+        // Intentionally excludes macOS ARM (Apple Silicon) which has ample
+        // VRAM.
+        maxW_ = std::min(maxW_, 1024);
+        maxH_ = std::min(maxH_, 1024);
 #endif
       } else {
-#if defined(__linux__) || defined(__arm__) || defined(__aarch64__) ||          \
-    defined(__EMSCRIPTEN__)
         maxW_ = 2048;
         maxH_ = 2048;
-#else
-        maxW_ = 8192;
-        maxH_ = 8192;
-#endif
       }
     }
 
     SDL_Surface *finalSurface = surface;
     bool mustFreeFinal = false;
-
-    if (maxW_ > 0 && maxH_ > 0 && (surface->w > maxW_ || surface->h > maxH_)) {
+    if (maxW_ > 0 && (surface->w > maxW_ || surface->h > maxH_)) {
       float scale =
           std::min((float)maxW_ / surface->w, (float)maxH_ / surface->h);
-      int newW = (int)(surface->w * scale);
-      int newH = (int)(surface->h * scale);
-      LOG_W("TextureManager", "Downscaling {} to {}x{} (limit {}x{})", key,
-            newW, newH, maxW_, maxH_);
-      finalSurface = SDL_CreateRGBSurfaceWithFormat(0, newW, newH, 32,
-                                                    surface->format->format);
+      finalSurface = SDL_CreateRGBSurfaceWithFormat(
+          0, (int)(surface->w * scale), (int)(surface->h * scale), 32,
+          surface->format->format);
       if (finalSurface) {
-        if (SDL_BlitScaled(surface, nullptr, finalSurface, nullptr) != 0) {
-          LOG_E("TextureManager", "SDL_BlitScaled failed: {}", SDL_GetError());
-          SDL_FreeSurface(finalSurface);
-          finalSurface = surface;
-        } else {
-          mustFreeFinal = true;
-        }
+        SDL_BlitScaled(surface, nullptr, finalSurface, nullptr);
+        mustFreeFinal = true;
       } else {
-        LOG_E("TextureManager",
-              "Failed to create surface for {} downscale: {}. "
-              "Source is {}x{}, Target was {}x{}.",
-              key, SDL_GetError(), surface->w, surface->h, newW, newH);
-
-        // CRITICAL: If we are already low on RAM, the 58MB source surface plus
-        // the 8MB dest surface might be too much.
-        // We will try one more time with a TINY surface just to survive.
-        finalSurface = SDL_CreateRGBSurfaceWithFormat(0, 512, 256, 32,
-                                                      surface->format->format);
-        if (finalSurface) {
-          LOG_W("TextureManager", "Resort to 512x256 fallback for {}", key);
-          SDL_BlitScaled(surface, nullptr, finalSurface, nullptr);
-          mustFreeFinal = true;
-        } else {
-          finalSurface =
-              surface; // Last resort, will likely fail SDL_CreateTexture
-        }
+        finalSurface = surface;
       }
     }
 
-    // Memory optimization: destroy previous texture before creating the new one
-    // to avoid peak VRAM usage.
     auto it = cache_.find(key);
     if (it != cache_.end()) {
-      destroyTexture(it->second);
+      destroyTexture(it->second.texture);
+      lru_.erase(it->second.lruIt);
       cache_.erase(it);
+    } else {
+      pruneIfNecessary();
     }
 
     SDL_Texture *texture = createTexture(renderer, finalSurface, key);
-    if (!texture) {
-      // If we failed, try to flush fonts and try once more
-      LOG_W("TextureManager",
-            "Allocation failed, trying to flush FontManager and retry...");
-      if (lowMemCallback_)
-        lowMemCallback_();
+    if (!texture && lowMemCallback_) {
+      lowMemCallback_();
       texture = createTexture(renderer, finalSurface, key);
     }
 
@@ -251,18 +175,13 @@ public:
       SDL_FreeSurface(finalSurface);
     SDL_FreeSurface(surface);
 
-    if (!texture) {
-      return nullptr;
+    if (texture) {
+      SDL_SetTextureBlendMode(texture, SDL_BLENDMODE_BLEND);
+      insert(key, texture);
     }
-
-    SDL_SetTextureBlendMode(texture, SDL_BLENDMODE_BLEND);
-    cache_[key] = texture;
-    LOG_I("TextureManager", "Created texture for {}", key);
-    MemoryMonitor::getInstance().logStats("TextureManager post-load");
     return texture;
   }
 
-  // Generate a procedural equirectangular Earth fallback.
   SDL_Texture *generateEarthFallback(SDL_Renderer *renderer,
                                      const std::string &key, int width,
                                      int height) {
@@ -271,115 +190,103 @@ public:
                           SDL_TEXTUREACCESS_TARGET, width, height);
     if (!texture)
       return nullptr;
-
     SDL_SetRenderTarget(renderer, texture);
     SDL_SetRenderDrawColor(renderer, 10, 20, 60, 255);
     SDL_RenderClear(renderer);
     SDL_SetRenderDrawColor(renderer, 40, 60, 100, 255);
-    for (int lonDeg = -180; lonDeg <= 180; lonDeg += 30) {
-      int px = static_cast<int>((lonDeg + 180.0) / 360.0 * width);
+    for (int lon = -180; lon <= 180; lon += 30) {
+      int px = (int)((lon + 180.0) / 360.0 * width);
       SDL_RenderDrawLine(renderer, px, 0, px, height);
     }
-    for (int latDeg = -90; latDeg <= 90; latDeg += 30) {
-      int py = static_cast<int>((90.0 - latDeg) / 180.0 * height);
+    for (int lat = -90; lat <= 90; lat += 30) {
+      int py = (int)((90.0 - lat) / 180.0 * height);
       SDL_RenderDrawLine(renderer, 0, py, width, py);
     }
     SDL_SetRenderTarget(renderer, nullptr);
-
-    // Track target texture
-    MemoryMonitor::getInstance().addVram(width * height * 4);
-
-    cache_[key] = texture;
+    insert(key, texture);
     return texture;
   }
 
-  // Generate a procedural 1x64 texture for anti-aliased lines.
   SDL_Texture *generateLineTexture(SDL_Renderer *renderer,
                                    const std::string &key) {
     auto it = cache_.find(key);
-    if (it != cache_.end())
-      return it->second;
-
-    constexpr int h = 64;
-    SDL_Surface *surf =
-        SDL_CreateRGBSurfaceWithFormat(0, 1, h, 32, SDL_PIXELFORMAT_RGBA32);
-    if (!surf)
-      return nullptr;
-    uint32_t *pix = (uint32_t *)surf->pixels;
-    for (int i = 0; i < h; ++i) {
-      float y = (static_cast<float>(i) / (h - 1)) * 2.0f - 1.0f;
-      float alpha = std::exp(-y * y * 8.0f);
-      if (alpha < 0.001f)
-        alpha = 0;
-      pix[i] =
-          SDL_MapRGBA(surf->format, 255, 255, 255, (uint8_t)(alpha * 255.0f));
+    if (it != cache_.end()) {
+      touch(key);
+      return it->second.texture;
     }
-    SDL_Texture *tex = createTexture(renderer, surf, key);
-    SDL_FreeSurface(surf);
-    if (tex) {
-      SDL_SetTextureBlendMode(tex, SDL_BLENDMODE_BLEND);
-      cache_[key] = tex;
+    SDL_Surface *s =
+        SDL_CreateRGBSurfaceWithFormat(0, 1, 64, 32, SDL_PIXELFORMAT_RGBA32);
+    uint32_t *p = (uint32_t *)s->pixels;
+    for (int i = 0; i < 64; ++i) {
+      float y = (i / 63.0f) * 2.0f - 1.0f;
+      p[i] = SDL_MapRGBA(s->format, 255, 255, 255,
+                         (uint8_t)(std::exp(-y * y * 8.0f) * 255));
     }
-    return tex;
+    SDL_Texture *t = createTexture(renderer, s, key);
+    SDL_FreeSurface(s);
+    if (t) {
+      SDL_SetTextureBlendMode(t, SDL_BLENDMODE_BLEND);
+      insert(key, t);
+    }
+    return t;
   }
 
-  // Generate circle and square markers.
   void generateMarkerTextures(SDL_Renderer *renderer) {
     if (cache_.count("marker_circle") && cache_.count("marker_square"))
       return;
 
     constexpr int sz = 64;
-    constexpr int center = sz / 2;
-    constexpr float r = sz / 2.0f - 2.0f;
-
-    SDL_Surface *cSurf =
+    SDL_Surface *cS =
         SDL_CreateRGBSurfaceWithFormat(0, sz, sz, 32, SDL_PIXELFORMAT_RGBA32);
-    SDL_Surface *sSurf =
+    SDL_Surface *sS =
         SDL_CreateRGBSurfaceWithFormat(0, sz, sz, 32, SDL_PIXELFORMAT_RGBA32);
-    if (!cSurf || !sSurf) {
-      if (cSurf)
-        SDL_FreeSurface(cSurf);
-      if (sSurf)
-        SDL_FreeSurface(sSurf);
+    if (!cS || !sS) {
+      if (cS)
+        SDL_FreeSurface(cS);
+      if (sS)
+        SDL_FreeSurface(sS);
       return;
     }
 
-    uint32_t *cPix = (uint32_t *)cSurf->pixels;
-    uint32_t *sPix = (uint32_t *)sSurf->pixels;
+    uint32_t *cP = (uint32_t *)cS->pixels;
+    uint32_t *sP = (uint32_t *)sS->pixels;
+    float center = sz / 2.0f - 0.5f;
+    float r = sz / 2.0f - 2.0f;
 
     for (int y = 0; y < sz; ++y) {
       for (int x = 0; x < sz; ++x) {
-        float dx = x - center + 0.5f;
-        float dy = y - center + 0.5f;
+        float dx = x - center, dy = y - center;
         float dist = std::sqrt(dx * dx + dy * dy);
-        float cA =
+        uint8_t cA =
             (dist < r - 1.0f)
-                ? 1.0f
-                : (dist < r + 1.0f ? 1.0f - (dist - (r - 1.0f)) / 2.0f : 0.0f);
+                ? 255
+                : (dist < r + 1.0f
+                       ? (uint8_t)((1.0f - (dist - (r - 1.0f)) / 2.0f) * 255)
+                       : 0);
         float d = std::max(std::abs(dx), std::abs(dy));
-        float sA = (d < r - 1.0f)
-                       ? 1.0f
-                       : (d < r + 1.0f ? 1.0f - (d - (r - 1.0f)) / 2.0f : 0.0f);
-
-        cPix[y * sz + x] =
-            SDL_MapRGBA(cSurf->format, 255, 255, 255, (uint8_t)(cA * 255));
-        sPix[y * sz + x] =
-            SDL_MapRGBA(sSurf->format, 255, 255, 255, (uint8_t)(sA * 255));
+        uint8_t sA =
+            (d < r - 1.0f)
+                ? 255
+                : (d < r + 1.0f
+                       ? (uint8_t)((1.0f - (d - (r - 1.0f)) / 2.0f) * 255)
+                       : 0);
+        cP[y * sz + x] = SDL_MapRGBA(cS->format, 255, 255, 255, cA);
+        sP[y * sz + x] = SDL_MapRGBA(sS->format, 255, 255, 255, sA);
       }
     }
 
-    SDL_Texture *ct = createTexture(renderer, cSurf, "marker_circle");
-    SDL_Texture *st = createTexture(renderer, sSurf, "marker_square");
+    SDL_Texture *ct = createTexture(renderer, cS, "marker_circle");
+    SDL_Texture *st = createTexture(renderer, sS, "marker_square");
+    SDL_FreeSurface(cS);
+    SDL_FreeSurface(sS);
     if (ct) {
       SDL_SetTextureBlendMode(ct, SDL_BLENDMODE_BLEND);
-      cache_["marker_circle"] = ct;
+      insert("marker_circle", ct);
     }
     if (st) {
       SDL_SetTextureBlendMode(st, SDL_BLENDMODE_BLEND);
-      cache_["marker_square"] = st;
+      insert("marker_square", st);
     }
-    SDL_FreeSurface(cSurf);
-    SDL_FreeSurface(sSurf);
   }
 
   void generateWhiteTexture(SDL_Renderer *renderer) {
@@ -392,7 +299,7 @@ public:
     SDL_FreeSurface(s);
     if (t) {
       SDL_SetTextureBlendMode(t, SDL_BLENDMODE_BLEND);
-      cache_["white"] = t;
+      insert("white", t);
     }
   }
 
@@ -406,61 +313,74 @@ public:
     SDL_FreeSurface(s);
     if (t) {
       SDL_SetTextureBlendMode(t, SDL_BLENDMODE_BLEND);
-      cache_["black"] = t;
+      insert("black", t);
     }
   }
 
-  SDL_Texture *get(const std::string &key) const {
+  SDL_Texture *get(const std::string &key) {
     auto it = cache_.find(key);
-    return it != cache_.end() ? it->second : nullptr;
+    if (it != cache_.end()) {
+      touch(key);
+      return it->second.texture;
+    }
+    return nullptr;
   }
 
   void setLowMemCallback(std::function<void()> cb) { lowMemCallback_ = cb; }
+  void setMaxCacheSize(int size) {
+    maxCacheSize_ = size;
+    pruneIfNecessary();
+  }
 
 private:
-  void pruneIfNecessary() {
-    const size_t MAX_TEXTURE_CACHE_SIZE = 50;
-    if (cache_.size() >= MAX_TEXTURE_CACHE_SIZE) {
-        LOG_W("TextureManager", "Texture cache size ({}) exceeds limit ({}), pruning.", cache_.size(), MAX_TEXTURE_CACHE_SIZE);
-        pruneCache();
+  struct CacheEntry {
+    SDL_Texture *texture;
+    std::list<std::string>::iterator lruIt;
+  };
+  void touch(const std::string &key) {
+    auto it = cache_.find(key);
+    if (it != cache_.end()) {
+      lru_.erase(it->second.lruIt);
+      lru_.push_front(key);
+      it->second.lruIt = lru_.begin();
     }
   }
-
-  void pruneCache() {
-    // Crude eviction: clear the whole cache. A proper LRU would be better.
-    clearCache();
+  void insert(const std::string &key, SDL_Texture *texture) {
+    auto it = cache_.find(key);
+    if (it != cache_.end()) {
+      destroyTexture(it->second.texture);
+      lru_.erase(it->second.lruIt);
+    }
+    lru_.push_front(key);
+    cache_[key] = {texture, lru_.begin()};
   }
-
+  void pruneIfNecessary() {
+    while (cache_.size() >= (size_t)maxCacheSize_) {
+      std::string oldest = lru_.back();
+      destroyTexture(cache_[oldest].texture);
+      cache_.erase(oldest);
+      lru_.pop_back();
+    }
+  }
   SDL_Texture *createTexture(SDL_Renderer *renderer, SDL_Surface *surface,
                              const std::string &key) {
-    if (!surface)
-      return nullptr;
-    SDL_Texture *texture = SDL_CreateTextureFromSurface(renderer, surface);
-    if (!texture) {
-      LOG_E("TextureManager", "SDL_CreateTextureFromSurface failed for {}: {}",
-            key, SDL_GetError());
-      return nullptr;
-    }
-
-    // Track estimated VRAM (assuming 4 bytes per pixel for typical textures)
-    int64_t bytes = surface->w * surface->h * 4;
-    MemoryMonitor::getInstance().addVram(bytes);
-
-    return texture;
+    SDL_Texture *t = SDL_CreateTextureFromSurface(renderer, surface);
+    if (t)
+      MemoryMonitor::getInstance().addVram((int64_t)surface->w * surface->h *
+                                           4);
+    else
+      LOG_E("TextureManager", "CreateTexture failed for {}", key);
+    return t;
   }
-
-  void destroyTexture(SDL_Texture *texture) {
-    if (!texture)
-      return;
+  void destroyTexture(SDL_Texture *t) {
     int w, h;
-    SDL_QueryTexture(texture, nullptr, nullptr, &w, &h);
-    MemoryMonitor::getInstance().markVramDestroyed(static_cast<int64_t>(w) * h *
-                                                   4);
-    SDL_DestroyTexture(texture);
+    if (SDL_QueryTexture(t, nullptr, nullptr, &w, &h) == 0)
+      MemoryMonitor::getInstance().markVramDestroyed((int64_t)w * h * 4);
+    SDL_DestroyTexture(t);
   }
-
-  std::map<std::string, SDL_Texture *> cache_;
-  int maxW_ = 0;
-  int maxH_ = 0;
+  std::unordered_map<std::string, CacheEntry> cache_;
+  std::list<std::string> lru_;
+  int maxW_ = 0, maxH_ = 0;
+  int maxCacheSize_ = 50;
   std::function<void()> lowMemCallback_;
 };

@@ -19,7 +19,8 @@ void CountdownPanel::update() {
     return;
   }
 
-  struct tm t = {0};
+  struct tm t;
+  std::memset(&t, 0, sizeof(t));
   if (std::sscanf(config_.countdownTime.c_str(), "%d-%d-%d %d:%d", &t.tm_year,
                   &t.tm_mon, &t.tm_mday, &t.tm_hour, &t.tm_min) == 5) {
     t.tm_year -= 1900;
@@ -40,13 +41,17 @@ void CountdownPanel::render(SDL_Renderer *renderer) {
   SDL_SetRenderDrawColor(renderer, 80, 80, 80, 255);
   SDL_RenderDrawRect(renderer, &rect);
 
-  int centerY = y_ + height_ / 2;
-  int centerX = x_ + width_ / 2;
-
+  int titleH = 20;
   std::string label =
-      config_.countdownLabel.empty() ? "Click to set" : config_.countdownLabel;
-  fontMgr_.drawText(renderer, label, centerX, y_ + 14, {0, 200, 255, 255}, 11,
-                    true, true);
+      config_.countdownLabel.empty() ? "Countdown" : config_.countdownLabel;
+  if (config_.countdownLabel.empty() && editing_)
+    label = "Click to set";
+
+  fontMgr_.drawText(renderer, label, x_ + 10, y_ + 5, {0, 200, 255, 255}, 10,
+                    true);
+
+  int centerX = x_ + width_ / 2;
+  int centerY = y_ + titleH + (height_ - titleH) / 2;
 
   if (targetTime_ == std::chrono::system_clock::time_point()) {
     fontMgr_.drawText(renderer, "No target set", centerX, centerY,
@@ -91,7 +96,7 @@ void CountdownPanel::render(SDL_Renderer *renderer) {
   }
 }
 
-bool CountdownPanel::onMouseUp(int mx, int my, Uint16) {
+bool CountdownPanel::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
   if (editing_) {
     int pad = 10;
     int boxH = 24;
@@ -213,8 +218,6 @@ void CountdownPanel::renderEditOverlay(SDL_Renderer *renderer) {
 
   SDL_Color cyan = {0, 255, 255, 255};
   SDL_Color white = {255, 255, 255, 255};
-  SDL_Color gray = {150, 150, 150, 255};
-  SDL_Color activeColor = {0, 200, 0, 255};
 
   int pad = 10;
   int boxH = 24;

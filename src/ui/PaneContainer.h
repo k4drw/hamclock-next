@@ -22,7 +22,8 @@ public:
   void update() override;
   void render(SDL_Renderer *renderer) override;
   void onResize(int x, int y, int w, int h) override;
-  bool onMouseUp(int mx, int my, Uint16 mod) override;
+  void onMouseMove(int mx, int my) override;
+  bool onMouseUp(int mx, int my, Uint16 mod, int clicks) override;
   bool onKeyDown(SDL_Keycode key, Uint16 mod) override;
 
   // Semantic Debug API

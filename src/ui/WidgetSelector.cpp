@@ -28,7 +28,7 @@ void WidgetSelector::show(
   int footerH = 50;
 
   int numRows = (static_cast<int>(available_.size()) + numCols - 1) / numCols;
-  int menuH = numRows * itemH + footerH + 10;
+  int menuH = numRows * itemH + footerH + 25; // Increased padding to prevent overlap
 
   // Max height clamp to prevent overflowing screen
   if (menuH > HamClock::LOGICAL_HEIGHT - 20) {
@@ -44,13 +44,13 @@ void WidgetSelector::show(
     int row = static_cast<int>(i) / numCols;
     int col = static_cast<int>(i) % numCols;
     itemRects_.push_back(
-        {menuRect_.x + col * colW, menuRect_.y + row * itemH + 5, colW, itemH});
+        {menuRect_.x + col * colW, menuRect_.y + row * itemH + 10, colW, itemH});
   }
 
   // Position footer buttons
   int btnW = 100;
   int btnH = 34;
-  int btnY = menuRect_.y + menuRect_.h - btnH - 10;
+  int btnY = menuRect_.y + menuRect_.h - btnH - 12;
   cancelRect_ = {menuRect_.x + menuW / 2 - btnW - 10, btnY, btnW, btnH};
   okRect_ = {menuRect_.x + menuW / 2 + 10, btnY, btnW, btnH};
 }
@@ -100,10 +100,10 @@ void WidgetSelector::render(SDL_Renderer *renderer) {
     }
 
     SDL_Color textColor = themes.text;
-    if (isForbidden) {
-      textColor = {80, 80, 90, 255};
-    } else if (isSelected) {
-      textColor = themes.accent; // Themed accent for selected
+    if (isSelected) {
+      textColor = themes.accent; // Selected always takes priority
+    } else if (isForbidden) {
+      textColor = {80, 80, 90, 255}; // Dim if forbidden and not current
     }
 
     fontMgr_.drawText(renderer, widgetTypeDisplayName(t),
@@ -149,7 +149,7 @@ void WidgetSelector::render(SDL_Renderer *renderer) {
                     okRect_.y + okRect_.h / 2, themes.accent, 14, true, true);
 }
 
-bool WidgetSelector::onMouseUp(int mx, int my, Uint16 /*mod*/) {
+bool WidgetSelector::onMouseUp(int mx, int my, Uint16 /*mod*/, int clicks) {
   if (!visible_)
     return false;
 
@@ -173,10 +173,8 @@ bool WidgetSelector::onMouseUp(int mx, int my, Uint16 /*mod*/) {
         my >= itemRects_[i].y && my < itemRects_[i].y + itemRects_[i].h) {
       WidgetType t = available_[i];
 
-      bool isForbidden = std::find(forbidden_.begin(), forbidden_.end(), t) !=
-                         forbidden_.end();
-      if (isForbidden)
-        return true;
+      // Note: Forbidden check disabled here to allow selecting duplicates
+      // if the user specifically requests them.
 
       bool isSelected = std::find(selection_.begin(), selection_.end(), t) !=
                         selection_.end();
@@ -195,8 +193,11 @@ bool WidgetSelector::onMouseUp(int mx, int my, Uint16 /*mod*/) {
     }
   }
 
-  // Click outside closes the menu (Cancel)
-  hide();
+  // Click outside menuRect_ closes the menu (Cancel)
+  if (mx < menuRect_.x || mx >= menuRect_.x + menuRect_.w || my < menuRect_.y ||
+      my >= menuRect_.y + menuRect_.h) {
+    hide();
+  }
   return true;
 }
 

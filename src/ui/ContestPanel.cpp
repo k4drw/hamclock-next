@@ -50,13 +50,12 @@ void ContestPanel::render(SDL_Renderer *renderer) {
   }
 
   auto now = std::chrono::system_clock::now();
+  int titleH = 20;
   int pad = 6;
-  int curY = y_ + pad;
+  fontMgr_.drawText(renderer, "Contests", x_ + 10, y_ + 5, themes.accent, 10,
+                    true);
 
-  // Header
-  fontMgr_.drawText(renderer, "Contests", x_ + pad, curY, themes.accent,
-                    labelFontSize_, true);
-  curY += labelFontSize_ + 6;
+  int curY = y_ + titleH + pad;
 
   // Separator line
   SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
@@ -273,9 +272,9 @@ void ContestPanel::renderPopup(SDL_Renderer *renderer) {
   }
 
   // Dismiss hint at bottom
-  fontMgr_.drawText(renderer, "Tap to dismiss",
-                    x_ + width_ / 2, y_ + height_ - pad - itemFontSize_,
-                    themes.textDim, std::max(8, itemFontSize_ - 2), false, true);
+  fontMgr_.drawText(renderer, "Tap to dismiss", x_ + width_ / 2,
+                    y_ + height_ - pad - itemFontSize_, themes.textDim,
+                    std::max(8, itemFontSize_ - 2), false, true);
 
   SDL_RenderSetClipRect(renderer, nullptr);
 }
@@ -292,7 +291,7 @@ void ContestPanel::onResize(int x, int y, int w, int h) {
   }
 }
 
-bool ContestPanel::onMouseUp(int mx, int my, Uint16 mod) {
+bool ContestPanel::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
   (void)mod;
 
   // Bounds check

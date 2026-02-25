@@ -1,7 +1,9 @@
 #pragma once
 
 #include <chrono>
+#include <fstream>
 #include <mutex>
+#include <nlohmann/json.hpp>
 #include <vector>
 
 struct AuroraDataPoint {
@@ -12,6 +14,11 @@ struct AuroraDataPoint {
 class AuroraHistoryStore {
 public:
   static constexpr int MAX_POINTS = 48; // 24 hours at 30-min intervals
+
+  void setStoragePath(const std::filesystem::path &path) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    storagePath_ = path;
+  }
 
   void addPoint(float percent) {
     std::lock_guard<std::mutex> lock(mutex_);
@@ -25,6 +32,43 @@ public:
     // Keep only MAX_POINTS
     if (history_.size() > MAX_POINTS) {
       history_.erase(history_.begin());
+    }
+
+    if (!storagePath_.empty()) {
+      save_internal();
+    }
+  }
+
+  void save() {
+    std::lock_guard<std::mutex> lock(mutex_);
+    save_internal();
+  }
+
+  void load() {
+    if (storagePath_.empty())
+      return;
+
+    try {
+      std::ifstream f(storagePath_);
+      if (!f.is_open())
+        return;
+
+      nlohmann::json j;
+      f >> j;
+
+      if (!j.is_array())
+        return;
+
+      std::lock_guard<std::mutex> lock(mutex_);
+      history_.clear();
+      for (const auto &item : j) {
+        AuroraDataPoint p;
+        p.percent = item["percent"].get<float>();
+        p.timestamp = std::chrono::system_clock::from_time_t(
+            item["ts"].get<std::time_t>());
+        history_.push_back(p);
+      }
+    } catch (...) {
     }
   }
 
@@ -46,6 +90,28 @@ public:
   }
 
 private:
+  void save_internal() {
+    if (storagePath_.empty())
+      return;
+
+    try {
+      nlohmann::json j = nlohmann::json::array();
+      for (const auto &p : history_) {
+        nlohmann::json point;
+        point["percent"] = p.percent;
+        point["ts"] = std::chrono::system_clock::to_time_t(p.timestamp);
+        j.push_back(point);
+      }
+
+      std::ofstream f(storagePath_);
+      if (f.is_open()) {
+        f << j.dump();
+      }
+    } catch (...) {
+    }
+  }
+
   mutable std::mutex mutex_;
   std::vector<AuroraDataPoint> history_;
+  std::filesystem::path storagePath_;
 };

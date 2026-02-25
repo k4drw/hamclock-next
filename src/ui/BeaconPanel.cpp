@@ -78,27 +78,21 @@ void BeaconPanel::render(SDL_Renderer *renderer) {
                          themes.border.b, themes.border.a);
   SDL_RenderDrawRect(renderer, &rect);
 
-  bool isNarrow = (width_ < 100);
+  bool isNarrow = (width_ < 100 || height_ < 140);
+  int titleH = 20;
+
+  // Standard Title
+  const char *titleText = isNarrow ? "NCDXF" : "NCDXF Beacons";
+  int titleFontSize = isNarrow ? 9 : 10;
+  fontMgr_.drawText(renderer, titleText, x_ + 10, y_ + 5, themes.accent,
+                    titleFontSize, true);
 
   if (isNarrow) {
-    // Narrow Layout (Fidelity Mode style)
+    // Narrow Layout
     int pad = 4;
-    int centerX = x_ + width_ / 2;
-    int curY = y_ + pad;
+    int curY = y_ + titleH + pad;
 
-    // Title - Use cached texture
-    char titleKey[64];
-    snprintf(titleKey, sizeof(titleKey), "NCDXF_%d_%d_%d_%d_1", themes.text.r,
-             themes.text.g, themes.text.b, labelFontSize_);
-    auto &titleCache = getCachedText(renderer, titleKey, "NCDXF", themes.text,
-                                     labelFontSize_, true);
-    if (titleCache.texture) {
-      SDL_Rect titleDst = {centerX - titleCache.w / 2,
-                           curY + labelFontSize_ / 2 - titleCache.h / 2,
-                           titleCache.w, titleCache.h};
-      SDL_RenderCopy(renderer, titleCache.texture, nullptr, &titleDst);
-    }
-    curY += labelFontSize_ + 4;
+    // (Old layout-specific title was here, now replaced by standard one above)
 
     // Band colors (approx based on screenshot)
     SDL_Color bandColors[] = {
@@ -226,12 +220,12 @@ void BeaconPanel::onResize(int x, int y, int w, int h) {
   labelFontSize_ = cat->ptSize(FontStyle::FastBold);
   callfontSize_ = cat->ptSize(FontStyle::MediumBold);
 
-  if (w < 100) {
+  if (w < 100 || h < 140) {
     labelFontSize_ = cat->ptSize(FontStyle::Micro); // "NCDXF"
     callfontSize_ =
         cat->ptSize(FontStyle::Micro); // Frequencies (12px fits ~24px row)
-  } else if (h < 120) {
-    labelFontSize_ = cat->ptSize(FontStyle::Micro);
+  } else {
+    labelFontSize_ = cat->ptSize(FontStyle::FastBold);
     callfontSize_ = cat->ptSize(FontStyle::Micro);
   }
 }

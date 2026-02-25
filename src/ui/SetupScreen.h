@@ -19,7 +19,7 @@ public:
   void update() override;
   void render(SDL_Renderer *renderer) override;
   void onResize(int x, int y, int w, int h) override;
-  bool onMouseUp(int mx, int my, Uint16 mod) override;
+  bool onMouseUp(int mx, int my, Uint16 mod, int clicks) override;
   bool onKeyDown(SDL_Keycode key, Uint16 mod) override;
   bool onTextInput(const char *text) override;
   std::string getName() const override { return "SetupScreen"; }
@@ -30,10 +30,23 @@ public:
   bool wasCancelled() const { return cancelled_; }
   AppConfig getConfig() const;
 
+  enum class Tab {
+    Identity,
+    Spotting,
+    Appearance,
+    Rig,
+    Services,
+    Network,
+    Widgets,
+    Update
+  };
+  void setStartTab(Tab tab) { activeTab_ = tab; }
+
 private:
   void recalcLayout();
   void autoPopulateLatLon();
   std::string *getActiveFieldText();
+  bool deleteSelection(std::string *text);
   int calculateCursorPosFromClick(int clickX, int fieldStartX,
                                   const std::string &text, int fontSize);
   void renderTabIdentity(SDL_Renderer *renderer, int cx, int pad, int fieldW,
@@ -48,13 +61,16 @@ private:
                          int fieldH, int fieldX, int textPad);
   void renderTabRig(SDL_Renderer *renderer, int cx, int pad, int fieldW,
                     int fieldH, int fieldX, int textPad);
+  void renderTabNetwork(SDL_Renderer *renderer, int cx, int pad, int fieldW,
+                        int fieldH, int fieldX, int textPad);
+  void renderTabUpdate(SDL_Renderer *renderer, int cx, int pad, int fieldW,
+                       int fieldH, int fieldX, int textPad);
 
   FontManager &fontMgr_;
   BrightnessManager &brightnessMgr_;
 
   // Appearance tab absorbs the old Display tab (brightness/schedule now live
   // there)
-  enum class Tab { Identity, Spotting, Appearance, Rig, Services, Widgets };
   Tab activeTab_ = Tab::Identity;
   bool gpsEnabled_ = false;
   std::string callsignText_;
@@ -87,7 +103,6 @@ private:
   std::string qrzPassword_;
   std::string countdownLabel_;
   std::string countdownTime_; // YYYY-MM-DD HH:MM
-  std::string webPasswordText_;
   std::string dimTime_;
   std::string brightTime_;
   std::string rigHost_;
@@ -98,6 +113,7 @@ private:
   int activePane_ = 0;
   int activeField_ = 0;
   int cursorPos_ = 0;
+  int selectionAnchor_ = 0;
   bool complete_ = false;
   bool cancelled_ = false;
   bool latLonManual_ = false;
@@ -130,6 +146,14 @@ private:
     SDL_Rect rect;
   };
   std::vector<WidgetClickRect> widgetRects_;
+
+  // Network / Hub tab
+  HubMode     hubMode_     = HubMode::Off;
+  std::string hubIp_;
+  std::string hubPortStr_  = "8080";
+  SDL_Rect    hubModeRect_ = {0, 0, 0, 0};
+  SDL_Rect    hubIpRect_   = {0, 0, 0, 0};
+  SDL_Rect    hubPortRect_ = {0, 0, 0, 0};
 
   // Track dimensions to detect size changes
   int lastRenderWidth_ = 0;

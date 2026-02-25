@@ -91,8 +91,8 @@ void DXSatPane::render(SDL_Renderer *renderer) {
     // Rotator "Trk" button (top-right corner)
     trackButtonRect_ = {x_ + width_ - headerH, y_, headerH, headerH};
     bool isTracking = (satMgr_.getTrackedSatellite() == selectedSatName_);
-    SDL_Color rotColor = isTracking ? SDL_Color{0, 210, 0, 255}
-                                    : SDL_Color{80, 80, 80, 255};
+    SDL_Color rotColor =
+        isTracking ? SDL_Color{0, 210, 0, 255} : SDL_Color{80, 80, 80, 255};
     SDL_SetRenderDrawColor(renderer, rotColor.r / 5, rotColor.g / 5,
                            rotColor.b / 5, 255);
     SDL_RenderFillRect(renderer, &trackButtonRect_);
@@ -129,7 +129,7 @@ void DXSatPane::onResize(int x, int y, int w, int h) {
     destroyMenuTextures();
 }
 
-bool DXSatPane::onMouseUp(int mx, int my, Uint16 mod) {
+bool DXSatPane::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
   // Modal: when menu is open, consume all clicks
   if (menuState_ != MenuState::Closed) {
     if (mx >= x_ && mx < x_ + width_ && my >= y_ && my < y_ + height_) {
@@ -178,8 +178,8 @@ bool DXSatPane::onMouseUp(int mx, int my, Uint16 mod) {
 
   // Forward to active panel
   if (mode_ == Mode::DX)
-    return dxPanel_.onMouseUp(mx, my, mod);
-  return satPanel_.onMouseUp(mx, my, mod);
+    return dxPanel_.onMouseUp(mx, my, mod, clicks);
+  return satPanel_.onMouseUp(mx, my, mod, clicks);
 }
 
 bool DXSatPane::onKeyDown(SDL_Keycode key, Uint16 mod) {

@@ -52,24 +52,25 @@ void ListPanel::render(SDL_Renderer *renderer) {
   bool titleFontChanged = (titleFontSize_ != lastTitleFontSize_);
   bool rowFontChanged = (rowFontSize_ != lastRowFontSize_);
 
-  // Title (centered, cyan)
+  // Title (standardized position and style)
   if (titleFontChanged || !titleTex_) {
     if (titleTex_) {
       MemoryMonitor::getInstance().destroyTexture(titleTex_);
     }
     SDL_Color cyan = themes.accent;
-    titleTex_ = fontMgr_.renderText(renderer, title_, cyan, titleFontSize_,
-                                    &titleW_, &titleH_);
-    lastTitleFontSize_ = titleFontSize_;
+    titleTex_ = fontMgr_.renderText(renderer, title_, cyan, 10, &titleW_,
+                                    &titleH_, true);
+    lastTitleFontSize_ = 10;
   }
 
-  int curY = y_ + pad;
   if (titleTex_) {
-    int tx = x_ + (width_ - titleW_) / 2;
-    SDL_Rect dst = {tx, curY, titleW_, titleH_};
+    SDL_Rect dst = {x_ + 10, y_ + 5, titleW_, titleH_};
     SDL_RenderCopy(renderer, titleTex_, nullptr, &dst);
-    curY += titleH_ + pad;
   }
+
+  // Start rows below title area
+  int titleAreaH = 20;
+  int curY = y_ + titleAreaH;
 
   // Rebuild row cache on font change or row count change
   if (rowCache_.size() != rows_.size() || rowFontChanged) {
@@ -109,12 +110,13 @@ void ListPanel::render(SDL_Renderer *renderer) {
     RenderUtils::drawRect(renderer, x_ + 1, rowY, width_ - 2, rowH,
                           stripeColor);
 
-    // Render row text (cached). Subclasses can override row color via getRowColor.
+    // Render row text (cached). Subclasses can override row color via
+    // getRowColor.
     SDL_Color thisRowColor = getRowColor(static_cast<int>(i), rowColor);
     auto &rc = rowCache_[i];
-    bool colorChanged = (rc.color.r != thisRowColor.r ||
-                         rc.color.g != thisRowColor.g ||
-                         rc.color.b != thisRowColor.b);
+    bool colorChanged =
+        (rc.color.r != thisRowColor.r || rc.color.g != thisRowColor.g ||
+         rc.color.b != thisRowColor.b);
     if (rows_[i] != rc.text || colorChanged) {
       if (rc.tex) {
         MemoryMonitor::getInstance().destroyTexture(rc.tex);

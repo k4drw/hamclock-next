@@ -6,7 +6,6 @@
 #ifdef _WIN32
 #include <winsock2.h>
 #include <ws2tcpip.h>
-#define close closesocket
 #else
 #include <arpa/inet.h>
 #include <fcntl.h>
@@ -82,7 +81,11 @@ void RBNProvider::runTelnet(const std::string &host, int port,
     LOG_E("RBN", "Could not resolve {}", host);
     if (state_)
       state_->services["RBN"].lastError = "DNS failed";
-    close(sock);
+#ifdef _WIN32
+    closesocket(sock);
+#else
+    ::close(sock);
+#endif
     return;
   }
 
@@ -99,7 +102,11 @@ void RBNProvider::runTelnet(const std::string &host, int port,
 #endif
     if (state_)
       state_->services["RBN"].lastError = "Connect failed";
-    close(sock);
+#ifdef _WIN32
+    closesocket(sock);
+#else
+    ::close(sock);
+#endif
     return;
   }
 
@@ -204,7 +211,11 @@ void RBNProvider::runTelnet(const std::string &host, int port,
     }
   }
 
-  close(sock);
+#ifdef _WIN32
+  closesocket(sock);
+#else
+  ::close(sock);
+#endif
 }
 
 void RBNProvider::processLine(const std::string &line) {

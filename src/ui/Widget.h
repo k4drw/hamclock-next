@@ -26,10 +26,11 @@ public:
   }
 
   // Called on mouse click. Returns true if the widget handled the event.
-  virtual bool onMouseUp(int mx, int my, Uint16 mod) {
+  virtual bool onMouseUp(int mx, int my, Uint16 mod, int clicks) {
     (void)mx;
     (void)my;
     (void)mod;
+    (void)clicks;
     return false;
   }
 
@@ -81,4 +82,17 @@ protected:
   int height_;
   std::string theme_ = "default";
   bool useMetric_ = true;
+
+  // Tooltip shared state
+  struct Tooltip {
+    bool visible = false;
+    std::string text;
+    int x = 0;
+    int y = 0;
+    uint32_t timestamp = 0;
+    SDL_Texture *cachedTexture = nullptr;
+    std::string cachedText;
+    int cachedW = 0;
+    int cachedH = 0;
+  } tooltip_;
 };

@@ -95,9 +95,12 @@ void SpaceWeatherPanel::update() {
   items_[3].value = buf;
   items_[3].valueColor = colorForK(data.k_index);
 
+  // Solar wind speed: km/s (metric) or mph (imperial)
+  // 1 km/s = 2236.94 mph;  previous code used 0.621371 (km→mi) which was wrong
   float windSpd =
-      useMetric_ ? data.solar_wind_speed : (data.solar_wind_speed * 0.621371f);
-  std::snprintf(buf, sizeof(buf), "%.0f", windSpd);
+      useMetric_ ? data.solar_wind_speed : (data.solar_wind_speed * 2236.94f);
+  std::snprintf(buf, sizeof(buf), "%.0f %s", windSpd,
+                useMetric_ ? "km/s" : "mph");
   items_[4].value = buf;
   items_[4].valueColor = {255, 128, 0, 255};
 
@@ -143,6 +146,25 @@ void SpaceWeatherPanel::update() {
   std::snprintf(buf, sizeof(buf), "G%d", data.noaa_g_scale);
   items_[14].value = buf;
   items_[14].valueColor = colorForNOAAScale(data.noaa_g_scale, themes);
+
+  // Alert badge: activate when any scale >= 3 (Strong or above).
+  alertBadge_.active = false;
+  if (data.noaa_g_scale >= 3) {
+    alertBadge_.active = true;
+    std::snprintf(buf, sizeof(buf), "G%d!", data.noaa_g_scale);
+    alertBadge_.text = buf;
+    alertBadge_.color = colorForNOAAScale(data.noaa_g_scale, themes);
+  } else if (data.noaa_r_scale >= 3) {
+    alertBadge_.active = true;
+    std::snprintf(buf, sizeof(buf), "R%d!", data.noaa_r_scale);
+    alertBadge_.text = buf;
+    alertBadge_.color = colorForNOAAScale(data.noaa_r_scale, themes);
+  } else if (data.noaa_s_scale >= 3) {
+    alertBadge_.active = true;
+    std::snprintf(buf, sizeof(buf), "S%d!", data.noaa_s_scale);
+    alertBadge_.text = buf;
+    alertBadge_.color = colorForNOAAScale(data.noaa_s_scale, themes);
+  }
 }
 
 void SpaceWeatherPanel::render(SDL_Renderer *renderer) {
@@ -172,9 +194,17 @@ void SpaceWeatherPanel::render(SDL_Renderer *renderer) {
                          themes.border.b, themes.border.a);
   SDL_RenderDrawRect(renderer, &rect);
 
+  int titleH = 20;
+  bool isSmall = (width_ < 150);
+  const char *titleText = isSmall ? "Space WX" : "Space Weather";
+  int titleFontSize = isSmall ? 9 : 10;
+  fontMgr_.drawText(renderer, titleText, x_ + 10, y_ + 5, themes.accent,
+                    titleFontSize, true);
+
   if (!dataValid_) {
-    fontMgr_.drawText(renderer, "Awaiting data...", x_ + 8,
-                      y_ + height_ / 2 - 8, themes.textDim, labelFontSize_);
+    fontMgr_.drawText(renderer, "Awaiting data...", x_ + 10,
+                      y_ + titleH + (height_ - titleH) / 2 - 8, themes.textDim,
+                      labelFontSize_);
     return;
   }
 
@@ -187,7 +217,8 @@ void SpaceWeatherPanel::render(SDL_Renderer *renderer) {
   int numRows = isNarrow ? 4 : 2;
 
   int cellW = width_ / numCols;
-  int cellH = (height_ - 10) / numRows; // Leave space for pagination bar
+  int cellH = (height_ - titleH - 10) /
+              numRows; // Leave space for title and pagination bar
   int pad = std::max(1, static_cast<int>(cellH * 0.05f));
 
   SDL_Color labelColor = themes.textDim;
@@ -203,7 +234,7 @@ void SpaceWeatherPanel::render(SDL_Renderer *renderer) {
     int col = i % numCols;
     int row = i / numCols;
     int cellX = x_ + col * cellW;
-    int cellY = y_ + row * cellH;
+    int cellY = y_ + titleH + row * cellH;
 
     // Label (cached until font size changes)
     if (labelFontChanged || !items_[itemIdx].labelTex) {
@@ -224,10 +255,14 @@ void SpaceWeatherPanel::render(SDL_Renderer *renderer) {
       if (items_[itemIdx].valueTex) {
         MemoryMonitor::getInstance().destroyTexture(items_[itemIdx].valueTex);
       }
+      int vSize = valueFontSize_;
+      // Special case: Wind text in Pane 4 (isSmall) might overflow
+      if (isSmall && itemIdx == 4) {
+        vSize = std::max(8, vSize - 2);
+      }
       items_[itemIdx].valueTex = fontMgr_.renderText(
-          renderer, items_[itemIdx].value, items_[itemIdx].valueColor,
-          valueFontSize_, &items_[itemIdx].valueW, &items_[itemIdx].valueH,
-          true); // SmallBold uses bold=true
+          renderer, items_[itemIdx].value, items_[itemIdx].valueColor, vSize,
+          &items_[itemIdx].valueW, &items_[itemIdx].valueH, true);
       items_[itemIdx].lastValue = items_[itemIdx].value;
       items_[itemIdx].lastValueColor = items_[itemIdx].valueColor;
     }
@@ -271,6 +306,16 @@ void SpaceWeatherPanel::render(SDL_Renderer *renderer) {
     SDL_RenderFillRect(renderer, &seg);
   }
 
+  // Alert badge (top-right corner): flash at 1 Hz when active.
+  if (alertBadge_.active) {
+    uint32_t ticks = SDL_GetTicks();
+    bool visible = (ticks / 500) % 2 == 0; // Blink every 500 ms
+    if (visible) {
+      fontMgr_.drawText(renderer, alertBadge_.text, x_ + width_ - 4, y_ + 3,
+                        alertBadge_.color, labelFontSize_, true, true);
+    }
+  }
+
   lastLabelFontSize_ = labelFontSize_;
   lastValueFontSize_ = valueFontSize_;
 }
@@ -283,7 +328,7 @@ void SpaceWeatherPanel::onResize(int x, int y, int w, int h) {
   destroyCache();
 }
 
-bool SpaceWeatherPanel::onMouseUp(int mx, int my, Uint16 mod) {
+bool SpaceWeatherPanel::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
   (void)mx;
   (void)mod;
   // Don't consume clicks in the top 10% — let PaneContainer handle them

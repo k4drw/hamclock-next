@@ -22,7 +22,7 @@
 
 namespace {
 
-static constexpr const char *kVersion = "V" HAMCLOCK_VERSION;
+static constexpr const char *kVersion = "v" HAMCLOCK_VERSION;
 static constexpr Uint32 kInfoRotateMs = 3000;
 
 std::string getSystemUptime() {
@@ -51,7 +51,7 @@ std::string getSystemUptime() {
 #endif
 }
 
-std::string getCpuTemp() {
+std::string getCpuTemp(bool metric) {
 #ifdef _WIN32
   return "CPU --";
 #else
@@ -63,7 +63,12 @@ std::string getCpuTemp() {
     milliC = 0;
   std::fclose(f);
   char buf[32];
-  std::snprintf(buf, sizeof(buf), "CPU %.0fC", milliC / 1000.0);
+  if (metric) {
+    std::snprintf(buf, sizeof(buf), "CPU %.0fC", milliC / 1000.0);
+  } else {
+    double tempF = milliC / 1000.0 * 9.0 / 5.0 + 32.0;
+    std::snprintf(buf, sizeof(buf), "CPU %.0fF", tempF);
+  }
   return buf;
 #endif
 }
@@ -151,13 +156,13 @@ void TimePanel::update() {
   if (ticks - lastInfoRotateMs_ >= kInfoRotateMs) {
     infoRotateIdx_ = (infoRotateIdx_ + 1) % 3;
     lastInfoRotateMs_ = ticks;
-    infoTexts_[0] = getCpuTemp();
+    infoTexts_[0] = getCpuTemp(useMetric_);
     infoTexts_[1] = getDiskUsage();
     infoTexts_[2] = getLocalIP();
   }
   // Seed on first call
   if (infoTexts_[0].empty()) {
-    infoTexts_[0] = getCpuTemp();
+    infoTexts_[0] = getCpuTemp(useMetric_);
     infoTexts_[1] = getDiskUsage();
     infoTexts_[2] = getLocalIP();
   }
@@ -238,10 +243,17 @@ void TimePanel::render(SDL_Renderer *renderer) {
       fontMgr_.drawText(renderer, centerText, x_ + (width_ - tw) * 0.58f, infoY,
                         gray, infoFontSize_);
 
-      // Right: version
-      TTF_SizeUTF8(infoFont, kVersion, &tw, &th);
-      fontMgr_.drawText(renderer, kVersion, x_ + width_ - pad - tw, infoY, gray,
-                        infoFontSize_);
+      // Right: version (amber + asterisk when update available)
+      std::string verStr = HAMCLOCK_VERSION;
+      SDL_Color verColor = gray;
+      if (updateAvailable_) {
+        verStr += "*";
+        verColor = {255, 200, 0, 255}; // amber
+      }
+      TTF_SizeUTF8(infoFont, verStr.c_str(), &tw, &th);
+      int vx = x_ + width_ - pad - tw;
+      fontMgr_.drawText(renderer, verStr, vx, infoY, verColor, infoFontSize_);
+      versionRect_ = {vx, infoY, tw, th};
     }
   }
 
@@ -343,7 +355,7 @@ void TimePanel::stopEditing(bool apply) {
   SDL_StopTextInput();
 }
 
-bool TimePanel::onMouseUp(int mx, int my, Uint16 /*mod*/) {
+bool TimePanel::onMouseUp(int mx, int my, Uint16 /*mod*/, int clicks) {
   // Gear icon click → request setup
   SDL_Rect hit = gearRect_;
   int margin = 5;
@@ -390,10 +402,18 @@ bool TimePanel::onMouseUp(int mx, int my, Uint16 /*mod*/) {
     return true;
   }
 
-  // Not editing: check if click is near the callsign text.
+  // Version click -> update request
+  if (mx >= versionRect_.x && mx <= versionRect_.x + versionRect_.w &&
+      my >= versionRect_.y && my <= versionRect_.y + versionRect_.h) {
+    updateRequested_ = true;
+    return true;
+  }
+
+  // Callsign area -> edit
+  // ing: check if click is near the callsign text.
   // Clamp hit area to TimePanel bounds so a wide callsign + generous pad
   // cannot bleed into the adjacent pane to the right.
-  int callRowH = height_ * 42 / 148;
+  int callRowH = height_ * 50 / 148;
   if (my >= y_ && my < y_ + callRowH && callW_ > 0) {
     int textX = x_ + (width_ - callW_) / 2;
     int pad = std::max(8, callW_ / 4);
@@ -568,7 +588,7 @@ SDL_Rect TimePanel::getActionRect(const std::string &action) const {
     return gearRect_;
   }
   if (action == "edit_callsign") {
-    int callRowH = height_ * 42 / 148;
+    int callRowH = height_ * 50 / 148;
     return {x_, y_, width_, callRowH};
   }
 

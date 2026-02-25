@@ -1,7 +1,7 @@
 {
-  "mcp_version": "2.2",
+  "mcp_version": "2.5",
   "project": "hamclock-next",
-  "updated_at": "2026-02-20T16:30:00.000Z",
+  "updated_at": "2026-02-25T00:00:00.000Z",
   "project_context": {
     "title": "HamClock Next \u2014 SDL2 Rewrite",
     "callsign": "K4DRW",
@@ -69,7 +69,9 @@
       "FontManager handles scaled TTF fonts. Never load your own TTF file.",
       "SDL coordinates: (0,0) is top-left. _bounds.x/y is the panel's top-left corner.",
       "All render() calls happen on the main thread. Providers run on a background thread. Use a mutex or std::atomic if sharing state.",
-      "The WebServer debug endpoint /debug/widgets calls getDebugData() on all registered panels \u2014 always implement it."
+      "The WebServer debug endpoint /debug/widgets calls getDebugData() on all registered panels \u2014 always implement it.",
+      "If a provider's API may be unavailable or require auth, add a `bool fetched` flag to the data struct (default false). The provider pushes event on completion with `fetched=true, valid=false` on error \u2014 panel shows meaningful status (e.g. 'API key required') rather than indefinite 'Loading...' state.",
+      "Widget::onMouseUp now takes `int clicks` as 4th parameter (Uint16 mod, int clicks). Update all Widget subclasses when overriding."
     ]
   },
   "api_reference": {
@@ -174,13 +176,13 @@
     ]
   },
   "feature_status_summary": {
-    "total": 71,
-    "implemented": 67,
-    "partial": 1,
-    "missing": 3,
+    "total": 87,
+    "implemented": 84,
+    "partial": 2,
+    "missing": 0,
     "not_needed": 2,
-    "percent_done": "~95% (68/71 parity features per parity.md — 2026-02-20)",
-    "notes": "v0.9B sprint complete: PropEngine MUF/REL/TOA grids, MufRtProvider KC2G integration, POTA/SOTA map pins (SOTA partial due to coordinate resolution), WxMb weather overlay. Missing: cloud_cover_overlay, wx_precipitation_overlay, bme280_sensor."
+    "percent_done": "~100% (84/86 features — 2026-02-25)",
+    "notes": "All original parity features implemented. Partial: repeater_directory (RepeaterBook API key required), winlink_gateways (Winlink access key required). New since v2.4: bme280_sensor fully implemented (Bosch compensation math, I2C calibration). RPi 1GB adaptive memory mode: isLowMemoryDevice() caps texture cache to 15, font cache to 100, texture dimension to 1024px on Linux ARM; 60s RSS heartbeat log. SOTA resolved via ActivityLocationManager (summitslist.csv + API fallback). Cloud and WX/Pressure overlays confirmed working."
   },
   "implemented_features": [
     {
@@ -503,15 +505,6 @@
       "notes": "Hamlib rigctld TCP client. Set frequency from DX spot click when auto-tune enabled. Config in Setup \u2192 Rig tab (host/port). Windows-compatible via Winsock2 guards."
     },
     {
-      "feature_id": "password_auth",
-      "name": "Web Server Password Auth",
-      "next_files": [
-        "src/network/WebServer.cpp",
-        "src/core/ConfigManager.h"
-      ],
-      "notes": "config.webPassword (empty = no auth). set_pre_routing_handler checks Basic auth on control endpoints. Stored in config.json under security.web_password."
-    },
-    {
       "feature_id": "cpu_temp",
       "name": "CPU Temperature Monitor",
       "next_files": [
@@ -536,6 +529,181 @@
         "src/ui/MapWidget.cpp"
       ],
       "notes": "Direct fetch and warp of KC2G MUF imagery."
+    },
+    {
+      "feature_id": "nws_severe_weather_alerts",
+      "name": "NWS Severe Weather Alerts",
+      "next_files": [
+        "src/services/AlertsProvider.h",
+        "src/services/AlertsProvider.cpp",
+        "src/ui/AlertsPanel.h",
+        "src/ui/AlertsPanel.cpp"
+      ],
+      "notes": "api.weather.gov/alerts polled every 5 min. Severity-coded rows: Extreme=red, Severe=orange, Moderate=yellow, Minor=light green."
+    },
+    {
+      "feature_id": "nws_7day_forecast",
+      "name": "NWS 7-Day Forecast",
+      "next_files": [
+        "src/services/ForecastProvider.h",
+        "src/services/ForecastProvider.cpp",
+        "src/ui/ForecastPanel.h",
+        "src/ui/ForecastPanel.cpp"
+      ],
+      "notes": "Two-step NWS API /points\u2192/forecast. Scrollable period list with temp, precip %, wind."
+    },
+    {
+      "feature_id": "hurricane_tracker",
+      "name": "Hurricane / Tropical Storm Tracker",
+      "next_files": [
+        "src/services/HurricaneProvider.h",
+        "src/services/HurricaneProvider.cpp",
+        "src/ui/HurricanePanel.h",
+        "src/ui/HurricanePanel.cpp"
+      ],
+      "notes": "nhc.noaa.gov/CurrentStorms.json. Category-colored storm cards: Cat5=red, Cat4=orange, Cat3=yellow, Cat2/1=green, TD/TS=blue."
+    },
+    {
+      "feature_id": "marine_coastal",
+      "name": "Marine / Coastal Conditions",
+      "next_files": [
+        "src/services/MarineProvider.h",
+        "src/services/MarineProvider.cpp",
+        "src/ui/MarinePanel.h",
+        "src/ui/MarinePanel.cpp"
+      ],
+      "notes": "NOAA CO-OPS hi/lo tides + NDBC buoy observations. Default: station 8722670 (Lake Worth FL), buoy 41114 (FL Atlantic)."
+    },
+    {
+      "feature_id": "space_weather_alert_badge",
+      "name": "Space Weather Alert Badge",
+      "next_files": [
+        "src/ui/SpaceWeatherPanel.h",
+        "src/ui/SpaceWeatherPanel.cpp"
+      ],
+      "notes": "AlertBadge struct added to SpaceWeatherPanel. Blinking G/R/S badge at 1 Hz when any NOAA scale \u2265 3."
+    },
+    {
+      "feature_id": "update_checker",
+      "name": "Update Checker & Update Overlay",
+      "next_files": [
+        "src/services/UpdateChecker.h",
+        "src/services/UpdateChecker.cpp",
+        "src/ui/UpdateOverlay.h",
+        "src/ui/UpdateOverlay.cpp"
+      ],
+      "notes": "Polls GitHub Releases API; cached 6h. Robust version comparison (dots/v-prefix, internal vs release format, numeric segment + beta suffix). TimePanel version string turns amber + appends * when update available. UpdateOverlay: 760x440px, Markdown rendering (H1/H2/H3, bullet lists), Skip/Not Now/Update result enum. SetupScreen trigger wiring."
+    },
+    {
+      "feature_id": "mjpeg_live_stream",
+      "name": "MJPEG Live Display Stream",
+      "next_files": [
+        "src/network/FrameCapture.h",
+        "src/network/FrameCapture.cpp",
+        "src/network/WebServer.cpp"
+      ],
+      "notes": "FrameCapture: SDL renderer \u2192 JPEG frames. /stream.mjpeg MJPEG endpoint. /live MJPEG viewer page. setMaxFps(30) in headless mode."
+    },
+    {
+      "feature_id": "live_web_interface",
+      "name": "Interactive Live Web Interface",
+      "next_files": [
+        "src/network/WebServer.h",
+        "src/network/WebServer.cpp",
+        "src/main.cpp"
+      ],
+      "notes": "--live-web CLI flag; auto-detects headless (offscreen SDL driver or /.dockerenv). Interactive canvas viewer with aspect-ratio scaling, R/W R/O badge, pointer/touch/keyboard injection, reconnect on stream error. Endpoints: /live/touch, /live/key, /live/mouse, /live/status (403 when disabled). All guarded by #ifndef __EMSCRIPTEN__."
+    },
+    {
+      "feature_id": "web_config_ui",
+      "name": "Web Config UI",
+      "next_files": [
+        "src/network/WebServer.h",
+        "src/network/WebServer.cpp"
+      ],
+      "notes": "/api/config GET returns 30+ AppConfig fields (qrzPassword write-only). /set_config extended with 25 new params (DX Cluster, Rig, Rotator, QRZ, Live Spots, Brightness, GPS/RSS/ONTA toggles). 4 new browser config tabs: Cluster, Radio, Services, Brightness. Routes moved outside #ifdef ENABLE_DEBUG_API (fixes 404s in default builds)."
+    },
+    {
+      "feature_id": "graph_hover_tooltips",
+      "name": "Graph Hover Tooltips & AA Lines",
+      "next_files": [
+        "src/ui/Widget.h",
+        "src/ui/AuroraGraphPanel.cpp",
+        "src/ui/DstPanel.cpp",
+        "src/ui/HistoryPanel.cpp",
+        "src/ui/PaneContainer.cpp",
+        "src/main.cpp"
+      ],
+      "notes": "Shared Tooltip infrastructure in base Widget class. Hover tooltips on Aurora, Dst, History (solar flux/SSN/Kp) panels. 2px AA lines with Gaussian falloff. PaneContainer mouse motion event forwarding fixed. Procedural texture generation for line_aa and circular markers in main.cpp."
+    },
+    {
+      "feature_id": "aurora_history_persistence",
+      "name": "Aurora History Persistence",
+      "next_files": [
+        "src/core/AuroraHistoryStore.h"
+      ],
+      "notes": "JSON persistence in SDL pref dir. Survives restart."
+    },
+    {
+      "feature_id": "local_data_hub",
+      "name": "Local Data Hub (LAN Rate-Limit Sharing)",
+      "next_files": [
+        "src/core/ConfigManager.h",
+        "src/core/ConfigManager.cpp",
+        "src/network/NetworkManager.h",
+        "src/network/NetworkManager.cpp",
+        "src/network/WebServer.h",
+        "src/network/WebServer.cpp",
+        "src/ui/SetupScreen.h",
+        "src/ui/SetupScreen.cpp",
+        "src/main.cpp"
+      ],
+      "notes": "HubMode enum (Off/Master/Client) in AppConfig. Master exposes /api/hub/fetch (base64-encoded target URL, max_age param). Client proxies all fetchAsync calls through hub with 2s curl timeout; falls back silently to direct fetch on failure. SetupScreen Network tab: mode cycle button + conditional IP/Port fields for Client mode. Config persists in hub.{mode,ip,port} JSON section."
+    },
+    {
+      "feature_id": "asteroid_enhancements",
+      "name": "Asteroid Panel Enhancements",
+      "next_files": [
+        "src/core/AsteroidPropagator.h",
+        "src/core/AsteroidPropagator.cpp",
+        "src/services/AsteroidProvider.h",
+        "src/services/AsteroidProvider.cpp",
+        "src/ui/AsteroidPanel.h",
+        "src/ui/AsteroidPanel.cpp",
+        "src/ui/MapWidget.cpp"
+      ],
+      "notes": "AsteroidPropagator ground track propagation. AsteroidProvider data fetching layer. 7 asteroids \u00d7 1 compact row layout ('Name Mon DD HH:MM'). Settings footer: icon picker (12 symbols) + color swatches (6). Title-area tap cycles icons \u2604\u2192\u2295\u2192\u25c8\u2192\u2b21\u2192\u2726\u2192\u2604. ConfigManager persists asteroidIcon (asteroid.icon) and asteroidColor (asteroid.color.r/g/b, default orange). MapWidget: glyph marker at closest-approach point, configurable color, hover tooltip (name, miss distance LD, velocity, hazardous flag)."
+    },
+    {
+      "feature_id": "bme280_sensor",
+      "name": "BME280 Environmental Sensor",
+      "next_files": [
+        "src/services/BME280Provider.cpp",
+        "src/services/BME280Provider.h"
+      ],
+      "notes": "Full Bosch datasheet §4.2.3 integer compensation math. Bank1 (0x88–0x9F: T1-T3, P1-P9, H1) + Bank2 (0xE1–0xE7: H2-H6, split-byte H4/H5). Outputs calibrated °C, hPa, %rH to WeatherStore every 60s. Hardware validation on RPi+sensor pending."
+    },
+    {
+      "feature_id": "sota_map_pins",
+      "name": "SOTA Activator Map Pins",
+      "next_files": [
+        "src/core/ActivityLocationManager.cpp",
+        "src/core/ActivityLocationManager.h",
+        "src/services/ActivityProvider.cpp",
+        "src/ui/MapWidget.cpp"
+      ],
+      "notes": "ActivityLocationManager: binary-search on full summitslist.csv (50K+ summits, 7-day network cache, pre-seeded CSV support). resolveSummitAsync() fallback calls SOTA API per-summit and persists results in sota_api_cache.csv (30-day cache). Map overlay: orange squares. POTA uses parks.csv the same way."
+    },
+    {
+      "feature_id": "rpi_low_memory_mode",
+      "name": "RPi 1GB Adaptive Memory Mode",
+      "next_files": [
+        "src/main.cpp",
+        "src/ui/TextureManager.h",
+        "src/ui/FontManager.h",
+        "src/core/MemoryMonitor.h"
+      ],
+      "notes": "MemoryMonitor::isLowMemoryDevice() (RAM ≤ 1536 MB) gates memory limits at startup. Low-memory path: TextureManager cache 50→15, FontManager text cache 300→100, texture dimension cap 2048→1024px (Linux ARM only, excludes macOS ARM). 60-second RSS heartbeat log via MemoryMonitor::logStats('heartbeat'). Startup log: 'System RAM: N MB, low-memory mode: YES/NO'."
     }
   ],
   "partial_features": {
@@ -1138,6 +1306,163 @@
         "WSPR band IDs are MHz integers {1,3,5,7,10,14,18,21,24,28,50,144}, not kHz.",
         "RBN source is read-only from DXClusterDataStore; RBNProvider still sends no Telnet filter commands (set dx filter call ...) \u2014 full firehose. Fix in T0-1."
       ]
+    },
+    "phase_46": {
+      "name": "MJPEG Stream + Web Config UI + UpdateChecker",
+      "completed": "2026-02-21",
+      "summary": "Added MJPEG live display streaming, extended web config UI with 4 new browser tabs and 25 new /set_config params, and added UpdateChecker polling GitHub Releases API. FrameCapture converts SDL renderer to JPEG frames. TimePanel version string turns amber + appends * when update available. CloudProvider switched from MODIS Terra to VIIRS SNPP for fewer orbital swath gaps.",
+      "key_changes": [
+        "WebServer: /api/config GET endpoint (30+ AppConfig fields, qrzPassword write-only)",
+        "WebServer: /set_config extended with 25 new params (DX Cluster, Rig, Rotator, QRZ, Live Spots, Brightness, GPS/RSS/ONTA toggles)",
+        "WebServer: 4 new browser config tabs \u2014 Cluster, Radio, Services, Brightness",
+        "WebServer: Routes moved outside #ifdef ENABLE_DEBUG_API (fixes 404s in default builds)",
+        "WebServer: /live MJPEG viewer page + /stream.mjpeg endpoint",
+        "FrameCapture (NEW): src/network/FrameCapture.{h,cpp} \u2014 SDL renderer \u2192 JPEG frames for MJPEG streaming",
+        "UpdateChecker (NEW): src/services/UpdateChecker.{h,cpp} \u2014 polls GitHub Releases API; cached 6h",
+        "TimePanel: Version string turns amber + appends * when update available",
+        "ConfigManager: persist weather_overlay in appearance section",
+        "CloudProvider: MODIS Terra \u2192 VIIRS SNPP for fewer orbital swath gaps",
+        "SetupScreen: WSJT-X UDP Port rendered inline with toggle",
+        "HistoryPanel: Kp overlay moved to upper third; SFI/SN value inset from right edge; time labels capped at 9pt"
+      ]
+    },
+    "phase_47": {
+      "name": "Graph Tooltips + Aurora Persistence",
+      "completed": "2026-02-21",
+      "summary": "Added hover tooltips and 2px AA lines with Gaussian falloff to AuroraGraphPanel, DstPanel, and HistoryPanel. Added AuroraHistoryStore for JSON persistence of Aurora history across restarts. Fixed PaneContainer mouse motion event forwarding.",
+      "key_changes": [
+        "Widget.h: Shared Tooltip infrastructure added to base Widget class",
+        "AuroraHistoryStore.h (NEW): src/core/AuroraHistoryStore.h \u2014 JSON persistence in SDL pref dir; survives restart",
+        "AuroraGraphPanel: Hover tooltips; 2px AA lines with Gaussian falloff",
+        "DstPanel: Hover tooltips; 2px AA lines; added to periodic refresh loop",
+        "HistoryPanel: Hover tooltips (solar flux, SSN, Kp)",
+        "PaneContainer: Fixed mouse motion event forwarding to child widgets",
+        "main.cpp: Procedural texture generation for line_aa and circular markers",
+        "EMEToolPanel: Dynamic right-alignment fix for text overlaps",
+        "BeaconPanel: Adaptive layout at heights < 140px"
+      ]
+    },
+    "phase_48": {
+      "name": "Interactive Live Web Interface",
+      "completed": "2026-02-22",
+      "summary": "Added --live-web CLI flag for interactive headless mode with full pointer/touch/keyboard injection via WebServer. Auto-detects headless (offscreen SDL driver or /.dockerenv). Canvas-based viewer with aspect-ratio scaling, R/W R/O badge, and automatic stream reconnect. All new code guarded by #ifndef __EMSCRIPTEN__.",
+      "key_changes": [
+        "--live-web CLI flag: auto-detects headless mode (offscreen SDL driver or /.dockerenv)",
+        "FrameCapture: setMaxFps(30) to cap rate in headless mode",
+        "WebServer: setLiveWebEnabled(bool) / isLiveWebEnabled()",
+        "WebServer: /live/touch, /live/key, /live/mouse, /live/status endpoints (403 when disabled)",
+        "WebServer: Interactive canvas-based viewer \u2014 aspect-ratio scaling, R/W R/O badge, pointer/touch/keyboard injection, reconnect on stream error",
+        "All new code guarded by #ifndef __EMSCRIPTEN__"
+      ]
+    },
+    "phase_49": {
+      "name": "Asteroid Ground Track + Icon Cycling",
+      "completed": "2026-02-22",
+      "summary": "Added AsteroidPropagator for ground track propagation and AsteroidProvider as data fetching layer. AsteroidPanel title-area tap cycles icons. MapWidget renders glyph marker at closest-approach point using selected icon. ConfigManager persists asteroidIcon.",
+      "key_changes": [
+        "AsteroidPropagator (NEW): src/core/AsteroidPropagator.{h,cpp} \u2014 ground track propagation",
+        "AsteroidProvider (NEW): src/services/AsteroidProvider.{h,cpp} \u2014 data fetching layer",
+        "AsteroidData.h: New fields for propagator state",
+        "ConfigManager: asteroidIcon field persisted as asteroid.icon in config.json",
+        "AsteroidPanel: Accepts AppConfig* + onSave callback; title-area tap cycles icons \u2604\u2192\u2295\u2192\u25c8\u2192\u2b21\u2192\u2726\u2192\u2604",
+        "MapWidget: renderAsteroidOverlay() \u2014 glyph marker at closest-approach point using selected icon"
+      ]
+    },
+    "phase_50": {
+      "name": "AsteroidPanel Compact Layout + Configurable Color",
+      "completed": "2026-02-22",
+      "summary": "Redesigned AsteroidPanel to show 7 asteroids in compact 1-row format. Added settings footer with icon picker (12 symbols) and color swatches (6). MapWidget applies configurable color to asteroid ground track and icon. Added hover tooltip on asteroid map icon.",
+      "key_changes": [
+        "AsteroidPanel: 7 asteroids \u00d7 1 compact row ('Name Mon DD HH:MM')",
+        "AsteroidPanel: Settings footer with icon picker (12 symbols) + color swatches (6)",
+        "ConfigManager: asteroidColor (default orange); persisted as asteroid.color.r/g/b",
+        "MapWidget: Configurable color applied to asteroid ground track and icon",
+        "MapWidget: Hover tooltip on asteroid map icon (name, miss distance LD, velocity, hazardous flag)"
+      ]
+    },
+    "phase_51": {
+      "name": "Update Notification Polish",
+      "completed": "2026-02-23",
+      "summary": "Added UpdateOverlay with Markdown rendering for release notes display. Robust version comparison normalization handles internal (0.9.5) vs release (0.95) format, beta suffixes, and numeric segment comparison. CMakeLists.txt adds HAMCLOCK_INSTALL_TYPE and HAMCLOCK_ARCH compile-time definitions.",
+      "key_changes": [
+        "CMakeLists.txt: HAMCLOCK_INSTALL_TYPE and HAMCLOCK_ARCH CMake compile-time definitions",
+        "UpdateChecker: Robust version comparison \u2014 normalizes dots and 'v' prefix; handles internal (0.9.5) vs release (0.95) format; numeric segment + beta suffix comparison",
+        "UpdateOverlay (NEW): src/ui/UpdateOverlay.{h,cpp} \u2014 760\u00d7440px overlay; Markdown rendering (H1/H2/H3, bullet lists); Skip / Not Now / Update result enum",
+        "SetupScreen: UpdateOverlay trigger wiring"
+      ]
+    },
+    "phase_52": {
+      "name": "New Data Panels + SpaceWeather Badge + SOTA Fix",
+      "completed": "2026-02-23",
+      "summary": "Added 5 new data panels: AlertsPanel (NWS severe weather), ForecastPanel (NWS 7-day), HurricanePanel (NHC), MarinePanel (NOAA CO-OPS tides + NDBC buoy), SpaceWeather badge (blinking G/R/S at 1 Hz when scale \u2265 3). RepeaterBook and Winlink panels implemented but fetching disabled (API key / access key required). Fixed SOTA 400 error with ? in summit refs. Established bool fetched pattern for API-key-gated providers.",
+      "key_changes": [
+        "AlertsProvider/AlertsPanel: api.weather.gov/alerts every 5 min; severity-coded rows",
+        "ForecastProvider/ForecastPanel: Two-step NWS API /points\u2192/forecast; scrollable period list",
+        "HurricaneProvider/HurricanePanel: nhc.noaa.gov/CurrentStorms.json; category-colored storm cards",
+        "MarineProvider/MarinePanel: NOAA CO-OPS hi/lo tides + NDBC buoy observations; defaults station 8722670 (Lake Worth FL), buoy 41114 (FL Atlantic)",
+        "SpaceWeatherPanel: AlertBadge struct; blinking G/R/S badge at 1 Hz when any NOAA scale \u2265 3",
+        "RepeaterProvider/RepeaterPanel: Code complete; fetch + selector DISABLED (RepeaterBook HTTP 401, API key required)",
+        "WinlinkProvider/WinlinkPanel: Code complete; fetch + selector DISABLED (access key required); correct URL: https://api.winlink.org/json/metadata?op=GatewayListing",
+        "Constants.h: AE event IDs 11\u201316",
+        "WidgetType.h: 6 new types; all 3 conversion functions updated",
+        "ActivityProvider.cpp: SOTA 400 fix \u2014 guard resolveSummitAsync against refs containing ?",
+        "CMakeLists.txt: 12 new source files",
+        "Established pattern: bool fetched flag in data structs \u2014 distinguishes 'still loading' from 'fetch attempted / API error'"
+      ]
+    },
+    "phase_54": {
+      "name": "Local Data Hub Phase 1 — Master/Client LAN Mode",
+      "completed": "2026-02-24",
+      "summary": "Multiple HamClock instances on the same LAN now share NetworkManager fetch cache via hub mode. Master instance exposes /api/hub/fetch (base64 URL, max_age). Client instances proxy all fetchAsync calls through the hub with a 2s curl timeout and automatic silent fallback to direct fetch. SetupScreen gains a new 'Network' tab (8 tabs total) with Off/Master/Client mode cycle and conditional IP+Port fields. Config persists in hub.{mode,ip,port} JSON section.",
+      "key_changes": [
+        "ConfigManager.h: HubMode enum (Off/Master/Client); hubMode/hubIp/hubPort in AppConfig",
+        "ConfigManager.cpp: hub JSON section in load()/save()",
+        "NetworkManager.h/cpp: setHubConfig(), fetchFromHubSync() (2s curl), fetchDirect() extracted; hub proxy branch in fetchAsync with silent 2s fallback",
+        "WebServer.h/cpp: netMgr_ member + setNetworkManager(); base64Decode(); /api/hub/fetch endpoint (Master-only, 403 otherwise, 501 WASM); hub fields in /api/config; hub_mode/hub_ip/hub_port in /set_config",
+        "SetupScreen.h/cpp: Network tab added (8 tabs); renderTabNetwork() with mode button + conditional IP/Port fields; setConfig/getConfig hub round-trip",
+        "main.cpp: setHubConfig() at 3 setCorsProxyUrl sites; setNetworkManager() after webServer init"
+      ]
+    },
+    "phase_53": {
+      "name": "v1.0B01 Version Bump + API Parity",
+      "completed": "2026-02-24",
+      "summary": "Version bumped to v1.0B01 (new scheme: Major.MinorBXX). SetupScreen: text selection via Ctrl+A and double-click; visual field highlight. Widget::onMouseUp signature standardized with int clicks parameter. WebServer: legacy API parity aliases, plain-text reporting endpoints, removed web_password requirement, extended store references.",
+      "key_changes": [
+        "Version: bumped to v1.0B01 (new scheme: Major.MinorBXX)",
+        "SetupScreen: Text selection via Ctrl+A and double-click; visual field highlight",
+        "Widget::onMouseUp: Signature standardized with int clicks parameter",
+        "WebServer: Legacy API parity aliases \u2014 set_displayOnOff, set_newde, set_cluster, etc.",
+        "WebServer: Plain-text reporting endpoints \u2014 get_spacewx.txt, get_sys.txt, get_contests.txt",
+        "WebServer: Removed web_password requirement",
+        "WebServer: Extended store references (DX, LiveSpots, Contests, CPU)",
+        "API.md: Fully updated"
+      ]
+    },
+    "phase_55": {
+      "name": "Security & Stability Hardening",
+      "completed": "2026-02-24",
+      "summary": "Private-IP gate for WebServer (refuses to bind on public IPs; HAMCLOCK_FORCE_WEB=1 override). SSRF guard extended to IPv6 ULA+link-local. String length caps in /set_config. DXCluster spot vector hard-capped at 500. NetworkManager cache load errors logged instead of swallowed.",
+      "key_changes": [
+        "WebServer.cpp: isHostOnPrivateNetwork() via getifaddrs (Linux/macOS) / GetAdaptersAddresses (Windows)",
+        "WebServer.cpp: SSRF guard adds IPv6 ULA fc00::/7 and link-local fe80::/10",
+        "WebServer.cpp: strParam() caps callsign 12, grid 8, theme 32, host 253 chars",
+        "DXClusterData.cpp: addSpot() hard cap at 500 entries after 60-min prune",
+        "NetworkManager.cpp: catch(std::exception&) logs parse failure path",
+        "CMakeLists.txt: iphlpapi added to Windows link libraries"
+      ]
+    },
+    "phase_56": {
+      "name": "RPi 1GB Low-Memory Adaptive Mode",
+      "completed": "2026-02-25",
+      "summary": "Fixed primary cache-sizing bug: fidelityMode() gate replaced by isLowMemoryDevice() (RAM ≤ 1536 MB). On RPi 3B (972 MB): texture cache 50→15, font text cache 300→100, texture dimension cap 2048→1024px (Linux ARM only, macOS ARM excluded via corrected preprocessor guard). 60-second RSS heartbeat log. Confirmed working on RPi 3B and 64GB dev machine.",
+      "key_changes": [
+        "main.cpp: isLowMemoryDevice() replaces fidelityMode() as cache-sizing gate",
+        "main.cpp: Startup log 'System RAM: N MB, low-memory mode: YES/NO'",
+        "main.cpp: 60s RSS heartbeat via MemoryMonitor::logStats('heartbeat')",
+        "TextureManager.h: maxW_/maxH_ cap 2048→1024 for (Linux && ARM) only",
+        "FontManager.h: setTextCacheLimit(size_t) added; hardcoded 300 replaced by textCacheLimit_ member"
+      ],
+      "testing": "RPi 3B startup confirmed: 'System RAM: 972 MB, low-memory mode: YES', 'capping texture cache to 15', 'capping font text cache to 100'."
     }
   },
   "platform_specific": {
@@ -1166,7 +1491,7 @@
         "display_power": "vcgencmd display_power (HDMI) or sysfs bl_power (DSI)",
         "cpu_temperature": "/sys/class/thermal/thermal_zone0/temp",
         "brightness_control": "sysfs backlight control via BrightnessManager",
-        "i2c_sensors": "BME280 support planned (low priority)"
+        "i2c_sensors": "BME280: full Bosch compensation math implemented (BME280Provider). Hardware validation on RPi+sensor pending."
       }
     }
   },
@@ -1377,6 +1702,109 @@
           "description": "KC2G real-time MUF map metadata. Returns image URL and CORS proxy URL. No backend needed.",
           "curl": "curl http://localhost:8080/api/propagation/muf_rt | jq",
           "notes": "Client fetches the returned image_url (or cors_proxy_url in WASM mode) to display the MUF-RT overlay. No computation required on the server."
+        }
+      ]
+    },
+    "v1_0B01_api": {
+      "description": "New endpoints added in v1.0B01 sprint (Phases 46\u201353). All are non-debug (always enabled) unless noted.",
+      "endpoints": [
+        {
+          "endpoint": "/api/config",
+          "method": "GET",
+          "description": "JSON dump of all 30+ AppConfig fields. qrzPassword is write-only (omitted from response).",
+          "curl": "curl http://localhost:8080/api/config | jq",
+          "notes": "Returns all user-configurable settings in JSON. Use /set_config to update individual fields."
+        },
+        {
+          "endpoint": "/stream.mjpeg",
+          "method": "GET",
+          "description": "MJPEG live display stream. Each frame is a JPEG wrapped in multipart/x-mixed-replace boundaries.",
+          "curl": "curl http://localhost:8080/stream.mjpeg --output stream.mjpeg",
+          "notes": "Open in browser or VLC for live view. FrameCapture caps at 30 FPS in headless mode. All SDL rendering is captured including all panels and overlays."
+        },
+        {
+          "endpoint": "/live",
+          "method": "GET",
+          "description": "Interactive canvas-based viewer. Streams /stream.mjpeg, injects pointer/touch/keyboard events, shows R/W or R/O badge.",
+          "curl": "open http://localhost:8080/live",
+          "notes": "Only available when --live-web flag is set or auto-detected headless. Returns 403 when live web is disabled. Aspect-ratio preserved scaling. Auto-reconnects on stream error."
+        },
+        {
+          "endpoint": "/live/touch",
+          "method": "GET",
+          "description": "Inject a touch/click event at canvas-relative coordinates.",
+          "curl": "curl 'http://localhost:8080/live/touch?x=400&y=240'",
+          "notes": "Params: x, y (canvas pixels). Coordinates are mapped to SDL display coordinates. Returns 403 when live web disabled."
+        },
+        {
+          "endpoint": "/live/key",
+          "method": "GET",
+          "description": "Inject a keyboard event.",
+          "curl": "curl 'http://localhost:8080/live/key?key=enter'\ncurl 'http://localhost:8080/live/key?key=escape'",
+          "notes": "Same key names as /debug/keypress. Returns 403 when live web disabled."
+        },
+        {
+          "endpoint": "/live/mouse",
+          "method": "GET",
+          "description": "Inject a mouse move event.",
+          "curl": "curl 'http://localhost:8080/live/mouse?x=200&y=100'",
+          "notes": "Params: x, y (canvas pixels). Returns 403 when live web disabled."
+        },
+        {
+          "endpoint": "/live/status",
+          "method": "GET",
+          "description": "Check live web interface status (enabled/disabled, read-write mode).",
+          "curl": "curl http://localhost:8080/live/status | jq",
+          "notes": "Returns JSON: {enabled: bool, readWrite: bool}. Returns 403 when live web disabled."
+        },
+        {
+          "endpoint": "/get_spacewx.txt",
+          "method": "GET",
+          "description": "Plain-text space weather report (SFI, SN, A-index, K-index, NOAA scales).",
+          "curl": "curl http://localhost:8080/get_spacewx.txt",
+          "notes": "Legacy API parity endpoint. Plain-text format matching original HamClock output."
+        },
+        {
+          "endpoint": "/get_sys.txt",
+          "method": "GET",
+          "description": "Plain-text system info (version, uptime, CPU, memory).",
+          "curl": "curl http://localhost:8080/get_sys.txt",
+          "notes": "Legacy API parity endpoint. Plain-text format."
+        },
+        {
+          "endpoint": "/get_contests.txt",
+          "method": "GET",
+          "description": "Plain-text active contests list.",
+          "curl": "curl http://localhost:8080/get_contests.txt",
+          "notes": "Legacy API parity endpoint. Plain-text format."
+        },
+        {
+          "endpoint": "/set_displayOnOff",
+          "method": "GET",
+          "description": "Legacy alias for /screen?blank= display power control.",
+          "curl": "curl 'http://localhost:8080/set_displayOnOff?on=1'\ncurl 'http://localhost:8080/set_displayOnOff?on=0'",
+          "notes": "Legacy API parity alias added in Phase 53. Maps to existing display power control."
+        },
+        {
+          "endpoint": "/set_newde",
+          "method": "GET",
+          "description": "Legacy alias for setting DE (operator) position.",
+          "curl": "curl 'http://localhost:8080/set_newde?lat=35.5&lon=-82.5'",
+          "notes": "Legacy API parity alias added in Phase 53."
+        },
+        {
+          "endpoint": "/set_cluster",
+          "method": "GET",
+          "description": "Legacy alias for setting DX cluster host/port.",
+          "curl": "curl 'http://localhost:8080/set_cluster?host=dxc.k0xm.net&port=7300'",
+          "notes": "Legacy API parity alias added in Phase 53."
+        },
+        {
+          "endpoint": "/api/hub/fetch",
+          "method": "GET",
+          "description": "Local Data Hub master endpoint. Proxies a URL through the master instance's NetworkManager cache. Requires hub mode = Master (403 otherwise). Returns raw response body as application/octet-stream. Returns 501 on WASM.",
+          "curl": "# Encode target URL in base64 first:\nURL=$(echo -n 'https://services.swpc.noaa.gov/json/planetary_k_index_1m.json' | base64 -w0)\ncurl \"http://192.168.1.10:8080/api/hub/fetch?url=${URL}&max_age=300\"",
+          "notes": "Params: url (base64-encoded target URL, must start with http), max_age (seconds, default 3600). Client instances proxy fetchAsync through this endpoint with 2s timeout; fall back to direct fetch on failure."
         }
       ]
     }

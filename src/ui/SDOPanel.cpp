@@ -81,10 +81,15 @@ void SDOPanel::render(SDL_Renderer *renderer) {
   // 3. Draw Image
   SDL_Texture *tex = texMgr_.get("sdo_latest");
   if (tex && imageReady_) {
-    int drawSz = std::min(width_, height_) - 4;
-    SDL_Rect dst = {x_ + (width_ - drawSz) / 2, y_ + (height_ - drawSz) / 2,
-                    drawSz, drawSz};
+    int titleH = height_ / 10;
+    int drawSz = std::min(width_, height_ - titleH) - 6;
+    SDL_Rect dst = {x_ + (width_ - drawSz) / 2,
+                    y_ + titleH + (height_ - titleH - drawSz) / 2, drawSz,
+                    drawSz};
     SDL_RenderCopy(renderer, tex, nullptr, &dst);
+
+    fontMgr_.drawText(renderer, "SDO Solar", x_ + 10, y_ + 5, themes.accent, 10,
+                      true);
 
     renderOverlays(renderer, themes);
   } else {
@@ -110,15 +115,17 @@ void SDOPanel::renderOverlays(SDL_Renderer *renderer,
   char buf[32];
   SDL_Color HUD = {255, 165, 0, 255}; // Orange HUD
 
+  int titleH = height_ / 10;
   // Az: NN
   std::snprintf(buf, sizeof(buf), "Az:%.0f", az);
-  fontMgr_.drawText(renderer, buf, x_ + 4, y_ + 4, HUD, overlayFontSize_);
+  fontMgr_.drawText(renderer, buf, x_ + 4, y_ + titleH + 4, HUD,
+                    overlayFontSize_);
 
   // El: NN
   std::snprintf(buf, sizeof(buf), "El:%.0f", el);
   int elW = 0;
   TTF_SizeText(fontMgr_.getFont(overlayFontSize_), buf, &elW, nullptr);
-  fontMgr_.drawText(renderer, buf, x_ + width_ - elW - 4, y_ + 4, HUD,
+  fontMgr_.drawText(renderer, buf, x_ + width_ - elW - 4, y_ + titleH + 4, HUD,
                     overlayFontSize_);
 
   // R@HH:MM (Rise/Set)
@@ -271,7 +278,7 @@ void SDOPanel::recalcMenuLayout() {
                  btnH};
 }
 
-bool SDOPanel::onMouseUp(int mx, int my, Uint16 mod) {
+bool SDOPanel::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
   if (menuVisible_) {
     // 1. Check buttons FIRST to avoid overlap issues
     if (mx >= okRect_.x && mx < okRect_.x + okRect_.w && my >= okRect_.y &&
@@ -320,8 +327,9 @@ bool SDOPanel::onMouseUp(int mx, int my, Uint16 mod) {
     return true; // Click eaten by modal
   }
 
-  // Open menu on click
-  if (mx >= x_ && mx < x_ + width_ && my >= y_ && my < y_ + height_) {
+  // Open menu on click (ignore top 10% reserved for widget selector)
+  if (mx >= x_ && mx < x_ + width_ && my >= y_ + height_ / 10 &&
+      my < y_ + height_) {
     menuVisible_ = true;
     tempId_ = currentId_;
     tempRotating_ = rotating_;

@@ -315,7 +315,7 @@ void ONTAPanel::render(SDL_Renderer *renderer) {
   }
 }
 
-bool ONTAPanel::onMouseUp(int mx, int my, Uint16 mod) {
+bool ONTAPanel::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
   (void)mod;
 
   if (showSetup_) {

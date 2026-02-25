@@ -235,8 +235,9 @@ void ActivityProvider::fetchSOTA() {
             os.lat = slat;
             os.lon = slon;
           } else {
-            // Trigger async per-summit API lookup for next refresh cycle
-            ActivityLocationManager::getInstance().resolveSummitAsync(os.ref);
+            // Only trigger API lookup for valid-looking refs (no '?' placeholders).
+            if (os.ref.find('?') == std::string::npos)
+              ActivityLocationManager::getInstance().resolveSummitAsync(os.ref);
           }
 
           if (!os.call.empty()) {

@@ -151,7 +151,11 @@ void SatPanel::render(SDL_Renderer *renderer) {
   SDL_RenderDrawRect(renderer, &clip);
 
   int pad = 2;
-  int curY = y_ + pad;
+  int titleH = 20;
+  fontMgr_.drawText(renderer, "Satellite", x_ + 10, y_ + 5, themes.accent, 10,
+                    true);
+
+  int curY = y_ + titleH + pad;
 
   // Text colors
   SDL_Color white = {255, 255, 255, 255};
@@ -343,7 +347,7 @@ void SatPanel::renderPolarPlot(SDL_Renderer *renderer, float cx, float cy,
 
     // Label: elevation angle
     char elBuf[16];
-    std::snprintf(elBuf, sizeof(elBuf), "%.0f%c", currentPos_.el, '\xB0');
+    std::snprintf(elBuf, sizeof(elBuf), "%.0f°", currentPos_.el);
     SDL_Color green = {0, 255, 0, 255};
     fontMgr_.drawText(renderer, elBuf, static_cast<int>(sx + markerR + 2),
                       static_cast<int>(sy - compassFontSize_ / 2.0f), green,

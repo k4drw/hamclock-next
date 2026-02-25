@@ -387,6 +387,10 @@ bool RotatorService::getAzEl(double &az, double &el) {
 
   // Try simple format first (most common)
   if (std::sscanf(response.c_str(), "%lf\n%lf", &azVal, &elVal) == 2) {
+    if (azVal < 0.0 || azVal > 360.0 || elVal < -90.0 || elVal > 90.0) {
+      LOG_W("Rotator", "az/el out of range: az={} el={}", azVal, elVal);
+      return false;
+    }
     az = azVal;
     el = elVal;
     return true;
@@ -395,6 +399,10 @@ bool RotatorService::getAzEl(double &az, double &el) {
   // Try verbose format
   if (std::sscanf(response.c_str(), "Azimuth: %lf\nElevation: %lf", &azVal,
                   &elVal) == 2) {
+    if (azVal < 0.0 || azVal > 360.0 || elVal < -90.0 || elVal > 90.0) {
+      LOG_W("Rotator", "az/el out of range: az={} el={}", azVal, elVal);
+      return false;
+    }
     az = azVal;
     el = elVal;
     return true;
