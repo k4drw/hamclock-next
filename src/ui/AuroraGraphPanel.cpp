@@ -100,7 +100,6 @@ void AuroraGraphPanel::render(SDL_Renderer *renderer) {
 
   // Calculate time range (24 hours)
   auto now = std::chrono::system_clock::now();
-  auto oldest = now - std::chrono::hours(24);
 
   SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255); // Green line
 

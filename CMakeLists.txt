@@ -163,6 +163,16 @@ if(NOT WIN32 AND NOT EMSCRIPTEN)
         GIT_SHALLOW    TRUE
     )
     FetchContent_MakeAvailable(mbedtls)
+    # Explicitly suppress warnings for mbedtls targets
+    foreach(target mbedtls mbedx509 mbedcrypto)
+        if(TARGET ${target})
+            if(MSVC)
+                target_compile_options(${target} PRIVATE /w)
+            else()
+                target_compile_options(${target} PRIVATE -w)
+            endif()
+        endif()
+    endforeach()
     # Export paths for CURL's FindMbedTLS using absolute paths to bypass export set checks
     set(MBEDTLS_INCLUDE_DIR "${mbedtls_SOURCE_DIR}/include" CACHE PATH "" FORCE)
     set(MBEDTLS_LIBRARY "${mbedtls_BINARY_DIR}/library/libmbedtls.a" CACHE FILEPATH "" FORCE)
@@ -354,7 +364,12 @@ if(NOT TARGET sqlite3)
     add_library(sqlite3 STATIC 
         ${sqlite3_amalgamation_SOURCE_DIR}/sqlite3.c
     )
-    target_include_directories(sqlite3 PUBLIC ${sqlite3_amalgamation_SOURCE_DIR})
+    target_include_directories(sqlite3 SYSTEM PUBLIC ${sqlite3_amalgamation_SOURCE_DIR})
+    if(MSVC)
+        target_compile_options(sqlite3 PRIVATE /w)
+    else()
+        target_compile_options(sqlite3 PRIVATE -w)
+    endif()
     if(UNIX)
         target_link_libraries(sqlite3 PRIVATE m dl)
     endif()
@@ -407,6 +422,17 @@ if(NOT TARGET SDL2_mixer::SDL2_mixer-static)
         add_library(SDL2_mixer::SDL2_mixer-static ALIAS SDL2_mixer)
     endif()
 endif()
+
+# Explicitly suppress warnings for SDL2 targets
+foreach(target SDL2-static SDL2_ttf SDL2_image SDL2_mixer)
+    if(TARGET ${target})
+        if(MSVC)
+            target_compile_options(${target} PRIVATE /w)
+        else()
+            target_compile_options(${target} PRIVATE -w)
+        endif()
+    endif()
+endforeach()
 
 # Special handling for libpredict (skipping tests)
 FetchContent_GetProperties(libpredict)
@@ -603,6 +629,8 @@ else()
 
     target_include_directories(hamclock-next PRIVATE
         ${CMAKE_SOURCE_DIR}/include
+    )
+    target_include_directories(hamclock-next SYSTEM PRIVATE
         ${libpredict_BINARY_DIR}/include
         ${SDL2_INCLUDE_DIRS}
     )

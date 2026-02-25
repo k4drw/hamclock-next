@@ -88,9 +88,9 @@ void HurricanePanel::render(SDL_Renderer *renderer) {
 
     // Wind + pressure
     char wBuf[48];
-    std::snprintf(wBuf, sizeof(wBuf), "%dkt  %dmb  %.1fN %.1f%c",
-                  s.maxWindKt, s.pressureMb, std::abs(s.lat),
-                  std::abs(s.lon), s.lon < 0 ? 'W' : 'E');
+    std::snprintf(wBuf, sizeof(wBuf), "%dkt  %dmb  %.1fN %.1f%c", s.maxWindKt,
+                  s.pressureMb, std::abs(s.lat), std::abs(s.lon),
+                  s.lon < 0 ? 'W' : 'E');
     fontMgr_.drawText(renderer, wBuf, x_ + pad, curY, themes.textDim,
                       detailFontSize_, false, false);
     curY += detailFontSize_ + 2;
@@ -114,7 +114,7 @@ void HurricanePanel::render(SDL_Renderer *renderer) {
   }
 
   if ((int)currentData_.storms.size() > maxBlocks) {
-    char buf[16];
+    char buf[32];
     std::snprintf(buf, sizeof(buf), "%d/%d", startIdx + 1,
                   (int)currentData_.storms.size());
     fontMgr_.drawText(renderer, buf, x_ + width_ - pad,

@@ -242,19 +242,15 @@ bool DXClusterSetup::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
 
 bool DXClusterSetup::onKeyDown(SDL_Keycode key, Uint16) {
   std::string *text = nullptr;
-  int maxLen = 0;
   switch (activeField_) {
   case 0:
     text = &hostText_;
-    maxLen = 64;
     break;
   case 1:
     text = &portText_;
-    maxLen = 5;
     break;
   case 2:
     text = &loginText_;
-    maxLen = 32;
     break;
   }
   if (!text)

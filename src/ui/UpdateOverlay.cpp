@@ -173,8 +173,6 @@ void UpdateOverlay::render(SDL_Renderer *renderer) {
 
   SDL_Color white = {255, 255, 255, 255};
   SDL_Color cyan = {0, 200, 255, 255};
-  SDL_Color gray = {150, 150, 150, 255};
-  SDL_Color green = {50, 200, 50, 255};
 
   // Header
   int ty = y_ + padding_;

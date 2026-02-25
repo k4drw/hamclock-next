@@ -54,8 +54,7 @@ void ForecastPanel::render(SDL_Renderer *renderer) {
   int rowH = nameFontSize_ + detailFontSize_ + 4;
   int maxRows = (height_ - (curY - y_) - pad) / rowH;
   int startIdx = std::max(0, scrollOffset_);
-  int endIdx =
-      std::min((int)currentData_.periods.size(), startIdx + maxRows);
+  int endIdx = std::min((int)currentData_.periods.size(), startIdx + maxRows);
 
   for (int i = startIdx; i < endIdx; ++i) {
     const auto &p = currentData_.periods[i];
@@ -109,7 +108,7 @@ void ForecastPanel::render(SDL_Renderer *renderer) {
 
   // Scroll indicator
   if ((int)currentData_.periods.size() > maxRows) {
-    char buf[16];
+    char buf[32];
     std::snprintf(buf, sizeof(buf), "%d/%d", startIdx + 1,
                   (int)currentData_.periods.size());
     fontMgr_.drawText(renderer, buf, x_ + width_ - pad,

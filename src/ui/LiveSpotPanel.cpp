@@ -243,8 +243,6 @@ void LiveSpotPanel::renderSetup(SDL_Renderer *renderer) {
 
   SDL_Color cyan = themes.accent;
   SDL_Color white = themes.text;
-  SDL_Color red = themes.danger;
-  SDL_Color green = themes.success;
 
   int y = y_ + 10;
   int cx = x_ + width_ / 2;

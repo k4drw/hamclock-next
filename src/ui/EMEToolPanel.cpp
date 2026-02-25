@@ -23,7 +23,6 @@ void EMEToolPanel::render(SDL_Renderer *renderer) {
 
   int curY = y_ + 10;
   int centerX = x_ + width_ / 2;
-  int pad = 20;
 
   fontMgr_.drawText(renderer, "EME Planning Tool", x_ + 10, curY, themes.accent,
                     10, true);

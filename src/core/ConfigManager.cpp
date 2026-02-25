@@ -31,7 +31,7 @@ static SDL_Color hexToColor(const std::string &hex, SDL_Color fallback) {
 bool ConfigManager::init() {
   // Use SDL_GetPrefPath for cross-platform data directory
   // On Linux: ~/.local/share/HamClock/HamClock-Next/
-  // On Windows: %APPDATA%\HamClock\HamClock-Next\
+  // On Windows: %APPDATA%\HamClock\HamClock-Next
   // On MacOS: ~/Library/Application Support/HamClock/HamClock-Next/
   char *prefPath = SDL_GetPrefPath("HamClock", "HamClock-Next");
   if (!prefPath) {
@@ -100,7 +100,7 @@ bool ConfigManager::init() {
                 console.log('[IDBFS] Sync-from-IDB complete' +
                             (mounted ? '' : ' (no IDBFS — session only)'));
               }
-              if (typeof Module._hamclock_after_idbfs === 'function')
+              if (typeof Module._hamclock_after_idbfs == = 'function')
                 Module._hamclock_after_idbfs();
             });
       },
@@ -226,10 +226,13 @@ bool ConfigManager::load(AppConfig &config) const {
   if (json.contains("hub")) {
     const auto &h = json["hub"];
     std::string mode = h.value("mode", "off");
-    if (mode == "master")      config.hubMode = HubMode::Master;
-    else if (mode == "client") config.hubMode = HubMode::Client;
-    else                       config.hubMode = HubMode::Off;
-    config.hubIp   = h.value("ip",   "");
+    if (mode == "master")
+      config.hubMode = HubMode::Master;
+    else if (mode == "client")
+      config.hubMode = HubMode::Client;
+    else
+      config.hubMode = HubMode::Off;
+    config.hubIp = h.value("ip", "");
     config.hubPort = h.value("port", 8080);
   }
 
@@ -424,9 +427,10 @@ bool ConfigManager::save(const AppConfig &config) const {
 
   json["network"]["cors_proxy_url"] = config.corsProxyUrl;
 
-  json["hub"]["mode"] = (config.hubMode == HubMode::Master) ? "master"
-                      : (config.hubMode == HubMode::Client)  ? "client" : "off";
-  json["hub"]["ip"]   = config.hubIp;
+  json["hub"]["mode"] = (config.hubMode == HubMode::Master)   ? "master"
+                        : (config.hubMode == HubMode::Client) ? "client"
+                                                              : "off";
+  json["hub"]["ip"] = config.hubIp;
   json["hub"]["port"] = config.hubPort;
 
   json["rotator"]["host"] = config.rotatorHost;

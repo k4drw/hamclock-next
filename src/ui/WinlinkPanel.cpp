@@ -38,15 +38,14 @@ void WinlinkPanel::render(SDL_Renderer *renderer) {
   if (!currentData_.valid) {
     const char *msg =
         currentData_.fetched ? "Service unavailable" : "Loading...";
-    fontMgr_.drawText(renderer, msg, centerX, y_ + height_ / 2,
-                      themes.textDim, rowFontSize_, false, true);
+    fontMgr_.drawText(renderer, msg, centerX, y_ + height_ / 2, themes.textDim,
+                      rowFontSize_, false, true);
     return;
   }
 
   if (currentData_.gateways.empty()) {
-    fontMgr_.drawText(renderer, "No gateways found", centerX,
-                      y_ + height_ / 2, themes.textDim, rowFontSize_, false,
-                      true);
+    fontMgr_.drawText(renderer, "No gateways found", centerX, y_ + height_ / 2,
+                      themes.textDim, rowFontSize_, false, true);
     return;
   }
 
@@ -54,8 +53,7 @@ void WinlinkPanel::render(SDL_Renderer *renderer) {
   int rowH = rowFontSize_ + subFontSize_ + 4;
   int maxRows = (height_ - (curY - y_) - pad) / rowH;
   int startIdx = std::max(0, scrollOffset_);
-  int endIdx =
-      std::min((int)currentData_.gateways.size(), startIdx + maxRows);
+  int endIdx = std::min((int)currentData_.gateways.size(), startIdx + maxRows);
 
   for (int i = startIdx; i < endIdx; ++i) {
     const auto &gw = currentData_.gateways[i];
@@ -98,7 +96,7 @@ void WinlinkPanel::render(SDL_Renderer *renderer) {
   }
 
   if ((int)currentData_.gateways.size() > maxRows) {
-    char buf[16];
+    char buf[32];
     std::snprintf(buf, sizeof(buf), "%d/%d", startIdx + 1,
                   (int)currentData_.gateways.size());
     fontMgr_.drawText(renderer, buf, x_ + width_ - pad,

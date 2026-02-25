@@ -85,9 +85,8 @@ void AlertsPanel::render(SDL_Renderer *renderer) {
 
   // Scroll indicator when there are more alerts than fit
   if ((int)alerts.size() > maxRows) {
-    char buf[16];
-    std::snprintf(buf, sizeof(buf), "%d/%d", startIdx + 1,
-                  (int)alerts.size());
+    char buf[32];
+    std::snprintf(buf, sizeof(buf), "%d/%d", startIdx + 1, (int)alerts.size());
     fontMgr_.drawText(renderer, buf, x_ + width_ - pad,
                       y_ + height_ - pad - rowFontSize_, themes.textDim,
                       rowFontSize_ - 2, false, true);

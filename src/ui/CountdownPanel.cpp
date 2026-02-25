@@ -19,7 +19,8 @@ void CountdownPanel::update() {
     return;
   }
 
-  struct tm t = {0};
+  struct tm t;
+  std::memset(&t, 0, sizeof(t));
   if (std::sscanf(config_.countdownTime.c_str(), "%d-%d-%d %d:%d", &t.tm_year,
                   &t.tm_mon, &t.tm_mday, &t.tm_hour, &t.tm_min) == 5) {
     t.tm_year -= 1900;
@@ -213,8 +214,6 @@ void CountdownPanel::renderEditOverlay(SDL_Renderer *renderer) {
 
   SDL_Color cyan = {0, 255, 255, 255};
   SDL_Color white = {255, 255, 255, 255};
-  SDL_Color gray = {150, 150, 150, 255};
-  SDL_Color activeColor = {0, 200, 0, 255};
 
   int pad = 10;
   int boxH = 24;

@@ -2407,9 +2407,8 @@ void MapWidget::renderAuroraOverlay(SDL_Renderer *renderer) {
         SDL_FPoint screenPos = latLonToScreen(lat, longitude);
 
         // Calculate alpha based on value (0-100)
-        Uint8 alpha = static_cast<Uint8>((val * 255) / 100);
-        if (alpha > 255)
-          alpha = 255;
+        int calculatedAlpha = (val * 255) / 100;
+        Uint8 alpha = static_cast<Uint8>(std::clamp(calculatedAlpha, 0, 255));
 
         // Draw green glow
         SDL_SetRenderDrawColor(renderer, 0, 255, 0, alpha);

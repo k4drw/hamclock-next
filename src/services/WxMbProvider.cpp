@@ -471,8 +471,6 @@ SDL_Surface *WxMbProvider::renderToSurface(const GribField &prmsl,
   uint32_t *pixels = static_cast<uint32_t *>(surf->pixels);
   int pitch = surf->pitch / 4;
 
-  const int gW = prmsl.nx, gH = prmsl.ny;
-
   // Bicubic B-spline for maximum smoothness
   auto cubic = [](float v0, float v1, float v2, float v3, float x) {
     float a = -0.5f * v0 + 1.5f * v1 - 1.5f * v2 + 0.5f * v3;

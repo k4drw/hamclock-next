@@ -37,10 +37,10 @@ void RepeaterPanel::render(SDL_Renderer *renderer) {
 
   if (!currentData_.valid) {
     const char *msg = currentData_.fetched
-                          ? "API key required"  // 401 from RepeaterBook
+                          ? "API key required" // 401 from RepeaterBook
                           : "Loading...";
-    fontMgr_.drawText(renderer, msg, centerX, y_ + height_ / 2,
-                      themes.textDim, rowFontSize_, false, true);
+    fontMgr_.drawText(renderer, msg, centerX, y_ + height_ / 2, themes.textDim,
+                      rowFontSize_, false, true);
     if (currentData_.fetched)
       fontMgr_.drawText(renderer, "repeaterbook.com", centerX,
                         y_ + height_ / 2 + rowFontSize_ + 4, themes.textDim,
@@ -49,9 +49,8 @@ void RepeaterPanel::render(SDL_Renderer *renderer) {
   }
 
   if (currentData_.repeaters.empty()) {
-    fontMgr_.drawText(renderer, "No repeaters found", centerX,
-                      y_ + height_ / 2, themes.textDim, rowFontSize_, false,
-                      true);
+    fontMgr_.drawText(renderer, "No repeaters found", centerX, y_ + height_ / 2,
+                      themes.textDim, rowFontSize_, false, true);
     return;
   }
 
@@ -59,8 +58,7 @@ void RepeaterPanel::render(SDL_Renderer *renderer) {
   int rowH = rowFontSize_ + subFontSize_ + 4;
   int maxRows = (height_ - (curY - y_) - pad) / rowH;
   int startIdx = std::max(0, scrollOffset_);
-  int endIdx =
-      std::min((int)currentData_.repeaters.size(), startIdx + maxRows);
+  int endIdx = std::min((int)currentData_.repeaters.size(), startIdx + maxRows);
 
   for (int i = startIdx; i < endIdx; ++i) {
     const auto &r = currentData_.repeaters[i];
@@ -105,7 +103,7 @@ void RepeaterPanel::render(SDL_Renderer *renderer) {
 
   // Scroll indicator
   if ((int)currentData_.repeaters.size() > maxRows) {
-    char buf[16];
+    char buf[32];
     std::snprintf(buf, sizeof(buf), "%d/%d", startIdx + 1,
                   (int)currentData_.repeaters.size());
     fontMgr_.drawText(renderer, buf, x_ + width_ - pad,

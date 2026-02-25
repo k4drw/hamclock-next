@@ -122,7 +122,7 @@ void RSSBanner::rebuildTextures(SDL_Renderer *renderer) {
   // Estimate maximum safe character length
   int maxChars = (kMaxTextureWidth - 100) / kMaxCharWidth; // Leave margin
 
-  if (fullText.size() > maxChars) {
+  if (fullText.size() > static_cast<size_t>(maxChars)) {
     fullText = fullText.substr(0, maxChars - 3) + "...";
   }
 
@@ -160,10 +160,10 @@ void RSSBanner::rebuildTextures(SDL_Renderer *renderer) {
 
     // Truncate individual lines if still too long
     int perLineMaxChars = maxChars / 2;
-    if (l1.size() > perLineMaxChars) {
+    if (l1.size() > static_cast<size_t>(perLineMaxChars)) {
       l1 = l1.substr(0, perLineMaxChars - 3) + "...";
     }
-    if (l2.size() > perLineMaxChars) {
+    if (l2.size() > static_cast<size_t>(perLineMaxChars)) {
       l2 = l2.substr(0, perLineMaxChars - 3) + "...";
     }
 
