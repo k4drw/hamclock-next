@@ -8,6 +8,8 @@
 #elif defined(__APPLE__)
 #include <mach/mach.h>
 #include <unistd.h>
+#elif defined(__EMSCRIPTEN__)
+#include <unistd.h>
 #elif defined(_WIN32)
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN

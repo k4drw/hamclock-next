@@ -1553,6 +1553,7 @@ void DashboardContext::update(AppContext &ctx) {
   }
 #endif
 
+#ifndef __EMSCRIPTEN__
   // Handle UpdateOverlay trigger from TimePanel version click
   if (timePanel && timePanel->isUpdateRequested()) {
     timePanel->clearUpdateRequest();
@@ -1569,6 +1570,7 @@ void DashboardContext::update(AppContext &ctx) {
   if (updateOverlay) {
     updateOverlay->update();
   }
+#endif
 
   SDL_Event event;
   while (SDL_PollEvent(&event)) {
@@ -1656,11 +1658,14 @@ void DashboardContext::update(AppContext &ctx) {
         render(ctx);
       }
       break;
+#ifndef __EMSCRIPTEN__
     case SDL_MOUSEWHEEL:
       if (updateOverlay) {
         updateOverlay->onMouseWheel(event.wheel.y);
       }
       break;
+#endif
+#ifndef __EMSCRIPTEN__
     case SDL_MOUSEBUTTONUP:
       if (updateOverlay) {
         int smx = event.button.x, smy = event.button.y;
@@ -1690,6 +1695,7 @@ void DashboardContext::update(AppContext &ctx) {
         }
       }
       break;
+#endif
     default:
       // Handle custom application events
       if (event.type >= AE_BASE_EVENT) {

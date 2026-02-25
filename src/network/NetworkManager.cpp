@@ -247,6 +247,7 @@ void NetworkManager::fetchAsync(const std::string &url,
 #endif
 }
 
+#ifndef __EMSCRIPTEN__
 void NetworkManager::fetchDirect(const std::string &url,
                                  std::function<void(std::string)> callback,
                                  bool hasCache, const CacheEntry &cached) {
@@ -374,6 +375,7 @@ void NetworkManager::fetchDirect(const std::string &url,
 
   callback(std::move(response));
 }
+#endif
 
 NetworkManager::NetworkManager(const std::filesystem::path &cacheDir)
     : cacheDir_(cacheDir) {

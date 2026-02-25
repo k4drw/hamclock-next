@@ -1,31 +1,36 @@
-#include "SysInfoPanel.h"
+#if defined(_WIN32) && !defined(__EMSCRIPTEN__)
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef _WIN32_WINNT
+#define _WIN32_WINNT 0x0600
+#endif
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#include <windows.h>
+#include <iphlpapi.h>
+#endif
+
 #include "../core/Theme.h"
 #include "FontCatalog.h"
+#include "SysInfoPanel.h"
 
 #include <SDL.h>
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
 
-#ifndef _WIN32
+#if !defined(_WIN32) && !defined(__EMSCRIPTEN__)
 #include <arpa/inet.h>
 #include <ifaddrs.h>
 #include <netinet/in.h>
-#else
-// Windows IP enumeration
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#endif
-#include <iphlpapi.h>
-#include <windows.h>
-#include <ws2tcpip.h>
 #endif
 
 // ---------------------------------------------------------------------------
 // Static helper: local IPv4 address (loopback excluded)
 // ---------------------------------------------------------------------------
 std::string SysInfoPanel::getLocalIP() {
-#if defined(_WIN32)
+#if defined(_WIN32) && !defined(__EMSCRIPTEN__)
   // GetAdaptersAddresses enumerates all adapters; pick first non-loopback IPv4
   ULONG bufLen = 15000;
   std::vector<BYTE> buf(bufLen);
@@ -66,6 +71,8 @@ std::string SysInfoPanel::getLocalIP() {
     }
   }
   return "--";
+#elif defined(__EMSCRIPTEN__)
+  return "WASM";
 #else
   // POSIX: getifaddrs available on Linux and macOS
   struct ifaddrs *addrs = nullptr;

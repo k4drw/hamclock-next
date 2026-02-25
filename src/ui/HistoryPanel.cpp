@@ -237,8 +237,9 @@ void HistoryPanel::onMouseMove(int mx, int my) {
     if (ageMins < 30) {
       std::snprintf(buf, sizeof(buf), "%s%s (Now)", valStr, unit.c_str());
     } else {
-      std::snprintf(buf, sizeof(buf), "%s%s (-%ldh %ldm)", valStr, unit.c_str(),
-                    ageMins / 60, ageMins % 60);
+      std::snprintf(buf, sizeof(buf), "%s%s (-%lldh %lldm)", valStr,
+                    unit.c_str(), static_cast<long long>(ageMins / 60),
+                    static_cast<long long>(ageMins % 60));
     }
     tooltip_.text = buf;
     tooltip_.x = mx;

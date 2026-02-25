@@ -210,8 +210,9 @@ void AuroraGraphPanel::onMouseMove(int mx, int my) {
     if (ageMins < 30) {
       std::snprintf(buf, sizeof(buf), "%.0f%% (Now)", bestPoint->percent);
     } else {
-      std::snprintf(buf, sizeof(buf), "%.0f%% (-%ldh %ldm)", bestPoint->percent,
-                    ageMins / 60, ageMins % 60);
+      std::snprintf(buf, sizeof(buf), "%.0f%% (-%lldh %lldm)",
+                    bestPoint->percent, static_cast<long long>(ageMins / 60),
+                    static_cast<long long>(ageMins % 60));
     }
     tooltip_.text = buf;
     tooltip_.x = mx;

@@ -53,7 +53,7 @@ bool ConfigManager::init() {
   std::filesystem::create_directories(configDir_, ec);
   if (ec) {
     std::fprintf(stderr, "ConfigManager: failed to create dir %s: %s\n",
-                 configDir_.c_str(), ec.message().c_str());
+                 configDir_.string().c_str(), ec.message().c_str());
     return false;
   }
 
@@ -98,9 +98,9 @@ bool ConfigManager::init() {
                 console.error('[IDBFS] Sync-from-IDB failed:', err);
               } else {
                 console.log('[IDBFS] Sync-from-IDB complete' +
-                            (mounted ? '' : ' (no IDBFS — session only)'));
+                            (mounted ? "" : " (no IDBFS — session only)"));
               }
-              if (typeof Module._hamclock_after_idbfs == = 'function')
+              if (typeof Module._hamclock_after_idbfs === 'function')
                 Module._hamclock_after_idbfs();
             });
       },
@@ -122,7 +122,7 @@ bool ConfigManager::load(AppConfig &config) const {
   auto json = nlohmann::json::parse(ifs, nullptr, false);
   if (json.is_discarded()) {
     std::fprintf(stderr, "ConfigManager: invalid JSON in %s\n",
-                 configPath_.c_str());
+                 configPath_.string().c_str());
     return false;
   }
 
@@ -368,7 +368,7 @@ bool ConfigManager::save(const AppConfig &config) const {
   std::filesystem::create_directories(configDir_, ec);
   if (ec) {
     std::fprintf(stderr, "ConfigManager: cannot create %s: %s\n",
-                 configDir_.c_str(), ec.message().c_str());
+                 configDir_.string().c_str(), ec.message().c_str());
     return false;
   }
 
@@ -487,7 +487,7 @@ bool ConfigManager::save(const AppConfig &config) const {
   std::ofstream ofs(configPath_);
   if (!ofs) {
     std::fprintf(stderr, "ConfigManager: cannot write %s\n",
-                 configPath_.c_str());
+                 configPath_.string().c_str());
     return false;
   }
 
