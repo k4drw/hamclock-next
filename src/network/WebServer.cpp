@@ -28,6 +28,19 @@
 #include "../core/UIRegistry.h"
 #endif
 
+// Platform includes for interface enumeration (private-IP gate)
+#if defined(__linux__) || defined(__APPLE__)
+#include <arpa/inet.h>
+#include <ifaddrs.h>
+#include <netinet/in.h>
+#elif defined(_WIN32)
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <iphlpapi.h>
+#include <windows.h>
+#endif
+
 using namespace HamClock;
 
 static std::string base64Decode(const std::string &in) {
@@ -52,6 +65,109 @@ static std::string base64Decode(const std::string &in) {
 }
 
 // Returns true if the URL targets a private/loopback address (SSRF guard)
+// Returns true if all non-loopback interfaces have private/link-local
+// addresses. If ANY interface has a public address this returns false and the
+// web server should not start.
+static bool isHostOnPrivateNetwork() {
+#if defined(__linux__) || defined(__APPLE__)
+  struct ifaddrs *ifap = nullptr;
+  if (getifaddrs(&ifap) != 0)
+    return true; // can't determine — allow rather than block on error
+
+  bool foundNonLoopback = false;
+  bool allPrivate = true;
+
+  for (struct ifaddrs *ifa = ifap; ifa != nullptr; ifa = ifa->ifa_next) {
+    if (!ifa->ifa_addr)
+      continue;
+    // IPv4
+    if (ifa->ifa_addr->sa_family == AF_INET) {
+      auto *sa = reinterpret_cast<struct sockaddr_in *>(ifa->ifa_addr);
+      uint32_t ip = ntohl(sa->sin_addr.s_addr);
+      if (ip == 0x7F000001u || (ip >> 24) == 127)
+        continue; // loopback
+      foundNonLoopback = true;
+      uint8_t a = (ip >> 24) & 0xFF;
+      uint8_t b = (ip >> 16) & 0xFF;
+      bool priv = (a == 10) || (a == 172 && b >= 16 && b <= 31) ||
+                  (a == 192 && b == 168) ||
+                  (a == 169 && b == 254); // link-local
+      if (!priv)
+        allPrivate = false;
+    }
+    // IPv6
+    else if (ifa->ifa_addr->sa_family == AF_INET6) {
+      auto *sa6 = reinterpret_cast<struct sockaddr_in6 *>(ifa->ifa_addr);
+      const uint8_t *b = sa6->sin6_addr.s6_addr;
+      // loopback ::1
+      bool loopback = true;
+      for (int i = 0; i < 15; ++i)
+        if (b[i] != 0) {
+          loopback = false;
+          break;
+        }
+      if (loopback && b[15] == 1)
+        continue;
+      foundNonLoopback = true;
+      // ULA fc00::/7
+      bool ula = (b[0] & 0xFE) == 0xFC;
+      // link-local fe80::/10
+      bool ll = (b[0] == 0xFE) && ((b[1] & 0xC0) == 0x80);
+      if (!ula && !ll)
+        allPrivate = false;
+    }
+  }
+  freeifaddrs(ifap);
+  // If we only found loopback (no real interfaces), allow — avoids blocking
+  // during early boot or container environments.
+  return !foundNonLoopback || allPrivate;
+
+#elif defined(_WIN32)
+  ULONG bufLen = 15000;
+  std::vector<uint8_t> buf(bufLen);
+  auto *addrBuf = reinterpret_cast<IP_ADAPTER_ADDRESSES *>(buf.data());
+  DWORD flags = GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_MULTICAST |
+                GAA_FLAG_SKIP_DNS_SERVER;
+  if (GetAdaptersAddresses(AF_UNSPEC, flags, nullptr, addrBuf, &bufLen) !=
+      ERROR_SUCCESS)
+    return true;
+
+  bool foundNonLoopback = false;
+  bool allPrivate = true;
+
+  for (auto *a = addrBuf; a != nullptr; a = a->Next) {
+    if (a->IfType == IF_TYPE_SOFTWARE_LOOPBACK)
+      continue;
+    for (auto *u = a->FirstUnicastAddress; u != nullptr; u = u->Next) {
+      auto family = u->Address.lpSockaddr->sa_family;
+      if (family == AF_INET) {
+        auto *sa = reinterpret_cast<sockaddr_in *>(u->Address.lpSockaddr);
+        uint32_t ip = ntohl(sa->sin_addr.s_addr);
+        foundNonLoopback = true;
+        uint8_t a0 = (ip >> 24) & 0xFF;
+        uint8_t b0 = (ip >> 16) & 0xFF;
+        bool priv = (a0 == 10) || (a0 == 172 && b0 >= 16 && b0 <= 31) ||
+                    (a0 == 192 && b0 == 168) || (a0 == 169 && b0 == 254);
+        if (!priv)
+          allPrivate = false;
+      } else if (family == AF_INET6) {
+        auto *sa6 = reinterpret_cast<sockaddr_in6 *>(u->Address.lpSockaddr);
+        const uint8_t *bytes = sa6->sin6_addr.s6_bytes;
+        bool ula = (bytes[0] & 0xFE) == 0xFC;
+        bool ll = (bytes[0] == 0xFE) && ((bytes[1] & 0xC0) == 0x80);
+        foundNonLoopback = true;
+        if (!ula && !ll)
+          allPrivate = false;
+      }
+    }
+  }
+  return !foundNonLoopback || allPrivate;
+
+#else
+  return true; // Unknown platform — allow
+#endif
+}
+
 static bool isPrivateOrLoopbackUrl(const std::string &url) {
   size_t pos = url.find("://");
   if (pos == std::string::npos)
@@ -64,6 +180,18 @@ static bool isPrivateOrLoopbackUrl(const std::string &url) {
     host = host.substr(1, host.size() >= 2 ? host.size() - 2 : 0);
   if (host == "localhost" || host == "::1")
     return true;
+  // IPv6: ULA (fc00::/7) and link-local (fe80::/10) are private
+  if (host.size() >= 4 && host[2] == ':') {
+    unsigned int h0 = 0, h1 = 0;
+    if (std::sscanf(host.c_str(), "%x:%x", &h0, &h1) >= 1) {
+      uint8_t b0 = (h0 >> 8) & 0xFF;
+      uint8_t b1 = h0 & 0xFF;
+      if ((b0 & 0xFE) == 0xFC)
+        return true; // ULA fc00::/7
+      if (b0 == 0xFE && (b1 & 0xC0) == 0x80)
+        return true; // link-local fe80::/10
+    }
+  }
   unsigned int a = 0, b = 0, c = 0, d = 0;
   if (std::sscanf(host.c_str(), "%u.%u.%u.%u", &a, &b, &c, &d) == 4) {
     if (a == 127)
@@ -101,6 +229,17 @@ void WebServer::start() {
 #ifndef __EMSCRIPTEN__
   if (running_)
     return;
+
+  // Security: only start the web server if all network interfaces are on
+  // private/LAN addresses. Override with HAMCLOCK_FORCE_WEB=1.
+  const char *forceEnv = std::getenv("HAMCLOCK_FORCE_WEB");
+  bool forced = (forceEnv != nullptr && forceEnv[0] == '1');
+  if (!forced && !isHostOnPrivateNetwork()) {
+    LOG_W("WebServer", "Public IP detected — web server disabled for security. "
+                       "Set HAMCLOCK_FORCE_WEB=1 to override.");
+    return;
+  }
+
   running_ = true;
   thread_ = std::thread(&WebServer::run, this);
 #endif
@@ -1908,12 +2047,18 @@ void WebServer::run() {
 
   svr.Get("/set_config", [this](const httplib::Request &req,
                                 httplib::Response &res) {
+    // Server-side length guards for string params (supplements client maxlength)
+    auto strParam = [&](const std::string &key, size_t maxLen) -> std::string {
+      std::string v = req.get_param_value(key);
+      if (v.size() > maxLen) v.resize(maxLen);
+      return v;
+    };
     if (req.has_param("call"))
-      cfg_->callsign = req.get_param_value("call");
+      cfg_->callsign = strParam("call", 12);
     if (req.has_param("grid"))
-      cfg_->grid = req.get_param_value("grid");
+      cfg_->grid = strParam("grid", 8);
     if (req.has_param("theme"))
-      cfg_->theme = req.get_param_value("theme");
+      cfg_->theme = strParam("theme", 32);
     if (req.has_param("lat")) {
       double v = StringUtils::safe_stod(req.get_param_value("lat"));
       if (v < -90.0 || v > 90.0) {
@@ -1940,7 +2085,7 @@ void WebServer::run() {
     if (req.has_param("dx_enabled"))
       cfg_->dxClusterEnabled = req.get_param_value("dx_enabled") == "1";
     if (req.has_param("dx_host"))
-      cfg_->dxClusterHost = req.get_param_value("dx_host");
+      cfg_->dxClusterHost = strParam("dx_host", 253);
     if (req.has_param("dx_port")) {
       int p = StringUtils::safe_stoi(req.get_param_value("dx_port"));
       if (p < 1 || p > 65535) {
@@ -1965,7 +2110,7 @@ void WebServer::run() {
     }
     // Rig
     if (req.has_param("rig_host"))
-      cfg_->rigHost = req.get_param_value("rig_host");
+      cfg_->rigHost = strParam("rig_host", 253);
     if (req.has_param("rig_port")) {
       int p = StringUtils::safe_stoi(req.get_param_value("rig_port"));
       if (p < 1 || p > 65535) {
@@ -1979,7 +2124,7 @@ void WebServer::run() {
       cfg_->rigAutoTune = req.get_param_value("rig_auto_tune") == "1";
     // Rotator
     if (req.has_param("rot_host"))
-      cfg_->rotatorHost = req.get_param_value("rot_host");
+      cfg_->rotatorHost = strParam("rot_host", 253);
     if (req.has_param("rot_port")) {
       int p = StringUtils::safe_stoi(req.get_param_value("rot_port"));
       if (p < 1 || p > 65535) {

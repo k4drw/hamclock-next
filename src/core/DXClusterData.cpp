@@ -108,13 +108,22 @@ void DXClusterDataStore::addSpot(const DXClusterSpot &spot) {
     // 2. Prune old spots from the same copy (in-place)
     auto now = std::chrono::system_clock::now();
     auto maxAge = std::chrono::minutes(60);
-    newData->spots.erase(std::remove_if(newData->spots.begin(),
-                                        newData->spots.end(),
-                                        [&](const DXClusterSpot &spot_to_prune) {
-                                          return (now - spot_to_prune.spottedAt) > maxAge;
-                                        }),
-                         newData->spots.end());
-    
+    newData->spots.erase(
+        std::remove_if(newData->spots.begin(), newData->spots.end(),
+                       [&](const DXClusterSpot &spot_to_prune) {
+                         return (now - spot_to_prune.spottedAt) > maxAge;
+                       }),
+        newData->spots.end());
+
+    // 3. Hard count cap — prevent unbounded growth on busy clusters (RPi
+    // safety)
+    static constexpr size_t kMaxDxSpots = 500;
+    if (newData->spots.size() > kMaxDxSpots)
+      newData->spots.erase(
+          newData->spots.begin(),
+          newData->spots.begin() +
+              static_cast<ptrdiff_t>(newData->spots.size() - kMaxDxSpots));
+
     // 3. Atomically swap the main pointer
     data_ = newData;
   }

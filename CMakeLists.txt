@@ -653,7 +653,7 @@ else()
 
     if(WIN32)
         add_definitions(-D_WIN32_WINNT=0x0601) # Target Windows 7+
-        target_link_libraries(hamclock-next PRIVATE ws2_32 psapi)
+        target_link_libraries(hamclock-next PRIVATE ws2_32 psapi iphlpapi)
     elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
         # On Linux with GCC, link libstdc++ and libgcc statically for better portability
         target_link_options(hamclock-next PRIVATE -static-libstdc++ -static-libgcc)

@@ -297,6 +297,10 @@ struct DashboardContext {
   std::vector<Widget *> widgets;
   std::vector<Widget *> eventWidgets;
 
+  // Widget factory — stored as a member so pane containers hold a valid [this]
+  // capture rather than a dangling reference to a constructor-local lambda.
+  std::function<Widget *(WidgetType)> widgetFactory_;
+
   // State
   Uint32 lastFetchMs = 0;
   Uint32 lastResizeMs = 0;
@@ -967,7 +971,6 @@ DashboardContext::DashboardContext(AppContext &ctx)
   santaProvider = std::make_unique<SantaProvider>(santaStore);
   santaProvider->update();
 
-  SDL_Color cyan = {0, 200, 255, 255};
   timePanel =
       std::make_unique<TimePanel>(0, 0, 0, 0, fontMgr, texMgr, appCfg.callsign);
   timePanel->setCallColor(appCfg.callsignColor);
@@ -980,8 +983,31 @@ DashboardContext::DashboardContext(AppContext &ctx)
 
   widgetSelector = std::make_unique<WidgetSelector>(fontMgr);
 
-  // Helper for pool (Lazy loading)
-  auto getOrAddWidget = [&](WidgetType type) -> Widget * {
+  // Helper for pool (Lazy loading) — assigned to a member so pane-container
+  // factory lambdas (captured by [this]) don't dangle after construction.
+  widgetFactory_ = [this, &ctx](WidgetType type) -> Widget * {
+    auto &appCfg = ctx.appCfg;
+    auto &netManager = *ctx.netManager;
+    auto solarStore = ctx.solarStore;
+    auto watchlistStore = ctx.watchlistStore;
+    auto rssStore = ctx.rssStore;
+    auto watchlistHitStore = ctx.watchlistHitStore;
+    auto spotStore = ctx.spotStore;
+    auto activityStore = ctx.activityStore;
+    auto dxcStore = ctx.dxcStore;
+    auto bandStore = ctx.bandStore;
+    auto contestStore = ctx.contestStore;
+    auto moonStore = ctx.moonStore;
+    auto historyStore = ctx.historyStore;
+    auto deWeatherStore = ctx.deWeatherStore;
+    auto dxWeatherStore = ctx.dxWeatherStore;
+    auto callbookStore = ctx.callbookStore;
+    auto dstStore = ctx.dstStore;
+    auto adifStore = ctx.adifStore;
+    auto santaStore = ctx.santaStore;
+    auto rotatorStore = ctx.rotatorStore;
+    auto state = ctx.state;
+    auto auroraHistoryStore = ctx.auroraHistoryStore;
     if (widgetPool.count(type) && widgetPool[type])
       return widgetPool[type].get();
 
@@ -1140,7 +1166,8 @@ DashboardContext::DashboardContext(AppContext &ctx)
       break;
     default:
       widgetPool[type] = std::make_unique<PlaceholderWidget>(
-          0, 0, 0, 0, fontMgr, widgetTypeDisplayName(type), cyan);
+          0, 0, 0, 0, fontMgr, widgetTypeDisplayName(type),
+          SDL_Color{0, 200, 255, 255});
       break;
     }
 
@@ -1232,8 +1259,9 @@ DashboardContext::DashboardContext(AppContext &ctx)
   for (int i = 0; i < 4; ++i) {
     panes.push_back(std::make_unique<PaneContainer>(
         0, 0, 0, 0, WidgetType::SOLAR, fontMgr));
+    // Capture [this] — widgetFactory_ is a member, so this is safe post-ctor.
     panes.back()->setWidgetFactory(
-        [&](WidgetType t) { return getOrAddWidget(t); });
+        [this](WidgetType t) { return widgetFactory_(t); });
   }
 
   panes[0]->setRotation(appCfg.pane1Rotation, appCfg.rotationIntervalS);

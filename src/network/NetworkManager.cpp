@@ -76,10 +76,10 @@ static std::string base64Encode(const std::string &in) {
 }
 
 void NetworkManager::setHubConfig(HubMode mode, const std::string &ip,
-                                   int port) {
+                                  int port) {
   std::lock_guard<std::mutex> lk(hubMutex_);
   hubMode_ = mode;
-  hubIp_   = ip;
+  hubIp_ = ip;
   hubPort_ = port;
 }
 
@@ -215,11 +215,11 @@ void NetworkManager::fetchAsync(const std::string &url,
     std::lock_guard<std::mutex> lk(hubMutex_);
     if (hubMode_ == HubMode::Client && !hubIp_.empty()) {
       std::string encoded = base64Encode(url);
-      std::string hubUrl  = "http://" + hubIp_ + ":" + std::to_string(hubPort_)
-                          + "/api/hub/fetch?url=" + encoded
-                          + "&max_age=" + std::to_string(cacheAgeSeconds);
-      std::thread([this, hubUrl, url, callback = std::move(callback),
-                   hasCache, cached]() mutable {
+      std::string hubUrl = "http://" + hubIp_ + ":" + std::to_string(hubPort_) +
+                           "/api/hub/fetch?url=" + encoded +
+                           "&max_age=" + std::to_string(cacheAgeSeconds);
+      std::thread([this, hubUrl, url, callback = std::move(callback), hasCache,
+                   cached]() mutable {
         std::string body = fetchFromHubSync(hubUrl);
         if (!body.empty()) {
           {
@@ -248,8 +248,8 @@ void NetworkManager::fetchAsync(const std::string &url,
 }
 
 void NetworkManager::fetchDirect(const std::string &url,
-                                  std::function<void(std::string)> callback,
-                                  bool hasCache, const CacheEntry &cached) {
+                                 std::function<void(std::string)> callback,
+                                 bool hasCache, const CacheEntry &cached) {
   CURL *curl = curl_easy_init();
   if (!curl) {
     LOG_E("NetworkManager", "curl_easy_init failed");
@@ -273,8 +273,7 @@ void NetworkManager::fetchDirect(const std::string &url,
     curl_easy_setopt(curl, CURLOPT_CAINFO,
                      "/etc/ssl/certs/ca-certificates.crt");
   } else if (std::filesystem::exists("/etc/pki/tls/certs/ca-bundle.crt")) {
-    curl_easy_setopt(curl, CURLOPT_CAINFO,
-                     "/etc/pki/tls/certs/ca-bundle.crt");
+    curl_easy_setopt(curl, CURLOPT_CAINFO, "/etc/pki/tls/certs/ca-bundle.crt");
   } else if (std::filesystem::exists("/etc/ssl/ca-bundle.pem")) {
     curl_easy_setopt(curl, CURLOPT_CAINFO, "/etc/ssl/ca-bundle.pem");
   }
@@ -467,7 +466,9 @@ void NetworkManager::loadCache() {
 
             std::lock_guard<std::mutex> lock(cacheMutex_);
             cache_[url] = {std::move(data), ts, lm, etag};
-          } catch (...) {
+          } catch (const std::exception &ex) {
+            LOG_W("NetworkManager", "Cache parse error for {}: {}",
+                  entry.path().string(), ex.what());
           }
         }
       }
