@@ -151,7 +151,11 @@ void SatPanel::render(SDL_Renderer *renderer) {
   SDL_RenderDrawRect(renderer, &clip);
 
   int pad = 2;
-  int curY = y_ + pad;
+  int titleH = 20;
+  fontMgr_.drawText(renderer, "Satellite", x_ + 10, y_ + 5, themes.accent, 10,
+                    true);
+
+  int curY = y_ + titleH + pad;
 
   // Text colors
   SDL_Color white = {255, 255, 255, 255};

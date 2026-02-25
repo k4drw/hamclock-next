@@ -537,7 +537,7 @@ set(HAMCLOCK_SOURCES
     src/ui/BeaconPanel.cpp
     src/ui/ContestPanel.cpp
     src/ui/CountdownPanel.cpp
-    src/ui/CPUTempPanel.cpp
+    src/ui/SysInfoPanel.cpp
     src/ui/DRAPPanel.cpp
     src/ui/GimbalPanel.cpp
     src/ui/HistoryPanel.cpp

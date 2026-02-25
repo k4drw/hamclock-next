@@ -52,12 +52,13 @@ void DRAPPanel::render(SDL_Renderer *renderer) {
                          themes.border.b, themes.border.a);
   SDL_RenderDrawRect(renderer, &rect);
 
+  int titleH = 20;
   // Title
-  fontMgr_.drawText(renderer, "DRAP Absorption", x_ + 5, y_ + 5, themes.accent,
-                    10);
+  fontMgr_.drawText(renderer, "DRAP", x_ + 10, y_ + 5, themes.accent, 10, true);
 
   if (!dataReady_) {
-    fontMgr_.drawText(renderer, "Loading...", x_ + width_ / 2, y_ + height_ / 2,
+    fontMgr_.drawText(renderer, "Loading...", x_ + width_ / 2,
+                      y_ + titleH + (height_ - titleH) / 2,
                       {150, 150, 150, 255}, 12, false, true);
     return;
   }

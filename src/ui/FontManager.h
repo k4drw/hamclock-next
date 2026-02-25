@@ -28,6 +28,10 @@ public:
   void setRenderScale(float scale) { renderScale_ = std::max(1.0f, scale); }
   float renderScale() const { return renderScale_; }
 
+  // Tune the persistent text cache limit at runtime (default: 300).
+  // Call with a lower value (e.g. 100) on low-memory devices.
+  void setTextCacheLimit(size_t limit) { textCacheLimit_ = limit; }
+
   FontManager(const FontManager &) = delete;
   FontManager &operator=(const FontManager &) = delete;
 
@@ -120,11 +124,12 @@ public:
       if (SDL_GetRendererInfo(renderer, &info) == 0) {
         maxW_ = info.max_texture_width;
         maxH_ = info.max_texture_height;
-#if defined(__linux__) || defined(__arm__) || defined(__aarch64__)
-        if (maxW_ > 2048)
-          maxW_ = 2048;
-        if (maxH_ > 2048)
-          maxH_ = 2048;
+#if (defined(__arm__) || defined(__aarch64__)) && defined(__linux__)
+        // RPi/Linux ARM only — not macOS Apple Silicon.
+        if (maxW_ > 1024)
+          maxW_ = 1024;
+        if (maxH_ > 1024)
+          maxH_ = 1024;
 #endif
       }
     }
@@ -187,7 +192,7 @@ public:
            text.find('m') != std::string::npos)));
 
     if (volatileText) {
-      VolatileCacheKey key{x, y, basePt, bold};
+      VolatileCacheKey key{x, y, basePt, bold, color};
       auto it = volatileCache_.find(key);
 
       // If we have a cached texture and the text is unchanged, just draw it.
@@ -247,7 +252,7 @@ public:
         return;
 
       // Prune cache if it gets too large
-      if (textCache_.size() > 300) {
+      if (textCache_.size() > textCacheLimit_) {
         pruneCache();
       }
       // Add to cache
@@ -378,6 +383,7 @@ private:
   struct VolatileCacheKey {
     int x, y, ptSize;
     bool bold;
+    SDL_Color color;
 
     bool operator<(const VolatileCacheKey &other) const {
       if (x != other.x)
@@ -386,7 +392,15 @@ private:
         return y < other.y;
       if (ptSize != other.ptSize)
         return ptSize < other.ptSize;
-      return bold < other.bold;
+      if (bold != other.bold)
+        return bold < other.bold;
+      if (color.r != other.color.r)
+        return color.r < other.color.r;
+      if (color.g != other.color.g)
+        return color.g < other.color.g;
+      if (color.b != other.color.b)
+        return color.b < other.color.b;
+      return color.a < other.color.a;
     }
   };
 
@@ -421,6 +435,7 @@ private:
   unsigned int size_ = 0;
   int defaultSize_ = 24;
   float renderScale_ = 1.0f;
+  size_t textCacheLimit_ = 300;
   std::map<int, TTF_Font *> cache_;
   std::map<TextCacheKey, CachedTexture> textCache_;
   std::map<VolatileCacheKey, CachedTextureWithText> volatileCache_;

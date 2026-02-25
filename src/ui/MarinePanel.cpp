@@ -26,18 +26,17 @@ void MarinePanel::render(SDL_Renderer *renderer) {
                          themes.border.b, themes.border.a);
   SDL_RenderDrawRect(renderer, &rect);
 
-  int centerX = x_ + width_ / 2;
+  int titleH = 20;
   int pad = 6;
-  int curY = y_ + pad;
+  int centerX = x_ + width_ / 2;
+  int curY = y_ + titleH + 4;
 
-  fontMgr_.drawText(renderer, "Marine", centerX, curY, themes.accent,
-                    titleFontSize_, true, true);
-  curY += titleFontSize_ + 6;
+  fontMgr_.drawText(renderer, "Marine", x_ + 10, y_ + 5, themes.accent, 10,
+                    true);
 
   if (!currentData_.tidesValid && !currentData_.buoyValid) {
-    fontMgr_.drawText(renderer, "No data configured", centerX,
-                      y_ + height_ / 2, themes.textDim, rowFontSize_, false,
-                      true);
+    fontMgr_.drawText(renderer, "No data configured", centerX, y_ + height_ / 2,
+                      themes.textDim, rowFontSize_, false, true);
     return;
   }
 
@@ -53,12 +52,11 @@ void MarinePanel::render(SDL_Renderer *renderer) {
       bool isHigh = (t.type == "H");
       float ht = useMetric_ ? (float)(t.heightFt * 0.3048) : (float)t.heightFt;
       std::snprintf(buf, sizeof(buf), "%s  %s  %.2f%s", t.time.c_str(),
-                    isHigh ? "HI" : "LO", ht,
-                    useMetric_ ? "m" : "ft");
-      SDL_Color col = isHigh ? SDL_Color{0, 200, 255, 255}
-                             : SDL_Color{180, 160, 100, 255};
-      fontMgr_.drawText(renderer, buf, x_ + pad, curY, col, rowFontSize_,
-                        false, false);
+                    isHigh ? "HI" : "LO", ht, useMetric_ ? "m" : "ft");
+      SDL_Color col =
+          isHigh ? SDL_Color{0, 200, 255, 255} : SDL_Color{180, 160, 100, 255};
+      fontMgr_.drawText(renderer, buf, x_ + pad, curY, col, rowFontSize_, false,
+                        false);
       curY += rowFontSize_ + 3;
     }
     curY += 4;
@@ -76,16 +74,17 @@ void MarinePanel::render(SDL_Renderer *renderer) {
     if (b.waveHeightM >= 0) {
       float wh =
           useMetric_ ? (float)b.waveHeightM : (float)(b.waveHeightM * 3.281);
-      std::snprintf(buf, sizeof(buf), "Waves: %.1f%s @ %.0fs",
-                    wh, useMetric_ ? "m" : "ft", b.wavePeriodS > 0 ? b.wavePeriodS : 0.0);
+      std::snprintf(buf, sizeof(buf), "Waves: %.1f%s @ %.0fs", wh,
+                    useMetric_ ? "m" : "ft",
+                    b.wavePeriodS > 0 ? b.wavePeriodS : 0.0);
       fontMgr_.drawText(renderer, buf, x_ + pad, curY, themes.text,
                         rowFontSize_, false, false);
       curY += rowFontSize_ + 2;
     }
 
     if (b.waterTempC > -900) {
-      float wt = useMetric_ ? (float)b.waterTempC
-                             : (float)(b.waterTempC * 1.8 + 32);
+      float wt =
+          useMetric_ ? (float)b.waterTempC : (float)(b.waterTempC * 1.8 + 32);
       std::snprintf(buf, sizeof(buf), "Water: %.1f%s", wt,
                     useMetric_ ? "C" : "F");
       fontMgr_.drawText(renderer, buf, x_ + pad, curY, {0, 200, 200, 255},
@@ -95,9 +94,9 @@ void MarinePanel::render(SDL_Renderer *renderer) {
 
     if (b.windSpeedMps >= 0) {
       float ws = useMetric_ ? (float)b.windSpeedMps
-                             : (float)(b.windSpeedMps * 1.944); // kts
-      std::snprintf(buf, sizeof(buf), "Wind: %.0f%s @ %d deg",
-                    ws, useMetric_ ? "m/s" : "kt", b.windDirDeg);
+                            : (float)(b.windSpeedMps * 1.944); // kts
+      std::snprintf(buf, sizeof(buf), "Wind: %.0f%s @ %d deg", ws,
+                    useMetric_ ? "m/s" : "kt", b.windDirDeg);
       fontMgr_.drawText(renderer, buf, x_ + pad, curY, themes.textDim,
                         rowFontSize_, false, false);
     }

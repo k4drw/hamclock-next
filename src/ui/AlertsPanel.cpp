@@ -43,8 +43,8 @@ void AlertsPanel::render(SDL_Renderer *renderer) {
   int pad = 6;
   int curY = y_ + pad;
 
-  fontMgr_.drawText(renderer, "WX Alerts", centerX, curY, themes.accent,
-                    titleFontSize_, true, true);
+  fontMgr_.drawText(renderer, "WX Alerts", x_ + 10, y_ + 5, themes.accent, 10,
+                    true);
   curY += titleFontSize_ + 6;
 
   if (!currentData_.valid) {

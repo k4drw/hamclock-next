@@ -41,13 +41,17 @@ void CountdownPanel::render(SDL_Renderer *renderer) {
   SDL_SetRenderDrawColor(renderer, 80, 80, 80, 255);
   SDL_RenderDrawRect(renderer, &rect);
 
-  int centerY = y_ + height_ / 2;
-  int centerX = x_ + width_ / 2;
-
+  int titleH = 20;
   std::string label =
-      config_.countdownLabel.empty() ? "Click to set" : config_.countdownLabel;
-  fontMgr_.drawText(renderer, label, centerX, y_ + 14, {0, 200, 255, 255}, 11,
-                    true, true);
+      config_.countdownLabel.empty() ? "Countdown" : config_.countdownLabel;
+  if (config_.countdownLabel.empty() && editing_)
+    label = "Click to set";
+
+  fontMgr_.drawText(renderer, label, x_ + 10, y_ + 5, {0, 200, 255, 255}, 10,
+                    true);
+
+  int centerX = x_ + width_ / 2;
+  int centerY = y_ + titleH + (height_ - titleH) / 2;
 
   if (targetTime_ == std::chrono::system_clock::time_point()) {
     fontMgr_.drawText(renderer, "No target set", centerX, centerY,

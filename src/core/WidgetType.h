@@ -31,7 +31,7 @@ enum class WidgetType {
   WATCHLIST,
   EME_TOOL,
   SANTA_TRACKER,
-  CPU_TEMP,
+  SYS_INFO,
   ASTEROID,
   ALERTS,
   FORECAST,
@@ -97,8 +97,8 @@ inline const char *widgetTypeToString(WidgetType t) {
     return "eme_tool";
   case WidgetType::SANTA_TRACKER:
     return "santa_tracker";
-  case WidgetType::CPU_TEMP:
-    return "cpu_temp";
+  case WidgetType::SYS_INFO:
+    return "sys_info";
   case WidgetType::ASTEROID:
     return "asteroid";
   case WidgetType::ALERTS:
@@ -173,8 +173,8 @@ inline const char *widgetTypeDisplayName(WidgetType t) {
     return "EME Tool";
   case WidgetType::SANTA_TRACKER:
     return "Santa Tracker";
-  case WidgetType::CPU_TEMP:
-    return "CPU Temp";
+  case WidgetType::SYS_INFO:
+    return "System Info";
   case WidgetType::ASTEROID:
     return "Asteroids";
   case WidgetType::ALERTS:
@@ -249,8 +249,8 @@ inline WidgetType widgetTypeFromString(const std::string &s,
     return WidgetType::EME_TOOL;
   if (s == "santa_tracker")
     return WidgetType::SANTA_TRACKER;
-  if (s == "cpu_temp")
-    return WidgetType::CPU_TEMP;
+  if (s == "sys_info" || s == "cpu_temp")
+    return WidgetType::SYS_INFO;
   if (s == "asteroid")
     return WidgetType::ASTEROID;
   if (s == "alerts")

@@ -137,8 +137,13 @@ void LocalPanel::render(SDL_Renderer *renderer) {
       themes.warning, // Weather 2
   };
 
-  int curY = y_ + pad;
+  int titleH = 20;
+  fontMgr_.drawText(renderer, "DE", x_ + 10, y_ + 5, themes.accent, 10, true);
+
+  int curY = y_ + titleH + pad / 2;
   for (int i = 0; i < kNumLines; ++i) {
+    if (i == 0 && lineText_[i] == "DE:")
+      continue;
     bool needRedraw = !lineTex_[i] || (lineText_[i] != lastLineText_[i]) ||
                       (lineFontSize_[i] != lastLineFontSize_[i]);
     if (needRedraw) {

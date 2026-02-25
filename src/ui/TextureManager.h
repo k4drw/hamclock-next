@@ -127,9 +127,12 @@ public:
 #ifdef __EMSCRIPTEN__
         maxW_ = std::min(maxW_, 1024);
         maxH_ = std::min(maxH_, 1024);
-#elif defined(__linux__) || defined(__arm__) || defined(__aarch64__)
-        maxW_ = std::min(maxW_, 2048);
-        maxH_ = std::min(maxH_, 2048);
+#elif (defined(__arm__) || defined(__aarch64__)) && defined(__linux__)
+        // RPi/Linux ARM only — keeps worst-case texture at 4 MB vs 16 MB.
+        // Intentionally excludes macOS ARM (Apple Silicon) which has ample
+        // VRAM.
+        maxW_ = std::min(maxW_, 1024);
+        maxH_ = std::min(maxH_, 1024);
 #endif
       } else {
         maxW_ = 2048;

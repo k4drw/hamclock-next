@@ -1,7 +1,7 @@
 {
-  "mcp_version": "2.4",
+  "mcp_version": "2.5",
   "project": "hamclock-next",
-  "updated_at": "2026-02-24T00:00:00.000Z",
+  "updated_at": "2026-02-25T00:00:00.000Z",
   "project_context": {
     "title": "HamClock Next \u2014 SDL2 Rewrite",
     "callsign": "K4DRW",
@@ -176,13 +176,13 @@
     ]
   },
   "feature_status_summary": {
-    "total": 84,
-    "implemented": 80,
-    "partial": 3,
-    "missing": 1,
+    "total": 87,
+    "implemented": 84,
+    "partial": 2,
+    "missing": 0,
     "not_needed": 2,
-    "percent_done": "~95% (79/83 features — 2026-02-24)",
-    "notes": "v1.0B01 sprint complete: 5 new data panels (Alerts, Forecast, Hurricane, Marine, SpaceWeather badge), UpdateChecker + UpdateOverlay, MJPEG stream + live web interface, Web Config UI, graph hover tooltips with AA rendering, Aurora history persistence, asteroid enhancements (propagator, icon cycling, configurable color, map hover tooltip), legacy API parity aliases, plain-text endpoints. Partial: repeater_directory (API key required), winlink_gateways (access key required), sota_map_pins (coordinate resolution). Missing: bme280_sensor."
+    "percent_done": "~100% (84/86 features — 2026-02-25)",
+    "notes": "All original parity features implemented. Partial: repeater_directory (RepeaterBook API key required), winlink_gateways (Winlink access key required). New since v2.4: bme280_sensor fully implemented (Bosch compensation math, I2C calibration). RPi 1GB adaptive memory mode: isLowMemoryDevice() caps texture cache to 15, font cache to 100, texture dimension to 1024px on Linux ARM; 60s RSS heartbeat log. SOTA resolved via ActivityLocationManager (summitslist.csv + API fallback). Cloud and WX/Pressure overlays confirmed working."
   },
   "implemented_features": [
     {
@@ -673,6 +673,37 @@
         "src/ui/MapWidget.cpp"
       ],
       "notes": "AsteroidPropagator ground track propagation. AsteroidProvider data fetching layer. 7 asteroids \u00d7 1 compact row layout ('Name Mon DD HH:MM'). Settings footer: icon picker (12 symbols) + color swatches (6). Title-area tap cycles icons \u2604\u2192\u2295\u2192\u25c8\u2192\u2b21\u2192\u2726\u2192\u2604. ConfigManager persists asteroidIcon (asteroid.icon) and asteroidColor (asteroid.color.r/g/b, default orange). MapWidget: glyph marker at closest-approach point, configurable color, hover tooltip (name, miss distance LD, velocity, hazardous flag)."
+    },
+    {
+      "feature_id": "bme280_sensor",
+      "name": "BME280 Environmental Sensor",
+      "next_files": [
+        "src/services/BME280Provider.cpp",
+        "src/services/BME280Provider.h"
+      ],
+      "notes": "Full Bosch datasheet §4.2.3 integer compensation math. Bank1 (0x88–0x9F: T1-T3, P1-P9, H1) + Bank2 (0xE1–0xE7: H2-H6, split-byte H4/H5). Outputs calibrated °C, hPa, %rH to WeatherStore every 60s. Hardware validation on RPi+sensor pending."
+    },
+    {
+      "feature_id": "sota_map_pins",
+      "name": "SOTA Activator Map Pins",
+      "next_files": [
+        "src/core/ActivityLocationManager.cpp",
+        "src/core/ActivityLocationManager.h",
+        "src/services/ActivityProvider.cpp",
+        "src/ui/MapWidget.cpp"
+      ],
+      "notes": "ActivityLocationManager: binary-search on full summitslist.csv (50K+ summits, 7-day network cache, pre-seeded CSV support). resolveSummitAsync() fallback calls SOTA API per-summit and persists results in sota_api_cache.csv (30-day cache). Map overlay: orange squares. POTA uses parks.csv the same way."
+    },
+    {
+      "feature_id": "rpi_low_memory_mode",
+      "name": "RPi 1GB Adaptive Memory Mode",
+      "next_files": [
+        "src/main.cpp",
+        "src/ui/TextureManager.h",
+        "src/ui/FontManager.h",
+        "src/core/MemoryMonitor.h"
+      ],
+      "notes": "MemoryMonitor::isLowMemoryDevice() (RAM ≤ 1536 MB) gates memory limits at startup. Low-memory path: TextureManager cache 50→15, FontManager text cache 300→100, texture dimension cap 2048→1024px (Linux ARM only, excludes macOS ARM). 60-second RSS heartbeat log via MemoryMonitor::logStats('heartbeat'). Startup log: 'System RAM: N MB, low-memory mode: YES/NO'."
     }
   ],
   "partial_features": {
@@ -1406,6 +1437,32 @@
         "WebServer: Extended store references (DX, LiveSpots, Contests, CPU)",
         "API.md: Fully updated"
       ]
+    },
+    "phase_55": {
+      "name": "Security & Stability Hardening",
+      "completed": "2026-02-24",
+      "summary": "Private-IP gate for WebServer (refuses to bind on public IPs; HAMCLOCK_FORCE_WEB=1 override). SSRF guard extended to IPv6 ULA+link-local. String length caps in /set_config. DXCluster spot vector hard-capped at 500. NetworkManager cache load errors logged instead of swallowed.",
+      "key_changes": [
+        "WebServer.cpp: isHostOnPrivateNetwork() via getifaddrs (Linux/macOS) / GetAdaptersAddresses (Windows)",
+        "WebServer.cpp: SSRF guard adds IPv6 ULA fc00::/7 and link-local fe80::/10",
+        "WebServer.cpp: strParam() caps callsign 12, grid 8, theme 32, host 253 chars",
+        "DXClusterData.cpp: addSpot() hard cap at 500 entries after 60-min prune",
+        "NetworkManager.cpp: catch(std::exception&) logs parse failure path",
+        "CMakeLists.txt: iphlpapi added to Windows link libraries"
+      ]
+    },
+    "phase_56": {
+      "name": "RPi 1GB Low-Memory Adaptive Mode",
+      "completed": "2026-02-25",
+      "summary": "Fixed primary cache-sizing bug: fidelityMode() gate replaced by isLowMemoryDevice() (RAM ≤ 1536 MB). On RPi 3B (972 MB): texture cache 50→15, font text cache 300→100, texture dimension cap 2048→1024px (Linux ARM only, macOS ARM excluded via corrected preprocessor guard). 60-second RSS heartbeat log. Confirmed working on RPi 3B and 64GB dev machine.",
+      "key_changes": [
+        "main.cpp: isLowMemoryDevice() replaces fidelityMode() as cache-sizing gate",
+        "main.cpp: Startup log 'System RAM: N MB, low-memory mode: YES/NO'",
+        "main.cpp: 60s RSS heartbeat via MemoryMonitor::logStats('heartbeat')",
+        "TextureManager.h: maxW_/maxH_ cap 2048→1024 for (Linux && ARM) only",
+        "FontManager.h: setTextCacheLimit(size_t) added; hardcoded 300 replaced by textCacheLimit_ member"
+      ],
+      "testing": "RPi 3B startup confirmed: 'System RAM: 972 MB, low-memory mode: YES', 'capping texture cache to 15', 'capping font text cache to 100'."
     }
   },
   "platform_specific": {
@@ -1434,7 +1491,7 @@
         "display_power": "vcgencmd display_power (HDMI) or sysfs bl_power (DSI)",
         "cpu_temperature": "/sys/class/thermal/thermal_zone0/temp",
         "brightness_control": "sysfs backlight control via BrightnessManager",
-        "i2c_sensors": "BME280 support planned (low priority)"
+        "i2c_sensors": "BME280: full Bosch compensation math implemented (BME280Provider). Hardware validation on RPi+sensor pending."
       }
     }
   },

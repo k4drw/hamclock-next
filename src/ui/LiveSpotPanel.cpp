@@ -96,30 +96,17 @@ void LiveSpotPanel::render(SDL_Renderer *renderer) {
                          themes.border.b, themes.border.a);
   SDL_RenderDrawRect(renderer, &bgRect);
 
-  bool titleFontChanged = (titleFontSize_ != lastTitleFontSize_);
   bool cellFontChanged = (cellFontSize_ != lastCellFontSize_);
 
   SDL_Color white = themes.text;
-  SDL_Color cyan = themes.accent;
   SDL_Color blue = themes.textDim;
 
   int pad = 2;
-  int curY = y_ + pad;
-
-  // --- Title: "Live Spots" (centered, blue) ---
-  if (titleFontChanged || !titleTex_) {
-    if (titleTex_) {
-      MemoryMonitor::getInstance().destroyTexture(titleTex_);
-    }
-    titleTex_ = fontMgr_.renderText(renderer, "Live Spots", cyan,
-                                    titleFontSize_, &titleW_, &titleH_);
-    lastTitleFontSize_ = titleFontSize_;
-  }
-  if (titleTex_) {
-    SDL_Rect dst = {x_ + (width_ - titleW_) / 2, curY, titleW_, titleH_};
-    SDL_RenderCopy(renderer, titleTex_, nullptr, &dst);
-    curY += titleH_ + 1;
-  }
+  int titleH = 20;
+  // --- Title: "Live Spots" (standard style) ---
+  fontMgr_.drawText(renderer, "Live Spots", x_ + 10, y_ + 5, themes.accent, 10,
+                    true);
+  int curY = y_ + titleH + pad;
 
   // --- Subtitle: "of GRID - PSK 30 mins" (centered, blue) ---
   if (!lastSubtitle_.empty() && !subtitleTex_) {

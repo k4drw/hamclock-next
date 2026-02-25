@@ -33,9 +33,14 @@ void AuroraGraphPanel::render(SDL_Renderer *renderer) {
                          themes.border.b, themes.border.a);
   SDL_RenderDrawRect(renderer, &rect);
 
+  int titleH = 20;
+  fontMgr_.drawText(renderer, "Aurora Chances", x_ + 10, y_ + 5, themes.accent,
+                    10, true);
+
   if (!store_ || !store_->hasData()) {
     fontMgr_.drawText(renderer, "Loading Aurora...", x_ + width_ / 2,
-                      y_ + height_ / 2, {150, 150, 150, 255}, 12, false, true);
+                      y_ + titleH + (height_ - titleH) / 2,
+                      {150, 150, 150, 255}, 12, false, true);
     return;
   }
 
@@ -43,17 +48,14 @@ void AuroraGraphPanel::render(SDL_Renderer *renderer) {
   auto history = store_->getHistory();
   float currentPercent = store_->getCurrentPercent();
 
-  // Title
-  fontMgr_.drawText(renderer, "Aurora Chances, max %", x_ + 5, y_ + 5,
-                    {0, 255, 128, 255}, 10);
-
   // Display current value prominently
   char valueText[32];
   std::snprintf(valueText, sizeof(valueText), "%.0f", currentPercent);
 
   int valueFontSize = std::max(24, height_ / 3);
-  fontMgr_.drawText(renderer, valueText, x_ + width_ / 2, y_ + height_ / 4,
-                    {200, 200, 200, 255}, valueFontSize, false, true);
+  fontMgr_.drawText(renderer, valueText, x_ + width_ / 2,
+                    y_ + titleH + (height_ - titleH) / 4, {200, 200, 200, 255},
+                    valueFontSize, false, true);
 
   // Graph area
   int graphX = x_ + 30;

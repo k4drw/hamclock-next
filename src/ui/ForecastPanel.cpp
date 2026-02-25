@@ -30,14 +30,14 @@ void ForecastPanel::render(SDL_Renderer *renderer) {
                          themes.border.b, themes.border.a);
   SDL_RenderDrawRect(renderer, &rect);
 
-  int centerX = x_ + width_ / 2;
+  int titleH = 20;
   int pad = 6;
-  int curY = y_ + pad;
+  int curY = y_ + titleH + 4;
 
-  fontMgr_.drawText(renderer, "7-Day Forecast", centerX, curY, themes.accent,
-                    titleFontSize_, true, true);
-  curY += titleFontSize_ + 6;
+  fontMgr_.drawText(renderer, "7-Day Forecast", x_ + 10, y_ + 5, themes.accent,
+                    10, true);
 
+  int centerX = x_ + width_ / 2;
   if (!currentData_.valid) {
     fontMgr_.drawText(renderer, "Loading...", centerX, y_ + height_ / 2,
                       themes.textDim, detailFontSize_, false, true);

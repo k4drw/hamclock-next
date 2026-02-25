@@ -58,22 +58,28 @@ void GimbalPanel::render(SDL_Renderer *renderer) {
   SDL_SetRenderDrawColor(renderer, 80, 80, 80, 255);
   SDL_RenderDrawRect(renderer, &rect);
 
+  int titleH = 20;
+  SDL_Color accent = {0, 200, 255, 255}; // Default cyan-ish accent
+  fontMgr_.drawText(renderer, "Rotator", x_ + 10, y_ + 5, accent, 10, true);
+
   // Display status line (Rotator status or Sat name)
+  int statusY = y_ + titleH + 5;
   if (hasRotator_) {
     // Show rotator status
     SDL_Color statusColor = rotatorConnected_ ? SDL_Color{0, 255, 0, 255}
-                                               : SDL_Color{255, 128, 0, 255};
+                                              : SDL_Color{255, 128, 0, 255};
     const char *statusText =
         rotatorConnected_ ? "ROTATOR CONNECTED" : "ROTATOR OFFLINE";
-    fontMgr_.drawText(renderer, statusText, x_ + width_ / 2, y_ + 10,
+    fontMgr_.drawText(renderer, statusText, x_ + width_ / 2, statusY,
                       statusColor, labelFontSize_, true, true);
   } else if (hasSat_) {
     // Show satellite name (prediction mode)
-    fontMgr_.drawText(renderer, predictor_->satName(), x_ + width_ / 2, y_ + 10,
+    fontMgr_.drawText(renderer, predictor_->satName(), x_ + width_ / 2, statusY,
                       {0, 255, 0, 255}, labelFontSize_, true, true);
   } else {
     // No data available
-    fontMgr_.drawText(renderer, "No Data", x_ + width_ / 2, y_ + height_ / 2,
+    fontMgr_.drawText(renderer, "No Data", x_ + width_ / 2,
+                      y_ + titleH + (height_ - titleH) / 2,
                       {150, 150, 150, 255}, labelFontSize_, false, true);
     return;
   }
@@ -110,8 +116,8 @@ void GimbalPanel::render(SDL_Renderer *renderer) {
       azDiff += 360;
 
     std::snprintf(buf, sizeof(buf), "Err: Az%.0f El%.0f", azDiff, elDiff);
-    fontMgr_.drawText(renderer, buf, 15 + x_, y_ + 105,
-                      {255, 200, 0, 255}, labelFontSize_ - 2);
+    fontMgr_.drawText(renderer, buf, 15 + x_, y_ + 105, {255, 200, 0, 255},
+                      labelFontSize_ - 2);
   }
 
   // Graphical indicator (Mechanical Crosshair) - Center-aligned in the

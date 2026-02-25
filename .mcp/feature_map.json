@@ -1,6 +1,6 @@
 {
-  "version": "2.1",
-  "updated_at": "2026-02-24T00:00:00.000Z",
+  "version": "2.2",
+  "updated_at": "2026-02-25T00:00:00.000Z",
   "features": [
     {
       "feature_id": "clock_callsign",
@@ -943,7 +943,7 @@
         "Spots on map",
         "Toggle between POTA and SOTA views"
       ],
-      "notes": "ActivityProvider fetches POTA/SOTA spots every 5 min. ONTAPanel shows scrollable list with POTA/SOTA/ALL filter toggle (click title area to cycle). POTA lat/lon resolved from grid4 field via Astronomy::gridToLatLon(). Map overlay: MapWidget::renderActivityPins() draws green squares for POTA, orange for SOTA. SOTA coordinates not resolved (no grid in SOTA spot API)."
+      "notes": "ActivityProvider fetches POTA/SOTA spots every 5 min. ONTAPanel shows scrollable list with POTA/SOTA/ALL filter toggle (click title area to cycle). POTA lat/lon resolved from grid4 field via Astronomy::gridToLatLon(). Map overlay: MapWidget::renderActivityPins() draws green squares for POTA, orange squares for SOTA. SOTA coordinates fully resolved via ActivityLocationManager: (1) binary-search on summitslist.csv (50K+ summits, 7-day cache, pre-seeded CSV at configDir or cwd), (2) resolveSummitAsync() per-summit API fallback with sota_api_cache.csv persistence (30-day cache)."
     },
     {
       "feature_id": "adif",
@@ -2828,6 +2828,41 @@
         "Config persists across restart; hub section in config.json",
         "WASM: /api/hub/fetch returns 501; client branch absent from WASM build"
       ]
+    },
+    {
+      "feature_id": "rpi_low_memory_mode",
+      "name": "RPi 1GB Adaptive Memory Mode",
+      "category": "infrastructure",
+      "description": "Automatic memory limit reduction on devices with ≤ 1536 MB RAM. Corrects a bug where fidelityMode() was used instead of isLowMemoryDevice() to gate cache sizes, causing the RPi to always use high-memory settings.",
+      "original": {
+        "files": [],
+        "symbols": [],
+        "notes": "No equivalent in original. Original targeted fixed-memory ESP32/RPi hardware without dynamic adaptation."
+      },
+      "next": {
+        "files": [
+          "src/main.cpp",
+          "src/ui/TextureManager.h",
+          "src/ui/FontManager.h",
+          "src/core/MemoryMonitor.h"
+        ],
+        "symbols": [
+          "MemoryMonitor::isLowMemoryDevice",
+          "TextureManager::setMaxCacheSize",
+          "FontManager::setTextCacheLimit",
+          "MemoryMonitor::logStats"
+        ],
+        "notes": "isLowMemoryDevice() reads /proc/meminfo MemTotal, returns true if ≤ 1536 MB. Low-memory path: texture cache 50→15, font text cache 300→100, texture dimension cap 2048→1024px for (Linux && ARM) only. 60s RSS heartbeat. Startup log confirms mode."
+      },
+      "status": "implemented",
+      "acceptance": [
+        "Startup log reports total RAM and low-memory mode status",
+        "RPi 3B: texture cache capped at 15, font cache at 100",
+        "Dev machine (64 GB): no capping applied",
+        "60-second RSS heartbeat appears in logs",
+        "macOS Apple Silicon not affected by texture dimension cap"
+      ],
+      "notes": "Implemented 2026-02-25. Confirmed on RPi 3B (972 MB, LOW) and 64 GB dev machine (NO). Saves ~220 MB RSS headroom."
     }
   ]
 }

@@ -51,18 +51,21 @@ void AuroraPanel::render(SDL_Renderer *renderer) {
   SDL_RenderDrawRect(renderer, &rect);
 
   SDL_Texture *tex = texMgr_.get("aurora_latest");
+  int titleH = 20;
   if (tex && imageReady_) {
-    // Aurora images are typically square or circular
-    int drawSz = std::min(width_, height_) - 10;
-    SDL_Rect dst = {x_ + (width_ - drawSz) / 2, y_ + (height_ - drawSz) / 2 + 5,
-                    drawSz, drawSz};
+    // Shrink slightly to clear title area
+    int drawSz = std::min(width_ - 10, height_ - titleH - 10);
+    SDL_Rect dst = {x_ + (width_ - drawSz) / 2,
+                    y_ + titleH + (height_ - titleH - drawSz) / 2, drawSz,
+                    drawSz};
     SDL_RenderCopy(renderer, tex, nullptr, &dst);
   } else {
     fontMgr_.drawText(renderer, "Loading Aurora...", x_ + width_ / 2,
-                      y_ + height_ / 2, {150, 150, 150, 255}, 12, false, true);
+                      y_ + titleH + (height_ - titleH) / 2,
+                      {150, 150, 150, 255}, 12, false, true);
   }
 
   fontMgr_.drawText(renderer,
                     north_ ? "Aurora Forecast (N)" : "Aurora Forecast (S)",
-                    x_ + 5, y_ + 5, themes.accent, 10);
+                    x_ + 10, y_ + 5, themes.accent, 10, true);
 }

@@ -51,7 +51,7 @@ std::string getSystemUptime() {
 #endif
 }
 
-std::string getCpuTemp() {
+std::string getCpuTemp(bool metric) {
 #ifdef _WIN32
   return "CPU --";
 #else
@@ -63,7 +63,12 @@ std::string getCpuTemp() {
     milliC = 0;
   std::fclose(f);
   char buf[32];
-  std::snprintf(buf, sizeof(buf), "CPU %.0fC", milliC / 1000.0);
+  if (metric) {
+    std::snprintf(buf, sizeof(buf), "CPU %.0fC", milliC / 1000.0);
+  } else {
+    double tempF = milliC / 1000.0 * 9.0 / 5.0 + 32.0;
+    std::snprintf(buf, sizeof(buf), "CPU %.0fF", tempF);
+  }
   return buf;
 #endif
 }
@@ -151,13 +156,13 @@ void TimePanel::update() {
   if (ticks - lastInfoRotateMs_ >= kInfoRotateMs) {
     infoRotateIdx_ = (infoRotateIdx_ + 1) % 3;
     lastInfoRotateMs_ = ticks;
-    infoTexts_[0] = getCpuTemp();
+    infoTexts_[0] = getCpuTemp(useMetric_);
     infoTexts_[1] = getDiskUsage();
     infoTexts_[2] = getLocalIP();
   }
   // Seed on first call
   if (infoTexts_[0].empty()) {
-    infoTexts_[0] = getCpuTemp();
+    infoTexts_[0] = getCpuTemp(useMetric_);
     infoTexts_[1] = getDiskUsage();
     infoTexts_[2] = getLocalIP();
   }

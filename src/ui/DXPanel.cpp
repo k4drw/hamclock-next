@@ -129,8 +129,14 @@ void DXPanel::render(SDL_Renderer *renderer) {
       {0, 255, 0, 255},     // Weather 2 (Green)
   };
 
-  int curY = y_ + pad;
+  int titleH = 20;
+  fontMgr_.drawText(renderer, "DX", x_ + 10, y_ + 5, themes.accent, 10, true);
+
+  int curY = y_ + titleH + pad / 2;
   for (int i = 0; i < kNumLines; ++i) {
+    // Skip "DX:" label line if it's the first one and we have a title
+    if (i == 0 && lineText_[i] == "DX:")
+      continue;
     if (lineText_[i].empty())
       continue;
 

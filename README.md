@@ -2,6 +2,8 @@
 
 HamClock-Next is a modern, SDL2-based reconstruction of the classic HamClock. It focuses on visual fidelity, high-DPI support, and a smooth user experience while maintaining the essential functionality loved by amateur radio operators.
 
+## [Feature Overview](feature_overview.md) — The Story, philosophy, and full feature list
+
 > [!WARNING]
 > **BETA RELEASE NOTICE**: This is a Beta release (**v1.0B01**). While functional, it is still under active development and contains known bugs. Breaking changes and refinements are ongoing. Please report issues on GitHub.
 
@@ -184,10 +186,11 @@ sudo dpkg -i hamclock-next_0.9.0B_unified_arm64.deb
 ```
 
 For detailed technical references and remote control info, see:
-- **[API.md](API.md)** - Remote control and debugging API reference
-- **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** - Solutions for common build and runtime issues
-- **[DATA_SOURCES.md](original-analysis/DATA_SOURCES.md)** - List of live data providers
-- **[USAGE.md](USAGE.md)** - Interface navigation and keyboard shortcuts
+- **[Feature Overview](feature_overview.md)** — The Story, philosophy, and full feature list
+- **[API.md](API.md)** — Remote control and debugging API reference
+- **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** — Solutions for common build and runtime issues
+- **[DATA_SOURCES.md](original-analysis/DATA_SOURCES.md)** — List of live data providers
+- **[USAGE.md](USAGE.md)** — Interface navigation and keyboard shortcuts
 
 **Note**: The web server live view is optimized for headless operation (1 FPS refresh) to reduce CPU usage (~50-60% vs ~100%). See **[API.md](API.md)** for customization options.
 

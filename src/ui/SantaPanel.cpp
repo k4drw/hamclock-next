@@ -21,12 +21,12 @@ void SantaPanel::render(SDL_Renderer *renderer) {
                          themes.border.b, themes.border.a);
   SDL_RenderDrawRect(renderer, &rect);
 
-  int curY = y_ + 10;
-  int centerX = x_ + width_ / 2;
+  int titleH = 20;
+  fontMgr_.drawText(renderer, "Santa Tracker", x_ + 10, y_ + 5, themes.accent,
+                    10, true);
 
-  fontMgr_.drawText(renderer, "Santa Tracker", centerX, curY,
-                    {255, 50, 50, 255}, 10, true, true);
-  curY += 25;
+  int curY = y_ + titleH + 10;
+  int centerX = x_ + width_ / 2;
 
   if (!currentData_.active) {
     fontMgr_.drawText(renderer, "Resting at North Pole", centerX,

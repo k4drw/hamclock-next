@@ -67,7 +67,6 @@
 #include "ui/AuroraPanel.h"
 #include "ui/BandConditionsPanel.h"
 #include "ui/BeaconPanel.h"
-#include "ui/CPUTempPanel.h"
 #include "ui/CallbookPanel.h"
 #include "ui/ClockAuxPanel.h"
 #include "ui/ContestPanel.h"
@@ -100,6 +99,7 @@
 #include "ui/SantaPanel.h"
 #include "ui/SetupScreen.h"
 #include "ui/SpaceWeatherPanel.h"
+#include "ui/SysInfoPanel.h"
 #include "ui/TextureManager.h"
 #include "ui/TimePanel.h"
 #include "ui/UpdateOverlay.h"
@@ -309,6 +309,7 @@ struct DashboardContext {
   Uint32 lastMouseMotionMs = 0;
   bool cursorVisible = true;
   Uint32 lastSleepAssert = 0;
+  Uint32 lastMemLogMs = 0;
 
   // State for background data aggregation
   std::vector<std::string> rssHeadlines[3];
@@ -1131,8 +1132,8 @@ DashboardContext::DashboardContext(AppContext &ctx)
       widgetPool[type] =
           std::make_unique<SDOPanel>(0, 0, 0, 0, fontMgr, texMgr, *sdoProvider);
       break;
-    case WidgetType::CPU_TEMP:
-      widgetPool[type] = std::make_unique<CPUTempPanel>(
+    case WidgetType::SYS_INFO:
+      widgetPool[type] = std::make_unique<SysInfoPanel>(
           0, 0, 0, 0, fontMgr, ctx.cpuMonitor, appCfg.useMetric);
       break;
     case WidgetType::ASTEROID:
@@ -1230,23 +1231,23 @@ DashboardContext::DashboardContext(AppContext &ctx)
   };
 
   std::vector<WidgetType> allTypes = {
-      WidgetType::SOLAR,         WidgetType::DX_CLUSTER,
-      WidgetType::LIVE_SPOTS,    WidgetType::BAND_CONDITIONS,
-      WidgetType::CONTESTS,      WidgetType::ON_THE_AIR,
-      WidgetType::GIMBAL,        WidgetType::MOON,
-      WidgetType::CLOCK_AUX,     WidgetType::DX_PEDITIONS,
-      WidgetType::DE_WEATHER,    WidgetType::DX_WEATHER,
-      WidgetType::NCDXF,         WidgetType::SDO,
-      WidgetType::HISTORY_FLUX,  WidgetType::HISTORY_KP,
-      WidgetType::HISTORY_SSN,   WidgetType::DRAP,
-      WidgetType::AURORA,        WidgetType::AURORA_GRAPH,
-      WidgetType::ADIF,          WidgetType::COUNTDOWN,
-      WidgetType::CALLBOOK,      WidgetType::DST_INDEX,
-      WidgetType::WATCHLIST,     WidgetType::EME_TOOL,
-      WidgetType::SANTA_TRACKER, WidgetType::CPU_TEMP,
-      WidgetType::ASTEROID,      WidgetType::ALERTS,
-      WidgetType::FORECAST,      WidgetType::HURRICANE,
-      WidgetType::MARINE};
+      WidgetType::ADIF,          WidgetType::ALERTS,
+      WidgetType::ASTEROID,      WidgetType::AURORA,
+      WidgetType::AURORA_GRAPH,  WidgetType::BAND_CONDITIONS,
+      WidgetType::CALLBOOK,      WidgetType::CLOCK_AUX,
+      WidgetType::CONTESTS,      WidgetType::COUNTDOWN,
+      WidgetType::DE_WEATHER,    WidgetType::DRAP,
+      WidgetType::DST_INDEX,     WidgetType::DX_CLUSTER,
+      WidgetType::DX_PEDITIONS,  WidgetType::DX_WEATHER,
+      WidgetType::EME_TOOL,      WidgetType::FORECAST,
+      WidgetType::GIMBAL,        WidgetType::HISTORY_FLUX,
+      WidgetType::HISTORY_KP,    WidgetType::HISTORY_SSN,
+      WidgetType::HURRICANE,     WidgetType::LIVE_SPOTS,
+      WidgetType::MARINE,        WidgetType::MOON,
+      WidgetType::NCDXF,         WidgetType::ON_THE_AIR,
+      WidgetType::SANTA_TRACKER, WidgetType::SDO,
+      WidgetType::SOLAR,         WidgetType::SYS_INFO,
+      WidgetType::WATCHLIST};
   // Note: REPEATER_DIR omitted — RepeaterBook API requires auth key (TODO).
   // Note: WINLINK omitted — Winlink API requires access key (TODO).
 
@@ -1273,7 +1274,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
     (void)mx;
     (void)my;
     std::vector<WidgetType> available = allTypes;
-    if (paneIdx == 3) {
+    if (paneIdx == 3) { // Pane 4 (top-right small pane)
       available = {WidgetType::NCDXF, WidgetType::SOLAR, WidgetType::DX_WEATHER,
                    WidgetType::DE_WEATHER};
     }
@@ -1398,14 +1399,19 @@ DashboardContext::DashboardContext(AppContext &ctx)
     fontMgr.clearCache();
   });
 
-  if (layout.fidelityMode()) {
-    // Desktop/High-end: keep 50 textures
-    texMgr.setMaxCacheSize(50);
-  } else {
-    // RPi/Low-end: cap at 20 textures to preserve VRAM
-    texMgr.setMaxCacheSize(20);
-    LOG_I("Main",
-          "Low-memory environment detected: capping texture cache to 20");
+  {
+    auto &memMon = MemoryMonitor::getInstance();
+    LOG_I("Main", "System RAM: {:.0f} MB, low-memory mode: {}",
+          memMon.getTotalRAM() / 1024.0 / 1024.0,
+          memMon.isLowMemoryDevice() ? "YES" : "NO");
+    if (memMon.isLowMemoryDevice()) {
+      texMgr.setMaxCacheSize(15);
+      LOG_I("Main", "Low-memory device: capping texture cache to 15");
+      fontMgr.setTextCacheLimit(100);
+      LOG_I("Main", "Low-memory device: capping font text cache to 100");
+    } else {
+      texMgr.setMaxCacheSize(50);
+    }
   }
 
   // Populate widgets/eventWidgets vector
@@ -1451,16 +1457,41 @@ void DashboardContext::update(AppContext &ctx) {
       return false;
     };
 
-    // Always fetch core/background providers
-    noaaProvider->fetch();
-    rssProvider->fetch();
-    satMgr->fetch();
-    deWeatherProvider->fetch(ctx.state->deLocation.lat,
-                             ctx.state->deLocation.lon);
-    dxWeatherProvider->fetch(ctx.state->dxLocation.lat,
-                             ctx.state->dxLocation.lon);
+    // Map overlay helper: true if the MUF/RT propagation overlay is active
+    // (mufRtProvider and ionosondeProvider only feed PropOverlayType::Muf)
+    const bool mufOverlayActive = appCfg.propOverlay == PropOverlayType::Muf;
 
-    // Context-sensitive fetches (gate only what was in the original loop)
+    // --- NOAA space-weather data ---
+    // Gate per consumer group to avoid unnecessary sub-feed fetches.
+    // Solar/SpaceWX panel consumers: KIndex, SFI, SN, Plasma, Mag, DST,
+    //   XRay, ProtonFlux
+    // Aurora/AuroraGraph consumers: Aurora sub-feed
+    // DRAP panel consumers: DRAP sub-feed
+    const bool needsNoaa = isWidgetActive(WidgetType::SOLAR) ||
+                           isWidgetActive(WidgetType::AURORA) ||
+                           isWidgetActive(WidgetType::AURORA_GRAPH) ||
+                           isWidgetActive(WidgetType::DRAP);
+    if (needsNoaa)
+      noaaProvider->fetch();
+
+    // --- RSS news banner ---
+    if (appCfg.rssEnabled)
+      rssProvider->fetch();
+
+    // --- Satellite manager ---
+    // Feeds: SatPanel (in DXSatPane), EME planning tool, map track overlay
+    if (isWidgetActive(WidgetType::EME_TOOL) || appCfg.showSatTrack)
+      satMgr->fetch();
+
+    // --- Weather providers ---
+    if (isWidgetActive(WidgetType::DE_WEATHER))
+      deWeatherProvider->fetch(ctx.state->deLocation.lat,
+                               ctx.state->deLocation.lon);
+    if (isWidgetActive(WidgetType::DX_WEATHER))
+      dxWeatherProvider->fetch(ctx.state->dxLocation.lat,
+                               ctx.state->dxLocation.lon);
+
+    // --- Context-sensitive fetches (existing gating preserved/unchanged) ---
     if (isWidgetActive(WidgetType::LIVE_SPOTS) ||
         appCfg.propOverlay != PropOverlayType::None)
       spotProvider->fetch();
@@ -1488,10 +1519,20 @@ void DashboardContext::update(AppContext &ctx) {
     if (dstProvider)
       dstProvider->fetch();
 
-    adifProvider->fetch(ctx.cfgMgr.configDir() / "logs.adif");
-    mufRtProvider->update();
-    ionosondeProvider->update();
-    asteroidProvider->update();
+    // --- ADIF log viewer ---
+    if (isWidgetActive(WidgetType::ADIF))
+      adifProvider->fetch(ctx.cfgMgr.configDir() / "logs.adif");
+
+    // --- Propagation map overlays ---
+    if (mufOverlayActive)
+      mufRtProvider->update();
+    if (mufOverlayActive)
+      ionosondeProvider->update();
+
+    // --- Asteroid widget + map pin ---
+    if (isWidgetActive(WidgetType::ASTEROID))
+      asteroidProvider->update();
+
 #ifndef __EMSCRIPTEN__
     if (ctx.updateChecker)
       ctx.updateChecker->fetch();
@@ -2004,6 +2045,12 @@ void DashboardContext::update(AppContext &ctx) {
   if (appCfg.preventSleep && (now - lastSleepAssert > 30000)) {
     preventRPiSleep(true);
     lastSleepAssert = now;
+  }
+
+  // 60-second RSS/VRAM heartbeat — helps diagnose memory growth on RPi
+  if (now - lastMemLogMs > 60000) {
+    MemoryMonitor::getInstance().logStats("heartbeat");
+    lastMemLogMs = now;
   }
 
   if (isPowerOn) {

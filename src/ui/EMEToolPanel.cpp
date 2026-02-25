@@ -21,16 +21,17 @@ void EMEToolPanel::render(SDL_Renderer *renderer) {
                          themes.border.b, themes.border.a);
   SDL_RenderDrawRect(renderer, &rect);
 
-  int curY = y_ + 10;
+  int titleH = 20;
+  fontMgr_.drawText(renderer, "EME Planning Tool", x_ + 10, y_ + 5,
+                    themes.accent, 10, true);
+
+  int curY = y_ + titleH + 10;
   int centerX = x_ + width_ / 2;
 
-  fontMgr_.drawText(renderer, "EME Planning Tool", x_ + 10, curY, themes.accent,
-                    10, true);
-  curY += 25;
-
   if (!currentData_.valid) {
-    fontMgr_.drawText(renderer, "Calculating...", centerX, y_ + height_ / 2,
-                      themes.textDim, 10, false, true);
+    fontMgr_.drawText(renderer, "Calculating...", centerX,
+                      y_ + titleH + (height_ - titleH) / 2, themes.textDim, 10,
+                      false, true);
     return;
   }
 

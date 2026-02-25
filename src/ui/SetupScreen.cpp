@@ -250,9 +250,6 @@ void SetupScreen::render(SDL_Renderer *renderer) {
   if (!fontMgr_.ready())
     return;
 
-  LOG_D("SetupScreen", "render(): width={}, height={}, last=({},{})", width_,
-        height_, lastRenderWidth_, lastRenderHeight_);
-
   // Ensure layout is up-to-date if dimensions changed
   // Fixes case where setup is launched after window resize
   if (width_ != lastRenderWidth_ || height_ != lastRenderHeight_) {
@@ -275,9 +272,6 @@ void SetupScreen::render(SDL_Renderer *renderer) {
   int fieldX = cx - fieldW / 2;
   int fieldH = fieldSize_ + 14;
   int textPad = 7;
-
-  LOG_D("SetupScreen", "Layout: pad={}, fieldW={}, fieldX={}, fieldH={}", pad,
-        fieldW, fieldX, fieldH);
 
   SDL_Color white = {255, 255, 255, 255};
   SDL_Color cyan = {0, 200, 255, 255};
@@ -759,8 +753,8 @@ void SetupScreen::renderTabServices(SDL_Renderer *renderer, int, int pad,
 }
 
 void SetupScreen::renderTabNetwork(SDL_Renderer *renderer, int /*cx*/, int pad,
-                                    int fieldW, int fieldH, int fieldX,
-                                    int textPad) {
+                                   int fieldW, int fieldH, int fieldX,
+                                   int textPad) {
   int y = (y_ + titleSize_ + 2 * pad + fieldH);
   int vSpace = pad / 2;
   SDL_Color white = {255, 255, 255, 255};
@@ -772,8 +766,9 @@ void SetupScreen::renderTabNetwork(SDL_Renderer *renderer, int /*cx*/, int pad,
   y += labelSize_ + pad;
 
   // Mode cycle button
-  const char *modeLabel = (hubMode_ == HubMode::Master) ? "Master"
-                        : (hubMode_ == HubMode::Client)  ? "Client" : "Off";
+  const char *modeLabel = (hubMode_ == HubMode::Master)   ? "Master"
+                          : (hubMode_ == HubMode::Client) ? "Client"
+                                                          : "Off";
   int btnW = 80;
   hubModeRect_ = {fieldX + fieldW - btnW, y, btnW, fieldH};
   fontMgr_.drawText(renderer, "Mode:", fieldX, y + fieldH / 2, white,
@@ -782,10 +777,9 @@ void SetupScreen::renderTabNetwork(SDL_Renderer *renderer, int /*cx*/, int pad,
   SDL_RenderFillRect(renderer, &hubModeRect_);
   SDL_SetRenderDrawColor(renderer, orange.r, orange.g, orange.b, 255);
   SDL_RenderDrawRect(renderer, &hubModeRect_);
-  fontMgr_.drawText(renderer, modeLabel,
-                    hubModeRect_.x + hubModeRect_.w / 2,
-                    hubModeRect_.y + hubModeRect_.h / 2,
-                    orange, labelSize_, false, true);
+  fontMgr_.drawText(renderer, modeLabel, hubModeRect_.x + hubModeRect_.w / 2,
+                    hubModeRect_.y + hubModeRect_.h / 2, orange, labelSize_,
+                    false, true);
   y += fieldH + vSpace;
 
   if (hubMode_ == HubMode::Client) {
@@ -805,7 +799,7 @@ void SetupScreen::renderTabNetwork(SDL_Renderer *renderer, int /*cx*/, int pad,
                 cursorPos_, selectionAnchor_, orange, gray, white, white, gray);
     y += vSpace;
   } else {
-    hubIpRect_   = {0, 0, 0, 0};
+    hubIpRect_ = {0, 0, 0, 0};
     hubPortRect_ = {0, 0, 0, 0};
   }
 
@@ -815,8 +809,8 @@ void SetupScreen::renderTabNetwork(SDL_Renderer *renderer, int /*cx*/, int pad,
                       fieldX, y + vSpace, gray, hintSize_);
   } else if (hubMode_ == HubMode::Client) {
     fontMgr_.drawText(renderer,
-                      "Fetches via hub; falls back to direct after 2s.",
-                      fieldX, y + vSpace, gray, hintSize_);
+                      "Fetches via hub; falls back to direct after 2s.", fieldX,
+                      y + vSpace, gray, hintSize_);
   } else {
     fontMgr_.drawText(renderer, "Hub mode disabled.", fieldX, y + vSpace, gray,
                       hintSize_);
@@ -908,25 +902,39 @@ void SetupScreen::renderTabWidgets(SDL_Renderer *renderer, int cx, int pad,
   int rowH = hintSize_ + 4; // Tighter vertical spacing
 
   WidgetType allTypes[] = {
-      WidgetType::SOLAR,         WidgetType::DX_CLUSTER,
-      WidgetType::LIVE_SPOTS,    WidgetType::BAND_CONDITIONS,
-      WidgetType::CONTESTS,      WidgetType::ON_THE_AIR,
-      WidgetType::GIMBAL,        WidgetType::MOON,
-      WidgetType::CLOCK_AUX,     WidgetType::DX_PEDITIONS,
-      WidgetType::DE_WEATHER,    WidgetType::DX_WEATHER,
-      WidgetType::NCDXF,         WidgetType::SDO,
-      WidgetType::HISTORY_FLUX,  WidgetType::HISTORY_KP,
-      WidgetType::HISTORY_SSN,   WidgetType::DRAP,
-      WidgetType::AURORA,        WidgetType::AURORA_GRAPH,
-      WidgetType::ADIF,          WidgetType::COUNTDOWN,
-      WidgetType::CALLBOOK,      WidgetType::DST_INDEX,
-      WidgetType::WATCHLIST,     WidgetType::EME_TOOL,
-      WidgetType::SANTA_TRACKER, WidgetType::CPU_TEMP};
+      WidgetType::ADIF,          WidgetType::ALERTS,
+      WidgetType::ASTEROID,      WidgetType::AURORA,
+      WidgetType::AURORA_GRAPH,  WidgetType::BAND_CONDITIONS,
+      WidgetType::CALLBOOK,      WidgetType::CLOCK_AUX,
+      WidgetType::CONTESTS,      WidgetType::COUNTDOWN,
+      WidgetType::DE_WEATHER,    WidgetType::DRAP,
+      WidgetType::DST_INDEX,     WidgetType::DX_CLUSTER,
+      WidgetType::DX_PEDITIONS,  WidgetType::DX_WEATHER,
+      WidgetType::EME_TOOL,      WidgetType::FORECAST,
+      WidgetType::GIMBAL,        WidgetType::HISTORY_FLUX,
+      WidgetType::HISTORY_KP,    WidgetType::HISTORY_SSN,
+      WidgetType::HURRICANE,     WidgetType::LIVE_SPOTS,
+      WidgetType::MARINE,        WidgetType::MOON,
+      WidgetType::NCDXF,         WidgetType::ON_THE_AIR,
+      WidgetType::SANTA_TRACKER, WidgetType::SDO,
+      WidgetType::SOLAR,         WidgetType::SYS_INFO,
+      WidgetType::WATCHLIST};
 
   const auto &currentPane = paneRotations_[activePane_];
 
-  for (size_t i = 0; i < sizeof(allTypes) / sizeof(allTypes[0]); ++i) {
+  const int nWidgets = sizeof(allTypes) / sizeof(allTypes[0]);
+  const int itemsPerCol = (nWidgets + 2) / 3;
+
+  for (size_t i = 0; i < nWidgets; ++i) {
     WidgetType t = allTypes[i];
+
+    // Pane 4 (index 3) is restricted to small widgets only
+    bool allowed = true;
+    if (activePane_ == 3) {
+      allowed = (t == WidgetType::NCDXF || t == WidgetType::SOLAR ||
+                 t == WidgetType::DX_WEATHER || t == WidgetType::DE_WEATHER);
+    }
+
     SDL_Rect r = {curX, y, 16, 16};
     // Neutral dark background (prevents 'blue' look)
     SDL_SetRenderDrawColor(renderer, 45, 45, 48, 255);
@@ -934,22 +942,27 @@ void SetupScreen::renderTabWidgets(SDL_Renderer *renderer, int cx, int pad,
     SDL_SetRenderDrawColor(renderer, 100, 100, 120, 255);
     SDL_RenderDrawRect(renderer, &r);
 
-    bool selected = std::find(currentPane.begin(), currentPane.end(), t) !=
-                    currentPane.end();
-    if (selected) {
-      SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
-      SDL_Rect check = {r.x + 3, r.y + 3, 10, 10};
-      SDL_RenderFillRect(renderer, &check);
+    if (allowed) {
+      bool selected = std::find(currentPane.begin(), currentPane.end(), t) !=
+                      currentPane.end();
+      if (selected) {
+        SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
+        SDL_Rect check = {r.x + 3, r.y + 3, 10, 10};
+        SDL_RenderFillRect(renderer, &check);
+      }
+      fontMgr_.drawText(renderer, widgetTypeDisplayName(t), r.x + 22, r.y,
+                        white, hintSize_);
+      widgetRects_.push_back({t, r});
+    } else {
+      // Draw disabled text
+      fontMgr_.drawText(renderer, widgetTypeDisplayName(t), r.x + 22, r.y,
+                        {60, 60, 70, 255}, hintSize_);
+      // Do not add to widgetRects_ so it is not clickable
     }
 
-    fontMgr_.drawText(renderer, widgetTypeDisplayName(t), r.x + 22, r.y, white,
-                      hintSize_);
-
-    widgetRects_.push_back({t, r});
-
     y += rowH;
-    // Break into columns every 10 items
-    if ((i + 1) % 10 == 0) {
+    // Break into columns
+    if ((i + 1) % itemsPerCol == 0) {
       y = startY;
       curX += colW;
     }
@@ -1183,9 +1196,12 @@ bool SetupScreen::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
   if (activeTab_ == Tab::Network) {
     if (mx >= hubModeRect_.x && mx <= hubModeRect_.x + hubModeRect_.w &&
         my >= hubModeRect_.y && my <= hubModeRect_.y + hubModeRect_.h) {
-      if (hubMode_ == HubMode::Off)         hubMode_ = HubMode::Master;
-      else if (hubMode_ == HubMode::Master) hubMode_ = HubMode::Client;
-      else                                  hubMode_ = HubMode::Off;
+      if (hubMode_ == HubMode::Off)
+        hubMode_ = HubMode::Master;
+      else if (hubMode_ == HubMode::Master)
+        hubMode_ = HubMode::Client;
+      else
+        hubMode_ = HubMode::Off;
       activeField_ = 0;
       return true;
     }
@@ -1719,8 +1735,8 @@ void SetupScreen::setConfig(const AppConfig &cfg) {
   rigPort_ = std::to_string(cfg.rigPort);
   rigAutoTune_ = cfg.rigAutoTune;
 
-  hubMode_    = cfg.hubMode;
-  hubIp_      = cfg.hubIp;
+  hubMode_ = cfg.hubMode;
+  hubIp_ = cfg.hubIp;
   hubPortStr_ = std::to_string(cfg.hubPort);
 
   paneRotations_[0] = cfg.pane1Rotation;
@@ -1792,7 +1808,7 @@ AppConfig SetupScreen::getConfig() const {
   cfg.rigAutoTune = rigAutoTune_;
 
   cfg.hubMode = hubMode_;
-  cfg.hubIp   = hubIp_;
+  cfg.hubIp = hubIp_;
   cfg.hubPort = std::atoi(hubPortStr_.c_str());
   if (cfg.hubPort == 0)
     cfg.hubPort = 8080;
