@@ -129,6 +129,18 @@ cd hamclock-next
 # Build .app bundle
 ./scripts/build-macos.sh
 
+# Optional: Developer ID sign (no notarization)
+MACOS_SIGN_MODE=developer-id \
+MACOS_CODESIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
+./scripts/build-macos.sh
+
+# Optional: Developer ID sign + notarize DMG using notarytool keychain profile
+MACOS_SIGN_MODE=developer-id \
+MACOS_CODESIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
+MACOS_NOTARIZE=1 \
+MACOS_NOTARY_KEYCHAIN_PROFILE="AC_NOTARY_PROFILE" \
+./scripts/build-macos.sh
+
 # The application bundle will be at:
 #   build-macos/hamclock-next.app
 #
@@ -136,6 +148,18 @@ cd hamclock-next
 #   build-macos/hamclock-next-macos-arm64.dmg  (or x86_64)
 #   build-macos/hamclock-next-macos-arm64.zip
 
+# Signing behavior:
+#   - Default is ad-hoc signing (MACOS_SIGN_MODE=adhoc), which avoids
+#     broken-signature "app is damaged" issues on unsigned local artifacts.
+#   - For trusted distribution, use Developer ID signing and notarization.
+#   - Script env vars:
+#       MACOS_SIGN_MODE=adhoc|developer-id|auto
+#       MACOS_CODESIGN_IDENTITY="Developer ID Application: ..."
+#       MACOS_NOTARIZE=0|1
+#       MACOS_NOTARY_KEYCHAIN_PROFILE="..."
+#       # Or credential fallback for notarytool:
+#       MACOS_NOTARY_APPLE_ID / MACOS_NOTARY_TEAM_ID / MACOS_NOTARY_APP_PASSWORD
+#
 # To install: Open the DMG and drag HamClock-Next.app to Applications
 # Or: Unzip and copy hamclock-next.app to /Applications
 ```
