@@ -70,7 +70,9 @@ void PaneContainer::render(SDL_Renderer *renderer) {
   SDL_RenderDrawRect(renderer, &border);
 
   // Draw manual navigation arrows when rotation has multiple widgets
-  if (rotation_.size() > 1) {
+  // Hide if widget is configuring
+  if (rotation_.size() > 1 &&
+      !(activeWidget_ && activeWidget_->isConfiguring())) {
     int arrowW = std::min(18, width_ / 8);
     int arrowH = std::min(36, height_ / 5);
     int cy = y_ + height_ / 2;
@@ -146,6 +148,11 @@ bool PaneContainer::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
   }
 
   // 4. Pane level logic - top 10% transitions to widget selection
+  // If widget is configuring, don't allow pane-level triggers
+  if (activeWidget_ && activeWidget_->isConfiguring()) {
+    return true;
+  }
+
   int relativeY = my - r.y;
   int titleThreshold = r.h / 10; // Top 10%
 
@@ -178,8 +185,15 @@ void PaneContainer::activateRotationIndex(size_t idx) {
 }
 
 bool PaneContainer::onKeyDown(SDL_Keycode key, Uint16 mod) {
-  if (isModalActive() && activeWidget_) {
+  if (activeWidget_) {
     return activeWidget_->onKeyDown(key, mod);
+  }
+  return false;
+}
+
+bool PaneContainer::onTextInput(const char *text) {
+  if (activeWidget_) {
+    return activeWidget_->onTextInput(text);
   }
   return false;
 }

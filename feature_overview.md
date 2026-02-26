@@ -225,14 +225,14 @@ See [API.md](API.md) for the complete endpoint reference.
 
 ## Platform Support
 
-| Platform                         | Status                        |
-| -------------------------------- | ----------------------------- |
-| Linux x86_64 (framebuffer / X11) | ✅ Supported                   |
-| Linux ARM64 (Raspberry Pi 4/5)   | ✅ Supported                   |
-| Linux ARMhf (Raspberry Pi 3)     | ✅ Supported                   |
-| macOS Apple Silicon              | ✅ Supported                   |
-| Windows x64                      | ✅ Supported (exe + installer) |
-| Browser (WebAssembly)            | ✅ Supported                   |
+| Platform                                       | Status                        |
+| ---------------------------------------------- | ----------------------------- |
+| Linux x86_64 (framebuffer / X11)               | ✅ Supported                   |
+| Linux ARM64 (Raspberry Pi 4/5, Armbian 64-bit) | ✅ Supported (arm64)           |
+| Linux ARMhf (Raspberry Pi 3, 32-bit OS)        | ✅ Supported (armhf)           |
+| macOS Apple Silicon                            | ✅ Supported                   |
+| Windows x64                                    | ✅ Supported (exe + installer) |
+| Browser (WebAssembly)                          | ✅ Supported                   |
 
 ---
 

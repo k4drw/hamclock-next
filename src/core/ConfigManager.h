@@ -13,6 +13,13 @@ enum class PropOverlayType { None, Muf, Voacap, Reliability, Toa };
 enum class WeatherOverlayType { None, Clouds, WxMb };
 enum class HubMode { Off, Master, Client };
 
+struct ReminderEntry {
+  std::string label;
+  std::string date; // YYYY-MM-DD
+  bool active = true;
+  std::string acknowledgedDate; // If == date, notification has been dismissed
+};
+
 struct AppConfig {
   // Identity
   std::string callsign;
@@ -96,6 +103,14 @@ struct AppConfig {
   std::string countdownLabel;
   std::string countdownTime;
 
+  // Reminder
+  std::string callsignExpiry;
+  std::string callsignFrn;
+  std::string
+      callsignExpiryAcknowledged;      // If == callsignExpiry, auto row acked
+  int64_t callsignExpiryLastCheck = 0; // epoch seconds; 0 = never checked
+  std::vector<ReminderEntry> reminders;
+
   // Brightness
   int brightness = 100;
   bool brightnessSchedule = false;
@@ -121,9 +136,9 @@ struct AppConfig {
   std::string skippedVersion;
 
   // Local Data Hub
-  HubMode     hubMode = HubMode::Off;
-  std::string hubIp   = "";
-  int         hubPort = 8080;
+  HubMode hubMode = HubMode::Off;
+  std::string hubIp = "";
+  int hubPort = 8080;
 
   // Network (WASM)
   // CORS proxy prefix prepended to all external URLs in the WASM build.

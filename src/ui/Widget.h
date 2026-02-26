@@ -58,6 +58,7 @@ public:
   virtual void setTheme(const std::string &theme) { theme_ = theme; }
 
   virtual bool isModalActive() const { return false; }
+  virtual bool isConfiguring() const { return false; }
   virtual void renderModal(SDL_Renderer *renderer) { (void)renderer; }
   virtual void setMetric(bool metric) { useMetric_ = metric; }
 

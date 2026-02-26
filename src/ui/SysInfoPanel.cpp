@@ -5,12 +5,13 @@
 #ifndef _WIN32_WINNT
 #define _WIN32_WINNT 0x0600
 #endif
+#include <iphlpapi.h>
+#include <windows.h>
 #include <winsock2.h>
 #include <ws2tcpip.h>
-#include <windows.h>
-#include <iphlpapi.h>
 #endif
 
+#include "../core/MemoryMonitor.h"
 #include "../core/Theme.h"
 #include "FontCatalog.h"
 #include "SysInfoPanel.h"
@@ -130,6 +131,7 @@ void SysInfoPanel::update() {
     rssBytes_ = mem.getRSS();
     totalRam_ = mem.getTotalRAM();
     vramBytes_ = mem.getVramEstimated();
+    diskPct_ = mem.getDiskUsagePct();
 
     lastStatsUpdateMs_ = now;
   }
@@ -278,7 +280,16 @@ void SysInfoPanel::render(SDL_Renderer *renderer) {
                     false, true);
   curY += smallFontSize_ + 4;
 
-  // Row 4: IP
+  // Row 4: Disk
+  if (diskPct_ >= 0) {
+    char diskBuf[32];
+    std::snprintf(diskBuf, sizeof(diskBuf), "Disk %d%%", diskPct_);
+    fontMgr_.drawText(renderer, diskBuf, cx, curY, themes.info, smallFontSize_,
+                      false, true);
+    curY += smallFontSize_ + 4;
+  }
+
+  // Row 5: IP
   fontMgr_.drawText(renderer, cachedIP_.c_str(), cx, curY, themes.textDim,
                     smallFontSize_, false, true);
 }

@@ -1,7 +1,6 @@
 #pragma once
 
 #include "../core/CPUMonitor.h"
-#include "../core/MemoryMonitor.h"
 #include "FontManager.h"
 #include "Widget.h"
 
@@ -43,6 +42,7 @@ private:
   size_t rssBytes_ = 0;
   size_t totalRam_ = 0;
   int64_t vramBytes_ = 0;
+  int diskPct_ = -1;
 
   // Throttling for stats (CPU, RAM, Temp)
   uint32_t lastStatsUpdateMs_ = 0;

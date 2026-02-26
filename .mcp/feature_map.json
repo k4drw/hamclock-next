@@ -1,6 +1,6 @@
 {
-  "version": "2.2",
-  "updated_at": "2026-02-25T00:00:00.000Z",
+  "version": "2.3",
+  "updated_at": "2026-02-26T00:00:00.000Z",
   "features": [
     {
       "feature_id": "clock_callsign",
@@ -36,7 +36,7 @@
           "TimePanel",
           "ClockAuxPanel"
         ],
-        "notes": "Split into separate widgets for callsign, main time, and aux time. Stopwatch functionality is in CountdownPanel."
+        "notes": "Split into separate widgets for callsign, main time, and aux time. Countdown functionality is in CountdownPanel; stopwatch (count-up) is currently missing."
       },
       "status": "implemented",
       "acceptance": [
@@ -1100,6 +1100,34 @@
       "notes": "CountdownPanel user-configurable via click-to-edit. Target persists to config_.countdownTime / config_.countdownLabel. Displays EVENT ACTIVE! in red when reached. No audio alarm \u2014 visual only."
     },
     {
+      "feature_id": "stopwatch",
+      "name": "Stopwatch (Count-up & Laps)",
+      "category": "data_panel",
+      "description": "Stopwatch for counting up from zero, recording lap times, and managing multiple concurrent timers.",
+      "original": {
+        "files": [
+          "stopwatch.cpp"
+        ],
+        "symbols": [
+          "drawStopwatch",
+          "checkStopwatchTouch"
+        ],
+        "notes": "stopwatch.cpp (97K) is the core engine for all timing functions, including the 'Big Stopwatch' mode."
+      },
+      "next": {
+        "files": [],
+        "symbols": [],
+        "notes": "Currently missing. No equivalent to the original's count-up or lap recording functionality yet."
+      },
+      "status": "missing",
+      "acceptance": [
+        "Count up from zero",
+        "Record lap times",
+        "Persistent timer state",
+        "Accessible from the widget pool or time clicking"
+      ]
+    },
+    {
       "feature_id": "rotator_gimbal",
       "name": "Rotator/Gimbal Control",
       "category": "hardware",
@@ -1975,10 +2003,10 @@
       "notes": "Desktop equivalent: UpdateChecker service polls GitHub Releases API (repos/k4drw/hamclock-next/releases/latest) at startup and every 6h. When newer tag found, TimePanel version string turns amber and appends *. No auto-download/install. Implemented 2026-02-23."
     },
     {
-      "feature_id": "cpu_temp",
-      "name": "CPU Temperature Monitor",
+      "feature_id": "sys_info",
+      "name": "System Intelligence & Monitoring",
       "category": "hardware",
-      "description": "CPU temperature monitoring and display.",
+      "description": "Cross-platform system monitoring and display, including CPU usage, temperature, RAM (Used/Total), VRAM estimation, Disk usage (%), and Local IP address.",
       "original": {
         "files": [
           "cputemp.cpp"
@@ -1987,26 +2015,35 @@
           "readCPUtemp",
           "drawCPUtemp"
         ],
-        "notes": "cputemp.cpp (11K) reads CPU temperature via sysfs."
+        "notes": "Original HamClock's cputemp.cpp (11K) primarily reads CPU temperature via Linux sysfs. It has limited platform-specific logic for auxiliary stats."
       },
       "next": {
         "files": [
           "src/core/CPUMonitor.cpp",
           "src/core/CPUMonitor.h",
-          "src/ui/CPUTempPanel.cpp",
-          "src/ui/CPUTempPanel.h"
+          "src/core/MemoryMonitor.cpp",
+          "src/core/MemoryMonitor.h",
+          "src/ui/SysInfoPanel.cpp",
+          "src/ui/SysInfoPanel.h"
         ],
         "symbols": [
           "CPUMonitor",
-          "CPUTempPanel"
-        ]
+          "MemoryMonitor",
+          "SysInfoPanel",
+          "MemoryMonitor::getDiskUsagePct"
+        ],
+        "notes": "Universal support for Linux, macOS, and Windows. Uses platform-specific APIs (GetAdaptersAddresses, statvfs, GetDiskFreeSpaceExA) for deep system intelligence. Unified display in SysInfoPanel."
       },
       "status": "implemented",
       "acceptance": [
-        "Read CPU temperature from /sys/class/thermal",
-        "Display current temperature"
+        "Read CPU temperature across all major platforms",
+        "Display real-time CPU utilization %",
+        "Track RAM usage (Used vs Total capacity)",
+        "Estimate VRAM allocation",
+        "Monitor local disk free space (%)",
+        "Retrieve and display local IP address with 60s auto-refresh"
       ],
-      "notes": "Integrated CPUMonitor and CPUTempPanel into SetupScreen and main.cpp. Displays in pane rotation."
+      "notes": "Significantly expanded in Phase 40+ to include full cross-platform parity and additional disk/memory metrics. Replaces the older CPUTempPanel with the unified SysInfoPanel."
     },
     {
       "feature_id": "display_power",
@@ -2238,7 +2275,7 @@
       },
       "status": "implemented",
       "acceptance": [
-        "Fetch MUF-RT image from KC2G or OHB backend",
+        "Fetch MUF-RT image from KC2G",
         "Display as semi-transparent overlay on world map",
         "Auto-refresh every 15 minutes",
         "Toggle on/off in MapViewMenu",

@@ -1,6 +1,5 @@
 #include "TimePanel.h"
 #include "../core/Astronomy.h"
-#include "../core/MemoryMonitor.h"
 #include "../core/StringUtils.h"
 #include "../core/Theme.h"
 #include "FontCatalog.h"
@@ -22,13 +21,12 @@
 
 namespace {
 
-static constexpr const char *kVersion = "v" HAMCLOCK_VERSION;
 static constexpr Uint32 kInfoRotateMs = 3000;
 
 std::string getSystemUptime() {
 #ifdef _WIN32
-  // TODO: GetTickCount64() logic for Windows
-  return "Up --";
+  uint64_t ms = GetTickCount64();
+  double sec = ms / 1000.0;
 #else
   std::FILE *f = std::fopen("/proc/uptime", "r");
   if (!f)
@@ -37,6 +35,7 @@ std::string getSystemUptime() {
   if (std::fscanf(f, "%lf", &sec) != 1)
     sec = 0;
   std::fclose(f);
+#endif
   int days = static_cast<int>(sec / 86400);
   int hours = static_cast<int>(sec / 3600) % 24;
   int mins = static_cast<int>(sec / 60) % 60;
@@ -48,7 +47,6 @@ std::string getSystemUptime() {
   else
     std::snprintf(buf, sizeof(buf), "Up  %dm", mins);
   return buf;
-#endif
 }
 
 std::string getCpuTemp(bool metric) {
@@ -74,19 +72,12 @@ std::string getCpuTemp(bool metric) {
 }
 
 std::string getDiskUsage() {
-#ifdef _WIN32
-  return "Disk --";
-#else
-  struct statvfs stat;
-  if (statvfs("/", &stat) != 0)
+  int pct = MemoryMonitor::getInstance().getDiskUsagePct();
+  if (pct < 0)
     return "Disk --";
-  double total = static_cast<double>(stat.f_blocks) * stat.f_frsize;
-  double avail = static_cast<double>(stat.f_bavail) * stat.f_frsize;
-  int pct = (total > 0) ? static_cast<int>(100.0 * (1.0 - avail / total)) : 0;
   char buf[32];
   std::snprintf(buf, sizeof(buf), "Disk %d%%", pct);
   return buf;
-#endif
 }
 
 std::string getLocalIP() {

@@ -15,9 +15,6 @@
 #include "core/RotatorData.h"
 #include "core/SatelliteManager.h"
 #include "core/SolarData.h"
-#ifdef ENABLE_DEBUG_API
-#include "core/UIRegistry.h"
-#endif
 #include "core/SoundManager.h"
 #include "core/WidgetType.h"
 #include "core/WorkerService.h"
@@ -39,6 +36,7 @@
 #include "services/DRAPProvider.h"
 #include "services/DXClusterProvider.h"
 #include "services/DstProvider.h"
+#include "services/FccProvider.h"
 #include "services/ForecastProvider.h"
 #include "services/GPSProvider.h"
 #include "services/HistoryProvider.h"
@@ -94,11 +92,13 @@
 #include "ui/PaneContainer.h"
 #include "ui/PlaceholderWidget.h"
 #include "ui/RSSBanner.h"
+#include "ui/ReminderPanel.h"
 #include "ui/RepeaterPanel.h"
 #include "ui/SDOPanel.h"
 #include "ui/SantaPanel.h"
 #include "ui/SetupScreen.h"
 #include "ui/SpaceWeatherPanel.h"
+#include "ui/StopwatchPanel.h"
 #include "ui/SysInfoPanel.h"
 #include "ui/TextureManager.h"
 #include "ui/TimePanel.h"
@@ -227,6 +227,7 @@ struct AppContext {
   // themes, etc.) without tearing down the dashboard.
   std::atomic<bool> configReloadRequested{false};
   bool startOnUpdateTab = false;
+  bool startOnServicesTab = false;
 
   // Dashboard State (Transient)
   std::unique_ptr<DashboardContext> dashboard;
@@ -259,6 +260,7 @@ struct DashboardContext {
   std::unique_ptr<DRAPProvider> drapProvider;
   std::shared_ptr<AuroraProvider> auroraProvider;
   std::shared_ptr<CallbookProvider> callbookProvider;
+  FccProvider fccProvider;
   std::unique_ptr<DstProvider> dstProvider;
   std::unique_ptr<ADIFProvider> adifProvider;
   std::unique_ptr<MufRtProvider> mufRtProvider;
@@ -1165,6 +1167,14 @@ DashboardContext::DashboardContext(AppContext &ctx)
       widgetPool[type] =
           std::make_unique<WinlinkPanel>(0, 0, 0, 0, fontMgr, ctx.winlinkStore);
       break;
+    case WidgetType::STOPWATCH:
+      widgetPool[type] = std::make_unique<StopwatchPanel>(0, 0, 0, 0, fontMgr);
+      break;
+    case WidgetType::REMINDER:
+      widgetPool[type] = std::make_unique<ReminderPanel>(
+          0, 0, 0, 0, fontMgr, ctx.appCfg, ctx.cfgMgr, *callbookProvider,
+          callbookStore, fccProvider);
+      break;
     default:
       widgetPool[type] = std::make_unique<PlaceholderWidget>(
           0, 0, 0, 0, fontMgr, widgetTypeDisplayName(type),
@@ -1247,7 +1257,8 @@ DashboardContext::DashboardContext(AppContext &ctx)
       WidgetType::NCDXF,         WidgetType::ON_THE_AIR,
       WidgetType::SANTA_TRACKER, WidgetType::SDO,
       WidgetType::SOLAR,         WidgetType::SYS_INFO,
-      WidgetType::WATCHLIST};
+      WidgetType::WATCHLIST,     WidgetType::STOPWATCH,
+      WidgetType::REMINDER};
   // Note: REPEATER_DIR omitted — RepeaterBook API requires auth key (TODO).
   // Note: WINLINK omitted — Winlink API requires access key (TODO).
 
@@ -1299,6 +1310,14 @@ DashboardContext::DashboardContext(AppContext &ctx)
   };
   for (int i = 0; i < 4; ++i) {
     panes[i]->setOnSelectionRequested(onPaneSelectionRequested, i);
+    panes[i]->setOnConfigRequested([&ctx](WidgetType type) {
+      if (type == WidgetType::DX_CLUSTER) {
+        ctx.activeSetup = AppContext::SetupMode::DXCluster;
+      } else {
+        // Most widgets handle internal setup or don't have one.
+        // Don't open global setup generically.
+      }
+    });
   }
 
   localPanel =
@@ -1617,6 +1636,25 @@ void DashboardContext::update(AppContext &ctx) {
         if (event.key.keysym.sym == SDLK_q &&
             (event.key.keysym.mod & KMOD_CTRL)) {
           ctx.appRunning = false;
+        }
+      }
+      break;
+    }
+    case SDL_TEXTINPUT: {
+      Widget *activeModal = nullptr;
+      for (auto *w : eventWidgets) {
+        if (w->isModalActive()) {
+          activeModal = w;
+          break;
+        }
+      }
+      if (activeModal) {
+        activeModal->onTextInput(event.text.text);
+      } else {
+        for (auto *w : eventWidgets) {
+          if (w->onTextInput(event.text.text)) {
+            break;
+          }
         }
       }
       break;
@@ -2157,6 +2195,9 @@ void main_tick() {
         if (ctx.startOnUpdateTab) {
           s->setStartTab(SetupScreen::Tab::Update);
           ctx.startOnUpdateTab = false;
+        } else if (ctx.startOnServicesTab) {
+          s->setStartTab(SetupScreen::Tab::Services);
+          ctx.startOnServicesTab = false;
         }
         ctx.setupWidget = std::move(s);
       } else if (ctx.activeSetup == AppContext::SetupMode::DXCluster) {
@@ -2238,7 +2279,7 @@ void main_tick() {
         auto *s = static_cast<SetupScreen *>(ctx.setupWidget.get());
         if (!s->wasCancelled())
           ctx.appCfg = s->getConfig();
-      } else {
+      } else if (ctx.activeSetup == AppContext::SetupMode::DXCluster) {
         if (static_cast<DXClusterSetup *>(ctx.setupWidget.get())->isSaved())
           ctx.appCfg = static_cast<DXClusterSetup *>(ctx.setupWidget.get())
                            ->updateConfig(ctx.appCfg);

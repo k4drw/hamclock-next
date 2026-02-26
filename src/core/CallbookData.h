@@ -22,7 +22,9 @@ struct CallbookData {
   // Bio/Meta
   std::string bioUrl;
   std::string imageUrl;
-  std::string source; // e.g., "Callook + HamDB"
+  std::string source;     // e.g., "Callook + HamDB"
+  std::string expiryDate; // YYYY-MM-DD
+  std::string frn;
 
   bool valid = false;
 };

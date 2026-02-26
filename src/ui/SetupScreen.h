@@ -77,6 +77,7 @@ private:
   std::string gridText_;
   std::string latText_;
   std::string lonText_;
+  std::string frnText_;
   std::string clusterHost_;
   std::string clusterPort_;
   std::string clusterLogin_;
@@ -105,6 +106,10 @@ private:
   std::string countdownTime_; // YYYY-MM-DD HH:MM
   std::string dimTime_;
   std::string brightTime_;
+
+  SDL_Rect brightTimeRect_ = {0, 0, 0, 0};
+  SDL_Rect modalRect_ = {0, 0, 0, 0};
+
   std::string rigHost_;
   std::string rigPort_;
   bool rigAutoTune_ = true;
@@ -139,7 +144,6 @@ private:
   SDL_Rect brightnessSliderRect_ = {0, 0, 0, 0};
   SDL_Rect scheduleToggleRect_ = {0, 0, 0, 0};
   SDL_Rect dimTimeRect_ = {0, 0, 0, 0};
-  SDL_Rect brightTimeRect_ = {0, 0, 0, 0};
 
   struct WidgetClickRect {
     WidgetType type;
@@ -148,12 +152,12 @@ private:
   std::vector<WidgetClickRect> widgetRects_;
 
   // Network / Hub tab
-  HubMode     hubMode_     = HubMode::Off;
+  HubMode hubMode_ = HubMode::Off;
   std::string hubIp_;
-  std::string hubPortStr_  = "8080";
-  SDL_Rect    hubModeRect_ = {0, 0, 0, 0};
-  SDL_Rect    hubIpRect_   = {0, 0, 0, 0};
-  SDL_Rect    hubPortRect_ = {0, 0, 0, 0};
+  std::string hubPortStr_ = "8080";
+  SDL_Rect hubModeRect_ = {0, 0, 0, 0};
+  SDL_Rect hubIpRect_ = {0, 0, 0, 0};
+  SDL_Rect hubPortRect_ = {0, 0, 0, 0};
 
   // Track dimensions to detect size changes
   int lastRenderWidth_ = 0;

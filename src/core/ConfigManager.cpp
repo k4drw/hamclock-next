@@ -100,7 +100,7 @@ bool ConfigManager::init() {
                 console.log('[IDBFS] Sync-from-IDB complete' +
                             (mounted ? "" : " (no IDBFS — session only)"));
               }
-              if (typeof Module._hamclock_after_idbfs === 'function')
+              if (typeof Module._hamclock_after_idbfs == = 'function')
                 Module._hamclock_after_idbfs();
             });
       },
@@ -193,6 +193,27 @@ bool ConfigManager::load(AppConfig &config) const {
     auto &ap = json["appearance"];
     config.countdownLabel = ap.value("countdown_label", "");
     config.countdownTime = ap.value("countdown_time", "");
+  }
+
+  // Reminder
+  if (json.contains("reminder")) {
+    auto &rm = json["reminder"];
+    config.callsignExpiry = rm.value("callsign_expiry", "");
+    config.callsignFrn = rm.value("callsign_frn", "");
+    config.callsignExpiryAcknowledged = rm.value("callsign_expiry_acked", "");
+    config.callsignExpiryLastCheck =
+        rm.value("callsign_expiry_last_check", (int64_t)0);
+    if (rm.contains("custom") && rm["custom"].is_array()) {
+      config.reminders.clear();
+      for (auto &item : rm["custom"]) {
+        ReminderEntry re;
+        re.label = item.value("label", "");
+        re.date = item.value("date", "");
+        re.active = item.value("active", true);
+        re.acknowledgedDate = item.value("acked", "");
+        config.reminders.push_back(re);
+      }
+    }
   }
 
   // RSS
@@ -413,6 +434,22 @@ bool ConfigManager::save(const AppConfig &config) const {
 
   json["countdown"]["label"] = config.countdownLabel;
   json["countdown"]["time"] = config.countdownTime;
+
+  json["reminder"]["callsign_expiry"] = config.callsignExpiry;
+  json["reminder"]["callsign_frn"] = config.callsignFrn;
+  json["reminder"]["callsign_expiry_acked"] = config.callsignExpiryAcknowledged;
+  json["reminder"]["callsign_expiry_last_check"] =
+      config.callsignExpiryLastCheck;
+  auto rmArr = nlohmann::json::array();
+  for (const auto &re : config.reminders) {
+    nlohmann::json jre;
+    jre["label"] = re.label;
+    jre["date"] = re.date;
+    jre["active"] = re.active;
+    jre["acked"] = re.acknowledgedDate;
+    rmArr.push_back(jre);
+  }
+  json["reminder"]["custom"] = rmArr;
 
   json["brightness"]["level"] = config.brightness;
   json["brightness"]["schedule"] = config.brightnessSchedule;

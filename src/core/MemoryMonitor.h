@@ -39,7 +39,8 @@ BOOL WINAPI K32GetProcessMemoryInfo(HANDLE Process,
 #include <cstdio>
 #include <string>
 
-#if defined(__linux__)
+#if defined(__linux__) || defined(__APPLE__)
+#include <sys/statvfs.h>
 #include <unistd.h>
 #elif defined(__APPLE__)
 #include <mach/mach.h>
@@ -68,6 +69,33 @@ public:
     }
     SDL_DestroyTexture(tex);
     tex = nullptr;
+  }
+
+  // Get current disk usage percentage (-1 if unavailable)
+  int getDiskUsagePct() {
+#if defined(_WIN32)
+    ULARGE_INTEGER freeBytesAvailable, totalNumberOfBytes,
+        totalNumberOfFreeBytes;
+    // Passing NULL to GetDiskFreeSpaceEx defaults to the current volume
+    if (GetDiskFreeSpaceExA(NULL, &freeBytesAvailable, &totalNumberOfBytes,
+                            &totalNumberOfFreeBytes)) {
+      double total = static_cast<double>(totalNumberOfBytes.QuadPart);
+      double free = static_cast<double>(totalNumberOfFreeBytes.QuadPart);
+      if (total > 0) {
+        return static_cast<int>(100.0 * (1.0 - free / total));
+      }
+    }
+    return -1;
+#elif defined(__EMSCRIPTEN__)
+    return -1;
+#else
+    struct statvfs stat;
+    if (statvfs("/", &stat) != 0)
+      return -1;
+    double total = static_cast<double>(stat.f_blocks) * stat.f_frsize;
+    double avail = static_cast<double>(stat.f_bavail) * stat.f_frsize;
+    return (total > 0) ? static_cast<int>(100.0 * (1.0 - avail / total)) : 0;
+#endif
   }
 
   // Get Resident Set Size (RSS) in bytes

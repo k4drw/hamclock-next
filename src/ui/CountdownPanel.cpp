@@ -1,6 +1,7 @@
 #include "CountdownPanel.h"
 #include "../core/Astronomy.h"
 #include "../core/SoundManager.h"
+#include "../core/Theme.h"
 #include "FontManager.h"
 
 #include <cstdio>
@@ -35,26 +36,43 @@ void CountdownPanel::render(SDL_Renderer *renderer) {
   if (!fontMgr_.ready())
     return;
 
-  SDL_SetRenderDrawColor(renderer, 20, 20, 30, 255);
+  ThemeColors themes = getThemeColors(theme_);
+
+  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b,
+                         themes.bg.a);
   SDL_Rect rect = {x_, y_, width_, height_};
   SDL_RenderFillRect(renderer, &rect);
-  SDL_SetRenderDrawColor(renderer, 80, 80, 80, 255);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
+                         themes.border.b, themes.border.a);
   SDL_RenderDrawRect(renderer, &rect);
 
   int titleH = 20;
-  std::string label =
-      config_.countdownLabel.empty() ? "Countdown" : config_.countdownLabel;
-  if (config_.countdownLabel.empty() && editing_)
-    label = "Click to set";
 
-  fontMgr_.drawText(renderer, label, x_ + 10, y_ + 5, {0, 200, 255, 255}, 10,
+  // Unified Title Bar (Match standard font size/look)
+  fontMgr_.drawText(renderer, "Countdown", x_ + 10, y_ + 5, themes.accent, 10,
                     true);
+
+  // Separator line
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
+                         themes.border.b, 60);
+  SDL_RenderDrawLine(renderer, x_ + 5, y_ + titleH, x_ + width_ - 5,
+                     y_ + titleH);
 
   int centerX = x_ + width_ / 2;
   int centerY = y_ + titleH + (height_ - titleH) / 2;
 
+  // Custom User Label
+  std::string label = config_.countdownLabel;
+  if (label.empty() && editing_)
+    label = "Click to set";
+
+  if (!label.empty()) {
+    fontMgr_.drawText(renderer, label, centerX, centerY - 15, themes.text, 10,
+                      true, true);
+  }
+
   if (targetTime_ == std::chrono::system_clock::time_point()) {
-    fontMgr_.drawText(renderer, "No target set", centerX, centerY,
+    fontMgr_.drawText(renderer, "No target set", centerX, centerY + 5,
                       {150, 150, 150, 255}, 14, true, true);
     return;
   }
@@ -65,7 +83,7 @@ void CountdownPanel::render(SDL_Renderer *renderer) {
           .count();
 
   if (diff <= 0 && targetTime_.time_since_epoch().count() > 0) {
-    fontMgr_.drawText(renderer, "EVENT ACTIVE!", centerX, centerY,
+    fontMgr_.drawText(renderer, "EVENT ACTIVE!", centerX, centerY + 5,
                       {255, 0, 0, 255}, 15, true, true);
     if (!alarmTriggered_) {
       SoundManager::getInstance().playAlarm();
@@ -84,7 +102,7 @@ void CountdownPanel::render(SDL_Renderer *renderer) {
     else
       std::snprintf(buf, sizeof(buf), "%02dh %02dm %02ds", hours, mins, secs);
 
-    fontMgr_.drawText(renderer, buf, centerX, centerY, {255, 255, 255, 255}, 14,
+    fontMgr_.drawText(renderer, buf, centerX, centerY + 5, themes.text, 14,
                       true, true);
   }
 
@@ -129,8 +147,22 @@ bool CountdownPanel::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
       }
     }
 
-    // Click outside -> Save and Close
-    // stopEditing(true);
+    // Check buttons
+    int btnW = 60;
+    int btnY = y_ + height_ - boxH - 10;
+    int cx = x_ + width_ / 2;
+    if (my >= btnY && my < btnY + boxH) {
+      if (mx >= cx - btnW - 10 && mx < cx - 10) {
+        stopEditing(false); // Cancel
+        return true;
+      } else if (mx >= cx + 10 && mx < cx + 10 + btnW) {
+        stopEditing(true); // OK
+        return true;
+      }
+    }
+
+    // Click outside -> Ignore or beep? For now, do nothing since we have
+    // buttons
     return true;
   }
 
@@ -266,6 +298,29 @@ void CountdownPanel::renderEditOverlay(SDL_Renderer *renderer) {
     SDL_RenderDrawLine(renderer, x_ + pad + 4 + tw, timeY + 4,
                        x_ + pad + 4 + tw, timeY + boxH - 4);
   }
+
+  // OK / Cancel Buttons
+  int btnW = 60;
+  int btnH = 24;
+  int btnY = y_ + height_ - btnH - 10;
+  int cx = x_ + width_ / 2;
+
+  // Cancel
+  SDL_Rect cancelRect = {cx - btnW - 10, btnY, btnW, btnH};
+  SDL_SetRenderDrawColor(renderer, 60, 20, 20, 255);
+  SDL_RenderFillRect(renderer, &cancelRect);
+  SDL_SetRenderDrawColor(renderer, 150, 50, 50, 255);
+  SDL_RenderDrawRect(renderer, &cancelRect);
+  fontMgr_.drawText(renderer, "Cancel", cancelRect.x + 12, cancelRect.y + 6,
+                    white, 11);
+
+  // OK
+  SDL_Rect okRect = {cx + 10, btnY, btnW, btnH};
+  SDL_SetRenderDrawColor(renderer, 20, 60, 20, 255);
+  SDL_RenderFillRect(renderer, &okRect);
+  SDL_SetRenderDrawColor(renderer, 50, 150, 50, 255);
+  SDL_RenderDrawRect(renderer, &okRect);
+  fontMgr_.drawText(renderer, "OK", okRect.x + 22, okRect.y + 6, white, 11);
 
   SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
 }

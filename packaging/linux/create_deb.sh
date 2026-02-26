@@ -78,7 +78,54 @@ Description: HamClock Next - Portable Amateur Radio Clock
  Built for Linux (${VARIANT}).
 EOF
 
-# 4. Build Package
+# 4. FB0-specific: Add systemd service and maintainer scripts
+if [ "$VARIANT" == "fb0" ]; then
+    echo "Adding systemd service for FB0 variant..."
+    mkdir -p "$PKG_DIR/lib/systemd/system"
+    cat > "$PKG_DIR/lib/systemd/system/hamclock-next.service" <<EOF
+[Unit]
+Description=HamClock Next (FB0)
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/hamclock-next --fullscreen
+Restart=always
+RestartSec=5
+# Run as root to ensure access to /dev/fb0, /dev/dri/card*, /dev/input/*
+User=root
+WorkingDirectory=/root
+Environment=SDL_VIDEODRIVER=kmsdrm
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    # postinst: enable and start service
+    cat > "$PKG_DIR/DEBIAN/postinst" <<EOF
+#!/bin/sh
+set -e
+if [ "\$1" = "configure" ]; then
+    systemctl daemon-reload || true
+    systemctl enable --now hamclock-next.service || true
+fi
+EOF
+    chmod 755 "$PKG_DIR/DEBIAN/postinst"
+
+    # prerm: stop and disable service
+    cat > "$PKG_DIR/DEBIAN/prerm" <<EOF
+#!/bin/sh
+set -e
+if [ "\$1" = "remove" ] || [ "\$1" = "deconfigure" ]; then
+    systemctl disable --now hamclock-next.service || true
+fi
+EOF
+    chmod 755 "$PKG_DIR/DEBIAN/prerm"
+fi
+
+# 5. Build Package
 # Simplified naming: no OS distribution in filename
 FINAL_FILENAME="${BUILD_DIR}/hamclock-next_${VERSION}_${VARIANT}_${ARCH}.deb"
 dpkg-deb --build "$PKG_DIR" "$FINAL_FILENAME"

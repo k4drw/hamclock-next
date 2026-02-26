@@ -14,6 +14,14 @@ void WidgetSelector::show(
     std::function<void(int, const std::vector<WidgetType> &)> onDone) {
   paneIndex_ = paneIndex;
   available_ = available;
+
+  // Alphabetize
+  std::sort(available_.begin(), available_.end(),
+            [](WidgetType a, WidgetType b) {
+              return std::string(widgetTypeDisplayName(a)) <
+                     std::string(widgetTypeDisplayName(b));
+            });
+
   selection_ = currentSelection;
   forbidden_ = forbidden;
   onDone_ = onDone;
@@ -22,13 +30,14 @@ void WidgetSelector::show(
 
   // Center the menu
   int numCols = 3; // Use 3 columns to handle more widgets
-  int itemH = 34;
+  int itemH = 28;  // Shrink from 34
   int baseW = 180; // Narrower columns for 3-column layout
   int menuW = baseW * numCols;
   int footerH = 50;
 
   int numRows = (static_cast<int>(available_.size()) + numCols - 1) / numCols;
-  int menuH = numRows * itemH + footerH + 25; // Increased padding to prevent overlap
+  int menuH =
+      numRows * itemH + footerH + 25; // Increased padding to prevent overlap
 
   // Max height clamp to prevent overflowing screen
   if (menuH > HamClock::LOGICAL_HEIGHT - 20) {
@@ -43,8 +52,8 @@ void WidgetSelector::show(
   for (size_t i = 0; i < available_.size(); ++i) {
     int row = static_cast<int>(i) / numCols;
     int col = static_cast<int>(i) % numCols;
-    itemRects_.push_back(
-        {menuRect_.x + col * colW, menuRect_.y + row * itemH + 10, colW, itemH});
+    itemRects_.push_back({menuRect_.x + col * colW,
+                          menuRect_.y + row * itemH + 10, colW, itemH});
   }
 
   // Position footer buttons

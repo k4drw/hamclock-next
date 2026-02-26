@@ -505,6 +505,7 @@ set(HAMCLOCK_SOURCES
     src/services/SDOProvider.cpp
     src/services/WeatherProvider.cpp
     src/services/CallbookProvider.cpp
+    src/services/FccProvider.cpp
     src/services/DstProvider.cpp
     src/services/SantaProvider.cpp
     src/services/RotatorService.cpp
@@ -560,6 +561,8 @@ set(HAMCLOCK_SOURCES
     src/ui/SetupScreen.cpp
     src/ui/SpaceWeatherPanel.cpp
     src/ui/TimePanel.cpp
+    src/ui/StopwatchPanel.cpp
+    src/ui/ReminderPanel.cpp
     src/ui/UpdateOverlay.cpp
     src/ui/WidgetSelector.cpp
     src/ui/CallbookPanel.cpp

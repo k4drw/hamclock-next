@@ -21,11 +21,11 @@ SetupScreen::SetupScreen(int x, int y, int w, int h, FontManager &fontMgr,
 }
 
 void SetupScreen::recalcLayout() {
-  int h = height_;
-  titleSize_ = std::clamp(static_cast<int>(h * 0.050f), 14, 36);
-  labelSize_ = std::clamp(static_cast<int>(h * 0.030f), 10, 20);
-  fieldSize_ = std::clamp(static_cast<int>(h * 0.038f), 11, 26);
-  hintSize_ = std::clamp(static_cast<int>(h * 0.024f), 9, 15);
+  int h = std::min(480, height_ - 40);
+  titleSize_ = std::clamp(static_cast<int>(h * 0.050f), 14, 28);
+  labelSize_ = std::clamp(static_cast<int>(h * 0.030f), 10, 16);
+  fieldSize_ = std::clamp(static_cast<int>(h * 0.038f), 11, 20);
+  hintSize_ = std::clamp(static_cast<int>(h * 0.024f), 9, 13);
 }
 
 void SetupScreen::autoPopulateLatLon() {
@@ -262,14 +262,29 @@ void SetupScreen::render(SDL_Renderer *renderer) {
     lastRenderHeight_ = height_;
   }
 
-  SDL_SetRenderDrawColor(renderer, 15, 15, 25, 255);
-  SDL_Rect bg = {x_, y_, width_, height_};
-  SDL_RenderFillRect(renderer, &bg);
+  // Dim background
+  SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+  SDL_SetRenderDrawColor(renderer, 0, 0, 0, 160);
+  SDL_Rect full = {0, 0, width_, height_};
+  SDL_RenderFillRect(renderer, &full);
+  SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
 
-  int cx = x_ + width_ / 2;
-  int pad = std::max(16, width_ / 24);
-  int fieldW = std::min(400, width_ - 2 * pad);
-  int fieldX = cx - fieldW / 2;
+  // Main Modal Box
+  int modalW = std::min(600, width_ - 40);
+  int modalH = std::min(480, height_ - 40);
+  int modalX = (width_ - modalW) / 2;
+  int modalY = (height_ - modalH) / 2;
+  modalRect_ = {modalX, modalY, modalW, modalH};
+
+  SDL_SetRenderDrawColor(renderer, 25, 25, 35, 255);
+  SDL_RenderFillRect(renderer, &modalRect_);
+  SDL_SetRenderDrawColor(renderer, 60, 60, 80, 255);
+  SDL_RenderDrawRect(renderer, &modalRect_);
+
+  int cx = modalX + modalW / 2;
+  int pad = 20;
+  int fieldW = modalW - 2 * pad;
+  int fieldX = modalX + pad;
   int fieldH = fieldSize_ + 14;
   int textPad = 7;
 
@@ -349,15 +364,15 @@ void SetupScreen::render(SDL_Renderer *renderer) {
     break;
   }
 
-  y = y_ + height_ - 12 - 40; // anchored: fixed 12px bottom clearance (was pad)
+  y = modalY + modalH - 12 - 40;
 
-  // Draw footer background to prevent content bleed-through
-  SDL_Rect footerBg = {x_, y - 10, width_, height_ - (y - 10)};
-  SDL_SetRenderDrawColor(renderer, 15, 15, 25, 255); // Match bg
+  // Draw footer background
+  SDL_Rect footerBg = {modalX + 2, y - 10, modalW - 4,
+                       modalH - (y - modalY - 10)};
+  SDL_SetRenderDrawColor(renderer, 20, 20, 30, 255);
   SDL_RenderFillRect(renderer, &footerBg);
-  // Optional divider line
-  SDL_SetRenderDrawColor(renderer, 40, 40, 50, 255);
-  SDL_RenderDrawLine(renderer, x_, y - 10, x_ + width_, y - 10);
+  SDL_SetRenderDrawColor(renderer, 50, 50, 60, 255);
+  SDL_RenderDrawLine(renderer, modalX, y - 10, modalX + modalW, y - 10);
 
   int btnW = 100;
   int btnH = 34;
@@ -1027,12 +1042,19 @@ void SetupScreen::onResize(int x, int y, int w, int h) {
 }
 
 bool SetupScreen::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
-  int cx = x_ + width_ / 2;
-  int pad = std::max(16, width_ / 24);
-  int fieldW = std::min(400, width_ - 2 * pad);
-  int fieldX = cx - fieldW / 2;
+  // If clicked outside modal, cancel (like a true modal)
+  if (mx < modalRect_.x || mx >= modalRect_.x + modalRect_.w ||
+      my < modalRect_.y || my >= modalRect_.y + modalRect_.h) {
+    cancelled_ = true;
+    complete_ = true;
+    return true;
+  }
+
+  int pad = 20;
+  int fieldW = modalRect_.w - 2 * pad;
+  int fieldX = modalRect_.x + pad;
   int fieldH = fieldSize_ + 14;
-  int y = y_ + titleSize_ + 3 * pad / 2;
+  int y = modalRect_.y + titleSize_ + 3 * pad / 2;
 
   // Check Footer Buttons
   if (mx >= cancelBtnRect_.x && mx <= cancelBtnRect_.x + cancelBtnRect_.w &&
