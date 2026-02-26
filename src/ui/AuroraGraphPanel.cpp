@@ -124,6 +124,10 @@ void AuroraGraphPanel::render(SDL_Renderer *renderer) {
     if (prevAge > 24.0f)
       continue;
 
+    // Don't draw line across large data gaps (> 1 hour)
+    if (prevAge - currAge > 1.0f)
+      continue;
+
     // Map to graph coordinates
     // X: 0 hours (now) = right edge, -24 hours = left edge
     int x1 = graphX + graphW - static_cast<int>(prevAge * graphW / 24.0f);

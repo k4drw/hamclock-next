@@ -4,32 +4,29 @@
 #include <algorithm>
 #include <cstdio>
 
-static const std::vector<std::string> kIcons =
-    {"☄","⊕","◈","⬡","✦","★","✸","⬢","◉","⊛","✪","⚡"};
+static const std::vector<std::string> kIcons = {"☄", "⊕", "◈", "⬡", "✦", "★",
+                                                "✸", "⬢", "◉", "⊛", "✪", "⚡"};
 
 static const SDL_Color kPalette[] = {
-    {255, 140,   0, 255}, // orange
-    {  0, 255, 255, 255}, // cyan
-    {  0, 255, 128, 255}, // green
-    {255,  60,  60, 255}, // red
+    {255, 140, 0, 255},   // orange
+    {0, 255, 255, 255},   // cyan
+    {0, 255, 128, 255},   // green
+    {255, 60, 60, 255},   // red
     {255, 255, 255, 255}, // white
-    {255, 230,   0, 255}, // yellow
+    {255, 230, 0, 255},   // yellow
 };
 static constexpr int kPaletteSize = 6;
-
 
 AsteroidPanel::AsteroidPanel(int x, int y, int w, int h, FontManager &fontMgr,
                              AsteroidProvider &provider,
                              std::shared_ptr<HamClockState> state,
-                             AppConfig *config,
-                             std::function<void()> onSave)
-    : ListPanel(x, y, w, h, fontMgr,
-                (config && !config->asteroidIcon.empty()
-                     ? config->asteroidIcon + " Asteroids"
-                     : "☄ Asteroids"),
-                {}),
-      provider_(provider), state_(std::move(state)),
-      config_(config), onSave_(std::move(onSave)) {
+                             AppConfig *config, std::function<void()> onSave)
+    : ListPanel(
+          x, y, w, h, fontMgr,
+          (config && !config->asteroidIcon.empty() ? "Asteroids" : "Asteroids"),
+          {}),
+      provider_(provider), state_(std::move(state)), config_(config),
+      onSave_(std::move(onSave)) {
   onResize(x, y, w, h);
 }
 
@@ -42,8 +39,7 @@ void AsteroidPanel::update() {
   if (data.valid &&
       (data.lastFetchTime != lastData_.lastFetchTime ||
        data.asteroids.size() != lastData_.asteroids.size() || rows_.empty())) {
-    if (selectedIndex_ >= 0 &&
-        selectedIndex_ >= (int)data.asteroids.size()) {
+    if (selectedIndex_ >= 0 && selectedIndex_ >= (int)data.asteroids.size()) {
       selectedIndex_ = -1;
       if (state_)
         state_->selectedAsteroidName.clear();
@@ -73,17 +69,14 @@ void AsteroidPanel::rebuildRows() {
       name = name.substr(0, 8);
 
     // approachDate format: "YYYY-Mon-DD" (e.g. "2026-Feb-19")
-    std::string monStr = ast.approachDate.size() >= 8
-                             ? ast.approachDate.substr(5, 3)
-                             : "???";
-    std::string day = ast.approachDate.size() >= 11
-                          ? ast.approachDate.substr(9, 2)
-                          : "??";
+    std::string monStr =
+        ast.approachDate.size() >= 8 ? ast.approachDate.substr(5, 3) : "???";
+    std::string day =
+        ast.approachDate.size() >= 11 ? ast.approachDate.substr(9, 2) : "??";
 
     char row[64];
-    std::snprintf(row, sizeof(row), "%-8s %s %s %s",
-                  name.c_str(), monStr.c_str(), day.c_str(),
-                  ast.closeApproachTime.c_str());
+    std::snprintf(row, sizeof(row), "%-8s %s %s %s", name.c_str(),
+                  monStr.c_str(), day.c_str(), ast.closeApproachTime.c_str());
     newRows.push_back(row);
   }
 
@@ -160,8 +153,8 @@ void AsteroidPanel::render(SDL_Renderer *renderer) {
   int totalSwatchW = kPaletteSize * (swatchSize + pad) - pad;
   int swatchStartX = x_ + (width_ - totalSwatchW) / 2;
 
-  SDL_Color curColor = config_ ? config_->asteroidColor
-                               : SDL_Color{255, 140, 0, 255};
+  SDL_Color curColor =
+      config_ ? config_->asteroidColor : SDL_Color{255, 140, 0, 255};
 
   for (int k = 0; k < kPaletteSize; ++k) {
     int sx = swatchStartX + k * (swatchSize + pad);
@@ -171,8 +164,8 @@ void AsteroidPanel::render(SDL_Renderer *renderer) {
     SDL_Rect sr = {sx, swatchRowY, swatchSize, swatchSize};
     SDL_RenderFillRect(renderer, &sr);
 
-    bool selected = (sc.r == curColor.r && sc.g == curColor.g &&
-                     sc.b == curColor.b);
+    bool selected =
+        (sc.r == curColor.r && sc.g == curColor.g && sc.b == curColor.b);
     if (selected) {
       SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
       SDL_RenderDrawRect(renderer, &sr);
@@ -211,7 +204,7 @@ bool AsteroidPanel::onMouseUp(int mx, int my, Uint16 /*mod*/, int clicks) {
       if (iconIdx >= 0 && iconIdx < (int)kIcons.size()) {
         if (config_)
           config_->asteroidIcon = kIcons[iconIdx];
-        title_ = kIcons[iconIdx] + " Asteroids";
+        title_ = "Asteroids";
         if (titleTex_) {
           MemoryMonitor::getInstance().destroyTexture(titleTex_);
           titleTex_ = nullptr;

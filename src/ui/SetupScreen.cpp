@@ -269,11 +269,11 @@ void SetupScreen::render(SDL_Renderer *renderer) {
   SDL_RenderFillRect(renderer, &full);
   SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
 
-  // Main Modal Box
+  // Main Modal Box (Match standard max bounds, properly centered)
   int modalW = std::min(600, width_ - 40);
   int modalH = std::min(480, height_ - 40);
-  int modalX = (width_ - modalW) / 2;
-  int modalY = (height_ - modalH) / 2;
+  int modalX = x_ + (width_ - modalW) / 2;
+  int modalY = y_ + (height_ - modalH) / 2;
   modalRect_ = {modalX, modalY, modalW, modalH};
 
   SDL_SetRenderDrawColor(renderer, 25, 25, 35, 255);
@@ -292,7 +292,7 @@ void SetupScreen::render(SDL_Renderer *renderer) {
   SDL_Color cyan = {0, 200, 255, 255};
   SDL_Color gray = {120, 120, 120, 255};
 
-  int y = y_ + pad;
+  int y = modalRect_.y + pad;
 
   fontMgr_.drawText(renderer, "HamClock-Next Setup", cx, y, cyan, titleSize_,
                     true, true);
@@ -401,8 +401,8 @@ void SetupScreen::render(SDL_Renderer *renderer) {
 void SetupScreen::renderTabIdentity(SDL_Renderer *renderer, int, int pad,
                                     int fieldW, int fieldH, int fieldX,
                                     int textPad) {
-  int y =
-      (y_ + titleSize_ + 2 * pad + fieldH); // tightened: removed extra pad/2
+  int y = (modalRect_.y + titleSize_ + 2 * pad +
+           fieldH); // tightened: removed extra pad/2
   int vSpace = pad / 2;
   SDL_Color white = {255, 255, 255, 255};
   SDL_Color orange = {255, 165, 0, 255};
@@ -471,8 +471,8 @@ void SetupScreen::renderTabIdentity(SDL_Renderer *renderer, int, int pad,
 void SetupScreen::renderTabDXCluster(SDL_Renderer *renderer, int cx, int pad,
                                      int fieldW, int fieldH, int fieldX,
                                      int textPad) {
-  int y =
-      (y_ + titleSize_ + 2 * pad + fieldH); // tightened: removed extra pad/2
+  int y = (modalRect_.y + titleSize_ + 2 * pad +
+           fieldH); // tightened: removed extra pad/2
   int vSpace = 5;
   SDL_Color white = {255, 255, 255, 255};
   SDL_Color orange = {255, 165, 0, 255};
@@ -578,8 +578,8 @@ void SetupScreen::renderTabDXCluster(SDL_Renderer *renderer, int cx, int pad,
 void SetupScreen::renderTabAppearance(SDL_Renderer *renderer, int cx, int pad,
                                       int fieldW, int fieldH, int fieldX,
                                       int textPad) {
-  int y =
-      (y_ + titleSize_ + 2 * pad + fieldH); // tightened: removed extra pad/2
+  int y = (modalRect_.y + titleSize_ + 2 * pad +
+           fieldH); // tightened: removed extra pad/2
   // Cap vSpace so Appearance tab fits above the button bar on small screens
   // (e.g. 1024x600 7" display). Available height / ~26 keeps all rows visible.
   int availH = (y_ + height_ - 52) - y;
@@ -742,8 +742,8 @@ void SetupScreen::renderTabAppearance(SDL_Renderer *renderer, int cx, int pad,
 void SetupScreen::renderTabServices(SDL_Renderer *renderer, int, int pad,
                                     int fieldW, int fieldH, int fieldX,
                                     int textPad) {
-  int y =
-      (y_ + titleSize_ + 2 * pad + fieldH); // tightened: removed extra pad/2
+  int y = (modalRect_.y + titleSize_ + 2 * pad +
+           fieldH); // tightened: removed extra pad/2
   int vSpace = pad / 2;
   SDL_Color white = {255, 255, 255, 255};
   SDL_Color orange = {255, 165, 0, 255};
@@ -770,7 +770,7 @@ void SetupScreen::renderTabServices(SDL_Renderer *renderer, int, int pad,
 void SetupScreen::renderTabNetwork(SDL_Renderer *renderer, int /*cx*/, int pad,
                                    int fieldW, int fieldH, int fieldX,
                                    int textPad) {
-  int y = (y_ + titleSize_ + 2 * pad + fieldH);
+  int y = (modalRect_.y + titleSize_ + 2 * pad + fieldH);
   int vSpace = pad / 2;
   SDL_Color white = {255, 255, 255, 255};
   SDL_Color orange = {255, 165, 0, 255};
@@ -786,8 +786,8 @@ void SetupScreen::renderTabNetwork(SDL_Renderer *renderer, int /*cx*/, int pad,
                                                           : "Off";
   int btnW = 80;
   hubModeRect_ = {fieldX + fieldW - btnW, y, btnW, fieldH};
-  fontMgr_.drawText(renderer, "Mode:", fieldX, y + fieldH / 2, white,
-                    labelSize_, false, true);
+  fontMgr_.drawText(renderer, "Mode:", fieldX, y + (fieldH - labelSize_) / 2,
+                    white, labelSize_, false, false);
   SDL_SetRenderDrawColor(renderer, 40, 40, 60, 255);
   SDL_RenderFillRect(renderer, &hubModeRect_);
   SDL_SetRenderDrawColor(renderer, orange.r, orange.g, orange.b, 255);
@@ -835,8 +835,8 @@ void SetupScreen::renderTabNetwork(SDL_Renderer *renderer, int /*cx*/, int pad,
 void SetupScreen::renderTabRig(SDL_Renderer *renderer, int cx, int pad,
                                int fieldW, int fieldH, int fieldX,
                                int textPad) {
-  int y =
-      (y_ + titleSize_ + 2 * pad + fieldH); // tightened: removed extra pad/2
+  int y = (modalRect_.y + titleSize_ + 2 * pad +
+           fieldH); // tightened: removed extra pad/2
   int vSpace = pad / 2;
   SDL_Color white = {255, 255, 255, 255};
   SDL_Color orange = {255, 165, 0, 255};
@@ -884,8 +884,8 @@ void SetupScreen::renderTabRig(SDL_Renderer *renderer, int cx, int pad,
 void SetupScreen::renderTabWidgets(SDL_Renderer *renderer, int cx, int pad,
                                    int fieldW, int fieldH, int fieldX,
                                    int textPad) {
-  int y =
-      (y_ + titleSize_ + 2 * pad + fieldH); // tightened: removed extra pad/2
+  int y = (modalRect_.y + titleSize_ + 2 * pad +
+           fieldH); // tightened: removed extra pad/2
   SDL_Color white = {255, 255, 255, 255};
   SDL_Color gray = {140, 140, 140, 255};
 
@@ -916,24 +916,41 @@ void SetupScreen::renderTabWidgets(SDL_Renderer *renderer, int cx, int pad,
   int startY = y;
   int rowH = hintSize_ + 4; // Tighter vertical spacing
 
-  WidgetType allTypes[] = {
-      WidgetType::ADIF,          WidgetType::ALERTS,
-      WidgetType::ASTEROID,      WidgetType::AURORA,
-      WidgetType::AURORA_GRAPH,  WidgetType::BAND_CONDITIONS,
-      WidgetType::CALLBOOK,      WidgetType::CLOCK_AUX,
-      WidgetType::CONTESTS,      WidgetType::COUNTDOWN,
-      WidgetType::DE_WEATHER,    WidgetType::DRAP,
-      WidgetType::DST_INDEX,     WidgetType::DX_CLUSTER,
-      WidgetType::DX_PEDITIONS,  WidgetType::DX_WEATHER,
-      WidgetType::EME_TOOL,      WidgetType::FORECAST,
-      WidgetType::GIMBAL,        WidgetType::HISTORY_FLUX,
-      WidgetType::HISTORY_KP,    WidgetType::HISTORY_SSN,
-      WidgetType::HURRICANE,     WidgetType::LIVE_SPOTS,
-      WidgetType::MARINE,        WidgetType::MOON,
-      WidgetType::NCDXF,         WidgetType::ON_THE_AIR,
-      WidgetType::SANTA_TRACKER, WidgetType::SDO,
-      WidgetType::SOLAR,         WidgetType::SYS_INFO,
-      WidgetType::WATCHLIST};
+  WidgetType allTypes[] = {WidgetType::ADIF,
+                           WidgetType::ASTEROID,
+                           WidgetType::AURORA,
+                           WidgetType::AURORA_GRAPH,
+                           WidgetType::BAND_CONDITIONS,
+                           WidgetType::CALLBOOK,
+                           WidgetType::CLOCK_AUX,
+                           WidgetType::CONTESTS,
+                           WidgetType::COUNTDOWN,
+                           WidgetType::DE_WEATHER,
+                           WidgetType::DRAP,
+                           WidgetType::DST_INDEX,
+                           WidgetType::DX_CLUSTER,
+                           WidgetType::DX_PEDITIONS,
+                           WidgetType::DX_WEATHER,
+                           WidgetType::EME_TOOL,
+                           WidgetType::FORECAST,
+                           WidgetType::GIMBAL,
+                           WidgetType::HISTORY_KP,
+                           WidgetType::LIVE_SPOTS,
+                           WidgetType::MARINE,
+                           WidgetType::MOON,
+                           WidgetType::NCDXF,
+                           WidgetType::ON_THE_AIR,
+                           WidgetType::REMINDER,
+                           WidgetType::SANTA_TRACKER,
+                           WidgetType::SDO,
+                           WidgetType::SOLAR,
+                           WidgetType::HISTORY_FLUX,
+                           WidgetType::STOPWATCH,
+                           WidgetType::HISTORY_SSN,
+                           WidgetType::SYS_INFO,
+                           WidgetType::HURRICANE,
+                           WidgetType::WATCHLIST,
+                           WidgetType::ALERTS};
 
   const auto &currentPane = paneRotations_[activePane_];
 
@@ -986,7 +1003,7 @@ void SetupScreen::renderTabWidgets(SDL_Renderer *renderer, int cx, int pad,
 
 void SetupScreen::renderTabUpdate(SDL_Renderer *renderer, int cx, int pad,
                                   int fieldW, int fieldH, int fieldX, int) {
-  int y = (y_ + titleSize_ + 2 * pad + fieldH);
+  int y = (modalRect_.y + titleSize_ + 2 * pad + fieldH);
   SDL_Color white = {255, 255, 255, 255};
   SDL_Color gray = {140, 140, 140, 255};
   SDL_Color cyan = {0, 200, 255, 255};
@@ -996,20 +1013,23 @@ void SetupScreen::renderTabUpdate(SDL_Renderer *renderer, int cx, int pad,
   y += labelSize_ + pad;
 
   fontMgr_.drawText(renderer, "Current Version:", fieldX, y, white, labelSize_);
-  fontMgr_.drawText(renderer, HAMCLOCK_VERSION, fieldX + fieldW, y, gray,
+  int lenV = fontMgr_.getLogicalWidth(HAMCLOCK_VERSION, labelSize_);
+  fontMgr_.drawText(renderer, HAMCLOCK_VERSION, fieldX + fieldW - lenV, y, gray,
                     labelSize_, false, false);
   y += labelSize_ + 8;
 
   fontMgr_.drawText(renderer, "Platform Architecture:", fieldX, y, white,
                     labelSize_);
-  fontMgr_.drawText(renderer, HAMCLOCK_ARCH, fieldX + fieldW, y, gray,
+  int lenA = fontMgr_.getLogicalWidth(HAMCLOCK_ARCH, labelSize_);
+  fontMgr_.drawText(renderer, HAMCLOCK_ARCH, fieldX + fieldW - lenA, y, gray,
                     labelSize_, false, false);
   y += labelSize_ + 8;
 
   fontMgr_.drawText(renderer, "Installation Type:", fieldX, y, white,
                     labelSize_);
-  fontMgr_.drawText(renderer, HAMCLOCK_INSTALL_TYPE, fieldX + fieldW, y, gray,
-                    labelSize_, false, false);
+  int lenI = fontMgr_.getLogicalWidth(HAMCLOCK_INSTALL_TYPE, labelSize_);
+  fontMgr_.drawText(renderer, HAMCLOCK_INSTALL_TYPE, fieldX + fieldW - lenI, y,
+                    gray, labelSize_, false, false);
   y += labelSize_ + pad * 2;
 
   // Implementation-specific instructions
@@ -1248,7 +1268,8 @@ bool SetupScreen::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
   }
 
   if (activeTab_ == Tab::Widgets) {
-    int yTabBase = y_ + titleSize_ + 2 * pad + fieldH; // matches content start
+    int yTabBase =
+        modalRect_.y + titleSize_ + 2 * pad + fieldH; // matches content start
     int ySelector = yTabBase + labelSize_ + pad / 2;
     int paneW = fieldW / 4;
     if (my >= ySelector && my <= ySelector + 30) {
@@ -1277,7 +1298,7 @@ bool SetupScreen::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
   }
 
   // Handle generic field clicks for active tab
-  int yStart = y_ + titleSize_ + 2 * pad + fieldH + pad / 2;
+  int yStart = modalRect_.y + titleSize_ + 2 * pad + fieldH + pad / 2;
   // Rig tab has a section header ("Rig / CAT Control:") before the first field
   if (activeTab_ == Tab::Rig)
     yStart += labelSize_ + pad / 2;
@@ -1852,7 +1873,7 @@ SDL_Rect SetupScreen::getActionRect(const std::string &action) const {
   int fieldW = std::min(400, width_ - 2 * pad);
   int fieldX = cx - fieldW / 2;
   int fieldH = fieldSize_ + 14;
-  int tabY = y_ + titleSize_ + 2 * pad;
+  int tabY = modalRect_.y + titleSize_ + 2 * pad;
   int numTabs = 8;
   int tabW = fieldW / numTabs;
 
@@ -1872,7 +1893,7 @@ SDL_Rect SetupScreen::getActionRect(const std::string &action) const {
     return {fieldX + 6 * tabW, tabY, tabW, fieldH};
 
   // Fields (approximate positions)
-  int yStart = y_ + titleSize_ + 3 * pad + fieldH;
+  int yStart = modalRect_.y + titleSize_ + 3 * pad + fieldH;
   if (action.find("field_") == 0) {
     int idx = StringUtils::safe_stoi(action.substr(6));
     int fy = yStart + idx * (labelSize_ + fieldH + pad / 2);

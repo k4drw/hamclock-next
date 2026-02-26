@@ -662,6 +662,8 @@ void ReminderPanel::renderReminderList(SDL_Renderer *renderer) {
   int yOff = y_ + 25;
   int lineH = 15;
 
+  hoverZones_.clear();
+
   // Always show primary callsign renewal row if we have it
   if (!config_.callsign.empty()) {
     std::string label = config_.callsign + " Renewal";
@@ -691,6 +693,7 @@ void ReminderPanel::renderReminderList(SDL_Renderer *renderer) {
       SDL_Rect dst = {x_ + width_ - 10 - tw, yOff + (lineH - th) / 2, tw, th};
       SDL_RenderCopy(renderer, tex, nullptr, &dst);
       MemoryMonitor::getInstance().destroyTexture(tex);
+      hoverZones_.push_back({dst, date});
     }
     yOff += lineH;
   }
@@ -724,6 +727,7 @@ void ReminderPanel::renderReminderList(SDL_Renderer *renderer) {
       SDL_Rect dst = {x_ + width_ - 10 - tw, yOff + (lineH - th) / 2, tw, th};
       SDL_RenderCopy(renderer, tex, nullptr, &dst);
       MemoryMonitor::getInstance().destroyTexture(tex);
+      hoverZones_.push_back({dst, re.date});
     }
     yOff += lineH;
   }
@@ -733,4 +737,60 @@ void ReminderPanel::renderReminderList(SDL_Renderer *renderer) {
     fontMgr_.drawText(renderer, "No Reminders", x_ + width_ / 2,
                       y_ + height_ / 2, {150, 150, 150, 255}, 10, false, true);
   }
+
+  if (tooltip_.visible) {
+    renderTooltip(renderer);
+  }
+}
+
+void ReminderPanel::onMouseMove(int mx, int my) {
+  tooltip_.visible = false;
+  if (showSetup_ || notificationActive_)
+    return;
+
+  for (const auto &hz : hoverZones_) {
+    if (mx >= hz.rect.x && mx < hz.rect.x + hz.rect.w && my >= hz.rect.y &&
+        my < hz.rect.y + hz.rect.h) {
+      tooltip_.text = "Target: " + hz.text;
+      tooltip_.x = mx;
+      tooltip_.y = my;
+      tooltip_.visible = true;
+      break;
+    }
+  }
+}
+
+void ReminderPanel::renderTooltip(SDL_Renderer *renderer) {
+  if (tooltip_.text.empty())
+    return;
+
+  int ptSize = 10;
+  int tw = fontMgr_.getLogicalWidth(tooltip_.text, ptSize);
+  int th = fontMgr_.getLogicalHeight(tooltip_.text, ptSize);
+
+  int padX = 8;
+  int padY = 4;
+  int boxW = tw + padX * 2;
+  int boxH = th + padY * 2;
+
+  int bx = tooltip_.x - boxW / 2;
+  int by = tooltip_.y - boxH - 12;
+
+  if (by < y_) {
+    by = tooltip_.y + 16;
+  }
+  if (bx < x_)
+    bx = x_;
+  if (bx + boxW > x_ + width_)
+    bx = x_ + width_ - boxW;
+
+  SDL_Rect box = {bx, by, boxW, boxH};
+  SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+  SDL_SetRenderDrawColor(renderer, 20, 20, 20, 200);
+  SDL_RenderFillRect(renderer, &box);
+  SDL_SetRenderDrawColor(renderer, 100, 100, 100, 255);
+  SDL_RenderDrawRect(renderer, &box);
+
+  fontMgr_.drawText(renderer, tooltip_.text, bx + padX, by + padY,
+                    {255, 255, 255, 255}, ptSize);
 }

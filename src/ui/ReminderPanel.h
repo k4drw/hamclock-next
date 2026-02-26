@@ -49,6 +49,15 @@ private:
   bool checking_ = false;
   bool fetching_ = false;
 
+  struct HoverZone {
+    SDL_Rect rect;
+    std::string text;
+  };
+  std::vector<HoverZone> hoverZones_;
+
+  void onMouseMove(int mx, int my) override;
+  void renderTooltip(SDL_Renderer *renderer);
+
   // ── Notification state ────────────────────────────────────────────────────
   bool notificationActive_ = false;
   std::string notifyLabel_;  // Text shown in the dialog title

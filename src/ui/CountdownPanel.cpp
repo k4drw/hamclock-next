@@ -8,8 +8,9 @@
 #include <ctime>
 
 CountdownPanel::CountdownPanel(int x, int y, int w, int h, FontManager &fontMgr,
-                               AppConfig &config)
-    : Widget(x, y, w, h), fontMgr_(fontMgr), config_(config) {
+                               AppConfig &config, std::function<void()> onSave)
+    : Widget(x, y, w, h), fontMgr_(fontMgr), config_(config),
+      onSave_(std::move(onSave)) {
   update(); // Initial parse
 }
 
@@ -112,6 +113,10 @@ void CountdownPanel::render(SDL_Renderer *renderer) {
   if (editing_) {
     renderEditOverlay(renderer);
   }
+
+  if (tooltip_.visible) {
+    renderTooltip(renderer);
+  }
 }
 
 bool CountdownPanel::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
@@ -200,6 +205,9 @@ void CountdownPanel::stopEditing(bool apply) {
 
     config_.countdownLabel = tempLabel_;
     config_.countdownTime = tempTime_;
+    if (onSave_) {
+      onSave_();
+    }
     update();
   }
   editing_ = false;
@@ -323,4 +331,61 @@ void CountdownPanel::renderEditOverlay(SDL_Renderer *renderer) {
   fontMgr_.drawText(renderer, "OK", okRect.x + 22, okRect.y + 6, white, 11);
 
   SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+}
+
+void CountdownPanel::onMouseMove(int mx, int my) {
+  tooltip_.visible = false;
+  if (editing_)
+    return;
+
+  // Render text is centered horizontally.
+  // Check roughly if mouse is over the countdown
+  int textY = y_ + height_ / 2 - 10;
+  int textH = 30;
+
+  if (mx >= x_ + 10 && mx < x_ + width_ - 10 && my >= textY &&
+      my < textY + textH) {
+    auto now = std::chrono::system_clock::now();
+    if (targetTime_ > now) {
+      tooltip_.text = "Target: " + config_.countdownTime;
+      tooltip_.x = mx;
+      tooltip_.y = my;
+      tooltip_.visible = true;
+    }
+  }
+}
+
+void CountdownPanel::renderTooltip(SDL_Renderer *renderer) {
+  if (tooltip_.text.empty())
+    return;
+
+  int ptSize = 10;
+  int tw = fontMgr_.getLogicalWidth(tooltip_.text, ptSize);
+  int th = fontMgr_.getLogicalHeight(tooltip_.text, ptSize);
+
+  int padX = 8;
+  int padY = 4;
+  int boxW = tw + padX * 2;
+  int boxH = th + padY * 2;
+
+  int bx = tooltip_.x - boxW / 2;
+  int by = tooltip_.y - boxH - 12;
+
+  if (by < y_) {
+    by = tooltip_.y + 16;
+  }
+  if (bx < x_)
+    bx = x_;
+  if (bx + boxW > x_ + width_)
+    bx = x_ + width_ - boxW;
+
+  SDL_Rect box = {bx, by, boxW, boxH};
+  SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+  SDL_SetRenderDrawColor(renderer, 20, 20, 20, 200);
+  SDL_RenderFillRect(renderer, &box);
+  SDL_SetRenderDrawColor(renderer, 100, 100, 100, 255);
+  SDL_RenderDrawRect(renderer, &box);
+
+  fontMgr_.drawText(renderer, tooltip_.text, bx + padX, by + padY,
+                    {255, 255, 255, 255}, ptSize);
 }

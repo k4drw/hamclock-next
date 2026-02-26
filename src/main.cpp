@@ -1115,8 +1115,9 @@ DashboardContext::DashboardContext(AppContext &ctx)
           std::make_unique<ADIFPanel>(0, 0, 0, 0, fontMgr, adifStore);
       break;
     case WidgetType::COUNTDOWN:
-      widgetPool[type] =
-          std::make_unique<CountdownPanel>(0, 0, 0, 0, fontMgr, appCfg);
+      widgetPool[type] = std::make_unique<CountdownPanel>(
+          0, 0, 0, 0, fontMgr, ctx.appCfg,
+          [&ctx]() { ctx.cfgMgr.save(ctx.appCfg); });
       break;
     case WidgetType::DE_WEATHER:
       widgetPool[type] = std::make_unique<WeatherPanel>(
