@@ -2,6 +2,7 @@
 #include "../core/ConfigManager.h"
 #include "../core/MemoryMonitor.h"
 #include "../core/Theme.h"
+#include "FontCatalog.h"
 
 #include "../core/StringUtils.h"
 #include <cstring>
@@ -104,8 +105,8 @@ void LiveSpotPanel::render(SDL_Renderer *renderer) {
   int pad = 2;
   int titleH = 20;
   // --- Title: "Live Spots" (standard style) ---
-  fontMgr_.drawText(renderer, "Live Spots", x_ + 10, y_ + 5, themes.accent, 10,
-                    true);
+  fontMgr_.catalog()->drawText(renderer, "Live Spots", x_ + 10, y_ + 5,
+                               themes.accent, FontStyle::MicroBold);
   int curY = y_ + titleH + pad;
 
   // --- Subtitle: "of GRID - PSK 30 mins" (centered, blue) ---

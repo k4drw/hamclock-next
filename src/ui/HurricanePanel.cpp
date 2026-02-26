@@ -47,20 +47,21 @@ void HurricanePanel::render(SDL_Renderer *renderer) {
   int titleH = 20;
   int pad = 6;
   int curY = y_ + titleH + 4;
+  auto *cat = fontMgr_.catalog();
 
-  fontMgr_.drawText(renderer, "Tropics", x_ + 10, y_ + 5, themes.accent, 10,
-                    true);
+  cat->drawText(renderer, "Tropics", x_ + 10, y_ + 5, themes.accent,
+                FontStyle::MicroBold);
 
   int centerX = x_ + width_ / 2;
   if (!currentData_.valid) {
-    fontMgr_.drawText(renderer, "Loading...", centerX, y_ + height_ / 2,
-                      themes.textDim, detailFontSize_, false, true);
+    cat->drawText(renderer, "Loading...", centerX, y_ + height_ / 2,
+                  themes.textDim, FontStyle::Micro, true);
     return;
   }
 
   if (currentData_.storms.empty()) {
-    fontMgr_.drawText(renderer, "No active storms", centerX, y_ + height_ / 2,
-                      themes.success, detailFontSize_, false, true);
+    cat->drawText(renderer, "No active storms", centerX, y_ + height_ / 2,
+                  themes.success, FontStyle::Micro, true);
     return;
   }
 
@@ -81,8 +82,7 @@ void HurricanePanel::render(SDL_Renderer *renderer) {
                     s.category);
     else
       std::snprintf(nameLabel, sizeof(nameLabel), "%s (TS/TD)", s.name.c_str());
-    fontMgr_.drawText(renderer, nameLabel, x_ + pad, curY, col, nameFontSize_,
-                      true, false);
+    cat->drawText(renderer, nameLabel, x_ + pad, curY, col, FontStyle::Fast);
 
     curY += nameFontSize_ + 2;
 
@@ -91,8 +91,8 @@ void HurricanePanel::render(SDL_Renderer *renderer) {
     std::snprintf(wBuf, sizeof(wBuf), "%dkt  %dmb  %.1fN %.1f%c", s.maxWindKt,
                   s.pressureMb, std::abs(s.lat), std::abs(s.lon),
                   s.lon < 0 ? 'W' : 'E');
-    fontMgr_.drawText(renderer, wBuf, x_ + pad, curY, themes.textDim,
-                      detailFontSize_, false, false);
+    cat->drawText(renderer, wBuf, x_ + pad, curY, themes.textDim,
+                  FontStyle::Micro);
     curY += detailFontSize_ + 2;
 
     // Movement
@@ -100,8 +100,8 @@ void HurricanePanel::render(SDL_Renderer *renderer) {
       std::string mv = s.movement;
       if (mv.size() > 28)
         mv = mv.substr(0, 27) + "~";
-      fontMgr_.drawText(renderer, mv, x_ + pad, curY, themes.textDim,
-                        detailFontSize_, false, false);
+      cat->drawText(renderer, mv, x_ + pad, curY, themes.textDim,
+                    FontStyle::Micro);
     }
     curY += detailFontSize_ + 4;
 
@@ -117,9 +117,9 @@ void HurricanePanel::render(SDL_Renderer *renderer) {
     char buf[32];
     std::snprintf(buf, sizeof(buf), "%d/%d", startIdx + 1,
                   (int)currentData_.storms.size());
-    fontMgr_.drawText(renderer, buf, x_ + width_ - pad,
-                      y_ + height_ - pad - detailFontSize_, themes.textDim,
-                      detailFontSize_, false, true);
+    cat->drawText(renderer, buf, x_ + width_ - pad,
+                  y_ + height_ - pad - detailFontSize_, themes.textDim,
+                  FontStyle::Micro, false, true);
   }
 }
 

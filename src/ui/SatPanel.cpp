@@ -152,8 +152,8 @@ void SatPanel::render(SDL_Renderer *renderer) {
 
   int pad = 2;
   int titleH = 20;
-  fontMgr_.drawText(renderer, "Satellite", x_ + 10, y_ + 5, themes.accent, 10,
-                    true);
+  fontMgr_.catalog()->drawText(renderer, "Satellite", x_ + 10, y_ + 5,
+                               themes.accent, FontStyle::MicroBold);
 
   int curY = y_ + titleH + pad;
 
@@ -349,9 +349,10 @@ void SatPanel::renderPolarPlot(SDL_Renderer *renderer, float cx, float cy,
     char elBuf[16];
     std::snprintf(elBuf, sizeof(elBuf), "%.0f°", currentPos_.el);
     SDL_Color green = {0, 255, 0, 255};
-    fontMgr_.drawText(renderer, elBuf, static_cast<int>(sx + markerR + 2),
-                      static_cast<int>(sy - compassFontSize_ / 2.0f), green,
-                      compassFontSize_);
+    fontMgr_.catalog()->drawText(renderer, elBuf,
+                                 static_cast<int>(sx + markerR + 2),
+                                 static_cast<int>(sy - compassFontSize_ / 2.0f),
+                                 green, FontStyle::Fast);
   }
 }
 

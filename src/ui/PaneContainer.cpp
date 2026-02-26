@@ -1,4 +1,5 @@
 #include "PaneContainer.h"
+#include "FontCatalog.h"
 
 PaneContainer::PaneContainer(int x, int y, int w, int h, WidgetType initialType,
                              FontManager &fontMgr)
@@ -59,9 +60,9 @@ void PaneContainer::render(SDL_Renderer *renderer) {
     SDL_Rect r = {x_, y_, width_, height_};
     SDL_RenderFillRect(renderer, &r);
 
-    fontMgr_.drawText(renderer, widgetTypeDisplayName(currentType_),
-                      x_ + width_ / 2, y_ + height_ / 2, {100, 100, 120, 255},
-                      14, false, true);
+    fontMgr_.catalog()->drawText(
+        renderer, widgetTypeDisplayName(currentType_), x_ + width_ / 2,
+        y_ + height_ / 2, {100, 100, 120, 255}, FontStyle::UI, true);
   }
 
   // Draw border
@@ -85,10 +86,12 @@ void PaneContainer::render(SDL_Renderer *renderer) {
     SDL_RenderFillRect(renderer, &rArr);
     SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
 
-    fontMgr_.drawText(renderer, "<", lArr.x + lArr.w / 2, lArr.y + lArr.h / 2,
-                      {220, 220, 220, 255}, 14, false, true);
-    fontMgr_.drawText(renderer, ">", rArr.x + rArr.w / 2, rArr.y + rArr.h / 2,
-                      {220, 220, 220, 255}, 14, false, true);
+    fontMgr_.catalog()->drawText(renderer, "<", lArr.x + lArr.w / 2,
+                                 lArr.y + lArr.h / 2, {220, 220, 220, 255},
+                                 FontStyle::UI, true);
+    fontMgr_.catalog()->drawText(renderer, ">", rArr.x + rArr.w / 2,
+                                 rArr.y + rArr.h / 2, {220, 220, 220, 255},
+                                 FontStyle::UI, true);
   }
 }
 

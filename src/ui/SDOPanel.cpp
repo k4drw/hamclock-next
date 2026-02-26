@@ -88,13 +88,14 @@ void SDOPanel::render(SDL_Renderer *renderer) {
                     drawSz};
     SDL_RenderCopy(renderer, tex, nullptr, &dst);
 
-    fontMgr_.drawText(renderer, "SDO Solar", x_ + 10, y_ + 5, themes.accent, 10,
-                      true);
+    fontMgr_.catalog()->drawText(renderer, "SDO Solar", x_ + 10, y_ + 5,
+                                 themes.accent, FontStyle::MicroBold);
 
     renderOverlays(renderer, themes);
   } else {
-    fontMgr_.drawText(renderer, "Loading SUN...", x_ + width_ / 2,
-                      y_ + height_ / 2, themes.textDim, 12, false, true);
+    fontMgr_.catalog()->drawText(renderer, "Loading SUN...", x_ + width_ / 2,
+                                 y_ + height_ / 2, themes.textDim,
+                                 FontStyle::Fast, true);
   }
 }
 
@@ -111,6 +112,7 @@ void SDOPanel::renderOverlays(SDL_Renderer *renderer,
   auto now = std::chrono::system_clock::now();
   auto sunPos = Astronomy::sunPosition(now);
   Astronomy::calculateAzEl({obsLat_, obsLon_}, sunPos, az, el);
+  auto *cat = fontMgr_.catalog();
 
   char buf[32];
   SDL_Color HUD = {255, 165, 0, 255}; // Orange HUD
@@ -118,15 +120,13 @@ void SDOPanel::renderOverlays(SDL_Renderer *renderer,
   int titleH = height_ / 10;
   // Az: NN
   std::snprintf(buf, sizeof(buf), "Az:%.0f", az);
-  fontMgr_.drawText(renderer, buf, x_ + 4, y_ + titleH + 4, HUD,
-                    overlayFontSize_);
+  cat->drawText(renderer, buf, x_ + 4, y_ + titleH + 4, HUD, FontStyle::Micro);
 
   // El: NN
   std::snprintf(buf, sizeof(buf), "El:%.0f", el);
-  int elW = 0;
-  TTF_SizeText(fontMgr_.getFont(overlayFontSize_), buf, &elW, nullptr);
-  fontMgr_.drawText(renderer, buf, x_ + width_ - elW - 4, y_ + titleH + 4, HUD,
-                    overlayFontSize_);
+  int elW = fontMgr_.getLogicalWidth(buf, cat->ptSize(FontStyle::Micro));
+  cat->drawText(renderer, buf, x_ + width_ - elW - 4, y_ + titleH + 4, HUD,
+                FontStyle::Micro);
 
   // R@HH:MM (Rise/Set)
   time_t t0 = std::chrono::system_clock::to_time_t(now);
@@ -139,9 +139,8 @@ void SDOPanel::renderOverlays(SDL_Renderer *renderer,
     int rh = (int)st.sunrise;
     int rm = (int)((st.sunrise - rh) * 60);
     std::snprintf(buf, sizeof(buf), "R@%02d:%02d", rh, rm);
-    fontMgr_.drawText(renderer, buf, x_ + 4,
-                      y_ + height_ - overlayFontSize_ - 4, HUD,
-                      overlayFontSize_);
+    cat->drawText(renderer, buf, x_ + 4, y_ + height_ - overlayFontSize_ - 4,
+                  HUD, FontStyle::Micro);
   }
 
   // Wavelength Name
@@ -153,10 +152,9 @@ void SDOPanel::renderOverlays(SDL_Renderer *renderer,
     }
   }
   std::snprintf(buf, sizeof(buf), "%s", wlName.c_str());
-  int vW = 0;
-  TTF_SizeText(fontMgr_.getFont(overlayFontSize_), buf, &vW, nullptr);
-  fontMgr_.drawText(renderer, buf, x_ + width_ - vW - 4,
-                    y_ + height_ - overlayFontSize_ - 4, HUD, overlayFontSize_);
+  int vW = fontMgr_.getLogicalWidth(buf, cat->ptSize(FontStyle::Micro));
+  cat->drawText(renderer, buf, x_ + width_ - vW - 4,
+                y_ + height_ - overlayFontSize_ - 4, HUD, FontStyle::Micro);
 }
 
 void SDOPanel::renderMenu(SDL_Renderer *renderer, const ThemeColors &themes) {
@@ -174,8 +172,9 @@ void SDOPanel::renderMenu(SDL_Renderer *renderer, const ThemeColors &themes) {
   RenderUtils::drawGear(renderer, iconRect.x + iconRect.w / 2.0f,
                         iconRect.y + iconRect.h / 2.0f, iconRect.w / 2.0f,
                         gearColor, bgColor);
-  fontMgr_.drawText(renderer, "SDO Wavelength", menuRect_.x + menuRect_.w / 2,
-                    menuRect_.y + 5, themes.textDim, 14, false, true);
+  auto *cat = fontMgr_.catalog();
+  cat->drawText(renderer, "SDO Wavelength", menuRect_.x + menuRect_.w / 2,
+                menuRect_.y + 5, themes.textDim, FontStyle::SmallRegular, true);
 
   // Radio Buttons (Highlight instead of boxes)
   for (int i = 0; i < 7; ++i) {
@@ -188,8 +187,8 @@ void SDOPanel::renderMenu(SDL_Renderer *renderer, const ThemeColors &themes) {
       SDL_RenderFillRect(renderer, &r);
     }
 
-    fontMgr_.drawText(renderer, wavelengths_[i].name, r.x + 10, r.y + 4,
-                      selected ? themes.text : themes.textDim, 16);
+    cat->drawText(renderer, wavelengths_[i].name, r.x + 10, r.y + 4,
+                  selected ? themes.text : themes.textDim, FontStyle::UI);
   }
 
   // Rotate Toggle
@@ -199,8 +198,8 @@ void SDOPanel::renderMenu(SDL_Renderer *renderer, const ThemeColors &themes) {
                            themes.accent.b, 80);
     SDL_RenderFillRect(renderer, &rotIdx);
   }
-  fontMgr_.drawText(renderer, "Auto-Rotate", rotIdx.x + 10, rotIdx.y + 4,
-                    tempRotating_ ? themes.text : themes.textDim, 16);
+  cat->drawText(renderer, "Auto-Rotate", rotIdx.x + 10, rotIdx.y + 4,
+                tempRotating_ ? themes.text : themes.textDim, FontStyle::UI);
 
   // Checkboxes (Simplified)
   auto drawToggle = [&](SDL_Rect r, bool val, const char *lbl) {
@@ -209,8 +208,8 @@ void SDOPanel::renderMenu(SDL_Renderer *renderer, const ThemeColors &themes) {
                              themes.accent.b, 80);
       SDL_RenderFillRect(renderer, &r);
     }
-    fontMgr_.drawText(renderer, lbl, r.x + 10, r.y + 4,
-                      val ? themes.text : themes.textDim, 16);
+    cat->drawText(renderer, lbl, r.x + 10, r.y + 4,
+                  val ? themes.text : themes.textDim, FontStyle::UI);
   };
 
   drawToggle(graylineRect_, tempGrayline_, "Grayline Tool");
@@ -224,11 +223,12 @@ void SDOPanel::renderMenu(SDL_Renderer *renderer, const ThemeColors &themes) {
   SDL_RenderDrawRect(renderer, &okRect_);
   SDL_RenderDrawRect(renderer, &cancelRect_);
 
-  fontMgr_.drawText(renderer, "Ok", okRect_.x + okRect_.w / 2,
-                    okRect_.y + okRect_.h / 2, themes.text, 18, false, true);
-  fontMgr_.drawText(renderer, "Cancel", cancelRect_.x + cancelRect_.w / 2,
-                    cancelRect_.y + cancelRect_.h / 2, themes.text, 18, false,
-                    true);
+  cat->drawText(renderer, "Ok", okRect_.x + okRect_.w / 2,
+                okRect_.y + okRect_.h / 2, themes.text, FontStyle::SmallRegular,
+                true);
+  cat->drawText(renderer, "Cancel", cancelRect_.x + cancelRect_.w / 2,
+                cancelRect_.y + cancelRect_.h / 2, themes.text,
+                FontStyle::SmallRegular, true);
 }
 
 void SDOPanel::onResize(int x, int y, int w, int h) {

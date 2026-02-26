@@ -1,6 +1,7 @@
 #include "HistoryPanel.h"
 #include "../core/StringUtils.h"
 #include "../core/Theme.h"
+#include "FontCatalog.h"
 #include "RenderUtils.h"
 #include <SDL.h>
 #include <algorithm>
@@ -22,6 +23,10 @@ void HistoryPanel::render(SDL_Renderer *renderer) {
     return;
 
   ThemeColors themes = getThemeColors(theme_);
+  auto *cat = fontMgr_.catalog();
+  if (!cat)
+    return;
+
   // Background
   SDL_SetRenderDrawBlendMode(
       renderer, (theme_ == "glass") ? SDL_BLENDMODE_BLEND : SDL_BLENDMODE_NONE);
@@ -36,8 +41,7 @@ void HistoryPanel::render(SDL_Renderer *renderer) {
   SDL_RenderDrawRect(renderer, &rect);
 
   int pad = 10;
-  int hintSize = std::max(7, std::min(height_ / 12, 9));
-  int axisLabelH = hintSize + 4; // reserve space for X-axis time labels
+  int axisLabelH = 14; // reserve space for X-axis time labels
   int graphW = width_ - 2 * pad;
   int graphH = height_ - 2 * pad - 12 - axisLabelH;
   int graphX = x_ + pad;
@@ -47,11 +51,12 @@ void HistoryPanel::render(SDL_Renderer *renderer) {
   std::string title = seriesName_ == "flux"
                           ? "Solar Flux"
                           : (seriesName_ == "ssn" ? "Sunspots" : "Planetary K");
-  fontMgr_.drawText(renderer, title, x_ + pad, y_ + 5, themes.accent, 10, true);
+  cat->drawText(renderer, title, x_ + pad, y_ + 5, themes.accent,
+                FontStyle::MicroBold);
 
   if (!currentSeries_.valid || currentSeries_.points.empty()) {
-    fontMgr_.drawText(renderer, "No Data", x_ + width_ / 2, y_ + height_ / 2,
-                      {100, 100, 100, 255}, 12, false, true);
+    cat->drawText(renderer, "No Data", x_ + width_ / 2, y_ + height_ / 2,
+                  {100, 100, 100, 255}, FontStyle::Fast, true);
     return;
   }
 
@@ -94,8 +99,8 @@ void HistoryPanel::render(SDL_Renderer *renderer) {
     float vals[] = {0, 4, 5, 9};
     for (int i = 0; i < 4; ++i) {
       int ly = graphY + graphH - (int)((vals[i] / 9.0f) * graphH);
-      fontMgr_.drawText(renderer, labels[i], graphX - 2, ly, themes.textDim, 8,
-                        false, true);
+      cat->drawText(renderer, labels[i], graphX - 2, ly, themes.textDim,
+                    FontStyle::Tiny, false, true);
     }
 
     // Current Kp value as large overlay
@@ -107,9 +112,8 @@ void HistoryPanel::render(SDL_Renderer *renderer) {
         SDL_Color kpCol = (kpNow >= 5.0f)   ? SDL_Color{255, 0, 0, 255}
                           : (kpNow >= 4.0f) ? SDL_Color{255, 255, 0, 255}
                                             : SDL_Color{0, 255, 0, 255};
-        int kpFontSize = std::max(14, std::min(height_ / 3, 40));
-        fontMgr_.drawText(renderer, kpBuf, graphX + graphW / 2,
-                          graphY + graphH / 3, kpCol, kpFontSize, false, true);
+        cat->drawText(renderer, kpBuf, graphX + graphW / 2, graphY + graphH / 3,
+                      kpCol, FontStyle::MediumBold, true);
       }
     }
   } else {
@@ -134,10 +138,8 @@ void HistoryPanel::render(SDL_Renderer *renderer) {
     // Show current value inside graph area (right edge, top of graph)
     char buf[16];
     std::snprintf(buf, sizeof(buf), "%.0f", currentSeries_.points.back().value);
-    int valFontSize = std::max(12, std::min(height_ / 5, 24));
-    fontMgr_.drawText(renderer, buf, graphX + graphW - valFontSize * 2,
-                      graphY + valFontSize / 2 + 2, {255, 255, 255, 255},
-                      valFontSize, true, true);
+    cat->drawText(renderer, buf, graphX + graphW - 20, graphY + 10,
+                  {255, 255, 255, 255}, FontStyle::Fast, true);
   }
 
   // X-axis time labels at 4 evenly-spaced positions
@@ -164,8 +166,8 @@ void HistoryPanel::render(SDL_Renderer *renderer) {
         long ageH = ageMins / 60;
         label = "-" + std::to_string(ageH) + "h";
       }
-      fontMgr_.drawText(renderer, label, lx, timeY, themes.textDim, hintSize,
-                        false, true);
+      cat->drawText(renderer, label, lx, timeY, themes.textDim, FontStyle::Tiny,
+                    true);
     }
   }
 
@@ -182,8 +184,7 @@ void HistoryPanel::onMouseMove(int mx, int my) {
 
   // Graph area (must match render() logic)
   int pad = 10;
-  int hintSize = std::max(7, std::min(height_ / 12, 9));
-  int axisLabelH = hintSize + 4;
+  int axisLabelH = 14;
   int graphW = width_ - 2 * pad;
   int graphH = height_ - 2 * pad - 12 - axisLabelH;
   int graphX = x_ + pad;
@@ -255,9 +256,10 @@ void HistoryPanel::renderTooltip(SDL_Renderer *renderer) {
   if (tooltip_.text.empty())
     return;
 
-  int ptSize = 10;
-  int tw = fontMgr_.getLogicalWidth(tooltip_.text, ptSize);
-  int th = fontMgr_.getLogicalHeight(tooltip_.text, ptSize);
+  auto *cat = fontMgr_.catalog();
+  int tw, th;
+  cat->renderText(renderer, tooltip_.text, {255, 255, 255, 255},
+                  FontStyle::Micro, &tw, &th);
 
   int padX = 8;
   int padY = 4;
@@ -281,6 +283,6 @@ void HistoryPanel::renderTooltip(SDL_Renderer *renderer) {
   SDL_SetRenderDrawColor(renderer, 100, 100, 100, 255);
   SDL_RenderDrawRect(renderer, &box);
 
-  fontMgr_.drawText(renderer, tooltip_.text, bx + padX, by + padY,
-                    {255, 255, 255, 255}, ptSize);
+  cat->drawText(renderer, tooltip_.text, bx + padX, by + padY,
+                {255, 255, 255, 255}, FontStyle::Micro);
 }

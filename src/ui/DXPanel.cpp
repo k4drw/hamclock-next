@@ -130,7 +130,8 @@ void DXPanel::render(SDL_Renderer *renderer) {
   };
 
   int titleH = 20;
-  fontMgr_.drawText(renderer, "DX", x_ + 10, y_ + 5, themes.accent, 10, true);
+  fontMgr_.catalog()->drawText(renderer, "DX", x_ + 10, y_ + 5, themes.accent,
+                               FontStyle::MicroBold);
 
   int curY = y_ + titleH + pad / 2;
   for (int i = 0; i < kNumLines; ++i) {

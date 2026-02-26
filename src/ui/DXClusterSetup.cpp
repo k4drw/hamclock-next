@@ -1,4 +1,5 @@
 #include "DXClusterSetup.h"
+#include "FontCatalog.h"
 #include <algorithm>
 #include <cstring>
 
@@ -8,11 +9,7 @@ DXClusterSetup::DXClusterSetup(int x, int y, int w, int h, FontManager &fontMgr)
 }
 
 void DXClusterSetup::recalcLayout() {
-  int h = height_;
-  titleSize_ = std::clamp(static_cast<int>(h * 0.08f), 20, 48);
-  labelSize_ = std::clamp(static_cast<int>(h * 0.05f), 14, 24);
-  fieldSize_ = std::clamp(static_cast<int>(h * 0.06f), 16, 32);
-  hintSize_ = std::clamp(static_cast<int>(h * 0.04f), 12, 18);
+  // Layout logic moved to render() for resolution independence
 }
 
 void DXClusterSetup::update() {}
@@ -20,10 +17,12 @@ void DXClusterSetup::update() {}
 static void renderField(SDL_Renderer *renderer, FontManager &fontMgr,
                         const std::string &text, const std::string &placeholder,
                         int fieldX, int &y, int fieldW, int fieldH,
-                        int fieldSize, int textPad, bool active, int cursorPos,
-                        SDL_Color activeBorder, SDL_Color inactiveBorder,
-                        SDL_Color textColor, SDL_Color placeholderColor) {
+                        FontStyle fieldStyle, int textPad, bool active,
+                        int cursorPos, SDL_Color activeBorder,
+                        SDL_Color inactiveBorder, SDL_Color textColor,
+                        SDL_Color placeholderColor) {
   SDL_Color border = active ? activeBorder : inactiveBorder;
+  auto *cat = fontMgr.catalog();
 
   SDL_SetRenderDrawColor(renderer, 30, 30, 40, 255);
   SDL_Rect rect = {fieldX, y, fieldW, fieldH};
@@ -32,23 +31,19 @@ static void renderField(SDL_Renderer *renderer, FontManager &fontMgr,
   SDL_RenderDrawRect(renderer, &rect);
 
   if (!text.empty()) {
-    fontMgr.drawText(renderer, text, fieldX + textPad, y + textPad, textColor,
-                     fieldSize);
+    cat->drawText(renderer, text, fieldX + textPad, y + textPad, textColor,
+                  fieldStyle);
   } else if (!active) {
-    fontMgr.drawText(renderer, placeholder, fieldX + textPad, y + textPad,
-                     placeholderColor, fieldSize);
+    cat->drawText(renderer, placeholder, fieldX + textPad, y + textPad,
+                  placeholderColor, fieldStyle);
   }
 
   if (active) {
     int cursorX = fieldX + textPad;
     if (cursorPos > 0 && !text.empty()) {
-      TTF_Font *font = fontMgr.getFont(fieldSize);
-      if (font) {
-        std::string before = text.substr(0, cursorPos);
-        int tw = 0, th = 0;
-        TTF_SizeText(font, before.c_str(), &tw, &th);
-        cursorX += tw;
-      }
+      std::string before = text.substr(0, cursorPos);
+      int tw = fontMgr.getLogicalWidth(before, cat->ptSize(fieldStyle));
+      cursorX += tw;
     }
     if ((SDL_GetTicks() / 500) % 2 == 0) {
       SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
@@ -68,11 +63,12 @@ void DXClusterSetup::render(SDL_Renderer *renderer) {
   SDL_Rect bg = {x_, y_, width_, height_};
   SDL_RenderFillRect(renderer, &bg);
 
+  auto *cat = fontMgr_.catalog();
   int cx = x_ + width_ / 2;
   int pad = std::max(20, width_ / 20);
   int fieldW = std::min(500, width_ - 2 * pad);
   int fieldX = cx - fieldW / 2;
-  int fieldH = fieldSize_ + 14;
+  int fieldH = cat->ptSize(FontStyle::UI) + 14;
   int textPad = 8;
 
   SDL_Color white = {255, 255, 255, 255};
@@ -83,42 +79,33 @@ void DXClusterSetup::render(SDL_Renderer *renderer) {
   int y = y_ + height_ / 10;
 
   // --- Title ---
-  {
-    TTF_Font *font = fontMgr_.getFont(titleSize_);
-    if (font) {
-      int tw = 0, th = 0;
-      TTF_SizeText(font, "DX Cluster Settings", &tw, &th);
-      fontMgr_.drawText(renderer, "DX Cluster Settings", cx - tw / 2, y, cyan,
-                        titleSize_, true);
-      y += th + pad;
-    }
-  }
+  cat->drawText(renderer, "DX Cluster Settings", cx, y, cyan,
+                FontStyle::MediumBold, true);
+  y += cat->ptSize(FontStyle::MediumBold) + pad;
 
   // --- Host & Port ---
-  fontMgr_.drawText(renderer, "Cluster Host:", fieldX, y, white, labelSize_,
-                    true);
-  fontMgr_.drawText(renderer, "Port:", fieldX + fieldW - 100, y, white,
-                    labelSize_, true);
-  y += labelSize_ + 4;
+  cat->drawText(renderer, "Cluster Host:", fieldX, y, white, FontStyle::UI);
+  cat->drawText(renderer, "Port:", fieldX + fieldW - 100, y, white,
+                FontStyle::UI);
+  y += cat->ptSize(FontStyle::UI) + 4;
 
   int hostY = y;
   renderField(renderer, fontMgr_, hostText_, "e.g. dxc.k3lr.com", fieldX, hostY,
-              fieldW - 110, fieldH, fieldSize_, textPad, activeField_ == 0,
+              fieldW - 110, fieldH, FontStyle::UI, textPad, activeField_ == 0,
               cursorPos_, orange, gray, white, gray);
 
   int portY = y;
   renderField(renderer, fontMgr_, portText_, "7000", fieldX + fieldW - 100,
-              portY, 100, fieldH, fieldSize_, textPad, activeField_ == 1,
+              portY, 100, fieldH, FontStyle::UI, textPad, activeField_ == 1,
               cursorPos_, orange, gray, white, gray);
 
   y = std::max(hostY, portY) + pad;
 
   // --- Login ---
-  fontMgr_.drawText(renderer, "Callsign / Login:", fieldX, y, white, labelSize_,
-                    true);
-  y += labelSize_ + 4;
+  cat->drawText(renderer, "Callsign / Login:", fieldX, y, white, FontStyle::UI);
+  y += cat->ptSize(FontStyle::UI) + 4;
   renderField(renderer, fontMgr_, loginText_, "Your callsign", fieldX, y,
-              fieldW, fieldH, fieldSize_, textPad, activeField_ == 2,
+              fieldW, fieldH, FontStyle::UI, textPad, activeField_ == 2,
               cursorPos_, orange, gray, white, gray);
   y += pad;
 
@@ -133,8 +120,8 @@ void DXClusterSetup::render(SDL_Renderer *renderer) {
     SDL_Rect inner = {toggleRect_.x + 4, toggleRect_.y + 4, 16, 16};
     SDL_RenderFillRect(renderer, &inner);
   }
-  fontMgr_.drawText(renderer, "UDP Mode (receive from WSJT-X / JTDX)",
-                    fieldX + 35, y + 2, white, labelSize_);
+  cat->drawText(renderer, "UDP Mode (receive from WSJT-X / JTDX)",
+                fieldX + 35, y + 2, white, FontStyle::UI);
   y += pad * 2;
 
   // --- Buttons ---
@@ -148,24 +135,20 @@ void DXClusterSetup::render(SDL_Renderer *renderer) {
   SDL_RenderFillRect(renderer, &saveRect_);
   SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
   SDL_RenderDrawRect(renderer, &saveRect_);
-  int tw, th;
-  TTF_Font *btnFont = fontMgr_.getFont(labelSize_);
-  TTF_SizeText(btnFont, "SAVE", &tw, &th);
-  fontMgr_.drawText(renderer, "SAVE", saveRect_.x + (btnW - tw) / 2,
-                    saveRect_.y + (btnH - th) / 2, white, labelSize_);
+  cat->drawText(renderer, "SAVE", saveRect_.x + btnW / 2,
+                saveRect_.y + btnH / 2, white, FontStyle::UIBold, true);
 
   // Cancel Button
   SDL_SetRenderDrawColor(renderer, 100, 0, 0, 255);
   SDL_RenderFillRect(renderer, &cancelRect_);
   SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
   SDL_RenderDrawRect(renderer, &cancelRect_);
-  TTF_SizeText(btnFont, "CANCEL", &tw, &th);
-  fontMgr_.drawText(renderer, "CANCEL", cancelRect_.x + (btnW - tw) / 2,
-                    cancelRect_.y + (btnH - th) / 2, white, labelSize_);
+  cat->drawText(renderer, "CANCEL", cancelRect_.x + btnW / 2,
+                cancelRect_.y + btnH / 2, white, FontStyle::UIBold, true);
 
   y += btnH + pad;
-  fontMgr_.drawText(renderer, "Tip: Tab rotates fields. Enter to Save.",
-                    cx - 150, y, gray, hintSize_);
+  cat->drawText(renderer, "Tip: Tab rotates fields. Enter to Save.", cx, y,
+                gray, FontStyle::Fast, true);
 }
 
 void DXClusterSetup::onResize(int x, int y, int w, int h) {
@@ -195,43 +178,40 @@ bool DXClusterSetup::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
   }
 
   // Check fields
+  auto *cat = fontMgr_.catalog();
   int cx = x_ + width_ / 2;
   int pad = std::max(20, width_ / 20);
   int fieldW = std::min(500, width_ - 2 * pad);
   int fieldX = cx - fieldW / 2;
-  int fieldH = fieldSize_ + 14;
+  int fieldH = cat->ptSize(FontStyle::UI) + 14;
+  int uiSize = cat->ptSize(FontStyle::UI);
 
   int y = y_ + height_ / 10;
   // Skip title
-  TTF_Font *font = fontMgr_.getFont(titleSize_);
-  if (font) {
-    int tw = 0, th = 0;
-    TTF_SizeText(font, "DX Cluster Settings", &tw, &th);
-    y += th + pad;
-  }
+  y += cat->ptSize(FontStyle::MediumBold) + pad;
 
   // Check Host (Field 0)
-  if (mx >= fieldX && mx < fieldX + fieldW - 110 && my >= y + labelSize_ + 4 &&
-      my < y + labelSize_ + 4 + fieldH) {
+  if (mx >= fieldX && mx < fieldX + fieldW - 110 && my >= y + uiSize + 4 &&
+      my < y + uiSize + 4 + fieldH) {
     activeField_ = 0;
     cursorPos_ = hostText_.size();
     return true;
   }
   // Check Port (Field 1)
   if (mx >= fieldX + fieldW - 100 && mx < fieldX + fieldW &&
-      my >= y + labelSize_ + 4 && my < y + labelSize_ + 4 + fieldH) {
+      my >= y + uiSize + 4 && my < y + uiSize + 4 + fieldH) {
     activeField_ = 1;
     cursorPos_ = portText_.size();
     return true;
   }
 
-  int hostY = y + labelSize_ + 4 + fieldH;
-  int portY = y + labelSize_ + 4 + fieldH;
+  int hostY = y + uiSize + 4 + fieldH;
+  int portY = y + uiSize + 4 + fieldH;
   y = std::max(hostY, portY) + pad;
 
   // Check Login (Field 2)
-  if (mx >= fieldX && mx < fieldX + fieldW && my >= y + labelSize_ + 4 &&
-      my < y + labelSize_ + 4 + fieldH) {
+  if (mx >= fieldX && mx < fieldX + fieldW && my >= y + uiSize + 4 &&
+      my < y + uiSize + 4 + fieldH) {
     activeField_ = 2;
     cursorPos_ = loginText_.size();
     return true;

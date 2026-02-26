@@ -29,6 +29,7 @@ void ContestPanel::render(SDL_Renderer *renderer) {
     return;
 
   ThemeColors themes = getThemeColors(theme_);
+  auto *cat = fontMgr_.catalog();
 
   // Background and border
   SDL_SetRenderDrawBlendMode(
@@ -42,8 +43,8 @@ void ContestPanel::render(SDL_Renderer *renderer) {
   SDL_RenderDrawRect(renderer, &rect);
 
   if (!dataValid_) {
-    fontMgr_.drawText(renderer, "Awaiting Contests...", x_ + 10,
-                      y_ + height_ / 2 - 8, themes.textDim, itemFontSize_);
+    cat->drawText(renderer, "Awaiting Contests...", x_ + 10,
+                  y_ + height_ / 2 - 8, themes.textDim, FontStyle::SmallRegular);
     if (popupOpen_)
       renderPopup(renderer);
     return;
@@ -52,8 +53,8 @@ void ContestPanel::render(SDL_Renderer *renderer) {
   auto now = std::chrono::system_clock::now();
   int titleH = 20;
   int pad = 6;
-  fontMgr_.drawText(renderer, "Contests", x_ + 10, y_ + 5, themes.accent, 10,
-                    true);
+  cat->drawText(renderer, "Contests", x_ + 10, y_ + 5, themes.accent,
+                FontStyle::MicroBold);
 
   int curY = y_ + titleH + pad;
 
@@ -68,7 +69,8 @@ void ContestPanel::render(SDL_Renderer *renderer) {
 
   // List contests
   int count = 0;
-  TTF_Font *font = fontMgr_.getFont(itemFontSize_);
+  int itemPt = cat->ptSize(FontStyle::Fast);
+  TTF_Font *font = fontMgr_.getFont(itemPt);
   if (!font) {
     if (popupOpen_)
       renderPopup(renderer);
@@ -98,7 +100,7 @@ void ContestPanel::render(SDL_Renderer *renderer) {
       }
     }
 
-    int rowH = itemFontSize_ + 3;
+    int rowH = itemPt + 3;
     SDL_Rect stripeRect = {x_ + 1, curY - 1, width_ - 2, rowH};
     SDL_SetRenderDrawColor(
         renderer, (count % 2 == 0) ? themes.rowStripe1.r : themes.rowStripe2.r,
@@ -110,8 +112,8 @@ void ContestPanel::render(SDL_Renderer *renderer) {
     // Status (right-aligned)
     int sw, sh;
     TTF_SizeText(font, status.c_str(), &sw, &sh);
-    fontMgr_.drawText(renderer, status, x_ + width_ - pad - sw, curY,
-                      statusColor, itemFontSize_);
+    cat->drawText(renderer, status, x_ + width_ - pad - sw, curY, statusColor,
+                  FontStyle::Fast);
 
     // Title (truncated)
     int maxTitleW = width_ - pad * 2 - sw - 10;
@@ -125,14 +127,13 @@ void ContestPanel::render(SDL_Renderer *renderer) {
       }
       title += "..";
     }
-    fontMgr_.drawText(renderer, title, x_ + pad, curY, themes.text,
-                      itemFontSize_);
+    cat->drawText(renderer, title, x_ + pad, curY, themes.text, FontStyle::Fast);
 
     // Track for hit-testing
     displayedIndices_.push_back(i);
     rowRects_.push_back({x_, curY - 1, width_, rowH});
 
-    curY += itemFontSize_ + 2;
+    curY += itemPt + 2;
     count++;
   }
 
@@ -147,6 +148,7 @@ void ContestPanel::renderPopup(SDL_Renderer *renderer) {
 
   const Contest &c = currentData_.contests[selectedContestIdx_];
   ThemeColors themes = getThemeColors(theme_);
+  auto *cat = fontMgr_.catalog();
 
   // Popup covers the entire widget area
   SDL_Rect bg = {x_, y_, width_, height_};
@@ -164,14 +166,15 @@ void ContestPanel::renderPopup(SDL_Renderer *renderer) {
 
   int pad = 8;
   int curY = y_ + pad;
-  int lineH = itemFontSize_ + 4;
+  int lineH = cat->ptSize(FontStyle::Fast) + 4;
 
   // Clip to widget
   SDL_RenderSetClipRect(renderer, &bg);
 
   // Title — wrap if too wide
   {
-    TTF_Font *font = fontMgr_.getFont(itemFontSize_);
+    int itemPt = cat->ptSize(FontStyle::Fast);
+    TTF_Font *font = fontMgr_.getFont(itemPt);
     std::string title = c.title;
     if (font) {
       int maxW = width_ - pad * 2;
@@ -186,18 +189,18 @@ void ContestPanel::renderPopup(SDL_Renderer *renderer) {
         if (spacePos != std::string::npos) {
           std::string line1 = title.substr(0, spacePos);
           std::string line2 = title.substr(spacePos + 1);
-          fontMgr_.drawText(renderer, line1, x_ + pad, curY, themes.accent,
-                            itemFontSize_);
+          cat->drawText(renderer, line1, x_ + pad, curY, themes.accent,
+                        FontStyle::Fast);
           curY += lineH;
-          fontMgr_.drawText(renderer, line2, x_ + pad, curY, themes.accent,
-                            itemFontSize_);
+          cat->drawText(renderer, line2, x_ + pad, curY, themes.accent,
+                        FontStyle::Fast);
         } else {
-          fontMgr_.drawText(renderer, title, x_ + pad, curY, themes.accent,
-                            itemFontSize_);
+          cat->drawText(renderer, title, x_ + pad, curY, themes.accent,
+                        FontStyle::Fast);
         }
       } else {
-        fontMgr_.drawText(renderer, title, x_ + pad, curY, themes.accent,
-                          itemFontSize_);
+        cat->drawText(renderer, title, x_ + pad, curY, themes.accent,
+                      FontStyle::Fast);
       }
     }
     curY += lineH + 2;
@@ -227,8 +230,8 @@ void ContestPanel::renderPopup(SDL_Renderer *renderer) {
       status = "Status: Ended";
       statusColor = themes.textDim;
     }
-    fontMgr_.drawText(renderer, status, x_ + pad, curY, statusColor,
-                      itemFontSize_);
+    cat->drawText(renderer, status, x_ + pad, curY, statusColor,
+                  FontStyle::Fast);
     curY += lineH;
   }
 
@@ -236,24 +239,25 @@ void ContestPanel::renderPopup(SDL_Renderer *renderer) {
   {
     std::string startStr = "Start: " + formatContestTime(c.startTime);
     std::string endStr = "End:   " + formatContestTime(c.endTime);
-    fontMgr_.drawText(renderer, startStr, x_ + pad, curY, themes.text,
-                      itemFontSize_);
+    cat->drawText(renderer, startStr, x_ + pad, curY, themes.text,
+                  FontStyle::Fast);
     curY += lineH;
-    fontMgr_.drawText(renderer, endStr, x_ + pad, curY, themes.text,
-                      itemFontSize_);
+    cat->drawText(renderer, endStr, x_ + pad, curY, themes.text,
+                  FontStyle::Fast);
     curY += lineH;
   }
 
   // Raw date desc if available (compact)
   if (!c.dateDesc.empty()) {
-    fontMgr_.drawText(renderer, c.dateDesc, x_ + pad, curY, themes.textDim,
-                      std::max(8, itemFontSize_ - 2));
+    cat->drawText(renderer, c.dateDesc, x_ + pad, curY, themes.textDim,
+                  FontStyle::Caption);
     curY += lineH;
   }
 
   // URL (truncated to fit)
   if (!c.url.empty()) {
-    TTF_Font *font = fontMgr_.getFont(std::max(8, itemFontSize_ - 2));
+    int capPt = cat->ptSize(FontStyle::Caption);
+    TTF_Font *font = fontMgr_.getFont(capPt);
     std::string url = c.url;
     if (font) {
       int maxW = width_ - pad * 2;
@@ -266,15 +270,15 @@ void ContestPanel::renderPopup(SDL_Renderer *renderer) {
       if (url.size() < c.url.size())
         url += "..";
     }
-    fontMgr_.drawText(renderer, url, x_ + pad, curY, themes.textDim,
-                      std::max(8, itemFontSize_ - 2));
+    cat->drawText(renderer, url, x_ + pad, curY, themes.textDim,
+                  FontStyle::Caption);
     curY += lineH;
   }
 
   // Dismiss hint at bottom
-  fontMgr_.drawText(renderer, "Tap to dismiss", x_ + width_ / 2,
-                    y_ + height_ - pad - itemFontSize_, themes.textDim,
-                    std::max(8, itemFontSize_ - 2), false, true);
+  cat->drawText(renderer, "Tap to dismiss", x_ + width_ / 2,
+                y_ + height_ - pad - cat->ptSize(FontStyle::Fast),
+                themes.textDim, FontStyle::Caption, true);
 
   SDL_RenderSetClipRect(renderer, nullptr);
 }

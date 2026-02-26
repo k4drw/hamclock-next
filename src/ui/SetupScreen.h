@@ -2,6 +2,7 @@
 
 #include "../core/BrightnessManager.h"
 #include "../core/ConfigManager.h"
+#include "FontCatalog.h"
 #include "FontManager.h"
 #include "Widget.h"
 
@@ -48,7 +49,7 @@ private:
   std::string *getActiveFieldText();
   bool deleteSelection(std::string *text);
   int calculateCursorPosFromClick(int clickX, int fieldStartX,
-                                  const std::string &text, int fontSize);
+                                  const std::string &text, FontStyle style);
   void renderTabIdentity(SDL_Renderer *renderer, int cx, int pad, int fieldW,
                          int fieldH, int fieldX, int textPad);
   void renderTabDXCluster(SDL_Renderer *renderer, int cx, int pad, int fieldW,
@@ -126,10 +127,6 @@ private:
   double gridLon_ = 0.0;
   bool gridValid_ = false;
   bool mismatchWarning_ = false;
-  int titleSize_ = 32;
-  int labelSize_ = 18;
-  int fieldSize_ = 24;
-  int hintSize_ = 14;
   SDL_Rect toggleRect_ = {0, 0, 0, 0};
   SDL_Rect clusterToggleRect_ = {0, 0, 0, 0};
   SDL_Rect rbnToggleRect_ = {0, 0, 0, 0};

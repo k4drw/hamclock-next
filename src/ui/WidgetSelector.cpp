@@ -1,6 +1,7 @@
 #include "WidgetSelector.h"
 #include "../core/Constants.h"
 #include "../core/Theme.h"
+#include "FontCatalog.h"
 #include <algorithm>
 
 WidgetSelector::WidgetSelector(FontManager &fontMgr)
@@ -92,6 +93,8 @@ void WidgetSelector::render(SDL_Renderer *renderer) {
                          themes.border.b, themes.border.a);
   SDL_RenderDrawRect(renderer, &menuRect_);
 
+  auto *cat = fontMgr_.catalog();
+
   for (size_t i = 0; i < available_.size(); ++i) {
     WidgetType t = available_[i];
     bool isForbidden =
@@ -115,10 +118,10 @@ void WidgetSelector::render(SDL_Renderer *renderer) {
       textColor = {80, 80, 90, 255}; // Dim if forbidden and not current
     }
 
-    fontMgr_.drawText(renderer, widgetTypeDisplayName(t),
-                      itemRects_[i].x + itemRects_[i].w / 2,
-                      itemRects_[i].y + itemRects_[i].h / 2, textColor, 18,
-                      false, true); // bold=false, centered=true
+    cat->drawText(renderer, widgetTypeDisplayName(t),
+                  itemRects_[i].x + itemRects_[i].w / 2,
+                  itemRects_[i].y + itemRects_[i].h / 2, textColor,
+                  FontStyle::SmallRegular, true);
 
     // Draw separator (if not last row)
     int numCols = 3;
@@ -151,11 +154,12 @@ void WidgetSelector::render(SDL_Renderer *renderer) {
   SDL_RenderDrawRect(renderer, &cancelRect_);
   SDL_RenderDrawRect(renderer, &okRect_);
 
-  fontMgr_.drawText(renderer, "CANCEL", cancelRect_.x + cancelRect_.w / 2,
-                    cancelRect_.y + cancelRect_.h / 2, themes.text, 14, false,
-                    true);
-  fontMgr_.drawText(renderer, "OK", okRect_.x + okRect_.w / 2,
-                    okRect_.y + okRect_.h / 2, themes.accent, 14, true, true);
+  cat->drawText(renderer, "CANCEL", cancelRect_.x + cancelRect_.w / 2,
+                cancelRect_.y + cancelRect_.h / 2, themes.text, FontStyle::UI,
+                true);
+  cat->drawText(renderer, "OK", okRect_.x + okRect_.w / 2,
+                okRect_.y + okRect_.h / 2, themes.accent, FontStyle::UIBold,
+                true);
 }
 
 bool WidgetSelector::onMouseUp(int mx, int my, Uint16 /*mod*/, int clicks) {

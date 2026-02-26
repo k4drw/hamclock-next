@@ -15,17 +15,10 @@ SetupScreen::SetupScreen(int x, int y, int w, int h, FontManager &fontMgr,
     : Widget(x, y, w, h), fontMgr_(fontMgr), brightnessMgr_(brightnessMgr) {
   LOG_D("SetupScreen", "Constructor: x={}, y={}, w={}, h={}", x, y, w, h);
   recalcLayout();
-  LOG_D("SetupScreen",
-        "After recalcLayout: titleSize={}, labelSize={}, fieldSize={}",
-        titleSize_, labelSize_, fieldSize_);
 }
 
 void SetupScreen::recalcLayout() {
-  int h = std::min(480, height_ - 40);
-  titleSize_ = std::clamp(static_cast<int>(h * 0.050f), 14, 28);
-  labelSize_ = std::clamp(static_cast<int>(h * 0.030f), 10, 16);
-  fieldSize_ = std::clamp(static_cast<int>(h * 0.038f), 11, 20);
-  hintSize_ = std::clamp(static_cast<int>(h * 0.024f), 9, 13);
+  // Logic moved to render() using FontStyle for better resolution independence
 }
 
 void SetupScreen::autoPopulateLatLon() {
@@ -122,7 +115,7 @@ bool SetupScreen::deleteSelection(std::string *text) {
 
 int SetupScreen::calculateCursorPosFromClick(int clickX, int fieldStartX,
                                              const std::string &text,
-                                             int fontSize) {
+                                             FontStyle style) {
   if (text.empty())
     return 0;
 
@@ -130,8 +123,12 @@ int SetupScreen::calculateCursorPosFromClick(int clickX, int fieldStartX,
   if (relativeX <= 0)
     return 0; // Clicked before text start
 
+  auto *cat = fontMgr_.catalog();
+  int fontSize = cat->ptSize(style);
+  bool bold = FontCatalog::isBold(style);
+
   // Measure full text width first
-  int fullWidth = fontMgr_.getLogicalWidth(text, fontSize);
+  int fullWidth = fontMgr_.getLogicalWidth(text, fontSize, bold);
 
   // If clicked past end of text, return end position
   if (relativeX >= fullWidth) {
@@ -144,7 +141,7 @@ int SetupScreen::calculateCursorPosFromClick(int clickX, int fieldStartX,
 
   for (size_t i = 1; i <= text.size(); ++i) {
     std::string substr = text.substr(0, i);
-    int w = fontMgr_.getLogicalWidth(substr, fontSize);
+    int w = fontMgr_.getLogicalWidth(substr, fontSize, bold);
 
     // Check if click is closer to this position than previous best
     int dist = std::abs(relativeX - w);
@@ -179,12 +176,13 @@ void SetupScreen::update() {
 static void renderField(SDL_Renderer *renderer, FontManager &fontMgr,
                         const std::string &text, const std::string &placeholder,
                         int fieldX, int &y, int fieldW, int fieldH,
-                        int fieldSize, int textPad, bool active, bool valid,
-                        int cursorPos, int selectionAnchor,
+                        FontStyle fieldStyle, int textPad, bool active,
+                        bool valid, int cursorPos, int selectionAnchor,
                         SDL_Color activeBorder, SDL_Color inactiveBorder,
                         SDL_Color validColor, SDL_Color textColor,
                         SDL_Color placeholderColor) {
   SDL_Color border = active ? activeBorder : inactiveBorder;
+  auto *cat = fontMgr.catalog();
 
   SDL_SetRenderDrawColor(renderer, 30, 30, 40, 255);
   SDL_Rect rect = {fieldX, y, fieldW, fieldH};
@@ -208,10 +206,13 @@ static void renderField(SDL_Renderer *renderer, FontManager &fontMgr,
     int end = std::max(cursorPos, selectionAnchor);
     int selX = fieldX + textPad;
     if (start > 0) {
-      selX += fontMgr.getLogicalWidth(text.substr(0, start), fieldSize);
+      selX += fontMgr.getLogicalWidth(text.substr(0, start),
+                                      cat->ptSize(fieldStyle),
+                                      FontCatalog::isBold(fieldStyle));
     }
-    int selW =
-        fontMgr.getLogicalWidth(text.substr(start, end - start), fieldSize);
+    int selW = fontMgr.getLogicalWidth(text.substr(start, end - start),
+                                       cat->ptSize(fieldStyle),
+                                       FontCatalog::isBold(fieldStyle));
 
     SDL_Rect selRect = {selX, y + 4, selW, fieldH - 8};
     SDL_SetRenderDrawColor(renderer, 60, 60, 100, 255);
@@ -220,11 +221,11 @@ static void renderField(SDL_Renderer *renderer, FontManager &fontMgr,
 
   if (!text.empty()) {
     SDL_Color color = valid ? validColor : textColor;
-    fontMgr.drawText(renderer, text, fieldX + textPad, y + textPad, color,
-                     fieldSize);
+    cat->drawText(renderer, text, fieldX + textPad, y + textPad, color,
+                  fieldStyle);
   } else if (!active) {
-    fontMgr.drawText(renderer, placeholder, fieldX + textPad, y + textPad,
-                     placeholderColor, fieldSize);
+    cat->drawText(renderer, placeholder, fieldX + textPad, y + textPad,
+                  placeholderColor, fieldStyle);
   }
 
   // Reset clipping
@@ -235,7 +236,8 @@ static void renderField(SDL_Renderer *renderer, FontManager &fontMgr,
     if (cursorPos > 0 && !text.empty()) {
       std::string before = text.substr(0, cursorPos);
       // Use logical width from font manager
-      cursorX += fontMgr.getLogicalWidth(before, fieldSize);
+      cursorX += fontMgr.getLogicalWidth(before, cat->ptSize(fieldStyle),
+                                         FontCatalog::isBold(fieldStyle));
     }
     if ((SDL_GetTicks() / 500) % 2 == 0) {
       SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
@@ -250,14 +252,13 @@ void SetupScreen::render(SDL_Renderer *renderer) {
   if (!fontMgr_.ready())
     return;
 
+  auto *cat = fontMgr_.catalog();
+
   // Ensure layout is up-to-date if dimensions changed
   // Fixes case where setup is launched after window resize
   if (width_ != lastRenderWidth_ || height_ != lastRenderHeight_) {
     LOG_D("SetupScreen", "Dimensions changed, recalculating layout");
     recalcLayout();
-    LOG_D("SetupScreen",
-          "After recalc: titleSize={}, labelSize={}, fieldSize={}", titleSize_,
-          labelSize_, fieldSize_);
     lastRenderWidth_ = width_;
     lastRenderHeight_ = height_;
   }
@@ -285,7 +286,7 @@ void SetupScreen::render(SDL_Renderer *renderer) {
   int pad = 20;
   int fieldW = modalW - 2 * pad;
   int fieldX = modalX + pad;
-  int fieldH = fieldSize_ + 14;
+  int fieldH = cat->ptSize(FontStyle::SmallRegular) + 14;
   int textPad = 7;
 
   SDL_Color white = {255, 255, 255, 255};
@@ -294,9 +295,10 @@ void SetupScreen::render(SDL_Renderer *renderer) {
 
   int y = modalRect_.y + pad;
 
-  fontMgr_.drawText(renderer, "HamClock-Next Setup", cx, y, cyan, titleSize_,
-                    true, true);
-  y += titleSize_ + pad / 2; // tightened: was +pad, halved gap to tab bar
+  cat->drawText(renderer, "HamClock-Next Setup", cx, y, cyan,
+                FontStyle::MediumBold, true);
+  y += cat->ptSize(FontStyle::MediumBold) +
+       pad / 2; // tightened: was +pad, halved gap to tab bar
 
   // Appearance tab absorbs brightness/display settings — 8 tabs total
   const char *tabs[] = {"Identity", "Spotting", "Display", "Rig",
@@ -308,19 +310,17 @@ void SetupScreen::render(SDL_Renderer *renderer) {
   // Longest label is "Appearance" (10 chars)
   int tabTextPad = 4; // Padding on each side
   int maxTabTextWidth = tabW - (tabTextPad * 2);
-  int tabFontSize = labelSize_;
+  FontStyle tabStyle = FontStyle::SmallRegular;
 
   // Reduce font size if labels won't fit
-  // Measure all labels using logical width helper
   int longestWidth = 0;
   for (int i = 0; i < numTabs; ++i) {
-    int w = fontMgr_.getLogicalWidth(tabs[i], tabFontSize);
+    int w = fontMgr_.getLogicalWidth(tabs[i], cat->ptSize(tabStyle));
     if (w > longestWidth)
       longestWidth = w;
   }
-  // If too wide, scale down font
   if (longestWidth > maxTabTextWidth) {
-    tabFontSize = std::max(10, (tabFontSize * maxTabTextWidth) / longestWidth);
+    tabStyle = FontStyle::Fast;
   }
 
   for (int i = 0; i < numTabs; ++i) {
@@ -332,8 +332,8 @@ void SetupScreen::render(SDL_Renderer *renderer) {
     SDL_SetRenderDrawColor(renderer, active ? 0 : 80, active ? 200 : 80,
                            active ? 255 : 80, 255);
     SDL_RenderDrawRect(renderer, &tr);
-    fontMgr_.drawText(renderer, tabs[i], tr.x + tabW / 2, tr.y + fieldH / 2,
-                      active ? white : gray, tabFontSize, false, true);
+    cat->drawText(renderer, tabs[i], tr.x + tabW / 2, tr.y + fieldH / 2,
+                  active ? white : gray, tabStyle, true);
   }
   y += fieldH + pad / 2;
 
@@ -383,8 +383,8 @@ void SetupScreen::render(SDL_Renderer *renderer) {
   SDL_RenderFillRect(renderer, &cancelBtn);
   SDL_SetRenderDrawColor(renderer, 150, 50, 50, 255);
   SDL_RenderDrawRect(renderer, &cancelBtn);
-  fontMgr_.drawText(renderer, "Cancel", cancelBtn.x + btnW / 2,
-                    cancelBtn.y + btnH / 2, white, labelSize_, false, true);
+  cat->drawText(renderer, "Cancel", cancelBtn.x + btnW / 2,
+                cancelBtn.y + btnH / 2, white, FontStyle::SmallRegular, true);
   cancelBtnRect_ = cancelBtn;
 
   // Done Button
@@ -393,16 +393,17 @@ void SetupScreen::render(SDL_Renderer *renderer) {
   SDL_RenderFillRect(renderer, &okBtn);
   SDL_SetRenderDrawColor(renderer, 50, 150, 50, 255);
   SDL_RenderDrawRect(renderer, &okBtn);
-  fontMgr_.drawText(renderer, "Done", okBtn.x + btnW / 2, okBtn.y + btnH / 2,
-                    white, labelSize_, false, true);
+  cat->drawText(renderer, "Done", okBtn.x + btnW / 2, okBtn.y + btnH / 2, white,
+                FontStyle::SmallRegular, true);
   okBtnRect_ = okBtn;
 }
 
 void SetupScreen::renderTabIdentity(SDL_Renderer *renderer, int, int pad,
                                     int fieldW, int fieldH, int fieldX,
                                     int textPad) {
-  int y = (modalRect_.y + titleSize_ + 2 * pad +
-           fieldH); // tightened: removed extra pad/2
+  auto *cat = fontMgr_.catalog();
+  int y =
+      (modalRect_.y + cat->ptSize(FontStyle::MediumBold) + 2 * pad + fieldH);
   int vSpace = pad / 2;
   SDL_Color white = {255, 255, 255, 255};
   SDL_Color orange = {255, 165, 0, 255};
@@ -410,47 +411,49 @@ void SetupScreen::renderTabIdentity(SDL_Renderer *renderer, int, int pad,
   SDL_Color green = {0, 200, 0, 255};
   SDL_Color red = {255, 80, 80, 255};
 
-  fontMgr_.drawText(renderer, "Callsign:", fieldX, y, white, labelSize_, true);
-  y += labelSize_ + 4;
+  cat->drawText(renderer, "Callsign:", fieldX, y, white, FontStyle::SmallBold);
+  y += cat->ptSize(FontStyle::SmallBold) + 4;
   renderField(renderer, fontMgr_, callsignText_, "e.g. K4DRW", fieldX, y,
-              fieldW, fieldH, fieldSize_, textPad, activeField_ == 0,
-              !callsignText_.empty(), cursorPos_, selectionAnchor_, orange,
-              gray, white, white, gray);
+              fieldW, fieldH, FontStyle::SmallRegular, textPad,
+              activeField_ == 0, !callsignText_.empty(), cursorPos_,
+              selectionAnchor_, orange, gray, white, white, gray);
   y += vSpace;
 
-  fontMgr_.drawText(renderer, "Grid Square:", fieldX, y, white, labelSize_,
-                    true);
-  y += labelSize_ + 4;
+  cat->drawText(renderer, "Grid Square:", fieldX, y, white,
+                FontStyle::SmallBold);
+  y += cat->ptSize(FontStyle::SmallBold) + 4;
   renderField(renderer, fontMgr_, gridText_, "e.g. EL87qr", fieldX, y, fieldW,
-              fieldH, fieldSize_, textPad, activeField_ == 1, gridValid_,
-              cursorPos_, selectionAnchor_, orange, gray, green, white, gray);
+              fieldH, FontStyle::SmallRegular, textPad, activeField_ == 1,
+              gridValid_, cursorPos_, selectionAnchor_, orange, gray, green,
+              white, gray);
   y += vSpace;
 
   int halfFieldW = (fieldW - pad) / 2;
-  fontMgr_.drawText(renderer, "Latitude:", fieldX, y, white, labelSize_, true);
-  fontMgr_.drawText(renderer, "Longitude:", fieldX + halfFieldW + pad, y, white,
-                    labelSize_, true);
-  y += labelSize_ + 4;
+  cat->drawText(renderer, "Latitude:", fieldX, y, white, FontStyle::SmallBold);
+  cat->drawText(renderer, "Longitude:", fieldX + halfFieldW + pad, y, white,
+                FontStyle::SmallBold);
+  y += cat->ptSize(FontStyle::SmallBold) + 4;
 
   int latY = y;
   renderField(renderer, fontMgr_, latText_, "e.g. 27.76", fieldX, latY,
-              halfFieldW, fieldH, fieldSize_, textPad, activeField_ == 2,
-              !latText_.empty(), cursorPos_, selectionAnchor_, orange, gray,
-              white, white, gray);
+              halfFieldW, fieldH, FontStyle::SmallRegular, textPad,
+              activeField_ == 2, !latText_.empty(), cursorPos_,
+              selectionAnchor_, orange, gray, white, white, gray);
 
   int lonY = y;
   renderField(renderer, fontMgr_, lonText_, "e.g. -82.64",
-              fieldX + halfFieldW + pad, lonY, halfFieldW, fieldH, fieldSize_,
-              textPad, activeField_ == 3, !lonText_.empty(), cursorPos_,
-              selectionAnchor_, orange, gray, white, white, gray);
+              fieldX + halfFieldW + pad, lonY, halfFieldW, fieldH,
+              FontStyle::SmallRegular, textPad, activeField_ == 3,
+              !lonText_.empty(), cursorPos_, selectionAnchor_, orange, gray,
+              white, white, gray);
   y = std::max(latY, lonY) + pad / 2;
 
   if (mismatchWarning_) {
-    fontMgr_.drawText(renderer, "Warning: Lat/Lon outside grid square", fieldX,
-                      y, red, hintSize_);
+    cat->drawText(renderer, "Warning: Lat/Lon outside grid square", fieldX, y,
+                  red, FontStyle::Fast);
   } else if (gridValid_ && !latLonManual_) {
-    fontMgr_.drawText(renderer, "Auto-calculated from grid", fieldX, y, gray,
-                      hintSize_);
+    cat->drawText(renderer, "Auto-calculated from grid", fieldX, y, gray,
+                  FontStyle::Fast);
   }
   y += pad;
 
@@ -464,15 +467,16 @@ void SetupScreen::renderTabIdentity(SDL_Renderer *renderer, int, int pad,
     SDL_Rect check = {fieldX + 4, y + 4, 12, 12};
     SDL_RenderFillRect(renderer, &check);
   }
-  fontMgr_.drawText(renderer, "Synchronize with GPS (gpsd)", fieldX + 30, y + 2,
-                    white, labelSize_);
+  cat->drawText(renderer, "Synchronize with GPS (gpsd)", fieldX + 30, y + 2,
+                white, FontStyle::SmallRegular);
 }
 
 void SetupScreen::renderTabDXCluster(SDL_Renderer *renderer, int cx, int pad,
                                      int fieldW, int fieldH, int fieldX,
                                      int textPad) {
-  int y = (modalRect_.y + titleSize_ + 2 * pad +
-           fieldH); // tightened: removed extra pad/2
+  auto *cat = fontMgr_.catalog();
+  int y =
+      (modalRect_.y + cat->ptSize(FontStyle::MediumBold) + 2 * pad + fieldH);
   int vSpace = 5;
   SDL_Color white = {255, 255, 255, 255};
   SDL_Color orange = {255, 165, 0, 255};
@@ -480,32 +484,32 @@ void SetupScreen::renderTabDXCluster(SDL_Renderer *renderer, int cx, int pad,
   SDL_Color cyan = {0, 200, 255, 255};
 
   // --- DX CLUSTER SECTION ---
-  fontMgr_.drawText(renderer, "--- DX Cluster ---", cx, y, cyan, labelSize_,
-                    true, true);
-  y += labelSize_ + vSpace;
+  cat->drawText(renderer, "--- DX Cluster ---", cx, y, cyan,
+                FontStyle::SmallBold, true);
+  y += cat->ptSize(FontStyle::SmallBold) + vSpace;
 
-  fontMgr_.drawText(renderer, "Host:", fieldX, y, white, labelSize_, true);
-  fontMgr_.drawText(renderer, "Port:", fieldX + fieldW / 2 + pad, y, white,
-                    labelSize_, true);
-  y += labelSize_ + 4;
+  cat->drawText(renderer, "Host:", fieldX, y, white, FontStyle::SmallBold);
+  cat->drawText(renderer, "Port:", fieldX + fieldW / 2 + pad, y, white,
+                FontStyle::SmallBold);
+  y += cat->ptSize(FontStyle::SmallBold) + 4;
 
   int halfW = (fieldW - pad) / 2;
   int hostY = y;
   renderField(renderer, fontMgr_, clusterHost_, "dxusa.net", fieldX, hostY,
-              halfW, fieldH, fieldSize_, textPad, activeField_ == 0,
-              !clusterHost_.empty(), cursorPos_, selectionAnchor_, orange, gray,
-              white, white, gray);
+              halfW, fieldH, FontStyle::SmallRegular, textPad,
+              activeField_ == 0, !clusterHost_.empty(), cursorPos_,
+              selectionAnchor_, orange, gray, white, white, gray);
   int portY = y;
   renderField(renderer, fontMgr_, clusterPort_, "7300", fieldX + halfW + pad,
-              portY, halfW, fieldH, fieldSize_, textPad, activeField_ == 1,
-              !clusterPort_.empty(), cursorPos_, selectionAnchor_, orange, gray,
-              white, white, gray);
+              portY, halfW, fieldH, FontStyle::SmallRegular, textPad,
+              activeField_ == 1, !clusterPort_.empty(), cursorPos_,
+              selectionAnchor_, orange, gray, white, white, gray);
   y += fieldH + vSpace;
 
-  fontMgr_.drawText(renderer, "Login:", fieldX, y, white, labelSize_, true);
-  y += labelSize_ + 4;
+  cat->drawText(renderer, "Login:", fieldX, y, white, FontStyle::SmallBold);
+  y += cat->ptSize(FontStyle::SmallBold) + 4;
   renderField(renderer, fontMgr_, clusterLogin_, "NOCALL", fieldX, y, fieldW,
-              fieldH, fieldSize_, textPad, activeField_ == 2,
+              fieldH, FontStyle::SmallRegular, textPad, activeField_ == 2,
               !clusterLogin_.empty(), cursorPos_, selectionAnchor_, orange,
               gray, white, white, gray);
   y += fieldH + vSpace;
@@ -521,8 +525,8 @@ void SetupScreen::renderTabDXCluster(SDL_Renderer *renderer, int cx, int pad,
     SDL_Rect check = {fieldX + 4, y + 4, 12, 12};
     SDL_RenderFillRect(renderer, &check);
   }
-  fontMgr_.drawText(renderer, "Enable DX Cluster", fieldX + 30, y + 2, white,
-                    labelSize_);
+  cat->drawText(renderer, "Enable DX Cluster", fieldX + 30, y + 2, white,
+                FontStyle::SmallRegular);
   clusterToggleRect_ = enableToggle;
 
   y += 24;
@@ -537,8 +541,8 @@ void SetupScreen::renderTabDXCluster(SDL_Renderer *renderer, int cx, int pad,
     SDL_Rect check = {fieldX + 4, y + 4, 12, 12};
     SDL_RenderFillRect(renderer, &check);
   }
-  fontMgr_.drawText(renderer, "Use WSJT-X (UDP)", fieldX + 30, y + 2, white,
-                    labelSize_);
+  cat->drawText(renderer, "Use WSJT-X (UDP)", fieldX + 30, y + 2, white,
+                FontStyle::SmallRegular);
   toggleRect_ = toggle;
   if (clusterWSJTX_) {
     int wPortW = std::min(120, halfW);
@@ -546,7 +550,7 @@ void SetupScreen::renderTabDXCluster(SDL_Renderer *renderer, int cx, int pad,
     wsjtxPortRect_ = {portX, y, wPortW, fieldH};
     int tmpY = y;
     renderField(renderer, fontMgr_, wsjtxPort_, "2237", portX, tmpY, wPortW,
-                fieldH, fieldSize_, textPad, activeField_ == 3,
+                fieldH, FontStyle::SmallRegular, textPad, activeField_ == 3,
                 !wsjtxPort_.empty(), cursorPos_, selectionAnchor_, orange, gray,
                 white, white, gray);
   } else {
@@ -555,9 +559,9 @@ void SetupScreen::renderTabDXCluster(SDL_Renderer *renderer, int cx, int pad,
   y += 30;
 
   // --- RBN SECTION ---
-  fontMgr_.drawText(renderer, "--- Reverse Beacon Network ---", cx, y, cyan,
-                    labelSize_, true, true);
-  y += labelSize_ + vSpace;
+  cat->drawText(renderer, "--- Reverse Beacon Network ---", cx, y, cyan,
+                FontStyle::SmallBold, true);
+  y += cat->ptSize(FontStyle::SmallBold) + vSpace;
 
   SDL_Rect rbnToggle = {fieldX, y, 20, 20};
   SDL_SetRenderDrawColor(renderer, 50, 50, 60, 255);
@@ -569,8 +573,8 @@ void SetupScreen::renderTabDXCluster(SDL_Renderer *renderer, int cx, int pad,
     SDL_Rect check = {fieldX + 4, y + 4, 12, 12};
     SDL_RenderFillRect(renderer, &check);
   }
-  fontMgr_.drawText(renderer, "Enable RBN (feeds DX Cluster panel)",
-                    fieldX + 30, y + 2, white, labelSize_);
+  cat->drawText(renderer, "Enable RBN (feeds DX Cluster panel)", fieldX + 30,
+                y + 2, white, FontStyle::SmallRegular);
   rbnToggleRect_ = rbnToggle;
   y += 24;
 }
@@ -578,8 +582,9 @@ void SetupScreen::renderTabDXCluster(SDL_Renderer *renderer, int cx, int pad,
 void SetupScreen::renderTabAppearance(SDL_Renderer *renderer, int cx, int pad,
                                       int fieldW, int fieldH, int fieldX,
                                       int textPad) {
-  int y = (modalRect_.y + titleSize_ + 2 * pad +
-           fieldH); // tightened: removed extra pad/2
+  auto *cat = fontMgr_.catalog();
+  int y =
+      (modalRect_.y + cat->ptSize(FontStyle::MediumBold) + 2 * pad + fieldH);
   // Cap vSpace so Appearance tab fits above the button bar on small screens
   // (e.g. 1024x600 7" display). Available height / ~26 keeps all rows visible.
   int availH = (y_ + height_ - 52) - y;
@@ -590,18 +595,18 @@ void SetupScreen::renderTabAppearance(SDL_Renderer *renderer, int cx, int pad,
   SDL_Color cyan = {0, 200, 255, 255};
 
   // --- Appearance section ---
-  fontMgr_.drawText(renderer, "--- Appearance ---", cx, y, cyan, labelSize_,
-                    true, true);
-  y += labelSize_ + vSpace;
+  cat->drawText(renderer, "--- Appearance ---", cx, y, cyan,
+                FontStyle::SmallBold, true);
+  y += cat->ptSize(FontStyle::SmallBold) + vSpace;
 
-  fontMgr_.drawText(renderer, "Theme:", fieldX, y, white, labelSize_);
+  cat->drawText(renderer, "Theme:", fieldX, y, white, FontStyle::SmallRegular);
   SDL_Rect themeBtn = {fieldX + fieldW - 100, y, 100, 24};
   SDL_SetRenderDrawColor(renderer, 40, 40, 50, 255);
   SDL_RenderFillRect(renderer, &themeBtn);
   SDL_SetRenderDrawColor(renderer, 100, 100, 120, 255);
   SDL_RenderDrawRect(renderer, &themeBtn);
-  fontMgr_.drawText(renderer, theme_, themeBtn.x + themeBtn.w / 2,
-                    themeBtn.y + themeBtn.h / 2, white, hintSize_, false, true);
+  cat->drawText(renderer, theme_, themeBtn.x + themeBtn.w / 2,
+                themeBtn.y + themeBtn.h / 2, white, FontStyle::Fast, true);
   themeRect_ = themeBtn;
   y += vSpace * 2;
 
@@ -615,8 +620,8 @@ void SetupScreen::renderTabAppearance(SDL_Renderer *renderer, int cx, int pad,
     SDL_Rect check = {fieldX + 4, y + 4, 12, 12};
     SDL_RenderFillRect(renderer, &check);
   }
-  fontMgr_.drawText(renderer, "Enable Map Night Lights", fieldX + 30, y + 2,
-                    white, labelSize_);
+  cat->drawText(renderer, "Enable Map Night Lights", fieldX + 30, y + 2, white,
+                FontStyle::SmallRegular);
   nightLightsRect_ = nlToggle;
   y += 24 + vSpace;
 
@@ -630,8 +635,8 @@ void SetupScreen::renderTabAppearance(SDL_Renderer *renderer, int cx, int pad,
     SDL_Rect check = {fieldX + 4, y + 4, 12, 12};
     SDL_RenderFillRect(renderer, &check);
   }
-  fontMgr_.drawText(renderer, "Use Metric Units (°C, km, m/s)", fieldX + 30,
-                    y + 2, white, labelSize_);
+  cat->drawText(renderer, "Use Metric Units (°C, km, m/s)", fieldX + 30, y + 2,
+                white, FontStyle::SmallRegular);
   metricToggleRect_ = metricToggle;
   y += 24 + vSpace;
 
@@ -645,12 +650,12 @@ void SetupScreen::renderTabAppearance(SDL_Renderer *renderer, int cx, int pad,
     SDL_Rect check = {fieldX + 4, y + 4, 12, 12};
     SDL_RenderFillRect(renderer, &check);
   }
-  fontMgr_.drawText(renderer, "Enable News (RSS) Banner", fieldX + 30, y + 2,
-                    white, labelSize_);
+  cat->drawText(renderer, "Enable News (RSS) Banner", fieldX + 30, y + 2, white,
+                FontStyle::SmallRegular);
   y += 24 + vSpace;
 
-  fontMgr_.drawText(renderer, "Map Weather Overlay:", fieldX, y, white,
-                    labelSize_);
+  cat->drawText(renderer, "Map Weather Overlay:", fieldX, y, white,
+                FontStyle::SmallRegular);
   SDL_Rect weatherBtn = {fieldX + fieldW - 120, y, 120, 24};
   SDL_SetRenderDrawColor(renderer, 40, 40, 50, 255);
   SDL_RenderFillRect(renderer, &weatherBtn);
@@ -661,14 +666,13 @@ void SetupScreen::renderTabAppearance(SDL_Renderer *renderer, int cx, int pad,
     wStr = "Clouds";
   else if (weatherOverlay_ == WeatherOverlayType::WxMb)
     wStr = "Pressure";
-  fontMgr_.drawText(renderer, wStr, weatherBtn.x + weatherBtn.w / 2,
-                    weatherBtn.y + weatherBtn.h / 2, white, hintSize_, false,
-                    true);
+  cat->drawText(renderer, wStr, weatherBtn.x + weatherBtn.w / 2,
+                weatherBtn.y + weatherBtn.h / 2, white, FontStyle::Fast, true);
   weatherOverlayRect_ = weatherBtn;
   y += 24 + vSpace;
 
-  fontMgr_.drawText(renderer, "Pane Rotation Interval (s):", fieldX, y, white,
-                    labelSize_);
+  cat->drawText(renderer, "Pane Rotation Interval (s):", fieldX, y, white,
+                FontStyle::SmallRegular);
   int rotBtnW = 60;
   SDL_Rect rotBtn = {fieldX + fieldW - rotBtnW, y - 2, rotBtnW, fieldH};
   SDL_SetRenderDrawColor(renderer, 30, 30, 40, 255);
@@ -678,14 +682,14 @@ void SetupScreen::renderTabAppearance(SDL_Renderer *renderer, int cx, int pad,
                          activeField_ == 0 ? 0 : 80, 255);
   SDL_RenderDrawRect(renderer, &rotBtn);
   std::string rotStr = std::to_string(rotationInterval_);
-  fontMgr_.drawText(renderer, rotStr, rotBtn.x + rotBtnW / 2,
-                    rotBtn.y + fieldH / 2, white, fieldSize_, false, true);
+  cat->drawText(renderer, rotStr, rotBtn.x + rotBtnW / 2, rotBtn.y + fieldH / 2,
+                white, FontStyle::SmallRegular, true);
   y += fieldH + vSpace;
 
   // --- Brightness section ---
-  fontMgr_.drawText(renderer, "--- Brightness ---", cx, y, cyan, labelSize_,
-                    true, true);
-  y += labelSize_ + vSpace;
+  cat->drawText(renderer, "--- Brightness ---", cx, y, cyan,
+                FontStyle::SmallBold, true);
+  y += cat->ptSize(FontStyle::SmallBold) + vSpace;
 
   brightnessSliderRect_ = {fieldX, y, fieldW, fieldH};
   SDL_SetRenderDrawColor(renderer, 30, 30, 40, 255);
@@ -698,8 +702,8 @@ void SetupScreen::renderTabAppearance(SDL_Renderer *renderer, int cx, int pad,
   SDL_SetRenderDrawColor(renderer, 150, 150, 220, 255);
   SDL_RenderDrawRect(renderer, &brightnessSliderRect_);
   std::string brightText = std::to_string(brightness) + "%";
-  fontMgr_.drawText(renderer, brightText, fieldX + fieldW / 2, y + fieldH / 2,
-                    white, fieldSize_, false, true);
+  cat->drawText(renderer, brightText, fieldX + fieldW / 2, y + fieldH / 2,
+                white, FontStyle::SmallRegular, true);
   y += fieldH + vSpace;
 
   scheduleToggleRect_ = {fieldX, y, 20, 20};
@@ -712,26 +716,28 @@ void SetupScreen::renderTabAppearance(SDL_Renderer *renderer, int cx, int pad,
     SDL_Rect check = {fieldX + 4, y + 4, 12, 12};
     SDL_RenderFillRect(renderer, &check);
   }
-  fontMgr_.drawText(renderer, "Enable Dim/Bright Schedule", fieldX + 30, y + 2,
-                    white, labelSize_);
+  cat->drawText(renderer, "Enable Dim/Bright Schedule", fieldX + 30, y + 2,
+                white, FontStyle::SmallRegular);
   y += 24 + vSpace;
 
   if (brightnessMgr_.isScheduleEnabled()) {
-    fontMgr_.drawText(renderer, "Dim Time:", fieldX, y, white, labelSize_);
-    fontMgr_.drawText(renderer, "Bright Time:", fieldX + fieldW / 2 + pad, y,
-                      white, labelSize_);
-    y += labelSize_ + 4;
+    cat->drawText(renderer, "Dim Time:", fieldX, y, white,
+                  FontStyle::SmallRegular);
+    cat->drawText(renderer, "Bright Time:", fieldX + fieldW / 2 + pad, y, white,
+                  FontStyle::SmallRegular);
+    y += cat->ptSize(FontStyle::SmallRegular) + 4;
     int halfW = (fieldW - pad) / 2;
     int dimY = y;
     renderField(renderer, fontMgr_, dimTime_, "HH:MM", fieldX, dimY, halfW,
-                fieldH, fieldSize_, textPad, activeField_ == 1, true,
-                cursorPos_, selectionAnchor_, orange, gray, white, white, gray);
+                fieldH, FontStyle::SmallRegular, textPad, activeField_ == 1,
+                true, cursorPos_, selectionAnchor_, orange, gray, white, white,
+                gray);
     dimTimeRect_ = {fieldX, dimY, halfW, fieldH};
     int brightY = y;
     renderField(renderer, fontMgr_, brightTime_, "HH:MM", fieldX + halfW + pad,
-                brightY, halfW, fieldH, fieldSize_, textPad, activeField_ == 2,
-                true, cursorPos_, selectionAnchor_, orange, gray, white, white,
-                gray);
+                brightY, halfW, fieldH, FontStyle::SmallRegular, textPad,
+                activeField_ == 2, true, cursorPos_, selectionAnchor_, orange,
+                gray, white, white, gray);
     brightTimeRect_ = {fieldX + halfW + pad, brightY, halfW, fieldH};
   } else {
     dimTimeRect_ = {0, 0, 0, 0};
@@ -742,43 +748,46 @@ void SetupScreen::renderTabAppearance(SDL_Renderer *renderer, int cx, int pad,
 void SetupScreen::renderTabServices(SDL_Renderer *renderer, int, int pad,
                                     int fieldW, int fieldH, int fieldX,
                                     int textPad) {
-  int y = (modalRect_.y + titleSize_ + 2 * pad +
-           fieldH); // tightened: removed extra pad/2
+  auto *cat = fontMgr_.catalog();
+  int y =
+      (modalRect_.y + cat->ptSize(FontStyle::MediumBold) + 2 * pad + fieldH);
   int vSpace = pad / 2;
   SDL_Color white = {255, 255, 255, 255};
   SDL_Color orange = {255, 165, 0, 255};
   SDL_Color gray = {140, 140, 140, 255};
 
-  fontMgr_.drawText(renderer, "QRZ Username:", fieldX, y, white, labelSize_,
-                    true);
-  y += labelSize_ + 4;
+  cat->drawText(renderer, "QRZ Username:", fieldX, y, white,
+                FontStyle::SmallBold);
+  y += cat->ptSize(FontStyle::SmallBold) + 4;
   renderField(renderer, fontMgr_, qrzUsername_, "e.g. K4DRW", fieldX, y, fieldW,
-              fieldH, fieldSize_, textPad, activeField_ == 0, true, cursorPos_,
-              selectionAnchor_, orange, gray, white, white, gray);
+              fieldH, FontStyle::SmallRegular, textPad, activeField_ == 0, true,
+              cursorPos_, selectionAnchor_, orange, gray, white, white, gray);
   y += vSpace;
 
-  fontMgr_.drawText(renderer, "QRZ Password:", fieldX, y, white, labelSize_,
-                    true);
-  y += labelSize_ + 4;
+  cat->drawText(renderer, "QRZ Password:", fieldX, y, white,
+                FontStyle::SmallBold);
+  y += cat->ptSize(FontStyle::SmallBold) + 4;
   std::string passMask(qrzPassword_.length(), '*');
   renderField(renderer, fontMgr_, passMask, "********", fieldX, y, fieldW,
-              fieldH, fieldSize_, textPad, activeField_ == 1, true, cursorPos_,
-              selectionAnchor_, orange, gray, white, white, gray);
+              fieldH, FontStyle::SmallRegular, textPad, activeField_ == 1, true,
+              cursorPos_, selectionAnchor_, orange, gray, white, white, gray);
   y += vSpace;
 }
 
 void SetupScreen::renderTabNetwork(SDL_Renderer *renderer, int /*cx*/, int pad,
                                    int fieldW, int fieldH, int fieldX,
                                    int textPad) {
-  int y = (modalRect_.y + titleSize_ + 2 * pad + fieldH);
+  auto *cat = fontMgr_.catalog();
+  int y =
+      (modalRect_.y + cat->ptSize(FontStyle::MediumBold) + 2 * pad + fieldH);
   int vSpace = pad / 2;
   SDL_Color white = {255, 255, 255, 255};
   SDL_Color orange = {255, 165, 0, 255};
   SDL_Color gray = {140, 140, 140, 255};
 
-  fontMgr_.drawText(renderer, "--- Local Data Hub ---", fieldX, y, orange,
-                    labelSize_, true);
-  y += labelSize_ + pad;
+  cat->drawText(renderer, "--- Local Data Hub ---", fieldX, y, orange,
+                FontStyle::SmallBold);
+  y += cat->ptSize(FontStyle::SmallBold) + pad;
 
   // Mode cycle button
   const char *modeLabel = (hubMode_ == HubMode::Master)   ? "Master"
@@ -786,32 +795,37 @@ void SetupScreen::renderTabNetwork(SDL_Renderer *renderer, int /*cx*/, int pad,
                                                           : "Off";
   int btnW = 80;
   hubModeRect_ = {fieldX + fieldW - btnW, y, btnW, fieldH};
-  fontMgr_.drawText(renderer, "Mode:", fieldX, y + (fieldH - labelSize_) / 2,
-                    white, labelSize_, false, false);
+  cat->drawText(renderer, "Mode:", fieldX,
+                y + (fieldH - cat->ptSize(FontStyle::SmallRegular)) / 2, white,
+                FontStyle::SmallRegular);
   SDL_SetRenderDrawColor(renderer, 40, 40, 60, 255);
   SDL_RenderFillRect(renderer, &hubModeRect_);
   SDL_SetRenderDrawColor(renderer, orange.r, orange.g, orange.b, 255);
   SDL_RenderDrawRect(renderer, &hubModeRect_);
-  fontMgr_.drawText(renderer, modeLabel, hubModeRect_.x + hubModeRect_.w / 2,
-                    hubModeRect_.y + hubModeRect_.h / 2, orange, labelSize_,
-                    false, true);
+  cat->drawText(renderer, modeLabel, hubModeRect_.x + hubModeRect_.w / 2,
+                hubModeRect_.y + hubModeRect_.h / 2, orange,
+                FontStyle::SmallRegular, true);
   y += fieldH + vSpace;
 
   if (hubMode_ == HubMode::Client) {
-    fontMgr_.drawText(renderer, "Hub IP:", fieldX, y, white, labelSize_);
-    y += labelSize_ + 4;
+    cat->drawText(renderer, "Hub IP:", fieldX, y, white,
+                  FontStyle::SmallRegular);
+    y += cat->ptSize(FontStyle::SmallRegular) + 4;
     hubIpRect_ = {fieldX, y, fieldW, fieldH};
     renderField(renderer, fontMgr_, hubIp_, "e.g. 192.168.1.100", fieldX, y,
-                fieldW, fieldH, fieldSize_, textPad, activeField_ == 0, true,
-                cursorPos_, selectionAnchor_, orange, gray, white, white, gray);
+                fieldW, fieldH, FontStyle::SmallRegular, textPad,
+                activeField_ == 0, true, cursorPos_, selectionAnchor_, orange,
+                gray, white, white, gray);
     y += vSpace;
 
-    fontMgr_.drawText(renderer, "Hub Port:", fieldX, y, white, labelSize_);
-    y += labelSize_ + 4;
+    cat->drawText(renderer, "Hub Port:", fieldX, y, white,
+                  FontStyle::SmallRegular);
+    y += cat->ptSize(FontStyle::SmallRegular) + 4;
     hubPortRect_ = {fieldX, y, fieldW, fieldH};
     renderField(renderer, fontMgr_, hubPortStr_, "8080", fieldX, y, fieldW,
-                fieldH, fieldSize_, textPad, activeField_ == 1, true,
-                cursorPos_, selectionAnchor_, orange, gray, white, white, gray);
+                fieldH, FontStyle::SmallRegular, textPad, activeField_ == 1,
+                true, cursorPos_, selectionAnchor_, orange, gray, white, white,
+                gray);
     y += vSpace;
   } else {
     hubIpRect_ = {0, 0, 0, 0};
@@ -819,46 +833,46 @@ void SetupScreen::renderTabNetwork(SDL_Renderer *renderer, int /*cx*/, int pad,
   }
 
   if (hubMode_ == HubMode::Master) {
-    fontMgr_.drawText(renderer,
-                      "This instance serves cached data to hub clients.",
-                      fieldX, y + vSpace, gray, hintSize_);
+    cat->drawText(renderer, "This instance serves cached data to hub clients.",
+                  fieldX, y + vSpace, gray, FontStyle::Fast);
   } else if (hubMode_ == HubMode::Client) {
-    fontMgr_.drawText(renderer,
-                      "Fetches via hub; falls back to direct after 2s.", fieldX,
-                      y + vSpace, gray, hintSize_);
+    cat->drawText(renderer, "Fetches via hub; falls back to direct after 2s.",
+                  fieldX, y + vSpace, gray, FontStyle::Fast);
   } else {
-    fontMgr_.drawText(renderer, "Hub mode disabled.", fieldX, y + vSpace, gray,
-                      hintSize_);
+    cat->drawText(renderer, "Hub mode disabled.", fieldX, y + vSpace, gray,
+                  FontStyle::Fast);
   }
 }
 
 void SetupScreen::renderTabRig(SDL_Renderer *renderer, int cx, int pad,
                                int fieldW, int fieldH, int fieldX,
                                int textPad) {
-  int y = (modalRect_.y + titleSize_ + 2 * pad +
-           fieldH); // tightened: removed extra pad/2
+  auto *cat = fontMgr_.catalog();
+  int y =
+      (modalRect_.y + cat->ptSize(FontStyle::MediumBold) + 2 * pad + fieldH);
   int vSpace = pad / 2;
   SDL_Color white = {255, 255, 255, 255};
   SDL_Color orange = {255, 165, 0, 255};
   SDL_Color gray = {140, 140, 140, 255};
 
-  fontMgr_.drawText(renderer, "Rig / CAT Control:", fieldX, y, white,
-                    labelSize_, true);
-  y += labelSize_ + pad;
+  cat->drawText(renderer, "Rig / CAT Control:", fieldX, y, white,
+                FontStyle::SmallBold);
+  y += cat->ptSize(FontStyle::SmallBold) + pad;
 
-  fontMgr_.drawText(renderer, "rigctld Host (IP or Name):", fieldX, y, white,
-                    labelSize_);
-  y += labelSize_ + 4;
+  cat->drawText(renderer, "rigctld Host (IP or Name):", fieldX, y, white,
+                FontStyle::SmallRegular);
+  y += cat->ptSize(FontStyle::SmallRegular) + 4;
   renderField(renderer, fontMgr_, rigHost_, "e.g. localhost", fieldX, y, fieldW,
-              fieldH, fieldSize_, textPad, activeField_ == 0, true, cursorPos_,
-              selectionAnchor_, orange, gray, white, white, gray);
+              fieldH, FontStyle::SmallRegular, textPad, activeField_ == 0, true,
+              cursorPos_, selectionAnchor_, orange, gray, white, white, gray);
   y += vSpace;
 
-  fontMgr_.drawText(renderer, "rigctld Port:", fieldX, y, white, labelSize_);
-  y += labelSize_ + 4;
+  cat->drawText(renderer, "rigctld Port:", fieldX, y, white,
+                FontStyle::SmallRegular);
+  y += cat->ptSize(FontStyle::SmallRegular) + 4;
   renderField(renderer, fontMgr_, rigPort_, "4532", fieldX, y, fieldW, fieldH,
-              fieldSize_, textPad, activeField_ == 1, true, cursorPos_,
-              selectionAnchor_, orange, gray, white, white, gray);
+              FontStyle::SmallRegular, textPad, activeField_ == 1, true,
+              cursorPos_, selectionAnchor_, orange, gray, white, white, gray);
   y += vSpace;
 
   // Auto-tune Toggle
@@ -872,26 +886,26 @@ void SetupScreen::renderTabRig(SDL_Renderer *renderer, int cx, int pad,
     SDL_Rect check = {fieldX + 4, y + 4, 12, 12};
     SDL_RenderFillRect(renderer, &check);
   }
-  fontMgr_.drawText(renderer, "Enable Auto-Tune on DX Spot click", fieldX + 30,
-                    y + 2, white, labelSize_);
+  cat->drawText(renderer, "Enable Auto-Tune on DX Spot click", fieldX + 30,
+                y + 2, white, FontStyle::SmallRegular);
   y += 24 + pad;
 
-  fontMgr_.drawText(renderer,
-                    "Rig control requires 'rigctld' (Hamlib) running.", fieldX,
-                    y, gray, hintSize_);
+  cat->drawText(renderer, "Rig control requires 'rigctld' (Hamlib) running.",
+                fieldX, y, gray, FontStyle::Fast);
 }
 
 void SetupScreen::renderTabWidgets(SDL_Renderer *renderer, int cx, int pad,
                                    int fieldW, int fieldH, int fieldX,
                                    int textPad) {
-  int y = (modalRect_.y + titleSize_ + 2 * pad +
-           fieldH); // tightened: removed extra pad/2
+  auto *cat = fontMgr_.catalog();
+  int y =
+      (modalRect_.y + cat->ptSize(FontStyle::MediumBold) + 2 * pad + fieldH);
   SDL_Color white = {255, 255, 255, 255};
   SDL_Color gray = {140, 140, 140, 255};
 
-  fontMgr_.drawText(renderer, "Select Active Widgets for Each Pane:", fieldX, y,
-                    white, labelSize_, true);
-  y += labelSize_ + pad / 2;
+  cat->drawText(renderer, "Select Active Widgets for Each Pane:", fieldX, y,
+                white, FontStyle::SmallBold);
+  y += cat->ptSize(FontStyle::SmallBold) + pad / 2;
 
   int paneW = fieldW / 4;
   for (int i = 0; i < 4; ++i) {
@@ -905,8 +919,8 @@ void SetupScreen::renderTabWidgets(SDL_Renderer *renderer, int cx, int pad,
     SDL_RenderDrawRect(renderer, &pr);
     char buf[16];
     std::snprintf(buf, sizeof(buf), "Pane %d", i + 1);
-    fontMgr_.drawText(renderer, buf, pr.x + pr.w / 2, pr.y + pr.h / 2,
-                      active ? white : gray, hintSize_, false, true);
+    cat->drawText(renderer, buf, pr.x + pr.w / 2, pr.y + pr.h / 2,
+                  active ? white : gray, FontStyle::Fast, true);
   }
   y += 35;
 
@@ -914,7 +928,7 @@ void SetupScreen::renderTabWidgets(SDL_Renderer *renderer, int cx, int pad,
   int colW = fieldW / 3; // 3 columns
   int curX = fieldX;
   int startY = y;
-  int rowH = hintSize_ + 4; // Tighter vertical spacing
+  int rowH = cat->ptSize(FontStyle::Fast) + 4; // Tighter vertical spacing
 
   WidgetType allTypes[] = {WidgetType::ADIF,
                            WidgetType::ASTEROID,
@@ -982,13 +996,13 @@ void SetupScreen::renderTabWidgets(SDL_Renderer *renderer, int cx, int pad,
         SDL_Rect check = {r.x + 3, r.y + 3, 10, 10};
         SDL_RenderFillRect(renderer, &check);
       }
-      fontMgr_.drawText(renderer, widgetTypeDisplayName(t), r.x + 22, r.y,
-                        white, hintSize_);
+      cat->drawText(renderer, widgetTypeDisplayName(t), r.x + 22, r.y, white,
+                    FontStyle::Fast);
       widgetRects_.push_back({t, r});
     } else {
       // Draw disabled text
-      fontMgr_.drawText(renderer, widgetTypeDisplayName(t), r.x + 22, r.y,
-                        {60, 60, 70, 255}, hintSize_);
+      cat->drawText(renderer, widgetTypeDisplayName(t), r.x + 22, r.y,
+                    {60, 60, 70, 255}, FontStyle::Fast);
       // Do not add to widgetRects_ so it is not clickable
     }
 
@@ -1003,34 +1017,40 @@ void SetupScreen::renderTabWidgets(SDL_Renderer *renderer, int cx, int pad,
 
 void SetupScreen::renderTabUpdate(SDL_Renderer *renderer, int cx, int pad,
                                   int fieldW, int fieldH, int fieldX, int) {
-  int y = (modalRect_.y + titleSize_ + 2 * pad + fieldH);
+  auto *cat = fontMgr_.catalog();
+  int y =
+      (modalRect_.y + cat->ptSize(FontStyle::MediumBold) + 2 * pad + fieldH);
   SDL_Color white = {255, 255, 255, 255};
   SDL_Color gray = {140, 140, 140, 255};
   SDL_Color cyan = {0, 200, 255, 255};
 
-  fontMgr_.drawText(renderer, "--- Update Status ---", cx, y, cyan, labelSize_,
-                    true, true);
-  y += labelSize_ + pad;
+  cat->drawText(renderer, "--- Update Status ---", cx, y, cyan,
+                FontStyle::SmallBold, true);
+  y += cat->ptSize(FontStyle::SmallBold) + pad;
 
-  fontMgr_.drawText(renderer, "Current Version:", fieldX, y, white, labelSize_);
-  int lenV = fontMgr_.getLogicalWidth(HAMCLOCK_VERSION, labelSize_);
-  fontMgr_.drawText(renderer, HAMCLOCK_VERSION, fieldX + fieldW - lenV, y, gray,
-                    labelSize_, false, false);
-  y += labelSize_ + 8;
+  cat->drawText(renderer, "Current Version:", fieldX, y, white,
+                FontStyle::SmallRegular);
+  int lenV = fontMgr_.getLogicalWidth(HAMCLOCK_VERSION,
+                                      cat->ptSize(FontStyle::SmallRegular));
+  cat->drawText(renderer, HAMCLOCK_VERSION, fieldX + fieldW - lenV, y, gray,
+                FontStyle::SmallRegular);
+  y += cat->ptSize(FontStyle::SmallRegular) + 8;
 
-  fontMgr_.drawText(renderer, "Platform Architecture:", fieldX, y, white,
-                    labelSize_);
-  int lenA = fontMgr_.getLogicalWidth(HAMCLOCK_ARCH, labelSize_);
-  fontMgr_.drawText(renderer, HAMCLOCK_ARCH, fieldX + fieldW - lenA, y, gray,
-                    labelSize_, false, false);
-  y += labelSize_ + 8;
+  cat->drawText(renderer, "Platform Architecture:", fieldX, y, white,
+                FontStyle::SmallRegular);
+  int lenA = fontMgr_.getLogicalWidth(HAMCLOCK_ARCH,
+                                      cat->ptSize(FontStyle::SmallRegular));
+  cat->drawText(renderer, HAMCLOCK_ARCH, fieldX + fieldW - lenA, y, gray,
+                FontStyle::SmallRegular);
+  y += cat->ptSize(FontStyle::SmallRegular) + 8;
 
-  fontMgr_.drawText(renderer, "Installation Type:", fieldX, y, white,
-                    labelSize_);
-  int lenI = fontMgr_.getLogicalWidth(HAMCLOCK_INSTALL_TYPE, labelSize_);
-  fontMgr_.drawText(renderer, HAMCLOCK_INSTALL_TYPE, fieldX + fieldW - lenI, y,
-                    gray, labelSize_, false, false);
-  y += labelSize_ + pad * 2;
+  cat->drawText(renderer, "Installation Type:", fieldX, y, white,
+                FontStyle::SmallRegular);
+  int lenI = fontMgr_.getLogicalWidth(HAMCLOCK_INSTALL_TYPE,
+                                      cat->ptSize(FontStyle::SmallRegular));
+  cat->drawText(renderer, HAMCLOCK_INSTALL_TYPE, fieldX + fieldW - lenI, y,
+                gray, FontStyle::SmallRegular);
+  y += cat->ptSize(FontStyle::SmallRegular) + pad * 2;
 
   // Implementation-specific instructions
   std::string instr;
@@ -1051,9 +1071,9 @@ void SetupScreen::renderTabUpdate(SDL_Renderer *renderer, int cx, int pad,
     cmd = "Download the latest release from GitHub.";
   }
 
-  fontMgr_.drawText(renderer, instr, cx, y, white, fieldSize_, false, true);
-  y += fieldSize_ + 8;
-  fontMgr_.drawText(renderer, cmd, cx, y, cyan, fieldSize_, true, true);
+  cat->drawText(renderer, instr, cx, y, white, FontStyle::SmallRegular, true);
+  y += cat->ptSize(FontStyle::SmallRegular) + 8;
+  cat->drawText(renderer, cmd, cx, y, cyan, FontStyle::SmallBold, true);
 }
 
 void SetupScreen::onResize(int x, int y, int w, int h) {
@@ -1070,11 +1090,12 @@ bool SetupScreen::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
     return true;
   }
 
+  auto *cat = fontMgr_.catalog();
   int pad = 20;
   int fieldW = modalRect_.w - 2 * pad;
   int fieldX = modalRect_.x + pad;
-  int fieldH = fieldSize_ + 14;
-  int y = modalRect_.y + titleSize_ + 3 * pad / 2;
+  int fieldH = cat->ptSize(FontStyle::SmallRegular) + 14;
+  int y = modalRect_.y + cat->ptSize(FontStyle::MediumBold) + 3 * pad / 2;
 
   // Check Footer Buttons
   if (mx >= cancelBtnRect_.x && mx <= cancelBtnRect_.x + cancelBtnRect_.w &&
@@ -1268,9 +1289,9 @@ bool SetupScreen::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
   }
 
   if (activeTab_ == Tab::Widgets) {
-    int yTabBase =
-        modalRect_.y + titleSize_ + 2 * pad + fieldH; // matches content start
-    int ySelector = yTabBase + labelSize_ + pad / 2;
+    int yTabBase = modalRect_.y + cat->ptSize(FontStyle::MediumBold) + 2 * pad +
+                   fieldH; // matches content start
+    int ySelector = yTabBase + cat->ptSize(FontStyle::SmallBold) + pad / 2;
     int paneW = fieldW / 4;
     if (my >= ySelector && my <= ySelector + 30) {
       for (int i = 0; i < 4; ++i) {
@@ -1298,10 +1319,11 @@ bool SetupScreen::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
   }
 
   // Handle generic field clicks for active tab
-  int yStart = modalRect_.y + titleSize_ + 2 * pad + fieldH + pad / 2;
+  int yStart = modalRect_.y + cat->ptSize(FontStyle::MediumBold) + 2 * pad +
+               fieldH + pad / 2;
   // Rig tab has a section header ("Rig / CAT Control:") before the first field
   if (activeTab_ == Tab::Rig)
-    yStart += labelSize_ + pad / 2;
+    yStart += cat->ptSize(FontStyle::SmallBold) + pad;
   int nFields = 0;
   if (activeTab_ == Tab::Identity)
     nFields = 4;
@@ -1324,19 +1346,20 @@ bool SetupScreen::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
 
     if (activeTab_ == Tab::Identity) {
       if (i < 2) {
-        fy += i * (labelSize_ + 4 + fieldH + vSpace);
+        fy += i * (cat->ptSize(FontStyle::SmallBold) + 4 + fieldH + vSpace);
       } else { // lat/lon row
-        fy += 2 * (labelSize_ + 4 + fieldH + vSpace);
+        fy += 2 * (cat->ptSize(FontStyle::SmallBold) + 4 + fieldH + vSpace);
         fw = (fieldW - pad) / 2;
         if (i == 3) { // lon
           fx += fw + pad;
         }
       }
     } else { // All other tabs with simple vertical field lists
-      fy += i * (labelSize_ + 4 + fieldH + vSpace);
+      fy += i * (cat->ptSize(FontStyle::SmallBold) + 4 + fieldH + vSpace);
     }
 
-    if (mx >= fx && mx < fx + fw && my >= fy && my < fy + labelSize_ + fieldH) {
+    if (mx >= fx && mx < fx + fw && my >= fy &&
+        my < fy + cat->ptSize(FontStyle::SmallBold) + fieldH) {
       int textPad = 7;
       int oldField = activeField_;
       activeField_ = i;
@@ -1349,8 +1372,8 @@ bool SetupScreen::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
         // Calculate cursor position from click if clicking in same field
         if (oldField == i) {
           if (fieldText && !fieldText->empty()) {
-            cursorPos_ = calculateCursorPosFromClick(mx, fx + textPad,
-                                                     *fieldText, fieldSize_);
+            cursorPos_ = calculateCursorPosFromClick(
+                mx, fx + textPad, *fieldText, FontStyle::SmallRegular);
           } else {
             cursorPos_ = 0;
           }
@@ -1868,12 +1891,15 @@ std::vector<std::string> SetupScreen::getActions() const {
 }
 
 SDL_Rect SetupScreen::getActionRect(const std::string &action) const {
-  int cx = x_ + width_ / 2;
-  int pad = std::max(16, width_ / 24);
-  int fieldW = std::min(400, width_ - 2 * pad);
-  int fieldX = cx - fieldW / 2;
-  int fieldH = fieldSize_ + 14;
-  int tabY = modalRect_.y + titleSize_ + 2 * pad;
+  auto *cat = fontMgr_.catalog();
+  if (!cat)
+    return {0, 0, 0, 0};
+  int pad = 20;
+  int fieldW = modalRect_.w - 2 * pad;
+  int fieldX = modalRect_.x + pad;
+  int fieldH = cat->ptSize(FontStyle::SmallRegular) + 14;
+  int titleShift = cat->ptSize(FontStyle::MediumBold) + pad / 2;
+  int tabY = modalRect_.y + titleShift + pad / 2;
   int numTabs = 8;
   int tabW = fieldW / numTabs;
 
@@ -1893,10 +1919,11 @@ SDL_Rect SetupScreen::getActionRect(const std::string &action) const {
     return {fieldX + 6 * tabW, tabY, tabW, fieldH};
 
   // Fields (approximate positions)
-  int yStart = modalRect_.y + titleSize_ + 3 * pad + fieldH;
+  int yStart = modalRect_.y + titleShift + 2 * pad + fieldH;
   if (action.find("field_") == 0) {
     int idx = StringUtils::safe_stoi(action.substr(6));
-    int fy = yStart + idx * (labelSize_ + fieldH + pad / 2);
+    int fy =
+        yStart + idx * (cat->ptSize(FontStyle::SmallBold) + fieldH + pad / 2);
     return {fieldX, fy, fieldW, fieldH};
   }
 

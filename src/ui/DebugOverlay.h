@@ -238,20 +238,23 @@ public:
 
 private:
     void drawLabel(SDL_Renderer* renderer, const char* text, int x, int y,
-                   SDL_Color fg, int ptSize = 10)
+                   SDL_Color fg, FontStyle style = FontStyle::Micro)
     {
-        TTF_Font* font = fontMgr_.getFont(ptSize);
-        if (!font) return;
+        auto* cat = fontMgr_.catalog();
+        if (!cat) return;
 
         int tw = 0, th = 0;
-        TTF_SizeText(font, text, &tw, &th);
+        SDL_Texture* tex = cat->renderText(renderer, text, fg, style, &tw, &th);
+        if (!tex) return;
 
         // Dark background for readability
         SDL_Rect bg = {x - 1, y - 1, tw + 2, th + 2};
         SDL_SetRenderDrawColor(renderer, 0, 0, 0, 200);
         SDL_RenderFillRect(renderer, &bg);
 
-        fontMgr_.drawText(renderer, text, x, y, fg, ptSize);
+        SDL_Rect dst = {x, y, tw, th};
+        SDL_RenderCopy(renderer, tex, nullptr, &dst);
+        cat->destroyTexture(tex);
     }
 
     FontManager& fontMgr_;

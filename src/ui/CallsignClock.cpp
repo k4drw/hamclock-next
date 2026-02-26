@@ -1,5 +1,6 @@
 #include "CallsignClock.h"
 #include "../core/Astronomy.h"
+#include "FontCatalog.h"
 
 #include <algorithm>
 #include <chrono>
@@ -44,6 +45,9 @@ void CallsignClock::render(SDL_Renderer *renderer) {
   if (!fontMgr_.ready())
     return;
 
+  ThemeColors themes = getThemeColors("default");
+  auto *cat = fontMgr_.catalog();
+
   // Draw pane border
   SDL_SetRenderDrawColor(renderer, 80, 80, 80, 255);
   SDL_Rect border = {x_, y_, width_, height_};
@@ -52,17 +56,13 @@ void CallsignClock::render(SDL_Renderer *renderer) {
   // Row layout: callsign ~40%, time ~35%, date ~25% of height
   int callRowH = static_cast<int>(height_ * 0.40f);
   int timeRowH = static_cast<int>(height_ * 0.35f);
-  int pad = static_cast<int>(width_ * 0.02f);
+  int pad = static_cast<int>(width_ * 0.05f);
 
   // Callsign (large, colored)
-  if (callFontSize_ != lastCallFontSize_) {
-    if (callTex_) {
-      MemoryMonitor::getInstance().destroyTexture(callTex_);
-    }
+  if (!callTex_) {
     SDL_Color orange = {255, 165, 0, 255};
-    callTex_ = fontMgr_.renderText(renderer, callsign_, orange, callFontSize_,
-                                   &callW_, &callH_);
-    lastCallFontSize_ = callFontSize_;
+    callTex_ = cat->renderText(renderer, callsign_, orange,
+                               FontStyle::MediumBold, &callW_, &callH_);
   }
   if (callTex_) {
     int dy = y_ + (callRowH - callH_) / 2;
@@ -71,15 +71,14 @@ void CallsignClock::render(SDL_Renderer *renderer) {
   }
 
   // Time
-  if (currentTime_ != lastTime_ || timeFontSize_ != lastTimeFontSize_) {
+  if (currentTime_ != lastTime_ || !timeTex_) {
     if (timeTex_) {
       MemoryMonitor::getInstance().destroyTexture(timeTex_);
     }
     SDL_Color white = {255, 255, 255, 255};
-    timeTex_ = fontMgr_.renderText(renderer, currentTime_, white, timeFontSize_,
-                                   &timeW_, &timeH_);
+    timeTex_ = cat->renderText(renderer, currentTime_, white,
+                               FontStyle::SmallBold, &timeW_, &timeH_);
     lastTime_ = currentTime_;
-    lastTimeFontSize_ = timeFontSize_;
   }
   if (timeTex_) {
     int dy = y_ + callRowH + (timeRowH - timeH_) / 2;
@@ -88,15 +87,14 @@ void CallsignClock::render(SDL_Renderer *renderer) {
   }
 
   // Date
-  if (currentDate_ != lastDate_ || dateFontSize_ != lastDateFontSize_) {
+  if (currentDate_ != lastDate_ || !dateTex_) {
     if (dateTex_) {
       MemoryMonitor::getInstance().destroyTexture(dateTex_);
     }
     SDL_Color cyan = {0, 200, 255, 255};
-    dateTex_ = fontMgr_.renderText(renderer, currentDate_, cyan, dateFontSize_,
-                                   &dateW_, &dateH_);
+    dateTex_ = cat->renderText(renderer, currentDate_, cyan,
+                               FontStyle::SmallRegular, &dateW_, &dateH_);
     lastDate_ = currentDate_;
-    lastDateFontSize_ = dateFontSize_;
   }
   if (dateTex_) {
     int dy = y_ + callRowH + timeRowH;
@@ -107,9 +105,5 @@ void CallsignClock::render(SDL_Renderer *renderer) {
 
 void CallsignClock::onResize(int x, int y, int w, int h) {
   Widget::onResize(x, y, w, h);
-  // Height-based with caps to prevent giant text in taller top bar
-  callFontSize_ = std::clamp(static_cast<int>(h * 0.15f), 12, 36);
-  timeFontSize_ = std::clamp(static_cast<int>(h * 0.12f), 10, 28);
-  dateFontSize_ = std::clamp(static_cast<int>(h * 0.08f), 8, 20);
   destroyCache();
 }

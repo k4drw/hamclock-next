@@ -42,11 +42,4 @@ private:
 
     std::string currentTime_;
     std::string currentDate_;
-
-    int callFontSize_ = 24;
-    int timeFontSize_ = 16;
-    int dateFontSize_ = 12;
-    int lastCallFontSize_ = 0;
-    int lastTimeFontSize_ = 0;
-    int lastDateFontSize_ = 0;
 };

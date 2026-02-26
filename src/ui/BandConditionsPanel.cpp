@@ -78,14 +78,15 @@ void BandConditionsPanel::render(SDL_Renderer *renderer) {
   SDL_RenderDrawRect(renderer, &rect);
 
   int titleH = 20;
+  auto *cat = fontMgr_.catalog();
   // Standard Title
-  fontMgr_.drawText(renderer, "Band Conditions", x_ + 10, y_ + 5, themes.accent,
-                    10, true);
+  cat->drawText(renderer, "Band Conditions", x_ + 10, y_ + 5, themes.accent,
+                FontStyle::MicroBold);
 
   if (!dataValid_) {
-    fontMgr_.drawText(renderer, "No Data", x_ + width_ / 2,
-                      y_ + titleH + (height_ - titleH) / 2,
-                      {150, 150, 150, 255}, tableFontSize_, false, true);
+    cat->drawText(renderer, "No Data", x_ + width_ / 2,
+                  y_ + titleH + (height_ - titleH) / 2, {150, 150, 150, 255},
+                  FontStyle::Micro, true);
     return;
   }
 
@@ -97,11 +98,9 @@ void BandConditionsPanel::render(SDL_Renderer *renderer) {
   int availableH = height_ - titleH - 2 * pad;
   int rowHeight = availableH / numRows;
 
-  // Dynamically scale font if rowHeight is too small
-  int dynamicFontSize = tableFontSize_;
-  if (rowHeight < dynamicFontSize + 4) {
-    dynamicFontSize = std::max(8, rowHeight - 4);
-  }
+  // Use logical styles
+  FontStyle cellStyle = (rowHeight < 15) ? FontStyle::Tiny : FontStyle::Micro;
+  FontStyle headerStyle = (rowHeight < 15) ? FontStyle::TinyBold : FontStyle::MicroBold;
 
   SDL_Color headerColor = themes.accent;
   SDL_Color labelColor = themes.text;
@@ -109,22 +108,18 @@ void BandConditionsPanel::render(SDL_Renderer *renderer) {
   int curY = y_ + titleH + pad;
 
   auto drawInCol = [&](const std::string &text, int colIdx, SDL_Color color,
-                       int fontSize, bool bold = false) {
+                       FontStyle style) {
     int tx = x_ + pad + colIdx * colWidth + colWidth / 2;
     int ty = curY + rowHeight / 2;
-    fontMgr_.drawText(renderer, text, tx, ty, color, fontSize, bold, true);
+    cat->drawText(renderer, text, tx, ty, color, style, true);
   };
 
   // Header
   bool useShort = (width_ < 100);
   if (!useShort) {
-    drawInCol("Band", 0, headerColor, dynamicFontSize, true);
-    drawInCol("Day", 1, headerColor, dynamicFontSize, true);
-    drawInCol("Night", 2, headerColor, dynamicFontSize, true);
-  } else {
-    // Very narrow: no header or just one row?
-    // Usually original HamClock narrow Prop has no header or just vertical
-    // bands.
+    drawInCol("Band", 0, headerColor, headerStyle);
+    drawInCol("Day", 1, headerColor, headerStyle);
+    drawInCol("Night", 2, headerColor, headerStyle);
   }
 
   // Line under header (only if showing header)
@@ -138,11 +133,11 @@ void BandConditionsPanel::render(SDL_Renderer *renderer) {
 
   // Rows
   for (const auto &status : currentData_.statuses) {
-    drawInCol(status.band, 0, labelColor, dynamicFontSize);
+    drawInCol(status.band, 0, labelColor, cellStyle);
     drawInCol(stringForCondition(status.day, useShort), 1,
-              colorForCondition(status.day), dynamicFontSize);
+              colorForCondition(status.day), cellStyle);
     drawInCol(stringForCondition(status.night, useShort), 2,
-              colorForCondition(status.night), dynamicFontSize);
+              colorForCondition(status.night), cellStyle);
     curY += rowHeight;
   }
 }

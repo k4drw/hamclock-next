@@ -43,10 +43,4 @@ private:
   SDL_Rect toggleRect_ = {0, 0, 0, 0};
   SDL_Rect saveRect_ = {0, 0, 0, 0};
   SDL_Rect cancelRect_ = {0, 0, 0, 0};
-
-  // Layout metrics
-  int titleSize_ = 32;
-  int labelSize_ = 18;
-  int fieldSize_ = 24;
-  int hintSize_ = 14;
 };

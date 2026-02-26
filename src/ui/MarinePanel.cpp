@@ -30,20 +30,21 @@ void MarinePanel::render(SDL_Renderer *renderer) {
   int pad = 6;
   int centerX = x_ + width_ / 2;
   int curY = y_ + titleH + 4;
+  auto *cat = fontMgr_.catalog();
 
-  fontMgr_.drawText(renderer, "Marine", x_ + 10, y_ + 5, themes.accent, 10,
-                    true);
+  cat->drawText(renderer, "Marine", x_ + 10, y_ + 5, themes.accent,
+                FontStyle::MicroBold);
 
   if (!currentData_.tidesValid && !currentData_.buoyValid) {
-    fontMgr_.drawText(renderer, "No data configured", centerX, y_ + height_ / 2,
-                      themes.textDim, rowFontSize_, false, true);
+    cat->drawText(renderer, "No data configured", centerX, y_ + height_ / 2,
+                  themes.textDim, FontStyle::Fast, true);
     return;
   }
 
   // Tide section
   if (currentData_.tidesValid && !currentData_.tides.empty()) {
-    fontMgr_.drawText(renderer, "TIDES", x_ + pad, curY, themes.accent,
-                      subFontSize_, true, false);
+    cat->drawText(renderer, "TIDES", x_ + pad, curY, themes.accent,
+                  FontStyle::MicroBold);
     curY += subFontSize_ + 2;
 
     for (size_t i = 0; i < currentData_.tides.size() && i < 4; ++i) {
@@ -55,8 +56,7 @@ void MarinePanel::render(SDL_Renderer *renderer) {
                     isHigh ? "HI" : "LO", ht, useMetric_ ? "m" : "ft");
       SDL_Color col =
           isHigh ? SDL_Color{0, 200, 255, 255} : SDL_Color{180, 160, 100, 255};
-      fontMgr_.drawText(renderer, buf, x_ + pad, curY, col, rowFontSize_, false,
-                        false);
+      cat->drawText(renderer, buf, x_ + pad, curY, col, FontStyle::Fast);
       curY += rowFontSize_ + 3;
     }
     curY += 4;
@@ -64,8 +64,8 @@ void MarinePanel::render(SDL_Renderer *renderer) {
 
   // Buoy section
   if (currentData_.buoyValid) {
-    fontMgr_.drawText(renderer, "BUOY", x_ + pad, curY, themes.accent,
-                      subFontSize_, true, false);
+    cat->drawText(renderer, "BUOY", x_ + pad, curY, themes.accent,
+                  FontStyle::MicroBold);
     curY += subFontSize_ + 2;
 
     const auto &b = currentData_.buoy;
@@ -77,8 +77,7 @@ void MarinePanel::render(SDL_Renderer *renderer) {
       std::snprintf(buf, sizeof(buf), "Waves: %.1f%s @ %.0fs", wh,
                     useMetric_ ? "m" : "ft",
                     b.wavePeriodS > 0 ? b.wavePeriodS : 0.0);
-      fontMgr_.drawText(renderer, buf, x_ + pad, curY, themes.text,
-                        rowFontSize_, false, false);
+      cat->drawText(renderer, buf, x_ + pad, curY, themes.text, FontStyle::Fast);
       curY += rowFontSize_ + 2;
     }
 
@@ -87,8 +86,8 @@ void MarinePanel::render(SDL_Renderer *renderer) {
           useMetric_ ? (float)b.waterTempC : (float)(b.waterTempC * 1.8 + 32);
       std::snprintf(buf, sizeof(buf), "Water: %.1f%s", wt,
                     useMetric_ ? "C" : "F");
-      fontMgr_.drawText(renderer, buf, x_ + pad, curY, {0, 200, 200, 255},
-                        rowFontSize_, false, false);
+      cat->drawText(renderer, buf, x_ + pad, curY, {0, 200, 200, 255},
+                    FontStyle::Fast);
       curY += rowFontSize_ + 2;
     }
 
@@ -97,8 +96,8 @@ void MarinePanel::render(SDL_Renderer *renderer) {
                             : (float)(b.windSpeedMps * 1.944); // kts
       std::snprintf(buf, sizeof(buf), "Wind: %.0f%s @ %d deg", ws,
                     useMetric_ ? "m/s" : "kt", b.windDirDeg);
-      fontMgr_.drawText(renderer, buf, x_ + pad, curY, themes.textDim,
-                        rowFontSize_, false, false);
+      cat->drawText(renderer, buf, x_ + pad, curY, themes.textDim,
+                    FontStyle::Fast);
     }
   }
 }

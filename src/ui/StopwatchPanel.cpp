@@ -1,5 +1,6 @@
 #include "StopwatchPanel.h"
 #include "../core/Theme.h"
+#include "FontCatalog.h"
 #include <cstdio>
 
 StopwatchPanel::StopwatchPanel(int x, int y, int w, int h, FontManager &fontMgr)
@@ -31,8 +32,8 @@ void StopwatchPanel::render(SDL_Renderer *renderer) {
 
   // Unified Title Bar (Match standard font size/look)
   int titleH = 20;
-  fontMgr_.drawText(renderer, "Stopwatch", x_ + 10, y_ + 5, themes.accent, 10,
-                    true);
+  fontMgr_.catalog()->drawText(renderer, "Stopwatch", x_ + 10, y_ + 5, themes.accent,
+                               FontStyle::MicroBold);
 
   // Separator line
   SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,

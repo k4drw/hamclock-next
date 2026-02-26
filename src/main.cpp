@@ -220,6 +220,7 @@ struct AppContext {
   SetupMode activeSetup = SetupMode::None;
   std::unique_ptr<Widget> setupWidget;
   std::unique_ptr<FontManager> setupFontMgr;
+  std::unique_ptr<FontCatalog> setupCatalog;
 
   // Remote-config reload signal.  WebServer thread sets this to true after a
   // successful POST /api/reload or /set_config; main_tick() reads and clears
@@ -2181,6 +2182,10 @@ void main_tick() {
       if (FIDELITY_MODE)
         setupFontMgr->setRenderScale(ctx.layScale);
 
+      ctx.setupCatalog = std::make_unique<FontCatalog>(*setupFontMgr);
+      setupFontMgr->setCatalog(ctx.setupCatalog.get());
+      ctx.setupCatalog->recalculate(LOGICAL_WIDTH, LOGICAL_HEIGHT);
+
       ctx.setupFontMgr = std::move(setupFontMgr);
 
       int setupW = LOGICAL_WIDTH;
@@ -2288,6 +2293,7 @@ void main_tick() {
       ctx.cfgMgr.save(ctx.appCfg);
       ctx.setupWidget.reset();
       ctx.setupFontMgr.reset();
+      ctx.setupCatalog.reset();
       ctx.activeSetup = AppContext::SetupMode::None;
       // Update state
       ctx.state->deCallsign = ctx.appCfg.callsign;

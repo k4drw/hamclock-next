@@ -1655,9 +1655,9 @@ void MapWidget::renderDXClusterSpots(SDL_Renderer *renderer) {
     else
       std::snprintf(labelBuf, sizeof(labelBuf), "%s %.1f kHz",
                     spot.txCall.c_str(), spot.freqKhz);
-    int labelSize = std::max(8, std::min(width_ / 30, 12));
-    fontMgr_.drawText(renderer, labelBuf, static_cast<int>(sp.x) + 8,
-                      static_cast<int>(sp.y), color, labelSize, false, false);
+    fontMgr_.catalog()->drawText(renderer, labelBuf, static_cast<int>(sp.x) + 8,
+                                 static_cast<int>(sp.y), color,
+                                 FontStyle::Tiny);
   }
   SDL_RenderSetClipRect(renderer, nullptr);
 }
@@ -2445,10 +2445,11 @@ void MapWidget::renderProjectionSelect(SDL_Renderer *renderer) {
   SDL_SetRenderDrawColor(renderer, 150, 150, 150, 255);
   SDL_RenderDrawRect(renderer, &projRect_);
 
+  auto *cat = fontMgr_.catalog();
   // Text
-  fontMgr_.drawText(renderer, label, projRect_.x + projRect_.w / 2,
-                    projRect_.y + projRect_.h / 2, {200, 200, 200, 255}, 10,
-                    true, true);
+  cat->drawText(renderer, label, projRect_.x + projRect_.w / 2,
+                projRect_.y + projRect_.h / 2, {200, 200, 200, 255},
+                FontStyle::Micro, true, false, true);
 }
 
 void MapWidget::renderRssButton(SDL_Renderer *renderer) {
@@ -2468,8 +2469,9 @@ void MapWidget::renderRssButton(SDL_Renderer *renderer) {
   SDL_SetRenderDrawColor(renderer, col.r, col.g, col.b, col.a);
   SDL_RenderDrawRect(renderer, &rssRect_);
 
-  fontMgr_.drawText(renderer, "RSS", rssRect_.x + rssRect_.w / 2,
-                    rssRect_.y + rssRect_.h / 2, col, 10, false, true);
+  fontMgr_.catalog()->drawText(renderer, "RSS", rssRect_.x + rssRect_.w / 2,
+                               rssRect_.y + rssRect_.h / 2, col,
+                               FontStyle::Micro, true, false, true);
 }
 
 void MapWidget::renderOverlayInfo(SDL_Renderer *renderer) {
@@ -2524,8 +2526,8 @@ void MapWidget::renderOverlayInfo(SDL_Renderer *renderer) {
   SDL_RenderDrawRect(renderer, &box);
 
   // Text
-  fontMgr_.drawText(renderer, text, cx, cy, {255, 255, 255, 255}, ptSize, true,
-                    true);
+  fontMgr_.catalog()->drawText(renderer, text, cx, cy, {255, 255, 255, 255},
+                               FontStyle::Micro, true, false, true);
 }
 
 // Modal interface implementation

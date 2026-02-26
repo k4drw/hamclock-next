@@ -23,10 +23,11 @@ void ClockAuxPanel::render(SDL_Renderer *renderer) {
   auto now = std::chrono::system_clock::now();
   std::time_t now_c = std::chrono::system_clock::to_time_t(now);
   struct tm *gmt = std::gmtime(&now_c);
+  auto *cat = fontMgr_.catalog();
 
   int titleH = 20;
-  fontMgr_.drawText(renderer, "UTC Time", x_ + 10, y_ + 5, {0, 200, 255, 255},
-                    10, true);
+  cat->drawText(renderer, "UTC Time", x_ + 10, y_ + 5, {0, 200, 255, 255},
+                FontStyle::MicroBold);
 
   int curY = y_ + titleH + 10;
   int centerX = x_ + width_ / 2;
@@ -34,14 +35,14 @@ void ClockAuxPanel::render(SDL_Renderer *renderer) {
   // Time
   char buf[64];
   std::strftime(buf, sizeof(buf), "%H:%M:%S", gmt);
-  fontMgr_.drawText(renderer, buf, centerX, curY + timeFontSize_ / 2,
-                    {255, 255, 255, 255}, timeFontSize_, true, true);
+  cat->drawText(renderer, buf, centerX, curY + timeFontSize_ / 2,
+                {255, 255, 255, 255}, FontStyle::MediumBold, true);
   curY += timeFontSize_ + 12;
 
   // Date
   std::strftime(buf, sizeof(buf), "%Y-%m-%d", gmt);
-  fontMgr_.drawText(renderer, buf, centerX, curY, {200, 200, 200, 255},
-                    infoFontSize_, false, true);
+  cat->drawText(renderer, buf, centerX, curY, {200, 200, 200, 255},
+                FontStyle::Fast, true);
   curY += infoFontSize_ + 8;
 
   // Extra Info: Day of Year and Julian Date (simplified approximation)
@@ -51,13 +52,13 @@ void ClockAuxPanel::render(SDL_Renderer *renderer) {
   double jd = (double)now_c / 86400.0 + 2440587.5;
 
   std::snprintf(buf, sizeof(buf), "DOY %03d", doy);
-  fontMgr_.drawText(renderer, buf, centerX, curY, {150, 150, 150, 255},
-                    infoFontSize_, false, true);
+  cat->drawText(renderer, buf, centerX, curY, {150, 150, 150, 255},
+                FontStyle::Fast, true);
   curY += infoFontSize_ + 6;
 
   std::snprintf(buf, sizeof(buf), "JD %.2f", jd);
-  fontMgr_.drawText(renderer, buf, centerX, curY, {120, 120, 120, 255},
-                    infoFontSize_, false, true);
+  cat->drawText(renderer, buf, centerX, curY, {120, 120, 120, 255},
+                FontStyle::Fast, true);
 }
 
 void ClockAuxPanel::onResize(int x, int y, int w, int h) {

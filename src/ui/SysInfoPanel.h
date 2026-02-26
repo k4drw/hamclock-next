@@ -51,11 +51,6 @@ private:
   std::string cachedIP_;
   uint32_t lastIPRefreshMs_ = 0;
 
-  // Font sizes (set in onResize)
-  int labelFontSize_ = 12;
-  int valueFontSize_ = 18;
-  int smallFontSize_ = 10;
-
   // Helper
   static std::string getLocalIP();
 };

@@ -27,30 +27,31 @@ void RepeaterPanel::render(SDL_Renderer *renderer) {
                          themes.border.b, themes.border.a);
   SDL_RenderDrawRect(renderer, &rect);
 
+  auto *cat = fontMgr_.catalog();
   int titleH = 20;
   int pad = 6;
   int curY = y_ + titleH + 4;
 
-  fontMgr_.drawText(renderer, "Repeaters", x_ + 10, y_ + 5, themes.accent, 10,
-                    true);
+  cat->drawText(renderer, "Repeaters", x_ + 10, y_ + 5, themes.accent,
+                FontStyle::MicroBold);
 
   int centerX = x_ + width_ / 2;
   if (!currentData_.valid) {
     const char *msg = currentData_.fetched
                           ? "API key required" // 401 from RepeaterBook
                           : "Loading...";
-    fontMgr_.drawText(renderer, msg, centerX, y_ + height_ / 2, themes.textDim,
-                      rowFontSize_, false, true);
+    cat->drawText(renderer, msg, centerX, y_ + height_ / 2, themes.textDim,
+                  FontStyle::Fast, true);
     if (currentData_.fetched)
-      fontMgr_.drawText(renderer, "repeaterbook.com", centerX,
-                        y_ + height_ / 2 + rowFontSize_ + 4, themes.textDim,
-                        subFontSize_, false, true);
+      cat->drawText(renderer, "repeaterbook.com", centerX,
+                    y_ + height_ / 2 + rowFontSize_ + 4, themes.textDim,
+                    FontStyle::Micro, true);
     return;
   }
 
   if (currentData_.repeaters.empty()) {
-    fontMgr_.drawText(renderer, "No repeaters found", centerX, y_ + height_ / 2,
-                      themes.textDim, rowFontSize_, false, true);
+    cat->drawText(renderer, "No repeaters found", centerX, y_ + height_ / 2,
+                  themes.textDim, FontStyle::Fast, true);
     return;
   }
 
@@ -66,12 +67,12 @@ void RepeaterPanel::render(SDL_Renderer *renderer) {
     // Frequency (left)
     char freqBuf[24];
     std::snprintf(freqBuf, sizeof(freqBuf), "%.4g", r.freqMHz);
-    fontMgr_.drawText(renderer, freqBuf, x_ + pad, curY, {0, 255, 180, 255},
-                      rowFontSize_, true, false);
+    cat->drawText(renderer, freqBuf, x_ + pad, curY, {0, 255, 180, 255},
+                  FontStyle::Fast);
 
     // Callsign (center)
-    fontMgr_.drawText(renderer, r.callsign, centerX, curY, themes.text,
-                      rowFontSize_, true, true);
+    cat->drawText(renderer, r.callsign, centerX, curY, themes.text,
+                  FontStyle::Fast, true);
 
     // Distance (right)
     char distBuf[24];
@@ -80,16 +81,16 @@ void RepeaterPanel::render(SDL_Renderer *renderer) {
     else
       std::snprintf(distBuf, sizeof(distBuf), "%.0fmi",
                     r.distanceKm * 0.621371);
-    fontMgr_.drawText(renderer, distBuf, x_ + width_ - pad, curY,
-                      themes.textDim, rowFontSize_, false, true);
+    cat->drawText(renderer, distBuf, x_ + width_ - pad, curY, themes.textDim,
+                  FontStyle::Fast, false, true);
 
     // Tone + mode (sub-row)
     char subBuf[48];
     std::snprintf(subBuf, sizeof(subBuf), "%s %s",
                   r.tone.empty() ? "no tone" : r.tone.c_str(),
                   r.mode.empty() ? "" : r.mode.c_str());
-    fontMgr_.drawText(renderer, subBuf, x_ + pad, curY + rowFontSize_ + 1,
-                      themes.textDim, subFontSize_, false, false);
+    cat->drawText(renderer, subBuf, x_ + pad, curY + rowFontSize_ + 1,
+                  themes.textDim, FontStyle::Micro);
 
     curY += rowH;
 
@@ -106,9 +107,9 @@ void RepeaterPanel::render(SDL_Renderer *renderer) {
     char buf[32];
     std::snprintf(buf, sizeof(buf), "%d/%d", startIdx + 1,
                   (int)currentData_.repeaters.size());
-    fontMgr_.drawText(renderer, buf, x_ + width_ - pad,
-                      y_ + height_ - pad - subFontSize_, themes.textDim,
-                      subFontSize_, false, true);
+    cat->drawText(renderer, buf, x_ + width_ - pad,
+                  y_ + height_ - pad - subFontSize_, themes.textDim,
+                  FontStyle::Micro, false, true);
   }
 }
 

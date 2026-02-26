@@ -23,8 +23,4 @@ private:
   std::string title_;
   WeatherData currentData_;
   bool dataValid_ = false;
-
-  int labelFontSize_ = 12;
-  int tempFontSize_ = 24;
-  int infoFontSize_ = 12;
 };

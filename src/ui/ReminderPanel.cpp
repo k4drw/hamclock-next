@@ -1,5 +1,6 @@
 #include "ReminderPanel.h"
 #include "../core/Theme.h"
+#include "FontCatalog.h"
 #include <ctime>
 #include <iomanip>
 #include <sstream>
@@ -201,19 +202,16 @@ void ReminderPanel::renderModal(SDL_Renderer *renderer) {
   SDL_Color white = {255, 255, 255, 255};
   SDL_Color cyan = {0, 200, 255, 255};
   SDL_Color yellow = {255, 220, 50, 255};
-  int tw, th;
+  auto *cat = fontMgr_.catalog();
 
   // Title text
-  SDL_Texture *tex =
-      fontMgr_.renderText(renderer, "Reminder Due", cyan, 9, &tw, &th);
-  if (tex) {
-    SDL_Rect tr = {dx + (dW - tw) / 2, dy + (22 - th) / 2, tw, th};
-    SDL_RenderCopy(renderer, tex, nullptr, &tr);
-    MemoryMonitor::getInstance().destroyTexture(tex);
-  }
+  cat->drawText(renderer, "Reminder Due", dx + dW / 2, dy + 22 / 2, cyan,
+                FontStyle::Caption, true);
 
   // Reminder label (wrap at dialog width)
-  tex = fontMgr_.renderText(renderer, notifyLabel_, yellow, 9, &tw, &th);
+  int tw, th;
+  SDL_Texture *tex =
+      cat->renderText(renderer, notifyLabel_, yellow, FontStyle::Caption, &tw, &th);
   if (tex) {
     // Centre horizontally, keep within box
     int lx = dx + (dW - tw) / 2;
@@ -221,17 +219,12 @@ void ReminderPanel::renderModal(SDL_Renderer *renderer) {
       lx = dx + 8;
     SDL_Rect tr = {lx, dy + 32, tw, th};
     SDL_RenderCopy(renderer, tex, nullptr, &tr);
-    MemoryMonitor::getInstance().destroyTexture(tex);
+    cat->destroyTexture(tex);
   }
 
   // Date subtitle
-  tex =
-      fontMgr_.renderText(renderer, "Date: " + notifyDate_, white, 8, &tw, &th);
-  if (tex) {
-    SDL_Rect tr = {dx + (dW - tw) / 2, dy + 50, tw, th};
-    SDL_RenderCopy(renderer, tex, nullptr, &tr);
-    MemoryMonitor::getInstance().destroyTexture(tex);
-  }
+  cat->drawText(renderer, "Date: " + notifyDate_, dx + dW / 2, dy + 50, white,
+                FontStyle::Tiny, true);
 
   // Snooze / Acknowledge buttons
   const int btnW = 110, btnH = 24;
@@ -246,12 +239,8 @@ void ReminderPanel::renderModal(SDL_Renderer *renderer) {
   SDL_RenderFillRect(renderer, &notifySnoozeRect_);
   SDL_SetRenderDrawColor(renderer, 60, 120, 200, 255);
   SDL_RenderDrawRect(renderer, &notifySnoozeRect_);
-  tex = fontMgr_.renderText(renderer, "Snooze 1h", white, 9, &tw, &th);
-  if (tex) {
-    SDL_Rect tr = {bx + (btnW - tw) / 2, btnY + (btnH - th) / 2, tw, th};
-    SDL_RenderCopy(renderer, tex, nullptr, &tr);
-    MemoryMonitor::getInstance().destroyTexture(tex);
-  }
+  cat->drawText(renderer, "Snooze 1h", bx + btnW / 2, btnY + btnH / 2, white,
+                FontStyle::Caption, true);
 
   // Acknowledge
   int ax = bx + btnW + gap;
@@ -260,12 +249,8 @@ void ReminderPanel::renderModal(SDL_Renderer *renderer) {
   SDL_RenderFillRect(renderer, &notifyAckRect_);
   SDL_SetRenderDrawColor(renderer, 50, 160, 50, 255);
   SDL_RenderDrawRect(renderer, &notifyAckRect_);
-  tex = fontMgr_.renderText(renderer, "Acknowledge", white, 9, &tw, &th);
-  if (tex) {
-    SDL_Rect tr = {ax + (btnW - tw) / 2, btnY + (btnH - th) / 2, tw, th};
-    SDL_RenderCopy(renderer, tex, nullptr, &tr);
-    MemoryMonitor::getInstance().destroyTexture(tex);
-  }
+  cat->drawText(renderer, "Acknowledge", ax + btnW / 2, btnY + btnH / 2, white,
+                FontStyle::Caption, true);
 }
 
 void ReminderPanel::render(SDL_Renderer *renderer) {
@@ -288,8 +273,8 @@ void ReminderPanel::render(SDL_Renderer *renderer) {
 
   // Standard title bar (matches other widgets)
   int titleH = 20;
-  fontMgr_.drawText(renderer, "Reminders", x_ + 10, y_ + 5, themes.accent, 10,
-                    true);
+  fontMgr_.catalog()->drawText(renderer, "Reminders", x_ + 10, y_ + 5,
+                               themes.accent, FontStyle::MicroBold);
   SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
                          themes.border.b, 60);
   SDL_RenderDrawLine(renderer, x_ + 5, y_ + titleH, x_ + width_ - 5,
@@ -303,11 +288,12 @@ void ReminderPanel::render(SDL_Renderer *renderer) {
   int fy = y_ + height_ - footerH - 2;
   int tw = 0, th = 0;
   SDL_Color dim = {100, 100, 120, 255};
-  SDL_Texture *ftex = fontMgr_.renderText(renderer, "Setup", dim, 8, &tw, &th);
+  SDL_Texture *ftex = fontMgr_.catalog()->renderText(
+      renderer, "Setup", dim, FontStyle::Tiny, &tw, &th);
   if (ftex) {
     footerRect_ = {x_ + (width_ - tw) / 2, fy + (footerH - th) / 2, tw, th};
     SDL_RenderCopy(renderer, ftex, nullptr, &footerRect_);
-    MemoryMonitor::getInstance().destroyTexture(ftex);
+    fontMgr_.catalog()->destroyTexture(ftex);
   } else {
     // Fallback if font not ready yet
     footerRect_ = {x_ + width_ / 2 - 20, fy, 40, footerH};
@@ -318,6 +304,7 @@ void ReminderPanel::render(SDL_Renderer *renderer) {
 
 void ReminderPanel::renderSetup(SDL_Renderer *renderer) {
   ThemeColors themes = getThemeColors(theme_);
+  auto *cat = fontMgr_.catalog();
 
   // Pane background + border
   SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, 255);
@@ -335,12 +322,13 @@ void ReminderPanel::renderSetup(SDL_Renderer *renderer) {
 
   // Title
   int tw, th;
-  SDL_Texture *t = fontMgr_.renderText(renderer, "--- Reminders Setup ---",
-                                       cyan, 12, &tw, &th);
+  SDL_Texture *t =
+      cat->renderText(renderer, "--- Reminders Setup ---", cyan,
+                      FontStyle::FastBold, &tw, &th);
   if (t) {
     SDL_Rect tr = {cx - tw / 2, y, tw, th};
     SDL_RenderCopy(renderer, t, nullptr, &tr);
-    MemoryMonitor::getInstance().destroyTexture(t);
+    cat->destroyTexture(t);
   }
   y += th + 8;
 
@@ -362,8 +350,8 @@ void ReminderPanel::renderSetup(SDL_Renderer *renderer) {
     SDL_SetRenderDrawColor(renderer, (activeField_ == (int)i) ? 255 : 100, 150,
                            0, 255);
     SDL_RenderDrawRect(renderer, &lRect);
-    fontMgr_.drawText(renderer, pendingReminders_[i].label, lRect.x + textPad,
-                      lRect.y + 2, white, 9);
+    cat->drawText(renderer, pendingReminders_[i].label, lRect.x + textPad,
+                  lRect.y + 2, white, FontStyle::Caption);
 
     // Date field
     SDL_Rect dRect = {x_ + 5 + halfW + 5, ry, halfW, fieldH};
@@ -374,16 +362,16 @@ void ReminderPanel::renderSetup(SDL_Renderer *renderer) {
         (activeField_ == (int)(i + pendingReminders_.size())) ? 255 : 100, 150,
         0, 255);
     SDL_RenderDrawRect(renderer, &dRect);
-    fontMgr_.drawText(renderer, pendingReminders_[i].date, dRect.x + textPad,
-                      dRect.y + 2, white, 9);
+    cat->drawText(renderer, pendingReminders_[i].date, dRect.x + textPad,
+                  dRect.y + 2, white, FontStyle::Caption);
 
     // Delete (×) button
     SDL_Rect xRect = {x_ + width_ - 20, ry, 15, fieldH};
     deleteRects_.push_back(xRect);
     SDL_SetRenderDrawColor(renderer, 80, 20, 20, 255);
     SDL_RenderFillRect(renderer, &xRect);
-    fontMgr_.drawText(renderer, "x", xRect.x + xRect.w / 2,
-                      xRect.y + xRect.h / 2, white, 8, true, true);
+    cat->drawText(renderer, "x", xRect.x + xRect.w / 2, xRect.y + xRect.h / 2,
+                  white, FontStyle::Tiny, true, true);
 
     y += fieldH + 5;
   }
@@ -399,12 +387,12 @@ void ReminderPanel::renderSetup(SDL_Renderer *renderer) {
   SDL_RenderFillRect(renderer, &addRect_);
   SDL_SetRenderDrawColor(renderer, 50, 150, 50, 255);
   SDL_RenderDrawRect(renderer, &addRect_);
-  tex = fontMgr_.renderText(renderer, "+ Add", white, 9, &tw, &th);
+  tex = cat->renderText(renderer, "+ Add", white, FontStyle::Caption, &tw, &th);
   if (tex) {
     SDL_Rect tr = {addRect_.x + (addRect_.w - tw) / 2,
                    addRect_.y + (addRect_.h - th) / 2, tw, th};
     SDL_RenderCopy(renderer, tex, nullptr, &tr);
-    MemoryMonitor::getInstance().destroyTexture(tex);
+    cat->destroyTexture(tex);
   }
 
   // "Auto-Pop"
@@ -413,13 +401,13 @@ void ReminderPanel::renderSetup(SDL_Renderer *renderer) {
   SDL_RenderFillRect(renderer, &autoPopRect_);
   SDL_SetRenderDrawColor(renderer, 50, 50, 150, 255);
   SDL_RenderDrawRect(renderer, &autoPopRect_);
-  tex = fontMgr_.renderText(renderer, fetching_ ? "..." : "Auto-Pop", white, 9,
-                            &tw, &th);
+  tex = cat->renderText(renderer, fetching_ ? "..." : "Auto-Pop", white,
+                        FontStyle::Caption, &tw, &th);
   if (tex) {
     SDL_Rect tr = {autoPopRect_.x + (autoPopRect_.w - tw) / 2,
                    autoPopRect_.y + (autoPopRect_.h - th) / 2, tw, th};
     SDL_RenderCopy(renderer, tex, nullptr, &tr);
-    MemoryMonitor::getInstance().destroyTexture(tex);
+    cat->destroyTexture(tex);
   }
 
   // "Cancel"
@@ -428,12 +416,12 @@ void ReminderPanel::renderSetup(SDL_Renderer *renderer) {
   SDL_RenderFillRect(renderer, &cancelRect_);
   SDL_SetRenderDrawColor(renderer, 150, 50, 50, 255);
   SDL_RenderDrawRect(renderer, &cancelRect_);
-  tex = fontMgr_.renderText(renderer, "Cancel", white, 9, &tw, &th);
+  tex = cat->renderText(renderer, "Cancel", white, FontStyle::Caption, &tw, &th);
   if (tex) {
     SDL_Rect tr = {cancelRect_.x + (btnW - tw) / 2,
                    cancelRect_.y + (btnH - th) / 2, tw, th};
     SDL_RenderCopy(renderer, tex, nullptr, &tr);
-    MemoryMonitor::getInstance().destroyTexture(tex);
+    cat->destroyTexture(tex);
   }
 
   // "Done"
@@ -442,12 +430,12 @@ void ReminderPanel::renderSetup(SDL_Renderer *renderer) {
   SDL_RenderFillRect(renderer, &saveRect_);
   SDL_SetRenderDrawColor(renderer, 50, 150, 50, 255);
   SDL_RenderDrawRect(renderer, &saveRect_);
-  tex = fontMgr_.renderText(renderer, "Done", white, 9, &tw, &th);
+  tex = cat->renderText(renderer, "Done", white, FontStyle::Caption, &tw, &th);
   if (tex) {
     SDL_Rect tr = {saveRect_.x + (btnW - tw) / 2, saveRect_.y + (btnH - th) / 2,
                    tw, th};
     SDL_RenderCopy(renderer, tex, nullptr, &tr);
-    MemoryMonitor::getInstance().destroyTexture(tex);
+    cat->destroyTexture(tex);
   }
 }
 
@@ -661,6 +649,7 @@ static std::string formatDaysDuration(int totalDays) {
 void ReminderPanel::renderReminderList(SDL_Renderer *renderer) {
   int yOff = y_ + 25;
   int lineH = 15;
+  auto *cat = fontMgr_.catalog();
 
   hoverZones_.clear();
 
@@ -682,17 +671,18 @@ void ReminderPanel::renderReminderList(SDL_Renderer *renderer) {
     }
 
     int tw, th;
-    SDL_Texture *tex = fontMgr_.renderText(renderer, label, color, 9, &tw, &th);
+    SDL_Texture *tex =
+        cat->renderText(renderer, label, color, FontStyle::Caption, &tw, &th);
     if (tex) {
       SDL_Rect dst = {x_ + 10, yOff + (lineH - th) / 2, tw, th};
       SDL_RenderCopy(renderer, tex, nullptr, &dst);
-      MemoryMonitor::getInstance().destroyTexture(tex);
+      cat->destroyTexture(tex);
     }
-    tex = fontMgr_.renderText(renderer, status, color, 9, &tw, &th);
+    tex = cat->renderText(renderer, status, color, FontStyle::Caption, &tw, &th);
     if (tex) {
       SDL_Rect dst = {x_ + width_ - 10 - tw, yOff + (lineH - th) / 2, tw, th};
       SDL_RenderCopy(renderer, tex, nullptr, &dst);
-      MemoryMonitor::getInstance().destroyTexture(tex);
+      cat->destroyTexture(tex);
       hoverZones_.push_back({dst, date});
     }
     yOff += lineH;
@@ -716,17 +706,17 @@ void ReminderPanel::renderReminderList(SDL_Renderer *renderer) {
 
     int tw, th;
     SDL_Texture *tex =
-        fontMgr_.renderText(renderer, re.label, color, 9, &tw, &th);
+        cat->renderText(renderer, re.label, color, FontStyle::Caption, &tw, &th);
     if (tex) {
       SDL_Rect dst = {x_ + 10, yOff + (lineH - th) / 2, tw, th};
       SDL_RenderCopy(renderer, tex, nullptr, &dst);
-      MemoryMonitor::getInstance().destroyTexture(tex);
+      cat->destroyTexture(tex);
     }
-    tex = fontMgr_.renderText(renderer, status, color, 9, &tw, &th);
+    tex = cat->renderText(renderer, status, color, FontStyle::Caption, &tw, &th);
     if (tex) {
       SDL_Rect dst = {x_ + width_ - 10 - tw, yOff + (lineH - th) / 2, tw, th};
       SDL_RenderCopy(renderer, tex, nullptr, &dst);
-      MemoryMonitor::getInstance().destroyTexture(tex);
+      cat->destroyTexture(tex);
       hoverZones_.push_back({dst, re.date});
     }
     yOff += lineH;
@@ -734,8 +724,8 @@ void ReminderPanel::renderReminderList(SDL_Renderer *renderer) {
 
   if (config_.reminders.empty() && config_.callsignExpiry.empty() &&
       !checking_) {
-    fontMgr_.drawText(renderer, "No Reminders", x_ + width_ / 2,
-                      y_ + height_ / 2, {150, 150, 150, 255}, 10, false, true);
+    cat->drawText(renderer, "No Reminders", x_ + width_ / 2, y_ + height_ / 2,
+                  {150, 150, 150, 255}, FontStyle::Micro, true);
   }
 
   if (tooltip_.visible) {
@@ -764,9 +754,10 @@ void ReminderPanel::renderTooltip(SDL_Renderer *renderer) {
   if (tooltip_.text.empty())
     return;
 
-  int ptSize = 10;
-  int tw = fontMgr_.getLogicalWidth(tooltip_.text, ptSize);
-  int th = fontMgr_.getLogicalHeight(tooltip_.text, ptSize);
+  auto *cat = fontMgr_.catalog();
+  int tw, th;
+  cat->renderText(renderer, tooltip_.text, {255, 255, 255, 255},
+                  FontStyle::Micro, &tw, &th);
 
   int padX = 8;
   int padY = 4;
@@ -791,6 +782,6 @@ void ReminderPanel::renderTooltip(SDL_Renderer *renderer) {
   SDL_SetRenderDrawColor(renderer, 100, 100, 100, 255);
   SDL_RenderDrawRect(renderer, &box);
 
-  fontMgr_.drawText(renderer, tooltip_.text, bx + padX, by + padY,
-                    {255, 255, 255, 255}, ptSize);
+  cat->drawText(renderer, tooltip_.text, bx + padX, by + padY,
+                {255, 255, 255, 255}, FontStyle::Micro);
 }

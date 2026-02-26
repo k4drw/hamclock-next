@@ -1,5 +1,6 @@
 #include "AuroraGraphPanel.h"
 #include "../core/Theme.h"
+#include "FontCatalog.h"
 
 #include "RenderUtils.h"
 #include <SDL.h>
@@ -19,6 +20,7 @@ void AuroraGraphPanel::update() {
 
 void AuroraGraphPanel::render(SDL_Renderer *renderer) {
   ThemeColors themes = getThemeColors(theme_);
+  auto *cat = fontMgr_.catalog();
 
   // Background
   SDL_SetRenderDrawBlendMode(
@@ -34,13 +36,13 @@ void AuroraGraphPanel::render(SDL_Renderer *renderer) {
   SDL_RenderDrawRect(renderer, &rect);
 
   int titleH = 20;
-  fontMgr_.drawText(renderer, "Aurora Chances", x_ + 10, y_ + 5, themes.accent,
-                    10, true);
+  cat->drawText(renderer, "Aurora Chances", x_ + 10, y_ + 5, themes.accent,
+                FontStyle::MicroBold);
 
   if (!store_ || !store_->hasData()) {
-    fontMgr_.drawText(renderer, "Loading Aurora...", x_ + width_ / 2,
-                      y_ + titleH + (height_ - titleH) / 2,
-                      {150, 150, 150, 255}, 12, false, true);
+    cat->drawText(renderer, "Loading Aurora...", x_ + width_ / 2,
+                  y_ + titleH + (height_ - titleH) / 2, {150, 150, 150, 255},
+                  FontStyle::Fast, true);
     return;
   }
 
@@ -48,20 +50,18 @@ void AuroraGraphPanel::render(SDL_Renderer *renderer) {
   auto history = store_->getHistory();
   float currentPercent = store_->getCurrentPercent();
 
-  // Display current value prominently
+  // Display current value prominently (top-right area)
   char valueText[32];
-  std::snprintf(valueText, sizeof(valueText), "%.0f", currentPercent);
+  std::snprintf(valueText, sizeof(valueText), "%.0f%%", currentPercent);
 
-  int valueFontSize = std::max(24, height_ / 3);
-  fontMgr_.drawText(renderer, valueText, x_ + width_ / 2,
-                    y_ + titleH + (height_ - titleH) / 4, {200, 200, 200, 255},
-                    valueFontSize, false, true);
+  cat->drawText(renderer, valueText, x_ + width_ - 35, y_ + 5, {200, 200, 200, 255},
+                FontStyle::MediumBold, true);
 
-  // Graph area
+  // Graph area - significantly expanded
   int graphX = x_ + 30;
-  int graphY = y_ + height_ / 2;
+  int graphY = y_ + titleH + 10;
   int graphW = width_ - 40;
-  int graphH = height_ / 2 - 30;
+  int graphH = height_ - titleH - 40;
 
   if (graphW < 50 || graphH < 30)
     return; // Too small to draw graph
@@ -80,23 +80,23 @@ void AuroraGraphPanel::render(SDL_Renderer *renderer) {
     // Y-axis labels
     char label[8];
     std::snprintf(label, sizeof(label), "%d", pct);
-    fontMgr_.drawText(renderer, label, graphX - 20, gy - 4, {0, 255, 128, 255},
-                      8);
+    cat->drawText(renderer, label, graphX - 20, gy, {0, 255, 128, 255},
+                  FontStyle::Tiny, false, false, true);
   }
 
   // X-axis labels
-  fontMgr_.drawText(renderer, "-25", graphX, graphY + graphH + 10,
-                    {0, 255, 128, 255}, 8);
-  fontMgr_.drawText(renderer, "Hours", graphX + graphW / 2,
-                    graphY + graphH + 10, {0, 255, 128, 255}, 8, false, true);
-  fontMgr_.drawText(renderer, "0", graphX + graphW - 10, graphY + graphH + 10,
-                    {0, 255, 128, 255}, 8);
+  cat->drawText(renderer, "-25", graphX, graphY + graphH + 10,
+                {0, 255, 128, 255}, FontStyle::Tiny, false, false, true);
+  cat->drawText(renderer, "Hours", graphX + graphW / 2, graphY + graphH + 10,
+                {0, 255, 128, 255}, FontStyle::Tiny, true, false, true);
+  cat->drawText(renderer, "0", graphX + graphW - 10, graphY + graphH + 10,
+                {0, 255, 128, 255}, FontStyle::Tiny, false, false, true);
 
   // Plot data
   if (history.size() < 2) {
-    fontMgr_.drawText(renderer, "Collecting history...", x_ + width_ / 2,
-                      y_ + (graphY + graphH / 2), {100, 100, 100, 255}, 10,
-                      false, true);
+    cat->drawText(renderer, "Collecting history...", x_ + width_ / 2,
+                  y_ + (graphY + graphH / 2), {100, 100, 100, 255},
+                  FontStyle::Micro, true);
     return;
   }
 
@@ -232,9 +232,10 @@ void AuroraGraphPanel::renderTooltip(SDL_Renderer *renderer) {
   if (tooltip_.text.empty())
     return;
 
-  int ptSize = 10;
-  int tw = fontMgr_.getLogicalWidth(tooltip_.text, ptSize);
-  int th = fontMgr_.getLogicalHeight(tooltip_.text, ptSize);
+  auto *cat = fontMgr_.catalog();
+  int tw, th;
+  cat->renderText(renderer, tooltip_.text, {255, 255, 255, 255},
+                  FontStyle::Micro, &tw, &th);
 
   int padX = 8;
   int padY = 4;
@@ -261,6 +262,6 @@ void AuroraGraphPanel::renderTooltip(SDL_Renderer *renderer) {
   SDL_SetRenderDrawColor(renderer, 100, 100, 100, 255);
   SDL_RenderDrawRect(renderer, &box);
 
-  fontMgr_.drawText(renderer, tooltip_.text, bx + padX, by + padY,
-                    {255, 255, 255, 255}, ptSize);
+  cat->drawText(renderer, tooltip_.text, bx + padX, by + padY,
+                {255, 255, 255, 255}, FontStyle::Micro);
 }

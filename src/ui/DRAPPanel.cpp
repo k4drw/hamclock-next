@@ -1,6 +1,7 @@
 #include "DRAPPanel.h"
 #include "../core/StringUtils.h"
 #include "../core/Theme.h"
+#include "FontCatalog.h"
 #include <SDL.h>
 #include <cstdio>
 #include <mutex>
@@ -38,6 +39,7 @@ void DRAPPanel::render(SDL_Renderer *renderer) {
   }
 
   ThemeColors themes = getThemeColors(theme_);
+  auto *cat = fontMgr_.catalog();
 
   // Background
   SDL_SetRenderDrawBlendMode(
@@ -54,12 +56,13 @@ void DRAPPanel::render(SDL_Renderer *renderer) {
 
   int titleH = 20;
   // Title
-  fontMgr_.drawText(renderer, "DRAP", x_ + 10, y_ + 5, themes.accent, 10, true);
+  cat->drawText(renderer, "DRAP", x_ + 10, y_ + 5, themes.accent,
+                FontStyle::MicroBold);
 
   if (!dataReady_) {
-    fontMgr_.drawText(renderer, "Loading...", x_ + width_ / 2,
-                      y_ + titleH + (height_ - titleH) / 2,
-                      {150, 150, 150, 255}, 12, false, true);
+    cat->drawText(renderer, "Loading...", x_ + width_ / 2,
+                  y_ + titleH + (height_ - titleH) / 2, {150, 150, 150, 255},
+                  FontStyle::Fast, true);
     return;
   }
 
@@ -86,11 +89,10 @@ void DRAPPanel::render(SDL_Renderer *renderer) {
   char displayText[32];
   std::snprintf(displayText, sizeof(displayText), "%.1f MHz", freq);
 
-  int valueFontSize = std::max(16, height_ / 4);
-  fontMgr_.drawText(renderer, displayText, x_ + width_ / 2, y_ + height_ / 2,
-                    valueColor, valueFontSize, false, true);
+  cat->drawText(renderer, displayText, x_ + width_ / 2, y_ + height_ / 2,
+                valueColor, FontStyle::MediumBold, true);
 
   // Add description
-  fontMgr_.drawText(renderer, "Max Frequency", x_ + width_ / 2,
-                    y_ + height_ - 20, themes.textDim, 10, false, true);
+  cat->drawText(renderer, "Max Frequency", x_ + width_ / 2, y_ + height_ - 20,
+                themes.textDim, FontStyle::Micro, true);
 }

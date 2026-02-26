@@ -30,22 +30,23 @@ void WinlinkPanel::render(SDL_Renderer *renderer) {
   int titleH = 20;
   int pad = 6;
   int curY = y_ + titleH + 4;
+  auto *cat = fontMgr_.catalog();
 
-  fontMgr_.drawText(renderer, "Winlink RMS", x_ + 10, y_ + 5, themes.accent, 10,
-                    true);
+  cat->drawText(renderer, "Winlink RMS", x_ + 10, y_ + 5, themes.accent,
+                FontStyle::MicroBold);
 
   int centerX = x_ + width_ / 2;
   if (!currentData_.valid) {
     const char *msg =
         currentData_.fetched ? "Service unavailable" : "Loading...";
-    fontMgr_.drawText(renderer, msg, centerX, y_ + height_ / 2, themes.textDim,
-                      rowFontSize_, false, true);
+    cat->drawText(renderer, msg, centerX, y_ + height_ / 2, themes.textDim,
+                  FontStyle::Fast, true);
     return;
   }
 
   if (currentData_.gateways.empty()) {
-    fontMgr_.drawText(renderer, "No gateways found", centerX, y_ + height_ / 2,
-                      themes.textDim, rowFontSize_, false, true);
+    cat->drawText(renderer, "No gateways found", centerX, y_ + height_ / 2,
+                  themes.textDim, FontStyle::Fast, true);
     return;
   }
 
@@ -59,8 +60,8 @@ void WinlinkPanel::render(SDL_Renderer *renderer) {
     const auto &gw = currentData_.gateways[i];
 
     // Callsign
-    fontMgr_.drawText(renderer, gw.callsign, x_ + pad, curY, themes.text,
-                      rowFontSize_, true, false);
+    cat->drawText(renderer, gw.callsign, x_ + pad, curY, themes.text,
+                  FontStyle::Fast);
 
     // Distance (right)
     char distBuf[24];
@@ -69,8 +70,8 @@ void WinlinkPanel::render(SDL_Renderer *renderer) {
     else
       std::snprintf(distBuf, sizeof(distBuf), "%.0fmi",
                     gw.distanceKm * 0.621371);
-    fontMgr_.drawText(renderer, distBuf, x_ + width_ - pad, curY,
-                      themes.textDim, rowFontSize_, false, true);
+    cat->drawText(renderer, distBuf, x_ + width_ - pad, curY, themes.textDim,
+                  FontStyle::Fast, false, true);
 
     curY += rowFontSize_ + 1;
 
@@ -82,8 +83,8 @@ void WinlinkPanel::render(SDL_Renderer *renderer) {
     else
       std::snprintf(subBuf, sizeof(subBuf), "%s",
                     gw.modes.empty() ? "?" : gw.modes.c_str());
-    fontMgr_.drawText(renderer, subBuf, x_ + pad, curY, themes.textDim,
-                      subFontSize_, false, false);
+    cat->drawText(renderer, subBuf, x_ + pad, curY, themes.textDim,
+                  FontStyle::Micro);
 
     curY += subFontSize_ + 3;
 
@@ -99,9 +100,9 @@ void WinlinkPanel::render(SDL_Renderer *renderer) {
     char buf[32];
     std::snprintf(buf, sizeof(buf), "%d/%d", startIdx + 1,
                   (int)currentData_.gateways.size());
-    fontMgr_.drawText(renderer, buf, x_ + width_ - pad,
-                      y_ + height_ - pad - subFontSize_, themes.textDim,
-                      subFontSize_, false, true);
+    cat->drawText(renderer, buf, x_ + width_ - pad,
+                  y_ + height_ - pad - subFontSize_, themes.textDim,
+                  FontStyle::Micro, false, true);
   }
 }
 

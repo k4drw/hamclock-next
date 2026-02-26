@@ -137,9 +137,10 @@ void LocalPanel::render(SDL_Renderer *renderer) {
       themes.warning, // Weather 2
   };
 
-  int titleH = 20;
-  fontMgr_.drawText(renderer, "DE", x_ + 10, y_ + 5, themes.accent, 10, true);
+  fontMgr_.catalog()->drawText(renderer, "DE", x_ + 10, y_ + 5, themes.accent,
+                               FontStyle::MicroBold);
 
+  int titleH = 20;
   int curY = y_ + titleH + pad / 2;
   for (int i = 0; i < kNumLines; ++i) {
     if (i == 0 && lineText_[i] == "DE:")

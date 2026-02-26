@@ -1,6 +1,7 @@
 #include "MapViewMenu.h"
 #include "../core/Constants.h"
 #include "../core/Theme.h"
+#include "FontCatalog.h"
 #include <string>
 
 MapViewMenu::MapViewMenu(FontManager &fontMgr)
@@ -99,13 +100,15 @@ void MapViewMenu::render(SDL_Renderer *renderer) {
                          themes.border.b, themes.border.a);
   SDL_RenderDrawRect(renderer, &menuRect_);
 
+  auto *cat = fontMgr_.catalog();
+
   // Title
-  fontMgr_.drawText(renderer, "Map View Options", menuRect_.x + menuRect_.w / 2,
-                    menuRect_.y + 20, themes.text, 18, false, true);
+  cat->drawText(renderer, "Map View Options", menuRect_.x + menuRect_.w / 2,
+                menuRect_.y + 20, themes.text, FontStyle::SmallBold, true);
 
   // Projection Section
-  fontMgr_.drawText(renderer, "Projection", projRec_.x, projHeaderY_,
-                    themes.text, 16, false);
+  cat->drawText(renderer, "Projection", projRec_.x, projHeaderY_, themes.text,
+                FontStyle::UI);
   std::string projLabel = "Equirectangular";
   if (projection_ == "robinson")
     projLabel = "Robinson";
@@ -114,8 +117,8 @@ void MapViewMenu::render(SDL_Renderer *renderer) {
   drawDropdown(renderer, projRec_, projLabel, openCombo_ == COMBO_PROJ);
 
   // Style Section
-  fontMgr_.drawText(renderer, "Map Style", styleRec_.x, styleHeaderY_,
-                    themes.text, 16, false);
+  cat->drawText(renderer, "Map Style", styleRec_.x, styleHeaderY_, themes.text,
+                FontStyle::UI);
   std::string styleLabel = "NASA Blue Marble";
   if (mapStyle_ == "topo")
     styleLabel = "Topo";
@@ -124,16 +127,16 @@ void MapViewMenu::render(SDL_Renderer *renderer) {
   drawDropdown(renderer, styleRec_, styleLabel, openCombo_ == COMBO_STYLE);
 
   // Grid Section
-  fontMgr_.drawText(renderer, "Grid Overlay", gridRec_.x, gridHeaderY_,
-                    themes.text, 16, false);
+  cat->drawText(renderer, "Grid Overlay", gridRec_.x, gridHeaderY_, themes.text,
+                FontStyle::UI);
   std::string gridLabel = "Off";
   if (showGrid_)
     gridLabel = (gridType_ == "maidenhead") ? "Maidenhead" : "Lat/Lon";
   drawDropdown(renderer, gridRec_, gridLabel, openCombo_ == COMBO_GRID);
 
   // Propagation Section
-  fontMgr_.drawText(renderer, "Propagation Overlay", overlayRec_.x,
-                    mufRtHeaderY_, themes.text, 16, false);
+  cat->drawText(renderer, "Propagation Overlay", overlayRec_.x, mufRtHeaderY_,
+                themes.text, FontStyle::UI);
   std::string propLabel = "None";
   if (propOverlay_ == PropOverlayType::Muf)
     propLabel = "MUF";
@@ -146,8 +149,8 @@ void MapViewMenu::render(SDL_Renderer *renderer) {
   drawDropdown(renderer, overlayRec_, propLabel, openCombo_ == COMBO_OVERLAY);
 
   // Weather Section
-  fontMgr_.drawText(renderer, "Weather Overlay", weatherRec_.x, weatherHeaderY_,
-                    themes.text, 16, false);
+  cat->drawText(renderer, "Weather Overlay", weatherRec_.x, weatherHeaderY_,
+                themes.text, FontStyle::UI);
   std::string weatherLabel = "None";
   if (weatherOverlay_ == WeatherOverlayType::WxMb)
     weatherLabel = "WX/Pressure";
@@ -164,16 +167,16 @@ void MapViewMenu::render(SDL_Renderer *renderer) {
   if (propOverlay_ == PropOverlayType::Voacap ||
       propOverlay_ == PropOverlayType::Reliability ||
       propOverlay_ == PropOverlayType::Toa) {
-    fontMgr_.drawText(renderer, "Band", bandRec_.x, bandRec_.y - 20,
-                      themes.text, 16, false);
+    cat->drawText(renderer, "Band", bandRec_.x, bandRec_.y - 20, themes.text,
+                  FontStyle::UI);
     drawDropdown(renderer, bandRec_, propBand_, openCombo_ == COMBO_BAND);
 
-    fontMgr_.drawText(renderer, "Mode", modeRec_.x, modeRec_.y - 20,
-                      themes.text, 16, false);
+    cat->drawText(renderer, "Mode", modeRec_.x, modeRec_.y - 20, themes.text,
+                  FontStyle::UI);
     drawDropdown(renderer, modeRec_, propMode_, openCombo_ == COMBO_MODE);
 
-    fontMgr_.drawText(renderer, "Power", powerRec_.x, powerRec_.y - 20,
-                      themes.text, 16, false);
+    cat->drawText(renderer, "Power", powerRec_.x, powerRec_.y - 20, themes.text,
+                  FontStyle::UI);
     drawDropdown(renderer, powerRec_, std::to_string(propPower_) + "W",
                  openCombo_ == COMBO_POWER);
   }
@@ -205,18 +208,18 @@ void MapViewMenu::render(SDL_Renderer *renderer) {
   SDL_RenderFillRect(renderer, &cancelRect_);
   SDL_SetRenderDrawColor(renderer, 120, 120, 130, 255);
   SDL_RenderDrawRect(renderer, &cancelRect_);
-  fontMgr_.drawText(renderer, "Cancel", cancelRect_.x + cancelRect_.w / 2,
-                    cancelRect_.y + cancelRect_.h / 2, {255, 255, 255, 255}, 16,
-                    false, true);
+  cat->drawText(renderer, "Cancel", cancelRect_.x + cancelRect_.w / 2,
+                cancelRect_.y + cancelRect_.h / 2, {255, 255, 255, 255},
+                FontStyle::UI, true, false, true);
 
   // Apply button
   SDL_SetRenderDrawColor(renderer, 0, 100, 200, 255);
   SDL_RenderFillRect(renderer, &applyRect_);
   SDL_SetRenderDrawColor(renderer, 100, 150, 255, 255);
   SDL_RenderDrawRect(renderer, &applyRect_);
-  fontMgr_.drawText(renderer, "Apply", applyRect_.x + applyRect_.w / 2,
-                    applyRect_.y + applyRect_.h / 2, {255, 255, 255, 255}, 16,
-                    false, true);
+  cat->drawText(renderer, "Apply", applyRect_.x + applyRect_.w / 2,
+                applyRect_.y + applyRect_.h / 2, {255, 255, 255, 255},
+                FontStyle::UI, true, false, true);
 }
 
 void MapViewMenu::drawDropdown(SDL_Renderer *renderer, const SDL_Rect &rect,
@@ -226,10 +229,12 @@ void MapViewMenu::drawDropdown(SDL_Renderer *renderer, const SDL_Rect &rect,
   SDL_SetRenderDrawColor(renderer, 100, 100, 120, 255);
   SDL_RenderDrawRect(renderer, &rect);
 
+  auto *cat = fontMgr_.catalog();
+
   // Text
   SDL_Color txtCol = {220, 220, 220, 255};
-  fontMgr_.drawText(renderer, currentVal, rect.x + 10, rect.y + 4, txtCol, 14,
-                    false);
+  cat->drawText(renderer, currentVal, rect.x + 10, rect.y + rect.h / 2, txtCol,
+                FontStyle::Fast, false, false, true);
 
   // Arrow
   int cx = rect.x + rect.w - 15;
@@ -250,6 +255,8 @@ void MapViewMenu::drawDropdownList(SDL_Renderer *renderer,
   SDL_Rect listRect = {headerRect.x, headerRect.y + headerRect.h, headerRect.w,
                        h};
 
+  auto *cat = fontMgr_.catalog();
+
   // Background
   SDL_SetRenderDrawColor(renderer, 30, 30, 40, 255);
   SDL_RenderFillRect(renderer, &listRect);
@@ -264,8 +271,9 @@ void MapViewMenu::drawDropdownList(SDL_Renderer *renderer,
 
     SDL_Rect itemRec = {listRect.x, listRect.y + i * 30, listRect.w, 30};
 
-    fontMgr_.drawText(renderer, opts[idx], itemRec.x + 10, itemRec.y + 4,
-                      {255, 255, 255, 255}, 14, false);
+    cat->drawText(renderer, opts[idx], itemRec.x + 10,
+                  itemRec.y + itemRec.h / 2, {255, 255, 255, 255},
+                  FontStyle::Fast, false, false, true);
 
     // Divider
     if (i < visibleCount - 1) {

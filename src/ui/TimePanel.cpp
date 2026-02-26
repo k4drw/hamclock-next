@@ -220,19 +220,20 @@ void TimePanel::render(SDL_Renderer *renderer) {
   {
     SDL_Color gray = themes.textDim;
     int infoY = infoBaseY + (infoRowH - infoFontSize_) / 2;
+    auto *cat = fontMgr_.catalog();
     TTF_Font *infoFont = fontMgr_.getFont(infoFontSize_);
     if (infoFont) {
       int tw = 0, th = 0;
 
       // Left: uptime
-      fontMgr_.drawText(renderer, currentUptime_, x_ + pad, infoY, gray,
-                        infoFontSize_);
+      cat->drawText(renderer, currentUptime_, x_ + pad, infoY, gray,
+                    FontStyle::Fast);
 
       // Rotating info (shifted slightly right to give more room for uptime)
       const std::string &centerText = infoTexts_[infoRotateIdx_];
       TTF_SizeUTF8(infoFont, centerText.c_str(), &tw, &th);
-      fontMgr_.drawText(renderer, centerText, x_ + (width_ - tw) * 0.58f, infoY,
-                        gray, infoFontSize_);
+      cat->drawText(renderer, centerText, x_ + (width_ - tw) * 0.58f, infoY,
+                    gray, FontStyle::Fast);
 
       // Right: version (amber + asterisk when update available)
       std::string verStr = HAMCLOCK_VERSION;
@@ -243,7 +244,7 @@ void TimePanel::render(SDL_Renderer *renderer) {
       }
       TTF_SizeUTF8(infoFont, verStr.c_str(), &tw, &th);
       int vx = x_ + width_ - pad - tw;
-      fontMgr_.drawText(renderer, verStr, vx, infoY, verColor, infoFontSize_);
+      cat->drawText(renderer, verStr, vx, infoY, verColor, FontStyle::Fast);
       versionRect_ = {vx, infoY, tw, th};
     }
   }
@@ -498,22 +499,20 @@ void TimePanel::renderEditOverlay(SDL_Renderer *renderer) {
   // --- Draw edit text with cursor ---
   int textX = x_ + pad + 6;
   int textY = fieldY + 6;
+  auto *cat = fontMgr_.catalog();
 
   if (!editText_.empty()) {
-    fontMgr_.drawText(renderer, editText_, textX, textY, selColor,
-                      editorFontSize);
+    cat->drawText(renderer, editText_, textX, textY, selColor,
+                  FontStyle::MediumBold);
   }
 
   // Cursor: measure text up to cursorPos_ to find x offset
   int cursorX = textX;
   if (cursorPos_ > 0) {
     std::string beforeCursor = editText_.substr(0, cursorPos_);
-    TTF_Font *font = fontMgr_.getFont(editorFontSize);
-    if (font) {
-      int tw = 0, th = 0;
-      TTF_SizeText(font, beforeCursor.c_str(), &tw, &th);
-      cursorX = textX + tw;
-    }
+    int tw = fontMgr_.getLogicalWidth(beforeCursor,
+                                      cat->ptSize(FontStyle::MediumBold));
+    cursorX = textX + tw;
   }
 
   // Blinking cursor (visible 500ms on, 500ms off)
@@ -553,10 +552,9 @@ void TimePanel::renderEditOverlay(SDL_Renderer *renderer) {
   int hintY =
       paletteY + ((kNumColors + cols - 1) / cols) * (swatchSize + gap) + pad;
   if (hintY + 14 < y_ + height_) {
-    int hintSize = std::clamp(static_cast<int>(height_ * 0.08f), 8, 16);
     SDL_Color gray = {140, 140, 140, 255};
-    fontMgr_.drawText(renderer, "Enter=OK  Esc=Cancel", x_ + pad, hintY, gray,
-                      hintSize);
+    cat->drawText(renderer, "Enter=OK  Esc=Cancel", x_ + pad, hintY, gray,
+                  FontStyle::Caption);
   }
 
   SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
