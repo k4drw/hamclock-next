@@ -89,6 +89,7 @@
 #include "ui/LayoutManager.h"
 #include "ui/LightningPanel.h"
 #include "ui/MeteorPanel.h"
+#include "ui/IonosondePanel.h"
 #include "ui/LiveSpotPanel.h"
 #include "ui/LocalPanel.h"
 #include "ui/MapWidget.h"
@@ -945,9 +946,6 @@ DashboardContext::DashboardContext(AppContext &ctx)
   cloudProvider = std::make_unique<CloudProvider>(netManager);
   cloudProvider->update();
 
-  ionosondeProvider = std::make_unique<IonosondeProvider>(netManager);
-  ionosondeProvider->update();
-
   asteroidProvider = std::make_unique<AsteroidProvider>(netManager);
   asteroidProvider->update();
 
@@ -1004,6 +1002,14 @@ DashboardContext::DashboardContext(AppContext &ctx)
   meteorProvider->setCallback([this](const MeteorData &d) {
     if (widgetPool.count(WidgetType::METEOR)) {
       static_cast<MeteorPanel *>(widgetPool[WidgetType::METEOR].get())
+          ->updateData(d);
+    }
+  });
+
+  ionosondeProvider = std::make_unique<IonosondeProvider>(netManager);
+  ionosondeProvider->setCallback([this](const IonosondeData &d) {
+    if (widgetPool.count(WidgetType::IONOSONDE)) {
+      static_cast<IonosondePanel *>(widgetPool[WidgetType::IONOSONDE].get())
           ->updateData(d);
     }
   });
@@ -1219,6 +1225,9 @@ DashboardContext::DashboardContext(AppContext &ctx)
     case WidgetType::METEOR:
       widgetPool[type] = std::make_unique<MeteorPanel>(0, 0, 0, 0, fontMgr, texMgr);
       break;
+    case WidgetType::IONOSONDE:
+      widgetPool[type] = std::make_unique<IonosondePanel>(0, 0, 0, 0, fontMgr, texMgr);
+      break;
     default:
       widgetPool[type] = std::make_unique<PlaceholderWidget>(
           0, 0, 0, 0, fontMgr, widgetTypeDisplayName(type),
@@ -1303,7 +1312,8 @@ DashboardContext::DashboardContext(AppContext &ctx)
       WidgetType::SOLAR,         WidgetType::SYS_INFO,
       WidgetType::WATCHLIST,     WidgetType::STOPWATCH,
       WidgetType::REMINDER,      WidgetType::TROPO,
-      WidgetType::LIGHTNING,     WidgetType::METEOR};
+      WidgetType::LIGHTNING,     WidgetType::METEOR,
+      WidgetType::IONOSONDE};
   // Note: REPEATER_DIR omitted — RepeaterBook API requires auth key (TODO).
   // Note: WINLINK omitted — Winlink API requires access key (TODO).
 
@@ -1617,6 +1627,11 @@ void DashboardContext::update(AppContext &ctx) {
   // --- Meteor fetch (immediate upon widget activation, internal cache 10m) ---
   if (isWidgetActive(WidgetType::METEOR)) {
     meteorProvider->update(appCfg.lat, appCfg.lon);
+  }
+
+  // --- Ionosonde fetch (immediate upon widget activation, internal cache 15m) ---
+  if (isWidgetActive(WidgetType::IONOSONDE)) {
+    ionosondeProvider->fetch(appCfg.lat, appCfg.lon);
   }
 
 #ifndef __EMSCRIPTEN__
