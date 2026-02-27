@@ -45,6 +45,7 @@ enum class WidgetType {
   LIGHTNING,
   METEOR,
   IONOSONDE,
+  SOLAR_STORM,
 };
 
 inline const char *widgetTypeToString(WidgetType t) {
@@ -131,6 +132,8 @@ inline const char *widgetTypeToString(WidgetType t) {
     return "meteor";
   case WidgetType::IONOSONDE:
     return "ionosonde";
+  case WidgetType::SOLAR_STORM:
+    return "solar_storm";
   }
   return "solar";
 }
@@ -219,6 +222,8 @@ inline const char *widgetTypeDisplayName(WidgetType t) {
     return "Meteor Scat";
   case WidgetType::IONOSONDE:
     return "Ionosonde";
+  case WidgetType::SOLAR_STORM:
+    return "Solar Storm";
   }
   return "Solar";
 }
@@ -307,6 +312,8 @@ inline WidgetType widgetTypeFromString(const std::string &s,
     return WidgetType::METEOR;
   if (s == "ionosonde")
     return WidgetType::IONOSONDE;
+  if (s == "solar_storm")
+    return WidgetType::SOLAR_STORM;
   std::fprintf(stderr, "WidgetType: unknown '%s', using fallback\n", s.c_str());
   return fallback;
 }

@@ -514,6 +514,7 @@ set(HAMCLOCK_SOURCES
     src/services/LightningProvider.cpp
     src/services/MeteorProvider.cpp
     src/services/IonosondeProvider.cpp
+    src/services/SolarStormProvider.cpp
     src/services/RotatorService.cpp
     src/services/RigService.cpp
     src/services/GPSProvider.cpp
@@ -575,6 +576,7 @@ set(HAMCLOCK_SOURCES
     src/ui/LightningPanel.cpp
     src/ui/MeteorPanel.cpp
     src/ui/IonosondePanel.cpp
+    src/ui/SolarStormPanel.cpp
     src/ui/StopwatchPanel.cpp
     src/ui/ReminderPanel.cpp
     src/ui/UpdateOverlay.cpp

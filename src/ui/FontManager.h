@@ -105,9 +105,24 @@ public:
       TTF_SetFontStyle(font, prevStyle | TTF_STYLE_BOLD);
     }
 
-    // Use Wrapped version to support newlines if present
-    SDL_Surface *surface =
-        TTF_RenderUTF8_Blended_Wrapped(font, text.c_str(), color, 2048);
+    // Detect if we actually need wrapping
+    bool hasNewline = (text.find('\n') != std::string::npos);
+
+    SDL_Surface *surface = nullptr;
+    if (!hasNewline) {
+      // Use non-wrapped version for single lines.
+      // This ensures list boxes and normal UI text never wrap unexpectedly.
+      surface = TTF_RenderUTF8_Blended(font, text.c_str(), color);
+    } else {
+      // Multi-line text.
+      // Calculate exact required width to avoid the 2048px greedy surface
+      // issue. We add a small 4px buffer to account for rounding errors.
+      int measuredW = getLogicalWidth(text, basePt, bold);
+      int physicalWrapWidth =
+          std::max(1, static_cast<int>(measuredW * renderScale_) + 4);
+      surface =
+          TTF_RenderUTF8_Blended_Wrapped(font, text.c_str(), color, physicalWrapWidth);
+    }
 
     // Restore previous style
     if (bold) {
@@ -294,7 +309,7 @@ public:
           text.substr(start, (end == std::string::npos) ? std::string::npos
                                                         : (end - start));
       int w = 0, h = 0;
-      TTF_SizeUTF8(font, line.c_str(), &w, &h);
+      TTF_SizeUTF8(font, line.empty() ? " " : line.c_str(), &w, &h);
       if (w > maxW)
         maxW = w;
       if (end == std::string::npos)
@@ -306,7 +321,8 @@ public:
       TTF_SetFontStyle(font, prevStyle);
     }
 
-    return static_cast<int>(maxW / renderScale_);
+    // Add 1px buffer for safety against rounding issues
+    return static_cast<int>((maxW + 1) / renderScale_);
   }
 
   // Returns the height of the text in logical units.
@@ -328,21 +344,26 @@ public:
     if (bold) {
       TTF_SetFontStyle(font, prevStyle | TTF_STYLE_BOLD);
     }
-    int w = 0, h = 0;
-    TTF_SizeUTF8(font, text.c_str(), &w, &h);
 
-    // Count newlines to manually calculate height for multi-line text
-    int lines = 1;
-    for (char c : text) {
-      if (c == '\n')
-        lines++;
+    int lineCount = 0;
+    int fontHeight = TTF_FontHeight(font);
+    size_t start = 0;
+    while (start < text.length()) {
+      lineCount++;
+      size_t end = text.find('\n', start);
+      if (end == std::string::npos)
+        break;
+      start = end + 1;
     }
+    // Handle trailing newline
+    if (!text.empty() && text.back() == '\n')
+      lineCount++;
 
     if (bold) {
       TTF_SetFontStyle(font, prevStyle);
     }
 
-    return static_cast<int>((h * lines) / renderScale_);
+    return static_cast<int>((fontHeight * std::max(1, lineCount)) / renderScale_);
   }
 
   void clearCache() {

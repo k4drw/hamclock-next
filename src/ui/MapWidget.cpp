@@ -582,12 +582,40 @@ void MapWidget::onMouseMove(int mx, int my) {
     }
   }
 
-  // 6. Check asteroid icon
+  // 6. Check asteroid
   if (tip.empty() && asteroidProvider_ &&
       !state_->selectedAsteroidName.empty() && !cachedAsteroidTrack_.empty()) {
+    bool hit = false;
+    // Check icon midpoint
     size_t mid = cachedAsteroidTrack_.size() / 2;
     if (screenDist(cachedAsteroidTrack_[mid].lat,
                    cachedAsteroidTrack_[mid].lon) < kHitRadius + 4) {
+      hit = true;
+    } else {
+      // Check near ground track line
+      for (size_t i = 1; i < cachedAsteroidTrack_.size(); ++i) {
+        SDL_FPoint p1 = latLonToScreen(cachedAsteroidTrack_[i - 1].lat,
+                                       cachedAsteroidTrack_[i - 1].lon);
+        SDL_FPoint p2 = latLonToScreen(cachedAsteroidTrack_[i].lat,
+                                       cachedAsteroidTrack_[i].lon);
+        // Distance from mx,my to line segment p1-p2
+        float l2 = (p2.x - p1.x) * (p2.x - p1.x) + (p2.y - p1.y) * (p2.y - p1.y);
+        if (l2 < 1.0f)
+          continue;
+        float t = ((mx - p1.x) * (p2.x - p1.x) + (my - p1.y) * (p2.y - p1.y)) / l2;
+        t = std::max(0.0f, std::min(1.0f, t));
+        float dist = std::sqrt((mx - (p1.x + t * (p2.x - p1.x))) *
+                                   (mx - (p1.x + t * (p2.x - p1.x))) +
+                               (my - (p1.y + t * (p2.y - p1.y))) *
+                                   (my - (p1.y + t * (p2.y - p1.y))));
+        if (dist < 4.0f) {
+          hit = true;
+          break;
+        }
+      }
+    }
+
+    if (hit) {
       AsteroidData data = asteroidProvider_->getLatest();
       for (const auto &ast : data.asteroids) {
         if (ast.name == state_->selectedAsteroidName) {
@@ -597,8 +625,7 @@ void MapWidget::onMouseMove(int mx, int my) {
           char buf[256];
           std::snprintf(buf, sizeof(buf), "%s\n%.2f LD  %.1f km/s%s",
                         name.c_str(), ast.missDistanceLD, ast.velocityKmS,
-                        ast.isHazardous ? "\n\u26a0 Potentially Hazardous"
-                                        : "");
+                        ast.isHazardous ? "\n[!] Potentially Hazardous" : "");
           tip = buf;
           break;
         }
@@ -625,13 +652,15 @@ void MapWidget::onMouseMove(int mx, int my) {
     }
   }
 
-  // 6. Fallback: show lat/lon under cursor
   if (tip.empty()) {
-    char buf[64];
-    std::snprintf(buf, sizeof(buf), "%.2f°%c %.2f°%c  %s", std::fabs(lat),
-                  lat >= 0 ? 'N' : 'S', std::fabs(lon), lon >= 0 ? 'E' : 'W',
-                  Astronomy::latLonToGrid(lat, lon).c_str());
-    tip = buf;
+    tooltip_.visible = false;
+    return;
+  }
+
+  // Trim trailing whitespace (common in TLE names)
+  size_t last = tip.find_last_not_of(" \r\n\t");
+  if (last != std::string::npos) {
+    tip = tip.substr(0, last + 1);
   }
 
   tooltip_.text = tip;

@@ -57,6 +57,7 @@
 #include "services/TropoProvider.h"
 #include "services/LightningProvider.h"
 #include "services/MeteorProvider.h"
+#include "services/SolarStormProvider.h"
 #include "services/UpdateChecker.h"
 #include "services/WeatherProvider.h"
 #include "services/WinlinkProvider.h"
@@ -90,6 +91,7 @@
 #include "ui/LightningPanel.h"
 #include "ui/MeteorPanel.h"
 #include "ui/IonosondePanel.h"
+#include "ui/SolarStormPanel.h"
 #include "ui/LiveSpotPanel.h"
 #include "ui/LocalPanel.h"
 #include "ui/MapWidget.h"
@@ -278,6 +280,7 @@ struct DashboardContext {
   std::unique_ptr<TropoProvider> tropoProvider;
   std::unique_ptr<LightningProvider> lightningProvider;
   std::unique_ptr<MeteorProvider> meteorProvider;
+  std::unique_ptr<SolarStormProvider> solarStormProvider;
   std::unique_ptr<SatelliteManager> satMgr;
   std::unique_ptr<AsteroidProvider> asteroidProvider;
   std::unique_ptr<BeaconProvider> beaconProvider;
@@ -1006,6 +1009,14 @@ DashboardContext::DashboardContext(AppContext &ctx)
     }
   });
 
+  solarStormProvider = std::make_unique<SolarStormProvider>(netManager);
+  solarStormProvider->setCallback([this](const SolarStormData &d) {
+    if (widgetPool.count(WidgetType::SOLAR_STORM)) {
+      static_cast<SolarStormPanel *>(widgetPool[WidgetType::SOLAR_STORM].get())
+          ->updateData(d);
+    }
+  });
+
   ionosondeProvider = std::make_unique<IonosondeProvider>(netManager);
   ionosondeProvider->setCallback([this](const IonosondeData &d) {
     if (widgetPool.count(WidgetType::IONOSONDE)) {
@@ -1228,6 +1239,9 @@ DashboardContext::DashboardContext(AppContext &ctx)
     case WidgetType::IONOSONDE:
       widgetPool[type] = std::make_unique<IonosondePanel>(0, 0, 0, 0, fontMgr, texMgr);
       break;
+    case WidgetType::SOLAR_STORM:
+      widgetPool[type] = std::make_unique<SolarStormPanel>(0, 0, 0, 0, fontMgr, texMgr);
+      break;
     default:
       widgetPool[type] = std::make_unique<PlaceholderWidget>(
           0, 0, 0, 0, fontMgr, widgetTypeDisplayName(type),
@@ -1313,7 +1327,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
       WidgetType::WATCHLIST,     WidgetType::STOPWATCH,
       WidgetType::REMINDER,      WidgetType::TROPO,
       WidgetType::LIGHTNING,     WidgetType::METEOR,
-      WidgetType::IONOSONDE};
+      WidgetType::IONOSONDE,     WidgetType::SOLAR_STORM};
   // Note: REPEATER_DIR omitted — RepeaterBook API requires auth key (TODO).
   // Note: WINLINK omitted — Winlink API requires access key (TODO).
 
@@ -1632,6 +1646,11 @@ void DashboardContext::update(AppContext &ctx) {
   // --- Ionosonde fetch (immediate upon widget activation, internal cache 15m) ---
   if (isWidgetActive(WidgetType::IONOSONDE)) {
     ionosondeProvider->fetch(appCfg.lat, appCfg.lon);
+  }
+
+  // --- Solar Storm fetch (immediate upon widget activation, internal cache 1m/5m) ---
+  if (isWidgetActive(WidgetType::SOLAR_STORM)) {
+    solarStormProvider->update();
   }
 
 #ifndef __EMSCRIPTEN__
