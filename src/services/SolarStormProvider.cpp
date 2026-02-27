@@ -42,7 +42,7 @@ void SolarStormProvider::fetchXrayFlux() {
 }
 
 void SolarStormProvider::fetchAlerts() {
-  const char *url = "https://services.swpc.noaa.gov/json/swpc_notifications_summary.json";
+  const char *url = "https://services.swpc.noaa.gov/products/alerts.json";
   netMgr_.fetchAsync(url, [this](std::string body) {
     if (!body.empty()) {
       processAlerts(body);
@@ -112,13 +112,16 @@ void SolarStormProvider::processAlerts(const std::string& body) {
     auto j = json::parse(body);
     std::lock_guard<std::mutex> lock(mutex_);
 
-    // Simplified alert parsing logic: Look for CME predictions
+    // alerts.json is an array of objects
     data_.cmeImpactPredicted = false;
     for (auto& alert : j) {
-      std::string msg = alert.value("message", "");
-      if (msg.find("CME") != std::string::npos && msg.find("IMPACT") != std::string::npos) {
+      std::string message = alert.value("message", "");
+      // Look for CME predictions in alerts
+      if (message.find("CME") != std::string::npos && 
+          (message.find("EXPECTED") != std::string::npos || message.find("PREDICTED") != std::string::npos)) {
         data_.cmeImpactPredicted = true;
-        data_.alertMessage = "CME IMPACT PREDICTED";
+        data_.alertMessage = "CME PREDICTED";
+        break; 
       }
     }
   } catch (const std::exception &e) {

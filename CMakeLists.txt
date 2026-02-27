@@ -494,6 +494,7 @@ set(HAMCLOCK_SOURCES
     src/services/ActivityProvider.cpp
     src/services/DRAPProvider.cpp
     src/services/LiveSpotProvider.cpp
+    src/services/ReachProvider.cpp
     src/services/DXClusterProvider.cpp
     src/services/AuroraProvider.cpp
     src/services/MufRtProvider.cpp

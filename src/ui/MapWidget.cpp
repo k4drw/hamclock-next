@@ -2125,6 +2125,29 @@ void MapWidget::onPropDataReady(PropOverlayType type,
         g = (uint8_t)((1.0f - f) * 200.0f);
         b = 0;
       }
+    } else if (type == PropOverlayType::Heatmap) {
+      // Heatmap: Purple -> Red -> Orange -> Yellow -> White
+      if (t < 0.25f) { // Purple -> Red
+        float f = t / 0.25f;
+        r = (uint8_t)(128 + f * 127);
+        g = 0;
+        b = (uint8_t)(128 * (1.0f - f));
+      } else if (t < 0.5f) { // Red -> Orange
+        float f = (t - 0.25f) / 0.25f;
+        r = 255;
+        g = (uint8_t)(f * 128);
+        b = 0;
+      } else if (t < 0.75f) { // Orange -> Yellow
+        float f = (t - 0.5f) / 0.25f;
+        r = 255;
+        g = (uint8_t)(128 + f * 127);
+        b = 0;
+      } else { // Yellow -> White
+        float f = (t - 0.75f) / 0.25f;
+        r = 255;
+        g = 255;
+        b = (uint8_t)(f * 255);
+      }
     } else {
       // Jet-like colormap for MUF
       if (t < 0.25f) { // Blue -> Cyan

@@ -48,6 +48,7 @@
 #include "services/MufRtProvider.h"
 #include "services/NOAAProvider.h"
 #include "services/RBNProvider.h"
+#include "services/ReachProvider.h"
 #include "services/RSSProvider.h"
 #include "services/RepeaterProvider.h"
 #include "services/RigService.h"
@@ -276,6 +277,7 @@ struct DashboardContext {
   std::unique_ptr<MufRtProvider> mufRtProvider;
   std::unique_ptr<CloudProvider> cloudProvider;
   std::unique_ptr<IonosondeProvider> ionosondeProvider;
+  std::unique_ptr<ReachProvider> reachProvider;
   std::unique_ptr<SantaProvider> santaProvider;
   std::unique_ptr<TropoProvider> tropoProvider;
   std::unique_ptr<LightningProvider> lightningProvider;
@@ -1025,6 +1027,13 @@ DashboardContext::DashboardContext(AppContext &ctx)
     }
   });
 
+  reachProvider = std::make_unique<ReachProvider>(netManager, state);
+  reachProvider->setCallback([this](const ReachData &d) {
+    if (mapArea) {
+      mapArea->onPropDataReady(PropOverlayType::Heatmap, d.grid);
+    }
+  });
+
   timePanel =
       std::make_unique<TimePanel>(0, 0, 0, 0, fontMgr, texMgr, appCfg.callsign);
   timePanel->setCallColor(appCfg.callsignColor);
@@ -1651,6 +1660,10 @@ void DashboardContext::update(AppContext &ctx) {
   // --- Solar Storm fetch (immediate upon widget activation, internal cache 1m/5m) ---
   if (isWidgetActive(WidgetType::SOLAR_STORM)) {
     solarStormProvider->update();
+  }
+
+  if (appCfg.propOverlay == PropOverlayType::Heatmap) {
+    reachProvider->fetch(appCfg.propBand, appCfg.propMode);
   }
 
 #ifndef __EMSCRIPTEN__
