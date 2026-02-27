@@ -18,6 +18,7 @@ void LightningProvider::fetch(double lat, double lon, bool force) {
   lastFetch_ = nowMs;
   LOG_I("LightningProvider", "Fetching lightning data (4-tile scan)...");
 
+  // 1. Fetch RainViewer for specific strike clusters (Primary)
   net_.fetchAsync(
       "https://api.rainviewer.com/public/weather-maps.json",
       [this, lat, lon](std::string response) {
@@ -44,10 +45,11 @@ void LightningProvider::fetch(double lat, double lon, bool force) {
                   char url[256];
                   std::snprintf(url, sizeof(url), "https://nowcast.rainviewer.com/v2/lightning/%d/256/5/%d/%d/1/1_1.json", ts, cx+dx, cy+dy);
                   LOG_D("LightningProvider", "Requesting tile: {}", url);
+                  // Timestamped tiles are immutable, so 1 hour cache is safe
                   net_.fetchAsync(url, [this, lat, lon](std::string strikeData) {
                     LOG_D("LightningProvider", "Received tile ({} bytes)", strikeData.size());
                     processStrikes(strikeData, lat, lon);
-                  });
+                  }, 3600);
                 }
               }
             }
@@ -60,7 +62,7 @@ void LightningProvider::fetch(double lat, double lon, bool force) {
         } catch (const std::exception &e) {
           LOG_E("LightningProvider", "Metadata parse error: {}", e.what());
         }
-      });
+      }, 60); // Metadata refreshed every 60 seconds
 
   // Secondary broad check: Open-Meteo
   char meteoUrl[256];
@@ -85,7 +87,7 @@ void LightningProvider::fetch(double lat, double lon, bool force) {
     } catch (const std::exception &e) {
         LOG_E("LightningProvider", "Open-Meteo parse error: {}", e.what());
     }
-  });
+  }, 300); // 5 min cache for broad weather code
 }
 
 void LightningProvider::processStrikes(const std::string &strikesJson,

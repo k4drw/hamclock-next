@@ -1,7 +1,7 @@
 {
   "mcp_version": "2.6",
   "project": "hamclock-next",
-  "updated_at": "2026-02-27T00:00:00.000Z",
+  "updated_at": "2026-02-27T14:00:00.000Z",
   "project_context": {
     "title": "HamClock Next \u2014 SDL2 Rewrite",
     "callsign": "K4DRW",
@@ -74,7 +74,8 @@
       "The WebServer debug endpoint /debug/widgets calls getDebugData() on all registered panels \u2014 always implement it.",
       "If a provider's API may be unavailable or require auth, add a `bool fetched` flag to the data struct (default false). The provider pushes event on completion with `fetched=true, valid=false` on error \u2014 panel shows meaningful status (e.g. 'API key required') rather than indefinite 'Loading...' state.",
       "Widget::onMouseDown(int mx, int my, Uint16 mod) added for advanced interactivity (Phase 60).",
-      "Widget::onMouseUp now takes `int clicks` as 4th parameter (Uint16 mod, int clicks). Update all Widget subclasses when overriding."
+      "Widget::onMouseUp now takes `int clicks` as 4th parameter (Uint16 mod, int clicks). Update all Widget subclasses when overriding.",
+      "UI Engineering Standard for Graphs (Phase 62): Use 'line_aa' anti-aliased texture via RenderUtils::drawPolylineTextured for smooth plots. Implement onMouseMove hover tooltips to show precise data values."
     ]
   },
   "api_reference": {
@@ -707,6 +708,46 @@
         "src/core/MemoryMonitor.h"
       ],
       "notes": "MemoryMonitor::isLowMemoryDevice() (RAM ≤ 1536 MB) gates memory limits at startup. Low-memory path: TextureManager cache 50→15, FontManager text cache 300→100, texture dimension cap 2048→1024px (Linux ARM only, excludes macOS ARM). 60-second RSS heartbeat log via MemoryMonitor::logStats('heartbeat'). Startup log: 'System RAM: N MB, low-memory mode: YES/NO'."
+    },
+    {
+      "feature_id": "tropo_ducting",
+      "name": "Tropospheric Ducting Forecast",
+      "next_files": [
+        "src/services/TropoProvider.cpp",
+        "src/ui/TropoPanel.cpp",
+        "src/core/TropoData.h"
+      ],
+      "notes": "Uses Open-Meteo API to calculate ducting probability based on pressure stability, wind speed, and temperature/dewpoint inversions. 3-day hourly forecast."
+    },
+    {
+      "feature_id": "lightning_monitor",
+      "name": "Lightning & Static Monitor",
+      "next_files": [
+        "src/services/LightningProvider.cpp",
+        "src/ui/LightningPanel.cpp",
+        "src/core/LightningData.h"
+      ],
+      "notes": "Dual-source strategy using RainViewer (real-time strikes) and Open-Meteo (WMO weather code alerts). Ported distance/bearing algorithms from Home Assistant Blitzortung."
+    },
+    {
+      "feature_id": "greyline_overlap",
+      "name": "Greyline Overlap Sync",
+      "next_files": [
+        "src/core/GreylineCalculator.cpp",
+        "src/ui/GreylineModal.cpp",
+        "src/ui/DXPanel.cpp"
+      ],
+      "notes": "On-demand mutual twilight calculation for DE-to-DX path. High-performance coarse-to-fine scanning optimized for RPi."
+    },
+    {
+      "feature_id": "meteor_scatter",
+      "name": "Meteor Scatter Activity",
+      "next_files": [
+        "src/services/MeteorProvider.cpp",
+        "src/ui/MeteorPanel.cpp",
+        "src/core/MeteorData.h"
+      ],
+      "notes": "Diurnal activity model + annual shower database. High-fidelity anti-aliased graph with hover tooltips for planning weak-signal VHF openings."
     }
   ],
   "partial_features": {

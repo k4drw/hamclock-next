@@ -1,6 +1,6 @@
 {
-  "version": "2.4",
-  "updated_at": "2026-02-27T00:00:00.000Z",
+  "version": "2.5",
+  "updated_at": "2026-02-27T14:00:00.000Z",
   "features": [
     {
       "feature_id": "clock_callsign",
@@ -2899,7 +2899,126 @@
         "60-second RSS heartbeat appears in logs",
         "macOS Apple Silicon not affected by texture dimension cap"
       ],
-      "notes": "Implemented 2026-02-25. Confirmed on RPi 3B (972 MB, LOW) and 64 GB dev machine (NO). Saves ~220 MB RSS headroom."
-    }
-  ]
-}
+            "notes": "Implemented 2026-02-25. Confirmed on RPi 3B (972 MB, LOW) and 64 GB dev machine (NO). Saves ~220 MB RSS headroom."
+          },
+          {
+            "feature_id": "tropo_ducting",
+            "name": "Tropospheric Ducting Forecast",
+            "category": "data_panel",
+            "description": "Calculates probability of VHF/UHF ducting openings based on meteorological stability indices. 3-day hourly forecast.",
+            "original": {
+              "files": [],
+              "symbols": [],
+              "notes": "New feature in hamclock-next. Inspired by Hepburn Tropo Index."
+            },
+            "next": {
+              "files": [
+                "src/services/TropoProvider.cpp",
+                "src/ui/TropoPanel.cpp",
+                "src/core/TropoData.h"
+              ],
+              "symbols": [
+                "TropoProvider",
+                "TropoPanel"
+              ],
+              "notes": "Uses Open-Meteo API for pressure, wind, and dewpoint spread."
+            },
+            "status": "implemented",
+            "acceptance": [
+              "Hourly 3-day ducting forecast",
+              "Color-coded intensity levels",
+              "Visual progress bar for current potential"
+            ]
+          },
+          {
+            "feature_id": "lightning_monitor",
+            "name": "Lightning & Static Monitor",
+            "category": "data_panel",
+            "description": "Real-time lightning strike proximity monitoring and broad thunderstorm alerts for shack safety and QRN assessment.",
+            "original": {
+              "files": [],
+              "symbols": [],
+              "notes": "New feature in hamclock-next."
+            },
+            "next": {
+              "files": [
+                "src/services/LightningProvider.cpp",
+                "src/ui/LightningPanel.cpp",
+                "src/core/LightningData.h"
+              ],
+              "symbols": [
+                "LightningProvider",
+                "LightningPanel"
+              ],
+              "notes": "Dual-source (RainViewer + Open-Meteo). Features blinking safety alert for strikes within 15km."
+            },
+            "status": "implemented",
+            "acceptance": [
+              "Real-time strike counter (10m/30m)",
+              "Closest strike distance and bearing",
+              "Blinking Red 'STRIKE NEARBY' safety alert",
+              "Weather code fallback for broad alerts"
+            ]
+          },
+          {
+            "feature_id": "greyline_overlap",
+            "name": "Greyline Overlap Sync",
+            "category": "utility",
+            "description": "Calculates mutual twilight windows between DE and DX locations for low-band propagation planning.",
+            "original": {
+              "files": [],
+              "symbols": [],
+              "notes": "Original HamClock shows visual greyline but lacks mutual overlap calculation."
+            },
+            "next": {
+              "files": [
+                "src/core/GreylineCalculator.cpp",
+                "src/ui/GreylineModal.cpp",
+                "src/ui/DXPanel.cpp"
+              ],
+              "symbols": [
+                "GreylineCalculator",
+                "GreylineModal"
+              ],
+              "notes": "On-demand modal triggered via [Grey] button on DXPanel."
+            },
+            "status": "implemented",
+            "acceptance": [
+              "Find next mutual greyline window (±12 deg solar elevation)",
+              "Calculate window duration and type (Sunrise/Sunset overlap)",
+              "High-performance coarse-to-fine scanning logic"
+            ]
+          },
+          {
+            "feature_id": "meteor_scatter",
+            "name": "Meteor Scatter Activity",
+            "category": "data_panel",
+            "description": "Predicts VHF ionization potential from sporadic meteors and major annual showers.",
+            "original": {
+              "files": [],
+              "symbols": [],
+              "notes": "New feature in hamclock-next."
+            },
+            "next": {
+              "files": [
+                "src/services/MeteorProvider.cpp",
+                "src/ui/MeteorPanel.cpp",
+                "src/core/MeteorData.h"
+              ],
+              "symbols": [
+                "MeteorProvider",
+                "MeteorPanel"
+              ],
+              "notes": "Diurnal peak model + annual catalog. High-fidelity graph with AA lines and hover tooltips."
+            },
+            "status": "implemented",
+            "acceptance": [
+              "Current activity index (1-10)",
+              "Active shower detection",
+              "24-hour potential graph with hover tooltips",
+              "Anti-aliased visual style"
+            ]
+          }
+        ]
+      }
+      
