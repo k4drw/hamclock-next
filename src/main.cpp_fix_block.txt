@@ -1,0 +1,66 @@
+  // --- Tropo fetch (immediate upon widget activation, internal cache 1hr) ---
+  if (isWidgetActive(WidgetType::TROPO)) {
+    tropoProvider->fetch(appCfg.lat, appCfg.lon);
+  }
+
+  // --- Satellite manager ---
+  // Feeds: SatPanel (in DXSatPane), EME planning tool, map track overlay
+  if (isWidgetActive(WidgetType::EME_TOOL) || appCfg.showSatTrack)
+    satMgr->fetch();
+
+  // --- Weather providers ---
+  if (isWidgetActive(WidgetType::DE_WEATHER))
+    deWeatherProvider->fetch(ctx.state->deLocation.lat,
+                             ctx.state->deLocation.lon);
+  if (isWidgetActive(WidgetType::DX_WEATHER))
+    dxWeatherProvider->fetch(ctx.state->dxLocation.lat,
+                             ctx.state->dxLocation.lon);
+
+  // --- Context-sensitive fetches (existing gating preserved/unchanged) ---
+  if (isWidgetActive(WidgetType::LIVE_SPOTS) ||
+      appCfg.propOverlay != PropOverlayType::None)
+    spotProvider->fetch();
+
+  if (isWidgetActive(WidgetType::ON_THE_AIR) ||
+      isWidgetActive(WidgetType::DX_PEDITIONS) || appCfg.ontaFilter != "Off")
+    activityProvider->fetch();
+
+  if (isWidgetActive(WidgetType::BAND_CONDITIONS))
+    bandProvider->update();
+
+  if (isWidgetActive(WidgetType::CONTESTS))
+    contestProvider->fetch();
+
+  if (isWidgetActive(WidgetType::MOON))
+    moonProvider->update(appCfg.lat, appCfg.lon);
+
+  if (isWidgetActive(WidgetType::HISTORY_FLUX))
+    historyProvider->fetchFlux();
+  if (isWidgetActive(WidgetType::HISTORY_SSN))
+    historyProvider->fetchSSN();
+  if (isWidgetActive(WidgetType::HISTORY_KP))
+    historyProvider->fetchKp();
+
+  if (dstProvider)
+    dstProvider->fetch();
+
+  // --- ADIF log viewer ---
+  if (isWidgetActive(WidgetType::ADIF))
+    adifProvider->fetch(ctx.cfgMgr.configDir() / "logs.adif");
+
+  // --- Propagation map overlays ---
+  if (mufOverlayActive)
+    mufRtProvider->update();
+  if (mufOverlayActive)
+    ionosondeProvider->update();
+
+  // --- Asteroid widget + map pin ---
+  if (isWidgetActive(WidgetType::ASTEROID))
+    asteroidProvider->update();
+
+#ifndef __EMSCRIPTEN__
+  if (ctx.updateChecker)
+    ctx.updateChecker->fetch();
+#endif
+  lastFetchMs = now;
+}

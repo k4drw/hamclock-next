@@ -54,6 +54,7 @@
 #include "services/RotatorService.h"
 #include "services/SDOProvider.h"
 #include "services/SantaProvider.h"
+#include "services/TropoProvider.h"
 #include "services/UpdateChecker.h"
 #include "services/WeatherProvider.h"
 #include "services/WinlinkProvider.h"
@@ -102,6 +103,7 @@
 #include "ui/SysInfoPanel.h"
 #include "ui/TextureManager.h"
 #include "ui/TimePanel.h"
+#include "ui/TropoPanel.h"
 #include "ui/UpdateOverlay.h"
 #include "ui/WatchlistPanel.h"
 #include "ui/WeatherPanel.h"
@@ -268,6 +270,7 @@ struct DashboardContext {
   std::unique_ptr<CloudProvider> cloudProvider;
   std::unique_ptr<IonosondeProvider> ionosondeProvider;
   std::unique_ptr<SantaProvider> santaProvider;
+  std::unique_ptr<TropoProvider> tropoProvider;
   std::unique_ptr<SatelliteManager> satMgr;
   std::unique_ptr<AsteroidProvider> asteroidProvider;
   std::unique_ptr<BeaconProvider> beaconProvider;
@@ -975,6 +978,14 @@ DashboardContext::DashboardContext(AppContext &ctx)
   santaProvider = std::make_unique<SantaProvider>(santaStore);
   santaProvider->update();
 
+  tropoProvider = std::make_unique<TropoProvider>(netManager);
+  tropoProvider->setCallback([this](const TropoData &d) {
+    if (widgetPool.count(WidgetType::TROPO)) {
+      static_cast<TropoPanel *>(widgetPool[WidgetType::TROPO].get())
+          ->updateData(d);
+    }
+  });
+
   timePanel =
       std::make_unique<TimePanel>(0, 0, 0, 0, fontMgr, texMgr, appCfg.callsign);
   timePanel->setCallColor(appCfg.callsignColor);
@@ -1177,6 +1188,9 @@ DashboardContext::DashboardContext(AppContext &ctx)
           0, 0, 0, 0, fontMgr, ctx.appCfg, ctx.cfgMgr, *callbookProvider,
           callbookStore, fccProvider);
       break;
+    case WidgetType::TROPO:
+      widgetPool[type] = std::make_unique<TropoPanel>(0, 0, 0, 0, fontMgr);
+      break;
     default:
       widgetPool[type] = std::make_unique<PlaceholderWidget>(
           0, 0, 0, 0, fontMgr, widgetTypeDisplayName(type),
@@ -1260,7 +1274,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
       WidgetType::SANTA_TRACKER, WidgetType::SDO,
       WidgetType::SOLAR,         WidgetType::SYS_INFO,
       WidgetType::WATCHLIST,     WidgetType::STOPWATCH,
-      WidgetType::REMINDER};
+      WidgetType::REMINDER,      WidgetType::TROPO};
   // Note: REPEATER_DIR omitted — RepeaterBook API requires auth key (TODO).
   // Note: WINLINK omitted — Winlink API requires access key (TODO).
 
@@ -1469,15 +1483,15 @@ void DashboardContext::update(AppContext &ctx) {
   bool isPowerOn = ctx.displayPower->getPower();
 
   // Background refresh every 15 minutes, but only if power is on
-  if (isPowerOn && (now - lastFetchMs > 15 * 60 * 1000)) {
-    auto isWidgetActive = [&](WidgetType type) {
-      for (auto &p : panes) {
-        if (p->getActiveType() == type)
-          return true;
-      }
-      return false;
-    };
+  auto isWidgetActive = [&](WidgetType type) {
+    for (auto &p : panes) {
+      if (p->getActiveType() == type)
+        return true;
+    }
+    return false;
+  };
 
+  if (isPowerOn && (now - lastFetchMs > 15 * 60 * 1000)) {
     // Map overlay helper: true if the MUF/RT propagation overlay is active
     // (mufRtProvider and ionosondeProvider only feed PropOverlayType::Muf)
     const bool mufOverlayActive = appCfg.propOverlay == PropOverlayType::Muf;
@@ -1559,6 +1573,11 @@ void DashboardContext::update(AppContext &ctx) {
       ctx.updateChecker->fetch();
 #endif
     lastFetchMs = now;
+  }
+
+  // --- Tropo fetch (immediate upon widget activation, internal cache 1hr) ---
+  if (isWidgetActive(WidgetType::TROPO)) {
+    tropoProvider->fetch(appCfg.lat, appCfg.lon);
   }
 
 #ifndef __EMSCRIPTEN__

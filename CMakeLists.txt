@@ -510,6 +510,7 @@ set(HAMCLOCK_SOURCES
     src/services/FccProvider.cpp
     src/services/DstProvider.cpp
     src/services/SantaProvider.cpp
+    src/services/TropoProvider.cpp
     src/services/RotatorService.cpp
     src/services/RigService.cpp
     src/services/GPSProvider.cpp
@@ -567,6 +568,7 @@ set(HAMCLOCK_SOURCES
     src/ui/SpaceWeatherPanel.cpp
     src/ui/ThemeCustomizer.cpp
     src/ui/TimePanel.cpp
+    src/ui/TropoPanel.cpp
     src/ui/StopwatchPanel.cpp
     src/ui/ReminderPanel.cpp
     src/ui/UpdateOverlay.cpp
