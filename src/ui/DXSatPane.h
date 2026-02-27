@@ -8,6 +8,7 @@
 #include "FontManager.h"
 #include "SatPanel.h"
 #include "SatelliteSetup.h"
+#include "GreylineModal.h"
 #include "TextureManager.h"
 #include "Widget.h"
 
@@ -43,7 +44,8 @@ public:
   void restoreState(const std::string &panelMode, const std::string &satName);
 
   bool isModalActive() const override {
-    return menuState_ != MenuState::Closed || satelliteSetup_.isActive();
+    return menuState_ != MenuState::Closed || satelliteSetup_.isActive() ||
+           greylineModal_.isActive();
   }
 
   bool isConfiguring() const override { return isModalActive(); }
@@ -78,6 +80,7 @@ public:
     satPanel_.setTheme(theme);
     dxPanel_.setTheme(theme);
     satelliteSetup_.setTheme(theme);
+    greylineModal_.setTheme(theme);
   }
 
   void setMetric(bool metric) override {
@@ -85,6 +88,7 @@ public:
     satPanel_.setMetric(metric);
     dxPanel_.setMetric(metric);
     satelliteSetup_.setMetric(metric);
+    greylineModal_.setMetric(metric);
   }
 
   std::string getName() const override { return "DXSatPane"; }
@@ -132,6 +136,7 @@ private:
   DXPanel dxPanel_;
   SatPanel satPanel_;
   HamClock::SatelliteSetup satelliteSetup_;
+  HamClock::GreylineModal greylineModal_;
   OrbitPredictor predictor_;
 
   void notifyModeChanged();

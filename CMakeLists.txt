@@ -471,6 +471,7 @@ set(HAMCLOCK_SOURCES
     src/core/OrbitPredictor.cpp
     src/core/DXClusterData.cpp
     src/core/DisplayPower.cpp
+    src/core/GreylineCalculator.cpp
     src/core/BrightnessManager.cpp
     src/core/CPUMonitor.cpp
     src/core/SatelliteManager.cpp
@@ -542,6 +543,7 @@ set(HAMCLOCK_SOURCES
     src/ui/SysInfoPanel.cpp
     src/ui/DRAPPanel.cpp
     src/ui/GimbalPanel.cpp
+    src/ui/GreylineModal.cpp
     src/ui/HistoryPanel.cpp
     src/ui/MoonPanel.cpp
     src/ui/SDOPanel.cpp

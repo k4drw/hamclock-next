@@ -1,5 +1,6 @@
 #include "DXSatPane.h"
 #include "../core/Constants.h"
+#include "../core/GreylineCalculator.h"
 #include "../core/MemoryMonitor.h"
 #include "../core/Theme.h"
 #include "FontCatalog.h"
@@ -17,12 +18,24 @@ DXSatPane::DXSatPane(int x, int y, int w, int h, FontManager &fontMgr,
       dxPanel_(x, y, w, h, fontMgr, state, std::move(weatherStore)),
       satPanel_(x, y, w, h, fontMgr, texMgr),
       satelliteSetup_(0, 0, HamClock::LOGICAL_WIDTH, HamClock::LOGICAL_HEIGHT,
-                      fontMgr, satMgr) {}
+                      fontMgr, satMgr),
+      greylineModal_(0, 0, HamClock::LOGICAL_WIDTH, HamClock::LOGICAL_HEIGHT,
+                     fontMgr) {
+
+  dxPanel_.setOnGreylineSync([this]() {
+    auto window = HamClock::GreylineCalculator::findNextOverlap(
+        state_->deLocation, state_->dxLocation,
+        std::chrono::system_clock::now());
+    greylineModal_.setWindow(window, state_->dxCallsign);
+  });
+}
 
 DXSatPane::~DXSatPane() { destroyMenuTextures(); }
 
 void DXSatPane::renderModal(SDL_Renderer *renderer) {
-  if (satelliteSetup_.isActive()) {
+  if (greylineModal_.isActive()) {
+    greylineModal_.render(renderer);
+  } else if (satelliteSetup_.isActive()) {
     satelliteSetup_.render(renderer);
   } else if (menuState_ != MenuState::Closed) {
     renderMenu(renderer);
@@ -139,6 +152,9 @@ void DXSatPane::onResize(int x, int y, int w, int h) {
 }
 
 bool DXSatPane::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
+  if (greylineModal_.isActive()) {
+    return greylineModal_.onMouseUp(mx, my, mod, clicks);
+  }
   if (satelliteSetup_.isActive()) {
     return satelliteSetup_.onMouseUp(mx, my, mod, clicks);
   }
@@ -182,20 +198,29 @@ bool DXSatPane::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
     }
   }
 
-  // Upper 10% → open menu
+  // 1. Forward to active panel first (to catch specific buttons like Greyline Sync)
+  if (mode_ == Mode::DX) {
+    if (dxPanel_.onMouseUp(mx, my, mod, clicks))
+      return true;
+  } else {
+    if (satPanel_.onMouseUp(mx, my, mod, clicks))
+      return true;
+  }
+
+  // 2. Upper 10% title bar → open selection menu
   int headerH = std::max(1, height_ / 10);
   if (my < y_ + headerH) {
     openMenu();
     return true;
   }
 
-  // Forward to active panel
-  if (mode_ == Mode::DX)
-    return dxPanel_.onMouseUp(mx, my, mod, clicks);
-  return satPanel_.onMouseUp(mx, my, mod, clicks);
+  return false;
 }
 
 bool DXSatPane::onMouseDown(int mx, int my, Uint16 mod) {
+  if (greylineModal_.isActive()) {
+    return true; // Modal consumes
+  }
   if (satelliteSetup_.isActive()) {
     return satelliteSetup_.onMouseDown(mx, my, mod);
   }
@@ -203,6 +228,9 @@ bool DXSatPane::onMouseDown(int mx, int my, Uint16 mod) {
 }
 
 bool DXSatPane::onKeyDown(SDL_Keycode key, Uint16 mod) {
+  if (greylineModal_.isActive()) {
+    return greylineModal_.onKeyDown(key, mod);
+  }
   if (satelliteSetup_.isActive()) {
     return satelliteSetup_.onKeyDown(key, mod);
   }
@@ -232,6 +260,9 @@ bool DXSatPane::onKeyDown(SDL_Keycode key, Uint16 mod) {
 }
 
 bool DXSatPane::onTextInput(const char *text) {
+  if (greylineModal_.isActive()) {
+    return true; // Modal consumes
+  }
   if (satelliteSetup_.isActive()) {
     return satelliteSetup_.onTextInput(text);
   }
