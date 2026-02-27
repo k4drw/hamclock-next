@@ -44,7 +44,7 @@ void DXClusterDataStore::loadPersisted() {
   auto newData = std::make_shared<DXClusterData>(*data_);
   newData->spots.clear();
 
-  db.query(sql, [this, &newData](const DatabaseManager::Row &row) {
+  db.query(sql, [&newData](const DatabaseManager::Row &row) {
     if (row.size() < 12)
       return true;
     DXClusterSpot s;

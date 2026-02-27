@@ -42,10 +42,11 @@ BOOL WINAPI K32GetProcessMemoryInfo(HANDLE Process,
 #if defined(__linux__) || defined(__APPLE__)
 #include <sys/statvfs.h>
 #include <unistd.h>
-#elif defined(__APPLE__)
+#endif
+
+#if defined(__APPLE__)
 #include <mach/mach.h>
 #include <sys/sysctl.h>
-#include <unistd.h>
 #endif
 
 class MemoryMonitor {

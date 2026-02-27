@@ -1,4 +1,5 @@
 #include "GreylineModal.h"
+#include "../core/Astronomy.h"
 #include "../core/Theme.h"
 #include "FontCatalog.h"
 #include <iomanip>
@@ -32,7 +33,7 @@ void GreylineModal::setWindow(const GreylineWindow &window, const std::string &d
 static std::string formatTime(std::chrono::system_clock::time_point tp) {
   std::time_t t = std::chrono::system_clock::to_time_t(tp);
   std::tm utc{};
-  gmtime_r(&t, &utc);
+  Astronomy::portable_gmtime(&t, &utc);
   std::ostringstream ss;
   ss << std::setfill('0') << std::setw(2) << utc.tm_hour << ":"
      << std::setfill('0') << std::setw(2) << utc.tm_min << "Z";

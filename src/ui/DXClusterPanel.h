@@ -9,7 +9,7 @@
 
 // Forward declarations
 class RigService;
-class AppConfig;
+struct AppConfig;
 
 class DXClusterPanel : public ListPanel {
 public:
