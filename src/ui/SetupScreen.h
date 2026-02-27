@@ -22,6 +22,7 @@ public:
   void update() override;
   void render(SDL_Renderer *renderer) override;
   void onResize(int x, int y, int w, int h) override;
+  bool onMouseDown(int mx, int my, Uint16 mod) override;
   bool onMouseUp(int mx, int my, Uint16 mod, int clicks) override;
   bool onKeyDown(SDL_Keycode key, Uint16 mod) override;
   bool onTextInput(const char *text) override;
@@ -161,6 +162,7 @@ private:
   SDL_Rect hubModeRect_ = {0, 0, 0, 0};
   SDL_Rect hubIpRect_ = {0, 0, 0, 0};
   SDL_Rect hubPortRect_ = {0, 0, 0, 0};
+  std::map<std::string, SDL_Color> colorOverrides_;
 
   // Track dimensions to detect size changes
   int lastRenderWidth_ = 0;

@@ -1,4 +1,5 @@
 #include "DXClusterSetup.h"
+#include "../core/Theme.h"
 #include "FontCatalog.h"
 #include <algorithm>
 #include <cstring>
@@ -57,6 +58,8 @@ static void renderField(SDL_Renderer *renderer, FontManager &fontMgr,
 void DXClusterSetup::render(SDL_Renderer *renderer) {
   if (!fontMgr_.ready())
     return;
+
+  ThemeColors themes = getThemeColors(theme_);
 
   // Dark background with a slight fade to indicate it's an overlay
   SDL_SetRenderDrawColor(renderer, 10, 10, 20, 250);
@@ -125,25 +128,27 @@ void DXClusterSetup::render(SDL_Renderer *renderer) {
   y += pad * 2;
 
   // --- Buttons ---
-  int btnW = 120;
-  int btnH = 40;
+  int btnW = 100;
+  int btnH = 34;
   saveRect_ = {cx - btnW - pad / 2, y, btnW, btnH};
   cancelRect_ = {cx + pad / 2, y, btnW, btnH};
 
-  // Save Button
-  SDL_SetRenderDrawColor(renderer, 0, 100, 0, 255);
+  // Done Button
+  SDL_SetRenderDrawColor(renderer, themes.success.r, themes.success.g,
+                         themes.success.b, 255);
   SDL_RenderFillRect(renderer, &saveRect_);
-  SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
+  SDL_SetRenderDrawColor(renderer, 255, 255, 255, 50);
   SDL_RenderDrawRect(renderer, &saveRect_);
-  cat->drawText(renderer, "SAVE", saveRect_.x + btnW / 2,
+  cat->drawText(renderer, "Done", saveRect_.x + btnW / 2,
                 saveRect_.y + btnH / 2, white, FontStyle::UIBold, true);
 
   // Cancel Button
-  SDL_SetRenderDrawColor(renderer, 100, 0, 0, 255);
+  SDL_SetRenderDrawColor(renderer, themes.danger.r, themes.danger.g,
+                         themes.danger.b, 255);
   SDL_RenderFillRect(renderer, &cancelRect_);
-  SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
+  SDL_SetRenderDrawColor(renderer, 255, 255, 255, 50);
   SDL_RenderDrawRect(renderer, &cancelRect_);
-  cat->drawText(renderer, "CANCEL", cancelRect_.x + btnW / 2,
+  cat->drawText(renderer, "Cancel", cancelRect_.x + btnW / 2,
                 cancelRect_.y + btnH / 2, white, FontStyle::UIBold, true);
 
   y += btnH + pad;

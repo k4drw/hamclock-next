@@ -162,15 +162,16 @@ void StopwatchPanel::renderSetup(SDL_Renderer *renderer) {
   }
 
   // Bottom buttons
-  int btnW = 60;
-  int btnH = 24;
+  int btnW = 80;
+  int btnH = 28;
   int btnY = y_ + height_ - btnH - 6;
 
   // Done button
   doneRect_ = {cx - btnW / 2, btnY, btnW, btnH};
-  SDL_SetRenderDrawColor(renderer, 20, 60, 20, 255);
+  SDL_SetRenderDrawColor(renderer, themes.success.r, themes.success.g,
+                         themes.success.b, 255);
   SDL_RenderFillRect(renderer, &doneRect_);
-  SDL_SetRenderDrawColor(renderer, 50, 150, 50, 255);
+  SDL_SetRenderDrawColor(renderer, 255, 255, 255, 100);
   SDL_RenderDrawRect(renderer, &doneRect_);
   t = fontMgr_.renderText(renderer, "Done", white, 10, &tw, &th);
   if (t) {

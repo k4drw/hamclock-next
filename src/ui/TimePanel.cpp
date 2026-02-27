@@ -553,7 +553,7 @@ void TimePanel::renderEditOverlay(SDL_Renderer *renderer) {
       paletteY + ((kNumColors + cols - 1) / cols) * (swatchSize + gap) + pad;
   if (hintY + 14 < y_ + height_) {
     SDL_Color gray = {140, 140, 140, 255};
-    cat->drawText(renderer, "Enter=OK  Esc=Cancel", x_ + pad, hintY, gray,
+    cat->drawText(renderer, "Enter=Done  Esc=Cancel", x_ + pad, hintY, gray,
                   FontStyle::Caption);
   }
 

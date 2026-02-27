@@ -2,7 +2,8 @@
 #include "ConfigManager.h"
 #include <map>
 
-ThemeColors getThemeColors(const std::string &theme) {
+ThemeColors getThemeColors(const std::string &theme,
+                           const std::map<std::string, SDL_Color> *overrides) {
   ThemeColors colors;
   if (theme == "dark") {
     colors.bg = {10, 10, 15, 255};
@@ -40,8 +41,12 @@ ThemeColors getThemeColors(const std::string &theme) {
   // Apply overrides if theme is "custom" or for any theme if overrides exist
   // We prioritize the "custom" theme.
   if (theme == "custom") {
-    applyOverrides(colors,
-                   ConfigManager::instance().getConfig().colorOverrides);
+    if (overrides) {
+      applyOverrides(colors, *overrides);
+    } else {
+      applyOverrides(colors,
+                     ConfigManager::instance().getConfig().colorOverrides);
+    }
   }
 
   return colors;

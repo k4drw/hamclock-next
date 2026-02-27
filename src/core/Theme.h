@@ -19,6 +19,8 @@ struct ThemeColors {
   SDL_Color info;    // Informational / secondary accent
 };
 
-ThemeColors getThemeColors(const std::string &theme);
+ThemeColors getThemeColors(const std::string &theme,
+                           const std::map<std::string, SDL_Color> *overrides =
+                               nullptr);
 void applyOverrides(ThemeColors &colors,
                     const std::map<std::string, SDL_Color> &overrides);

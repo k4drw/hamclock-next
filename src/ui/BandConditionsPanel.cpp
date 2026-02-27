@@ -100,7 +100,8 @@ void BandConditionsPanel::render(SDL_Renderer *renderer) {
 
   // Use logical styles
   FontStyle cellStyle = (rowHeight < 15) ? FontStyle::Tiny : FontStyle::Micro;
-  FontStyle headerStyle = (rowHeight < 15) ? FontStyle::TinyBold : FontStyle::MicroBold;
+  FontStyle headerStyle =
+      (rowHeight < 15) ? FontStyle::TinyBold : FontStyle::MicroBold;
 
   SDL_Color headerColor = themes.accent;
   SDL_Color labelColor = themes.text;
@@ -108,18 +109,18 @@ void BandConditionsPanel::render(SDL_Renderer *renderer) {
   int curY = y_ + titleH + pad;
 
   auto drawInCol = [&](const std::string &text, int colIdx, SDL_Color color,
-                       FontStyle style) {
+                       FontStyle style, int yOffset = 0) {
     int tx = x_ + pad + colIdx * colWidth + colWidth / 2;
-    int ty = curY + rowHeight / 2;
+    int ty = curY + rowHeight / 2 + yOffset;
     cat->drawText(renderer, text, tx, ty, color, style, true);
   };
 
   // Header
   bool useShort = (width_ < 100);
   if (!useShort) {
-    drawInCol("Band", 0, headerColor, headerStyle);
-    drawInCol("Day", 1, headerColor, headerStyle);
-    drawInCol("Night", 2, headerColor, headerStyle);
+    drawInCol("Band", 0, headerColor, headerStyle, -2);
+    drawInCol("Day", 1, headerColor, headerStyle, -2);
+    drawInCol("Night", 2, headerColor, headerStyle, -2);
   }
 
   // Line under header (only if showing header)

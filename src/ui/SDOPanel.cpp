@@ -215,20 +215,18 @@ void SDOPanel::renderMenu(SDL_Renderer *renderer, const ThemeColors &themes) {
   drawToggle(graylineRect_, tempGrayline_, "Grayline Tool");
   drawToggle(movieRect_, tempMovie_, "Show Movie");
 
-  // OK / Cancel
-  SDL_SetRenderDrawColor(renderer, 60, 60, 60, 255);
-  SDL_RenderFillRect(renderer, &okRect_);
-  SDL_RenderFillRect(renderer, &cancelRect_);
-  SDL_SetRenderDrawColor(renderer, 255, 255, 255, 150);
-  SDL_RenderDrawRect(renderer, &okRect_);
-  SDL_RenderDrawRect(renderer, &cancelRect_);
+  // Done / Cancel
+  auto drawBtn = [&](const SDL_Rect &r, const char *label, SDL_Color bg) {
+    SDL_SetRenderDrawColor(renderer, bg.r, bg.g, bg.b, 255);
+    SDL_RenderFillRect(renderer, &r);
+    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 150);
+    SDL_RenderDrawRect(renderer, &r);
+    cat->drawText(renderer, label, r.x + r.w / 2, r.y + r.h / 2, themes.text,
+                  FontStyle::SmallBold, true, false, true);
+  };
 
-  cat->drawText(renderer, "Ok", okRect_.x + okRect_.w / 2,
-                okRect_.y + okRect_.h / 2, themes.text, FontStyle::SmallRegular,
-                true);
-  cat->drawText(renderer, "Cancel", cancelRect_.x + cancelRect_.w / 2,
-                cancelRect_.y + cancelRect_.h / 2, themes.text,
-                FontStyle::SmallRegular, true);
+  drawBtn(okRect_, "Done", themes.success);
+  drawBtn(cancelRect_, "Cancel", themes.danger);
 }
 
 void SDOPanel::onResize(int x, int y, int w, int h) {
@@ -271,11 +269,14 @@ void SDOPanel::recalcMenuLayout() {
   curY += itemH_;
   movieRect_ = {menuRect_.x + 10, curY, mW - 20, itemH_};
 
-  int btnW = 80;
-  int btnH = 35;
-  okRect_ = {menuRect_.x + 30, menuRect_.y + mH - 45, btnW, btnH};
-  cancelRect_ = {menuRect_.x + mW - 30 - btnW, menuRect_.y + mH - 45, btnW,
-                 btnH};
+  int btnW = 100;
+  int btnH = 34;
+  int spacing = 20;
+  int totalBtnsW = 2 * btnW + spacing;
+  int startX = menuRect_.x + (mW - totalBtnsW) / 2;
+
+  okRect_ = {startX, menuRect_.y + mH - 45, btnW, btnH};
+  cancelRect_ = {startX + btnW + spacing, menuRect_.y + mH - 45, btnW, btnH};
 }
 
 bool SDOPanel::onMouseUp(int mx, int my, Uint16 mod, int clicks) {

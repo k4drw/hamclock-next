@@ -82,11 +82,20 @@ void ReminderPanel::update() {
 
   if (checking_) {
     const auto &data = callbookStore_->get();
-    if (data.valid && data.callsign == config_.callsign &&
-        !data.expiryDate.empty()) {
-      config_.callsignExpiry = data.expiryDate;
-      config_.callsignExpiryLastCheck = std::time(nullptr);
-      cfgMgr_.save(config_);
+    if (data.valid && data.callsign == config_.callsign) {
+      bool changed = false;
+      if (!data.expiryDate.empty() && config_.callsignExpiry != data.expiryDate) {
+        config_.callsignExpiry = data.expiryDate;
+        changed = true;
+      }
+      if (!data.frn.empty() && config_.callsignFrn != data.frn) {
+        config_.callsignFrn = data.frn;
+        changed = true;
+      }
+      if (changed || config_.callsignExpiryLastCheck == 0) {
+        config_.callsignExpiryLastCheck = std::time(nullptr);
+        cfgMgr_.save(config_);
+      }
       checking_ = false;
     } else if (data.valid) {
       // Lookup finished but returned empty or wrong callsign
@@ -210,8 +219,8 @@ void ReminderPanel::renderModal(SDL_Renderer *renderer) {
 
   // Reminder label (wrap at dialog width)
   int tw, th;
-  SDL_Texture *tex =
-      cat->renderText(renderer, notifyLabel_, yellow, FontStyle::Caption, &tw, &th);
+  SDL_Texture *tex = cat->renderText(renderer, notifyLabel_, yellow,
+                                     FontStyle::Caption, &tw, &th);
   if (tex) {
     // Centre horizontally, keep within box
     int lx = dx + (dW - tw) / 2;
@@ -288,8 +297,8 @@ void ReminderPanel::render(SDL_Renderer *renderer) {
   int fy = y_ + height_ - footerH - 2;
   int tw = 0, th = 0;
   SDL_Color dim = {100, 100, 120, 255};
-  SDL_Texture *ftex = fontMgr_.catalog()->renderText(
-      renderer, "Setup", dim, FontStyle::Tiny, &tw, &th);
+  SDL_Texture *ftex = fontMgr_.catalog()->renderText(renderer, "Setup", dim,
+                                                     FontStyle::Tiny, &tw, &th);
   if (ftex) {
     footerRect_ = {x_ + (width_ - tw) / 2, fy + (footerH - th) / 2, tw, th};
     SDL_RenderCopy(renderer, ftex, nullptr, &footerRect_);
@@ -322,9 +331,8 @@ void ReminderPanel::renderSetup(SDL_Renderer *renderer) {
 
   // Title
   int tw, th;
-  SDL_Texture *t =
-      cat->renderText(renderer, "--- Reminders Setup ---", cyan,
-                      FontStyle::FastBold, &tw, &th);
+  SDL_Texture *t = cat->renderText(renderer, "--- Reminders Setup ---", cyan,
+                                   FontStyle::FastBold, &tw, &th);
   if (t) {
     SDL_Rect tr = {cx - tw / 2, y, tw, th};
     SDL_RenderCopy(renderer, t, nullptr, &tr);
@@ -371,18 +379,18 @@ void ReminderPanel::renderSetup(SDL_Renderer *renderer) {
     SDL_SetRenderDrawColor(renderer, 80, 20, 20, 255);
     SDL_RenderFillRect(renderer, &xRect);
     cat->drawText(renderer, "x", xRect.x + xRect.w / 2, xRect.y + xRect.h / 2,
-                  white, FontStyle::Tiny, true, true);
+                  white, FontStyle::Tiny, true, false, true);
 
     y += fieldH + 5;
   }
 
   // Buttons
-  int btnW = 60;
-  int btnH = 22;
+  int btnW = 80;
+  int btnH = 28;
   int btnY = y_ + height_ - btnH - 6;
 
   // "+ Add"
-  addRect_ = {x_ + 5, btnY - 28, 56, 20};
+  addRect_ = {x_ + 5, btnY - 32, 56, 20};
   SDL_SetRenderDrawColor(renderer, 20, 60, 20, 255);
   SDL_RenderFillRect(renderer, &addRect_);
   SDL_SetRenderDrawColor(renderer, 50, 150, 50, 255);
@@ -396,7 +404,7 @@ void ReminderPanel::renderSetup(SDL_Renderer *renderer) {
   }
 
   // "Auto-Pop"
-  autoPopRect_ = {x_ + 65, btnY - 28, 72, 20};
+  autoPopRect_ = {x_ + 65, btnY - 32, 72, 20};
   SDL_SetRenderDrawColor(renderer, 20, 20, 80, 255);
   SDL_RenderFillRect(renderer, &autoPopRect_);
   SDL_SetRenderDrawColor(renderer, 50, 50, 150, 255);
@@ -412,11 +420,13 @@ void ReminderPanel::renderSetup(SDL_Renderer *renderer) {
 
   // "Cancel"
   cancelRect_ = {cx - btnW - 5, btnY, btnW, btnH};
-  SDL_SetRenderDrawColor(renderer, 60, 20, 20, 255);
+  SDL_SetRenderDrawColor(renderer, themes.danger.r, themes.danger.g,
+                         themes.danger.b, 255);
   SDL_RenderFillRect(renderer, &cancelRect_);
-  SDL_SetRenderDrawColor(renderer, 150, 50, 50, 255);
+  SDL_SetRenderDrawColor(renderer, 255, 255, 255, 100);
   SDL_RenderDrawRect(renderer, &cancelRect_);
-  tex = cat->renderText(renderer, "Cancel", white, FontStyle::Caption, &tw, &th);
+  tex =
+      cat->renderText(renderer, "Cancel", white, FontStyle::Caption, &tw, &th);
   if (tex) {
     SDL_Rect tr = {cancelRect_.x + (btnW - tw) / 2,
                    cancelRect_.y + (btnH - th) / 2, tw, th};
@@ -426,9 +436,10 @@ void ReminderPanel::renderSetup(SDL_Renderer *renderer) {
 
   // "Done"
   saveRect_ = {cx + 5, btnY, btnW, btnH};
-  SDL_SetRenderDrawColor(renderer, 20, 60, 20, 255);
+  SDL_SetRenderDrawColor(renderer, themes.success.r, themes.success.g,
+                         themes.success.b, 255);
   SDL_RenderFillRect(renderer, &saveRect_);
-  SDL_SetRenderDrawColor(renderer, 50, 150, 50, 255);
+  SDL_SetRenderDrawColor(renderer, 255, 255, 255, 100);
   SDL_RenderDrawRect(renderer, &saveRect_);
   tex = cat->renderText(renderer, "Done", white, FontStyle::Caption, &tw, &th);
   if (tex) {
@@ -678,7 +689,8 @@ void ReminderPanel::renderReminderList(SDL_Renderer *renderer) {
       SDL_RenderCopy(renderer, tex, nullptr, &dst);
       cat->destroyTexture(tex);
     }
-    tex = cat->renderText(renderer, status, color, FontStyle::Caption, &tw, &th);
+    tex =
+        cat->renderText(renderer, status, color, FontStyle::Caption, &tw, &th);
     if (tex) {
       SDL_Rect dst = {x_ + width_ - 10 - tw, yOff + (lineH - th) / 2, tw, th};
       SDL_RenderCopy(renderer, tex, nullptr, &dst);
@@ -705,14 +717,15 @@ void ReminderPanel::renderReminderList(SDL_Renderer *renderer) {
       color = {255, 100, 100, 255};
 
     int tw, th;
-    SDL_Texture *tex =
-        cat->renderText(renderer, re.label, color, FontStyle::Caption, &tw, &th);
+    SDL_Texture *tex = cat->renderText(renderer, re.label, color,
+                                       FontStyle::Caption, &tw, &th);
     if (tex) {
       SDL_Rect dst = {x_ + 10, yOff + (lineH - th) / 2, tw, th};
       SDL_RenderCopy(renderer, tex, nullptr, &dst);
       cat->destroyTexture(tex);
     }
-    tex = cat->renderText(renderer, status, color, FontStyle::Caption, &tw, &th);
+    tex =
+        cat->renderText(renderer, status, color, FontStyle::Caption, &tw, &th);
     if (tex) {
       SDL_Rect dst = {x_ + width_ - 10 - tw, yOff + (lineH - th) / 2, tw, th};
       SDL_RenderCopy(renderer, tex, nullptr, &dst);

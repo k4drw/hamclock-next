@@ -160,6 +160,12 @@ public:
     return inst;
   }
 
+  // Delete copy and move
+  ConfigManager(const ConfigManager &) = delete;
+  ConfigManager &operator=(const ConfigManager &) = delete;
+  ConfigManager(ConfigManager &&) = delete;
+  ConfigManager &operator=(ConfigManager &&) = delete;
+
   AppConfig &getConfig() { return config_; }
   const AppConfig &getConfig() const { return config_; }
 
@@ -168,17 +174,18 @@ public:
   bool init();
 
   // Load config from disk. Returns false if file is missing or invalid.
-  bool load(AppConfig &config) const;
+  bool load(AppConfig &config);
 
   // Save config to disk. Creates directories if needed. Returns false on
   // failure.
-  bool save(const AppConfig &config) const;
+  bool save(const AppConfig &config);
 
   // Returns the resolved config file path (valid after init()).
   const std::filesystem::path &configPath() const { return configPath_; }
   const std::filesystem::path &configDir() const { return configDir_; }
 
 private:
+  ConfigManager() = default;
   AppConfig config_;
   std::filesystem::path configDir_;
   std::filesystem::path configPath_;

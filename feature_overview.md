@@ -198,8 +198,10 @@ Every external data fetch is cached both in memory and on disk.
 
 ### 10. Modern UI Enhancements
 
-- **Multiple color themes** — Dark, Light, High Contrast, and custom theme support
-- **Adaptive layouts** — panels reflow for 7-inch (1024×600) displays and larger 1080p/4K screens
+- **Dynamic Theme Engine** — Multiple built-in color themes (Default, Dark, Glass) plus a powerful **Custom Theme** editor.
+- **Real-time UI Preview** — Changes in the Theme Customizer are reflected immediately across the entire UI before saving.
+- **UI Standardization** — Unified interaction patterns (PascalCase "Done/Cancel" buttons), consistent sizing, and semantic theme-aware coloring for all interactive elements.
+- **Adaptive layouts** — panels reflow for 7-inch (1024×600) displays and larger 1080p/4K screens.
 - **Manual pane rotation** — left/right arrows in multi-pane view; resets auto-rotate timer
 - **DX spot inline label** — callsign, frequency, and band shown next to selected map bubble without requiring hover
 - **Semantic click API** — external tools can trigger named widget actions (`/debug/click?widget=SolarPanel&action=Cycle`) without pixel-coordinate guessing

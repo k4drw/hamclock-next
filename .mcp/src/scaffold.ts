@@ -70,6 +70,7 @@ private:
 function generateSource(name: string, type: "Widget" | "Service"): string {
     if (type === "Widget") {
         return `#include "${name}.h"
+#include "../core/Theme.h"
 #include "RenderUtils.h"
 
 ${name}::${name}(int x, int y, int w, int h, FontManager &fontMgr, std::shared_ptr<HamClockState> state)
@@ -81,13 +82,15 @@ void ${name}::update() {
 }
 
 void ${name}::render(SDL_Renderer *renderer) {
+  ThemeColors themes = getThemeColors(theme_);
+
   // Draw background
-  SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, themes.bg.a);
   SDL_Rect rect = {x_, y_, width_, height_};
   SDL_RenderFillRect(renderer, &rect);
   
   // Draw border
-  SDL_SetRenderDrawColor(renderer, 100, 100, 100, 255);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, themes.border.a);
   SDL_RenderDrawRect(renderer, &rect);
   
   // Draw content
@@ -95,8 +98,18 @@ void ${name}::render(SDL_Renderer *renderer) {
   
   // Example text
   // int tw, th;
-  // SDL_Texture* tex = fontMgr_.renderText(renderer, "Hello", {255,255,255,255}, 12, &tw, &th);
-  // ...
+  // auto* cat = fontMgr_.catalog();
+  // cat->drawText(renderer, "Hello", x_ + 10, y_ + 10, themes.text, FontStyle::UI);
+}
+
+bool ${name}::onMouseDown(int mx, int my, Uint16 mod) {
+  // Return true if you handle the click
+  return false;
+}
+
+bool ${name}::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
+  // Return true if you handle the release
+  return false;
 }
 
 void ${name}::onResize(int x, int y, int w, int h) {

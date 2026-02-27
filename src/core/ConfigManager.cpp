@@ -100,7 +100,7 @@ bool ConfigManager::init() {
                 console.log('[IDBFS] Sync-from-IDB complete' +
                             (mounted ? "" : " (no IDBFS — session only)"));
               }
-              if (typeof Module._hamclock_after_idbfs == = 'function')
+              if (typeof Module._hamclock_after_idbfs === 'function')
                 Module._hamclock_after_idbfs();
             });
       },
@@ -111,7 +111,7 @@ bool ConfigManager::init() {
   return true;
 }
 
-bool ConfigManager::load(AppConfig &config) const {
+bool ConfigManager::load(AppConfig &config) {
   if (configPath_.empty())
     return false;
 
@@ -387,13 +387,19 @@ bool ConfigManager::load(AppConfig &config) const {
     config.rigAutoTune = r.value("auto_tune", true);
   }
 
+  // Sync internal state
+  config_ = config;
+
   // Require at least a callsign to consider config valid
   return !config.callsign.empty();
 }
 
-bool ConfigManager::save(const AppConfig &config) const {
+bool ConfigManager::save(const AppConfig &config) {
   if (configPath_.empty())
     return false;
+
+  // Sync internal state
+  config_ = config;
 
   // Create directory if needed
   std::error_code ec;

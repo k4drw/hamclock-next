@@ -153,7 +153,7 @@ struct DashboardContext;
 struct AppContext {
   // Core & Configuration
   AppConfig appCfg;
-  ConfigManager cfgMgr;
+  ConfigManager &cfgMgr = ConfigManager::instance();
   std::shared_ptr<HamClockState> state;
   bool appRunning = true;
 
@@ -2251,7 +2251,18 @@ void main_tick() {
                                      event.key.keysym.mod);
         else if (event.type == SDL_TEXTINPUT)
           ctx.setupWidget->onTextInput(event.text.text);
-        else if (event.type == SDL_MOUSEBUTTONUP) {
+        else if (event.type == SDL_MOUSEBUTTONDOWN) {
+          int smx = event.button.x, smy = event.button.y;
+          if (FIDELITY_MODE) {
+            float pixX = event.button.x * static_cast<float>(ctx.globalDrawW) /
+                         ctx.globalWinW;
+            float pixY = event.button.y * static_cast<float>(ctx.globalDrawH) /
+                         ctx.globalWinH;
+            smx = static_cast<int>(pixX / ctx.layScale);
+            smy = static_cast<int>(pixY / ctx.layScale);
+          }
+          ctx.setupWidget->onMouseDown(smx, smy, SDL_GetModState());
+        } else if (event.type == SDL_MOUSEBUTTONUP) {
           int smx = event.button.x, smy = event.button.y;
           if (FIDELITY_MODE) {
             float pixX = event.button.x * static_cast<float>(ctx.globalDrawW) /
@@ -2263,6 +2274,24 @@ void main_tick() {
           }
           ctx.setupWidget->onMouseUp(smx, smy, SDL_GetModState(),
                                      event.button.clicks);
+        } else if (event.type == SDL_MOUSEMOTION) {
+          int smx = event.motion.x, smy = event.motion.y;
+          if (FIDELITY_MODE) {
+            float pixX = event.motion.x * static_cast<float>(ctx.globalDrawW) /
+                         ctx.globalWinW;
+            float pixY = event.motion.y * static_cast<float>(ctx.globalDrawH) /
+                         ctx.globalWinH;
+            smx = static_cast<int>(pixX / ctx.layScale);
+            smy = static_cast<int>(pixY / ctx.layScale);
+          }
+          ctx.setupWidget->onMouseMove(smx, smy);
+        } else if (event.type == SDL_MOUSEWHEEL) {
+          int scrollY = event.wheel.y;
+#if SDL_VERSION_ATLEAST(2, 0, 18)
+          if (event.wheel.direction == SDL_MOUSEWHEEL_FLIPPED)
+            scrollY = -scrollY;
+#endif
+          ctx.setupWidget->onMouseWheel(scrollY);
         } else if (event.type == SDL_WINDOWEVENT &&
                    event.window.event == SDL_WINDOWEVENT_SIZE_CHANGED) {
           ctx.updateLayoutMetrics();

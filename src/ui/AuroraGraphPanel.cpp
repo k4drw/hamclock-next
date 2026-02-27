@@ -54,8 +54,8 @@ void AuroraGraphPanel::render(SDL_Renderer *renderer) {
   char valueText[32];
   std::snprintf(valueText, sizeof(valueText), "%.0f%%", currentPercent);
 
-  cat->drawText(renderer, valueText, x_ + width_ - 35, y_ + 5, {200, 200, 200, 255},
-                FontStyle::MediumBold, true);
+  cat->drawText(renderer, valueText, x_ + width_ - 35, y_ + 5,
+                {200, 200, 200, 255}, FontStyle::SmallBold, true);
 
   // Graph area - significantly expanded
   int graphX = x_ + 30;

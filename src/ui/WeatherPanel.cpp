@@ -51,7 +51,8 @@ void WeatherPanel::render(SDL_Renderer *renderer) {
     else if (title_.find("DX") != std::string::npos)
       displayTitle = "DX WX";
   }
-  FontStyle titleStyle = isNarrow ? FontStyle::CaptionBold : FontStyle::MicroBold;
+  FontStyle titleStyle =
+      isNarrow ? FontStyle::CaptionBold : FontStyle::MicroBold;
   cat->drawText(renderer, displayTitle, x_ + 10, y_ + 5, themes.accent,
                 titleStyle);
 
@@ -67,7 +68,8 @@ void WeatherPanel::render(SDL_Renderer *renderer) {
                              SDL_Color valColor) {
       int ry = curY + rowIdx * rowH;
       // Value (Medium or Small depending on space)
-      FontStyle valStyle = (rowH < 35) ? FontStyle::SmallBold : FontStyle::MediumBold;
+      FontStyle valStyle =
+          (rowH < 35) ? FontStyle::SmallBold : FontStyle::MediumBold;
       cat->drawText(renderer, val, centerX, ry + rowH * 0.35f, valColor,
                     valStyle, true);
       // Label (Tiny or Micro depending on space)
@@ -127,7 +129,7 @@ void WeatherPanel::render(SDL_Renderer *renderer) {
   curY += cat->ptSize(FontStyle::MediumBold) + 10;
 
   // Description
-  cat->drawText(renderer, currentData_.description, centerX, curY,
+  cat->drawText(renderer, currentData_.description, centerX, curY + 4,
                 {255, 255, 0, 255}, FontStyle::Fast, true);
   curY += cat->ptSize(FontStyle::Fast) + 12;
 

@@ -7,8 +7,10 @@
 namespace HamClock {
 
 ThemeCustomizer::ThemeCustomizer(int x, int y, int w, int h,
-                                 FontManager &fontMgr)
-    : Widget(x, y, w, h), fontMgr_(fontMgr) {
+                                 FontManager &fontMgr, std::string &theme,
+                                 std::map<std::string, SDL_Color> &overrides)
+    : Widget(x, y, w, h), fontMgr_(fontMgr), theme_(theme),
+      overrides_(overrides) {
   colorKeys_ = {{"bg", "Background"},
                 {"border", "Border"},
                 {"text", "Text"},
@@ -24,35 +26,40 @@ ThemeCustomizer::ThemeCustomizer(int x, int y, int w, int h,
   int pickerSize = std::min(w - 250, h - 100);
   colorPicker_ = std::make_unique<ColorPicker>(
       x + 220, y + 40, pickerSize + 100, pickerSize, [this](SDL_Color c) {
-        auto &config = ConfigManager::instance().getConfig();
-        config.colorOverrides[colorKeys_[selectedIndex_].key] = c;
-        config.theme = "custom"; // Auto-switch to custom theme when editing
+        overrides_[colorKeys_[selectedIndex_].key] = c;
+        theme_ = "custom"; // Auto-switch to custom theme when editing
       });
 
   calculateLayout();
 }
 
 void ThemeCustomizer::calculateLayout() {
-  rectList_ = {x_ + 10, y_ + 40, 200, height_ - 80};
-  rectClose_ = {x_ + width_ - 100, y_ + 10, 80, 30};
+  rectList_ = {x_ + 10, y_ + 40, 200, height_ - 100};
+  int btnW = 100;
+  int btnH = 34;
+  int bx = x_ + width_ / 2;
+  int by = y_ + height_ - btnH - 12;
+  rectCancel_ = {bx - btnW - 10, by, btnW, btnH};
+  rectOk_ = {bx + 10, by, btnW, btnH};
 }
 
 void ThemeCustomizer::setActive(bool active) {
   active_ = active;
   if (active_) {
-    // Load current color for selection
+    // Backup current overrides to allow Cancel
+    overridesBackup_ = overrides_;
+    themeBackup_ = theme_;
     loadOverrides();
   }
 }
 
 void ThemeCustomizer::loadOverrides() {
-  const auto &config = ConfigManager::instance().getConfig();
-  auto it = config.colorOverrides.find(colorKeys_[selectedIndex_].key);
-  if (it != config.colorOverrides.end()) {
+  auto it = overrides_.find(colorKeys_[selectedIndex_].key);
+  if (it != overrides_.end()) {
     colorPicker_->setColor(it->second);
   } else {
     // Fallback to current theme's color
-    ThemeColors current = getThemeColors(config.theme);
+    ThemeColors current = getThemeColors(theme_, &overrides_);
     SDL_Color c = {0, 0, 0, 255};
     std::string k = colorKeys_[selectedIndex_].key;
     if (k == "bg")
@@ -90,19 +97,16 @@ void ThemeCustomizer::render(SDL_Renderer *renderer) {
   if (!active_)
     return;
 
-  // Background dimming
+  ThemeColors themes = getThemeColors(theme_, &overrides_);
+  auto *cat = fontMgr_.catalog();
+
+  // Draw background semi-transparent
   SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-  SDL_SetRenderDrawColor(renderer, 0, 0, 0, 200);
-  SDL_Rect full = {x_, y_, width_, height_};
-  SDL_RenderFillRect(renderer, &full);
-
-  // Border
-  SDL_SetRenderDrawColor(renderer, 100, 100, 120, 255);
-  SDL_RenderDrawRect(renderer, &full);
-
-  // Title
-  // (Assuming FontManager is available via some global or context)
-  // For now, I'll just draw the picker.
+  SDL_SetRenderDrawColor(renderer, 20, 20, 25, 230);
+  SDL_Rect bg = {x_, y_, width_, height_};
+  SDL_RenderFillRect(renderer, &bg);
+  SDL_SetRenderDrawColor(renderer, 100, 100, 150, 255);
+  SDL_RenderDrawRect(renderer, &bg);
 
   // 1. Draw List of Keys
   for (size_t i = 0; i < colorKeys_.size(); ++i) {
@@ -112,7 +116,6 @@ void ThemeCustomizer::render(SDL_Renderer *renderer) {
       SDL_RenderFillRect(renderer, &r);
     }
     SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
-    auto *cat = fontMgr_.catalog();
     cat->drawText(renderer, colorKeys_[i].label.c_str(), rectList_.x + 5,
                   rectList_.y + (int)i * 25 + 2, {255, 255, 255, 255},
                   FontStyle::SmallRegular);
@@ -121,23 +124,35 @@ void ThemeCustomizer::render(SDL_Renderer *renderer) {
   // 2. Render ColorPicker
   colorPicker_->render(renderer);
 
-  // 3. Close Button
-  SDL_SetRenderDrawColor(renderer, 150, 50, 50, 255);
-  SDL_RenderFillRect(renderer, &rectClose_);
-  SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
-  SDL_RenderDrawRect(renderer, &rectClose_);
-  auto *cat = fontMgr_.catalog();
-  cat->drawText(renderer, "Close", rectClose_.x + rectClose_.w / 2,
-                rectClose_.y + 5, {255, 255, 255, 255}, FontStyle::MediumBold,
-                true);
+  // 3. OK and Cancel Buttons
+  auto drawBottomBtn = [&](const SDL_Rect &r, const char *label, SDL_Color bg) {
+    SDL_SetRenderDrawColor(renderer, bg.r, bg.g, bg.b, 255);
+    SDL_RenderFillRect(renderer, &r);
+    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+    SDL_RenderDrawRect(renderer, &r);
+    cat->drawText(renderer, label, r.x + r.w / 2, r.y + r.h / 2,
+                  {255, 255, 255, 255}, FontStyle::UIBold, true, false, true);
+  };
+
+  drawBottomBtn(rectCancel_, "Cancel", themes.danger);
+  drawBottomBtn(rectOk_, "Done", themes.success);
 }
 
 bool ThemeCustomizer::onMouseDown(int mx, int my, Uint16 mod) {
   if (!active_)
     return false;
 
-  if (mx >= rectClose_.x && mx < rectClose_.x + rectClose_.w &&
-      my >= rectClose_.y && my < rectClose_.y + rectClose_.h) {
+  if (mx >= rectOk_.x && mx < rectOk_.x + rectOk_.w && my >= rectOk_.y &&
+      my < rectOk_.y + rectOk_.h) {
+    setActive(false);
+    return true;
+  }
+
+  if (mx >= rectCancel_.x && mx < rectCancel_.x + rectCancel_.w &&
+      my >= rectCancel_.y && my < rectCancel_.y + rectCancel_.h) {
+    // Revert overrides and theme
+    overrides_ = overridesBackup_;
+    theme_ = themeBackup_;
     setActive(false);
     return true;
   }
@@ -165,6 +180,10 @@ void ThemeCustomizer::onMouseMove(int mx, int my) {
   if (!active_)
     return;
   colorPicker_->onMouseMove(mx, my);
+}
+
+void ThemeCustomizer::saveOverrides() {
+  // Now handled by SetupScreen when clicking Done
 }
 
 } // namespace HamClock

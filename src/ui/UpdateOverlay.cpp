@@ -1,4 +1,5 @@
 #include "UpdateOverlay.h"
+#include "../core/Theme.h"
 #include "FontCatalog.h"
 #include <algorithm>
 
@@ -12,7 +13,8 @@ UpdateOverlay::~UpdateOverlay() {}
 
 void UpdateOverlay::update() {
   // Check if content needs re-wrapping
-  if (lastNotes_ != updateChecker_.releaseNotes() || lastWidth_ != notesArea_.w) {
+  if (lastNotes_ != updateChecker_.releaseNotes() ||
+      lastWidth_ != notesArea_.w) {
     lastNotes_ = updateChecker_.releaseNotes();
     lastWidth_ = notesArea_.w;
 
@@ -86,6 +88,8 @@ void UpdateOverlay::recalcLayout() {
 }
 
 void UpdateOverlay::render(SDL_Renderer *renderer) {
+  ThemeColors themes = getThemeColors(theme_);
+
   // Semi-transparent dimming of backbuffer
   SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
   SDL_SetRenderDrawColor(renderer, 0, 0, 0, 180);
@@ -93,14 +97,15 @@ void UpdateOverlay::render(SDL_Renderer *renderer) {
   SDL_RenderFillRect(renderer, &screen);
 
   // Modal background
-  SDL_SetRenderDrawColor(renderer, 20, 25, 35, 255);
+  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, 255);
   SDL_Rect modal = {x_, y_, width_, height_};
   SDL_RenderFillRect(renderer, &modal);
-  SDL_SetRenderDrawColor(renderer, 60, 70, 90, 255);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
+                         themes.border.b, 255);
   SDL_RenderDrawRect(renderer, &modal);
 
-  SDL_Color white = {255, 255, 255, 255};
-  SDL_Color cyan = {0, 200, 255, 255};
+  SDL_Color white = themes.text;
+  SDL_Color cyan = themes.accent;
   auto *cat = fontMgr_.catalog();
 
   // Header
@@ -159,15 +164,15 @@ void UpdateOverlay::render(SDL_Renderer *renderer) {
   auto drawBtn = [&](SDL_Rect r, const char *label, SDL_Color bg) {
     SDL_SetRenderDrawColor(renderer, bg.r, bg.g, bg.b, 255);
     SDL_RenderFillRect(renderer, &r);
-    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 50);
+    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 100);
     SDL_RenderDrawRect(renderer, &r);
     cat->drawText(renderer, label, r.x + r.w / 2, r.y + r.h / 2, white,
-                  FontStyle::UI, true);
+                  FontStyle::UI, true, false, true);
   };
 
-  drawBtn(skipBtn_, "Skip Ver", {80, 20, 20, 255});
-  drawBtn(notNowBtn_, "Not Now", {60, 60, 70, 255});
-  drawBtn(updateBtn_, "Update", {20, 80, 20, 255});
+  drawBtn(skipBtn_, "Skip Ver", themes.danger);
+  drawBtn(notNowBtn_, "Not Now", themes.info);
+  drawBtn(updateBtn_, "Update", themes.success);
 }
 
 void UpdateOverlay::onResize(int x, int y, int w, int h) {

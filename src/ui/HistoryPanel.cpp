@@ -1,5 +1,4 @@
 #include "HistoryPanel.h"
-#include "../core/StringUtils.h"
 #include "../core/Theme.h"
 #include "FontCatalog.h"
 #include "RenderUtils.h"
@@ -112,8 +111,8 @@ void HistoryPanel::render(SDL_Renderer *renderer) {
         SDL_Color kpCol = (kpNow >= 5.0f)   ? SDL_Color{255, 0, 0, 255}
                           : (kpNow >= 4.0f) ? SDL_Color{255, 255, 0, 255}
                                             : SDL_Color{0, 255, 0, 255};
-        cat->drawText(renderer, kpBuf, graphX + graphW / 2, graphY + graphH / 3,
-                      kpCol, FontStyle::MediumBold, true);
+        cat->drawText(renderer, kpBuf, graphX + graphW / 2, graphY + 15, kpCol,
+                      FontStyle::MediumBold, true, false, true);
       }
     }
   } else {

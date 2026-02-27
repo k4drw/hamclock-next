@@ -144,20 +144,21 @@ void WidgetSelector::render(SDL_Renderer *renderer) {
                      menuRect_.x + menuRect_.w - 5, okRect_.y - 8);
 
   // Buttons
-  SDL_SetRenderDrawColor(renderer, 100, 40, 40, themes.bg.a);
+  SDL_SetRenderDrawColor(renderer, themes.danger.r, themes.danger.g,
+                         themes.danger.b, 255);
   SDL_RenderFillRect(renderer, &cancelRect_);
-  SDL_SetRenderDrawColor(renderer, 40, 100, 40, themes.bg.a);
+  SDL_SetRenderDrawColor(renderer, themes.success.r, themes.success.g,
+                         themes.success.b, 255);
   SDL_RenderFillRect(renderer, &okRect_);
 
-  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
-                         themes.border.b, themes.border.a);
+  SDL_SetRenderDrawColor(renderer, 255, 255, 255, 100);
   SDL_RenderDrawRect(renderer, &cancelRect_);
   SDL_RenderDrawRect(renderer, &okRect_);
 
-  cat->drawText(renderer, "CANCEL", cancelRect_.x + cancelRect_.w / 2,
+  cat->drawText(renderer, "Cancel", cancelRect_.x + cancelRect_.w / 2,
                 cancelRect_.y + cancelRect_.h / 2, themes.text, FontStyle::UI,
                 true);
-  cat->drawText(renderer, "OK", okRect_.x + okRect_.w / 2,
+  cat->drawText(renderer, "Done", okRect_.x + okRect_.w / 2,
                 okRect_.y + okRect_.h / 2, themes.accent, FontStyle::UIBold,
                 true);
 }

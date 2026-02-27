@@ -90,7 +90,7 @@ void DRAPPanel::render(SDL_Renderer *renderer) {
   std::snprintf(displayText, sizeof(displayText), "%.1f MHz", freq);
 
   cat->drawText(renderer, displayText, x_ + width_ / 2, y_ + height_ / 2,
-                valueColor, FontStyle::MediumBold, true);
+                valueColor, FontStyle::MediumBold, true, false, true);
 
   // Add description
   cat->drawText(renderer, "Max Frequency", x_ + width_ / 2, y_ + height_ - 20,

@@ -12,7 +12,9 @@ namespace HamClock {
 
 class ThemeCustomizer : public Widget {
 public:
-  ThemeCustomizer(int x, int y, int w, int h, FontManager &fontMgr);
+  ThemeCustomizer(int x, int y, int w, int h, FontManager &fontMgr,
+                  std::string &theme,
+                  std::map<std::string, SDL_Color> &overrides);
   ~ThemeCustomizer() override = default;
 
   void update() override;
@@ -35,9 +37,15 @@ private:
   std::vector<ColorKey> colorKeys_;
   int selectedIndex_ = 0;
   FontManager &fontMgr_;
+  std::string &theme_;
+  std::map<std::string, SDL_Color> &overrides_;
 
   SDL_Rect rectList_;
-  SDL_Rect rectClose_;
+  SDL_Rect rectOk_;
+  SDL_Rect rectCancel_;
+
+  std::map<std::string, SDL_Color> overridesBackup_;
+  std::string themeBackup_;
 
   void calculateLayout();
   void loadOverrides();

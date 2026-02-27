@@ -155,15 +155,16 @@ bool CountdownPanel::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
     }
 
     // Check buttons
-    int btnW = 60;
-    int btnY = y_ + height_ - boxH - 10;
+    int btnW = 80;
+    int btnH = 28;
+    int btnY = y_ + height_ - btnH - 10;
     int cx = x_ + width_ / 2;
-    if (my >= btnY && my < btnY + boxH) {
+    if (my >= btnY && my < btnY + btnH) {
       if (mx >= cx - btnW - 10 && mx < cx - 10) {
         stopEditing(false); // Cancel
         return true;
       } else if (mx >= cx + 10 && mx < cx + 10 + btnW) {
-        stopEditing(true); // OK
+        stopEditing(true); // Done
         return true;
       }
     }
@@ -251,6 +252,7 @@ bool CountdownPanel::onTextInput(const char *text) {
 }
 
 void CountdownPanel::renderEditOverlay(SDL_Renderer *renderer) {
+  ThemeColors themes = getThemeColors(theme_);
   SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
   SDL_SetRenderDrawColor(renderer, 0, 0, 0, 240);
   SDL_Rect overlay = {x_, y_, width_, height_};
@@ -258,8 +260,8 @@ void CountdownPanel::renderEditOverlay(SDL_Renderer *renderer) {
   SDL_SetRenderDrawColor(renderer, 100, 100, 100, 255);
   SDL_RenderDrawRect(renderer, &overlay);
 
-  SDL_Color cyan = {0, 255, 255, 255};
-  SDL_Color white = {255, 255, 255, 255};
+  SDL_Color cyan = themes.accent;
+  SDL_Color white = themes.text;
   auto *cat = fontMgr_.catalog();
 
   int pad = 10;
@@ -315,29 +317,31 @@ void CountdownPanel::renderEditOverlay(SDL_Renderer *renderer) {
                        x_ + pad + 4 + tw, timeY + boxH - 4);
   }
 
-  // OK / Cancel Buttons
-  int btnW = 60;
-  int btnH = 24;
+  // Done / Cancel Buttons
+  int btnW = 80;
+  int btnH = 28;
   int btnY = y_ + height_ - btnH - 10;
   int cx = x_ + width_ / 2;
 
   // Cancel
   SDL_Rect cancelRect = {cx - btnW - 10, btnY, btnW, btnH};
-  SDL_SetRenderDrawColor(renderer, 60, 20, 20, 255);
+  SDL_SetRenderDrawColor(renderer, themes.danger.r, themes.danger.g,
+                         themes.danger.b, 255);
   SDL_RenderFillRect(renderer, &cancelRect);
-  SDL_SetRenderDrawColor(renderer, 150, 50, 50, 255);
+  SDL_SetRenderDrawColor(renderer, 255, 255, 255, 100);
   SDL_RenderDrawRect(renderer, &cancelRect);
   cat->drawText(renderer, "Cancel", cancelRect.x + btnW / 2,
                 cancelRect.y + btnH / 2, white, FontStyle::UI, true, false,
                 true);
 
-  // OK
+  // Done
   SDL_Rect okRect = {cx + 10, btnY, btnW, btnH};
-  SDL_SetRenderDrawColor(renderer, 20, 60, 20, 255);
+  SDL_SetRenderDrawColor(renderer, themes.success.r, themes.success.g,
+                         themes.success.b, 255);
   SDL_RenderFillRect(renderer, &okRect);
-  SDL_SetRenderDrawColor(renderer, 50, 150, 50, 255);
+  SDL_SetRenderDrawColor(renderer, 255, 255, 255, 100);
   SDL_RenderDrawRect(renderer, &okRect);
-  cat->drawText(renderer, "OK", okRect.x + btnW / 2, okRect.y + btnH / 2, white,
+  cat->drawText(renderer, "Done", okRect.x + btnW / 2, okRect.y + btnH / 2, white,
                 FontStyle::UI, true, false, true);
 
   SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);

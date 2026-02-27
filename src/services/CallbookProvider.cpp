@@ -61,6 +61,8 @@ void CallbookProvider::fetchCallook(const std::string &callsign,
             if (oi.contains("expiryDate"))
               result.expiryDate =
                   normalizeDate(oi["expiryDate"].get<std::string>());
+            if (oi.contains("frn"))
+              result.frn = oi["frn"].get<std::string>();
           }
 
           result.source = "Callook.info";
