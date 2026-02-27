@@ -42,6 +42,7 @@ enum class WidgetType {
   STOPWATCH,
   REMINDER,
   TROPO,
+  LIGHTNING,
 };
 
 inline const char *widgetTypeToString(WidgetType t) {
@@ -122,6 +123,8 @@ inline const char *widgetTypeToString(WidgetType t) {
     return "reminders";
   case WidgetType::TROPO:
     return "tropo";
+  case WidgetType::LIGHTNING:
+    return "lightning";
   }
   return "solar";
 }
@@ -204,6 +207,8 @@ inline const char *widgetTypeDisplayName(WidgetType t) {
     return "Reminders";
   case WidgetType::TROPO:
     return "Tropo Cond";
+  case WidgetType::LIGHTNING:
+    return "Lightning";
   }
   return "Solar";
 }
@@ -286,6 +291,8 @@ inline WidgetType widgetTypeFromString(const std::string &s,
     return WidgetType::REMINDER;
   if (s == "tropo")
     return WidgetType::TROPO;
+  if (s == "lightning")
+    return WidgetType::LIGHTNING;
   std::fprintf(stderr, "WidgetType: unknown '%s', using fallback\n", s.c_str());
   return fallback;
 }

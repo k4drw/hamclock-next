@@ -55,6 +55,7 @@
 #include "services/SDOProvider.h"
 #include "services/SantaProvider.h"
 #include "services/TropoProvider.h"
+#include "services/LightningProvider.h"
 #include "services/UpdateChecker.h"
 #include "services/WeatherProvider.h"
 #include "services/WinlinkProvider.h"
@@ -85,6 +86,7 @@
 #include "ui/HistoryPanel.h"
 #include "ui/HurricanePanel.h"
 #include "ui/LayoutManager.h"
+#include "ui/LightningPanel.h"
 #include "ui/LiveSpotPanel.h"
 #include "ui/LocalPanel.h"
 #include "ui/MapWidget.h"
@@ -271,6 +273,7 @@ struct DashboardContext {
   std::unique_ptr<IonosondeProvider> ionosondeProvider;
   std::unique_ptr<SantaProvider> santaProvider;
   std::unique_ptr<TropoProvider> tropoProvider;
+  std::unique_ptr<LightningProvider> lightningProvider;
   std::unique_ptr<SatelliteManager> satMgr;
   std::unique_ptr<AsteroidProvider> asteroidProvider;
   std::unique_ptr<BeaconProvider> beaconProvider;
@@ -986,6 +989,14 @@ DashboardContext::DashboardContext(AppContext &ctx)
     }
   });
 
+  lightningProvider = std::make_unique<LightningProvider>(netManager);
+  lightningProvider->setCallback([this](const LightningData &d) {
+    if (widgetPool.count(WidgetType::LIGHTNING)) {
+      static_cast<LightningPanel *>(widgetPool[WidgetType::LIGHTNING].get())
+          ->updateData(d);
+    }
+  });
+
   timePanel =
       std::make_unique<TimePanel>(0, 0, 0, 0, fontMgr, texMgr, appCfg.callsign);
   timePanel->setCallColor(appCfg.callsignColor);
@@ -1191,6 +1202,9 @@ DashboardContext::DashboardContext(AppContext &ctx)
     case WidgetType::TROPO:
       widgetPool[type] = std::make_unique<TropoPanel>(0, 0, 0, 0, fontMgr);
       break;
+    case WidgetType::LIGHTNING:
+      widgetPool[type] = std::make_unique<LightningPanel>(0, 0, 0, 0, fontMgr);
+      break;
     default:
       widgetPool[type] = std::make_unique<PlaceholderWidget>(
           0, 0, 0, 0, fontMgr, widgetTypeDisplayName(type),
@@ -1274,7 +1288,8 @@ DashboardContext::DashboardContext(AppContext &ctx)
       WidgetType::SANTA_TRACKER, WidgetType::SDO,
       WidgetType::SOLAR,         WidgetType::SYS_INFO,
       WidgetType::WATCHLIST,     WidgetType::STOPWATCH,
-      WidgetType::REMINDER,      WidgetType::TROPO};
+      WidgetType::REMINDER,      WidgetType::TROPO,
+      WidgetType::LIGHTNING};
   // Note: REPEATER_DIR omitted — RepeaterBook API requires auth key (TODO).
   // Note: WINLINK omitted — Winlink API requires access key (TODO).
 
@@ -1578,6 +1593,11 @@ void DashboardContext::update(AppContext &ctx) {
   // --- Tropo fetch (immediate upon widget activation, internal cache 1hr) ---
   if (isWidgetActive(WidgetType::TROPO)) {
     tropoProvider->fetch(appCfg.lat, appCfg.lon);
+  }
+
+  // --- Lightning fetch (immediate upon widget activation, internal cache 2m) ---
+  if (isWidgetActive(WidgetType::LIGHTNING)) {
+    lightningProvider->fetch(appCfg.lat, appCfg.lon);
   }
 
 #ifndef __EMSCRIPTEN__
