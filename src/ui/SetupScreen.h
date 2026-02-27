@@ -4,9 +4,11 @@
 #include "../core/ConfigManager.h"
 #include "FontCatalog.h"
 #include "FontManager.h"
+#include "ThemeCustomizer.h"
 #include "Widget.h"
 
 #include <SDL.h>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -23,6 +25,7 @@ public:
   bool onMouseUp(int mx, int my, Uint16 mod, int clicks) override;
   bool onKeyDown(SDL_Keycode key, Uint16 mod) override;
   bool onTextInput(const char *text) override;
+  bool isModalActive() const override;
   std::string getName() const override { return "SetupScreen"; }
   std::vector<std::string> getActions() const override;
   SDL_Rect getActionRect(const std::string &action) const override;
@@ -141,6 +144,9 @@ private:
   SDL_Rect brightnessSliderRect_ = {0, 0, 0, 0};
   SDL_Rect scheduleToggleRect_ = {0, 0, 0, 0};
   SDL_Rect dimTimeRect_ = {0, 0, 0, 0};
+  SDL_Rect customizeBtnRect_ = {0, 0, 0, 0};
+
+  std::unique_ptr<HamClock::ThemeCustomizer> themeCustomizer_;
 
   struct WidgetClickRect {
     WidgetType type;

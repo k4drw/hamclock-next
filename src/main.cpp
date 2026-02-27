@@ -1662,15 +1662,32 @@ void DashboardContext::update(AppContext &ctx) {
       break;
     }
     case SDL_FINGERDOWN:
-    case SDL_MOUSEBUTTONDOWN:
-      lastMouseMotionMs = SDL_GetTicks();
-      if (!cursorVisible) {
-        SDL_ShowCursor(SDL_ENABLE);
-        cursorVisible = true;
-        if (appCfg.preventSleep)
-          preventRPiSleep(true, ctx.displayPower.get());
+      if (appCfg.preventSleep)
+        preventRPiSleep(true, ctx.displayPower.get());
+      [[fallthrough]];
+    case SDL_MOUSEBUTTONDOWN: {
+      int smx = event.button.x, smy = event.button.y;
+      if (FIDELITY_MODE) {
+        float pixX = event.button.x * static_cast<float>(ctx.globalDrawW) /
+                     ctx.globalWinW;
+        float pixY = event.button.y * static_cast<float>(ctx.globalDrawH) /
+                     ctx.globalWinH;
+        smx = static_cast<int>(pixX / ctx.layScale);
+        smy = static_cast<int>(pixY / ctx.layScale);
       }
-      break;
+      Widget *activeModal = nullptr;
+      for (auto *w : eventWidgets)
+        if (w->isModalActive()) {
+          activeModal = w;
+          break;
+        }
+      if (activeModal)
+        activeModal->onMouseDown(smx, smy, SDL_GetModState());
+      else
+        for (auto *w : eventWidgets)
+          if (w->onMouseDown(smx, smy, SDL_GetModState()))
+            break;
+    } break;
     case SDL_WINDOWEVENT:
       if (event.window.event == SDL_WINDOWEVENT_SIZE_CHANGED) {
         ctx.updateLayoutMetrics();

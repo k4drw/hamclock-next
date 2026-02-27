@@ -14,6 +14,8 @@ SetupScreen::SetupScreen(int x, int y, int w, int h, FontManager &fontMgr,
                          BrightnessManager &brightnessMgr)
     : Widget(x, y, w, h), fontMgr_(fontMgr), brightnessMgr_(brightnessMgr) {
   LOG_D("SetupScreen", "Constructor: x={}, y={}, w={}, h={}", x, y, w, h);
+  themeCustomizer_ =
+      std::make_unique<HamClock::ThemeCustomizer>(x, y, w, h, fontMgr);
   recalcLayout();
 }
 
@@ -158,6 +160,10 @@ int SetupScreen::calculateCursorPosFromClick(int clickX, int fieldStartX,
 }
 
 void SetupScreen::update() {
+  if (themeCustomizer_ && themeCustomizer_->isActive()) {
+    themeCustomizer_->update();
+    return;
+  }
   autoPopulateLatLon();
 
   mismatchWarning_ = false;
@@ -171,6 +177,10 @@ void SetupScreen::update() {
       mismatchWarning_ = true;
     }
   }
+}
+
+bool SetupScreen::isModalActive() const {
+  return themeCustomizer_ && themeCustomizer_->isActive();
 }
 
 static void renderField(SDL_Renderer *renderer, FontManager &fontMgr,
@@ -249,6 +259,10 @@ static void renderField(SDL_Renderer *renderer, FontManager &fontMgr,
 }
 
 void SetupScreen::render(SDL_Renderer *renderer) {
+  if (themeCustomizer_ && themeCustomizer_->isActive()) {
+    themeCustomizer_->render(renderer);
+    return;
+  }
   if (!fontMgr_.ready())
     return;
 
@@ -608,6 +622,20 @@ void SetupScreen::renderTabAppearance(SDL_Renderer *renderer, int cx, int pad,
   cat->drawText(renderer, theme_, themeBtn.x + themeBtn.w / 2,
                 themeBtn.y + themeBtn.h / 2, white, FontStyle::Fast, true);
   themeRect_ = themeBtn;
+
+  // Customize button
+  int customizeBtnW = 100;
+  customizeBtnRect_ = {fieldX + fieldW - 100 - customizeBtnW - 10, y,
+                       customizeBtnW, 24};
+  SDL_SetRenderDrawColor(renderer, 40, 40, 50, 255);
+  SDL_RenderFillRect(renderer, &customizeBtnRect_);
+  SDL_SetRenderDrawColor(renderer, 100, 100, 120, 255);
+  SDL_RenderDrawRect(renderer, &customizeBtnRect_);
+  cat->drawText(renderer, "Customize",
+                customizeBtnRect_.x + customizeBtnRect_.w / 2,
+                customizeBtnRect_.y + customizeBtnRect_.h / 2, white,
+                FontStyle::Fast, true);
+
   y += vSpace * 2;
 
   SDL_Rect nlToggle = {fieldX, y, 20, 20};
@@ -745,7 +773,7 @@ void SetupScreen::renderTabAppearance(SDL_Renderer *renderer, int cx, int pad,
   }
 }
 
-void SetupScreen::renderTabServices(SDL_Renderer *renderer, int, int pad,
+void SetupScreen::renderTabServices(SDL_Renderer *renderer, int cx, int pad,
                                     int fieldW, int fieldH, int fieldX,
                                     int textPad) {
   auto *cat = fontMgr_.catalog();
@@ -1078,10 +1106,19 @@ void SetupScreen::renderTabUpdate(SDL_Renderer *renderer, int cx, int pad,
 
 void SetupScreen::onResize(int x, int y, int w, int h) {
   Widget::onResize(x, y, w, h);
+  if (themeCustomizer_) {
+    themeCustomizer_->onResize(x, y, w, h);
+  }
   recalcLayout();
 }
 
 bool SetupScreen::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
+  if (themeCustomizer_ && themeCustomizer_->isActive()) {
+    if (themeCustomizer_->onMouseUp(mx, my, mod, clicks)) {
+      return true;
+    }
+  }
+
   // If clicked outside modal, cancel (like a true modal)
   if (mx < modalRect_.x || mx >= modalRect_.x + modalRect_.w ||
       my < modalRect_.y || my >= modalRect_.y + modalRect_.h) {
@@ -1172,8 +1209,18 @@ bool SetupScreen::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
         theme_ = "dark";
       else if (theme_ == "dark")
         theme_ = "glass";
+      else if (theme_ == "glass")
+        theme_ = "custom";
       else
         theme_ = "default";
+      return true;
+    }
+    if (mx >= customizeBtnRect_.x &&
+        mx <= customizeBtnRect_.x + customizeBtnRect_.w &&
+        my >= customizeBtnRect_.y &&
+        my <= customizeBtnRect_.y + customizeBtnRect_.h) {
+      themeCustomizer_->setActive(true);
+      theme_ = "custom"; // Switch to custom mode
       return true;
     }
     if (mx >= nightLightsRect_.x &&
@@ -1343,6 +1390,11 @@ bool SetupScreen::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
     int fx = fieldX;
     int fw = fieldW;
     int vSpace = pad / 2;
+
+    if (themeCustomizer_ && themeCustomizer_->isActive()) {
+      if (themeCustomizer_->onMouseDown(mx, my, mod))
+        return true;
+    }
 
     if (activeTab_ == Tab::Identity) {
       if (i < 2) {

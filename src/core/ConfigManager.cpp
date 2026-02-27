@@ -243,6 +243,17 @@ bool ConfigManager::load(AppConfig &config) const {
     config.corsProxyUrl = n.value("cors_proxy_url", config.corsProxyUrl);
   }
 
+  // Color Overrides
+  if (json.contains("color_overrides") && json["color_overrides"].is_object()) {
+    config.colorOverrides.clear();
+    for (auto &el : json["color_overrides"].items()) {
+      if (el.value().is_string()) {
+        config.colorOverrides[el.key()] =
+            hexToColor(el.value().get<std::string>(), {0, 0, 0, 255});
+      }
+    }
+  }
+
   // Local Data Hub
   if (json.contains("hub")) {
     const auto &h = json["hub"];
@@ -520,6 +531,13 @@ bool ConfigManager::save(const AppConfig &config) const {
   json["asteroid"]["color"]["r"] = config.asteroidColor.r;
   json["asteroid"]["color"]["g"] = config.asteroidColor.g;
   json["asteroid"]["color"]["b"] = config.asteroidColor.b;
+
+  // Color Overrides
+  if (!config.colorOverrides.empty()) {
+    for (auto const &[key, val] : config.colorOverrides) {
+      json["color_overrides"][key] = colorToHex(val);
+    }
+  }
 
   std::ofstream ofs(configPath_);
   if (!ofs) {

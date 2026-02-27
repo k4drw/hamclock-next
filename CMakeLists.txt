@@ -464,6 +464,7 @@ endif()
 
 set(HAMCLOCK_SOURCES
     src/main.cpp
+    src/core/Theme.cpp
     src/core/Logger.cpp
     src/core/ConfigManager.cpp
     src/core/DatabaseManager.cpp
@@ -555,11 +556,13 @@ set(HAMCLOCK_SOURCES
     src/ui/MapViewMenu.cpp
     src/ui/PaneContainer.cpp
     src/ui/PlaceholderWidget.cpp
+    src/ui/ColorPicker.cpp
     src/ui/RenderUtils.cpp
     src/ui/RSSBanner.cpp
     src/ui/SatPanel.cpp
     src/ui/SetupScreen.cpp
     src/ui/SpaceWeatherPanel.cpp
+    src/ui/ThemeCustomizer.cpp
     src/ui/TimePanel.cpp
     src/ui/StopwatchPanel.cpp
     src/ui/ReminderPanel.cpp

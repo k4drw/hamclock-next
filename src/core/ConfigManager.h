@@ -3,6 +3,7 @@
 #include "WidgetType.h"
 
 #include <filesystem>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -149,10 +150,19 @@ struct AppConfig {
 #else
   std::string corsProxyUrl = "";
 #endif
+  std::map<std::string, SDL_Color> colorOverrides;
 };
 
 class ConfigManager {
 public:
+  static ConfigManager &instance() {
+    static ConfigManager inst;
+    return inst;
+  }
+
+  AppConfig &getConfig() { return config_; }
+  const AppConfig &getConfig() const { return config_; }
+
   // Resolves the config directory and file path.
   // Returns false if the path could not be determined.
   bool init();
@@ -169,6 +179,7 @@ public:
   const std::filesystem::path &configDir() const { return configDir_; }
 
 private:
+  AppConfig config_;
   std::filesystem::path configDir_;
   std::filesystem::path configPath_;
 };

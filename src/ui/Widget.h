@@ -26,6 +26,13 @@ public:
   }
 
   // Called on mouse click. Returns true if the widget handled the event.
+  virtual bool onMouseDown(int mx, int my, Uint16 mod) {
+    (void)mx;
+    (void)my;
+    (void)mod;
+    return false;
+  }
+
   virtual bool onMouseUp(int mx, int my, Uint16 mod, int clicks) {
     (void)mx;
     (void)my;
