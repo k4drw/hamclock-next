@@ -11,7 +11,7 @@ struct SDL_Renderer;
 class CountdownPanel : public Widget {
 public:
   CountdownPanel(int x, int y, int w, int h, FontManager &fontMgr,
-                 AppConfig &config);
+                 AppConfig &config, std::function<void()> onSave);
 
   void update() override;
   void render(SDL_Renderer *renderer) override;
@@ -24,8 +24,12 @@ private:
   void stopEditing(bool apply);
   void renderEditOverlay(SDL_Renderer *renderer);
 
+  void onMouseMove(int mx, int my) override;
+  void renderTooltip(SDL_Renderer *renderer);
+
   FontManager &fontMgr_;
   AppConfig &config_;
+  std::function<void()> onSave_;
   std::chrono::system_clock::time_point targetTime_;
 
   // Editor state

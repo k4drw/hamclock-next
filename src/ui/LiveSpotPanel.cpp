@@ -2,6 +2,7 @@
 #include "../core/ConfigManager.h"
 #include "../core/MemoryMonitor.h"
 #include "../core/Theme.h"
+#include "FontCatalog.h"
 
 #include "../core/StringUtils.h"
 #include <cstring>
@@ -104,8 +105,8 @@ void LiveSpotPanel::render(SDL_Renderer *renderer) {
   int pad = 2;
   int titleH = 20;
   // --- Title: "Live Spots" (standard style) ---
-  fontMgr_.drawText(renderer, "Live Spots", x_ + 10, y_ + 5, themes.accent, 10,
-                    true);
+  fontMgr_.catalog()->drawText(renderer, "Live Spots", x_ + 10, y_ + 5,
+                               themes.accent, FontStyle::MicroBold);
   int curY = y_ + titleH + pad;
 
   // --- Subtitle: "of GRID - PSK 30 mins" (centered, blue) ---
@@ -322,15 +323,16 @@ void LiveSpotPanel::renderSetup(SDL_Renderer *renderer) {
   }
 
   // Buttons at bottom
-  int btnW = 60;
-  int btnH = 24;
+  int btnW = 80;
+  int btnH = 28;
   int btnY = y_ + height_ - btnH - 6;
 
   // Cancel
   cancelBtnRect_ = {cx - btnW - 10, btnY, btnW, btnH};
-  SDL_SetRenderDrawColor(renderer, 60, 20, 20, 255);
+  SDL_SetRenderDrawColor(renderer, themes.danger.r, themes.danger.g,
+                         themes.danger.b, 255);
   SDL_RenderFillRect(renderer, &cancelBtnRect_);
-  SDL_SetRenderDrawColor(renderer, 150, 50, 50, 255);
+  SDL_SetRenderDrawColor(renderer, 255, 255, 255, 100);
   SDL_RenderDrawRect(renderer, &cancelBtnRect_);
   t = fontMgr_.renderText(renderer, "Cancel", white, cellFontSize_, &tw, &th);
   if (t) {
@@ -342,9 +344,10 @@ void LiveSpotPanel::renderSetup(SDL_Renderer *renderer) {
 
   // Done
   doneBtnRect_ = {cx + 10, btnY, btnW, btnH};
-  SDL_SetRenderDrawColor(renderer, 20, 60, 20, 255);
+  SDL_SetRenderDrawColor(renderer, themes.success.r, themes.success.g,
+                         themes.success.b, 255);
   SDL_RenderFillRect(renderer, &doneBtnRect_);
-  SDL_SetRenderDrawColor(renderer, 50, 150, 50, 255);
+  SDL_SetRenderDrawColor(renderer, 255, 255, 255, 100);
   SDL_RenderDrawRect(renderer, &doneBtnRect_);
   t = fontMgr_.renderText(renderer, "Done", white, cellFontSize_, &tw, &th);
   if (t) {

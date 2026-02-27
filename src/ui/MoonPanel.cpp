@@ -90,12 +90,13 @@ void MoonPanel::render(SDL_Renderer *renderer) {
   SDL_RenderDrawRect(renderer, &rect);
 
   int titleH = 20;
-  fontMgr_.drawText(renderer, "Moon", x_ + 10, y_ + 5, themes.accent, 10, true);
+  fontMgr_.catalog()->drawText(renderer, "Moon", x_ + 10, y_ + 5, themes.accent,
+                               FontStyle::MicroBold);
 
   if (!dataValid_) {
-    fontMgr_.drawText(renderer, "No Data", x_ + 10,
-                      y_ + titleH + (height_ - titleH) / 2 - 8, themes.textDim,
-                      valueFontSize_);
+    fontMgr_.catalog()->drawText(renderer, "No Data", x_ + 10,
+                                 y_ + titleH + (height_ - titleH) / 2 - 8,
+                                 themes.textDim, FontStyle::Fast);
     return;
   }
 
@@ -109,13 +110,14 @@ void MoonPanel::render(SDL_Renderer *renderer) {
 
   // Labels
   int textY = moonY + moonR + 8;
-  fontMgr_.drawText(renderer, currentData_.phaseName, centerX, textY,
-                    themes.text, labelFontSize_, true, true);
+  fontMgr_.catalog()->drawText(renderer, currentData_.phaseName, centerX, textY,
+                               themes.text, FontStyle::FastBold, true);
 
   char buf[32];
   std::snprintf(buf, sizeof(buf), "%.0f%% Illum", currentData_.illumination);
-  fontMgr_.drawText(renderer, buf, centerX, textY + labelFontSize_ + 2,
-                    {0, 255, 128, 255}, valueFontSize_, false, true);
+  fontMgr_.catalog()->drawText(renderer, buf, centerX,
+                               textY + labelFontSize_ + 2, {0, 255, 128, 255},
+                               FontStyle::Fast, true);
 }
 
 void MoonPanel::onResize(int x, int y, int w, int h) {

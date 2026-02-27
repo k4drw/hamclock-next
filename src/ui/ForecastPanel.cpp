@@ -33,20 +33,21 @@ void ForecastPanel::render(SDL_Renderer *renderer) {
   int titleH = 20;
   int pad = 6;
   int curY = y_ + titleH + 4;
+  auto *cat = fontMgr_.catalog();
 
-  fontMgr_.drawText(renderer, "7-Day Forecast", x_ + 10, y_ + 5, themes.accent,
-                    10, true);
+  cat->drawText(renderer, "7-Day Forecast", x_ + 10, y_ + 5, themes.accent,
+                FontStyle::MicroBold);
 
   int centerX = x_ + width_ / 2;
   if (!currentData_.valid) {
-    fontMgr_.drawText(renderer, "Loading...", centerX, y_ + height_ / 2,
-                      themes.textDim, detailFontSize_, false, true);
+    cat->drawText(renderer, "Loading...", centerX, y_ + height_ / 2,
+                  themes.textDim, FontStyle::Fast, true);
     return;
   }
 
   if (currentData_.periods.empty()) {
-    fontMgr_.drawText(renderer, "No forecast data", centerX, y_ + height_ / 2,
-                      themes.textDim, detailFontSize_, false, true);
+    cat->drawText(renderer, "No forecast data", centerX, y_ + height_ / 2,
+                  themes.textDim, FontStyle::Fast, true);
     return;
   }
 
@@ -64,8 +65,7 @@ void ForecastPanel::render(SDL_Renderer *renderer) {
     std::string nameTrunc = p.name;
     if (nameTrunc.size() > 14)
       nameTrunc = nameTrunc.substr(0, 13) + "~";
-    fontMgr_.drawText(renderer, nameTrunc, x_ + pad, curY, nameCol,
-                      nameFontSize_, true, false);
+    cat->drawText(renderer, nameTrunc, x_ + pad, curY, nameCol, FontStyle::Fast);
 
     // Temperature (right-aligned)
     char tempBuf[16];
@@ -76,23 +76,23 @@ void ForecastPanel::render(SDL_Renderer *renderer) {
       std::snprintf(tempBuf, sizeof(tempBuf), "%d F", p.tempF);
     }
     SDL_Color tempCol = {0, 200, 255, 255};
-    fontMgr_.drawText(renderer, tempBuf, x_ + width_ - pad, curY, tempCol,
-                      nameFontSize_, true, true);
+    cat->drawText(renderer, tempBuf, x_ + width_ - pad, curY, tempCol,
+                  FontStyle::Fast, false, true);
 
     // Short forecast below name
     std::string sf = p.shortForecast;
     if (sf.size() > 24)
       sf = sf.substr(0, 23) + "~";
-    fontMgr_.drawText(renderer, sf, x_ + pad, curY + nameFontSize_ + 1,
-                      themes.textDim, detailFontSize_, false, false);
+    cat->drawText(renderer, sf, x_ + pad, curY + nameFontSize_ + 1,
+                  themes.textDim, FontStyle::Micro);
 
     // Precip if non-zero
     if (p.precipitationPercent > 0) {
       char ppBuf[16];
       std::snprintf(ppBuf, sizeof(ppBuf), "%d%%", p.precipitationPercent);
-      fontMgr_.drawText(renderer, ppBuf, x_ + width_ - pad,
-                        curY + nameFontSize_ + 1, {100, 160, 255, 255},
-                        detailFontSize_, false, true);
+      cat->drawText(renderer, ppBuf, x_ + width_ - pad,
+                    curY + nameFontSize_ + 1, {100, 160, 255, 255},
+                    FontStyle::Micro, false, true);
     }
 
     curY += rowH;
@@ -111,9 +111,9 @@ void ForecastPanel::render(SDL_Renderer *renderer) {
     char buf[32];
     std::snprintf(buf, sizeof(buf), "%d/%d", startIdx + 1,
                   (int)currentData_.periods.size());
-    fontMgr_.drawText(renderer, buf, x_ + width_ - pad,
-                      y_ + height_ - pad - detailFontSize_, themes.textDim,
-                      detailFontSize_ - 1, false, true);
+    cat->drawText(renderer, buf, x_ + width_ - pad,
+                  y_ + height_ - pad - detailFontSize_, themes.textDim,
+                  FontStyle::Tiny, false, true);
   }
 }
 

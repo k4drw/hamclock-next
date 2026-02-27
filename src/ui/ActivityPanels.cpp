@@ -3,6 +3,7 @@
 #include "../core/MemoryMonitor.h"
 #include "../core/StringUtils.h"
 #include "../core/Theme.h"
+#include "FontCatalog.h"
 #include "RenderUtils.h" // ADDED
 #include <algorithm>
 #include <iomanip>
@@ -181,11 +182,12 @@ void ONTAPanel::render(SDL_Renderer *renderer) {
   }
 
   std::string chip = filterLabel(filter_);
-  int chipFontSize = rowFontSize_;
+  auto *cat = fontMgr_.catalog();
   int cw = 0, ch = 0;
-  TTF_Font *font = fontMgr_.getFont(chipFontSize);
-  if (font) {
-    TTF_SizeText(font, chip.c_str(), &cw, &ch);
+  SDL_Texture *chipTex =
+      cat->renderText(renderer, chip, themes.text, FontStyle::Fast, &cw, &ch);
+  if (chipTex) {
+    cat->destroyTexture(chipTex);
   }
 
   // Visual button background centered vertically in title area
@@ -204,9 +206,9 @@ void ONTAPanel::render(SDL_Renderer *renderer) {
   SDL_SetRenderDrawColor(renderer, chipColor.r, chipColor.g, chipColor.b, 255);
   SDL_RenderDrawRect(renderer, &btnRect);
 
-  fontMgr_.drawText(renderer, chip, btnRect.x + btnRect.w / 2,
-                    btnRect.y + btnRect.h / 2, chipColor, chipFontSize, false,
-                    true);
+  cat->drawText(renderer, chip, btnRect.x + btnRect.w / 2,
+                btnRect.y + btnRect.h / 2, chipColor, FontStyle::Fast, true,
+                false, true);
 
   // Generous hit box spans full title height
   chipRect_ = {btnRect.x, y_, btnRect.w, titleAreaH};
@@ -229,11 +231,12 @@ void ONTAPanel::render(SDL_Renderer *renderer) {
   // Use "SSB" (widest mode) and "WB2LJK/P" (wide portable call) as anchors
   int modeX = x_ + pad;
   int callX = modeX + fontMgr_.getLogicalWidth("SSB", rowFontSize_) + 8;
-  int refX  = callX + fontMgr_.getLogicalWidth("WB2LJK/P", rowFontSize_) + 6;
+  int refX = callX + fontMgr_.getLogicalWidth("WB2LJK/P", rowFontSize_) + 6;
   int progXEnd = x_ + width_ - pad;
   // Ref extends to full right edge when P/S column is hidden
-  int refXEnd = showProg ? (progXEnd - fontMgr_.getLogicalWidth("S", rowFontSize_) - 4)
-                         : progXEnd;
+  int refXEnd =
+      showProg ? (progXEnd - fontMgr_.getLogicalWidth("S", rowFontSize_) - 4)
+               : progXEnd;
 
   for (size_t i = 0; i < currentSpots_.size(); ++i) {
     if (i >= spotCache_.size())
@@ -302,8 +305,9 @@ void ONTAPanel::render(SDL_Renderer *renderer) {
       if (!cache.progTex || cache.lastProg != shortProg) {
         if (cache.progTex)
           MemoryMonitor::getInstance().destroyTexture(cache.progTex);
-        cache.progTex = fontMgr_.renderText(
-            renderer, shortProg, color, rowFontSize_, &cache.progW, &cache.progH);
+        cache.progTex =
+            fontMgr_.renderText(renderer, shortProg, color, rowFontSize_,
+                                &cache.progW, &cache.progH);
         cache.lastProg = shortProg;
       }
       if (cache.progTex) {
@@ -391,7 +395,7 @@ bool ONTAPanel::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
         const auto &clicked = currentSpots_[idx];
         bool isSame = data.hasSelection &&
                       data.selectedSpot.call == clicked.call &&
-                      data.selectedSpot.ref  == clicked.ref;
+                      data.selectedSpot.ref == clicked.ref;
         if (isSame) {
           data.hasSelection = false;
           store_->set(data);
@@ -420,12 +424,13 @@ void ONTAPanel::renderModal(SDL_Renderer *renderer) { renderSetup(renderer); }
 
 void ONTAPanel::renderSetup(SDL_Renderer *renderer) {
   ThemeColors themes = getThemeColors(theme_);
+  auto *cat = fontMgr_.catalog();
   // Background
   SDL_Rect bg = {x_, y_, width_, height_};
   RenderUtils::drawRect(renderer, (float)bg.x, (float)bg.y, (float)bg.w,
                         (float)bg.h, themes.bg);
-  RenderUtils::drawRect(renderer, (float)bg.x, (float)bg.y, (float)bg.w,
-                        (float)bg.h, themes.border);
+  RenderUtils::drawRectOutline(renderer, (float)bg.x, (float)bg.y, (float)bg.w,
+                               (float)bg.h, themes.border);
 
   SDL_Color cyan = themes.accent;
   SDL_Color white = themes.text;
@@ -434,35 +439,26 @@ void ONTAPanel::renderSetup(SDL_Renderer *renderer) {
   int cx = x_ + width_ / 2;
 
   // Title
-  int tw, th;
-  SDL_Texture *t = fontMgr_.renderText(renderer, "--- ONTA Filter ---", cyan,
-                                       titleFontSize_, &tw, &th);
-  if (t) {
-    SDL_Rect tr = {cx - tw / 2, y, tw, th};
-    SDL_RenderCopy(renderer, t, nullptr, &tr);
-    MemoryMonitor::getInstance().destroyTexture(t);
-  }
-  y += th + 15;
+  cat->drawText(renderer, "--- ONTA Filter ---", cx, y, cyan,
+                FontStyle::MicroBold, true);
+  y += 22;
   int lx = x_ + 10;
   int btnW = width_ - 20;
+  int btnH = std::min(22, (height_ - 60) / 4);
 
   auto renderButton = [&](const char *label, Filter f, SDL_Rect &rect) {
     bool selected = (pendingFilter_ == f);
-    rect = {lx, y, btnW, 22};
+    rect = {lx, y, btnW, btnH};
     RenderUtils::drawRect(renderer, (float)rect.x, (float)rect.y, (float)rect.w,
                           (float)rect.h,
                           selected ? themes.accent : themes.rowStripe1);
-    RenderUtils::drawRect(renderer, (float)rect.x, (float)rect.y, (float)rect.w,
-                          (float)rect.h, themes.border);
+    RenderUtils::drawRectOutline(renderer, (float)rect.x, (float)rect.y,
+                                 (float)rect.w, (float)rect.h, themes.border);
 
-    t = fontMgr_.renderText(renderer, label, selected ? themes.bg : white,
-                            rowFontSize_, &tw, &th);
-    if (t) {
-      SDL_Rect tr = {lx + 10, y + (22 - th) / 2, tw, th};
-      SDL_RenderCopy(renderer, t, nullptr, &tr);
-      MemoryMonitor::getInstance().destroyTexture(t);
-    }
-    y += 24;
+    cat->drawText(renderer, label, lx + 10, y + btnH / 2,
+                  selected ? themes.bg : white, FontStyle::Fast, false, false,
+                  true);
+    y += btnH + 2;
   };
 
   renderButton("All Spots", Filter::ALL, allBtnRect_);
@@ -470,21 +466,16 @@ void ONTAPanel::renderSetup(SDL_Renderer *renderer) {
   renderButton("SOTA Spots Only", Filter::SOTA, sotaBtnRect_);
 
   // Done Button
-  int doneW = 60, doneH = 24;
+  int doneW = 80, doneH = 28;
   doneBtnRect_ = {cx - doneW / 2, y_ + height_ - doneH - 6, doneW, doneH};
   RenderUtils::drawRect(renderer, (float)doneBtnRect_.x, (float)doneBtnRect_.y,
                         (float)doneBtnRect_.w, (float)doneBtnRect_.h,
                         themes.success);
-  RenderUtils::drawRect(renderer, (float)doneBtnRect_.x, (float)doneBtnRect_.y,
-                        (float)doneBtnRect_.w, (float)doneBtnRect_.h,
-                        themes.border);
-  t = fontMgr_.renderText(renderer, "Done", themes.bg, rowFontSize_, &tw, &th);
-  if (t) {
-    SDL_Rect tr = {doneBtnRect_.x + (doneW - tw) / 2,
-                   doneBtnRect_.y + (doneH - th) / 2, tw, th};
-    SDL_RenderCopy(renderer, t, nullptr, &tr);
-    MemoryMonitor::getInstance().destroyTexture(t);
-  }
+  RenderUtils::drawRectOutline(renderer, (float)doneBtnRect_.x,
+                               (float)doneBtnRect_.y, (float)doneBtnRect_.w,
+                               (float)doneBtnRect_.h, themes.border);
+  cat->drawText(renderer, "Done", cx, doneBtnRect_.y + doneH / 2, themes.bg,
+                FontStyle::Fast, true, false, true);
 }
 
 bool ONTAPanel::handleSetupClick(int mx, int my) {

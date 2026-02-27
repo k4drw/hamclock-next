@@ -60,7 +60,9 @@ void GimbalPanel::render(SDL_Renderer *renderer) {
 
   int titleH = 20;
   SDL_Color accent = {0, 200, 255, 255}; // Default cyan-ish accent
-  fontMgr_.drawText(renderer, "Rotator", x_ + 10, y_ + 5, accent, 10, true);
+  auto *cat = fontMgr_.catalog();
+  cat->drawText(renderer, "Rotator", x_ + 10, y_ + 5, accent,
+                FontStyle::MicroBold);
 
   // Display status line (Rotator status or Sat name)
   int statusY = y_ + titleH + 5;
@@ -70,17 +72,17 @@ void GimbalPanel::render(SDL_Renderer *renderer) {
                                               : SDL_Color{255, 128, 0, 255};
     const char *statusText =
         rotatorConnected_ ? "ROTATOR CONNECTED" : "ROTATOR OFFLINE";
-    fontMgr_.drawText(renderer, statusText, x_ + width_ / 2, statusY,
-                      statusColor, labelFontSize_, true, true);
+    cat->drawText(renderer, statusText, x_ + width_ / 2, statusY, statusColor,
+                  FontStyle::Fast, true);
   } else if (hasSat_) {
     // Show satellite name (prediction mode)
-    fontMgr_.drawText(renderer, predictor_->satName(), x_ + width_ / 2, statusY,
-                      {0, 255, 0, 255}, labelFontSize_, true, true);
+    cat->drawText(renderer, predictor_->satName(), x_ + width_ / 2, statusY,
+                  {0, 255, 0, 255}, FontStyle::Fast, true);
   } else {
     // No data available
-    fontMgr_.drawText(renderer, "No Data", x_ + width_ / 2,
-                      y_ + titleH + (height_ - titleH) / 2,
-                      {150, 150, 150, 255}, labelFontSize_, false, true);
+    cat->drawText(renderer, "No Data", x_ + width_ / 2,
+                  y_ + titleH + (height_ - titleH) / 2, {150, 150, 150, 255},
+                  FontStyle::Fast, true);
     return;
   }
 
@@ -88,21 +90,21 @@ void GimbalPanel::render(SDL_Renderer *renderer) {
   char buf[64];
   std::snprintf(buf, sizeof(buf), "AZ: %.1f%c", az_,
                 hasRotator_ ? '\xb0' : ' ');
-  fontMgr_.drawText(renderer, buf, 15 + x_, y_ + 35, {255, 255, 255, 255},
-                    valueFontSize_);
+  cat->drawText(renderer, buf, 15 + x_, y_ + 35, {255, 255, 255, 255},
+                FontStyle::SmallBold);
 
   std::snprintf(buf, sizeof(buf), "EL: %.1f%c", el_,
                 hasRotator_ ? '\xb0' : ' ');
-  fontMgr_.drawText(renderer, buf, 15 + x_, y_ + 60, {255, 255, 255, 255},
-                    valueFontSize_);
+  cat->drawText(renderer, buf, 15 + x_, y_ + 60, {255, 255, 255, 255},
+                FontStyle::SmallBold);
 
   // Show data source indicator
   const char *sourceText =
       hasRotator_ ? "Live" : (hasSat_ ? "Predicted" : "---");
   SDL_Color sourceColor =
       hasRotator_ ? SDL_Color{0, 255, 255, 255} : SDL_Color{128, 128, 128, 255};
-  fontMgr_.drawText(renderer, sourceText, 15 + x_, y_ + 85, sourceColor,
-                    labelFontSize_);
+  cat->drawText(renderer, sourceText, 15 + x_, y_ + 85, sourceColor,
+                FontStyle::Fast);
 
   // If we have both rotator and satellite, show the difference
   if (hasRotator_ && hasSat_) {
@@ -116,8 +118,8 @@ void GimbalPanel::render(SDL_Renderer *renderer) {
       azDiff += 360;
 
     std::snprintf(buf, sizeof(buf), "Err: Az%.0f El%.0f", azDiff, elDiff);
-    fontMgr_.drawText(renderer, buf, 15 + x_, y_ + 105, {255, 200, 0, 255},
-                      labelFontSize_ - 2);
+    cat->drawText(renderer, buf, 15 + x_, y_ + 105, {255, 200, 0, 255},
+                  FontStyle::Caption);
   }
 
   // Graphical indicator (Mechanical Crosshair) - Center-aligned in the

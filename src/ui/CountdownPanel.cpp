@@ -1,14 +1,17 @@
 #include "CountdownPanel.h"
 #include "../core/Astronomy.h"
 #include "../core/SoundManager.h"
+#include "../core/Theme.h"
+#include "FontCatalog.h"
 #include "FontManager.h"
 
 #include <cstdio>
 #include <ctime>
 
 CountdownPanel::CountdownPanel(int x, int y, int w, int h, FontManager &fontMgr,
-                               AppConfig &config)
-    : Widget(x, y, w, h), fontMgr_(fontMgr), config_(config) {
+                               AppConfig &config, std::function<void()> onSave)
+    : Widget(x, y, w, h), fontMgr_(fontMgr), config_(config),
+      onSave_(std::move(onSave)) {
   update(); // Initial parse
 }
 
@@ -35,27 +38,45 @@ void CountdownPanel::render(SDL_Renderer *renderer) {
   if (!fontMgr_.ready())
     return;
 
-  SDL_SetRenderDrawColor(renderer, 20, 20, 30, 255);
+  ThemeColors themes = getThemeColors(theme_);
+
+  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b,
+                         themes.bg.a);
   SDL_Rect rect = {x_, y_, width_, height_};
   SDL_RenderFillRect(renderer, &rect);
-  SDL_SetRenderDrawColor(renderer, 80, 80, 80, 255);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
+                         themes.border.b, themes.border.a);
   SDL_RenderDrawRect(renderer, &rect);
 
   int titleH = 20;
-  std::string label =
-      config_.countdownLabel.empty() ? "Countdown" : config_.countdownLabel;
-  if (config_.countdownLabel.empty() && editing_)
-    label = "Click to set";
+  auto *cat = fontMgr_.catalog();
 
-  fontMgr_.drawText(renderer, label, x_ + 10, y_ + 5, {0, 200, 255, 255}, 10,
-                    true);
+  // Unified Title Bar (Match standard font size/look)
+  cat->drawText(renderer, "Countdown", x_ + 10, y_ + 5, themes.accent,
+                FontStyle::MicroBold);
+
+  // Separator line
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
+                         themes.border.b, 60);
+  SDL_RenderDrawLine(renderer, x_ + 5, y_ + titleH, x_ + width_ - 5,
+                     y_ + titleH);
 
   int centerX = x_ + width_ / 2;
   int centerY = y_ + titleH + (height_ - titleH) / 2;
 
+  // Custom User Label
+  std::string label = config_.countdownLabel;
+  if (label.empty() && editing_)
+    label = "Click to set";
+
+  if (!label.empty()) {
+    cat->drawText(renderer, label, centerX, centerY - 15, themes.text,
+                  FontStyle::Micro, true);
+  }
+
   if (targetTime_ == std::chrono::system_clock::time_point()) {
-    fontMgr_.drawText(renderer, "No target set", centerX, centerY,
-                      {150, 150, 150, 255}, 14, true, true);
+    cat->drawText(renderer, "No target set", centerX, centerY + 5,
+                  {150, 150, 150, 255}, FontStyle::SmallRegular, true);
     return;
   }
 
@@ -65,8 +86,8 @@ void CountdownPanel::render(SDL_Renderer *renderer) {
           .count();
 
   if (diff <= 0 && targetTime_.time_since_epoch().count() > 0) {
-    fontMgr_.drawText(renderer, "EVENT ACTIVE!", centerX, centerY,
-                      {255, 0, 0, 255}, 15, true, true);
+    cat->drawText(renderer, "EVENT ACTIVE!", centerX, centerY + 5,
+                  {255, 0, 0, 255}, FontStyle::MicroBold, true);
     if (!alarmTriggered_) {
       SoundManager::getInstance().playAlarm();
       alarmTriggered_ = true;
@@ -84,15 +105,19 @@ void CountdownPanel::render(SDL_Renderer *renderer) {
     else
       std::snprintf(buf, sizeof(buf), "%02dh %02dm %02ds", hours, mins, secs);
 
-    fontMgr_.drawText(renderer, buf, centerX, centerY, {255, 255, 255, 255}, 14,
-                      true, true);
+    cat->drawText(renderer, buf, centerX, centerY + 5, themes.text,
+                  FontStyle::SmallRegular, true);
   }
 
-  fontMgr_.drawText(renderer, "Remaining", centerX, y_ + height_ - 14,
-                    {100, 100, 100, 255}, 9, false, true);
+  cat->drawText(renderer, "Remaining", centerX, y_ + height_ - 14,
+                {100, 100, 100, 255}, FontStyle::Caption, true);
 
   if (editing_) {
     renderEditOverlay(renderer);
+  }
+
+  if (tooltip_.visible) {
+    renderTooltip(renderer);
   }
 }
 
@@ -129,8 +154,23 @@ bool CountdownPanel::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
       }
     }
 
-    // Click outside -> Save and Close
-    // stopEditing(true);
+    // Check buttons
+    int btnW = 80;
+    int btnH = 28;
+    int btnY = y_ + height_ - btnH - 10;
+    int cx = x_ + width_ / 2;
+    if (my >= btnY && my < btnY + btnH) {
+      if (mx >= cx - btnW - 10 && mx < cx - 10) {
+        stopEditing(false); // Cancel
+        return true;
+      } else if (mx >= cx + 10 && mx < cx + 10 + btnW) {
+        stopEditing(true); // Done
+        return true;
+      }
+    }
+
+    // Click outside -> Ignore or beep? For now, do nothing since we have
+    // buttons
     return true;
   }
 
@@ -168,6 +208,9 @@ void CountdownPanel::stopEditing(bool apply) {
 
     config_.countdownLabel = tempLabel_;
     config_.countdownTime = tempTime_;
+    if (onSave_) {
+      onSave_();
+    }
     update();
   }
   editing_ = false;
@@ -209,6 +252,7 @@ bool CountdownPanel::onTextInput(const char *text) {
 }
 
 void CountdownPanel::renderEditOverlay(SDL_Renderer *renderer) {
+  ThemeColors themes = getThemeColors(theme_);
   SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
   SDL_SetRenderDrawColor(renderer, 0, 0, 0, 240);
   SDL_Rect overlay = {x_, y_, width_, height_};
@@ -216,15 +260,17 @@ void CountdownPanel::renderEditOverlay(SDL_Renderer *renderer) {
   SDL_SetRenderDrawColor(renderer, 100, 100, 100, 255);
   SDL_RenderDrawRect(renderer, &overlay);
 
-  SDL_Color cyan = {0, 255, 255, 255};
-  SDL_Color white = {255, 255, 255, 255};
+  SDL_Color cyan = themes.accent;
+  SDL_Color white = themes.text;
+  auto *cat = fontMgr_.catalog();
 
   int pad = 10;
   int boxH = 24;
   int startY = y_ + 20;
 
   // Label Field
-  fontMgr_.drawText(renderer, "Label:", x_ + pad, startY - 12, cyan, 9);
+  cat->drawText(renderer, "Label:", x_ + pad, startY - 12, cyan,
+                FontStyle::Caption);
   SDL_Rect labelBox = {x_ + pad, startY, width_ - 2 * pad, boxH};
   SDL_SetRenderDrawColor(renderer, 40, 40, 40, 255);
   SDL_RenderFillRect(renderer, &labelBox);
@@ -235,10 +281,12 @@ void CountdownPanel::renderEditOverlay(SDL_Renderer *renderer) {
   SDL_RenderDrawRect(renderer, &labelBox);
 
   std::string labelText = !editingTime_ ? editText_ : tempLabel_;
-  fontMgr_.drawText(renderer, labelText, x_ + pad + 4, startY + 6, white, 11);
+  cat->drawText(renderer, labelText, x_ + pad + 4, startY + 6, white,
+                FontStyle::UI);
 
   if (!editingTime_ && (SDL_GetTicks() / 500) % 2 == 0) {
-    int tw = fontMgr_.getLogicalWidth(editText_.substr(0, cursorPos_), 11);
+    int tw = fontMgr_.getLogicalWidth(editText_.substr(0, cursorPos_),
+                                      cat->ptSize(FontStyle::UI));
     SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
     SDL_RenderDrawLine(renderer, x_ + pad + 4 + tw, startY + 4,
                        x_ + pad + 4 + tw, startY + boxH - 4);
@@ -246,8 +294,8 @@ void CountdownPanel::renderEditOverlay(SDL_Renderer *renderer) {
 
   // Time Field
   int timeY = startY + boxH + 20;
-  fontMgr_.drawText(renderer, "Time (YYYY-MM-DD HH:MM):", x_ + pad, timeY - 12,
-                    cyan, 9);
+  cat->drawText(renderer, "Time (YYYY-MM-DD HH:MM):", x_ + pad, timeY - 12, cyan,
+                FontStyle::Caption);
   SDL_Rect timeBox = {x_ + pad, timeY, width_ - 2 * pad, boxH};
   SDL_SetRenderDrawColor(renderer, 40, 40, 40, 255);
   SDL_RenderFillRect(renderer, &timeBox);
@@ -258,14 +306,101 @@ void CountdownPanel::renderEditOverlay(SDL_Renderer *renderer) {
   SDL_RenderDrawRect(renderer, &timeBox);
 
   std::string timeStr = editingTime_ ? editText_ : tempTime_;
-  fontMgr_.drawText(renderer, timeStr, x_ + pad + 4, timeY + 6, white, 11);
+  cat->drawText(renderer, timeStr, x_ + pad + 4, timeY + 6, white,
+                FontStyle::UI);
 
   if (editingTime_ && (SDL_GetTicks() / 500) % 2 == 0) {
-    int tw = fontMgr_.getLogicalWidth(editText_.substr(0, cursorPos_), 11);
+    int tw = fontMgr_.getLogicalWidth(editText_.substr(0, cursorPos_),
+                                      cat->ptSize(FontStyle::UI));
     SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
     SDL_RenderDrawLine(renderer, x_ + pad + 4 + tw, timeY + 4,
                        x_ + pad + 4 + tw, timeY + boxH - 4);
   }
 
+  // Done / Cancel Buttons
+  int btnW = 80;
+  int btnH = 28;
+  int btnY = y_ + height_ - btnH - 10;
+  int cx = x_ + width_ / 2;
+
+  // Cancel
+  SDL_Rect cancelRect = {cx - btnW - 10, btnY, btnW, btnH};
+  SDL_SetRenderDrawColor(renderer, themes.danger.r, themes.danger.g,
+                         themes.danger.b, 255);
+  SDL_RenderFillRect(renderer, &cancelRect);
+  SDL_SetRenderDrawColor(renderer, 255, 255, 255, 100);
+  SDL_RenderDrawRect(renderer, &cancelRect);
+  cat->drawText(renderer, "Cancel", cancelRect.x + btnW / 2,
+                cancelRect.y + btnH / 2, white, FontStyle::UI, true, false,
+                true);
+
+  // Done
+  SDL_Rect okRect = {cx + 10, btnY, btnW, btnH};
+  SDL_SetRenderDrawColor(renderer, themes.success.r, themes.success.g,
+                         themes.success.b, 255);
+  SDL_RenderFillRect(renderer, &okRect);
+  SDL_SetRenderDrawColor(renderer, 255, 255, 255, 100);
+  SDL_RenderDrawRect(renderer, &okRect);
+  cat->drawText(renderer, "Done", okRect.x + btnW / 2, okRect.y + btnH / 2, white,
+                FontStyle::UI, true, false, true);
+
   SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+}
+
+void CountdownPanel::onMouseMove(int mx, int my) {
+  tooltip_.visible = false;
+  if (editing_)
+    return;
+
+  // Render text is centered horizontally.
+  // Check roughly if mouse is over the countdown
+  int textY = y_ + height_ / 2 - 10;
+  int textH = 30;
+
+  if (mx >= x_ + 10 && mx < x_ + width_ - 10 && my >= textY &&
+      my < textY + textH) {
+    auto now = std::chrono::system_clock::now();
+    if (targetTime_ > now) {
+      tooltip_.text = "Target: " + config_.countdownTime;
+      tooltip_.x = mx;
+      tooltip_.y = my;
+      tooltip_.visible = true;
+    }
+  }
+}
+
+void CountdownPanel::renderTooltip(SDL_Renderer *renderer) {
+  if (tooltip_.text.empty())
+    return;
+
+  auto *cat = fontMgr_.catalog();
+  int tw, th;
+  cat->renderText(renderer, tooltip_.text, {255, 255, 255, 255},
+                  FontStyle::Micro, &tw, &th);
+
+  int padX = 8;
+  int padY = 4;
+  int boxW = tw + padX * 2;
+  int boxH = th + padY * 2;
+
+  int bx = tooltip_.x - boxW / 2;
+  int by = tooltip_.y - boxH - 12;
+
+  if (by < y_) {
+    by = tooltip_.y + 16;
+  }
+  if (bx < x_)
+    bx = x_;
+  if (bx + boxW > x_ + width_)
+    bx = x_ + width_ - boxW;
+
+  SDL_Rect box = {bx, by, boxW, boxH};
+  SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+  SDL_SetRenderDrawColor(renderer, 20, 20, 20, 200);
+  SDL_RenderFillRect(renderer, &box);
+  SDL_SetRenderDrawColor(renderer, 100, 100, 100, 255);
+  SDL_RenderDrawRect(renderer, &box);
+
+  cat->drawText(renderer, tooltip_.text, bx + padX, by + padY,
+                {255, 255, 255, 255}, FontStyle::Micro);
 }

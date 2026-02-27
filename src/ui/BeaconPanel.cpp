@@ -83,9 +83,9 @@ void BeaconPanel::render(SDL_Renderer *renderer) {
 
   // Standard Title
   const char *titleText = isNarrow ? "NCDXF" : "NCDXF Beacons";
-  int titleFontSize = isNarrow ? 9 : 10;
-  fontMgr_.drawText(renderer, titleText, x_ + 10, y_ + 5, themes.accent,
-                    titleFontSize, true);
+  auto *cat = fontMgr_.catalog();
+  FontStyle titleStyle = isNarrow ? FontStyle::CaptionBold : FontStyle::MicroBold;
+  cat->drawText(renderer, titleText, x_ + 10, y_ + 5, themes.accent, titleStyle);
 
   if (isNarrow) {
     // Narrow Layout

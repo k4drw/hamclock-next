@@ -3,15 +3,23 @@
 #include "WidgetType.h"
 
 #include <filesystem>
+#include <map>
 #include <string>
 #include <vector>
 
 #include <SDL.h>
 
 enum class LiveSpotSource { PSK, RBN, WSPR };
-enum class PropOverlayType { None, Muf, Voacap, Reliability, Toa };
+enum class PropOverlayType { None, Muf, Voacap, Reliability, Toa, Heatmap };
 enum class WeatherOverlayType { None, Clouds, WxMb };
 enum class HubMode { Off, Master, Client };
+
+struct ReminderEntry {
+  std::string label;
+  std::string date; // YYYY-MM-DD
+  bool active = true;
+  std::string acknowledgedDate; // If == date, notification has been dismissed
+};
 
 struct AppConfig {
   // Identity
@@ -49,6 +57,7 @@ struct AppConfig {
   // Panel state
   std::string panelMode = "dx";  // "dx" or "sat"
   std::string selectedSatellite; // satellite name (empty = none)
+  std::vector<int> customSatelliteSCCs;
 
   // DX Cluster
   bool dxClusterEnabled = true;
@@ -96,6 +105,14 @@ struct AppConfig {
   std::string countdownLabel;
   std::string countdownTime;
 
+  // Reminder
+  std::string callsignExpiry;
+  std::string callsignFrn;
+  std::string
+      callsignExpiryAcknowledged;      // If == callsignExpiry, auto row acked
+  int64_t callsignExpiryLastCheck = 0; // epoch seconds; 0 = never checked
+  std::vector<ReminderEntry> reminders;
+
   // Brightness
   int brightness = 100;
   bool brightnessSchedule = false;
@@ -121,9 +138,9 @@ struct AppConfig {
   std::string skippedVersion;
 
   // Local Data Hub
-  HubMode     hubMode = HubMode::Off;
-  std::string hubIp   = "";
-  int         hubPort = 8080;
+  HubMode hubMode = HubMode::Off;
+  std::string hubIp = "";
+  int hubPort = 8080;
 
   // Network (WASM)
   // CORS proxy prefix prepended to all external URLs in the WASM build.
@@ -134,26 +151,43 @@ struct AppConfig {
 #else
   std::string corsProxyUrl = "";
 #endif
+  std::map<std::string, SDL_Color> colorOverrides;
 };
 
 class ConfigManager {
 public:
+  static ConfigManager &instance() {
+    static ConfigManager inst;
+    return inst;
+  }
+
+  // Delete copy and move
+  ConfigManager(const ConfigManager &) = delete;
+  ConfigManager &operator=(const ConfigManager &) = delete;
+  ConfigManager(ConfigManager &&) = delete;
+  ConfigManager &operator=(ConfigManager &&) = delete;
+
+  AppConfig &getConfig() { return config_; }
+  const AppConfig &getConfig() const { return config_; }
+
   // Resolves the config directory and file path.
   // Returns false if the path could not be determined.
   bool init();
 
   // Load config from disk. Returns false if file is missing or invalid.
-  bool load(AppConfig &config) const;
+  bool load(AppConfig &config);
 
   // Save config to disk. Creates directories if needed. Returns false on
   // failure.
-  bool save(const AppConfig &config) const;
+  bool save(const AppConfig &config);
 
   // Returns the resolved config file path (valid after init()).
   const std::filesystem::path &configPath() const { return configPath_; }
   const std::filesystem::path &configDir() const { return configDir_; }
 
 private:
+  ConfigManager() = default;
+  AppConfig config_;
   std::filesystem::path configDir_;
   std::filesystem::path configPath_;
 };

@@ -197,14 +197,14 @@ void SpaceWeatherPanel::render(SDL_Renderer *renderer) {
   int titleH = 20;
   bool isSmall = (width_ < 150);
   const char *titleText = isSmall ? "Space WX" : "Space Weather";
-  int titleFontSize = isSmall ? 9 : 10;
-  fontMgr_.drawText(renderer, titleText, x_ + 10, y_ + 5, themes.accent,
-                    titleFontSize, true);
+  FontStyle titleStyle = isSmall ? FontStyle::CaptionBold : FontStyle::MicroBold;
+  fontMgr_.catalog()->drawText(renderer, titleText, x_ + 10, y_ + 5, themes.accent,
+                               titleStyle);
 
   if (!dataValid_) {
-    fontMgr_.drawText(renderer, "Awaiting data...", x_ + 10,
+    fontMgr_.catalog()->drawText(renderer, "Awaiting data...", x_ + 10,
                       y_ + titleH + (height_ - titleH) / 2 - 8, themes.textDim,
-                      labelFontSize_);
+                      FontStyle::Micro);
     return;
   }
 
@@ -311,8 +311,9 @@ void SpaceWeatherPanel::render(SDL_Renderer *renderer) {
     uint32_t ticks = SDL_GetTicks();
     bool visible = (ticks / 500) % 2 == 0; // Blink every 500 ms
     if (visible) {
-      fontMgr_.drawText(renderer, alertBadge_.text, x_ + width_ - 4, y_ + 3,
-                        alertBadge_.color, labelFontSize_, true, true);
+      fontMgr_.catalog()->drawText(renderer, alertBadge_.text, x_ + width_ - 4,
+                                   y_ + 3, alertBadge_.color,
+                                   FontStyle::MicroBold, true);
     }
   }
 

@@ -20,8 +20,4 @@ private:
   FontManager &fontMgr_;
   std::shared_ptr<CallbookStore> store_;
   CallbookData currentData_;
-
-  int titleSize_ = 14;
-  int nameSize_ = 18;
-  int infoSize_ = 12;
 };

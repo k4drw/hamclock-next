@@ -1,6 +1,5 @@
 #include "TimePanel.h"
 #include "../core/Astronomy.h"
-#include "../core/MemoryMonitor.h"
 #include "../core/StringUtils.h"
 #include "../core/Theme.h"
 #include "FontCatalog.h"
@@ -22,13 +21,12 @@
 
 namespace {
 
-static constexpr const char *kVersion = "v" HAMCLOCK_VERSION;
 static constexpr Uint32 kInfoRotateMs = 3000;
 
 std::string getSystemUptime() {
 #ifdef _WIN32
-  // TODO: GetTickCount64() logic for Windows
-  return "Up --";
+  uint64_t ms = GetTickCount64();
+  double sec = ms / 1000.0;
 #else
   std::FILE *f = std::fopen("/proc/uptime", "r");
   if (!f)
@@ -37,6 +35,7 @@ std::string getSystemUptime() {
   if (std::fscanf(f, "%lf", &sec) != 1)
     sec = 0;
   std::fclose(f);
+#endif
   int days = static_cast<int>(sec / 86400);
   int hours = static_cast<int>(sec / 3600) % 24;
   int mins = static_cast<int>(sec / 60) % 60;
@@ -48,7 +47,6 @@ std::string getSystemUptime() {
   else
     std::snprintf(buf, sizeof(buf), "Up  %dm", mins);
   return buf;
-#endif
 }
 
 std::string getCpuTemp(bool metric) {
@@ -74,19 +72,12 @@ std::string getCpuTemp(bool metric) {
 }
 
 std::string getDiskUsage() {
-#ifdef _WIN32
-  return "Disk --";
-#else
-  struct statvfs stat;
-  if (statvfs("/", &stat) != 0)
+  int pct = MemoryMonitor::getInstance().getDiskUsagePct();
+  if (pct < 0)
     return "Disk --";
-  double total = static_cast<double>(stat.f_blocks) * stat.f_frsize;
-  double avail = static_cast<double>(stat.f_bavail) * stat.f_frsize;
-  int pct = (total > 0) ? static_cast<int>(100.0 * (1.0 - avail / total)) : 0;
   char buf[32];
   std::snprintf(buf, sizeof(buf), "Disk %d%%", pct);
   return buf;
-#endif
 }
 
 std::string getLocalIP() {
@@ -229,19 +220,20 @@ void TimePanel::render(SDL_Renderer *renderer) {
   {
     SDL_Color gray = themes.textDim;
     int infoY = infoBaseY + (infoRowH - infoFontSize_) / 2;
+    auto *cat = fontMgr_.catalog();
     TTF_Font *infoFont = fontMgr_.getFont(infoFontSize_);
     if (infoFont) {
       int tw = 0, th = 0;
 
       // Left: uptime
-      fontMgr_.drawText(renderer, currentUptime_, x_ + pad, infoY, gray,
-                        infoFontSize_);
+      cat->drawText(renderer, currentUptime_, x_ + pad, infoY, gray,
+                    FontStyle::Fast);
 
       // Rotating info (shifted slightly right to give more room for uptime)
       const std::string &centerText = infoTexts_[infoRotateIdx_];
       TTF_SizeUTF8(infoFont, centerText.c_str(), &tw, &th);
-      fontMgr_.drawText(renderer, centerText, x_ + (width_ - tw) * 0.58f, infoY,
-                        gray, infoFontSize_);
+      cat->drawText(renderer, centerText, x_ + (width_ - tw) * 0.58f, infoY,
+                    gray, FontStyle::Fast);
 
       // Right: version (amber + asterisk when update available)
       std::string verStr = HAMCLOCK_VERSION;
@@ -252,7 +244,7 @@ void TimePanel::render(SDL_Renderer *renderer) {
       }
       TTF_SizeUTF8(infoFont, verStr.c_str(), &tw, &th);
       int vx = x_ + width_ - pad - tw;
-      fontMgr_.drawText(renderer, verStr, vx, infoY, verColor, infoFontSize_);
+      cat->drawText(renderer, verStr, vx, infoY, verColor, FontStyle::Fast);
       versionRect_ = {vx, infoY, tw, th};
     }
   }
@@ -507,22 +499,20 @@ void TimePanel::renderEditOverlay(SDL_Renderer *renderer) {
   // --- Draw edit text with cursor ---
   int textX = x_ + pad + 6;
   int textY = fieldY + 6;
+  auto *cat = fontMgr_.catalog();
 
   if (!editText_.empty()) {
-    fontMgr_.drawText(renderer, editText_, textX, textY, selColor,
-                      editorFontSize);
+    cat->drawText(renderer, editText_, textX, textY, selColor,
+                  FontStyle::MediumBold);
   }
 
   // Cursor: measure text up to cursorPos_ to find x offset
   int cursorX = textX;
   if (cursorPos_ > 0) {
     std::string beforeCursor = editText_.substr(0, cursorPos_);
-    TTF_Font *font = fontMgr_.getFont(editorFontSize);
-    if (font) {
-      int tw = 0, th = 0;
-      TTF_SizeText(font, beforeCursor.c_str(), &tw, &th);
-      cursorX = textX + tw;
-    }
+    int tw = fontMgr_.getLogicalWidth(beforeCursor,
+                                      cat->ptSize(FontStyle::MediumBold));
+    cursorX = textX + tw;
   }
 
   // Blinking cursor (visible 500ms on, 500ms off)
@@ -562,10 +552,9 @@ void TimePanel::renderEditOverlay(SDL_Renderer *renderer) {
   int hintY =
       paletteY + ((kNumColors + cols - 1) / cols) * (swatchSize + gap) + pad;
   if (hintY + 14 < y_ + height_) {
-    int hintSize = std::clamp(static_cast<int>(height_ * 0.08f), 8, 16);
     SDL_Color gray = {140, 140, 140, 255};
-    fontMgr_.drawText(renderer, "Enter=OK  Esc=Cancel", x_ + pad, hintY, gray,
-                      hintSize);
+    cat->drawText(renderer, "Enter=Done  Esc=Cancel", x_ + pad, hintY, gray,
+                  FontStyle::Caption);
   }
 
   SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);

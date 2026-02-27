@@ -39,6 +39,13 @@ enum class WidgetType {
   HURRICANE,
   MARINE,
   WINLINK,
+  STOPWATCH,
+  REMINDER,
+  TROPO,
+  LIGHTNING,
+  METEOR,
+  IONOSONDE,
+  SOLAR_STORM,
 };
 
 inline const char *widgetTypeToString(WidgetType t) {
@@ -113,6 +120,20 @@ inline const char *widgetTypeToString(WidgetType t) {
     return "marine";
   case WidgetType::WINLINK:
     return "winlink";
+  case WidgetType::STOPWATCH:
+    return "stopwatch";
+  case WidgetType::REMINDER:
+    return "reminders";
+  case WidgetType::TROPO:
+    return "tropo";
+  case WidgetType::LIGHTNING:
+    return "lightning";
+  case WidgetType::METEOR:
+    return "meteor";
+  case WidgetType::IONOSONDE:
+    return "ionosonde";
+  case WidgetType::SOLAR_STORM:
+    return "solar_storm";
   }
   return "solar";
 }
@@ -189,6 +210,20 @@ inline const char *widgetTypeDisplayName(WidgetType t) {
     return "Marine";
   case WidgetType::WINLINK:
     return "Winlink";
+  case WidgetType::STOPWATCH:
+    return "Stopwatch";
+  case WidgetType::REMINDER:
+    return "Reminders";
+  case WidgetType::TROPO:
+    return "Tropo Cond";
+  case WidgetType::LIGHTNING:
+    return "Lightning";
+  case WidgetType::METEOR:
+    return "Meteor Scat";
+  case WidgetType::IONOSONDE:
+    return "Ionosonde";
+  case WidgetType::SOLAR_STORM:
+    return "Solar Storm";
   }
   return "Solar";
 }
@@ -265,6 +300,20 @@ inline WidgetType widgetTypeFromString(const std::string &s,
     return WidgetType::MARINE;
   if (s == "winlink")
     return WidgetType::WINLINK;
+  if (s == "stopwatch")
+    return WidgetType::STOPWATCH;
+  if (s == "reminders")
+    return WidgetType::REMINDER;
+  if (s == "tropo")
+    return WidgetType::TROPO;
+  if (s == "lightning")
+    return WidgetType::LIGHTNING;
+  if (s == "meteor")
+    return WidgetType::METEOR;
+  if (s == "ionosonde")
+    return WidgetType::IONOSONDE;
+  if (s == "solar_storm")
+    return WidgetType::SOLAR_STORM;
   std::fprintf(stderr, "WidgetType: unknown '%s', using fallback\n", s.c_str());
   return fallback;
 }

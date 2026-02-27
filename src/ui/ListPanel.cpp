@@ -58,9 +58,10 @@ void ListPanel::render(SDL_Renderer *renderer) {
       MemoryMonitor::getInstance().destroyTexture(titleTex_);
     }
     SDL_Color cyan = themes.accent;
-    titleTex_ = fontMgr_.renderText(renderer, title_, cyan, 10, &titleW_,
-                                    &titleH_, true);
-    lastTitleFontSize_ = 10;
+    titleTex_ = fontMgr_.catalog()->renderText(renderer, title_, cyan,
+                                               FontStyle::MicroBold, &titleW_,
+                                               &titleH_);
+    lastTitleFontSize_ = fontMgr_.catalog()->ptSize(FontStyle::MicroBold);
   }
 
   if (titleTex_) {
@@ -138,7 +139,7 @@ void ListPanel::render(SDL_Renderer *renderer) {
 void ListPanel::onResize(int x, int y, int w, int h) {
   Widget::onResize(x, y, w, h);
   auto *cat = fontMgr_.catalog();
-  titleFontSize_ = cat->ptSize(FontStyle::Fast);
+  titleFontSize_ = cat->ptSize(FontStyle::MicroBold);
   rowFontSize_ = cat->ptSize(FontStyle::Fast);
   destroyCache();
 }

@@ -198,11 +198,21 @@ Every external data fetch is cached both in memory and on disk.
 
 ### 10. Modern UI Enhancements
 
-- **Multiple color themes** — Dark, Light, High Contrast, and custom theme support
-- **Adaptive layouts** — panels reflow for 7-inch (1024×600) displays and larger 1080p/4K screens
+- **Dynamic Theme Engine** — Multiple built-in color themes (Default, Dark, Glass) plus a powerful **Custom Theme** editor.
+- **Real-time UI Preview** — Changes in the Theme Customizer are reflected immediately across the entire UI before saving.
+- **UI Standardization** — Unified interaction patterns (PascalCase "Done/Cancel" buttons), consistent sizing, and semantic theme-aware coloring for all interactive elements.
+- **Adaptive layouts** — panels reflow for 7-inch (1024×600) displays and larger 1080p/4K screens.
 - **Manual pane rotation** — left/right arrows in multi-pane view; resets auto-rotate timer
 - **DX spot inline label** — callsign, frequency, and band shown next to selected map bubble without requiring hover
 - **Semantic click API** — external tools can trigger named widget actions (`/debug/click?widget=SolarPanel&action=Cycle`) without pixel-coordinate guessing
+
+### 11. Tactical Propagation & Safety
+
+- **Solar Storm Tactical Dashboard** — Real-time NOAA GOES-18 X-ray flux monitoring with R/S/G tactical badges (Radio Blackout, Solar Radiation, Geomagnetic Storm). Features a 60-minute logarithmic flux sparkline with interactive hover tooltips and CME impact alerts.
+- **Digital Mode "Reach" Heatmap** — Aggregated transmitter reach visualization from PSKReporter. Maps digital mode spots into a geographic grid with Gaussian blurring to show signal density and "live" propagation reach for specific bands and modes.
+- **Live Ionosonde / NVIS** — Real-time critical frequency (foF2) and M-Factor monitoring from the KC2G Global Ionosonde network. Features anti-aliased history graphs and interactive hover tooltips for local ionospheric data.
+- **Meteor Scatter Activity** — Comprehensive meteor shower tracking with an annual database and diurnal activity models. Includes a 24-hour activity prediction graph using textured anti-aliased rendering for high-fidelity shack monitoring.
+- **Interactive Map Tooltips** — Surgical hover tooltips for all map objects (DE, DX, Satellites, Asteroids, Spots) with accurate bounding boxes and whitespace trimming for a polished, professional UI.
 
 ---
 
@@ -225,14 +235,14 @@ See [API.md](API.md) for the complete endpoint reference.
 
 ## Platform Support
 
-| Platform                         | Status                        |
-| -------------------------------- | ----------------------------- |
-| Linux x86_64 (framebuffer / X11) | ✅ Supported                   |
-| Linux ARM64 (Raspberry Pi 4/5)   | ✅ Supported                   |
-| Linux ARMhf (Raspberry Pi 3)     | ✅ Supported                   |
-| macOS Apple Silicon              | ✅ Supported                   |
-| Windows x64                      | ✅ Supported (exe + installer) |
-| Browser (WebAssembly)            | ✅ Supported                   |
+| Platform                                       | Status                        |
+| ---------------------------------------------- | ----------------------------- |
+| Linux x86_64 (framebuffer / X11)               | ✅ Supported                   |
+| Linux ARM64 (Raspberry Pi 4/5, Armbian 64-bit) | ✅ Supported (arm64)           |
+| Linux ARMhf (Raspberry Pi 3, 32-bit OS)        | ✅ Supported (armhf)           |
+| macOS Apple Silicon                            | ✅ Supported                   |
+| Windows x64                                    | ✅ Supported (exe + installer) |
+| Browser (WebAssembly)                          | ✅ Supported                   |
 
 ---
 

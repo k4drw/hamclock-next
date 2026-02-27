@@ -1,6 +1,6 @@
 {
-  "version": "2.2",
-  "updated_at": "2026-02-25T00:00:00.000Z",
+  "version": "2.5",
+  "updated_at": "2026-02-27T14:00:00.000Z",
   "features": [
     {
       "feature_id": "clock_callsign",
@@ -36,7 +36,7 @@
           "TimePanel",
           "ClockAuxPanel"
         ],
-        "notes": "Split into separate widgets for callsign, main time, and aux time. Stopwatch functionality is in CountdownPanel."
+        "notes": "Split into separate widgets for callsign, main time, and aux time. Countdown functionality is in CountdownPanel; stopwatch (count-up) is currently missing."
       },
       "status": "implemented",
       "acceptance": [
@@ -1100,6 +1100,34 @@
       "notes": "CountdownPanel user-configurable via click-to-edit. Target persists to config_.countdownTime / config_.countdownLabel. Displays EVENT ACTIVE! in red when reached. No audio alarm \u2014 visual only."
     },
     {
+      "feature_id": "stopwatch",
+      "name": "Stopwatch (Count-up & Laps)",
+      "category": "data_panel",
+      "description": "Stopwatch for counting up from zero, recording lap times, and managing multiple concurrent timers.",
+      "original": {
+        "files": [
+          "stopwatch.cpp"
+        ],
+        "symbols": [
+          "drawStopwatch",
+          "checkStopwatchTouch"
+        ],
+        "notes": "stopwatch.cpp (97K) is the core engine for all timing functions, including the 'Big Stopwatch' mode."
+      },
+      "next": {
+        "files": [],
+        "symbols": [],
+        "notes": "Currently missing. No equivalent to the original's count-up or lap recording functionality yet."
+      },
+      "status": "missing",
+      "acceptance": [
+        "Count up from zero",
+        "Record lap times",
+        "Persistent timer state",
+        "Accessible from the widget pool or time clicking"
+      ]
+    },
+    {
       "feature_id": "rotator_gimbal",
       "name": "Rotator/Gimbal Control",
       "category": "hardware",
@@ -1975,10 +2003,10 @@
       "notes": "Desktop equivalent: UpdateChecker service polls GitHub Releases API (repos/k4drw/hamclock-next/releases/latest) at startup and every 6h. When newer tag found, TimePanel version string turns amber and appends *. No auto-download/install. Implemented 2026-02-23."
     },
     {
-      "feature_id": "cpu_temp",
-      "name": "CPU Temperature Monitor",
+      "feature_id": "sys_info",
+      "name": "System Intelligence & Monitoring",
       "category": "hardware",
-      "description": "CPU temperature monitoring and display.",
+      "description": "Cross-platform system monitoring and display, including CPU usage, temperature, RAM (Used/Total), VRAM estimation, Disk usage (%), and Local IP address.",
       "original": {
         "files": [
           "cputemp.cpp"
@@ -1987,26 +2015,35 @@
           "readCPUtemp",
           "drawCPUtemp"
         ],
-        "notes": "cputemp.cpp (11K) reads CPU temperature via sysfs."
+        "notes": "Original HamClock's cputemp.cpp (11K) primarily reads CPU temperature via Linux sysfs. It has limited platform-specific logic for auxiliary stats."
       },
       "next": {
         "files": [
           "src/core/CPUMonitor.cpp",
           "src/core/CPUMonitor.h",
-          "src/ui/CPUTempPanel.cpp",
-          "src/ui/CPUTempPanel.h"
+          "src/core/MemoryMonitor.cpp",
+          "src/core/MemoryMonitor.h",
+          "src/ui/SysInfoPanel.cpp",
+          "src/ui/SysInfoPanel.h"
         ],
         "symbols": [
           "CPUMonitor",
-          "CPUTempPanel"
-        ]
+          "MemoryMonitor",
+          "SysInfoPanel",
+          "MemoryMonitor::getDiskUsagePct"
+        ],
+        "notes": "Universal support for Linux, macOS, and Windows. Uses platform-specific APIs (GetAdaptersAddresses, statvfs, GetDiskFreeSpaceExA) for deep system intelligence. Unified display in SysInfoPanel."
       },
       "status": "implemented",
       "acceptance": [
-        "Read CPU temperature from /sys/class/thermal",
-        "Display current temperature"
+        "Read CPU temperature across all major platforms",
+        "Display real-time CPU utilization %",
+        "Track RAM usage (Used vs Total capacity)",
+        "Estimate VRAM allocation",
+        "Monitor local disk free space (%)",
+        "Retrieve and display local IP address with 60s auto-refresh"
       ],
-      "notes": "Integrated CPUMonitor and CPUTempPanel into SetupScreen and main.cpp. Displays in pane rotation."
+      "notes": "Significantly expanded in Phase 40+ to include full cross-platform parity and additional disk/memory metrics. Replaces the older CPUTempPanel with the unified SysInfoPanel."
     },
     {
       "feature_id": "display_power",
@@ -2238,7 +2275,7 @@
       },
       "status": "implemented",
       "acceptance": [
-        "Fetch MUF-RT image from KC2G or OHB backend",
+        "Fetch MUF-RT image from KC2G",
         "Display as semi-transparent overlay on world map",
         "Auto-refresh every 15 minutes",
         "Toggle on/off in MapViewMenu",
@@ -2862,7 +2899,213 @@
         "60-second RSS heartbeat appears in logs",
         "macOS Apple Silicon not affected by texture dimension cap"
       ],
-      "notes": "Implemented 2026-02-25. Confirmed on RPi 3B (972 MB, LOW) and 64 GB dev machine (NO). Saves ~220 MB RSS headroom."
-    }
-  ]
-}
+            "notes": "Implemented 2026-02-25. Confirmed on RPi 3B (972 MB, LOW) and 64 GB dev machine (NO). Saves ~220 MB RSS headroom."
+          },
+          {
+            "feature_id": "tropo_ducting",
+            "name": "Tropospheric Ducting Forecast",
+            "category": "data_panel",
+            "description": "Calculates probability of VHF/UHF ducting openings based on meteorological stability indices. 3-day hourly forecast.",
+            "original": {
+              "files": [],
+              "symbols": [],
+              "notes": "New feature in hamclock-next. Inspired by Hepburn Tropo Index."
+            },
+            "next": {
+              "files": [
+                "src/services/TropoProvider.cpp",
+                "src/ui/TropoPanel.cpp",
+                "src/core/TropoData.h"
+              ],
+              "symbols": [
+                "TropoProvider",
+                "TropoPanel"
+              ],
+              "notes": "Uses Open-Meteo API for pressure, wind, and dewpoint spread."
+            },
+            "status": "implemented",
+            "acceptance": [
+              "Hourly 3-day ducting forecast",
+              "Color-coded intensity levels",
+              "Visual progress bar for current potential"
+            ]
+          },
+          {
+            "feature_id": "lightning_monitor",
+            "name": "Lightning & Static Monitor",
+            "category": "data_panel",
+            "description": "Real-time lightning strike proximity monitoring and broad thunderstorm alerts for shack safety and QRN assessment.",
+            "original": {
+              "files": [],
+              "symbols": [],
+              "notes": "New feature in hamclock-next."
+            },
+            "next": {
+              "files": [
+                "src/services/LightningProvider.cpp",
+                "src/ui/LightningPanel.cpp",
+                "src/core/LightningData.h"
+              ],
+              "symbols": [
+                "LightningProvider",
+                "LightningPanel"
+              ],
+              "notes": "Dual-source (RainViewer + Open-Meteo). Features blinking safety alert for strikes within 15km."
+            },
+            "status": "implemented",
+            "acceptance": [
+              "Real-time strike counter (10m/30m)",
+              "Closest strike distance and bearing",
+              "Blinking Red 'STRIKE NEARBY' safety alert",
+              "Weather code fallback for broad alerts"
+            ]
+          },
+          {
+            "feature_id": "greyline_overlap",
+            "name": "Greyline Overlap Sync",
+            "category": "utility",
+            "description": "Calculates mutual twilight windows between DE and DX locations for low-band propagation planning.",
+            "original": {
+              "files": [],
+              "symbols": [],
+              "notes": "Original HamClock shows visual greyline but lacks mutual overlap calculation."
+            },
+            "next": {
+              "files": [
+                "src/core/GreylineCalculator.cpp",
+                "src/ui/GreylineModal.cpp",
+                "src/ui/DXPanel.cpp"
+              ],
+              "symbols": [
+                "GreylineCalculator",
+                "GreylineModal"
+              ],
+              "notes": "On-demand modal triggered via [Grey] button on DXPanel."
+            },
+            "status": "implemented",
+            "acceptance": [
+              "Find next mutual greyline window (±12 deg solar elevation)",
+              "Calculate window duration and type (Sunrise/Sunset overlap)",
+              "High-performance coarse-to-fine scanning logic"
+            ]
+          },
+          {
+            "feature_id": "meteor_scatter",
+            "name": "Meteor Scatter Activity",
+            "category": "data_panel",
+            "description": "Predicts VHF ionization potential from sporadic meteors and major annual showers.",
+            "original": {
+              "files": [],
+              "symbols": [],
+              "notes": "New feature in hamclock-next."
+            },
+            "next": {
+              "files": [
+                "src/services/MeteorProvider.cpp",
+                "src/ui/MeteorPanel.cpp",
+                "src/core/MeteorData.h"
+              ],
+              "symbols": [
+                "MeteorProvider",
+                "MeteorPanel"
+              ],
+              "notes": "Diurnal peak model + annual catalog. High-fidelity graph with AA lines and hover tooltips."
+            },
+            "status": "implemented",
+            "acceptance": [
+              "Current activity index (1-10)",
+              "Active shower detection",
+              "24-hour potential graph with hover tooltips",
+              "Anti-aliased visual style"
+            ]
+          },
+          {
+            "feature_id": "ionosonde_nvis",
+            "name": "Live Ionosonde / NVIS",
+            "category": "data_panel",
+            "description": "Real-time ionospheric monitoring (foF2/M-Factor) from KC2G Global Ionosonde network.",
+            "original": {
+              "files": [],
+              "symbols": [],
+              "notes": "New in hamclock-next."
+            },
+            "next": {
+              "files": [
+                "src/services/IonosondeProvider.cpp",
+                "src/ui/IonosondePanel.cpp",
+                "src/core/IonosondeData.h"
+              ],
+              "symbols": [
+                "IonosondeProvider",
+                "IonosondePanel"
+              ],
+              "notes": "Real-time critical frequency graphs with hover tooltips. Reliable foF2 tracking."
+            },
+            "status": "implemented",
+            "acceptance": [
+              "foF2/M-Factor metrics",
+              "Real-time history graph",
+              "Interactive hover tooltips"
+            ]
+          },
+          {
+            "feature_id": "solar_storm",
+            "name": "Solar Storm Tactical Dashboard",
+            "category": "data_panel",
+            "description": "Tactical monitoring of space weather storm levels (R/S/G scales).",
+            "original": {
+              "files": [],
+              "symbols": [],
+              "notes": "New in hamclock-next."
+            },
+            "next": {
+              "files": [
+                "src/services/SolarStormProvider.cpp",
+                "src/ui/SolarStormPanel.cpp",
+                "src/core/SolarStormData.h"
+              ],
+              "symbols": [
+                "SolarStormProvider",
+                "SolarStormPanel"
+              ],
+              "notes": "GOES-18 flux monitoring. NOAA alerts.json integration."
+            },
+            "status": "implemented",
+            "acceptance": [
+              "NOAA R/S/G badges",
+              "Logarithmic X-ray flux sparkline",
+              "CME impact prediction alerts"
+            ]
+          },
+          {
+            "feature_id": "reach_heatmap",
+            "name": "Digital Mode Reach Heatmap",
+            "category": "map",
+            "description": "Live signal density heatmap based on PSKReporter/WSPR spots.",
+            "original": {
+              "files": [],
+              "symbols": [],
+              "notes": "New in hamclock-next."
+            },
+            "next": {
+              "files": [
+                "src/services/ReachProvider.cpp",
+                "src/ui/MapWidget.cpp",
+                "src/core/ReachData.h"
+              ],
+              "symbols": [
+                "ReachProvider",
+                "MapWidget::onPropDataReady"
+              ],
+              "notes": "Uses 660x330 grid with Gaussian blur and Jet/Heat colormap."
+            },
+            "status": "implemented",
+            "acceptance": [
+              "Spot density aggregation",
+              "Smooth Gaussian blurring",
+              "Selectable from Map View menu"
+            ]
+          }
+        ]
+      }
+      

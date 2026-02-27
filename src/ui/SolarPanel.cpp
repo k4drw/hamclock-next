@@ -40,8 +40,8 @@ void SolarPanel::render(SDL_Renderer *renderer) {
   SolarData data = store_->get();
 
   int titleH = 20;
-  fontMgr_.drawText(renderer, "Solar", x_ + 10, y_ + 5, themes.accent, 10,
-                    true);
+  fontMgr_.catalog()->drawText(renderer, "Solar", x_ + 10, y_ + 5, themes.accent,
+                               FontStyle::MicroBold);
 
   if (isNarrow) {
     // Vertical stack (Fidelity Mode style)
@@ -54,11 +54,12 @@ void SolarPanel::render(SDL_Renderer *renderer) {
       // Value (Large, Green)
       char valBuf[16];
       std::snprintf(valBuf, sizeof(valBuf), "%d", val);
-      fontMgr_.drawText(renderer, valBuf, centerX, ry + rowH * 0.35f,
-                        {0, 255, 0, 255}, valueFontSize_, true, true);
+      fontMgr_.catalog()->drawText(renderer, valBuf, centerX, ry + rowH * 0.35f,
+                                   {0, 255, 0, 255}, FontStyle::MediumBold,
+                                   true);
       // Label (Small)
-      fontMgr_.drawText(renderer, lbl, centerX, ry + rowH * 0.75f,
-                        themes.textDim, labelFontSize_, false, true);
+      fontMgr_.catalog()->drawText(renderer, lbl, centerX, ry + rowH * 0.75f,
+                                   themes.textDim, FontStyle::Micro, true);
     };
 
     if (data.valid) {
@@ -70,10 +71,11 @@ void SolarPanel::render(SDL_Renderer *renderer) {
       char akBuf[32];
       std::snprintf(akBuf, sizeof(akBuf), "A%d K%d", data.a_index,
                     data.k_index);
-      fontMgr_.drawText(renderer, akBuf, centerX, ry + rowH * 0.35f,
-                        {0, 255, 0, 255}, valueFontSize_, true, true);
-      fontMgr_.drawText(renderer, "A & K", centerX, ry + rowH * 0.75f,
-                        themes.textDim, labelFontSize_, false, true);
+      fontMgr_.catalog()->drawText(renderer, akBuf, centerX, ry + rowH * 0.35f,
+                                   {0, 255, 0, 255}, FontStyle::MediumBold,
+                                   true);
+      fontMgr_.catalog()->drawText(renderer, "A & K", centerX, ry + rowH * 0.75f,
+                                   themes.textDim, FontStyle::Micro, true);
     }
     return;
   }

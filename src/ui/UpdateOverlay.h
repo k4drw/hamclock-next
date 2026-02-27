@@ -37,9 +37,6 @@ private:
   Result result_ = Result::None;
 
   // Layout
-  int titleSize_ = 24;
-  int bodySize_ = 14;
-  int btnSize_ = 16;
   int padding_ = 20;
 
   SDL_Rect skipBtn_ = {0, 0, 0, 0};

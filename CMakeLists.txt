@@ -464,12 +464,14 @@ endif()
 
 set(HAMCLOCK_SOURCES
     src/main.cpp
+    src/core/Theme.cpp
     src/core/Logger.cpp
     src/core/ConfigManager.cpp
     src/core/DatabaseManager.cpp
     src/core/OrbitPredictor.cpp
     src/core/DXClusterData.cpp
     src/core/DisplayPower.cpp
+    src/core/GreylineCalculator.cpp
     src/core/BrightnessManager.cpp
     src/core/CPUMonitor.cpp
     src/core/SatelliteManager.cpp
@@ -492,6 +494,7 @@ set(HAMCLOCK_SOURCES
     src/services/ActivityProvider.cpp
     src/services/DRAPProvider.cpp
     src/services/LiveSpotProvider.cpp
+    src/services/ReachProvider.cpp
     src/services/DXClusterProvider.cpp
     src/services/AuroraProvider.cpp
     src/services/MufRtProvider.cpp
@@ -505,8 +508,14 @@ set(HAMCLOCK_SOURCES
     src/services/SDOProvider.cpp
     src/services/WeatherProvider.cpp
     src/services/CallbookProvider.cpp
+    src/services/FccProvider.cpp
     src/services/DstProvider.cpp
     src/services/SantaProvider.cpp
+    src/services/TropoProvider.cpp
+    src/services/LightningProvider.cpp
+    src/services/MeteorProvider.cpp
+    src/services/IonosondeProvider.cpp
+    src/services/SolarStormProvider.cpp
     src/services/RotatorService.cpp
     src/services/RigService.cpp
     src/services/GPSProvider.cpp
@@ -540,6 +549,7 @@ set(HAMCLOCK_SOURCES
     src/ui/SysInfoPanel.cpp
     src/ui/DRAPPanel.cpp
     src/ui/GimbalPanel.cpp
+    src/ui/GreylineModal.cpp
     src/ui/HistoryPanel.cpp
     src/ui/MoonPanel.cpp
     src/ui/SDOPanel.cpp
@@ -554,12 +564,22 @@ set(HAMCLOCK_SOURCES
     src/ui/MapViewMenu.cpp
     src/ui/PaneContainer.cpp
     src/ui/PlaceholderWidget.cpp
+    src/ui/ColorPicker.cpp
     src/ui/RenderUtils.cpp
     src/ui/RSSBanner.cpp
+    src/ui/SatelliteSetup.cpp
     src/ui/SatPanel.cpp
     src/ui/SetupScreen.cpp
     src/ui/SpaceWeatherPanel.cpp
+    src/ui/ThemeCustomizer.cpp
     src/ui/TimePanel.cpp
+    src/ui/TropoPanel.cpp
+    src/ui/LightningPanel.cpp
+    src/ui/MeteorPanel.cpp
+    src/ui/IonosondePanel.cpp
+    src/ui/SolarStormPanel.cpp
+    src/ui/StopwatchPanel.cpp
+    src/ui/ReminderPanel.cpp
     src/ui/UpdateOverlay.cpp
     src/ui/WidgetSelector.cpp
     src/ui/CallbookPanel.cpp

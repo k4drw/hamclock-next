@@ -100,7 +100,7 @@ bool ConfigManager::init() {
                 console.log('[IDBFS] Sync-from-IDB complete' +
                             (mounted ? "" : " (no IDBFS — session only)"));
               }
-              if (typeof Module._hamclock_after_idbfs === 'function')
+              if (typeof Module._hamclock_after_idbfs == = 'function')
                 Module._hamclock_after_idbfs();
             });
       },
@@ -111,7 +111,7 @@ bool ConfigManager::init() {
   return true;
 }
 
-bool ConfigManager::load(AppConfig &config) const {
+bool ConfigManager::load(AppConfig &config) {
   if (configPath_.empty())
     return false;
 
@@ -195,6 +195,27 @@ bool ConfigManager::load(AppConfig &config) const {
     config.countdownTime = ap.value("countdown_time", "");
   }
 
+  // Reminder
+  if (json.contains("reminder")) {
+    auto &rm = json["reminder"];
+    config.callsignExpiry = rm.value("callsign_expiry", "");
+    config.callsignFrn = rm.value("callsign_frn", "");
+    config.callsignExpiryAcknowledged = rm.value("callsign_expiry_acked", "");
+    config.callsignExpiryLastCheck =
+        rm.value("callsign_expiry_last_check", (int64_t)0);
+    if (rm.contains("custom") && rm["custom"].is_array()) {
+      config.reminders.clear();
+      for (auto &item : rm["custom"]) {
+        ReminderEntry re;
+        re.label = item.value("label", "");
+        re.date = item.value("date", "");
+        re.active = item.value("active", true);
+        re.acknowledgedDate = item.value("acked", "");
+        config.reminders.push_back(re);
+      }
+    }
+  }
+
   // RSS
   if (json.contains("rss")) {
     config.rssEnabled = json["rss"].value("enabled", true);
@@ -220,6 +241,17 @@ bool ConfigManager::load(AppConfig &config) const {
   if (json.contains("network")) {
     const auto &n = json["network"];
     config.corsProxyUrl = n.value("cors_proxy_url", config.corsProxyUrl);
+  }
+
+  // Color Overrides
+  if (json.contains("color_overrides") && json["color_overrides"].is_object()) {
+    config.colorOverrides.clear();
+    for (auto &el : json["color_overrides"].items()) {
+      if (el.value().is_string()) {
+        config.colorOverrides[el.key()] =
+            hexToColor(el.value().get<std::string>(), {0, 0, 0, 255});
+      }
+    }
   }
 
   // Local Data Hub
@@ -284,6 +316,13 @@ bool ConfigManager::load(AppConfig &config) const {
     auto &pn = json["panel"];
     config.panelMode = pn.value("mode", "dx");
     config.selectedSatellite = pn.value("satellite", "");
+    if (pn.contains("custom_sccs") && pn["custom_sccs"].is_array()) {
+      config.customSatelliteSCCs.clear();
+      for (auto &item : pn["custom_sccs"]) {
+        if (item.is_number())
+          config.customSatelliteSCCs.push_back(item.get<int>());
+      }
+    }
   }
 
   // DX Cluster
@@ -355,13 +394,19 @@ bool ConfigManager::load(AppConfig &config) const {
     config.rigAutoTune = r.value("auto_tune", true);
   }
 
+  // Sync internal state
+  config_ = config;
+
   // Require at least a callsign to consider config valid
   return !config.callsign.empty();
 }
 
-bool ConfigManager::save(const AppConfig &config) const {
+bool ConfigManager::save(const AppConfig &config) {
   if (configPath_.empty())
     return false;
+
+  // Sync internal state
+  config_ = config;
 
   // Create directory if needed
   std::error_code ec;
@@ -414,6 +459,22 @@ bool ConfigManager::save(const AppConfig &config) const {
   json["countdown"]["label"] = config.countdownLabel;
   json["countdown"]["time"] = config.countdownTime;
 
+  json["reminder"]["callsign_expiry"] = config.callsignExpiry;
+  json["reminder"]["callsign_frn"] = config.callsignFrn;
+  json["reminder"]["callsign_expiry_acked"] = config.callsignExpiryAcknowledged;
+  json["reminder"]["callsign_expiry_last_check"] =
+      config.callsignExpiryLastCheck;
+  auto rmArr = nlohmann::json::array();
+  for (const auto &re : config.reminders) {
+    nlohmann::json jre;
+    jre["label"] = re.label;
+    jre["date"] = re.date;
+    jre["active"] = re.active;
+    jre["acked"] = re.acknowledgedDate;
+    rmArr.push_back(jre);
+  }
+  json["reminder"]["custom"] = rmArr;
+
   json["brightness"]["level"] = config.brightness;
   json["brightness"]["schedule"] = config.brightnessSchedule;
   json["brightness"]["dim_hour"] = config.dimHour;
@@ -459,6 +520,12 @@ bool ConfigManager::save(const AppConfig &config) const {
   json["panel"]["mode"] = config.panelMode;
   json["panel"]["satellite"] = config.selectedSatellite;
 
+  auto sccArr = nlohmann::json::array();
+  for (int scc : config.customSatelliteSCCs) {
+    sccArr.push_back(scc);
+  }
+  json["panel"]["custom_sccs"] = sccArr;
+
   json["dx_cluster"]["enabled"] = config.dxClusterEnabled;
   json["dx_cluster"]["host"] = config.dxClusterHost;
   json["dx_cluster"]["port"] = config.dxClusterPort;
@@ -483,6 +550,13 @@ bool ConfigManager::save(const AppConfig &config) const {
   json["asteroid"]["color"]["r"] = config.asteroidColor.r;
   json["asteroid"]["color"]["g"] = config.asteroidColor.g;
   json["asteroid"]["color"]["b"] = config.asteroidColor.b;
+
+  // Color Overrides
+  if (!config.colorOverrides.empty()) {
+    for (auto const &[key, val] : config.colorOverrides) {
+      json["color_overrides"][key] = colorToHex(val);
+    }
+  }
 
   std::ofstream ofs(configPath_);
   if (!ofs) {

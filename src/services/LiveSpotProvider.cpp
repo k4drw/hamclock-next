@@ -60,7 +60,7 @@ void parsePSKReporter(const std::string &body, LiveSpotData &data,
           // Store in generic fields (SpotRecord uses receiverGrid for location)
           data.spots.push_back({freqKhz, grid, call});
           if (data.spots.size() >= 500) {
-            LOG_W("LiveSpot", "Too many spots in response, capped at 500");
+            LOG_D("LiveSpot", "Too many spots in response, capped at 500");
             break;
           }
         }
@@ -230,7 +230,7 @@ void LiveSpotProvider::fetchWSPR() {
 
   // Band IDs used by db1.wspr.live (MHz integer, matching kBands order)
   static const int wsprBandIds[kNumBands] = {1,  3,  5,  7,  10, 14,
-                                              18, 21, 24, 28, 50, 144};
+                                             18, 21, 24, 28, 50, 144};
   std::string bandList;
   for (int i = 0; i < kNumBands; ++i) {
     if (config_.liveSpotsBands & (1u << i)) {
@@ -428,12 +428,12 @@ void LiveSpotProvider::fetchRBN() {
 
   if (state_) {
     state_->services["LiveSpot"].ok = true;
-    state_->services["LiveSpot"].lastSuccess =
-        std::chrono::system_clock::now();
+    state_->services["LiveSpot"].lastSuccess = std::chrono::system_clock::now();
     state_->services["LiveSpot"].lastError = "";
   }
 
-  LOG_I("LiveSpot", "Aggregated {} RBN spots from DX store (ofDe={}, useCall={})",
+  LOG_I("LiveSpot",
+        "Aggregated {} RBN spots from DX store (ofDe={}, useCall={})",
         data.spots.size(), ofDe, useCall);
   data.lastUpdated = std::chrono::system_clock::now();
   data.valid = true;

@@ -5,12 +5,13 @@
 #ifndef _WIN32_WINNT
 #define _WIN32_WINNT 0x0600
 #endif
+#include <iphlpapi.h>
+#include <windows.h>
 #include <winsock2.h>
 #include <ws2tcpip.h>
-#include <windows.h>
-#include <iphlpapi.h>
 #endif
 
+#include "../core/MemoryMonitor.h"
 #include "../core/Theme.h"
 #include "FontCatalog.h"
 #include "SysInfoPanel.h"
@@ -130,6 +131,7 @@ void SysInfoPanel::update() {
     rssBytes_ = mem.getRSS();
     totalRam_ = mem.getTotalRAM();
     vramBytes_ = mem.getVramEstimated();
+    diskPct_ = mem.getDiskUsagePct();
 
     lastStatsUpdateMs_ = now;
   }
@@ -170,6 +172,7 @@ void SysInfoPanel::render(SDL_Renderer *renderer) {
     return;
 
   ThemeColors themes = getThemeColors(theme_);
+  auto *cat = fontMgr_.catalog();
 
   // Background
   SDL_SetRenderDrawBlendMode(
@@ -185,9 +188,8 @@ void SysInfoPanel::render(SDL_Renderer *renderer) {
   SDL_RenderDrawRect(renderer, &rect);
 
   if (!monitor_ || !monitor_->isAvailable()) {
-    fontMgr_.drawText(renderer, "No CPU Temp", x_ + width_ / 2,
-                      y_ + height_ / 2, themes.textDim, labelFontSize_, false,
-                      true);
+    cat->drawText(renderer, "No CPU Temp", x_ + width_ / 2, y_ + height_ / 2,
+                  themes.textDim, FontStyle::Fast, true);
     return;
   }
 
@@ -204,39 +206,38 @@ void SysInfoPanel::render(SDL_Renderer *renderer) {
 
   // ---- Minimum layout (h < 70): just temperature -------------------------
   if (height_ < 70) {
-    fontMgr_.drawText(renderer, "CPU", x_ + width_ / 2, y_ + 6, themes.accent,
-                      labelFontSize_, true, true);
-    fontMgr_.drawText(renderer, tempBuf, x_ + width_ / 2, y_ + height_ / 2 + 4,
-                      tempColor, valueFontSize_, false, true);
+    cat->drawText(renderer, "CPU", x_ + width_ / 2, y_ + 6, themes.accent,
+                  FontStyle::Fast, true);
+    cat->drawText(renderer, tempBuf, x_ + width_ / 2, y_ + height_ / 2 + 4,
+                  tempColor, FontStyle::SmallBold, true);
     return;
   }
 
   int pad = std::max(4, static_cast<int>(width_ * 0.04f));
-  int lineH = valueFontSize_ + 3;
   int cx = x_ + width_ / 2;
 
   // Title bar for compact and tall layouts
   // Use themes.text instead of themes.accent for more reliable visibility
   // Shift it down slightly to ensure it's not clipped by border
-  fontMgr_.drawText(renderer, "System Info", x_ + 10, y_ + 5, themes.accent, 10,
-                    true);
-  int titleShift = labelFontSize_ + 10;
+  cat->drawText(renderer, "System Info", x_ + 10, y_ + 5, themes.accent,
+                FontStyle::MicroBold);
+  int titleShift = cat->ptSize(FontStyle::MicroBold) + 10;
 
   // ---- Compact layout (70 ≤ h < 120): temp+CPU% / IP --------------------
   if (height_ < 120) {
     int row1Y = y_ + pad + titleShift;
-    int row2Y = row1Y + lineH + 2;
+    int row2Y = row1Y + cat->ptSize(FontStyle::SmallBold) + 5;
 
     // Row 1: temp (left-ish), CPU% (right-ish)
     int halfW = width_ / 2;
-    fontMgr_.drawText(renderer, tempBuf, x_ + halfW / 2, row1Y, tempColor,
-                      valueFontSize_, false, true);
-    fontMgr_.drawText(renderer, cpuBuf, x_ + halfW + halfW / 2, row1Y, cpuColor,
-                      valueFontSize_, false, true);
+    cat->drawText(renderer, tempBuf, x_ + halfW / 2, row1Y, tempColor,
+                  FontStyle::SmallBold, true);
+    cat->drawText(renderer, cpuBuf, x_ + halfW + halfW / 2, row1Y, cpuColor,
+                  FontStyle::SmallBold, true);
 
     // Row 2: IP
-    fontMgr_.drawText(renderer, cachedIP_.c_str(), cx, row2Y, themes.textDim,
-                      smallFontSize_, false, true);
+    cat->drawText(renderer, cachedIP_.c_str(), cx, row2Y, themes.textDim,
+                  FontStyle::Fast, true);
     return;
   }
 
@@ -249,11 +250,11 @@ void SysInfoPanel::render(SDL_Renderer *renderer) {
 
   // Row 1: Temp + CPU%
   int halfW = width_ / 2;
-  fontMgr_.drawText(renderer, tempBuf, x_ + halfW / 2, curY, tempColor,
-                    valueFontSize_, false, true);
-  fontMgr_.drawText(renderer, cpuBuf, x_ + halfW + halfW / 2, curY, cpuColor,
-                    valueFontSize_, false, true);
-  curY += lineH + 4;
+  cat->drawText(renderer, tempBuf, x_ + halfW / 2, curY, tempColor,
+                FontStyle::SmallBold, true);
+  cat->drawText(renderer, cpuBuf, x_ + halfW + halfW / 2, curY, cpuColor,
+                FontStyle::SmallBold, true);
+  curY += cat->ptSize(FontStyle::SmallBold) + 7;
 
   // Row 2: RAM
   if (totalRam_ > 0) {
@@ -263,9 +264,8 @@ void SysInfoPanel::render(SDL_Renderer *renderer) {
   } else {
     std::snprintf(ramBuf, sizeof(ramBuf), "RAM --");
   }
-  fontMgr_.drawText(renderer, ramBuf, cx, curY, themes.info, smallFontSize_,
-                    false, true);
-  curY += smallFontSize_ + 4;
+  cat->drawText(renderer, ramBuf, cx, curY, themes.info, FontStyle::Micro, true);
+  curY += cat->ptSize(FontStyle::Micro) + 4;
 
   // Row 3: Est. VRAM
   if (vramBytes_ >= 0) {
@@ -274,13 +274,22 @@ void SysInfoPanel::render(SDL_Renderer *renderer) {
   } else {
     std::snprintf(vramBuf, sizeof(vramBuf), "VRAM --");
   }
-  fontMgr_.drawText(renderer, vramBuf, cx, curY, themes.textDim, smallFontSize_,
-                    false, true);
-  curY += smallFontSize_ + 4;
+  cat->drawText(renderer, vramBuf, cx, curY, themes.textDim, FontStyle::Micro,
+                true);
+  curY += cat->ptSize(FontStyle::Micro) + 4;
 
-  // Row 4: IP
-  fontMgr_.drawText(renderer, cachedIP_.c_str(), cx, curY, themes.textDim,
-                    smallFontSize_, false, true);
+  // Row 4: Disk
+  if (diskPct_ >= 0) {
+    char diskBuf[32];
+    std::snprintf(diskBuf, sizeof(diskBuf), "Disk %d%%", diskPct_);
+    cat->drawText(renderer, diskBuf, cx, curY, themes.info, FontStyle::Micro,
+                  true);
+    curY += cat->ptSize(FontStyle::Micro) + 4;
+  }
+
+  // Row 5: IP
+  cat->drawText(renderer, cachedIP_.c_str(), cx, curY, themes.textDim,
+                FontStyle::Micro, true);
 }
 
 // ---------------------------------------------------------------------------
@@ -288,20 +297,6 @@ void SysInfoPanel::render(SDL_Renderer *renderer) {
 // ---------------------------------------------------------------------------
 void SysInfoPanel::onResize(int x, int y, int w, int h) {
   Widget::onResize(x, y, w, h);
-  auto *cat = fontMgr_.catalog();
-  if (cat) {
-    labelFontSize_ = cat->ptSize(FontStyle::Fast);
-    smallFontSize_ = cat->ptSize(FontStyle::Micro);
-
-    if (h < 70) {
-      valueFontSize_ = cat->ptSize(FontStyle::Fast);
-    } else if (h < 120) {
-      valueFontSize_ = cat->ptSize(FontStyle::SmallBold);
-      smallFontSize_ = cat->ptSize(FontStyle::Fast);
-    } else {
-      valueFontSize_ = cat->ptSize(FontStyle::SmallBold);
-    }
-  }
 }
 
 // ---------------------------------------------------------------------------

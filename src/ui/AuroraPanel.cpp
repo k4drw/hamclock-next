@@ -1,5 +1,6 @@
 #include "AuroraPanel.h"
 #include "../core/Theme.h"
+#include "FontCatalog.h"
 #include <SDL.h>
 #include <mutex>
 
@@ -36,6 +37,7 @@ void AuroraPanel::render(SDL_Renderer *renderer) {
   }
 
   ThemeColors themes = getThemeColors(theme_);
+  auto *cat = fontMgr_.catalog();
 
   // Background
   SDL_SetRenderDrawBlendMode(
@@ -60,12 +62,12 @@ void AuroraPanel::render(SDL_Renderer *renderer) {
                     drawSz};
     SDL_RenderCopy(renderer, tex, nullptr, &dst);
   } else {
-    fontMgr_.drawText(renderer, "Loading Aurora...", x_ + width_ / 2,
-                      y_ + titleH + (height_ - titleH) / 2,
-                      {150, 150, 150, 255}, 12, false, true);
+    cat->drawText(renderer, "Loading Aurora...", x_ + width_ / 2,
+                  y_ + titleH + (height_ - titleH) / 2, {150, 150, 150, 255},
+                  FontStyle::Fast, true);
   }
 
-  fontMgr_.drawText(renderer,
-                    north_ ? "Aurora Forecast (N)" : "Aurora Forecast (S)",
-                    x_ + 10, y_ + 5, themes.accent, 10, true);
+  cat->drawText(renderer,
+                north_ ? "Aurora Forecast (N)" : "Aurora Forecast (S)", x_ + 10,
+                y_ + 5, themes.accent, FontStyle::MicroBold);
 }

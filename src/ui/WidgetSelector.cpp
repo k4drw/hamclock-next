@@ -1,6 +1,7 @@
 #include "WidgetSelector.h"
 #include "../core/Constants.h"
 #include "../core/Theme.h"
+#include "FontCatalog.h"
 #include <algorithm>
 
 WidgetSelector::WidgetSelector(FontManager &fontMgr)
@@ -14,6 +15,14 @@ void WidgetSelector::show(
     std::function<void(int, const std::vector<WidgetType> &)> onDone) {
   paneIndex_ = paneIndex;
   available_ = available;
+
+  // Alphabetize
+  std::sort(available_.begin(), available_.end(),
+            [](WidgetType a, WidgetType b) {
+              return std::string(widgetTypeDisplayName(a)) <
+                     std::string(widgetTypeDisplayName(b));
+            });
+
   selection_ = currentSelection;
   forbidden_ = forbidden;
   onDone_ = onDone;
@@ -22,13 +31,14 @@ void WidgetSelector::show(
 
   // Center the menu
   int numCols = 3; // Use 3 columns to handle more widgets
-  int itemH = 34;
+  int itemH = 28;  // Shrink from 34
   int baseW = 180; // Narrower columns for 3-column layout
   int menuW = baseW * numCols;
   int footerH = 50;
 
   int numRows = (static_cast<int>(available_.size()) + numCols - 1) / numCols;
-  int menuH = numRows * itemH + footerH + 25; // Increased padding to prevent overlap
+  int menuH =
+      numRows * itemH + footerH + 25; // Increased padding to prevent overlap
 
   // Max height clamp to prevent overflowing screen
   if (menuH > HamClock::LOGICAL_HEIGHT - 20) {
@@ -43,8 +53,8 @@ void WidgetSelector::show(
   for (size_t i = 0; i < available_.size(); ++i) {
     int row = static_cast<int>(i) / numCols;
     int col = static_cast<int>(i) % numCols;
-    itemRects_.push_back(
-        {menuRect_.x + col * colW, menuRect_.y + row * itemH + 10, colW, itemH});
+    itemRects_.push_back({menuRect_.x + col * colW,
+                          menuRect_.y + row * itemH + 10, colW, itemH});
   }
 
   // Position footer buttons
@@ -83,6 +93,8 @@ void WidgetSelector::render(SDL_Renderer *renderer) {
                          themes.border.b, themes.border.a);
   SDL_RenderDrawRect(renderer, &menuRect_);
 
+  auto *cat = fontMgr_.catalog();
+
   for (size_t i = 0; i < available_.size(); ++i) {
     WidgetType t = available_[i];
     bool isForbidden =
@@ -106,10 +118,10 @@ void WidgetSelector::render(SDL_Renderer *renderer) {
       textColor = {80, 80, 90, 255}; // Dim if forbidden and not current
     }
 
-    fontMgr_.drawText(renderer, widgetTypeDisplayName(t),
-                      itemRects_[i].x + itemRects_[i].w / 2,
-                      itemRects_[i].y + itemRects_[i].h / 2, textColor, 18,
-                      false, true); // bold=false, centered=true
+    cat->drawText(renderer, widgetTypeDisplayName(t),
+                  itemRects_[i].x + itemRects_[i].w / 2,
+                  itemRects_[i].y + itemRects_[i].h / 2, textColor,
+                  FontStyle::SmallRegular, true);
 
     // Draw separator (if not last row)
     int numCols = 3;
@@ -132,21 +144,23 @@ void WidgetSelector::render(SDL_Renderer *renderer) {
                      menuRect_.x + menuRect_.w - 5, okRect_.y - 8);
 
   // Buttons
-  SDL_SetRenderDrawColor(renderer, 100, 40, 40, themes.bg.a);
+  SDL_SetRenderDrawColor(renderer, themes.danger.r, themes.danger.g,
+                         themes.danger.b, 255);
   SDL_RenderFillRect(renderer, &cancelRect_);
-  SDL_SetRenderDrawColor(renderer, 40, 100, 40, themes.bg.a);
+  SDL_SetRenderDrawColor(renderer, themes.success.r, themes.success.g,
+                         themes.success.b, 255);
   SDL_RenderFillRect(renderer, &okRect_);
 
-  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
-                         themes.border.b, themes.border.a);
+  SDL_SetRenderDrawColor(renderer, 255, 255, 255, 100);
   SDL_RenderDrawRect(renderer, &cancelRect_);
   SDL_RenderDrawRect(renderer, &okRect_);
 
-  fontMgr_.drawText(renderer, "CANCEL", cancelRect_.x + cancelRect_.w / 2,
-                    cancelRect_.y + cancelRect_.h / 2, themes.text, 14, false,
-                    true);
-  fontMgr_.drawText(renderer, "OK", okRect_.x + okRect_.w / 2,
-                    okRect_.y + okRect_.h / 2, themes.accent, 14, true, true);
+  cat->drawText(renderer, "Cancel", cancelRect_.x + cancelRect_.w / 2,
+                cancelRect_.y + cancelRect_.h / 2, themes.text, FontStyle::UI,
+                true, false, true);
+  cat->drawText(renderer, "Done", okRect_.x + okRect_.w / 2,
+                okRect_.y + okRect_.h / 2, themes.accent, FontStyle::UIBold,
+                true, false, true);
 }
 
 bool WidgetSelector::onMouseUp(int mx, int my, Uint16 /*mod*/, int clicks) {

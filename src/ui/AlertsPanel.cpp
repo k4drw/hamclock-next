@@ -42,20 +42,21 @@ void AlertsPanel::render(SDL_Renderer *renderer) {
   int centerX = x_ + width_ / 2;
   int pad = 6;
   int curY = y_ + pad;
+  auto *cat = fontMgr_.catalog();
 
-  fontMgr_.drawText(renderer, "WX Alerts", x_ + 10, y_ + 5, themes.accent, 10,
-                    true);
+  cat->drawText(renderer, "WX Alerts", x_ + 10, y_ + 5, themes.accent,
+                FontStyle::MicroBold);
   curY += titleFontSize_ + 6;
 
   if (!currentData_.valid) {
-    fontMgr_.drawText(renderer, "Loading...", centerX, y_ + height_ / 2,
-                      themes.textDim, rowFontSize_, false, true);
+    cat->drawText(renderer, "Loading...", centerX, y_ + height_ / 2,
+                  themes.textDim, FontStyle::Fast, true);
     return;
   }
 
   if (currentData_.alerts.empty()) {
-    fontMgr_.drawText(renderer, "No active alerts", centerX, y_ + height_ / 2,
-                      themes.success, rowFontSize_, false, true);
+    cat->drawText(renderer, "No active alerts", centerX, y_ + height_ / 2,
+                  themes.success, FontStyle::Fast, true);
     return;
   }
 
@@ -78,8 +79,7 @@ void AlertsPanel::render(SDL_Renderer *renderer) {
     std::string label = a.event;
     if (label.size() > 22)
       label = label.substr(0, 21) + "~";
-    fontMgr_.drawText(renderer, label, x_ + pad + 10, curY, col, rowFontSize_,
-                      true, false);
+    cat->drawText(renderer, label, x_ + pad + 10, curY, col, FontStyle::Fast);
     curY += rowH;
   }
 
@@ -87,9 +87,9 @@ void AlertsPanel::render(SDL_Renderer *renderer) {
   if ((int)alerts.size() > maxRows) {
     char buf[32];
     std::snprintf(buf, sizeof(buf), "%d/%d", startIdx + 1, (int)alerts.size());
-    fontMgr_.drawText(renderer, buf, x_ + width_ - pad,
-                      y_ + height_ - pad - rowFontSize_, themes.textDim,
-                      rowFontSize_ - 2, false, true);
+    cat->drawText(renderer, buf, x_ + width_ - pad,
+                  y_ + height_ - pad - rowFontSize_, themes.textDim,
+                  FontStyle::Caption, false, true);
   }
 }
 

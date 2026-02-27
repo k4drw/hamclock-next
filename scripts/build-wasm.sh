@@ -25,3 +25,4 @@ echo "Output: $BUILD_DIR/hamclock-wasm.html"
 echo ""
 echo "Serve with COOP/COEP headers (required for SharedArrayBuffer/pthreads):"
 echo "  python3 packaging/web/serve.py $BUILD_DIR"
+find "$BUILD_DIR" -maxdepth 1 ! -name "hamclock-next*" -delete

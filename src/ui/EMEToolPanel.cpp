@@ -1,5 +1,6 @@
 #include "EMEToolPanel.h"
 #include "../core/Theme.h"
+#include "FontCatalog.h"
 #include <cstdio>
 
 EMEToolPanel::EMEToolPanel(int x, int y, int w, int h, FontManager &fontMgr,
@@ -10,6 +11,7 @@ void EMEToolPanel::update() { currentData_ = store_->get(); }
 
 void EMEToolPanel::render(SDL_Renderer *renderer) {
   ThemeColors themes = getThemeColors(theme_);
+  auto *cat = fontMgr_.catalog();
   SDL_SetRenderDrawBlendMode(
       renderer, (theme_ == "glass") ? SDL_BLENDMODE_BLEND : SDL_BLENDMODE_NONE);
   SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b,
@@ -22,25 +24,25 @@ void EMEToolPanel::render(SDL_Renderer *renderer) {
   SDL_RenderDrawRect(renderer, &rect);
 
   int titleH = 20;
-  fontMgr_.drawText(renderer, "EME Planning Tool", x_ + 10, y_ + 5,
-                    themes.accent, 10, true);
+  cat->drawText(renderer, "EME Planning Tool", x_ + 10, y_ + 5, themes.accent,
+                FontStyle::MicroBold);
 
   int curY = y_ + titleH + 10;
   int centerX = x_ + width_ / 2;
 
   if (!currentData_.valid) {
-    fontMgr_.drawText(renderer, "Calculating...", centerX,
-                      y_ + titleH + (height_ - titleH) / 2, themes.textDim, 10,
-                      false, true);
+    cat->drawText(renderer, "Calculating...", centerX,
+                  y_ + titleH + (height_ - titleH) / 2, themes.textDim,
+                  FontStyle::Micro, true);
     return;
   }
 
   auto drawRow = [&](const char *label, const char *value, SDL_Color valCol) {
-    int fontSize = 9;
-    fontMgr_.drawText(renderer, label, x_ + 10, curY, themes.text, fontSize);
-    int valW = fontMgr_.getLogicalWidth(value, fontSize);
+    cat->drawText(renderer, label, x_ + 10, curY, themes.text,
+                  FontStyle::Caption);
+    int valW = fontMgr_.getLogicalWidth(value, cat->ptSize(FontStyle::Caption));
     int valX = x_ + width_ - 10 - valW;
-    fontMgr_.drawText(renderer, value, valX, curY, valCol, fontSize);
+    cat->drawText(renderer, value, valX, curY, valCol, FontStyle::Caption);
     curY += 18;
   };
 

@@ -1,5 +1,6 @@
 #include "DstPanel.h"
 #include "../core/Theme.h"
+#include "FontCatalog.h"
 #include "RenderUtils.h"
 #include <SDL.h>
 #include <cstdio>
@@ -16,6 +17,7 @@ void DstPanel::render(SDL_Renderer *renderer) {
     return;
 
   ThemeColors themes = getThemeColors(theme_);
+  auto *cat = fontMgr_.catalog();
   SDL_SetRenderDrawBlendMode(
       renderer, (theme_ == "glass") ? SDL_BLENDMODE_BLEND : SDL_BLENDMODE_NONE);
   SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b,
@@ -33,12 +35,12 @@ void DstPanel::render(SDL_Renderer *renderer) {
   int graphX = x_ + pad;
   int graphY = y_ + pad + 12;
 
-  fontMgr_.drawText(renderer, "Dst Index", x_ + pad, y_ + 5, themes.accent, 10,
-                    true);
+  cat->drawText(renderer, "Dst Index", x_ + pad, y_ + 5, themes.accent,
+                FontStyle::MicroBold);
 
   if (!currentData_.valid || currentData_.points.empty()) {
-    fontMgr_.drawText(renderer, "No Data", x_ + width_ / 2, y_ + height_ / 2,
-                      {100, 100, 100, 255}, 10, false, true);
+    cat->drawText(renderer, "No Data", x_ + width_ / 2, y_ + height_ / 2,
+                  {100, 100, 100, 255}, FontStyle::Micro, true);
     return;
   }
 
@@ -95,8 +97,8 @@ void DstPanel::render(SDL_Renderer *renderer) {
   // Current value bubble
   char buf[16];
   std::snprintf(buf, sizeof(buf), "%.0f nT", currentData_.current_val);
-  fontMgr_.drawText(renderer, buf, x_ + width_ - pad, y_ + 5,
-                    {255, 255, 255, 255}, 10, true, true);
+  cat->drawText(renderer, buf, x_ + width_ - pad, y_ + 5, {255, 255, 255, 255},
+                FontStyle::Micro, false, true);
 
   if (tooltip_.visible) {
     renderTooltip(renderer);
@@ -158,9 +160,10 @@ void DstPanel::renderTooltip(SDL_Renderer *renderer) {
   if (tooltip_.text.empty())
     return;
 
-  int ptSize = 10;
-  int tw = fontMgr_.getLogicalWidth(tooltip_.text, ptSize);
-  int th = fontMgr_.getLogicalHeight(tooltip_.text, ptSize);
+  auto *cat = fontMgr_.catalog();
+  int tw, th;
+  cat->renderText(renderer, tooltip_.text, {255, 255, 255, 255},
+                  FontStyle::Micro, &tw, &th);
 
   int padX = 8;
   int padY = 4;
@@ -184,8 +187,8 @@ void DstPanel::renderTooltip(SDL_Renderer *renderer) {
   SDL_SetRenderDrawColor(renderer, 100, 100, 100, 255);
   SDL_RenderDrawRect(renderer, &box);
 
-  fontMgr_.drawText(renderer, tooltip_.text, bx + padX, by + padY,
-                    {255, 255, 255, 255}, ptSize);
+  cat->drawText(renderer, tooltip_.text, bx + padX, by + padY,
+                {255, 255, 255, 255}, FontStyle::Micro);
 }
 
 nlohmann::json DstPanel::getDebugData() const {

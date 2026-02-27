@@ -1,7 +1,7 @@
 {
-  "mcp_version": "2.5",
+  "mcp_version": "2.6",
   "project": "hamclock-next",
-  "updated_at": "2026-02-25T00:00:00.000Z",
+  "updated_at": "2026-02-27T14:00:00.000Z",
   "project_context": {
     "title": "HamClock Next \u2014 SDL2 Rewrite",
     "callsign": "K4DRW",
@@ -61,17 +61,21 @@
     ],
     "data_template": "// src/core/{Name}Data.h\n#pragma once\n#include <string>\n#include <vector>\n#include <ctime>\n\nstruct {Name}Data {\n    // --- domain fields ---\n    bool valid = false;       // set true once first fetch succeeds\n    time_t lastUpdate = 0;    // unix timestamp of last successful fetch\n};\n",
     "provider_template": "// src/services/{Name}Provider.h\n#pragma once\n#include \"core/{Name}Data.h\"\n\nclass {Name}Provider {\npublic:\n    static {Name}Provider& instance();\n    void update();               // called on interval by main loop\n    const {Name}Data& data() const { return _data; }\nprivate:\n    {Name}Provider() = default;\n    {Name}Data _data;\n    time_t _nextFetch = 0;\n    static constexpr int FETCH_INTERVAL_S = 300;\n};\n",
-    "panel_template": "// src/ui/{Name}Panel.h\n#pragma once\n#include <SDL2/SDL.h>\n#include \"services/{Name}Provider.h\"\n\nclass {Name}Panel {\npublic:\n    void setBounds(SDL_Rect r) { _bounds = r; }\n    void render(SDL_Renderer* ren);\n    bool onTouch(int x, int y);  // return true if consumed\n    std::string getDebugData() const;\nprivate:\n    SDL_Rect _bounds{};\n};\n",
+    "panel_template": "// src/ui/{Name}Panel.cpp\n#include \"{Name}Panel.h\"\n#include \"../core/Theme.h\"\n\nvoid {Name}Panel::render(SDL_Renderer* renderer) {\n    ThemeColors themes = getThemeColors(theme_);\n    \n    // Draw background\n    SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, themes.bg.a);\n    SDL_Rect r = {x_, y_, width_, height_};\n    SDL_RenderFillRect(renderer, &r);\n\n    // Standard button example (PascalCase Done/Cancel, semantic colors)\n    // SDL_Rect okBtn = {x_ + 10, y_ + height_ - 34, 80, 28};\n    // SDL_SetRenderDrawColor(renderer, themes.success.r, themes.success.g, themes.success.b, 255);\n    // SDL_RenderFillRect(renderer, &okBtn);\n}\n",
     "important_notes": [
       "NetworkManager handles HTTP. Call NetworkManager::instance().get(url) \u2014 it returns cached data when ETag/Last-Modified hasn't changed.",
-      "ConfigManager::instance().get(key, default) for reading user settings. ConfigManager::instance().set(key, value) + save() to persist.",
-      "Theme.h has all color constants. Use Theme::TEXT, Theme::ACCENT, etc. \u2014 never hardcode SDL_Color values.",
+      "ConfigManager::instance().getConfig() for reading/modifying settings. ConfigManager::instance().save(cfg) to persist.",
+      "Theme.h has all color constants. Use getThemeColors(theme_) to obtain a ThemeColors struct \u2014 never hardcode SDL_Color values.",
+      "Standardize all setup/confirmation buttons: Use 'Done' and 'Cancel' labels (PascalCase).",
+      "Standard button sizes: 100x34 for main modals, 80x28 for small widget-based setups.",
       "FontManager handles scaled TTF fonts. Never load your own TTF file.",
-      "SDL coordinates: (0,0) is top-left. _bounds.x/y is the panel's top-left corner.",
+      "SDL coordinates: (0,0) is top-left. x_/y_ is the panel's top-left corner.",
       "All render() calls happen on the main thread. Providers run on a background thread. Use a mutex or std::atomic if sharing state.",
       "The WebServer debug endpoint /debug/widgets calls getDebugData() on all registered panels \u2014 always implement it.",
       "If a provider's API may be unavailable or require auth, add a `bool fetched` flag to the data struct (default false). The provider pushes event on completion with `fetched=true, valid=false` on error \u2014 panel shows meaningful status (e.g. 'API key required') rather than indefinite 'Loading...' state.",
-      "Widget::onMouseUp now takes `int clicks` as 4th parameter (Uint16 mod, int clicks). Update all Widget subclasses when overriding."
+      "Widget::onMouseDown(int mx, int my, Uint16 mod) added for advanced interactivity (Phase 60).",
+      "Widget::onMouseUp now takes `int clicks` as 4th parameter (Uint16 mod, int clicks). Update all Widget subclasses when overriding.",
+      "UI Engineering Standard for Graphs (Phase 62): Use 'line_aa' anti-aliased texture via RenderUtils::drawPolylineTextured for smooth plots. Implement onMouseMove hover tooltips to show precise data values."
     ]
   },
   "api_reference": {
@@ -177,12 +181,12 @@
   },
   "feature_status_summary": {
     "total": 87,
-    "implemented": 84,
-    "partial": 2,
+    "implemented": 85,
+    "partial": 1,
     "missing": 0,
     "not_needed": 2,
-    "percent_done": "~100% (84/86 features — 2026-02-25)",
-    "notes": "All original parity features implemented. Partial: repeater_directory (RepeaterBook API key required), winlink_gateways (Winlink access key required). New since v2.4: bme280_sensor fully implemented (Bosch compensation math, I2C calibration). RPi 1GB adaptive memory mode: isLowMemoryDevice() caps texture cache to 15, font cache to 100, texture dimension to 1024px on Linux ARM; 60s RSS heartbeat log. SOTA resolved via ActivityLocationManager (summitslist.csv + API fallback). Cloud and WX/Pressure overlays confirmed working."
+    "percent_done": "~100% (85/86 features — 2026-02-27)",
+    "notes": "v1.0B02 stable. All original parity features implemented. New: Dynamic Theme Customizer, Unified Typography System, Resolution-Aware Scaling, and Real-time UI Preview. RPi 1GB adaptive memory mode active."
   },
   "implemented_features": [
     {
@@ -704,6 +708,46 @@
         "src/core/MemoryMonitor.h"
       ],
       "notes": "MemoryMonitor::isLowMemoryDevice() (RAM ≤ 1536 MB) gates memory limits at startup. Low-memory path: TextureManager cache 50→15, FontManager text cache 300→100, texture dimension cap 2048→1024px (Linux ARM only, excludes macOS ARM). 60-second RSS heartbeat log via MemoryMonitor::logStats('heartbeat'). Startup log: 'System RAM: N MB, low-memory mode: YES/NO'."
+    },
+    {
+      "feature_id": "tropo_ducting",
+      "name": "Tropospheric Ducting Forecast",
+      "next_files": [
+        "src/services/TropoProvider.cpp",
+        "src/ui/TropoPanel.cpp",
+        "src/core/TropoData.h"
+      ],
+      "notes": "Uses Open-Meteo API to calculate ducting probability based on pressure stability, wind speed, and temperature/dewpoint inversions. 3-day hourly forecast."
+    },
+    {
+      "feature_id": "lightning_monitor",
+      "name": "Lightning & Static Monitor",
+      "next_files": [
+        "src/services/LightningProvider.cpp",
+        "src/ui/LightningPanel.cpp",
+        "src/core/LightningData.h"
+      ],
+      "notes": "Dual-source strategy using RainViewer (real-time strikes) and Open-Meteo (WMO weather code alerts). Ported distance/bearing algorithms from Home Assistant Blitzortung."
+    },
+    {
+      "feature_id": "greyline_overlap",
+      "name": "Greyline Overlap Sync",
+      "next_files": [
+        "src/core/GreylineCalculator.cpp",
+        "src/ui/GreylineModal.cpp",
+        "src/ui/DXPanel.cpp"
+      ],
+      "notes": "On-demand mutual twilight calculation for DE-to-DX path. High-performance coarse-to-fine scanning optimized for RPi."
+    },
+    {
+      "feature_id": "meteor_scatter",
+      "name": "Meteor Scatter Activity",
+      "next_files": [
+        "src/services/MeteorProvider.cpp",
+        "src/ui/MeteorPanel.cpp",
+        "src/core/MeteorData.h"
+      ],
+      "notes": "Diurnal activity model + annual shower database. High-fidelity anti-aliased graph with hover tooltips for planning weak-signal VHF openings."
     }
   ],
   "partial_features": {
@@ -1463,6 +1507,53 @@
         "FontManager.h: setTextCacheLimit(size_t) added; hardcoded 300 replaced by textCacheLimit_ member"
       ],
       "testing": "RPi 3B startup confirmed: 'System RAM: 972 MB, low-memory mode: YES', 'capping texture cache to 15', 'capping font text cache to 100'."
+    },
+    "phase_58": {
+      "name": "UI Polish & Widget Logic Fixes",
+      "completed": "2026-02-26",
+      "summary": "Implemented a series of targeted UI improvements and logic bug fixes across core widgets.",
+      "key_changes": [
+        "Aurora History: Increased storage to 24+ hours; added automatic pruning; fixed gap-plotting over outages > 1hr.",
+        "Tooltips: Added hover tooltips to Countdown and Reminder panels showing exact target timestamps.",
+        "Countdown: Fixed configuration persistence bug where target time changes were lost on restart.",
+        "Asteroids: Unified title to 'Asteroids' and cleaned up color palette definitions.",
+        "Setup Screen: Added missing 'Reminder' widget type to pane selection; fixed vertical layout bleeding on small displays."
+      ]
+    },
+    "phase_59": {
+      "name": "Unified Typography & Resolution Scaling",
+      "completed": "2026-02-26",
+      "summary": "Completed a massive overhaul of the typography system, moving from hardcoded point sizes to a unified FontCatalog and FontStyle architecture.",
+      "key_changes": [
+        "Infrastructure: Implemented FontCatalog and FontStyle (Tiny, Caption, Micro, UI, Fast) across 30+ panels.",
+        "Scaling: Standardized 800x480 pixel-perfection while gaining proportional scaling for 1080p/4K displays.",
+        "Alignment: Enhanced drawText with vertical centering for buttons and dropdowns.",
+        "Stability: Resolved a critical segfault in Setup screen by standardizing catalog initialization.",
+        "UI Layout: Standardized text measurement and cursor positioning logic using unified style metrics."
+      ]
+    },
+    "phase_60": {
+      "name": "Dynamic Theme System & Color Customization",
+      "completed": "2026-02-26",
+      "summary": "Introduced the dynamic theme engine and interactive color customization interface.",
+      "key_changes": [
+        "Custom Theme: Added infrastructure for color overrides in AppConfig and ConfigManager.",
+        "Color Picker: Implemented a new ColorPicker widget with HSV wheel and RGB sliders.",
+        "Theme Customizer: Implemented granular control over all semantic application colors (bg, accent, text, etc.).",
+        "Widget Interface: Enhanced base Widget class with onMouseDown support for advanced interactivity."
+      ]
+    },
+    "phase_61": {
+      "name": "UI Standardization & Custom Theme Persistence",
+      "completed": "2026-02-27",
+      "summary": "Standardized all UI buttons to 'Done/Cancel' (PascalCase) with unified sizing (100x34 main, 80x28 small). Resolved critical bug where custom theme colors were not persisting due to multiple ConfigManager instances. Restored automatic FCC FRN population from Callook.info. Fixed interactive events in Setup screen (mouse drag/click).",
+      "key_changes": [
+        "ConfigManager: Refactored into a strict singleton; unified application-wide state.",
+        "Theme Engine: Added real-time preview support via getThemeColors(theme, &overrides).",
+        "UI Standardization: Updated 10+ files to use standardized button labels, sizes, and semantic theme colors.",
+        "Event System: Enhanced SetupScreen event loop to support MouseDown/MouseMotion/MouseWheel for complex sub-modals.",
+        "Automatic Reminders: Restored FRN parsing in CallbookProvider and automatic background sync."
+      ]
     }
   },
   "platform_specific": {

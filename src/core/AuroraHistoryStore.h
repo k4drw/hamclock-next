@@ -13,7 +13,7 @@ struct AuroraDataPoint {
 
 class AuroraHistoryStore {
 public:
-  static constexpr int MAX_POINTS = 48; // 24 hours at 30-min intervals
+  static constexpr int MAX_POINTS = 1000; // 24+ hours loosely
 
   void setStoragePath(const std::filesystem::path &path) {
     std::lock_guard<std::mutex> lock(mutex_);
@@ -29,8 +29,21 @@ public:
 
     history_.push_back(point);
 
+    // Remove points older than 25 hours
+    auto now = std::chrono::system_clock::now();
+    while (!history_.empty()) {
+      auto ageMins = std::chrono::duration_cast<std::chrono::minutes>(
+                         now - history_.front().timestamp)
+                         .count();
+      if (ageMins > 25 * 60) {
+        history_.erase(history_.begin());
+      } else {
+        break;
+      }
+    }
+
     // Keep only MAX_POINTS
-    if (history_.size() > MAX_POINTS) {
+    while (history_.size() > MAX_POINTS) {
       history_.erase(history_.begin());
     }
 

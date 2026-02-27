@@ -4,6 +4,17 @@
 
 using json = nlohmann::json;
 
+static std::string normalizeDate(const std::string &dateStr) {
+  // Try MM/DD/YYYY -> YYYY-MM-DD
+  int m, d, y;
+  if (std::sscanf(dateStr.c_str(), "%d/%d/%d", &m, &d, &y) == 3) {
+    char buf[16];
+    std::snprintf(buf, sizeof(buf), "%04d-%02d-%02d", y, m, d);
+    return buf;
+  }
+  return dateStr;
+}
+
 CallbookProvider::CallbookProvider(NetworkManager &net,
                                    std::shared_ptr<CallbookStore> store)
     : net_(net), store_(store) {}
@@ -44,6 +55,16 @@ void CallbookProvider::fetchCallook(const std::string &callsign,
               j["location"]["latitude"].get<std::string>());
           result.lon = StringUtils::safe_stof(
               j["location"]["longitude"].get<std::string>());
+
+          if (j.contains("otherInfo")) {
+            const auto &oi = j["otherInfo"];
+            if (oi.contains("expiryDate"))
+              result.expiryDate =
+                  normalizeDate(oi["expiryDate"].get<std::string>());
+            if (oi.contains("frn"))
+              result.frn = oi["frn"].get<std::string>();
+          }
+
           result.source = "Callook.info";
         }
       }

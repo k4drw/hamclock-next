@@ -21,11 +21,15 @@ This document covers common setup issues and runtime environment tips.
 HamClock-Next includes specialized compatibility paths for artifact-free rendering on Raspberry Pi. If you see visual glitches, ensure you are running with the `kmsdrm` driver and have adequate GPU memory allocated in `/boot/config.txt`.
 
 ### 📦 Installation Errors (.deb)
-**Symptom**: "cannot execute binary file: Exec format error" or similar when running `./hamclock-next.deb`.
-**Solution**: Do **not** try to run the `.deb` file directly. It is a package archive. Install it using `apt`:
-```bash
-sudo apt install ./hamclock-next_0.9.0B_unified_arm64.deb
-```
+**Symptom**: "cannot execute binary file: Exec format error"
+**Solution**: This usually means you are trying to install a package that doesn't match your Operating System's architecture.
+1. Check your architecture: `uname -m`
+2. If it says `aarch64`, you need the **arm64** package.
+3. If it says `armv7l`, you need the **armhf** package.
+4. **Note**: Do not try to run the `.deb` file directly. Install it using `apt`:
+   ```bash
+   sudo apt install ./hamclock-next_0.9.0B_unified_arm64.deb
+   ```
 
 ---
 

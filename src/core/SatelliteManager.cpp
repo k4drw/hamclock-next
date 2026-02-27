@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cstdlib>
+#include <fstream>
 #include <sstream>
 
 // Trim whitespace from both ends of a string.
@@ -26,6 +27,8 @@ void SatelliteManager::fetch(bool force) {
       return;
   }
 
+  loadLocalTLEs();
+
   LOG_I("SatelliteManager", "Fetching TLE data from celestrak...");
 
   net_.fetchAsync(
@@ -38,6 +41,12 @@ void SatelliteManager::fetch(bool force) {
         parse(response);
       },
       86400); // 24 hour cache age
+
+  // Also fetch custom SCCs
+  const auto &cfg = ConfigManager::instance().getConfig();
+  for (int scc : cfg.customSatelliteSCCs) {
+    fetchSCC(scc);
+  }
 }
 
 void SatelliteManager::update() {
@@ -162,7 +171,9 @@ void SatelliteManager::parse(const std::string &raw) {
 
 std::vector<SatelliteTLE> SatelliteManager::getSatellites() const {
   std::lock_guard<std::mutex> lock(mutex_);
-  return satellites_;
+  std::vector<SatelliteTLE> all = satellites_;
+  all.insert(all.end(), customSatellites_.begin(), customSatellites_.end());
+  return all;
 }
 
 bool SatelliteManager::hasData() const {
@@ -173,6 +184,10 @@ bool SatelliteManager::hasData() const {
 const SatelliteTLE *SatelliteManager::findByNoradId(int noradId) const {
   std::lock_guard<std::mutex> lock(mutex_);
   for (const auto &sat : satellites_) {
+    if (sat.noradId == noradId)
+      return &sat;
+  }
+  for (const auto &sat : customSatellites_) {
     if (sat.noradId == noradId)
       return &sat;
   }
@@ -197,5 +212,172 @@ SatelliteManager::findByName(const std::string &search) const {
     if (satLower.find(lower) != std::string::npos)
       return &sat;
   }
+  for (const auto &sat : customSatellites_) {
+    std::string satLower;
+    satLower.resize(sat.name.size());
+    std::transform(sat.name.begin(), sat.name.end(), satLower.begin(),
+                   [](unsigned char c) { return std::tolower(c); });
+    if (satLower.find(lower) != std::string::npos)
+      return &sat;
+  }
   return nullptr;
+}
+
+void SatelliteManager::addCustomSCC(int noradId) {
+  auto &cfg = ConfigManager::instance().getConfig();
+  if (std::find(cfg.customSatelliteSCCs.begin(), cfg.customSatelliteSCCs.end(),
+                noradId) == cfg.customSatelliteSCCs.end()) {
+    cfg.customSatelliteSCCs.push_back(noradId);
+    ConfigManager::instance().save(cfg);
+    fetchSCC(noradId);
+  }
+}
+
+void SatelliteManager::removeCustomSCC(int noradId) {
+  auto &cfg = ConfigManager::instance().getConfig();
+  auto it = std::find(cfg.customSatelliteSCCs.begin(),
+                      cfg.customSatelliteSCCs.end(), noradId);
+  if (it != cfg.customSatelliteSCCs.end()) {
+    cfg.customSatelliteSCCs.erase(it);
+    ConfigManager::instance().save(cfg);
+
+    std::lock_guard<std::mutex> lock(mutex_);
+    customSatellites_.erase(std::remove_if(customSatellites_.begin(),
+                                           customSatellites_.end(),
+                                           [noradId](const SatelliteTLE &s) {
+                                             return s.noradId == noradId;
+                                           }),
+                            customSatellites_.end());
+  }
+}
+
+void SatelliteManager::addCustomTLE(const SatelliteTLE &tle) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  // Remove if exists
+  customSatellites_.erase(
+      std::remove_if(customSatellites_.begin(), customSatellites_.end(),
+                     [&](const SatelliteTLE &s) { return s.name == tle.name; }),
+      customSatellites_.end());
+
+  customSatellites_.push_back(tle);
+  saveLocalTLEs();
+}
+
+void SatelliteManager::removeCustomTLE(const std::string &satName) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  customSatellites_.erase(
+      std::remove_if(customSatellites_.begin(), customSatellites_.end(),
+                     [&](const SatelliteTLE &s) { return s.name == satName; }),
+      customSatellites_.end());
+  saveLocalTLEs();
+}
+
+void SatelliteManager::fetchSCC(int noradId) {
+  std::string url = SCC_URL_TEMPLATE;
+  size_t pos = url.find("{}");
+  if (pos != std::string::npos) {
+    url.replace(pos, 2, std::to_string(noradId));
+  }
+
+  net_.fetchAsync(
+      url,
+      [this, noradId](std::string response) {
+        if (response.empty()) {
+          LOG_W("SatelliteManager", "Fetch failed for SCC {}", noradId);
+          return;
+        }
+
+        // We use a temporary stringstream to use our existing parse logic
+        // but it parses into a vector. We want to single it out.
+        std::istringstream stream(response);
+        std::string line, n, l1, l2;
+        if (std::getline(stream, n) && std::getline(stream, l1) &&
+            std::getline(stream, l2)) {
+          SatelliteTLE tle;
+          tle.name = trim(n);
+          tle.line1 = trim(l1);
+          tle.line2 = trim(l2);
+          tle.noradId = noradId;
+
+          std::lock_guard<std::mutex> lock(mutex_);
+          // Remove potential existing custom one for this ID
+          customSatellites_.erase(
+              std::remove_if(customSatellites_.begin(), customSatellites_.end(),
+                             [noradId](const SatelliteTLE &s) {
+                               return s.noradId == noradId;
+                             }),
+              customSatellites_.end());
+          customSatellites_.push_back(tle);
+          LOG_I("SatelliteManager", "Fetched custom satellite: {}", tle.name);
+        }
+      },
+      86400);
+}
+
+void SatelliteManager::loadLocalTLEs() {
+  auto path = getLocalTLEPath();
+  if (!std::filesystem::exists(path))
+    return;
+
+  std::ifstream ifs(path);
+  if (!ifs)
+    return;
+
+  std::string content((std::istreambuf_iterator<char>(ifs)),
+                      (std::istreambuf_iterator<char>()));
+
+  std::istringstream stream(content);
+  std::vector<SatelliteTLE> loaded;
+  std::string n, l1, l2;
+  while (std::getline(stream, n) && std::getline(stream, l1) &&
+         std::getline(stream, l2)) {
+    SatelliteTLE tle;
+    tle.name = trim(n);
+    tle.line1 = trim(l1);
+    tle.line2 = trim(l2);
+    if (tle.line1.size() >= 7) {
+      tle.noradId = std::atoi(tle.line1.substr(2, 5).c_str());
+    }
+    loaded.push_back(tle);
+  }
+
+  std::lock_guard<std::mutex> lock(mutex_);
+  // Merge with existing custom satellites (which might contain SCCs)
+  // Local TLEs are identified as not being in cfg.customSatelliteSCCs
+  const auto &cfg = ConfigManager::instance().getConfig();
+
+  // Clear non-SCC custom satellites
+  customSatellites_.erase(
+      std::remove_if(customSatellites_.begin(), customSatellites_.end(),
+                     [&](const SatelliteTLE &s) {
+                       return std::find(cfg.customSatelliteSCCs.begin(),
+                                        cfg.customSatelliteSCCs.end(),
+                                        s.noradId) ==
+                              cfg.customSatelliteSCCs.end();
+                     }),
+      customSatellites_.end());
+
+  for (const auto &tle : loaded) {
+    customSatellites_.push_back(tle);
+  }
+}
+
+void SatelliteManager::saveLocalTLEs() {
+  const auto &cfg = ConfigManager::instance().getConfig();
+  std::ofstream ofs(getLocalTLEPath());
+  if (!ofs)
+    return;
+
+  // Only save satellites that AREN'T from SCC fetch (those are in config.json)
+  for (const auto &tle : customSatellites_) {
+    if (std::find(cfg.customSatelliteSCCs.begin(),
+                  cfg.customSatelliteSCCs.end(),
+                  tle.noradId) == cfg.customSatelliteSCCs.end()) {
+      ofs << tle.name << "\n" << tle.line1 << "\n" << tle.line2 << "\n";
+    }
+  }
+}
+
+std::filesystem::path SatelliteManager::getLocalTLEPath() const {
+  return ConfigManager::instance().configDir() / "user_sats.tle";
 }

@@ -25,6 +25,7 @@ public:
   void onMouseMove(int mx, int my) override;
   bool onMouseUp(int mx, int my, Uint16 mod, int clicks) override;
   bool onKeyDown(SDL_Keycode key, Uint16 mod) override;
+  bool onTextInput(const char *text) override;
 
   // Semantic Debug API
   std::string getName() const override {

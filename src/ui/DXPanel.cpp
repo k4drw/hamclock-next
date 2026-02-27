@@ -130,7 +130,27 @@ void DXPanel::render(SDL_Renderer *renderer) {
   };
 
   int titleH = 20;
-  fontMgr_.drawText(renderer, "DX", x_ + 10, y_ + 5, themes.accent, 10, true);
+  fontMgr_.catalog()->drawText(renderer, "DX", x_ + 10, y_ + 5, themes.accent,
+                               FontStyle::MicroBold);
+
+  // Greyline Button
+  if (state_->dxActive) {
+    int btnW = 35;
+    int btnH = 16;
+    greylineBtnRect_ = {x_ + width_ - btnW - 5, y_ + 4, btnW, btnH};
+    SDL_SetRenderDrawColor(renderer, themes.rowStripe1.r, themes.rowStripe1.g,
+                           themes.rowStripe1.b, 255);
+    SDL_RenderFillRect(renderer, &greylineBtnRect_);
+    SDL_SetRenderDrawColor(renderer, themes.accent.r, themes.accent.g,
+                           themes.accent.b, 150);
+    SDL_RenderDrawRect(renderer, &greylineBtnRect_);
+    fontMgr_.catalog()->drawText(
+        renderer, "Grey", greylineBtnRect_.x + btnW / 2,
+        greylineBtnRect_.y + btnH / 2, themes.accent, FontStyle::Micro, true,
+        false, true);
+  } else {
+    greylineBtnRect_ = {0, 0, 0, 0};
+  }
 
   int curY = y_ + titleH + pad / 2;
   for (int i = 0; i < kNumLines; ++i) {
@@ -173,6 +193,18 @@ void DXPanel::onResize(int x, int y, int w, int h) {
   lineFontSize_[7] = cat->ptSize(FontStyle::Fast); // Weather 2
   lineFontSize_[7] = cat->ptSize(FontStyle::Fast); // Weather 2
   destroyCache();
+}
+
+bool DXPanel::onMouseUp(int mx, int my, Uint16 /*mod*/, int /*clicks*/) {
+  if (greylineBtnRect_.w > 0 && mx >= greylineBtnRect_.x &&
+      mx < greylineBtnRect_.x + greylineBtnRect_.w && my >= greylineBtnRect_.y &&
+      my < greylineBtnRect_.y + greylineBtnRect_.h) {
+    if (onGreylineSync_) {
+      onGreylineSync_();
+    }
+    return true;
+  }
+  return false;
 }
 
 nlohmann::json DXPanel::getDebugData() const {

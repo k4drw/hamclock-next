@@ -30,6 +30,7 @@ HamClock-Next is a modern, SDL2-based reconstruction of the classic HamClock. It
   - **Propagation Model**: Solar flux, sunspot numbers, and band-specific condition estimates.
 - **Smart Setup**: Easy configuration of callsign and location via Maidenhead grid squares or direct map interaction (Shift-Click to set DE).
 - **RSS News Banner**: Smoothly scrolling news ticker aggregating multiple amateur radio news feeds.
+- **Stopwatch & Reminders**: High-precision count-up timer and automated license expiry tracking with custom user reminders.
 
 ### Customization & Themes
 HamClock-Next features a built-in theming system with three presets:
@@ -105,8 +106,13 @@ cmake ..
 cmake --build . -j1
 
 # For automated universal builds (recommended for releases):
-./scripts/build-linux-arm64-universal.sh   # Builds ARM64 DEBs (Unified + FB0)
-./scripts/build-linux-armhf-universal.sh   # Builds ARMhf DEBs (Unified + FB0)
+./scripts/build-linux-arm64-universal.sh   # Builds ARM64 DEBs (64-bit OS)
+./scripts/build-linux-armhf-universal.sh   # Builds ARMhf DEBs (32-bit OS)
+
+> [!IMPORTANT]
+> **Choose the correct architecture**: Your choice depends on your **Operating System architecture**, not just the hardware.
+> - **64-bit OS** (e.g., Raspberry Pi OS 64-bit, Armbian 64-bit): Use **arm64**.
+> - **32-bit OS** (e.g., Raspberry Pi OS 32-bit, Raspbian): Use **armhf**.
 ```
 
 **Build times:**
@@ -196,6 +202,12 @@ We provide high-compatibility **Universal Binaries** built against a Debian Bull
 
 1. **`unified`**: The standard desktop package. Includes dependencies for X11, Wayland, and KMSDRM. Recommended for most users.
 2. **`fb0`**: A lean "kiosk" package. Only includes dependencies for direct framebuffer (KMSDRM) rendering. Ideal for headless Raspberry Pi Lite installs.
+
+> [!IMPORTANT]
+> **Architecture Selection**:
+> - If you are running a **64-bit OS** (check with `uname -m`, should return `aarch64`), you **MUST** use the `arm64` package.
+> - If you are running a **32-bit OS** (should return `armv7l`), use the `armhf` package.
+> - Using the wrong package will result in an "Exec format error".
 
 #### How to Install (.deb)
 

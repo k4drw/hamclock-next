@@ -1,4 +1,5 @@
 #include "PaneContainer.h"
+#include "FontCatalog.h"
 
 PaneContainer::PaneContainer(int x, int y, int w, int h, WidgetType initialType,
                              FontManager &fontMgr)
@@ -59,9 +60,9 @@ void PaneContainer::render(SDL_Renderer *renderer) {
     SDL_Rect r = {x_, y_, width_, height_};
     SDL_RenderFillRect(renderer, &r);
 
-    fontMgr_.drawText(renderer, widgetTypeDisplayName(currentType_),
-                      x_ + width_ / 2, y_ + height_ / 2, {100, 100, 120, 255},
-                      14, false, true);
+    fontMgr_.catalog()->drawText(renderer, widgetTypeDisplayName(currentType_),
+                                 x_ + width_ / 2, y_ + height_ / 2,
+                                 {100, 100, 120, 255}, FontStyle::UI, true);
   }
 
   // Draw border
@@ -70,7 +71,9 @@ void PaneContainer::render(SDL_Renderer *renderer) {
   SDL_RenderDrawRect(renderer, &border);
 
   // Draw manual navigation arrows when rotation has multiple widgets
-  if (rotation_.size() > 1) {
+  // Hide if widget is configuring
+  if (rotation_.size() > 1 &&
+      !(activeWidget_ && activeWidget_->isConfiguring())) {
     int arrowW = std::min(18, width_ / 8);
     int arrowH = std::min(36, height_ / 5);
     int cy = y_ + height_ / 2;
@@ -83,10 +86,12 @@ void PaneContainer::render(SDL_Renderer *renderer) {
     SDL_RenderFillRect(renderer, &rArr);
     SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
 
-    fontMgr_.drawText(renderer, "<", lArr.x + lArr.w / 2, lArr.y + lArr.h / 2,
-                      {220, 220, 220, 255}, 14, false, true);
-    fontMgr_.drawText(renderer, ">", rArr.x + rArr.w / 2, rArr.y + rArr.h / 2,
-                      {220, 220, 220, 255}, 14, false, true);
+    fontMgr_.catalog()->drawText(renderer, "<", lArr.x + lArr.w / 2,
+                                 lArr.y + lArr.h / 2, {220, 220, 220, 255},
+                                 FontStyle::Fast, true, false, true);
+    fontMgr_.catalog()->drawText(renderer, ">", rArr.x + rArr.w / 2,
+                                 rArr.y + rArr.h / 2, {220, 220, 220, 255},
+                                 FontStyle::Fast, true, false, true);
   }
 }
 
@@ -146,6 +151,11 @@ bool PaneContainer::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
   }
 
   // 4. Pane level logic - top 10% transitions to widget selection
+  // If widget is configuring, don't allow pane-level triggers
+  if (activeWidget_ && activeWidget_->isConfiguring()) {
+    return true;
+  }
+
   int relativeY = my - r.y;
   int titleThreshold = r.h / 10; // Top 10%
 
@@ -178,8 +188,15 @@ void PaneContainer::activateRotationIndex(size_t idx) {
 }
 
 bool PaneContainer::onKeyDown(SDL_Keycode key, Uint16 mod) {
-  if (isModalActive() && activeWidget_) {
+  if (activeWidget_) {
     return activeWidget_->onKeyDown(key, mod);
+  }
+  return false;
+}
+
+bool PaneContainer::onTextInput(const char *text) {
+  if (activeWidget_) {
+    return activeWidget_->onTextInput(text);
   }
   return false;
 }

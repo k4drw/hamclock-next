@@ -582,12 +582,40 @@ void MapWidget::onMouseMove(int mx, int my) {
     }
   }
 
-  // 6. Check asteroid icon
+  // 6. Check asteroid
   if (tip.empty() && asteroidProvider_ &&
       !state_->selectedAsteroidName.empty() && !cachedAsteroidTrack_.empty()) {
+    bool hit = false;
+    // Check icon midpoint
     size_t mid = cachedAsteroidTrack_.size() / 2;
     if (screenDist(cachedAsteroidTrack_[mid].lat,
                    cachedAsteroidTrack_[mid].lon) < kHitRadius + 4) {
+      hit = true;
+    } else {
+      // Check near ground track line
+      for (size_t i = 1; i < cachedAsteroidTrack_.size(); ++i) {
+        SDL_FPoint p1 = latLonToScreen(cachedAsteroidTrack_[i - 1].lat,
+                                       cachedAsteroidTrack_[i - 1].lon);
+        SDL_FPoint p2 = latLonToScreen(cachedAsteroidTrack_[i].lat,
+                                       cachedAsteroidTrack_[i].lon);
+        // Distance from mx,my to line segment p1-p2
+        float l2 = (p2.x - p1.x) * (p2.x - p1.x) + (p2.y - p1.y) * (p2.y - p1.y);
+        if (l2 < 1.0f)
+          continue;
+        float t = ((mx - p1.x) * (p2.x - p1.x) + (my - p1.y) * (p2.y - p1.y)) / l2;
+        t = std::max(0.0f, std::min(1.0f, t));
+        float dist = std::sqrt((mx - (p1.x + t * (p2.x - p1.x))) *
+                                   (mx - (p1.x + t * (p2.x - p1.x))) +
+                               (my - (p1.y + t * (p2.y - p1.y))) *
+                                   (my - (p1.y + t * (p2.y - p1.y))));
+        if (dist < 4.0f) {
+          hit = true;
+          break;
+        }
+      }
+    }
+
+    if (hit) {
       AsteroidData data = asteroidProvider_->getLatest();
       for (const auto &ast : data.asteroids) {
         if (ast.name == state_->selectedAsteroidName) {
@@ -597,8 +625,7 @@ void MapWidget::onMouseMove(int mx, int my) {
           char buf[256];
           std::snprintf(buf, sizeof(buf), "%s\n%.2f LD  %.1f km/s%s",
                         name.c_str(), ast.missDistanceLD, ast.velocityKmS,
-                        ast.isHazardous ? "\n\u26a0 Potentially Hazardous"
-                                        : "");
+                        ast.isHazardous ? "\n[!] Potentially Hazardous" : "");
           tip = buf;
           break;
         }
@@ -625,13 +652,15 @@ void MapWidget::onMouseMove(int mx, int my) {
     }
   }
 
-  // 6. Fallback: show lat/lon under cursor
   if (tip.empty()) {
-    char buf[64];
-    std::snprintf(buf, sizeof(buf), "%.2f°%c %.2f°%c  %s", std::fabs(lat),
-                  lat >= 0 ? 'N' : 'S', std::fabs(lon), lon >= 0 ? 'E' : 'W',
-                  Astronomy::latLonToGrid(lat, lon).c_str());
-    tip = buf;
+    tooltip_.visible = false;
+    return;
+  }
+
+  // Trim trailing whitespace (common in TLE names)
+  size_t last = tip.find_last_not_of(" \r\n\t");
+  if (last != std::string::npos) {
+    tip = tip.substr(0, last + 1);
   }
 
   tooltip_.text = tip;
@@ -1655,9 +1684,9 @@ void MapWidget::renderDXClusterSpots(SDL_Renderer *renderer) {
     else
       std::snprintf(labelBuf, sizeof(labelBuf), "%s %.1f kHz",
                     spot.txCall.c_str(), spot.freqKhz);
-    int labelSize = std::max(8, std::min(width_ / 30, 12));
-    fontMgr_.drawText(renderer, labelBuf, static_cast<int>(sp.x) + 8,
-                      static_cast<int>(sp.y), color, labelSize, false, false);
+    fontMgr_.catalog()->drawText(renderer, labelBuf, static_cast<int>(sp.x) + 8,
+                                 static_cast<int>(sp.y), color,
+                                 FontStyle::Tiny);
   }
   SDL_RenderSetClipRect(renderer, nullptr);
 }
@@ -2096,6 +2125,29 @@ void MapWidget::onPropDataReady(PropOverlayType type,
         g = (uint8_t)((1.0f - f) * 200.0f);
         b = 0;
       }
+    } else if (type == PropOverlayType::Heatmap) {
+      // Heatmap: Purple -> Red -> Orange -> Yellow -> White
+      if (t < 0.25f) { // Purple -> Red
+        float f = t / 0.25f;
+        r = (uint8_t)(128 + f * 127);
+        g = 0;
+        b = (uint8_t)(128 * (1.0f - f));
+      } else if (t < 0.5f) { // Red -> Orange
+        float f = (t - 0.25f) / 0.25f;
+        r = 255;
+        g = (uint8_t)(f * 128);
+        b = 0;
+      } else if (t < 0.75f) { // Orange -> Yellow
+        float f = (t - 0.5f) / 0.25f;
+        r = 255;
+        g = (uint8_t)(128 + f * 127);
+        b = 0;
+      } else { // Yellow -> White
+        float f = (t - 0.75f) / 0.25f;
+        r = 255;
+        g = 255;
+        b = (uint8_t)(f * 255);
+      }
     } else {
       // Jet-like colormap for MUF
       if (t < 0.25f) { // Blue -> Cyan
@@ -2445,10 +2497,11 @@ void MapWidget::renderProjectionSelect(SDL_Renderer *renderer) {
   SDL_SetRenderDrawColor(renderer, 150, 150, 150, 255);
   SDL_RenderDrawRect(renderer, &projRect_);
 
+  auto *cat = fontMgr_.catalog();
   // Text
-  fontMgr_.drawText(renderer, label, projRect_.x + projRect_.w / 2,
-                    projRect_.y + projRect_.h / 2, {200, 200, 200, 255}, 10,
-                    true, true);
+  cat->drawText(renderer, label, projRect_.x + projRect_.w / 2,
+                projRect_.y + projRect_.h / 2, {200, 200, 200, 255},
+                FontStyle::Micro, true, false, true);
 }
 
 void MapWidget::renderRssButton(SDL_Renderer *renderer) {
@@ -2468,8 +2521,9 @@ void MapWidget::renderRssButton(SDL_Renderer *renderer) {
   SDL_SetRenderDrawColor(renderer, col.r, col.g, col.b, col.a);
   SDL_RenderDrawRect(renderer, &rssRect_);
 
-  fontMgr_.drawText(renderer, "RSS", rssRect_.x + rssRect_.w / 2,
-                    rssRect_.y + rssRect_.h / 2, col, 10, false, true);
+  fontMgr_.catalog()->drawText(renderer, "RSS", rssRect_.x + rssRect_.w / 2,
+                               rssRect_.y + rssRect_.h / 2, col,
+                               FontStyle::Micro, true, false, true);
 }
 
 void MapWidget::renderOverlayInfo(SDL_Renderer *renderer) {
@@ -2524,8 +2578,8 @@ void MapWidget::renderOverlayInfo(SDL_Renderer *renderer) {
   SDL_RenderDrawRect(renderer, &box);
 
   // Text
-  fontMgr_.drawText(renderer, text, cx, cy, {255, 255, 255, 255}, ptSize, true,
-                    true);
+  fontMgr_.catalog()->drawText(renderer, text, cx, cy, {255, 255, 255, 255},
+                               FontStyle::Micro, true, false, true);
 }
 
 // Modal interface implementation

@@ -2,10 +2,13 @@
 
 #include "../core/BrightnessManager.h"
 #include "../core/ConfigManager.h"
+#include "FontCatalog.h"
 #include "FontManager.h"
+#include "ThemeCustomizer.h"
 #include "Widget.h"
 
 #include <SDL.h>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -19,9 +22,11 @@ public:
   void update() override;
   void render(SDL_Renderer *renderer) override;
   void onResize(int x, int y, int w, int h) override;
+  bool onMouseDown(int mx, int my, Uint16 mod) override;
   bool onMouseUp(int mx, int my, Uint16 mod, int clicks) override;
   bool onKeyDown(SDL_Keycode key, Uint16 mod) override;
   bool onTextInput(const char *text) override;
+  bool isModalActive() const override;
   std::string getName() const override { return "SetupScreen"; }
   std::vector<std::string> getActions() const override;
   SDL_Rect getActionRect(const std::string &action) const override;
@@ -48,7 +53,7 @@ private:
   std::string *getActiveFieldText();
   bool deleteSelection(std::string *text);
   int calculateCursorPosFromClick(int clickX, int fieldStartX,
-                                  const std::string &text, int fontSize);
+                                  const std::string &text, FontStyle style);
   void renderTabIdentity(SDL_Renderer *renderer, int cx, int pad, int fieldW,
                          int fieldH, int fieldX, int textPad);
   void renderTabDXCluster(SDL_Renderer *renderer, int cx, int pad, int fieldW,
@@ -77,6 +82,7 @@ private:
   std::string gridText_;
   std::string latText_;
   std::string lonText_;
+  std::string frnText_;
   std::string clusterHost_;
   std::string clusterPort_;
   std::string clusterLogin_;
@@ -105,6 +111,10 @@ private:
   std::string countdownTime_; // YYYY-MM-DD HH:MM
   std::string dimTime_;
   std::string brightTime_;
+
+  SDL_Rect brightTimeRect_ = {0, 0, 0, 0};
+  SDL_Rect modalRect_ = {0, 0, 0, 0};
+
   std::string rigHost_;
   std::string rigPort_;
   bool rigAutoTune_ = true;
@@ -121,10 +131,6 @@ private:
   double gridLon_ = 0.0;
   bool gridValid_ = false;
   bool mismatchWarning_ = false;
-  int titleSize_ = 32;
-  int labelSize_ = 18;
-  int fieldSize_ = 24;
-  int hintSize_ = 14;
   SDL_Rect toggleRect_ = {0, 0, 0, 0};
   SDL_Rect clusterToggleRect_ = {0, 0, 0, 0};
   SDL_Rect rbnToggleRect_ = {0, 0, 0, 0};
@@ -139,7 +145,9 @@ private:
   SDL_Rect brightnessSliderRect_ = {0, 0, 0, 0};
   SDL_Rect scheduleToggleRect_ = {0, 0, 0, 0};
   SDL_Rect dimTimeRect_ = {0, 0, 0, 0};
-  SDL_Rect brightTimeRect_ = {0, 0, 0, 0};
+  SDL_Rect customizeBtnRect_ = {0, 0, 0, 0};
+
+  std::unique_ptr<HamClock::ThemeCustomizer> themeCustomizer_;
 
   struct WidgetClickRect {
     WidgetType type;
@@ -148,12 +156,13 @@ private:
   std::vector<WidgetClickRect> widgetRects_;
 
   // Network / Hub tab
-  HubMode     hubMode_     = HubMode::Off;
+  HubMode hubMode_ = HubMode::Off;
   std::string hubIp_;
-  std::string hubPortStr_  = "8080";
-  SDL_Rect    hubModeRect_ = {0, 0, 0, 0};
-  SDL_Rect    hubIpRect_   = {0, 0, 0, 0};
-  SDL_Rect    hubPortRect_ = {0, 0, 0, 0};
+  std::string hubPortStr_ = "8080";
+  SDL_Rect hubModeRect_ = {0, 0, 0, 0};
+  SDL_Rect hubIpRect_ = {0, 0, 0, 0};
+  SDL_Rect hubPortRect_ = {0, 0, 0, 0};
+  std::map<std::string, SDL_Color> colorOverrides_;
 
   // Track dimensions to detect size changes
   int lastRenderWidth_ = 0;

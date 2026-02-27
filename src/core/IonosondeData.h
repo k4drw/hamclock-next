@@ -2,6 +2,8 @@
 
 #include <optional>
 #include <string>
+#include <vector>
+#include <cstdint>
 
 struct IonosondeStation {
   std::string code;
@@ -25,4 +27,12 @@ struct InterpolatedIonosonde {
   // Quality markers
   int stationsUsed = 0;
   double nearestDistance = 1e9;
+};
+
+struct IonosondeData {
+  bool valid = false;
+  std::vector<IonosondeStation> stations;
+  float maxFof2 = 0.0f;
+  float minFof2 = 0.0f;
+  float avgFof2 = 0.0f;
 };

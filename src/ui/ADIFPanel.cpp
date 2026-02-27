@@ -1,5 +1,6 @@
 #include "ADIFPanel.h"
 #include "../core/Theme.h"
+#include "FontCatalog.h"
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
@@ -34,23 +35,24 @@ std::string ADIFPanel::formatTime(const std::string &date,
 
 void ADIFPanel::renderStatsView(SDL_Renderer *renderer) {
   ThemeColors themes = getThemeColors(theme_);
+  auto *cat = fontMgr_.catalog();
 
   int pad = 8;
   int curY = y_ + pad;
 
-  fontMgr_.drawText(renderer, "ADIF Log Stats", x_ + pad, curY, themes.accent,
-                    10, true);
+  cat->drawText(renderer, "ADIF Log Stats", x_ + pad, curY, themes.accent,
+                FontStyle::MicroBold);
   curY += 16;
 
   if (!stats_.valid) {
-    fontMgr_.drawText(renderer, "No Log Found", x_ + width_ / 2,
-                      y_ + height_ / 2, themes.info, 12, false, true);
+    cat->drawText(renderer, "No Log Found", x_ + width_ / 2, y_ + height_ / 2,
+                  themes.info, FontStyle::Fast);
     return;
   }
 
   char buf[64];
   std::snprintf(buf, sizeof(buf), "Total QSOs: %d", stats_.totalQSOs);
-  fontMgr_.drawText(renderer, buf, x_ + pad, curY, themes.text, 11);
+  cat->drawText(renderer, buf, x_ + pad, curY, themes.text, FontStyle::UI);
   curY += 18;
 
   // Top Bands
@@ -59,40 +61,45 @@ void ADIFPanel::renderStatsView(SDL_Renderer *renderer) {
   std::sort(topBands.begin(), topBands.end(),
             [](auto &a, auto &b) { return a.second > b.second; });
 
-  fontMgr_.drawText(renderer, "Top Bands:", x_ + pad, curY, themes.info, 9);
+  cat->drawText(renderer, "Top Bands:", x_ + pad, curY, themes.info,
+                FontStyle::Caption);
   curY += 12;
   for (size_t i = 0; i < std::min((size_t)3, topBands.size()); ++i) {
     std::snprintf(buf, sizeof(buf), "%s: %d", topBands[i].first.c_str(),
                   topBands[i].second);
-    fontMgr_.drawText(renderer, buf, x_ + pad + 5, curY, themes.text, 10);
+    cat->drawText(renderer, buf, x_ + pad + 5, curY, themes.text,
+                  FontStyle::Micro);
     curY += 12;
   }
   curY += 5;
 
   // Latest Calls
-  fontMgr_.drawText(renderer, "Latest:", x_ + pad, curY, themes.info, 9);
+  cat->drawText(renderer, "Latest:", x_ + pad, curY, themes.info,
+                FontStyle::Caption);
   curY += 12;
   for (const auto &call : stats_.latestCalls) {
-    fontMgr_.drawText(renderer, call, x_ + pad + 5, curY, themes.accent, 10);
+    cat->drawText(renderer, call, x_ + pad + 5, curY, themes.accent,
+                  FontStyle::Micro);
     curY += 12;
   }
 }
 
 void ADIFPanel::renderLogView(SDL_Renderer *renderer) {
   ThemeColors themes = getThemeColors(theme_);
+  auto *cat = fontMgr_.catalog();
 
   int pad = 4;
   int headerY = y_ + pad;
 
   // Title with band/mode filter chips
-  fontMgr_.drawText(renderer, "Recent QSOs", x_ + pad, headerY, themes.accent,
-                    10, true);
+  cat->drawText(renderer, "Recent QSOs", x_ + pad, headerY, themes.accent,
+                FontStyle::MicroBold);
   // Filter chips (clickable): band on the right side of title row
   char chipBuf[32];
   std::snprintf(chipBuf, sizeof(chipBuf), "[%s %s]",
                 kFilterBands[filterBandIdx_], kFilterModes[filterModeIdx_]);
-  fontMgr_.drawText(renderer, chipBuf, x_ + width_ - 65, headerY, themes.info,
-                    9, true, false, true);
+  cat->drawText(renderer, chipBuf, x_ + width_ - 65, headerY, themes.info,
+                FontStyle::Caption);
   headerY += headerHeight_;
 
   // Build filtered QSO list
@@ -111,8 +118,8 @@ void ADIFPanel::renderLogView(SDL_Renderer *renderer) {
   }
 
   if (!stats_.valid || filtered.empty()) {
-    fontMgr_.drawText(renderer, "No QSOs Found", x_ + width_ / 2,
-                      y_ + height_ / 2, themes.info, 12, false, true);
+    cat->drawText(renderer, "No QSOs Found", x_ + width_ / 2, y_ + height_ / 2,
+                  themes.info, FontStyle::Fast, true);
     return;
   }
 
@@ -140,12 +147,18 @@ void ADIFPanel::renderLogView(SDL_Renderer *renderer) {
 
   // Column headers
   SDL_Color headerColor = themes.info;
-  fontMgr_.drawText(renderer, "Call", colCall, headerY, headerColor, 9, true);
-  fontMgr_.drawText(renderer, "Time", colTime, headerY, headerColor, 9, true);
-  fontMgr_.drawText(renderer, "Band", colBand, headerY, headerColor, 9, true);
-  fontMgr_.drawText(renderer, "Mode", colMode, headerY, headerColor, 9, true);
-  fontMgr_.drawText(renderer, "RST", colRST, headerY, headerColor, 9, true);
-  fontMgr_.drawText(renderer, "Grid", colGrid, headerY, headerColor, 9, true);
+  cat->drawText(renderer, "Call", colCall, headerY, headerColor,
+                FontStyle::Caption);
+  cat->drawText(renderer, "Time", colTime, headerY, headerColor,
+                FontStyle::Caption);
+  cat->drawText(renderer, "Band", colBand, headerY, headerColor,
+                FontStyle::Caption);
+  cat->drawText(renderer, "Mode", colMode, headerY, headerColor,
+                FontStyle::Caption);
+  cat->drawText(renderer, "RST", colRST, headerY, headerColor,
+                FontStyle::Caption);
+  cat->drawText(renderer, "Grid", colGrid, headerY, headerColor,
+                FontStyle::Caption);
 
   // Header separator line
   SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
@@ -171,27 +184,32 @@ void ADIFPanel::renderLogView(SDL_Renderer *renderer) {
     SDL_Color textColor = themes.text;
 
     // Callsign (highlighted)
-    fontMgr_.drawText(renderer, qso.callsign, colCall, rowY, themes.accent, 9);
+    cat->drawText(renderer, qso.callsign, colCall, rowY, themes.accent,
+                  FontStyle::Caption);
 
     // Time
     std::string timeStr = formatTime(qso.date, qso.time);
-    fontMgr_.drawText(renderer, timeStr, colTime, rowY, textColor, 9);
+    cat->drawText(renderer, timeStr, colTime, rowY, textColor,
+                  FontStyle::Caption);
 
     // Band
-    fontMgr_.drawText(renderer, qso.band, colBand, rowY, textColor, 9);
+    cat->drawText(renderer, qso.band, colBand, rowY, textColor,
+                  FontStyle::Caption);
 
     // Mode
-    fontMgr_.drawText(renderer, qso.mode, colMode, rowY, textColor, 9);
+    cat->drawText(renderer, qso.mode, colMode, rowY, textColor,
+                  FontStyle::Caption);
 
     // RST (sent/rcvd)
     std::string rstStr = qso.rstSent;
     if (!qso.rstRcvd.empty()) {
       rstStr += "/" + qso.rstRcvd;
     }
-    fontMgr_.drawText(renderer, rstStr, colRST, rowY, textColor, 9);
+    cat->drawText(renderer, rstStr, colRST, rowY, textColor, FontStyle::Caption);
 
     // Grid
-    fontMgr_.drawText(renderer, qso.gridsquare, colGrid, rowY, textColor, 9);
+    cat->drawText(renderer, qso.gridsquare, colGrid, rowY, textColor,
+                  FontStyle::Caption);
 
     rowY += rowHeight_;
   }
