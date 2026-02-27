@@ -56,6 +56,7 @@
 #include "services/SantaProvider.h"
 #include "services/TropoProvider.h"
 #include "services/LightningProvider.h"
+#include "services/MeteorProvider.h"
 #include "services/UpdateChecker.h"
 #include "services/WeatherProvider.h"
 #include "services/WinlinkProvider.h"
@@ -87,6 +88,7 @@
 #include "ui/HurricanePanel.h"
 #include "ui/LayoutManager.h"
 #include "ui/LightningPanel.h"
+#include "ui/MeteorPanel.h"
 #include "ui/LiveSpotPanel.h"
 #include "ui/LocalPanel.h"
 #include "ui/MapWidget.h"
@@ -274,6 +276,7 @@ struct DashboardContext {
   std::unique_ptr<SantaProvider> santaProvider;
   std::unique_ptr<TropoProvider> tropoProvider;
   std::unique_ptr<LightningProvider> lightningProvider;
+  std::unique_ptr<MeteorProvider> meteorProvider;
   std::unique_ptr<SatelliteManager> satMgr;
   std::unique_ptr<AsteroidProvider> asteroidProvider;
   std::unique_ptr<BeaconProvider> beaconProvider;
@@ -997,6 +1000,14 @@ DashboardContext::DashboardContext(AppContext &ctx)
     }
   });
 
+  meteorProvider = std::make_unique<MeteorProvider>();
+  meteorProvider->setCallback([this](const MeteorData &d) {
+    if (widgetPool.count(WidgetType::METEOR)) {
+      static_cast<MeteorPanel *>(widgetPool[WidgetType::METEOR].get())
+          ->updateData(d);
+    }
+  });
+
   timePanel =
       std::make_unique<TimePanel>(0, 0, 0, 0, fontMgr, texMgr, appCfg.callsign);
   timePanel->setCallColor(appCfg.callsignColor);
@@ -1205,6 +1216,9 @@ DashboardContext::DashboardContext(AppContext &ctx)
     case WidgetType::LIGHTNING:
       widgetPool[type] = std::make_unique<LightningPanel>(0, 0, 0, 0, fontMgr);
       break;
+    case WidgetType::METEOR:
+      widgetPool[type] = std::make_unique<MeteorPanel>(0, 0, 0, 0, fontMgr, texMgr);
+      break;
     default:
       widgetPool[type] = std::make_unique<PlaceholderWidget>(
           0, 0, 0, 0, fontMgr, widgetTypeDisplayName(type),
@@ -1289,7 +1303,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
       WidgetType::SOLAR,         WidgetType::SYS_INFO,
       WidgetType::WATCHLIST,     WidgetType::STOPWATCH,
       WidgetType::REMINDER,      WidgetType::TROPO,
-      WidgetType::LIGHTNING};
+      WidgetType::LIGHTNING,     WidgetType::METEOR};
   // Note: REPEATER_DIR omitted — RepeaterBook API requires auth key (TODO).
   // Note: WINLINK omitted — Winlink API requires access key (TODO).
 
@@ -1598,6 +1612,11 @@ void DashboardContext::update(AppContext &ctx) {
   // --- Lightning fetch (immediate upon widget activation, internal cache 2m) ---
   if (isWidgetActive(WidgetType::LIGHTNING)) {
     lightningProvider->fetch(appCfg.lat, appCfg.lon);
+  }
+
+  // --- Meteor fetch (immediate upon widget activation, internal cache 10m) ---
+  if (isWidgetActive(WidgetType::METEOR)) {
+    meteorProvider->update(appCfg.lat, appCfg.lon);
   }
 
 #ifndef __EMSCRIPTEN__
