@@ -140,7 +140,8 @@ void DXClusterSetup::render(SDL_Renderer *renderer) {
   SDL_SetRenderDrawColor(renderer, 255, 255, 255, 50);
   SDL_RenderDrawRect(renderer, &saveRect_);
   cat->drawText(renderer, "Done", saveRect_.x + btnW / 2,
-                saveRect_.y + btnH / 2, white, FontStyle::UIBold, true);
+                saveRect_.y + btnH / 2, white, FontStyle::UIBold, true, false,
+                true);
 
   // Cancel Button
   SDL_SetRenderDrawColor(renderer, themes.danger.r, themes.danger.g,
@@ -149,7 +150,8 @@ void DXClusterSetup::render(SDL_Renderer *renderer) {
   SDL_SetRenderDrawColor(renderer, 255, 255, 255, 50);
   SDL_RenderDrawRect(renderer, &cancelRect_);
   cat->drawText(renderer, "Cancel", cancelRect_.x + btnW / 2,
-                cancelRect_.y + btnH / 2, white, FontStyle::UIBold, true);
+                cancelRect_.y + btnH / 2, white, FontStyle::UIBold, true, false,
+                true);
 
   y += btnH + pad;
   cat->drawText(renderer, "Tip: Tab rotates fields. Enter to Save.", cx, y,

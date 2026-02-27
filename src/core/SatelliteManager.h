@@ -46,6 +46,16 @@ public:
   void trackSatellite(const std::string &satName);
   std::string getTrackedSatellite() const;
 
+  // Custom satellite management
+  const std::vector<SatelliteTLE> &getCustomSatellites() const {
+    return customSatellites_;
+  }
+
+  void addCustomSCC(int noradId);
+  void removeCustomSCC(int noradId);
+  void addCustomTLE(const SatelliteTLE &tle);
+  void removeCustomTLE(const std::string &satName);
+
   void setObserver(double lat, double lon) {
     obsLat_ = lat;
     obsLon_ = lon;
@@ -56,12 +66,20 @@ private:
 
   static constexpr const char *TLE_URL =
       "https://celestrak.org/NORAD/elements/gp.php?GROUP=amateur&FORMAT=tle";
+  static constexpr const char *SCC_URL_TEMPLATE =
+      "https://celestrak.org/NORAD/elements/gp.php?CATNR={}&FORMAT=tle";
+
+  void fetchSCC(int noradId);
+  void loadLocalTLEs();
+  void saveLocalTLEs();
+  std::filesystem::path getLocalTLEPath() const;
 
   NetworkManager &net_;
   RotatorService *rotator_ = nullptr;
 
   mutable std::mutex mutex_;
-  std::vector<SatelliteTLE> satellites_;
+  std::vector<SatelliteTLE> satellites_;       // Global list (amateur)
+  std::vector<SatelliteTLE> customSatellites_; // Custom SCCs and uploads
   bool dataValid_ = false;
   std::chrono::steady_clock::time_point lastFetch_;
 

@@ -10,6 +10,10 @@ struct SatelliteTLE {
   int noradId = 0;   // NORAD catalog number (from line 1)
 };
 
+// Maximum age for a TLE before it's considered stale/unreliable.
+// Satellite maneuvers or orbital decay can make old TLEs inaccurate.
+static constexpr int MAX_TLE_AGE_DAYS = 14;
+
 // Result of observing a satellite from an observer position.
 struct SatObservation {
   double azimuth = 0.0;   // degrees [0, 360)

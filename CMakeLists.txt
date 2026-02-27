@@ -559,6 +559,7 @@ set(HAMCLOCK_SOURCES
     src/ui/ColorPicker.cpp
     src/ui/RenderUtils.cpp
     src/ui/RSSBanner.cpp
+    src/ui/SatelliteSetup.cpp
     src/ui/SatPanel.cpp
     src/ui/SetupScreen.cpp
     src/ui/SpaceWeatherPanel.cpp

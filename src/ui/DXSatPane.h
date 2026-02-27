@@ -7,6 +7,7 @@
 #include "DXPanel.h"
 #include "FontManager.h"
 #include "SatPanel.h"
+#include "SatelliteSetup.h"
 #include "TextureManager.h"
 #include "Widget.h"
 
@@ -41,12 +42,21 @@ public:
   // mode.
   void restoreState(const std::string &panelMode, const std::string &satName);
 
+  bool isModalActive() const override {
+    return menuState_ != MenuState::Closed || satelliteSetup_.isActive();
+  }
+
+  bool isConfiguring() const override { return isModalActive(); }
+
+  void renderModal(SDL_Renderer *renderer) override;
+
   // Called when mode or satellite selection changes.
   using ModeChangedCb =
       std::function<void(const std::string &mode, const std::string &satName)>;
   void setOnModeChanged(ModeChangedCb cb) { onModeChanged_ = std::move(cb); }
 
-  // Called when the "Map Track" button is toggled. Arg is the new enabled state.
+  // Called when the "Map Track" button is toggled. Arg is the new enabled
+  // state.
   void setOnMapTrackToggle(std::function<void(bool)> cb) {
     onMapTrackToggle_ = std::move(cb);
   }
@@ -58,12 +68,23 @@ public:
   void render(SDL_Renderer *renderer) override;
   void onResize(int x, int y, int w, int h) override;
   bool onMouseUp(int mx, int my, Uint16 mod, int clicks) override;
+  bool onMouseDown(int mx, int my, Uint16 mod) override;
   bool onKeyDown(SDL_Keycode key, Uint16 mod) override;
+  bool onTextInput(const char *text) override;
   bool onMouseWheel(int scrollY) override;
 
   void setTheme(const std::string &theme) override {
     Widget::setTheme(theme);
     satPanel_.setTheme(theme);
+    dxPanel_.setTheme(theme);
+    satelliteSetup_.setTheme(theme);
+  }
+
+  void setMetric(bool metric) override {
+    Widget::setMetric(metric);
+    satPanel_.setMetric(metric);
+    dxPanel_.setMetric(metric);
+    satelliteSetup_.setMetric(metric);
   }
 
   std::string getName() const override { return "DXSatPane"; }
@@ -110,6 +131,7 @@ private:
 
   DXPanel dxPanel_;
   SatPanel satPanel_;
+  HamClock::SatelliteSetup satelliteSetup_;
   OrbitPredictor predictor_;
 
   void notifyModeChanged();

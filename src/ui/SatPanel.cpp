@@ -170,7 +170,15 @@ void SatPanel::render(SDL_Renderer *renderer) {
                       (lineFontSize_[i] != lastLineFontSize_[i]);
     if (needRedraw) {
       MemoryMonitor::getInstance().destroyTexture(lineTex_[i]);
-      SDL_Color c = (i == 0) ? white : gray; // name white, rest gray
+      SDL_Color c = gray;
+      if (i == 0) {
+        c = white;
+      } else if (i == 4) {
+        // TLE Age: if > 14 days, show in danger color
+        if (predictor_ && predictor_->tleAgeDays() > MAX_TLE_AGE_DAYS) {
+          c = themes.danger;
+        }
+      }
       lineTex_[i] = fontMgr_.renderText(
           renderer, lineText_[i], c, lineFontSize_[i], &lineW_[i], &lineH_[i]);
       lastLineText_[i] = lineText_[i];
@@ -349,10 +357,9 @@ void SatPanel::renderPolarPlot(SDL_Renderer *renderer, float cx, float cy,
     char elBuf[16];
     std::snprintf(elBuf, sizeof(elBuf), "%.0f°", currentPos_.el);
     SDL_Color green = {0, 255, 0, 255};
-    fontMgr_.catalog()->drawText(renderer, elBuf,
-                                 static_cast<int>(sx + markerR + 2),
-                                 static_cast<int>(sy - compassFontSize_ / 2.0f),
-                                 green, FontStyle::Fast);
+    fontMgr_.catalog()->drawText(
+        renderer, elBuf, static_cast<int>(sx + markerR + 2),
+        static_cast<int>(sy - compassFontSize_ / 2.0f), green, FontStyle::Fast);
   }
 }
 

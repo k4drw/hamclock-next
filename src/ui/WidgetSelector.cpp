@@ -157,10 +157,10 @@ void WidgetSelector::render(SDL_Renderer *renderer) {
 
   cat->drawText(renderer, "Cancel", cancelRect_.x + cancelRect_.w / 2,
                 cancelRect_.y + cancelRect_.h / 2, themes.text, FontStyle::UI,
-                true);
+                true, false, true);
   cat->drawText(renderer, "Done", okRect_.x + okRect_.w / 2,
                 okRect_.y + okRect_.h / 2, themes.accent, FontStyle::UIBold,
-                true);
+                true, false, true);
 }
 
 bool WidgetSelector::onMouseUp(int mx, int my, Uint16 /*mod*/, int clicks) {

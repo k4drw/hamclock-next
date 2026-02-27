@@ -57,6 +57,7 @@ struct AppConfig {
   // Panel state
   std::string panelMode = "dx";  // "dx" or "sat"
   std::string selectedSatellite; // satellite name (empty = none)
+  std::vector<int> customSatelliteSCCs;
 
   // DX Cluster
   bool dxClusterEnabled = true;

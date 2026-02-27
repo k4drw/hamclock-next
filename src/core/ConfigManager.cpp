@@ -100,7 +100,7 @@ bool ConfigManager::init() {
                 console.log('[IDBFS] Sync-from-IDB complete' +
                             (mounted ? "" : " (no IDBFS — session only)"));
               }
-              if (typeof Module._hamclock_after_idbfs === 'function')
+              if (typeof Module._hamclock_after_idbfs == = 'function')
                 Module._hamclock_after_idbfs();
             });
       },
@@ -316,6 +316,13 @@ bool ConfigManager::load(AppConfig &config) {
     auto &pn = json["panel"];
     config.panelMode = pn.value("mode", "dx");
     config.selectedSatellite = pn.value("satellite", "");
+    if (pn.contains("custom_sccs") && pn["custom_sccs"].is_array()) {
+      config.customSatelliteSCCs.clear();
+      for (auto &item : pn["custom_sccs"]) {
+        if (item.is_number())
+          config.customSatelliteSCCs.push_back(item.get<int>());
+      }
+    }
   }
 
   // DX Cluster
@@ -512,6 +519,12 @@ bool ConfigManager::save(const AppConfig &config) {
 
   json["panel"]["mode"] = config.panelMode;
   json["panel"]["satellite"] = config.selectedSatellite;
+
+  auto sccArr = nlohmann::json::array();
+  for (int scc : config.customSatelliteSCCs) {
+    sccArr.push_back(scc);
+  }
+  json["panel"]["custom_sccs"] = sccArr;
 
   json["dx_cluster"]["enabled"] = config.dxClusterEnabled;
   json["dx_cluster"]["host"] = config.dxClusterHost;

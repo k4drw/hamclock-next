@@ -2148,10 +2148,20 @@ void DashboardContext::render(AppContext &ctx) {
   SDL_RenderSetClipRect(ctx.renderer, nullptr);
 
   if (activeModal) {
+    if (FIDELITY_MODE)
+      SDL_RenderSetScale(ctx.renderer, 1.0f, 1.0f);
+
     SDL_SetRenderDrawBlendMode(ctx.renderer, SDL_BLENDMODE_BLEND);
     SDL_SetRenderDrawColor(ctx.renderer, 0, 0, 0, 150);
-    SDL_Rect full = {0, 0, LOGICAL_WIDTH, LOGICAL_HEIGHT};
+    // Draw over entire window by bypassing logical scaling
+    int dw, dh;
+    SDL_GetRendererOutputSize(ctx.renderer, &dw, &dh);
+    SDL_Rect full = {0, 0, dw, dh};
     SDL_RenderFillRect(ctx.renderer, &full);
+
+    if (FIDELITY_MODE)
+      SDL_RenderSetScale(ctx.renderer, ctx.layScale, ctx.layScale);
+
     activeModal->renderModal(ctx.renderer);
   }
 

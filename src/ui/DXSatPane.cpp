@@ -1,4 +1,5 @@
 #include "DXSatPane.h"
+#include "../core/Constants.h"
 #include "../core/MemoryMonitor.h"
 #include "../core/Theme.h"
 #include "FontCatalog.h"
@@ -14,9 +15,19 @@ DXSatPane::DXSatPane(int x, int y, int w, int h, FontManager &fontMgr,
     : Widget(x, y, w, h), fontMgr_(fontMgr), texMgr_(texMgr), state_(state),
       satMgr_(satMgr),
       dxPanel_(x, y, w, h, fontMgr, state, std::move(weatherStore)),
-      satPanel_(x, y, w, h, fontMgr, texMgr) {}
+      satPanel_(x, y, w, h, fontMgr, texMgr),
+      satelliteSetup_(0, 0, HamClock::LOGICAL_WIDTH, HamClock::LOGICAL_HEIGHT,
+                      fontMgr, satMgr) {}
 
 DXSatPane::~DXSatPane() { destroyMenuTextures(); }
+
+void DXSatPane::renderModal(SDL_Renderer *renderer) {
+  if (satelliteSetup_.isActive()) {
+    satelliteSetup_.render(renderer);
+  } else if (menuState_ != MenuState::Closed) {
+    renderMenu(renderer);
+  }
+}
 
 void DXSatPane::setObserver(double latDeg, double lonDeg) {
   predictor_.setObserver(latDeg, lonDeg);
@@ -65,7 +76,7 @@ void DXSatPane::update() {
     pendingSatRestore_.clear();
   }
 
-  if (menuState_ != MenuState::Closed)
+  if (menuState_ != MenuState::Closed || satelliteSetup_.isActive())
     return;
 
   if (mode_ == Mode::DX) {
@@ -76,15 +87,13 @@ void DXSatPane::update() {
 }
 
 void DXSatPane::render(SDL_Renderer *renderer) {
-  if (menuState_ != MenuState::Closed) {
-    renderMenu(renderer);
-  } else if (mode_ == Mode::DX) {
+  if (mode_ == Mode::DX) {
     dxPanel_.render(renderer);
   } else {
     satPanel_.render(renderer);
   }
 
-  if (mode_ == Mode::SAT) {
+  if (mode_ == Mode::SAT && !isModalActive()) {
     int headerH = std::max(1, height_ / 10);
 
     // Rotator "Trk" button (top-right corner)
@@ -109,7 +118,8 @@ void DXSatPane::render(SDL_Renderer *renderer) {
     SDL_SetRenderDrawColor(renderer, pathColor.r / 5, pathColor.g / 5,
                            pathColor.b / 5, 255);
     SDL_RenderFillRect(renderer, &mapTrackBtnRect_);
-    SDL_SetRenderDrawColor(renderer, pathColor.r, pathColor.g, pathColor.b, 255);
+    SDL_SetRenderDrawColor(renderer, pathColor.r, pathColor.g, pathColor.b,
+                           255);
     SDL_RenderDrawRect(renderer, &mapTrackBtnRect_);
     fontMgr_.catalog()->drawText(renderer, "Pth",
                                  mapTrackBtnRect_.x + mapTrackBtnRect_.w / 2,
@@ -122,12 +132,17 @@ void DXSatPane::onResize(int x, int y, int w, int h) {
   Widget::onResize(x, y, w, h);
   dxPanel_.onResize(x, y, w, h);
   satPanel_.onResize(x, y, w, h);
+  satelliteSetup_.onResize(x, y, w, h);
   menuFontSize_ = fontMgr_.catalog()->ptSize(FontStyle::Fast);
   if (menuState_ != MenuState::Closed)
     destroyMenuTextures();
 }
 
 bool DXSatPane::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
+  if (satelliteSetup_.isActive()) {
+    return satelliteSetup_.onMouseUp(mx, my, mod, clicks);
+  }
+
   // Modal: when menu is open, consume all clicks
   if (menuState_ != MenuState::Closed) {
     if (mx >= x_ && mx < x_ + width_ && my >= y_ && my < y_ + height_) {
@@ -180,7 +195,18 @@ bool DXSatPane::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
   return satPanel_.onMouseUp(mx, my, mod, clicks);
 }
 
+bool DXSatPane::onMouseDown(int mx, int my, Uint16 mod) {
+  if (satelliteSetup_.isActive()) {
+    return satelliteSetup_.onMouseDown(mx, my, mod);
+  }
+  return false;
+}
+
 bool DXSatPane::onKeyDown(SDL_Keycode key, Uint16 mod) {
+  if (satelliteSetup_.isActive()) {
+    return satelliteSetup_.onKeyDown(key, mod);
+  }
+
   if (menuState_ != MenuState::Closed) {
     if (key == SDLK_ESCAPE) {
       closeMenu();
@@ -203,6 +229,13 @@ bool DXSatPane::onKeyDown(SDL_Keycode key, Uint16 mod) {
   if (mode_ == Mode::DX)
     return dxPanel_.onKeyDown(key, mod);
   return satPanel_.onKeyDown(key, mod);
+}
+
+bool DXSatPane::onTextInput(const char *text) {
+  if (satelliteSetup_.isActive()) {
+    return satelliteSetup_.onTextInput(text);
+  }
+  return false;
 }
 
 bool DXSatPane::onMouseWheel(int scrollY) {
@@ -247,6 +280,8 @@ void DXSatPane::populateMenu() {
 
   if (menuState_ == MenuState::SatOptions) {
     menuItems_.push_back({"Choose satellites", kActionChooseSats, false});
+    menuItems_.push_back(
+        {"Add satellite...", 9999, false}); // Random high number for Add
     menuItems_.push_back({"Show DX Info here", kActionShowDX, false});
   } else if (menuState_ == MenuState::SatList) {
     satSnapshot_ = satMgr_.getSatellites();
@@ -306,6 +341,12 @@ void DXSatPane::executeAction(int action) {
     return;
   }
 
+  if (action == 9999) {
+    satelliteSetup_.setActive(true);
+    closeMenu();
+    return;
+  }
+
   // Satellite index in satSnapshot_
   if (action >= 0 && action < static_cast<int>(satSnapshot_.size())) {
     auto &tle = satSnapshot_[action];
@@ -344,11 +385,11 @@ void DXSatPane::drawRadio(SDL_Renderer *renderer, int cx, int cy, int r,
 void DXSatPane::renderMenu(SDL_Renderer *renderer) {
   ThemeColors themes = getThemeColors(theme_);
 
-  // Background
+  // Background - force opaque (255) for all except glass to pop above dimming
   SDL_SetRenderDrawBlendMode(
       renderer, (theme_ == "glass") ? SDL_BLENDMODE_BLEND : SDL_BLENDMODE_NONE);
   SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b,
-                         themes.bg.a);
+                         (theme_ == "glass") ? 160 : 255);
   SDL_Rect bg = {x_, y_, width_, height_};
   SDL_RenderFillRect(renderer, &bg);
 
