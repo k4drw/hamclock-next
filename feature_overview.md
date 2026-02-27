@@ -206,6 +206,14 @@ Every external data fetch is cached both in memory and on disk.
 - **DX spot inline label** — callsign, frequency, and band shown next to selected map bubble without requiring hover
 - **Semantic click API** — external tools can trigger named widget actions (`/debug/click?widget=SolarPanel&action=Cycle`) without pixel-coordinate guessing
 
+### 11. Tactical Propagation & Safety
+
+- **Solar Storm Tactical Dashboard** — Real-time NOAA GOES-18 X-ray flux monitoring with R/S/G tactical badges (Radio Blackout, Solar Radiation, Geomagnetic Storm). Features a 60-minute logarithmic flux sparkline with interactive hover tooltips and CME impact alerts.
+- **Digital Mode "Reach" Heatmap** — Aggregated transmitter reach visualization from PSKReporter. Maps digital mode spots into a geographic grid with Gaussian blurring to show signal density and "live" propagation reach for specific bands and modes.
+- **Live Ionosonde / NVIS** — Real-time critical frequency (foF2) and M-Factor monitoring from the KC2G Global Ionosonde network. Features anti-aliased history graphs and interactive hover tooltips for local ionospheric data.
+- **Meteor Scatter Activity** — Comprehensive meteor shower tracking with an annual database and diurnal activity models. Includes a 24-hour activity prediction graph using textured anti-aliased rendering for high-fidelity shack monitoring.
+- **Interactive Map Tooltips** — Surgical hover tooltips for all map objects (DE, DX, Satellites, Asteroids, Spots) with accurate bounding boxes and whitespace trimming for a polished, professional UI.
+
 ---
 
 ## REST API & Automation

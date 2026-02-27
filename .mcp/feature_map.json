@@ -3018,6 +3018,93 @@
               "24-hour potential graph with hover tooltips",
               "Anti-aliased visual style"
             ]
+          },
+          {
+            "feature_id": "ionosonde_nvis",
+            "name": "Live Ionosonde / NVIS",
+            "category": "data_panel",
+            "description": "Real-time ionospheric monitoring (foF2/M-Factor) from KC2G Global Ionosonde network.",
+            "original": {
+              "files": [],
+              "symbols": [],
+              "notes": "New in hamclock-next."
+            },
+            "next": {
+              "files": [
+                "src/services/IonosondeProvider.cpp",
+                "src/ui/IonosondePanel.cpp",
+                "src/core/IonosondeData.h"
+              ],
+              "symbols": [
+                "IonosondeProvider",
+                "IonosondePanel"
+              ],
+              "notes": "Real-time critical frequency graphs with hover tooltips. Reliable foF2 tracking."
+            },
+            "status": "implemented",
+            "acceptance": [
+              "foF2/M-Factor metrics",
+              "Real-time history graph",
+              "Interactive hover tooltips"
+            ]
+          },
+          {
+            "feature_id": "solar_storm",
+            "name": "Solar Storm Tactical Dashboard",
+            "category": "data_panel",
+            "description": "Tactical monitoring of space weather storm levels (R/S/G scales).",
+            "original": {
+              "files": [],
+              "symbols": [],
+              "notes": "New in hamclock-next."
+            },
+            "next": {
+              "files": [
+                "src/services/SolarStormProvider.cpp",
+                "src/ui/SolarStormPanel.cpp",
+                "src/core/SolarStormData.h"
+              ],
+              "symbols": [
+                "SolarStormProvider",
+                "SolarStormPanel"
+              ],
+              "notes": "GOES-18 flux monitoring. NOAA alerts.json integration."
+            },
+            "status": "implemented",
+            "acceptance": [
+              "NOAA R/S/G badges",
+              "Logarithmic X-ray flux sparkline",
+              "CME impact prediction alerts"
+            ]
+          },
+          {
+            "feature_id": "reach_heatmap",
+            "name": "Digital Mode Reach Heatmap",
+            "category": "map",
+            "description": "Live signal density heatmap based on PSKReporter/WSPR spots.",
+            "original": {
+              "files": [],
+              "symbols": [],
+              "notes": "New in hamclock-next."
+            },
+            "next": {
+              "files": [
+                "src/services/ReachProvider.cpp",
+                "src/ui/MapWidget.cpp",
+                "src/core/ReachData.h"
+              ],
+              "symbols": [
+                "ReachProvider",
+                "MapWidget::onPropDataReady"
+              ],
+              "notes": "Uses 660x330 grid with Gaussian blur and Jet/Heat colormap."
+            },
+            "status": "implemented",
+            "acceptance": [
+              "Spot density aggregation",
+              "Smooth Gaussian blurring",
+              "Selectable from Map View menu"
+            ]
           }
         ]
       }
