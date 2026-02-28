@@ -75,6 +75,8 @@ void NOAAProvider::fetch() {
   fetchMag();
   fetchDST();
   fetchAurora();
+  if (auroraStore_ && auroraStore_->needsBackfill())
+    fetchAuroraHistory();
   fetchDRAP();
   fetchXRay();
   fetchProtonFlux();
@@ -377,6 +379,79 @@ void NOAAProvider::fetchAurora() {
           }
         }
       } catch (...) {
+      }
+    });
+  });
+}
+
+void NOAAProvider::fetchAuroraHistory() {
+  auto auroraStore = auroraStore_;
+  net_.fetchAsync(KP_1M_URL, [auroraStore](std::string body) {
+    if (body.empty() || !auroraStore)
+      return;
+
+    WorkerService::getInstance().submitTask([body, auroraStore]() {
+      try {
+        auto j = nlohmann::json::parse(body, nullptr, false);
+        if (j.is_discarded() || !j.is_array() || j.empty())
+          return;
+
+        std::vector<AuroraDataPoint> points;
+        points.reserve(j.size());
+
+        for (const auto &entry : j) {
+          if (!entry.contains("time_tag"))
+            continue;
+
+          // Accept any of the field names NOAA uses across API versions
+          double kp = 0.0;
+          if (entry.contains("kp_index") && !entry["kp_index"].is_null())
+            kp = entry["kp_index"].get<double>();
+          else if (entry.contains("estimated_kp") &&
+                   !entry["estimated_kp"].is_null())
+            kp = entry["estimated_kp"].get<double>();
+          else if (entry.contains("kp") && !entry["kp"].is_null())
+            kp = entry["kp"].get<double>();
+          else
+            continue;
+
+          // Parse "YYYY-MM-DD HH:MM:SS.sss" or "YYYY-MM-DDTHH:MM:SSZ"
+          const std::string &ts = entry["time_tag"].get_ref<const std::string &>();
+          std::tm tm{};
+          int y = 0, mo = 0, d = 0, h = 0, mi = 0, s = 0;
+          bool parsed =
+              sscanf(ts.c_str(), "%d-%d-%d %d:%d:%d", &y, &mo, &d, &h, &mi,
+                     &s) == 6 ||
+              sscanf(ts.c_str(), "%d-%d-%dT%d:%d:%d", &y, &mo, &d, &h, &mi,
+                     &s) == 6;
+          if (!parsed)
+            continue;
+
+          tm.tm_year = y - 1900;
+          tm.tm_mon = mo - 1;
+          tm.tm_mday = d;
+          tm.tm_hour = h;
+          tm.tm_min = mi;
+          tm.tm_sec = s;
+          tm.tm_isdst = -1;
+
+          std::time_t t = Astronomy::portable_timegm(&tm);
+          if (t < 0)
+            continue;
+
+          AuroraDataPoint dp;
+          dp.percent =
+              std::min(100.0f, static_cast<float>(kp) * 11.1f);
+          dp.timestamp = std::chrono::system_clock::from_time_t(t);
+          points.push_back(dp);
+        }
+
+        if (!points.empty()) {
+          auroraStore->mergePoints(std::move(points));
+          LOG_I("NOAAProvider", "Aurora history backfill complete");
+        }
+      } catch (const std::exception &e) {
+        LOG_E("NOAAProvider", "Aurora history parse error: {}", e.what());
       }
     });
   });

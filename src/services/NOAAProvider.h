@@ -37,6 +37,7 @@ private:
   void fetchMag();
   void fetchDST();
   void fetchAurora();
+  void fetchAuroraHistory();
   void fetchDRAP();
   void fetchXRay();
   void fetchProtonFlux();
@@ -56,6 +57,9 @@ private:
       "https://services.swpc.noaa.gov/products/kyoto-dst.json";
   static constexpr const char *AURORA_URL =
       "https://services.swpc.noaa.gov/json/ovation_aurora_latest.json";
+  // 1-minute resolution Kp index — last 30 days; used for history backfill
+  static constexpr const char *KP_1M_URL =
+      "https://services.swpc.noaa.gov/json/planetary_k_index_1m.json";
   static constexpr const char *DRAP_URL =
       "https://services.swpc.noaa.gov/text/drap_global_frequencies.txt";
   static constexpr const char *XRAY_URL =
