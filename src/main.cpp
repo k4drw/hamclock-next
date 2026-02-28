@@ -865,17 +865,41 @@ DashboardContext::DashboardContext(AppContext &ctx)
   auto &netManager = *ctx.netManager;
   auto &appCfg = ctx.appCfg;
 
+  // Returns true if the widget appears in any pane rotation.
+  // AURORA_GRAPH is always treated as configured: its history store
+  // needs continuous sampling even when the pane is off-screen.
+  auto isWidgetConfigured = [&](WidgetType type) -> bool {
+    if (type == WidgetType::AURORA_GRAPH)
+      return true;
+    for (auto t : appCfg.pane1Rotation)
+      if (t == type) return true;
+    for (auto t : appCfg.pane2Rotation)
+      if (t == type) return true;
+    for (auto t : appCfg.pane3Rotation)
+      if (t == type) return true;
+    for (auto t : appCfg.pane4Rotation)
+      if (t == type) return true;
+    return false;
+  };
+  const bool isMasterMode = (appCfg.hubMode == HubMode::Master);
+
   auto auroraHistoryStore = ctx.auroraHistoryStore;
   noaaProvider = std::make_unique<NOAAProvider>(
       netManager, solarStore, auroraHistoryStore, state.get());
-  noaaProvider->fetch();
+  if (isMasterMode || isWidgetConfigured(WidgetType::SOLAR) ||
+      isWidgetConfigured(WidgetType::AURORA) ||
+      isWidgetConfigured(WidgetType::AURORA_GRAPH) ||
+      isWidgetConfigured(WidgetType::DRAP))
+    noaaProvider->fetch();
 
   rssProvider = std::make_unique<RSSProvider>(netManager, rssStore);
   rssProvider->fetch();
 
   spotProvider = std::make_unique<LiveSpotProvider>(
       netManager, spotStore, appCfg, state.get(), dxcStore);
-  spotProvider->fetch();
+  if (isMasterMode || isWidgetConfigured(WidgetType::LIVE_SPOTS) ||
+      appCfg.propOverlay != PropOverlayType::None)
+    spotProvider->fetch();
 
 #ifndef __EMSCRIPTEN__
   rotatorService =
@@ -905,13 +929,16 @@ DashboardContext::DashboardContext(AppContext &ctx)
   dxcProvider = std::make_unique<DXClusterProvider>(
       dxcStore, ctx.prefixMgr, watchlistStore, watchlistHitStore, state.get());
 #ifndef __EMSCRIPTEN__
-  dxcProvider->start(appCfg);
+  if (isMasterMode || isWidgetConfigured(WidgetType::DX_CLUSTER))
+    dxcProvider->start(appCfg);
 #endif
 
   rbnProvider =
       std::make_unique<RBNProvider>(dxcStore, ctx.prefixMgr, state.get());
 #ifndef __EMSCRIPTEN__
-  rbnProvider->start(appCfg);
+  if ((isMasterMode || isWidgetConfigured(WidgetType::DX_CLUSTER)) &&
+      appCfg.rbnEnabled)
+    rbnProvider->start(appCfg);
 #endif
 
   bandProvider =
@@ -925,9 +952,12 @@ DashboardContext::DashboardContext(AppContext &ctx)
   moonProvider->update(appCfg.lat, appCfg.lon);
 
   historyProvider = std::make_unique<HistoryProvider>(netManager, historyStore);
-  historyProvider->fetchFlux();
-  historyProvider->fetchSSN();
-  historyProvider->fetchKp();
+  if (isMasterMode || isWidgetConfigured(WidgetType::HISTORY_FLUX))
+    historyProvider->fetchFlux();
+  if (isMasterMode || isWidgetConfigured(WidgetType::HISTORY_SSN))
+    historyProvider->fetchSSN();
+  if (isMasterMode || isWidgetConfigured(WidgetType::HISTORY_KP))
+    historyProvider->fetchKp();
 
   deWeatherProvider =
       std::make_unique<WeatherProvider>(netManager, deWeatherStore, 0);
@@ -946,7 +976,8 @@ DashboardContext::DashboardContext(AppContext &ctx)
   callbookProvider->lookup("K1ABC");
 
   dstProvider = std::make_unique<DstProvider>(netManager, dstStore);
-  dstProvider->fetch();
+  if (isMasterMode || isWidgetConfigured(WidgetType::DST_INDEX))
+    dstProvider->fetch();
 
   adifProvider = std::make_unique<ADIFProvider>(adifStore, ctx.prefixMgr);
   adifProvider->fetch(ctx.cfgMgr.configDir() / "logs.adif");
@@ -964,11 +995,13 @@ DashboardContext::DashboardContext(AppContext &ctx)
 
   alertsProvider =
       std::make_unique<AlertsProvider>(netManager, ctx.alertsStore);
-  alertsProvider->fetch(appCfg.lat, appCfg.lon);
+  if (isMasterMode || isWidgetConfigured(WidgetType::ALERTS))
+    alertsProvider->fetch(appCfg.lat, appCfg.lon);
 
   forecastProvider =
       std::make_unique<ForecastProvider>(netManager, ctx.forecastStore);
-  forecastProvider->fetch(appCfg.lat, appCfg.lon);
+  if (isMasterMode || isWidgetConfigured(WidgetType::FORECAST))
+    forecastProvider->fetch(appCfg.lat, appCfg.lon);
 
   repeaterProvider =
       std::make_unique<RepeaterProvider>(netManager, ctx.repeaterStore);
@@ -977,13 +1010,15 @@ DashboardContext::DashboardContext(AppContext &ctx)
 
   hurricaneProvider =
       std::make_unique<HurricaneProvider>(netManager, ctx.hurricaneStore);
-  hurricaneProvider->fetch();
+  if (isMasterMode || isWidgetConfigured(WidgetType::HURRICANE))
+    hurricaneProvider->fetch();
 
   marineProvider =
       std::make_unique<MarineProvider>(netManager, ctx.marineStore);
   // Default NOAA tide station (Lake Worth FL) + NDBC buoy 41114 (FL Atlantic).
   // TODO: make configurable via settings.
-  marineProvider->fetch("8722670", "41114");
+  if (isMasterMode || isWidgetConfigured(WidgetType::MARINE))
+    marineProvider->fetch("8722670", "41114");
 
   winlinkProvider =
       std::make_unique<WinlinkProvider>(netManager, ctx.winlinkStore);
@@ -1558,6 +1593,20 @@ void DashboardContext::update(AppContext &ctx) {
     }
     return false;
   };
+  auto isWidgetConfigured = [&](WidgetType type) -> bool {
+    if (type == WidgetType::AURORA_GRAPH)
+      return true;
+    for (auto t : appCfg.pane1Rotation)
+      if (t == type) return true;
+    for (auto t : appCfg.pane2Rotation)
+      if (t == type) return true;
+    for (auto t : appCfg.pane3Rotation)
+      if (t == type) return true;
+    for (auto t : appCfg.pane4Rotation)
+      if (t == type) return true;
+    return false;
+  };
+  const bool isMaster = (appCfg.hubMode == HubMode::Master);
 
   if (isPowerOn && (now - lastFetchMs > 15 * 60 * 1000)) {
     // Map overlay helper: true if the MUF/RT propagation overlay is active
@@ -1570,9 +1619,10 @@ void DashboardContext::update(AppContext &ctx) {
     //   XRay, ProtonFlux
     // Aurora/AuroraGraph consumers: Aurora sub-feed
     // DRAP panel consumers: DRAP sub-feed
-    const bool needsNoaa = isWidgetActive(WidgetType::SOLAR) ||
+    const bool needsNoaa = isMaster ||
+                           isWidgetActive(WidgetType::SOLAR) ||
                            isWidgetActive(WidgetType::AURORA) ||
-                           isWidgetActive(WidgetType::AURORA_GRAPH) ||
+                           isWidgetConfigured(WidgetType::AURORA_GRAPH) ||
                            isWidgetActive(WidgetType::DRAP);
     if (needsNoaa)
       noaaProvider->fetch();
@@ -1583,47 +1633,47 @@ void DashboardContext::update(AppContext &ctx) {
 
     // --- Satellite manager ---
     // Feeds: SatPanel (in DXSatPane), EME planning tool, map track overlay
-    if (isWidgetActive(WidgetType::EME_TOOL) || appCfg.showSatTrack)
+    if (isMaster || isWidgetActive(WidgetType::EME_TOOL) || appCfg.showSatTrack)
       satMgr->fetch();
 
     // --- Weather providers ---
-    if (isWidgetActive(WidgetType::DE_WEATHER))
+    if (isMaster || isWidgetActive(WidgetType::DE_WEATHER))
       deWeatherProvider->fetch(ctx.state->deLocation.lat,
                                ctx.state->deLocation.lon);
-    if (isWidgetActive(WidgetType::DX_WEATHER))
+    if (isMaster || isWidgetActive(WidgetType::DX_WEATHER))
       dxWeatherProvider->fetch(ctx.state->dxLocation.lat,
                                ctx.state->dxLocation.lon);
 
     // --- Context-sensitive fetches (existing gating preserved/unchanged) ---
-    if (isWidgetActive(WidgetType::LIVE_SPOTS) ||
+    if (isMaster || isWidgetActive(WidgetType::LIVE_SPOTS) ||
         appCfg.propOverlay != PropOverlayType::None)
       spotProvider->fetch();
 
-    if (isWidgetActive(WidgetType::ON_THE_AIR) ||
+    if (isMaster || isWidgetActive(WidgetType::ON_THE_AIR) ||
         isWidgetActive(WidgetType::DX_PEDITIONS) || appCfg.ontaFilter != "Off")
       activityProvider->fetch();
 
-    if (isWidgetActive(WidgetType::BAND_CONDITIONS))
+    if (isMaster || isWidgetActive(WidgetType::BAND_CONDITIONS))
       bandProvider->update();
 
-    if (isWidgetActive(WidgetType::CONTESTS))
+    if (isMaster || isWidgetActive(WidgetType::CONTESTS))
       contestProvider->fetch();
 
-    if (isWidgetActive(WidgetType::MOON))
+    if (isMaster || isWidgetActive(WidgetType::MOON))
       moonProvider->update(appCfg.lat, appCfg.lon);
 
-    if (isWidgetActive(WidgetType::HISTORY_FLUX))
+    if (isMaster || isWidgetActive(WidgetType::HISTORY_FLUX))
       historyProvider->fetchFlux();
-    if (isWidgetActive(WidgetType::HISTORY_SSN))
+    if (isMaster || isWidgetActive(WidgetType::HISTORY_SSN))
       historyProvider->fetchSSN();
-    if (isWidgetActive(WidgetType::HISTORY_KP))
+    if (isMaster || isWidgetActive(WidgetType::HISTORY_KP))
       historyProvider->fetchKp();
 
-    if (dstProvider)
+    if (dstProvider && (isMaster || isWidgetActive(WidgetType::DST_INDEX)))
       dstProvider->fetch();
 
     // --- ADIF log viewer ---
-    if (isWidgetActive(WidgetType::ADIF))
+    if (isMaster || isWidgetActive(WidgetType::ADIF))
       adifProvider->fetch(ctx.cfgMgr.configDir() / "logs.adif");
 
     // --- Propagation map overlays ---
@@ -1633,7 +1683,7 @@ void DashboardContext::update(AppContext &ctx) {
       ionosondeProvider->update();
 
     // --- Asteroid widget + map pin ---
-    if (isWidgetActive(WidgetType::ASTEROID))
+    if (isMaster || isWidgetActive(WidgetType::ASTEROID))
       asteroidProvider->update();
 
 #ifndef __EMSCRIPTEN__
