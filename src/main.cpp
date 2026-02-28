@@ -759,9 +759,15 @@ int main(int argc, char *argv[]) {
   emscripten_set_main_loop(main_tick, 0, 1);
 #else
   while (ctx.appRunning) {
+    static constexpr Uint32 kTargetFrameMs = 33; // ~30 FPS
+    static Uint32 s_lastFrameMs = 0;
     main_tick();
-    if (headlessMode)
-      SDL_Delay(10); // ~100 ticks/s cap when vsync unavailable
+    Uint32 elapsed = SDL_GetTicks() - s_lastFrameMs;
+    if (!headlessMode && elapsed < kTargetFrameMs)
+      SDL_Delay(kTargetFrameMs - elapsed);
+    else if (headlessMode && elapsed < 10)
+      SDL_Delay(10 - elapsed);
+    s_lastFrameMs = SDL_GetTicks();
   }
 #endif
 
