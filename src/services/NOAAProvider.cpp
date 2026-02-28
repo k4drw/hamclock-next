@@ -17,9 +17,10 @@
 NOAAProvider::NOAAProvider(NetworkManager &net,
                            std::shared_ptr<SolarDataStore> store,
                            std::shared_ptr<AuroraHistoryStore> auroraStore,
+                           std::shared_ptr<XRayHistoryStore> xrayStore,
                            HamClockState *state)
     : net_(net), store_(std::move(store)), auroraStore_(std::move(auroraStore)),
-      state_(state) {}
+      xrayStore_(std::move(xrayStore)), state_(state) {}
 
 // Calculate R-scale (Radio Blackouts) from X-ray flux
 // R1: >= 1e-5, R2: >= 5e-5, R3: >= 1e-4, R4: >= 1e-3, R5: >= 2e-3
@@ -572,7 +573,8 @@ void NOAAProvider::fetchDRAP() {
 
 void NOAAProvider::fetchXRay() {
   auto state = state_;
-  net_.fetchAsync(XRAY_URL, [state](std::string body) {
+  auto xrayStore = xrayStore_;
+  net_.fetchAsync(XRAY_URL, [state, xrayStore](std::string body) {
     if (body.empty()) {
       if (state) {
         auto &s = state->services["NOAA:XRay"];
@@ -582,7 +584,7 @@ void NOAAProvider::fetchXRay() {
       return;
     }
 
-    WorkerService::getInstance().submitTask([body, state]() {
+    WorkerService::getInstance().submitTask([body, state, xrayStore]() {
       try {
         auto j = nlohmann::json::parse(body, nullptr, false);
         if (j.is_discarded() || !j.is_array() || j.empty()) {
@@ -593,21 +595,34 @@ void NOAAProvider::fetchXRay() {
           return;
         }
 
-        // Find the most recent 0.1-0.8nm band entry
-        // Iterate backwards to find the latest valid entry
+        // Collect all 0.1-0.8nm entries; also find the latest for SolarData
         double latest_flux = 0.0;
         bool found = false;
 
-        for (auto it = j.rbegin(); it != j.rend(); ++it) {
-          const auto &entry = *it;
-          if (entry.contains("energy") && entry.contains("flux")) {
-            std::string energy = entry["energy"].get<std::string>();
-            if (energy == "0.1-0.8nm") {
-              latest_flux = entry["flux"].get<double>();
-              found = true;
-              break;
+        for (const auto &entry : j) {
+          if (!entry.contains("energy") || !entry.contains("flux"))
+            continue;
+          if (entry["energy"].get<std::string>() != "0.1-0.8nm")
+            continue;
+
+          double flux = entry["flux"].get<double>();
+
+          // Push to history store with parsed timestamp
+          if (xrayStore && entry.contains("time_tag") &&
+              entry["time_tag"].is_string()) {
+            int64_t t =
+                parseNoaaMinute(entry["time_tag"].get<std::string>());
+            if (t >= 0) {
+              XRayDataPoint pt;
+              pt.timestamp = std::chrono::system_clock::from_time_t(
+                  static_cast<std::time_t>(t));
+              pt.flux = flux;
+              xrayStore->push(pt);
             }
           }
+
+          latest_flux = flux; // last entry in array is the most recent
+          found = true;
         }
 
         if (found) {

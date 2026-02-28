@@ -2,17 +2,20 @@
 
 #include "../core/SolarData.h"
 #include "../core/Theme.h"
+#include "../core/XRayData.h"
 #include "FontManager.h"
 #include "Widget.h"
 
 #include <SDL.h>
 #include <memory>
 #include <string>
+#include <vector>
 
 class SpaceWeatherPanel : public Widget {
 public:
   SpaceWeatherPanel(int x, int y, int w, int h, FontManager &fontMgr,
-                    std::shared_ptr<SolarDataStore> store);
+                    std::shared_ptr<SolarDataStore> store,
+                    std::shared_ptr<XRayHistoryStore> xrayStore = nullptr);
   ~SpaceWeatherPanel() override { destroyCache(); }
 
   void update() override;
@@ -34,6 +37,8 @@ private:
 
   FontManager &fontMgr_;
   std::shared_ptr<SolarDataStore> store_;
+  std::shared_ptr<XRayHistoryStore> xrayStore_;
+  std::vector<XRayDataPoint> sparklineHistory_;
 
   static constexpr int kNumItems = 15;
   static constexpr int kItemsPerPage = 4;

@@ -1986,8 +1986,60 @@ void MapWidget::renderWxMbOverlay(SDL_Renderer *renderer) {
   SDL_RenderSetClipRect(renderer, nullptr);
 }
 
+// DRAP absorption color: SDL_PIXELFORMAT_RGBA32 little-endian packing
+// pixels[i] = (a << 24) | (b << 16) | (g << 8) | r
+static uint32_t drapColor(float mhz) {
+  if (mhz < 0.1f)
+    return 0; // fully transparent
+  if (mhz < 5.0f)
+    return (80u << 24) | (0u << 16) | (255u << 8) | 255u; // yellow, 80 alpha
+  if (mhz < 15.0f)
+    return (160u << 24) | (0u << 16) | (140u << 8) | 255u; // orange, 160 alpha
+  return (200u << 24) | (50u << 16) | (50u << 8) | 220u;   // red, 200 alpha
+}
+
 void MapWidget::updatePropagationOverlay() {
   if (config_.propOverlay == PropOverlayType::None) {
+    return;
+  }
+
+  // DRAP grid: read synchronously from drapStore_, upload texture on main thread
+  if (config_.propOverlay == PropOverlayType::Drap) {
+    if (!drapStore_)
+      return;
+    auto grid = drapStore_->get();
+    if (!grid.valid || grid.cells.empty() || grid.cols <= 0 || grid.rows <= 0)
+      return;
+
+    SDL_Window *win = SDL_GL_GetCurrentWindow();
+    if (!win)
+      return;
+    SDL_Renderer *renderer = SDL_GetRenderer(win);
+    if (!renderer)
+      return;
+
+    // Recreate propTexture_ if dimensions differ
+    if (propTexture_) {
+      int texW = 0, texH = 0;
+      SDL_QueryTexture(propTexture_, nullptr, nullptr, &texW, &texH);
+      if (texW != grid.cols || texH != grid.rows) {
+        MemoryMonitor::getInstance().destroyTexture(propTexture_);
+        propTexture_ = nullptr;
+      }
+    }
+    if (!propTexture_) {
+      propTexture_ =
+          SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32,
+                            SDL_TEXTUREACCESS_STATIC, grid.cols, grid.rows);
+    }
+    if (!propTexture_)
+      return;
+
+    std::vector<uint32_t> pixels(grid.cells.size());
+    for (int i = 0; i < (int)grid.cells.size(); i++)
+      pixels[i] = drapColor(grid.cells[i]);
+    SDL_UpdateTexture(propTexture_, nullptr, pixels.data(),
+                      grid.cols * sizeof(uint32_t));
     return;
   }
 
@@ -2542,6 +2594,8 @@ void MapWidget::renderOverlayInfo(SDL_Renderer *renderer) {
                        config_.propMode, config_.propPower);
   } else if (config_.propOverlay == PropOverlayType::Toa) {
     text = "TOA Overlay";
+  } else if (config_.propOverlay == PropOverlayType::Drap) {
+    text = "DRAP Absorption";
   }
 
   if (config_.weatherOverlay == WeatherOverlayType::WxMb) {

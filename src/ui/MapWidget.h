@@ -5,6 +5,7 @@
 #include "../core/AsteroidData.h"
 #include "../core/AuroraHistoryStore.h"
 #include "../core/ConfigManager.h"
+#include "../core/DRAPData.h"
 #include "../core/DXClusterData.h"
 #include "../core/HamClockState.h"
 #include "../core/LiveSpotData.h"
@@ -67,6 +68,10 @@ public:
 
   void setAuroraStore(std::shared_ptr<AuroraHistoryStore> store) {
     auroraStore_ = std::move(store);
+  }
+
+  void setDrapStore(std::shared_ptr<DRAPDataStore> store) {
+    drapStore_ = std::move(store);
   }
 
   void setADIFStore(std::shared_ptr<ADIFStore> store) {
@@ -134,6 +139,7 @@ private:
   std::shared_ptr<LiveSpotDataStore> spotStore_;
   std::shared_ptr<DXClusterDataStore> dxcStore_;
   std::shared_ptr<AuroraHistoryStore> auroraStore_;
+  std::shared_ptr<DRAPDataStore> drapStore_;
   std::shared_ptr<ADIFStore> adifStore_;
   std::shared_ptr<ActivityDataStore> activityStore_;
   MufRtProvider *mufrt_ = nullptr;

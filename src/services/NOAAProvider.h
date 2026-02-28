@@ -2,6 +2,7 @@
 
 #include "../core/AuroraHistoryStore.h"
 #include "../core/SolarData.h"
+#include "../core/XRayData.h"
 #include "../network/NetworkManager.h"
 
 #include <memory>
@@ -25,6 +26,7 @@ public:
 
   NOAAProvider(NetworkManager &net, std::shared_ptr<SolarDataStore> store,
                std::shared_ptr<AuroraHistoryStore> auroraStore = nullptr,
+               std::shared_ptr<XRayHistoryStore> xrayStore = nullptr,
                HamClockState *state = nullptr);
 
   void fetch();
@@ -73,5 +75,6 @@ private:
   NetworkManager &net_;
   std::shared_ptr<SolarDataStore> store_;
   std::shared_ptr<AuroraHistoryStore> auroraStore_;
+  std::shared_ptr<XRayHistoryStore> xrayStore_;
   HamClockState *state_;
 };

@@ -209,6 +209,8 @@ struct AppContext {
   std::shared_ptr<HurricaneStore> hurricaneStore;
   std::shared_ptr<MarineStore> marineStore;
   std::shared_ptr<WinlinkStore> winlinkStore;
+  std::shared_ptr<DRAPDataStore> drapDataStore;
+  std::shared_ptr<XRayHistoryStore> xrayHistoryStore;
 
   // Managers & Services
   std::unique_ptr<NetworkManager> netManager;
@@ -884,8 +886,10 @@ DashboardContext::DashboardContext(AppContext &ctx)
   const bool isMasterMode = (appCfg.hubMode == HubMode::Master);
 
   auto auroraHistoryStore = ctx.auroraHistoryStore;
+  ctx.xrayHistoryStore = std::make_shared<XRayHistoryStore>();
   noaaProvider = std::make_unique<NOAAProvider>(
-      netManager, solarStore, auroraHistoryStore, state.get());
+      netManager, solarStore, auroraHistoryStore, ctx.xrayHistoryStore,
+      state.get());
   if (isMasterMode || isWidgetConfigured(WidgetType::SOLAR) ||
       isWidgetConfigured(WidgetType::AURORA) ||
       isWidgetConfigured(WidgetType::AURORA_GRAPH) ||
@@ -968,7 +972,8 @@ DashboardContext::DashboardContext(AppContext &ctx)
   dxWeatherProvider->fetch(state->dxLocation.lat, state->dxLocation.lon);
 
   sdoProvider = std::make_unique<SDOProvider>(netManager);
-  drapProvider = std::make_unique<DRAPProvider>(netManager);
+  ctx.drapDataStore = std::make_shared<DRAPDataStore>();
+  drapProvider = std::make_unique<DRAPProvider>(netManager, ctx.drapDataStore);
   auroraProvider = std::make_shared<AuroraProvider>(netManager);
 
   callbookProvider =
@@ -1117,8 +1122,8 @@ DashboardContext::DashboardContext(AppContext &ctx)
 
     switch (type) {
     case WidgetType::SOLAR:
-      widgetPool[type] =
-          std::make_unique<SpaceWeatherPanel>(0, 0, 0, 0, fontMgr, solarStore);
+      widgetPool[type] = std::make_unique<SpaceWeatherPanel>(
+          0, 0, 0, 0, fontMgr, solarStore, ctx.xrayHistoryStore);
       break;
     case WidgetType::DX_CLUSTER:
 #ifndef __EMSCRIPTEN__
@@ -1467,6 +1472,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
   mapArea->setCloudProvider(cloudProvider.get());
   mapArea->setBeaconProvider(beaconProvider.get());
   mapArea->setAuroraStore(auroraHistoryStore);
+  mapArea->setDrapStore(ctx.drapDataStore);
   mapArea->setIonosondeProvider(ionosondeProvider.get());
   mapArea->setSolarDataStore(ctx.solarStore.get());
   mapArea->setActivityStore(ctx.activityStore);

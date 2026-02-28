@@ -3,13 +3,16 @@
 #include "FontCatalog.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <cstring>
 
 SpaceWeatherPanel::SpaceWeatherPanel(int x, int y, int w, int h,
                                      FontManager &fontMgr,
-                                     std::shared_ptr<SolarDataStore> store)
-    : Widget(x, y, w, h), fontMgr_(fontMgr), store_(std::move(store)) {
+                                     std::shared_ptr<SolarDataStore> store,
+                                     std::shared_ptr<XRayHistoryStore> xrayStore)
+    : Widget(x, y, w, h), fontMgr_(fontMgr), store_(std::move(store)),
+      xrayStore_(std::move(xrayStore)) {
   items_[0].label = "SFI";
   items_[1].label = "SN";
   items_[2].label = "A";
@@ -72,6 +75,9 @@ void SpaceWeatherPanel::destroyCache() {
 }
 
 void SpaceWeatherPanel::update() {
+  if (xrayStore_)
+    sparklineHistory_ = xrayStore_->getHistory();
+
   SolarData data = store_->get();
   dataValid_ = data.valid;
   if (!data.valid)
@@ -216,9 +222,13 @@ void SpaceWeatherPanel::render(SDL_Renderer *renderer) {
   int numCols = isNarrow ? 1 : 2;
   int numRows = isNarrow ? 4 : 2;
 
+  bool showSparkline =
+      (!isNarrow && xrayStore_ && !sparklineHistory_.empty() && height_ >= 80);
+  int sparklineH = showSparkline ? 22 : 0;
+
   int cellW = width_ / numCols;
-  int cellH = (height_ - titleH - 10) /
-              numRows; // Leave space for title and pagination bar
+  int cellH = (height_ - titleH - sparklineH - 10) /
+              numRows; // Leave space for title, sparkline, and pagination bar
   int pad = std::max(1, static_cast<int>(cellH * 0.05f));
 
   SDL_Color labelColor = themes.textDim;
@@ -286,6 +296,64 @@ void SpaceWeatherPanel::render(SDL_Renderer *renderer) {
       }
       SDL_Rect dst = {vx, vy, items_[itemIdx].valueW, items_[itemIdx].valueH};
       SDL_RenderCopy(renderer, items_[itemIdx].valueTex, nullptr, &dst);
+    }
+  }
+
+  // Draw X-ray flux sparkline (above pagination bar)
+  if (showSparkline) {
+    const int pad = 4;
+    const int slX = x_ + pad;
+    const int slW = width_ - 2 * pad;
+    const int slY = y_ + titleH + numRows * cellH + 2;
+    const int slH = sparklineH - 4;
+
+    // Log-scale Y mapping: 1e-8 (bottom) to 1e-3 (top)
+    const double logMin = -8.0; // log10(1e-8)
+    const double logMax = -3.0; // log10(1e-3)
+    auto fluxToY = [&](double flux) -> int {
+      double logVal = std::log10(std::max(flux, 1e-9));
+      double t = (logVal - logMin) / (logMax - logMin);
+      t = std::max(0.0, std::min(1.0, t));
+      return slY + slH - static_cast<int>(t * slH);
+    };
+
+    // Threshold lines (A=1e-8, B=1e-7, C=1e-6, M=1e-5, X=1e-4)
+    static const double kThresholds[] = {1e-8, 1e-7, 1e-6, 1e-5, 1e-4};
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+    for (double thr : kThresholds) {
+      int ty = fluxToY(thr);
+      if (ty < slY || ty > slY + slH)
+        continue;
+      bool isX = (thr >= 1e-4);
+      SDL_SetRenderDrawColor(renderer, isX ? 255 : 80, isX ? 140 : 80,
+                             isX ? 0 : 80, 160);
+      SDL_RenderDrawLine(renderer, slX, ty, slX + slW, ty);
+    }
+
+    // Time-range: last 6 hours
+    auto now = std::chrono::system_clock::now();
+    auto tMin = now - std::chrono::hours(6);
+    double tSpan = std::chrono::duration<double>(now - tMin).count();
+
+    auto timeToX = [&](std::chrono::system_clock::time_point tp) -> int {
+      double age = std::chrono::duration<double>(tp - tMin).count();
+      return slX + static_cast<int>(age / tSpan * slW);
+    };
+
+    // Draw sparkline
+    SDL_SetRenderDrawColor(renderer, themes.info.r, themes.info.g,
+                           themes.info.b, 255);
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+    int prevX = -1, prevY = -1;
+    for (const auto &pt : sparklineHistory_) {
+      if (pt.timestamp < tMin)
+        continue;
+      int px = timeToX(pt.timestamp);
+      int py = fluxToY(pt.flux);
+      if (prevX >= 0)
+        SDL_RenderDrawLine(renderer, prevX, prevY, px, py);
+      prevX = px;
+      prevY = py;
     }
   }
 
