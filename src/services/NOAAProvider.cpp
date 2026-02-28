@@ -385,8 +385,11 @@ void NOAAProvider::fetchAurora() {
 }
 
 void NOAAProvider::fetchAuroraHistory() {
+  // Re-use the 3-hourly K-index feed (K_INDEX_URL).  It spans 30+ days so
+  // overnight gaps are fully covered.  Format: [[time_str, kp_str, a_str], ...]
+  // kp_str is already a float string ("0.33", "3.67") so no integer stepping.
   auto auroraStore = auroraStore_;
-  net_.fetchAsync(KP_1M_URL, [auroraStore](std::string body) {
+  net_.fetchAsync(K_INDEX_URL, [auroraStore](std::string body) {
     if (body.empty() || !auroraStore)
       return;
 
@@ -399,32 +402,20 @@ void NOAAProvider::fetchAuroraHistory() {
         std::vector<AuroraDataPoint> points;
         points.reserve(j.size());
 
-        for (const auto &entry : j) {
-          if (!entry.contains("time_tag"))
+        for (const auto &row : j) {
+          if (!row.is_array() || row.size() < 2)
+            continue;
+          if (!row[0].is_string() || !row[1].is_string())
             continue;
 
-          // Accept any of the field names NOAA uses across API versions
-          double kp = 0.0;
-          if (entry.contains("kp_index") && !entry["kp_index"].is_null())
-            kp = entry["kp_index"].get<double>();
-          else if (entry.contains("estimated_kp") &&
-                   !entry["estimated_kp"].is_null())
-            kp = entry["estimated_kp"].get<double>();
-          else if (entry.contains("kp") && !entry["kp"].is_null())
-            kp = entry["kp"].get<double>();
-          else
-            continue;
+          double kp = StringUtils::safe_stod(row[1].get<std::string>());
 
-          // Parse "YYYY-MM-DD HH:MM:SS.sss" or "YYYY-MM-DDTHH:MM:SSZ"
-          const std::string &ts = entry["time_tag"].get_ref<const std::string &>();
+          // Parse "YYYY-MM-DD HH:MM:SS.sss" (NOAA K-index time-tag format)
+          const std::string &ts = row[0].get_ref<const std::string &>();
           std::tm tm{};
           int y = 0, mo = 0, d = 0, h = 0, mi = 0, s = 0;
-          bool parsed =
-              sscanf(ts.c_str(), "%d-%d-%d %d:%d:%d", &y, &mo, &d, &h, &mi,
-                     &s) == 6 ||
-              sscanf(ts.c_str(), "%d-%d-%dT%d:%d:%d", &y, &mo, &d, &h, &mi,
-                     &s) == 6;
-          if (!parsed)
+          if (sscanf(ts.c_str(), "%d-%d-%d %d:%d:%d", &y, &mo, &d, &h, &mi,
+                     &s) != 6)
             continue;
 
           tm.tm_year = y - 1900;
@@ -440,15 +431,15 @@ void NOAAProvider::fetchAuroraHistory() {
             continue;
 
           AuroraDataPoint dp;
-          dp.percent =
-              std::min(100.0f, static_cast<float>(kp) * 11.1f);
+          dp.percent = std::min(100.0f, static_cast<float>(kp) * 11.1f);
           dp.timestamp = std::chrono::system_clock::from_time_t(t);
           points.push_back(dp);
         }
 
         if (!points.empty()) {
           auroraStore->mergePoints(std::move(points));
-          LOG_I("NOAAProvider", "Aurora history backfill complete");
+          LOG_I("NOAAProvider", "Aurora history backfill: {} Kp points merged",
+                points.size());
         }
       } catch (const std::exception &e) {
         LOG_E("NOAAProvider", "Aurora history parse error: {}", e.what());

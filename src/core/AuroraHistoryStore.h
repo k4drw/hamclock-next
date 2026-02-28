@@ -10,6 +10,7 @@
 struct AuroraDataPoint {
   float percent;
   std::chrono::system_clock::time_point timestamp;
+  bool isBackfill = false; // true when derived from Kp estimate, not OVATION
 };
 
 class AuroraHistoryStore {
@@ -80,6 +81,7 @@ public:
         p.percent = item["percent"].get<float>();
         p.timestamp = std::chrono::system_clock::from_time_t(
             item["ts"].get<std::time_t>());
+        p.isBackfill = item.value("bf", false);
         history_.push_back(p);
       }
     } catch (...) {
@@ -141,8 +143,11 @@ public:
           break;
         }
       }
-      if (!duplicate)
-        merged.push_back(np);
+      if (!duplicate) {
+        AuroraDataPoint flagged = np;
+        flagged.isBackfill = true;
+        merged.push_back(flagged);
+      }
     }
 
     std::sort(merged.begin(), merged.end(),
@@ -181,6 +186,8 @@ private:
         nlohmann::json point;
         point["percent"] = p.percent;
         point["ts"] = std::chrono::system_clock::to_time_t(p.timestamp);
+        if (p.isBackfill)
+          point["bf"] = true;
         j.push_back(point);
       }
 

@@ -143,14 +143,18 @@ void AuroraGraphPanel::render(SDL_Renderer *renderer) {
     y1 = std::max(graphY, std::min(graphY + graphH, y1));
     y2 = std::max(graphY, std::min(graphY + graphH, y2));
 
+    // Dim color for Kp-estimated (backfill) segments
+    SDL_Color segColor = (prev.isBackfill || curr.isBackfill)
+                             ? SDL_Color{0, 140, 80, 180}
+                             : SDL_Color{0, 255, 128, 255};
+
     SDL_Texture *lineAA = texMgr_.get("line_aa");
     if (lineAA) {
       RenderUtils::drawThickLineTextured(renderer, lineAA, (float)x1, (float)y1,
-                                         (float)x2, (float)y2, 2.0f,
-                                         {0, 255, 128, 255});
+                                         (float)x2, (float)y2, 2.0f, segColor);
     } else {
       RenderUtils::drawThickLine(renderer, (float)x1, (float)y1, (float)x2,
-                                 (float)y2, 2.0f, {0, 255, 128, 255});
+                                 (float)y2, 2.0f, segColor);
     }
   }
 
@@ -211,12 +215,14 @@ void AuroraGraphPanel::onMouseMove(int mx, int my) {
                        now - bestPoint->timestamp)
                        .count();
     char buf[64];
+    const char *src = bestPoint->isBackfill ? " [Est. Kp]" : "";
     if (ageMins < 30) {
-      std::snprintf(buf, sizeof(buf), "%.0f%% (Now)", bestPoint->percent);
+      std::snprintf(buf, sizeof(buf), "%.0f%% (Now)%s", bestPoint->percent,
+                    src);
     } else {
-      std::snprintf(buf, sizeof(buf), "%.0f%% (-%lldh %lldm)",
+      std::snprintf(buf, sizeof(buf), "%.0f%% (-%lldh %lldm)%s",
                     bestPoint->percent, static_cast<long long>(ageMins / 60),
-                    static_cast<long long>(ageMins % 60));
+                    static_cast<long long>(ageMins % 60), src);
     }
     tooltip_.text = buf;
     tooltip_.x = mx;
