@@ -523,14 +523,20 @@ void NOAAProvider::fetchAuroraHistory() {
 }
 
 void NOAAProvider::fetchDRAP() {
-  net_.fetchAsync(DRAP_URL, [](std::string body) {
-    if (body.empty())
+  LOG_I("NOAAProvider", "DRAP fetch started (drapStore_={})", drapStore_ ? "set" : "null");
+  auto drapStore = drapStore_;
+  net_.fetchAsync(DRAP_URL, [drapStore](std::string body) {
+    if (body.empty()) {
+      LOG_W("NOAAProvider", "DRAP fetch returned empty body");
       return;
+    }
 
-    WorkerService::getInstance().submitTask([body]() {
+    WorkerService::getInstance().submitTask([body, drapStore]() {
       try {
         float max_freq = 0;
         bool found_any = false;
+        DRAPGrid grid;
+        int maxCols = 0;
 
         std::stringstream ss(body);
         std::string line;
@@ -539,22 +545,42 @@ void NOAAProvider::fetchDRAP() {
             continue;
 
           size_t pipe_pos = line.find('|');
-          if (pipe_pos != std::string::npos) {
-            std::string freqs = line.substr(pipe_pos + 1);
-            std::stringstream ss_vals(freqs);
-            float val;
-            while (ss_vals >> val) {
-              if (val > max_freq)
-                max_freq = val;
-              found_any = true;
-            }
+          if (pipe_pos == std::string::npos)
+            continue;
+
+          std::string freqs = line.substr(pipe_pos + 1);
+          std::stringstream ss_vals(freqs);
+          float val;
+          int rowCols = 0;
+          while (ss_vals >> val) {
+            grid.cells.push_back(val);
+            if (val > max_freq)
+              max_freq = val;
+            found_any = true;
+            rowCols++;
+          }
+          if (rowCols > 0) {
+            grid.rows++;
+            if (rowCols > maxCols)
+              maxCols = rowCols;
           }
         }
 
         if (found_any) {
+          // Populate grid store for DRAP map overlay
+          if (drapStore) {
+            grid.cols = maxCols;
+            grid.valid = true;
+            grid.updated = std::chrono::system_clock::now();
+            drapStore->set(grid);
+            LOG_I("NOAAProvider", "DRAP grid stored: {}x{}, {} cells, max={:.1f} MHz",
+                  grid.rows, grid.cols, (int)grid.cells.size(), max_freq);
+          } else {
+            LOG_W("NOAAProvider", "DRAP grid parsed but drapStore is null (rows={} cols={})",
+                  grid.rows, maxCols);
+          }
+
           auto *update = new SolarData();
-          // Storing float frequency into int field (rounding) per existing
-          // pattern
           update->drap = static_cast<int>(std::round(max_freq));
           update->valid = true;
 

@@ -323,6 +323,8 @@ struct DashboardContext {
 
   // State
   Uint32 lastFetchMs = 0;
+  Uint32 lastReachFetchMs = 0;
+  Uint32 lastDrapFetchMs = 0;
   Uint32 lastResizeMs = 0;
   Uint32 lastFpsUpdate = 0;
   int frames = 0;
@@ -887,14 +889,18 @@ DashboardContext::DashboardContext(AppContext &ctx)
 
   auto auroraHistoryStore = ctx.auroraHistoryStore;
   ctx.xrayHistoryStore = std::make_shared<XRayHistoryStore>();
+  ctx.drapDataStore = std::make_shared<DRAPDataStore>();
   noaaProvider = std::make_unique<NOAAProvider>(
       netManager, solarStore, auroraHistoryStore, ctx.xrayHistoryStore,
       state.get());
+  noaaProvider->setDrapStore(ctx.drapDataStore);
   if (isMasterMode || isWidgetConfigured(WidgetType::SOLAR) ||
       isWidgetConfigured(WidgetType::AURORA) ||
       isWidgetConfigured(WidgetType::AURORA_GRAPH) ||
       isWidgetConfigured(WidgetType::DRAP))
     noaaProvider->fetch();
+  if (appCfg.propOverlay == PropOverlayType::Drap)
+    noaaProvider->fetchDRAP();
 
   rssProvider = std::make_unique<RSSProvider>(netManager, rssStore);
   rssProvider->fetch();
@@ -972,7 +978,6 @@ DashboardContext::DashboardContext(AppContext &ctx)
   dxWeatherProvider->fetch(state->dxLocation.lat, state->dxLocation.lon);
 
   sdoProvider = std::make_unique<SDOProvider>(netManager);
-  ctx.drapDataStore = std::make_shared<DRAPDataStore>();
   drapProvider = std::make_unique<DRAPProvider>(netManager, ctx.drapDataStore);
   auroraProvider = std::make_shared<AuroraProvider>(netManager);
 
@@ -1629,7 +1634,8 @@ void DashboardContext::update(AppContext &ctx) {
                            isWidgetActive(WidgetType::SOLAR) ||
                            isWidgetActive(WidgetType::AURORA) ||
                            isWidgetConfigured(WidgetType::AURORA_GRAPH) ||
-                           isWidgetActive(WidgetType::DRAP);
+                           isWidgetActive(WidgetType::DRAP) ||
+                           appCfg.propOverlay == PropOverlayType::Drap;
     if (needsNoaa)
       noaaProvider->fetch();
 
@@ -1699,6 +1705,14 @@ void DashboardContext::update(AppContext &ctx) {
     lastFetchMs = now;
   }
 
+  // --- DRAP fetch: immediate when overlay active and store empty (60s cooldown) ---
+  if (isPowerOn && appCfg.propOverlay == PropOverlayType::Drap &&
+      !ctx.drapDataStore->get().valid &&
+      (lastDrapFetchMs == 0 || now - lastDrapFetchMs > 60000u)) {
+    noaaProvider->fetchDRAP();
+    lastDrapFetchMs = now;
+  }
+
   // --- Tropo fetch (immediate upon widget activation, internal cache 1hr) ---
   if (isWidgetActive(WidgetType::TROPO)) {
     tropoProvider->fetch(appCfg.lat, appCfg.lon);
@@ -1724,8 +1738,10 @@ void DashboardContext::update(AppContext &ctx) {
     solarStormProvider->update();
   }
 
-  if (appCfg.propOverlay == PropOverlayType::Heatmap) {
+  if (appCfg.propOverlay == PropOverlayType::Heatmap &&
+      now - lastReachFetchMs > 5 * 60 * 1000) {
     reachProvider->fetch(appCfg.propBand, appCfg.propMode);
+    lastReachFetchMs = now;
   }
 
 #ifndef __EMSCRIPTEN__

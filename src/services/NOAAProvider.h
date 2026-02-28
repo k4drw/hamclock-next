@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../core/AuroraHistoryStore.h"
+#include "../core/DRAPData.h"
 #include "../core/SolarData.h"
 #include "../core/XRayData.h"
 #include "../network/NetworkManager.h"
@@ -30,6 +31,10 @@ public:
                HamClockState *state = nullptr);
 
   void fetch();
+  void fetchDRAP();
+  void setDrapStore(std::shared_ptr<DRAPDataStore> s) {
+    drapStore_ = std::move(s);
+  }
 
 private:
   void fetchKIndex();
@@ -40,7 +45,6 @@ private:
   void fetchDST();
   void fetchAurora();
   void fetchAuroraHistory();
-  void fetchDRAP();
   void fetchXRay();
   void fetchProtonFlux();
 
@@ -76,5 +80,6 @@ private:
   std::shared_ptr<SolarDataStore> store_;
   std::shared_ptr<AuroraHistoryStore> auroraStore_;
   std::shared_ptr<XRayHistoryStore> xrayStore_;
+  std::shared_ptr<DRAPDataStore> drapStore_;
   HamClockState *state_;
 };

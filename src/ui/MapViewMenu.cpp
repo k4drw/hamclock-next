@@ -112,6 +112,8 @@ void MapViewMenu::render(SDL_Renderer *renderer) {
   std::string projLabel = "Equirectangular";
   if (projection_ == "robinson")
     projLabel = "Robinson";
+  else if (projection_ == "azimuthal")
+    projLabel = "Azimuthal";
   else if (projection_ == "mercator")
     projLabel = "Mercator";
   drawDropdown(renderer, projRec_, projLabel, openCombo_ == COMBO_PROJ);
@@ -148,6 +150,8 @@ void MapViewMenu::render(SDL_Renderer *renderer) {
     propLabel = "TOA";
   else if (propOverlay_ == PropOverlayType::Heatmap)
     propLabel = "Heatmap";
+  else if (propOverlay_ == PropOverlayType::Drap)
+    propLabel = "DRAP";
   drawDropdown(renderer, overlayRec_, propLabel, openCombo_ == COMBO_OVERLAY);
 
   // Weather Section
@@ -356,6 +360,8 @@ bool MapViewMenu::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
         else if (idx == 1)
           projection_ = "robinson";
         else if (idx == 2)
+          projection_ = "azimuthal";
+        else if (idx == 3)
           projection_ = "mercator";
       }))
     return true;
@@ -396,6 +402,8 @@ bool MapViewMenu::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
                   propOverlay_ = PropOverlayType::Toa;
                 else if (idx == 5)
                   propOverlay_ = PropOverlayType::Heatmap;
+                else if (idx == 6)
+                  propOverlay_ = PropOverlayType::Drap;
               }))
             return true;
       
