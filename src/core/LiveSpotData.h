@@ -78,6 +78,11 @@ public:
     // Perform an in-place update to avoid deep copy churn
     std::memcpy(data_->bandCounts, data.bandCounts, sizeof(data.bandCounts));
     data_->spots = data.spots;
+    static constexpr size_t kMaxSpots = 500;
+    if (data_->spots.size() > kMaxSpots)
+      data_->spots.erase(data_->spots.begin(),
+                         data_->spots.begin() +
+                             (data_->spots.size() - kMaxSpots));
     data_->grid = data.grid;
     data_->windowMinutes = data.windowMinutes;
     data_->lastUpdated = data.lastUpdated;
