@@ -53,6 +53,11 @@ private:
       "https://services.swpc.noaa.gov/products/solar-wind/plasma-5-minute.json";
   static constexpr const char *MAG_URL =
       "https://services.swpc.noaa.gov/products/solar-wind/mag-5-minute.json";
+  // 7-day versions used for aurora history backfill
+  static constexpr const char *PLASMA_7D_URL =
+      "https://services.swpc.noaa.gov/products/solar-wind/plasma-7-day.json";
+  static constexpr const char *MAG_7D_URL =
+      "https://services.swpc.noaa.gov/products/solar-wind/mag-7-day.json";
   static constexpr const char *DST_URL =
       "https://services.swpc.noaa.gov/products/kyoto-dst.json";
   static constexpr const char *AURORA_URL =

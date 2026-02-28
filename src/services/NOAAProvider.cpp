@@ -8,8 +8,11 @@
 #include "../core/WorkerService.h"
 #include <SDL_events.h>
 #include <chrono>
+#include <cmath>
 #include <cstdio>
+#include <memory>
 #include <nlohmann/json.hpp>
+#include <unordered_map>
 
 NOAAProvider::NOAAProvider(NetworkManager &net,
                            std::shared_ptr<SolarDataStore> store,
@@ -384,66 +387,136 @@ void NOAAProvider::fetchAurora() {
   });
 }
 
-void NOAAProvider::fetchAuroraHistory() {
-  // Re-use the 3-hourly K-index feed (K_INDEX_URL).  It spans 30+ days so
-  // overnight gaps are fully covered.  Format: [[time_str, kp_str, a_str], ...]
-  // kp_str is already a float string ("0.33", "3.67") so no integer stepping.
-  auto auroraStore = auroraStore_;
-  net_.fetchAsync(K_INDEX_URL, [auroraStore](std::string body) {
-    if (body.empty() || !auroraStore)
-      return;
+// Shared state for the two parallel solar-wind backfill fetches.
+// Lives until both callbacks have fired (held by shared_ptr in each lambda).
+struct SolarWindBackfill {
+  std::mutex mu;
+  int pending{2};
+  // keyed by unix timestamp rounded to the nearest minute
+  std::unordered_map<int64_t, std::pair<float, float>> mag; // t → (bz, bt_transverse)
+  std::unordered_map<int64_t, float> speed;                 // t → km/s
+  std::shared_ptr<AuroraHistoryStore> store;
+};
 
-    WorkerService::getInstance().submitTask([body, auroraStore]() {
+// Parse NOAA "YYYY-MM-DD HH:MM:SS.sss" time-tag → unix seconds, rounded to
+// the nearest minute.  Returns -1 on failure.
+static int64_t parseNoaaMinute(const std::string &ts) {
+  int y = 0, mo = 0, d = 0, h = 0, mi = 0, s = 0;
+  if (sscanf(ts.c_str(), "%d-%d-%d %d:%d:%d", &y, &mo, &d, &h, &mi, &s) != 6)
+    return -1;
+  std::tm tm{};
+  tm.tm_year = y - 1900;
+  tm.tm_mon = mo - 1;
+  tm.tm_mday = d;
+  tm.tm_hour = h;
+  tm.tm_min = mi;
+  tm.tm_sec = s;
+  tm.tm_isdst = -1;
+  std::time_t t = Astronomy::portable_timegm(&tm);
+  if (t < 0)
+    return -1;
+  return (static_cast<int64_t>(t) / 60) * 60; // round to minute
+}
+
+static void computeAndMerge(std::shared_ptr<SolarWindBackfill> state) {
+  std::vector<AuroraDataPoint> points;
+  points.reserve(state->speed.size());
+
+  for (const auto &[t, v] : state->speed) {
+    auto it = state->mag.find(t);
+    if (it == state->mag.end())
+      continue;
+
+    float bz = it->second.first;
+    float bt = it->second.second; // sqrt(By² + Bz²)
+
+    if (bt < 0.5f || v < 50.0f)
+      continue; // skip bad/null data
+
+    // Newell coupling: dΦ/dt = V^(4/3) × Bt^(2/3) × sin^(8/3)(θ/2)
+    // sin²(θ/2) = (1 - Bz/Bt) / 2  (clock angle; 1 when Bz fully southward)
+    float sin2 = std::max(0.0f, (1.0f - bz / bt) * 0.5f);
+    float coupling = std::pow(v, 4.0f / 3.0f) * std::pow(bt, 2.0f / 3.0f) *
+                     std::pow(sin2, 4.0f / 3.0f);
+
+    // Scale to 0-100%: power-law, ~50 000 Wb/s ≈ extreme storm
+    float pct =
+        std::min(100.0f, std::pow(coupling / 50000.0f, 0.4f) * 100.0f);
+
+    AuroraDataPoint dp;
+    dp.percent = pct;
+    dp.timestamp =
+        std::chrono::system_clock::from_time_t(static_cast<std::time_t>(t));
+    points.push_back(dp);
+  }
+
+  if (!points.empty()) {
+    state->store->mergePoints(std::move(points));
+    LOG_I("NOAAProvider", "Aurora backfill: {} solar-wind points merged",
+          points.size());
+  }
+}
+
+void NOAAProvider::fetchAuroraHistory() {
+  auto backfill = std::make_shared<SolarWindBackfill>();
+  backfill->store = auroraStore_;
+
+  // --- Fetch 1: solar-wind speed (plasma-7-day) ---
+  net_.fetchAsync(PLASMA_7D_URL, [backfill](std::string body) {
+    WorkerService::getInstance().submitTask([body, backfill]() {
       try {
         auto j = nlohmann::json::parse(body, nullptr, false);
-        if (j.is_discarded() || !j.is_array() || j.empty())
-          return;
-
-        std::vector<AuroraDataPoint> points;
-        points.reserve(j.size());
-
-        for (const auto &row : j) {
-          if (!row.is_array() || row.size() < 2)
-            continue;
-          if (!row[0].is_string() || !row[1].is_string())
-            continue;
-
-          double kp = StringUtils::safe_stod(row[1].get<std::string>());
-
-          // Parse "YYYY-MM-DD HH:MM:SS.sss" (NOAA K-index time-tag format)
-          const std::string &ts = row[0].get_ref<const std::string &>();
-          std::tm tm{};
-          int y = 0, mo = 0, d = 0, h = 0, mi = 0, s = 0;
-          if (sscanf(ts.c_str(), "%d-%d-%d %d:%d:%d", &y, &mo, &d, &h, &mi,
-                     &s) != 6)
-            continue;
-
-          tm.tm_year = y - 1900;
-          tm.tm_mon = mo - 1;
-          tm.tm_mday = d;
-          tm.tm_hour = h;
-          tm.tm_min = mi;
-          tm.tm_sec = s;
-          tm.tm_isdst = -1;
-
-          std::time_t t = Astronomy::portable_timegm(&tm);
-          if (t < 0)
-            continue;
-
-          AuroraDataPoint dp;
-          dp.percent = std::min(100.0f, static_cast<float>(kp) * 11.1f);
-          dp.timestamp = std::chrono::system_clock::from_time_t(t);
-          points.push_back(dp);
+        if (!j.is_discarded() && j.is_array()) {
+          for (const auto &row : j) {
+            if (!row.is_array() || row.size() < 3)
+              continue;
+            if (!row[0].is_string() || row[2].is_null())
+              continue;
+            int64_t t = parseNoaaMinute(row[0].get<std::string>());
+            if (t < 0)
+              continue;
+            float v = static_cast<float>(
+                StringUtils::safe_stod(row[2].get<std::string>()));
+            if (v > 0)
+              backfill->speed[t] = v;
+          }
         }
-
-        if (!points.empty()) {
-          auroraStore->mergePoints(std::move(points));
-          LOG_I("NOAAProvider", "Aurora history backfill: {} Kp points merged",
-                points.size());
-        }
-      } catch (const std::exception &e) {
-        LOG_E("NOAAProvider", "Aurora history parse error: {}", e.what());
+      } catch (...) {
       }
+      std::lock_guard<std::mutex> lk(backfill->mu);
+      if (--backfill->pending == 0)
+        computeAndMerge(backfill);
+    });
+  });
+
+  // --- Fetch 2: IMF Bz + By (mag-7-day) ---
+  net_.fetchAsync(MAG_7D_URL, [backfill](std::string body) {
+    WorkerService::getInstance().submitTask([body, backfill]() {
+      try {
+        auto j = nlohmann::json::parse(body, nullptr, false);
+        if (!j.is_discarded() && j.is_array()) {
+          for (const auto &row : j) {
+            // row: [time, bx, by, bz, lon, lat, bt]
+            if (!row.is_array() || row.size() < 7)
+              continue;
+            if (!row[0].is_string() || row[2].is_null() || row[3].is_null())
+              continue;
+            int64_t t = parseNoaaMinute(row[0].get<std::string>());
+            if (t < 0)
+              continue;
+            float by = static_cast<float>(
+                StringUtils::safe_stod(row[2].get<std::string>()));
+            float bz = static_cast<float>(
+                StringUtils::safe_stod(row[3].get<std::string>()));
+            float bt = std::sqrt(by * by + bz * bz); // transverse field
+            backfill->mag[t] = {bz, bt};
+          }
+        }
+      } catch (...) {
+      }
+      std::lock_guard<std::mutex> lk(backfill->mu);
+      if (--backfill->pending == 0)
+        computeAndMerge(backfill);
     });
   });
 }

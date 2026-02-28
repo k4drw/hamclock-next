@@ -215,7 +215,7 @@ void AuroraGraphPanel::onMouseMove(int mx, int my) {
                        now - bestPoint->timestamp)
                        .count();
     char buf[64];
-    const char *src = bestPoint->isBackfill ? " [Est. Kp]" : "";
+    const char *src = bestPoint->isBackfill ? " [Est.]" : "";
     if (ageMins < 30) {
       std::snprintf(buf, sizeof(buf), "%.0f%% (Now)%s", bestPoint->percent,
                     src);
