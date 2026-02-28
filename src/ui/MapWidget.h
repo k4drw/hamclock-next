@@ -53,7 +53,8 @@ public:
   // Set the asteroid provider for ground track overlay (non-owning).
   void setAsteroidProvider(AsteroidProvider *p) { asteroidProvider_ = p; }
 
-  // Called when orbital elements are ready (from background thread via SDL event).
+  // Called when orbital elements are ready (from background thread via SDL
+  // event).
   void onAsteroidElementsReady(const std::string &des,
                                const OrbitalElements &elem);
 
@@ -103,8 +104,9 @@ public:
   nlohmann::json getDebugData() const override;
 
   // Thread-safe method for receiving data from background threads
-  void onSatTrackReady(const std::vector<GroundTrackPoint>& track);
+  void onSatTrackReady(const std::vector<GroundTrackPoint> &track);
   void onPropDataReady(PropOverlayType type, const std::vector<float> &grid);
+
 private:
   SDL_FPoint latLonToScreen(double lat, double lon) const;
   bool screenToLatLon(int sx, int sy, double &lat, double &lon) const;
@@ -217,6 +219,7 @@ private:
     int cachedH = 0;
   } tooltip_;
 
+  void renderLegend(SDL_Renderer *renderer);
   void renderTooltip(SDL_Renderer *renderer);
   void renderProjectionSelect(SDL_Renderer *renderer);
 

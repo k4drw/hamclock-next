@@ -929,7 +929,8 @@ void MapWidget::renderNightOverlay(SDL_Renderer *renderer) {
                   : (cosZ > GRAYLINE_COS
                          ? 1.0f - std::pow(cosZ / GRAYLINE_COS, GRAYLINE_POW)
                          : 0.0f);
-          float nf = 1.0f - fd;
+          float nf = (1.0f - fd) * 0.50f; // Mute night shading to 50% to allow
+                                          // overlays to show through
 
           // Projection-aware texture coordinates for night lights
           float u = static_cast<float>((lon + 180.0) / 360.0);
@@ -1029,7 +1030,7 @@ void MapWidget::renderNightOverlay(SDL_Renderer *renderer) {
                 : (cosZ > GRAYLINE_COS
                        ? 1.0f - std::pow(cosZ / GRAYLINE_COS, GRAYLINE_POW)
                        : 0.0f);
-        float darkness = 1.0f - fd;
+        float darkness = (1.0f - fd) * 0.50f;
         if (darkness > 0) {
           SDL_SetRenderDrawColor(renderer, 0, 0, 0, (Uint8)(darkness * 255));
           SDL_Rect r = {x1, y1, x2 - x1, y2 - y1};
@@ -1075,7 +1076,7 @@ void MapWidget::renderNightOverlay(SDL_Renderer *renderer) {
                             : 0.0f);
           }
 
-          float darkness = 1.0f - fd;
+          float darkness = (1.0f - fd) * 0.50f;
           if (darkness > 0.05f) {
             // Re-calculate projection-aware u,v for legacy path
             float u = static_cast<float>((lon + 180.0) / 360.0);
@@ -1265,10 +1266,10 @@ void MapWidget::render(SDL_Renderer *renderer) {
     }
   }
 
-  renderPropagationOverlay(renderer);
-  renderMufRtOverlay(renderer);
   renderWxMbOverlay(renderer);
   renderCloudOverlay(renderer);
+  renderPropagationOverlay(renderer);
+  renderMufRtOverlay(renderer);
   renderNightOverlay(renderer);
   renderGridOverlay(renderer);
   renderGreatCircle(renderer);
@@ -1295,6 +1296,7 @@ void MapWidget::render(SDL_Renderer *renderer) {
   renderProjectionSelect(renderer);
   renderRssButton(renderer);
   renderOverlayInfo(renderer);
+  renderLegend(renderer);
   renderTooltip(renderer);
 
   // Note: MapViewMenu is rendered via renderModal() in the centralized modal
@@ -2056,7 +2058,8 @@ void MapWidget::renderPropagationOverlay(SDL_Renderer *renderer) {
         SDL_FPoint pt = latLonToScreen(lat, lon);
         int idx = j * (gridW + 1) + i;
         propVerts_[idx].position = {pt.x, pt.y};
-        propVerts_[idx].color = {255, 255, 255, 255};
+        propVerts_[idx].color = {255, 255, 255,
+                                 190}; // Slightly muted for geometry paths
         propVerts_[idx].tex_coord = {(float)i / gridW, (float)j / gridH};
       }
     }
@@ -2123,7 +2126,7 @@ void MapWidget::renderCloudOverlay(SDL_Renderer *renderer) {
     return;
 
   SDL_SetTextureBlendMode(tex, SDL_BLENDMODE_BLEND);
-  SDL_SetTextureAlphaMod(tex, 76); // 30% opacity
+  SDL_SetTextureAlphaMod(tex, 64); // 25% opacity, moved behind prop map
 
   SDL_RenderSetClipRect(renderer, &mapRect_);
 
@@ -2148,9 +2151,15 @@ void MapWidget::renderWxMbOverlay(SDL_Renderer *renderer) {
   if (!tex)
     return;
   SDL_SetTextureBlendMode(tex, SDL_BLENDMODE_BLEND);
-  SDL_SetTextureAlphaMod(tex, 255);
+  SDL_SetTextureAlphaMod(tex, 180);
   SDL_RenderSetClipRect(renderer, &mapRect_);
-  SDL_RenderCopy(renderer, tex, nullptr, &mapRect_);
+  if (config_.projection != "equirectangular" && !mapVerts_.empty()) {
+    // Warp WX texture to match map projection using map geometry (1024x512)
+    SDL_RenderGeometry(renderer, tex, mapVerts_.data(), (int)mapVerts_.size(),
+                       nightIndices_.data(), (int)nightIndices_.size());
+  } else {
+    SDL_RenderCopy(renderer, tex, nullptr, &mapRect_);
+  }
   SDL_RenderSetClipRect(renderer, nullptr);
 }
 
@@ -2206,6 +2215,7 @@ void MapWidget::updatePropagationOverlay() {
       propTexture_ =
           SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32,
                             SDL_TEXTUREACCESS_STATIC, grid.cols, grid.rows);
+      SDL_SetTextureBlendMode(propTexture_, SDL_BLENDMODE_BLEND);
     }
     if (!propTexture_)
       return;
@@ -2307,6 +2317,7 @@ void MapWidget::onPropDataReady(PropOverlayType type,
     propTexture_ = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32,
                                      SDL_TEXTUREACCESS_STATIC,
                                      PropEngine::MAP_W, PropEngine::MAP_H);
+    SDL_SetTextureBlendMode(propTexture_, SDL_BLENDMODE_BLEND);
   }
 
   std::vector<uint32_t> pixels(grid.size());
@@ -2418,6 +2429,163 @@ void MapWidget::onResize(int x, int y, int w, int h) {
 }
 
 // --- Tooltip Rendering ---
+
+void MapWidget::renderLegend(SDL_Renderer *renderer) {
+  if (config_.propOverlay == PropOverlayType::None)
+    return;
+
+  // Legend position: bottom-right of map area
+  int legendW = 120;
+  int legendH = 12;
+  int pad = 6;
+  int lx = x_ + width_ - legendW - pad - 4;
+  int ly = y_ + height_ - legendH - pad - 22; // Above RSS button if active
+
+  // Labels and Scale
+  std::string labelMin, labelMax, title;
+  PropOverlayType type = config_.propOverlay;
+
+  if (type == PropOverlayType::Muf) {
+    title = "MUF (MHz)";
+    labelMin = "0";
+    labelMax = "50";
+  } else if (type == PropOverlayType::Reliability) {
+    title = "Rel (%)";
+    labelMin = "0";
+    labelMax = "100";
+  } else if (type == PropOverlayType::Toa) {
+    title = "TOA (deg)";
+    labelMin = "0";
+    labelMax = "40";
+  } else if (type == PropOverlayType::Drap) {
+    title = "Abs (MHz)";
+    labelMin = "0";
+    labelMax = "30+";
+  } else if (type == PropOverlayType::Heatmap) {
+    title = "Reach";
+    labelMin = "Low";
+    labelMax = "High";
+  } else {
+    // VOACAP uses Reliability scale/colors internally
+    title = "Reliability";
+    labelMin = "0";
+    labelMax = "100";
+  }
+
+  auto *cat = fontMgr_.catalog();
+  SDL_Color txtCol = {220, 220, 220, 255};
+
+  // Draw Title
+  cat->drawText(renderer, title, lx + legendW / 2, ly - 10, txtCol,
+                FontStyle::Micro, true, false, true);
+
+  // Draw Legend Strip (gradient)
+  SDL_Rect strip = {lx, ly, legendW, legendH};
+  SDL_SetRenderDrawColor(renderer, 40, 40, 40, 200);
+  SDL_RenderFillRect(renderer, &strip);
+  SDL_SetRenderDrawColor(renderer, 100, 100, 100, 255);
+  SDL_RenderDrawRect(renderer, &strip);
+
+  // Draw 10 segments to approximate the color scale
+  for (int i = 0; i < 10; ++i) {
+    float t = (float)i / 9.0f;
+    uint8_t r = 0, g = 0, b = 0;
+
+    // Reuse color logic from onPropDataReady/drapColor
+    if (type == PropOverlayType::Drap) {
+      float mhz = t * 30.0f;
+      if (mhz < 5.0f) {
+        r = 255;
+        g = 255;
+        b = 0;
+      } else if (mhz < 15.0f) {
+        r = 255;
+        g = 140;
+        b = 0;
+      } else {
+        r = 220;
+        g = 50;
+        b = 50;
+      }
+    } else if (type == PropOverlayType::Reliability ||
+               type == PropOverlayType::Voacap) {
+      if (t < 0.5f) {
+        float f = t / 0.5f;
+        r = (uint8_t)(100 + f * 155);
+        g = (uint8_t)(100 + f * 155);
+        b = 100;
+      } else {
+        float f = (t - 0.5f) / 0.5f;
+        r = (uint8_t)(255 * (1.0f - f));
+        g = 255;
+        b = (uint8_t)(100 * (1.0f - f));
+      }
+    } else if (type == PropOverlayType::Toa) {
+      if (t < 0.5f) {
+        float f = t * 2.0f;
+        r = (uint8_t)(f * 255.0f);
+        g = 200;
+        b = 0;
+      } else {
+        float f = (t - 0.5f) * 2.0f;
+        r = 255;
+        g = (uint8_t)((1.0f - f) * 200.0f);
+        b = 0;
+      }
+    } else if (type == PropOverlayType::Heatmap) {
+      if (t < 0.25f) {
+        float f = t / 0.25f;
+        r = (uint8_t)(128 + f * 127);
+        g = 0;
+        b = (uint8_t)(128 * (1.0f - f));
+      } else if (t < 0.5f) {
+        float f = (t - 0.25f) / 0.25f;
+        r = 255;
+        g = (uint8_t)(f * 128);
+        b = 0;
+      } else if (t < 0.75f) {
+        float f = (t - 0.5f) / 0.25f;
+        r = 255;
+        g = (uint8_t)(128 + f * 127);
+        b = 0;
+      } else {
+        float f = (t - 0.75f) / 0.25f;
+        r = 255;
+        g = 255;
+        b = (uint8_t)(f * 255);
+      }
+    } else { // MUF
+      if (t < 0.25f) {
+        float f = t / 0.25f;
+        b = 255;
+        g = (uint8_t)(f * 255.0f);
+      } else if (t < 0.5f) {
+        float f = (t - 0.25f) / 0.25f;
+        g = 255;
+        b = (uint8_t)((1.0f - f) * 255.0f);
+      } else if (t < 0.75f) {
+        float f = (t - 0.5f) / 0.25f;
+        g = 255;
+        r = (uint8_t)(f * 255.0f);
+      } else {
+        float f = (t - 0.75f) / 0.25f;
+        r = 255;
+        g = (uint8_t)((1.0f - f) * 255.0f);
+      }
+    }
+
+    SDL_SetRenderDrawColor(renderer, r, g, b, 255);
+    SDL_Rect seg = {lx + i * legendW / 10, ly + 1, legendW / 10 + 1,
+                    legendH - 2};
+    SDL_RenderFillRect(renderer, &seg);
+  }
+
+  // Draw Min/Max Labels
+  cat->drawText(renderer, labelMin, lx, ly + legendH + 8, txtCol,
+                FontStyle::Micro, false, false, true);
+  cat->drawText(renderer, labelMax, lx + legendW, ly + legendH + 8, txtCol,
+                FontStyle::Micro, true, false, true);
+}
 
 void MapWidget::renderTooltip(SDL_Renderer *renderer) {
   if (!tooltip_.visible || tooltip_.text.empty()) {
@@ -2802,6 +2970,8 @@ void MapWidget::renderOverlayInfo(SDL_Renderer *renderer) {
     text = "TOA Overlay";
   } else if (config_.propOverlay == PropOverlayType::Drap) {
     text = "DRAP Absorption";
+  } else if (config_.propOverlay == PropOverlayType::Heatmap) {
+    text = "Reach Heatmap";
   }
 
   if (config_.weatherOverlay == WeatherOverlayType::WxMb) {
