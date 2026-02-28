@@ -206,7 +206,7 @@ void TimePanel::render(SDL_Renderer *renderer) {
     SDL_RenderCopy(renderer, callTex_, nullptr, &dst);
   }
 
-  // --- Gear icon (bottom-right, setup trigger) ---
+  // --- Gear icon + rotation transport controls (bottom-right corner) ---
   if (!editing_) {
     float gcx = gearRect_.x + gearRect_.w / 2.0f;
     float gcy = gearRect_.y + gearRect_.h / 2.0f;
@@ -214,6 +214,36 @@ void TimePanel::render(SDL_Renderer *renderer) {
     SDL_Color gearColor = {140, 140, 140, 255};
     SDL_Color bgColor = {10, 10, 20, 255};
     RenderUtils::drawGear(renderer, gcx, gcy, r, gearColor, bgColor);
+
+    // Pause / Next buttons — stacked above the gear icon (same column)
+    auto *cat = fontMgr_.catalog();
+    if (cat) {
+      SDL_Color ctrlColor = {120, 120, 120, 255};
+      SDL_Color activeColor = {0, 200, 255, 255};
+      int btnSize = gearSize_ + 4;
+      int btnGap = 3;
+      int btnX = gearRect_.x + (gearRect_.w - btnSize) / 2;
+
+      // Pause/Resume — directly above gear (persistent state, close to gear)
+      pauseRect_ = {btnX, gearRect_.y - btnSize - btnGap, btnSize, btnSize};
+      SDL_SetRenderDrawColor(renderer, 30, 30, 40, 255);
+      SDL_RenderFillRect(renderer, &pauseRect_);
+      const char *pauseLabel = rotationPaused_ ? "|>" : "||";
+      SDL_Color pauseColor = rotationPaused_ ? activeColor : ctrlColor;
+      cat->drawText(renderer, pauseLabel,
+                    pauseRect_.x + pauseRect_.w / 2,
+                    pauseRect_.y + pauseRect_.h / 2,
+                    pauseColor, FontStyle::Caption, true, false, true);
+
+      // Next — above Pause (one-shot action floats to top)
+      nextRect_ = {btnX, pauseRect_.y - btnSize - btnGap, btnSize, btnSize};
+      SDL_SetRenderDrawColor(renderer, 30, 30, 40, 255);
+      SDL_RenderFillRect(renderer, &nextRect_);
+      cat->drawText(renderer, ">>",
+                    nextRect_.x + nextRect_.w / 2,
+                    nextRect_.y + nextRect_.h / 2,
+                    ctrlColor, FontStyle::Caption, true, false, true);
+    }
   }
 
   // --- Info bar: uptime (left), rotating center, version (right) ---
@@ -348,6 +378,24 @@ void TimePanel::stopEditing(bool apply) {
 }
 
 bool TimePanel::onMouseUp(int mx, int my, Uint16 /*mod*/, int clicks) {
+  // Transport controls (pause / next) — check before gear
+  if (!editing_) {
+    if (pauseRect_.w > 0 && mx >= pauseRect_.x &&
+        mx < pauseRect_.x + pauseRect_.w && my >= pauseRect_.y &&
+        my < pauseRect_.y + pauseRect_.h) {
+      if (onPauseRotation_)
+        onPauseRotation_();
+      return true;
+    }
+    if (nextRect_.w > 0 && mx >= nextRect_.x &&
+        mx < nextRect_.x + nextRect_.w && my >= nextRect_.y &&
+        my < nextRect_.y + nextRect_.h) {
+      if (onNextRotation_)
+        onNextRotation_();
+      return true;
+    }
+  }
+
   // Gear icon click → request setup
   SDL_Rect hit = gearRect_;
   int margin = 5;

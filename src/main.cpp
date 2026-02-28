@@ -726,9 +726,12 @@ int main(int argc, char *argv[]) {
   ctx.brightnessMgr->setBrightTime(ctx.appCfg.brightHour,
                                    ctx.appCfg.brightMinute);
 
+  for (const auto &call : ctx.appCfg.watchlist)
+    ctx.watchlistStore->add(call);
   if (ctx.watchlistStore->getAll().empty()) {
     ctx.watchlistStore->add("K1ABC");
     ctx.watchlistStore->add("W1AW");
+    ctx.appCfg.watchlist = {"K1ABC", "W1AW"};
   }
 
 #ifndef __EMSCRIPTEN__
@@ -1095,6 +1098,18 @@ DashboardContext::DashboardContext(AppContext &ctx)
         ctx.cfgMgr.save(ctx.appCfg);
       });
 
+  timePanel->setOnPauseRotation([this, &tp = *timePanel]() {
+    bool nowPaused = !panes[0]->isPaused();
+    for (auto &p : panes)
+      p->setPaused(nowPaused);
+    tp.setRotationPaused(nowPaused);
+  });
+
+  timePanel->setOnNextRotation([this]() {
+    for (auto &p : panes)
+      p->forceAdvance();
+  });
+
   widgetSelector = std::make_unique<WidgetSelector>(fontMgr);
 
   // Helper for pool (Lazy loading) — assigned to a member so pane-container
@@ -1405,10 +1420,10 @@ DashboardContext::DashboardContext(AppContext &ctx)
         [this](WidgetType t) { return widgetFactory_(t); });
   }
 
-  panes[0]->setRotation(appCfg.pane1Rotation, appCfg.rotationIntervalS);
-  panes[1]->setRotation(appCfg.pane2Rotation, appCfg.rotationIntervalS);
-  panes[2]->setRotation(appCfg.pane3Rotation, appCfg.rotationIntervalS);
-  panes[3]->setRotation(appCfg.pane4Rotation, appCfg.rotationIntervalS);
+  panes[0]->setRotation(appCfg.pane1Rotation, appCfg.rotationIntervalS, appCfg.syncRotation);
+  panes[1]->setRotation(appCfg.pane2Rotation, appCfg.rotationIntervalS, appCfg.syncRotation);
+  panes[2]->setRotation(appCfg.pane3Rotation, appCfg.rotationIntervalS, appCfg.syncRotation);
+  panes[3]->setRotation(appCfg.pane4Rotation, appCfg.rotationIntervalS, appCfg.syncRotation);
 
   auto onPaneSelectionRequested = [&, allTypes](int paneIdx, int mx, int my) {
     (void)mx;
@@ -1429,7 +1444,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
     widgetSelector->show(
         paneIdx, available, current, forbidden,
         [&ctx, this](int idx, const std::vector<WidgetType> &finalSelection) {
-          panes[idx]->setRotation(finalSelection, ctx.appCfg.rotationIntervalS);
+          panes[idx]->setRotation(finalSelection, ctx.appCfg.rotationIntervalS, ctx.appCfg.syncRotation);
           ctx.appCfg.pane1Rotation = panes[0]->getRotation();
           ctx.appCfg.pane2Rotation = panes[1]->getRotation();
           ctx.appCfg.pane3Rotation = panes[2]->getRotation();
@@ -2522,8 +2537,15 @@ void main_tick() {
       // Save logic
       if (ctx.activeSetup == AppContext::SetupMode::Main) {
         auto *s = static_cast<SetupScreen *>(ctx.setupWidget.get());
-        if (!s->wasCancelled())
+        if (!s->wasCancelled()) {
           ctx.appCfg = s->getConfig();
+          // Sync watchlist store from updated config
+          auto oldW = ctx.watchlistStore->getAll();
+          for (const auto &c : oldW)
+            ctx.watchlistStore->remove(c);
+          for (const auto &c : ctx.appCfg.watchlist)
+            ctx.watchlistStore->add(c);
+        }
       } else if (ctx.activeSetup == AppContext::SetupMode::DXCluster) {
         if (static_cast<DXClusterSetup *>(ctx.setupWidget.get())->isSaved())
           ctx.appCfg = static_cast<DXClusterSetup *>(ctx.setupWidget.get())

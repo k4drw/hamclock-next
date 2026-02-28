@@ -6,9 +6,10 @@ PaneContainer::PaneContainer(int x, int y, int w, int h, WidgetType initialType,
     : Widget(x, y, w, h), currentType_(initialType), fontMgr_(fontMgr) {}
 
 void PaneContainer::setRotation(const std::vector<WidgetType> &types,
-                                int intervalS) {
+                                int intervalS, bool syncRotation) {
   rotation_ = types;
   intervalS_ = intervalS;
+  syncRotation_ = syncRotation;
   if (rotationIdx_ >= rotation_.size()) {
     rotationIdx_ = 0;
   }
@@ -28,15 +29,57 @@ void PaneContainer::setRotation(const std::vector<WidgetType> &types,
   lastRotateMs_ = SDL_GetTicks();
 }
 
+void PaneContainer::setPaused(bool paused) {
+  paused_ = paused;
+  if (!paused_)
+    lastRotateMs_ = SDL_GetTicks(); // fresh interval on resume
+}
+
+bool PaneContainer::isPaused() const { return paused_; }
+
+void PaneContainer::forceAdvance() {
+  if (rotation_.size() < 2)
+    return;
+  rotationIdx_ = (rotationIdx_ + 1) % rotation_.size();
+  currentType_ = rotation_[rotationIdx_];
+  if (widgetFactory_) {
+    activeWidget_ = widgetFactory_(currentType_);
+    if (activeWidget_) {
+      activeWidget_->onResize(x_, y_, width_, height_);
+      activeWidget_->setTheme(theme_);
+    }
+  }
+  lastRotateMs_ = SDL_GetTicks();
+}
+
 void PaneContainer::update() {
   if (activeWidget_) {
     activeWidget_->update();
   }
 
-  if (rotation_.size() > 1 && intervalS_ > 0) {
+  if (!paused_ && rotation_.size() > 1 && intervalS_ > 0) {
     Uint32 now = SDL_GetTicks();
-    if (now - lastRotateMs_ >= static_cast<Uint32>(intervalS_ * 1000)) {
-      rotationIdx_ = (rotationIdx_ + 1) % rotation_.size();
+    Uint32 intervalMs = static_cast<Uint32>(intervalS_ * 1000);
+    bool shouldAdvance = false;
+    size_t newIdx = rotationIdx_;
+
+    if (syncRotation_) {
+      // Advance at wall-clock epoch boundaries so all panes flip together
+      size_t bucket = now / intervalMs;
+      size_t lastBucket = lastRotateMs_ / intervalMs;
+      if (bucket != lastBucket) {
+        newIdx = bucket % rotation_.size();
+        shouldAdvance = true;
+      }
+    } else {
+      if (now - lastRotateMs_ >= intervalMs) {
+        newIdx = (rotationIdx_ + 1) % rotation_.size();
+        shouldAdvance = true;
+      }
+    }
+
+    if (shouldAdvance) {
+      rotationIdx_ = newIdx;
       currentType_ = rotation_[rotationIdx_];
       if (widgetFactory_) {
         activeWidget_ = widgetFactory_(currentType_);

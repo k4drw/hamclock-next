@@ -316,10 +316,11 @@ void SetupScreen::render(SDL_Renderer *renderer) {
   y += cat->ptSize(FontStyle::MediumBold) +
        pad / 2; // tightened: was +pad, halved gap to tab bar
 
-  // Appearance tab absorbs brightness/display settings — 8 tabs total
+  // Appearance tab absorbs brightness/display settings — 9 tabs total
   const char *tabs[] = {"Identity", "Spotting", "Appearance", "Rig",
-                        "Services", "Network",  "Widgets",    "Update"};
-  int numTabs = 8;
+                        "Services", "Network",  "Widgets",    "Watchlist",
+                        "Update"};
+  int numTabs = 9;
   int tabW = fieldW / numTabs;
 
   // Calculate safe font size for tabs to prevent overflow
@@ -380,6 +381,9 @@ void SetupScreen::render(SDL_Renderer *renderer) {
     break;
   case Tab::Widgets:
     renderTabWidgets(renderer, cx, pad, fieldW, fieldH, fieldX, textPad);
+    break;
+  case Tab::Watchlist:
+    renderTabWatchlist(renderer, cx, pad, fieldW, fieldH, fieldX, textPad);
     break;
   case Tab::Update:
     renderTabUpdate(renderer, cx, pad, fieldW, fieldH, fieldX, textPad);
@@ -928,6 +932,21 @@ void SetupScreen::renderTabWidgets(SDL_Renderer *renderer, int cx, int pad,
   }
   y += 35;
 
+  // Sync rotation checkbox
+  syncRotationRect_ = {fieldX, y, 16, 16};
+  SDL_SetRenderDrawColor(renderer, 50, 50, 60, 255);
+  SDL_RenderFillRect(renderer, &syncRotationRect_);
+  SDL_SetRenderDrawColor(renderer, 100, 100, 120, 255);
+  SDL_RenderDrawRect(renderer, &syncRotationRect_);
+  if (syncRotation_) {
+    SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
+    SDL_Rect check = {syncRotationRect_.x + 3, syncRotationRect_.y + 3, 10, 10};
+    SDL_RenderFillRect(renderer, &check);
+  }
+  cat->drawText(renderer, "Sync pane rotation", fieldX + 22, y + 8, gray,
+                FontStyle::SmallRegular, false, false, true);
+  y += 20 + pad / 2;
+
   widgetRects_.clear();
   int colW = fieldW / 3; // 3 columns
   int curX = fieldX;
@@ -1245,10 +1264,10 @@ bool SetupScreen::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
     return true;
   }
 
-  const Tab tabValues[] = {Tab::Identity, Tab::Spotting, Tab::Appearance,
-                           Tab::Rig,      Tab::Services, Tab::Network,
-                           Tab::Widgets,  Tab::Update};
-  int numTabs = 8;
+  const Tab tabValues[] = {Tab::Identity,  Tab::Spotting, Tab::Appearance,
+                           Tab::Rig,       Tab::Services, Tab::Network,
+                           Tab::Widgets,   Tab::Watchlist, Tab::Update};
+  int numTabs = 9;
   int tabW = fieldW / numTabs;
 
   if (my >= y && my <= y + fieldH) {
@@ -1444,6 +1463,15 @@ bool SetupScreen::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
       }
     }
 
+    // Sync rotation checkbox
+    if (mx >= syncRotationRect_.x &&
+        mx <= syncRotationRect_.x + syncRotationRect_.w &&
+        my >= syncRotationRect_.y &&
+        my <= syncRotationRect_.y + syncRotationRect_.h) {
+      syncRotation_ = !syncRotation_;
+      return true;
+    }
+
     // Check widget selection clicks
     for (const auto &wr : widgetRects_) {
       if (mx >= wr.rect.x && mx <= wr.rect.x + wr.rect.w && my >= wr.rect.y &&
@@ -1457,6 +1485,78 @@ bool SetupScreen::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
         }
         return true;
       }
+    }
+  }
+
+  if (activeTab_ == Tab::Watchlist) {
+    // Delete buttons
+    for (int i = 0; i < (int)watchlistDeleteRects_.size(); ++i) {
+      const auto &r = watchlistDeleteRects_[i];
+      if (mx >= r.x && mx < r.x + r.w && my >= r.y && my < r.y + r.h) {
+        int realIdx = watchlistScrollOffset_ + i;
+        if (realIdx < (int)watchlistEntries_.size()) {
+          watchlistEntries_.erase(watchlistEntries_.begin() + realIdx);
+          if (watchlistScrollOffset_ > 0 &&
+              watchlistScrollOffset_ >= (int)watchlistEntries_.size())
+            --watchlistScrollOffset_;
+        }
+        return true;
+      }
+    }
+    // Scroll up arrow
+    if (watchlistScrollOffset_ > 0) {
+      int arrowY = watchlistInputRect_.y - fieldH - pad / 2;
+      SDL_Rect upR = {fieldX, arrowY, 40, fieldH};
+      if (mx >= upR.x && mx < upR.x + upR.w && my >= upR.y &&
+          my < upR.y + upR.h) {
+        --watchlistScrollOffset_;
+        return true;
+      }
+    }
+    // Scroll down arrow
+    {
+      int contentY = modalRect_.y + cat->ptSize(FontStyle::MediumBold) +
+                     2 * pad + fieldH;
+      int maxVisible = 8;
+      if ((int)watchlistEntries_.size() > watchlistScrollOffset_ + maxVisible) {
+        int arrowY = watchlistInputRect_.y - fieldH - pad / 2;
+        SDL_Rect downR = {fieldX + 44, arrowY, 40, fieldH};
+        (void)contentY;
+        if (mx >= downR.x && mx < downR.x + downR.w && my >= downR.y &&
+            my < downR.y + downR.h) {
+          ++watchlistScrollOffset_;
+          return true;
+        }
+      }
+    }
+    // Input field activation
+    if (watchlistInputRect_.w > 0 && mx >= watchlistInputRect_.x &&
+        mx < watchlistInputRect_.x + watchlistInputRect_.w &&
+        my >= watchlistInputRect_.y &&
+        my < watchlistInputRect_.y + watchlistInputRect_.h) {
+      activeField_ = 0;
+      cursorPos_ = static_cast<int>(watchlistInput_.size());
+      selectionAnchor_ = cursorPos_;
+      return true;
+    }
+    // Add button
+    if (watchlistAddRect_.w > 0 && mx >= watchlistAddRect_.x &&
+        mx < watchlistAddRect_.x + watchlistAddRect_.w &&
+        my >= watchlistAddRect_.y &&
+        my < watchlistAddRect_.y + watchlistAddRect_.h) {
+      if (!watchlistInput_.empty()) {
+        // Uppercase + deduplicate
+        std::string call = watchlistInput_;
+        std::transform(call.begin(), call.end(), call.begin(), ::toupper);
+        if (std::find(watchlistEntries_.begin(), watchlistEntries_.end(),
+                      call) == watchlistEntries_.end()) {
+          watchlistEntries_.push_back(call);
+        }
+        watchlistInput_.clear();
+        cursorPos_ = 0;
+        selectionAnchor_ = 0;
+      }
+      return true;
     }
   }
 
@@ -1529,6 +1629,26 @@ bool SetupScreen::onKeyDown(SDL_Keycode key, Uint16 mod) {
       text = &rigPort_;
       break;
     }
+  } else if (activeTab_ == Tab::Watchlist) {
+    nFields = 1;
+    text = &watchlistInput_;
+  }
+
+  // Watchlist: Enter adds the entry
+  if (activeTab_ == Tab::Watchlist && activeField_ == 0 &&
+      (key == SDLK_RETURN || key == SDLK_KP_ENTER)) {
+    if (!watchlistInput_.empty()) {
+      std::string call = watchlistInput_;
+      std::transform(call.begin(), call.end(), call.begin(), ::toupper);
+      if (std::find(watchlistEntries_.begin(), watchlistEntries_.end(), call) ==
+          watchlistEntries_.end()) {
+        watchlistEntries_.push_back(call);
+      }
+      watchlistInput_.clear();
+      cursorPos_ = 0;
+      selectionAnchor_ = 0;
+    }
+    return true;
   }
 
   switch (key) {
@@ -1708,6 +1828,22 @@ bool SetupScreen::onTextInput(const char *inputText) {
       maxLen = 16;
       break;
     }
+  } else if (activeTab_ == Tab::Watchlist && activeField_ == 0) {
+    // Callsign: alphanumeric + slash only, auto-uppercase, max 12 chars
+    for (const char *p = inputText; *p; ++p) {
+      if (!((*p >= 'A' && *p <= 'Z') || (*p >= 'a' && *p <= 'z') ||
+            (*p >= '0' && *p <= '9') || *p == '/')) {
+        return true;
+      }
+    }
+    if ((int)watchlistInput_.size() < 12) {
+      std::string upper = inputText;
+      std::transform(upper.begin(), upper.end(), upper.begin(), ::toupper);
+      watchlistInput_.insert(cursorPos_, upper);
+      cursorPos_ += static_cast<int>(upper.size());
+      selectionAnchor_ = cursorPos_;
+    }
+    return true;
   }
 
   if (!field)
@@ -1816,6 +1952,118 @@ bool SetupScreen::onTextInput(const char *inputText) {
   return true;
 }
 
+void SetupScreen::renderTabWatchlist(SDL_Renderer *renderer, int /*cx*/,
+                                     int pad, int fieldW, int fieldH,
+                                     int fieldX, int textPad) {
+  auto *cat = fontMgr_.catalog();
+  int y = modalRect_.y + cat->ptSize(FontStyle::MediumBold) + 2 * pad + fieldH;
+  SDL_Color white = {255, 255, 255, 255};
+  SDL_Color orange = {255, 165, 0, 255};
+  SDL_Color gray = {140, 140, 140, 255};
+  SDL_Color red = {200, 60, 60, 255};
+
+  cat->drawText(renderer, "Highlight Callsigns (Watchlist):", fieldX, y, orange,
+                FontStyle::SmallBold);
+  y += cat->ptSize(FontStyle::SmallBold) + pad / 2;
+
+  // List area: up to 8 visible rows
+  const int maxVisible = 8;
+  const int rowH = fieldH + 4;
+  const int delBtnW = 36;
+
+  watchlistDeleteRects_.clear();
+  int visCount =
+      std::min(maxVisible, (int)watchlistEntries_.size() - watchlistScrollOffset_);
+  visCount = std::max(0, visCount);
+
+  for (int i = 0; i < visCount; ++i) {
+    int realIdx = watchlistScrollOffset_ + i;
+    const std::string &call = watchlistEntries_[realIdx];
+
+    // Row background
+    SDL_Rect rowR = {fieldX, y, fieldW, fieldH};
+    SDL_SetRenderDrawColor(renderer, 30, 30, 40, 255);
+    SDL_RenderFillRect(renderer, &rowR);
+    SDL_SetRenderDrawColor(renderer, 60, 60, 80, 255);
+    SDL_RenderDrawRect(renderer, &rowR);
+
+    // Callsign text
+    cat->drawText(renderer, call.c_str(), fieldX + textPad,
+                  y + fieldH / 2, white, FontStyle::SmallRegular, false, false,
+                  true);
+
+    // [X] delete button
+    SDL_Rect delR = {fieldX + fieldW - delBtnW, y + 2, delBtnW, fieldH - 4};
+    SDL_SetRenderDrawColor(renderer, 80, 30, 30, 255);
+    SDL_RenderFillRect(renderer, &delR);
+    SDL_SetRenderDrawColor(renderer, 140, 60, 60, 255);
+    SDL_RenderDrawRect(renderer, &delR);
+    cat->drawText(renderer, "X", delR.x + delR.w / 2, delR.y + delR.h / 2,
+                  red, FontStyle::SmallBold, true, false, true);
+    watchlistDeleteRects_.push_back(delR);
+
+    y += rowH;
+  }
+
+  // Scroll arrows (shown when list is longer than maxVisible)
+  if ((int)watchlistEntries_.size() > maxVisible) {
+    SDL_Color arrowCol = {180, 180, 180, 255};
+    if (watchlistScrollOffset_ > 0) {
+      SDL_Rect upR = {fieldX, y, 40, fieldH};
+      SDL_SetRenderDrawColor(renderer, 40, 40, 50, 255);
+      SDL_RenderFillRect(renderer, &upR);
+      SDL_SetRenderDrawColor(renderer, 80, 80, 100, 255);
+      SDL_RenderDrawRect(renderer, &upR);
+      cat->drawText(renderer, "^", upR.x + upR.w / 2, upR.y + upR.h / 2,
+                    arrowCol, FontStyle::Fast, true, false, true);
+    }
+    if (watchlistScrollOffset_ + maxVisible < (int)watchlistEntries_.size()) {
+      SDL_Rect downR = {fieldX + 44, y, 40, fieldH};
+      SDL_SetRenderDrawColor(renderer, 40, 40, 50, 255);
+      SDL_RenderFillRect(renderer, &downR);
+      SDL_SetRenderDrawColor(renderer, 80, 80, 100, 255);
+      SDL_RenderDrawRect(renderer, &downR);
+      cat->drawText(renderer, "v", downR.x + downR.w / 2,
+                    downR.y + downR.h / 2, arrowCol, FontStyle::Fast, true,
+                    false, true);
+    }
+    y += rowH;
+  }
+
+  y += pad / 2;
+
+  // Count hint
+  char hint[48];
+  std::snprintf(hint, sizeof(hint), "%d callsign(s)",
+                (int)watchlistEntries_.size());
+  cat->drawText(renderer, hint, fieldX, y, gray, FontStyle::Fast);
+  y += cat->ptSize(FontStyle::Fast) + pad / 2;
+
+  // Input field + Add button
+  const int addBtnW = 60;
+  int inputW = fieldW - addBtnW - pad / 2;
+
+  cat->drawText(renderer, "Add:", fieldX, y, white, FontStyle::SmallBold);
+  y += cat->ptSize(FontStyle::SmallBold) + 4;
+
+  watchlistInputRect_ = {fieldX, y, inputW, fieldH};
+  watchlistAddRect_ = {fieldX + inputW + pad / 2, y, addBtnW, fieldH};
+
+  bool inputActive = (activeTab_ == Tab::Watchlist && activeField_ == 0);
+  renderField(renderer, fontMgr_, watchlistInput_, "e.g. K1ABC", fieldX, y,
+              inputW, fieldH, FontStyle::SmallRegular, textPad, inputActive,
+              true, cursorPos_, selectionAnchor_, orange, gray, white, white,
+              gray);
+
+  SDL_SetRenderDrawColor(renderer, 40, 80, 40, 255);
+  SDL_RenderFillRect(renderer, &watchlistAddRect_);
+  SDL_SetRenderDrawColor(renderer, 80, 140, 80, 255);
+  SDL_RenderDrawRect(renderer, &watchlistAddRect_);
+  cat->drawText(renderer, "Add", watchlistAddRect_.x + watchlistAddRect_.w / 2,
+                watchlistAddRect_.y + watchlistAddRect_.h / 2, white,
+                FontStyle::SmallBold, true, false, true);
+}
+
 void SetupScreen::setConfig(const AppConfig &cfg) {
   gpsEnabled_ = cfg.gpsEnabled;
   callsignText_ = cfg.callsign;
@@ -1840,6 +2088,10 @@ void SetupScreen::setConfig(const AppConfig &cfg) {
   pskMaxAge_ = cfg.liveSpotsMaxAge;
 
   rotationInterval_ = cfg.rotationIntervalS;
+  syncRotation_ = cfg.syncRotation;
+  watchlistEntries_ = cfg.watchlist;
+  watchlistInput_.clear();
+  watchlistScrollOffset_ = 0;
   theme_ = cfg.theme;
   mapNightLights_ = cfg.mapNightLights;
   useMetric_ = cfg.useMetric;
@@ -1908,6 +2160,8 @@ AppConfig SetupScreen::getConfig() const {
   cfg.liveSpotsMaxAge = pskMaxAge_;
 
   cfg.rotationIntervalS = rotationInterval_;
+  cfg.syncRotation = syncRotation_;
+  cfg.watchlist = watchlistEntries_;
   cfg.theme = theme_;
   cfg.mapNightLights = mapNightLights_;
   cfg.useMetric = useMetric_;
@@ -1974,7 +2228,7 @@ SDL_Rect SetupScreen::getActionRect(const std::string &action) const {
   int fieldH = cat->ptSize(FontStyle::SmallRegular) + 14;
   int titleShift = cat->ptSize(FontStyle::MediumBold) + pad / 2;
   int tabY = modalRect_.y + titleShift + pad / 2;
-  int numTabs = 8;
+  int numTabs = 9;
   int tabW = fieldW / numTabs;
 
   if (action == "tab_identity")

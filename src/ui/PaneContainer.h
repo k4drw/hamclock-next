@@ -11,7 +11,11 @@ public:
   PaneContainer(int x, int y, int w, int h, WidgetType initialType,
                 FontManager &fontMgr);
 
-  void setRotation(const std::vector<WidgetType> &types, int intervalS);
+  void setRotation(const std::vector<WidgetType> &types, int intervalS,
+                   bool syncRotation = false);
+  void setPaused(bool paused);
+  bool isPaused() const;
+  void forceAdvance();
   const std::vector<WidgetType> &getRotation() const { return rotation_; }
   WidgetType getActiveType() const { return currentType_; }
 
@@ -70,6 +74,8 @@ private:
   size_t rotationIdx_ = 0;
   Uint32 lastRotateMs_ = 0;
   int intervalS_ = 30;
+  bool syncRotation_ = false;
+  bool paused_ = false;
   std::function<Widget *(WidgetType)> widgetFactory_;
 
   int paneIndex_ = 0;

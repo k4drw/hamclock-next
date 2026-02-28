@@ -309,6 +309,13 @@ bool ConfigManager::load(AppConfig &config) {
     loadRotation("pane4_rotation", "pane4_widget", config.pane4Rotation,
                  WidgetType::BAND_CONDITIONS);
     config.rotationIntervalS = pa.value("rotation_interval_s", 30);
+    config.syncRotation = pa.value("sync_rotation", false);
+    if (pa.contains("watchlist") && pa["watchlist"].is_array()) {
+      for (const auto &e : pa["watchlist"]) {
+        if (e.is_string())
+          config.watchlist.push_back(e.get<std::string>());
+      }
+    }
   }
 
   // Panel state
@@ -516,6 +523,13 @@ bool ConfigManager::save(const AppConfig &config) {
   saveRotation("pane3_rotation", config.pane3Rotation);
   saveRotation("pane4_rotation", config.pane4Rotation);
   json["panes"]["rotation_interval_s"] = config.rotationIntervalS;
+  json["panes"]["sync_rotation"] = config.syncRotation;
+  {
+    auto wl = nlohmann::json::array();
+    for (const auto &c : config.watchlist)
+      wl.push_back(c);
+    json["panes"]["watchlist"] = wl;
+  }
 
   json["panel"]["mode"] = config.panelMode;
   json["panel"]["satellite"] = config.selectedSatellite;

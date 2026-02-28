@@ -43,6 +43,7 @@ public:
     Services,
     Network,
     Widgets,
+    Watchlist,
     Update
   };
   void setStartTab(Tab tab) { activeTab_ = tab; }
@@ -70,6 +71,8 @@ private:
                         int fieldH, int fieldX, int textPad);
   void renderTabUpdate(SDL_Renderer *renderer, int cx, int pad, int fieldW,
                        int fieldH, int fieldX, int textPad);
+  void renderTabWatchlist(SDL_Renderer *renderer, int cx, int pad, int fieldW,
+                          int fieldH, int fieldX, int textPad);
 
   FontManager &fontMgr_;
   BrightnessManager &brightnessMgr_;
@@ -120,6 +123,16 @@ private:
   bool rigAutoTune_ = true;
 
   std::vector<WidgetType> paneRotations_[4];
+  bool syncRotation_ = false;
+  SDL_Rect syncRotationRect_ = {0, 0, 0, 0};
+
+  // Watchlist tab
+  std::vector<std::string> watchlistEntries_;
+  std::string watchlistInput_;
+  SDL_Rect watchlistInputRect_ = {0, 0, 0, 0};
+  SDL_Rect watchlistAddRect_ = {0, 0, 0, 0};
+  std::vector<SDL_Rect> watchlistDeleteRects_;
+  int watchlistScrollOffset_ = 0;
   int activePane_ = 0;
   int activeField_ = 0;
   int cursorPos_ = 0;

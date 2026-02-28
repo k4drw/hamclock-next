@@ -53,6 +53,8 @@ struct AppConfig {
   std::vector<WidgetType> pane3Rotation = {WidgetType::LIVE_SPOTS};
   std::vector<WidgetType> pane4Rotation = {WidgetType::BAND_CONDITIONS};
   int rotationIntervalS = 30;
+  bool syncRotation = false; // true = all panes advance on the same wall-clock tick
+  std::vector<std::string> watchlist; // persisted callsign watchlist
 
   // Panel state
   std::string panelMode = "dx";  // "dx" or "sat"

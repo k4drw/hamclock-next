@@ -50,6 +50,15 @@ public:
   bool isSetupRequested() const { return setupRequested_; }
   void clearSetupRequest() { setupRequested_ = false; }
 
+  // Rotation transport controls
+  void setOnPauseRotation(std::function<void()> cb) {
+    onPauseRotation_ = std::move(cb);
+  }
+  void setOnNextRotation(std::function<void()> cb) {
+    onNextRotation_ = std::move(cb);
+  }
+  void setRotationPaused(bool paused) { rotationPaused_ = paused; }
+
   // Called whenever the update checker has new information.
   void setUpdateInfo(bool available, const std::string &latestVersion) {
     updateAvailable_ = available;
@@ -129,6 +138,11 @@ private:
   int lastDateFontSize_ = 0;
 
   ConfigChangedCb onConfigChanged_;
+  std::function<void()> onPauseRotation_;
+  std::function<void()> onNextRotation_;
+  bool rotationPaused_ = false;
+  SDL_Rect pauseRect_ = {};
+  SDL_Rect nextRect_ = {};
   bool setupRequested_ = false;
   bool updateAvailable_ = false;
   std::string latestVersion_;
