@@ -756,10 +756,10 @@ int main(int argc, char *argv[]) {
 
   // --- Main Loop ---
 #ifdef __EMSCRIPTEN__
-  emscripten_set_main_loop(main_tick, 0, 1);
+  emscripten_set_main_loop(main_tick, 10, 1);
 #else
   while (ctx.appRunning) {
-    static constexpr Uint32 kTargetFrameMs = 33; // ~30 FPS
+    static constexpr Uint32 kTargetFrameMs = 100; // ~10 FPS
     static Uint32 s_lastFrameMs = 0;
     main_tick();
     Uint32 elapsed = SDL_GetTicks() - s_lastFrameMs;
