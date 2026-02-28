@@ -89,7 +89,7 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/hamclock-next --fullscreen
+ExecStart=/usr/bin/hamclock-next --fullscreen --live-web
 Restart=always
 RestartSec=5
 # Run as root to ensure access to /dev/fb0, /dev/dri/card*, /dev/input/*

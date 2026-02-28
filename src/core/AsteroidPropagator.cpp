@@ -127,6 +127,25 @@ bool AsteroidPropagator::subAsteroidPoint(const OrbitalElements &elem,
   return true;
 }
 
+void AsteroidPropagator::computeAzEl(double obsLat, double obsLon,
+                                      double subLat, double subLon,
+                                      double &az, double &el) {
+  double ha  = (obsLon - subLon) * DEG2RAD;
+  double lat = obsLat * DEG2RAD;
+  double dec = subLat * DEG2RAD;
+
+  double sinEl = std::sin(lat) * std::sin(dec) +
+                 std::cos(lat) * std::cos(dec) * std::cos(ha);
+  el = std::asin(sinEl) * RAD2DEG;
+
+  double X = -std::sin(ha) * std::cos(dec);
+  double Y = std::sin(dec) * std::cos(lat) -
+             std::cos(dec) * std::sin(lat) * std::cos(ha);
+  az = std::atan2(X, Y) * RAD2DEG;
+  if (az < 0.0)
+    az += 360.0;
+}
+
 std::vector<GroundTrackPoint>
 AsteroidPropagator::computeGroundTrack(const OrbitalElements &elem,
                                        double jd_start, double jd_end,

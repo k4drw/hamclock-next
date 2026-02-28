@@ -6,6 +6,7 @@
 #include "ListPanel.h"
 #include <functional>
 #include <memory>
+#include <vector>
 
 class AsteroidPanel : public ListPanel {
 public:
@@ -30,11 +31,20 @@ protected:
 
 private:
   void rebuildRows();
+  void renderPolarPlot(SDL_Renderer *renderer, float cx, float cy, int radius);
+
+  struct AzElPoint { double az; double el; };
 
   AsteroidProvider &provider_;
   AsteroidData lastData_;
   std::shared_ptr<HamClockState> state_;
-  int selectedIndex_ = -1; // -1 = none; maps to asteroid index
+  int selectedIndex_ = -1;          // -1 = none; maps to asteroid index in lastData_
+  std::vector<int> rowToAstIndex_;  // display row → lastData_ asteroid index
   AppConfig *config_ = nullptr;
   std::function<void()> onSave_;
+
+  // Polar plot track (pre-computed in update)
+  std::vector<AzElPoint> asteroidTrack_;
+  AzElPoint asteroidCurrentAzEl_ = {0, 0};
+  bool asteroidAboveHorizon_ = false;
 };
