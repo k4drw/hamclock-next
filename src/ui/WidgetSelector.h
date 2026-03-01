@@ -14,7 +14,8 @@ public:
   void show(int paneIndex, const std::vector<WidgetType> &available,
             const std::vector<WidgetType> &currentSelection,
             const std::vector<WidgetType> &forbidden,
-            std::function<void(int, const std::vector<WidgetType> &)> onDone);
+            std::function<void(int, const std::vector<WidgetType> &)> onDone,
+            bool singleSelect = false);
   void hide();
   bool isVisible() const { return visible_; }
 
@@ -34,6 +35,7 @@ private:
   std::vector<WidgetType> selection_;
   std::vector<WidgetType> forbidden_;
   std::function<void(int, const std::vector<WidgetType> &)> onDone_;
+  bool singleSelect_ = false;
 
   SDL_Rect menuRect_;
   std::vector<SDL_Rect> itemRects_;

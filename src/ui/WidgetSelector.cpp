@@ -12,7 +12,9 @@ void WidgetSelector::show(
     int paneIndex, const std::vector<WidgetType> &available,
     const std::vector<WidgetType> &currentSelection,
     const std::vector<WidgetType> &forbidden,
-    std::function<void(int, const std::vector<WidgetType> &)> onDone) {
+    std::function<void(int, const std::vector<WidgetType> &)> onDone,
+    bool singleSelect) {
+  singleSelect_ = singleSelect;
   paneIndex_ = paneIndex;
   available_ = available;
 
@@ -194,7 +196,9 @@ bool WidgetSelector::onMouseUp(int mx, int my, Uint16 /*mod*/, int clicks) {
                         selection_.end();
 
       // Update local selection for immediate UI feedback
-      if (isSelected) {
+      if (singleSelect_) {
+        selection_ = {t}; // radio: replace entire selection
+      } else if (isSelected) {
         if (selection_.size() > 1) {
           selection_.erase(std::remove(selection_.begin(), selection_.end(), t),
                            selection_.end());
@@ -267,13 +271,17 @@ bool WidgetSelector::onKeyDown(SDL_Keycode key, Uint16 /*mod*/) {
       bool isForbidden = std::find(forbidden_.begin(), forbidden_.end(), t) !=
                          forbidden_.end();
       if (!isForbidden) {
-        auto it = std::find(selection_.begin(), selection_.end(), t);
-        if (it != selection_.end()) {
-          if (selection_.size() > 1) {
-            selection_.erase(it);
-          }
+        if (singleSelect_) {
+          selection_ = {t};
         } else {
-          selection_.push_back(t);
+          auto it = std::find(selection_.begin(), selection_.end(), t);
+          if (it != selection_.end()) {
+            if (selection_.size() > 1) {
+              selection_.erase(it);
+            }
+          } else {
+            selection_.push_back(t);
+          }
         }
       }
     }

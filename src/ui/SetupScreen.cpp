@@ -320,8 +320,8 @@ void SetupScreen::renderTabIdentity(SDL_Renderer *renderer, int, int pad,
   int labelH = cat->ptSize(FontStyle::SmallBold) + 4;
 
   cat->drawText(renderer, "Callsign:", fieldX, y, white, FontStyle::SmallBold);
+  callsignRect_ = {fieldX, y, fieldW, labelH + fieldH};
   y += labelH;
-  callsignRect_ = {fieldX, y, fieldW, fieldH};
   callsignInput_.render(renderer, fontMgr_, fieldX, y, fieldW, fieldH,
                         FontStyle::SmallRegular, textPad, activeField_ == 0,
                         !callsignInput_.getValue().empty(), orange, gray, white,
@@ -330,8 +330,8 @@ void SetupScreen::renderTabIdentity(SDL_Renderer *renderer, int, int pad,
 
   cat->drawText(renderer, "Grid Square:", fieldX, y, white,
                 FontStyle::SmallBold);
+  gridRect_ = {fieldX, y, fieldW, labelH + fieldH};
   y += labelH;
-  gridRect_ = {fieldX, y, fieldW, fieldH};
   gridInput_.render(renderer, fontMgr_, fieldX, y, fieldW, fieldH,
                     FontStyle::SmallRegular, textPad, activeField_ == 1,
                     gridValid_, orange, gray, green, white, gray, "e.g. EL87qr");
@@ -341,17 +341,17 @@ void SetupScreen::renderTabIdentity(SDL_Renderer *renderer, int, int pad,
   cat->drawText(renderer, "Latitude:", fieldX, y, white, FontStyle::SmallBold);
   cat->drawText(renderer, "Longitude:", fieldX + halfFieldW + pad, y, white,
                 FontStyle::SmallBold);
+  latRect_ = {fieldX, y, halfFieldW, labelH + fieldH};
+  lonRect_ = {fieldX + halfFieldW + pad, y, halfFieldW, labelH + fieldH};
   y += labelH;
 
   int latY = y;
-  latRect_ = {fieldX, latY, halfFieldW, fieldH};
   latInput_.render(renderer, fontMgr_, fieldX, latY, halfFieldW, fieldH,
                    FontStyle::SmallRegular, textPad, activeField_ == 2,
                    !latInput_.getValue().empty(), orange, gray, white, white,
                    gray, "e.g. 27.76");
 
   int lonY = y;
-  lonRect_ = {fieldX + halfFieldW + pad, lonY, halfFieldW, fieldH};
   lonInput_.render(renderer, fontMgr_, fieldX + halfFieldW + pad, lonY,
                    halfFieldW, fieldH, FontStyle::SmallRegular, textPad,
                    activeField_ == 3, !lonInput_.getValue().empty(), orange,
@@ -644,8 +644,8 @@ void SetupScreen::renderTabServices(SDL_Renderer *renderer, int cx, int pad,
   cat->drawText(renderer, "QRZ Username:", fieldX, y, white,
                 FontStyle::SmallBold);
   int labelH = cat->ptSize(FontStyle::SmallBold) + 4;
+  qrzUsernameRect_ = {fieldX, y, fieldW, labelH + fieldH};
   y += labelH;
-  qrzUsernameRect_ = {fieldX, y, fieldW, fieldH};
   qrzUsernameInput_.render(renderer, fontMgr_, fieldX, y, fieldW, fieldH,
                            FontStyle::SmallRegular, textPad, activeField_ == 0,
                            true, orange, gray, white, white, gray, "e.g. K4DRW");
@@ -653,8 +653,8 @@ void SetupScreen::renderTabServices(SDL_Renderer *renderer, int cx, int pad,
 
   cat->drawText(renderer, "QRZ Password:", fieldX, y, white,
                 FontStyle::SmallBold);
+  qrzPasswordRect_ = {fieldX, y, fieldW, labelH + fieldH};
   y += labelH;
-  qrzPasswordRect_ = {fieldX, y, fieldW, fieldH};
   {
     std::string passMask(qrzPasswordInput_.getValue().length(), '*');
     TextInput tmpPwd;
@@ -707,8 +707,8 @@ void SetupScreen::renderTabNetwork(SDL_Renderer *renderer, int /*cx*/, int pad,
     int labelH = cat->ptSize(FontStyle::SmallRegular) + 4;
     cat->drawText(renderer, "Hub IP:", fieldX, y, white,
                   FontStyle::SmallRegular);
+    hubIpRect_ = {fieldX, y, fieldW, labelH + fieldH};
     y += labelH;
-    hubIpRect_ = {fieldX, y, fieldW, fieldH};
     hubIpInput_.render(renderer, fontMgr_, fieldX, y, fieldW, fieldH,
                        FontStyle::SmallRegular, textPad, activeField_ == 0,
                        true, orange, gray, white, white, gray,
@@ -717,8 +717,8 @@ void SetupScreen::renderTabNetwork(SDL_Renderer *renderer, int /*cx*/, int pad,
 
     cat->drawText(renderer, "Hub Port:", fieldX, y, white,
                   FontStyle::SmallRegular);
+    hubPortRect_ = {fieldX, y, fieldW, labelH + fieldH};
     y += labelH;
-    hubPortRect_ = {fieldX, y, fieldW, fieldH};
     hubPortInput_.render(renderer, fontMgr_, fieldX, y, fieldW, fieldH,
                          FontStyle::SmallRegular, textPad, activeField_ == 1,
                          true, orange, gray, white, white, gray, "8080");
@@ -758,8 +758,8 @@ void SetupScreen::renderTabRig(SDL_Renderer *renderer, int cx, int pad,
   int rigLabelH = cat->ptSize(FontStyle::SmallRegular) + 4;
   cat->drawText(renderer, "rigctld Host (IP or Name):", fieldX, y, white,
                 FontStyle::SmallRegular);
+  rigHostRect_ = {fieldX, y, fieldW, rigLabelH + fieldH};
   y += rigLabelH;
-  rigHostRect_ = {fieldX, y, fieldW, fieldH};
   rigHostInput_.render(renderer, fontMgr_, fieldX, y, fieldW, fieldH,
                        FontStyle::SmallRegular, textPad, activeField_ == 0,
                        true, orange, gray, white, white, gray, "e.g. localhost");
@@ -767,8 +767,8 @@ void SetupScreen::renderTabRig(SDL_Renderer *renderer, int cx, int pad,
 
   cat->drawText(renderer, "rigctld Port:", fieldX, y, white,
                 FontStyle::SmallRegular);
+  rigPortRect_ = {fieldX, y, fieldW, rigLabelH + fieldH};
   y += rigLabelH;
-  rigPortRect_ = {fieldX, y, fieldW, fieldH};
   rigPortInput_.render(renderer, fontMgr_, fieldX, y, fieldW, fieldH,
                        FontStyle::SmallRegular, textPad, activeField_ == 1,
                        true, orange, gray, white, white, gray, "4532");
@@ -795,20 +795,28 @@ void SetupScreen::renderTabRig(SDL_Renderer *renderer, int cx, int pad,
 
 void SetupScreen::renderTabWidgets(SDL_Renderer *renderer, int cx, int pad,
                                    int fieldW, int fieldH, int fieldX,
-                                   int textPad) {
+                                   int /*textPad*/) {
   auto *cat = fontMgr_.catalog();
+  // Clamp activePane_ to top-bar panes only (0-3)
+  if (activePane_ > 3) activePane_ = 0;
+
   int y =
       (modalRect_.y + cat->ptSize(FontStyle::MediumBold) + 2 * pad + fieldH);
   SDL_Color white = {255, 255, 255, 255};
   SDL_Color gray = {140, 140, 140, 255};
+  SDL_Color cyan = {0, 200, 255, 255};
 
   cat->drawText(renderer, "Select Active Widgets for Each Pane:", fieldX, y,
                 white, FontStyle::SmallBold);
   y += cat->ptSize(FontStyle::SmallBold) + pad / 2;
 
+  // 4 top-bar pane buttons in one compact row
+  const int btnH = 22;
+  const int btnGap = 4;
   int paneW = fieldW / 4;
+  static const char *kTopLabels[] = {"Top 1", "Top 2", "Top 3", "Top 4"};
   for (int i = 0; i < 4; ++i) {
-    SDL_Rect pr = {fieldX + i * paneW, y, paneW - 4, 30};
+    SDL_Rect pr = {fieldX + i * paneW, y, paneW - btnGap, btnH};
     bool active = activePane_ == i;
     SDL_SetRenderDrawColor(renderer, active ? 60 : 30, active ? 60 : 30,
                            active ? 80 : 40, 255);
@@ -816,12 +824,10 @@ void SetupScreen::renderTabWidgets(SDL_Renderer *renderer, int cx, int pad,
     SDL_SetRenderDrawColor(renderer, active ? 0 : 200, active ? 200 : 80,
                            active ? 255 : 80, 255);
     SDL_RenderDrawRect(renderer, &pr);
-    char buf[16];
-    std::snprintf(buf, sizeof(buf), "Pane %d", i + 1);
-    cat->drawText(renderer, buf, pr.x + pr.w / 2, pr.y + pr.h / 2,
+    cat->drawText(renderer, kTopLabels[i], pr.x + pr.w / 2, pr.y + pr.h / 2,
                   active ? white : gray, FontStyle::Fast, true);
   }
-  y += 35;
+  y += btnH + btnGap;
 
   // Sync rotation checkbox
   syncRotationRect_ = {fieldX, y, 16, 16};
@@ -834,98 +840,149 @@ void SetupScreen::renderTabWidgets(SDL_Renderer *renderer, int cx, int pad,
     SDL_Rect check = {syncRotationRect_.x + 3, syncRotationRect_.y + 3, 10, 10};
     SDL_RenderFillRect(renderer, &check);
   }
-  cat->drawText(renderer, "Sync pane rotation", fieldX + 22, y + 8, gray,
-                FontStyle::SmallRegular, false, false, true);
-  y += 20 + pad / 2;
+  cat->drawText(renderer, "Sync pane rotation", fieldX + 22, y + 4, gray,
+                FontStyle::Fast);
+  y += 20;
 
+  // --- Widget checklist (scrollable) ---
   widgetRects_.clear();
-  int colW = fieldW / 3; // 3 columns
-  int curX = fieldX;
-  int startY = y;
-  int rowH = cat->ptSize(FontStyle::Fast) + 4; // Tighter vertical spacing
+  int rowH = cat->ptSize(FontStyle::Fast) + 4;
 
-  WidgetType allTypes[] = {WidgetType::ADIF,
-                           WidgetType::ASTEROID,
-                           WidgetType::AURORA,
-                           WidgetType::AURORA_GRAPH,
-                           WidgetType::BAND_CONDITIONS,
-                           WidgetType::CALLBOOK,
-                           WidgetType::CLOCK_AUX,
-                           WidgetType::CONTESTS,
-                           WidgetType::COUNTDOWN,
-                           WidgetType::DE_WEATHER,
-                           WidgetType::DRAP,
-                           WidgetType::DST_INDEX,
-                           WidgetType::DX_CLUSTER,
-                           WidgetType::DX_PEDITIONS,
-                           WidgetType::DX_WEATHER,
-                           WidgetType::EME_TOOL,
-                           WidgetType::FORECAST,
-                           WidgetType::GIMBAL,
-                           WidgetType::HISTORY_KP,
-                           WidgetType::LIVE_SPOTS,
-                           WidgetType::MARINE,
-                           WidgetType::MOON,
-                           WidgetType::NCDXF,
-                           WidgetType::ON_THE_AIR,
-                           WidgetType::REMINDER,
-                           WidgetType::SANTA_TRACKER,
-                           WidgetType::SDO,
-                           WidgetType::SOLAR,
-                           WidgetType::HISTORY_FLUX,
-                           WidgetType::STOPWATCH,
-                           WidgetType::HISTORY_SSN,
-                           WidgetType::SYS_INFO,
-                           WidgetType::HURRICANE,
-                           WidgetType::WATCHLIST,
-                           WidgetType::ALERTS};
+  // Side panel section height: header + 4 radio options
+  int sideSecH = cat->ptSize(FontStyle::SmallBold) + 4 + 4 * (rowH + 2) + 4;
+  int footerY = modalRect_.y + modalRect_.h - 52;
+  int sideSecY = footerY - sideSecH;
+  int listEndY = sideSecY - pad / 2;
+  int listAvailH = listEndY - y;
 
+  static const WidgetType kAllTypes[] = {
+      WidgetType::ADIF,          WidgetType::ASTEROID,
+      WidgetType::AURORA,        WidgetType::AURORA_GRAPH,
+      WidgetType::BAND_CONDITIONS, WidgetType::CALLBOOK,
+      WidgetType::CLOCK_AUX,    WidgetType::CONTESTS,
+      WidgetType::COUNTDOWN,    WidgetType::DE_WEATHER,
+      WidgetType::DRAP,          WidgetType::DST_INDEX,
+      WidgetType::DX_CLUSTER,   WidgetType::DX_PEDITIONS,
+      WidgetType::DX_WEATHER,   WidgetType::EME_TOOL,
+      WidgetType::FORECAST,     WidgetType::GIMBAL,
+      WidgetType::HISTORY_KP,   WidgetType::LIVE_SPOTS,
+      WidgetType::MARINE,        WidgetType::MOON,
+      WidgetType::NCDXF,         WidgetType::ON_THE_AIR,
+      WidgetType::REMINDER,     WidgetType::SANTA_TRACKER,
+      WidgetType::SDO,           WidgetType::SOLAR,
+      WidgetType::HISTORY_FLUX, WidgetType::STOPWATCH,
+      WidgetType::HISTORY_SSN,  WidgetType::SYS_INFO,
+      WidgetType::HURRICANE,    WidgetType::WATCHLIST,
+      WidgetType::ALERTS};
+  constexpr int kNWidgets = static_cast<int>(sizeof(kAllTypes) / sizeof(kAllTypes[0]));
+  constexpr int kColItems = (kNWidgets + 2) / 3; // items per column = 12
+
+  int visRows = std::max(1, listAvailH / rowH);
+  widgetListMaxScroll_ = std::max(0, kColItems - visRows);
+  widgetListScrollOffset_ = std::max(0, std::min(widgetListScrollOffset_, widgetListMaxScroll_));
+  widgetListStartY_ = y;
+  widgetListEndY_ = y + visRows * rowH;
+
+  // Clip widget list to its allotted area
+  SDL_Rect prevClip = {0, 0, 0, 0};
+  SDL_RenderGetClipRect(renderer, &prevClip);
+  SDL_Rect listClip = {modalRect_.x + 2, y, modalRect_.w - 4, visRows * rowH};
+  SDL_RenderSetClipRect(renderer, &listClip);
+
+  int colW = fieldW / 3;
   const auto &currentPane = paneRotations_[activePane_];
 
-  const int nWidgets = sizeof(allTypes) / sizeof(allTypes[0]);
-  const int itemsPerCol = (nWidgets + 2) / 3;
+  for (int col = 0; col < 3; ++col) {
+    for (int row = 0; row < visRows; ++row) {
+      int idx = col * kColItems + widgetListScrollOffset_ + row;
+      if (idx >= kNWidgets) break;
+      WidgetType t = kAllTypes[idx];
 
-  for (size_t i = 0; i < nWidgets; ++i) {
-    WidgetType t = allTypes[i];
-
-    // Pane 4 (index 3) is restricted to small widgets only
-    bool allowed = true;
-    if (activePane_ == 3) {
-      allowed = (t == WidgetType::NCDXF || t == WidgetType::SOLAR ||
-                 t == WidgetType::DX_WEATHER || t == WidgetType::DE_WEATHER);
-    }
-
-    SDL_Rect r = {curX, y, 16, 16};
-    // Neutral dark background (prevents 'blue' look)
-    SDL_SetRenderDrawColor(renderer, 45, 45, 48, 255);
-    SDL_RenderFillRect(renderer, &r);
-    SDL_SetRenderDrawColor(renderer, 100, 100, 120, 255);
-    SDL_RenderDrawRect(renderer, &r);
-
-    if (allowed) {
-      bool selected = std::find(currentPane.begin(), currentPane.end(), t) !=
-                      currentPane.end();
-      if (selected) {
-        SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
-        SDL_Rect check = {r.x + 3, r.y + 3, 10, 10};
-        SDL_RenderFillRect(renderer, &check);
+      bool allowed = true;
+      if (activePane_ == 3) {
+        allowed = (t == WidgetType::NCDXF || t == WidgetType::SOLAR ||
+                   t == WidgetType::DX_WEATHER || t == WidgetType::DE_WEATHER);
       }
-      cat->drawText(renderer, widgetTypeDisplayName(t), r.x + 22, r.y, white,
-                    FontStyle::Fast);
-      widgetRects_.push_back({t, r});
-    } else {
-      // Draw disabled text
-      cat->drawText(renderer, widgetTypeDisplayName(t), r.x + 22, r.y,
-                    {60, 60, 70, 255}, FontStyle::Fast);
-      // Do not add to widgetRects_ so it is not clickable
-    }
 
-    y += rowH;
-    // Break into columns
-    if ((i + 1) % itemsPerCol == 0) {
-      y = startY;
-      curX += colW;
+      int drawX = fieldX + col * colW;
+      int drawY = y + row * rowH;
+      SDL_Rect r = {drawX, drawY, 16, 16};
+      SDL_SetRenderDrawColor(renderer, 45, 45, 48, 255);
+      SDL_RenderFillRect(renderer, &r);
+      SDL_SetRenderDrawColor(renderer, 100, 100, 120, 255);
+      SDL_RenderDrawRect(renderer, &r);
+
+      if (allowed) {
+        bool selected = std::find(currentPane.begin(), currentPane.end(), t) !=
+                        currentPane.end();
+        if (selected) {
+          SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
+          SDL_Rect check = {r.x + 3, r.y + 3, 10, 10};
+          SDL_RenderFillRect(renderer, &check);
+        }
+        cat->drawText(renderer, widgetTypeDisplayName(t), r.x + 22, r.y, white,
+                      FontStyle::Fast);
+        widgetRects_.push_back({t, r});
+      } else {
+        cat->drawText(renderer, widgetTypeDisplayName(t), r.x + 22, r.y,
+                      {60, 60, 70, 255}, FontStyle::Fast);
+      }
     }
+  }
+
+  // Restore previous clip
+  if (prevClip.w > 0 && prevClip.h > 0)
+    SDL_RenderSetClipRect(renderer, &prevClip);
+  else
+    SDL_RenderSetClipRect(renderer, nullptr);
+
+  // Scroll arrows when list overflows
+  if (widgetListMaxScroll_ > 0) {
+    int arrowX = modalRect_.x + modalRect_.w - 18;
+    if (widgetListScrollOffset_ > 0)
+      cat->drawText(renderer, "^", arrowX, y + 2, gray, FontStyle::Fast, true);
+    if (widgetListScrollOffset_ < widgetListMaxScroll_)
+      cat->drawText(renderer, "v", arrowX, widgetListEndY_ - rowH, gray,
+                    FontStyle::Fast, true);
+  }
+
+  // --- Side Panel section ---
+  y = sideSecY;
+  cat->drawText(renderer, "--- Side Panel ---", cx, y, cyan,
+                FontStyle::SmallBold, true);
+  y += cat->ptSize(FontStyle::SmallBold) + 4;
+
+  // Determine current side-panel mode from paneRotations_[4/5]
+  int curMode = 0;
+  if (!paneRotations_[4].empty()) {
+    WidgetType t5 = paneRotations_[4][0];
+    if (t5 == WidgetType::DX_CLUSTER)  curMode = 1;
+    else if (t5 == WidgetType::ON_THE_AIR) curMode = 2;
+    else if (t5 == WidgetType::LIVE_SPOTS) curMode = 3;
+    // else curMode = 0 (DE_INFO + DX_INFO or default)
+  }
+
+  static const char *kSideLabels[] = {
+      "DE Info + DX/Sat (2 panes, original)",
+      "DX Cluster (full height)",
+      "On The Air (full height)",
+      "Live Spots (full height)",
+  };
+  for (int i = 0; i < 4; ++i) {
+    SDL_Rect rr = {fieldX, y, 14, 14};
+    sidePanelModeRects_[i] = {fieldX, y, fieldW, rowH};
+    SDL_SetRenderDrawColor(renderer, 45, 45, 48, 255);
+    SDL_RenderFillRect(renderer, &rr);
+    SDL_SetRenderDrawColor(renderer, 100, 100, 120, 255);
+    SDL_RenderDrawRect(renderer, &rr);
+    if (curMode == i) {
+      SDL_SetRenderDrawColor(renderer, 0, 200, 255, 255);
+      SDL_Rect inner = {rr.x + 3, rr.y + 3, 8, 8};
+      SDL_RenderFillRect(renderer, &inner);
+    }
+    cat->drawText(renderer, kSideLabels[i], rr.x + 20, rr.y,
+                  curMode == i ? white : gray, FontStyle::Fast);
+    y += rowH + 2;
   }
 }
 
@@ -1094,6 +1151,60 @@ bool SetupScreen::onMouseDown(int mx, int my, Uint16 mod, int clicks) {
       return true;
     if (hitField(brightTimeRect_, 2, &brightTimeInput_))
       return true;
+  } else if (activeTab_ == Tab::Widgets) {
+    // 1. Pane Switching (4 top-bar panes, 1 row)
+    int yW = modalRect_.y + cat->ptSize(FontStyle::MediumBold) + 2 * pad + fieldH +
+             cat->ptSize(FontStyle::SmallBold) + pad / 2;
+    const int btnH = 22;
+    int paneW = fieldW / 4;
+    for (int i = 0; i < 4; ++i) {
+      SDL_Rect pr = {fieldX + i * paneW, yW, paneW - 4, btnH};
+      if (mx >= pr.x && mx < pr.x + pr.w && my >= pr.y && my < pr.y + pr.h) {
+        if (activePane_ != i) {
+          activePane_ = i;
+          widgetListScrollOffset_ = 0;
+        }
+        return true;
+      }
+    }
+
+    // 2. Sync Rotation Toggle
+    if (mx >= syncRotationRect_.x && mx < syncRotationRect_.x + syncRotationRect_.w &&
+        my >= syncRotationRect_.y && my < syncRotationRect_.y + syncRotationRect_.h) {
+      syncRotation_ = !syncRotation_;
+      return true;
+    }
+
+    // 3. Widget Selection (only within visible list area)
+    if (my >= widgetListStartY_ && my < widgetListEndY_) {
+      for (auto &wr : widgetRects_) {
+        if (mx >= wr.rect.x && mx < wr.rect.x + wr.rect.w &&
+            my >= wr.rect.y && my < wr.rect.y + wr.rect.h) {
+          auto &cur = paneRotations_[activePane_];
+          auto it = std::find(cur.begin(), cur.end(), wr.type);
+          if (it != cur.end()) {
+            if (cur.size() > 1) cur.erase(it);
+          } else {
+            cur.push_back(wr.type);
+          }
+          return true;
+        }
+      }
+    }
+
+    // 4. Side Panel Mode
+    static const WidgetType kMode5[] = {WidgetType::DE_INFO, WidgetType::DX_CLUSTER,
+                                        WidgetType::ON_THE_AIR, WidgetType::LIVE_SPOTS};
+    for (int i = 0; i < 4; ++i) {
+      auto &sr = sidePanelModeRects_[i];
+      if (sr.w > 0 && mx >= sr.x && mx < sr.x + sr.w &&
+          my >= sr.y && my < sr.y + sr.h) {
+        paneRotations_[4] = {kMode5[i]};
+        paneRotations_[5] = (i == 0) ? std::vector<WidgetType>{WidgetType::DX_INFO}
+                                     : std::vector<WidgetType>{};
+        return true;
+      }
+    }
   }
 
   // 3. Toggles and Buttons (Non-text fields)
@@ -1171,6 +1282,15 @@ bool SetupScreen::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
   }
 
   return true;
+}
+
+bool SetupScreen::onMouseWheel(int scrollY) {
+  if (activeTab_ == Tab::Widgets && widgetListMaxScroll_ > 0) {
+    widgetListScrollOffset_ = std::max(
+        0, std::min(widgetListScrollOffset_ - scrollY, widgetListMaxScroll_));
+    return true;
+  }
+  return false;
 }
 
 void SetupScreen::onMouseMove(int mx, int /*my*/) {
@@ -1632,6 +1752,8 @@ void SetupScreen::setConfig(const AppConfig &cfg) {
   paneRotations_[1] = cfg.pane2Rotation;
   paneRotations_[2] = cfg.pane3Rotation;
   paneRotations_[3] = cfg.pane4Rotation;
+  paneRotations_[4] = cfg.pane5Rotation;
+  paneRotations_[5] = cfg.pane6Rotation;
 
   colorOverrides_ = cfg.colorOverrides;
 
@@ -1694,6 +1816,8 @@ AppConfig SetupScreen::getConfig() const {
   cfg.pane2Rotation = paneRotations_[1];
   cfg.pane3Rotation = paneRotations_[2];
   cfg.pane4Rotation = paneRotations_[3];
+  cfg.pane5Rotation = paneRotations_[4];
+  cfg.pane6Rotation = paneRotations_[5];
 
   cfg.rigHost = rigHostInput_.getValue();
   cfg.rigPort = std::atoi(rigPortInput_.getValue().c_str());

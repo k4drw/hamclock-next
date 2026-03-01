@@ -1297,6 +1297,11 @@ void MapWidget::render(SDL_Renderer *renderer) {
   renderRssButton(renderer);
   renderOverlayInfo(renderer);
   renderLegend(renderer);
+
+  if (config_.projection == "azimuthal") {
+    renderAzimuthalMask(renderer);
+  }
+
   renderTooltip(renderer);
 
   // Note: MapViewMenu is rendered via renderModal() in the centralized modal
@@ -3020,5 +3025,71 @@ bool MapWidget::isModalActive() const {
 void MapWidget::renderModal(SDL_Renderer *renderer) {
   if (mapViewMenu_ && mapViewMenu_->isVisible()) {
     mapViewMenu_->render(renderer);
+  }
+}
+
+void MapWidget::renderAzimuthalMask(SDL_Renderer *renderer) {
+  // Clear areas outside the circular azimuthal projection within mapRect_
+  // but also handle the space between mapRect_ and x_,y_,w,h if any.
+
+  // The map is a circle inside mapRect_
+  int radius = mapRect_.w / 2;
+  int centerX = mapRect_.x + radius;
+
+  // We use 4 rectangles to mask the corners, but for a perfect circle
+  // we could use a custom mesh. Given the "Masking Overlay" recommendation,
+  // let's at least cover the outer rectangular areas that bleed.
+
+  // Actually, some overlays (like propagation) are drawn on the whole mapRect_.
+  // The simplest effective mask is to draw 4 large rects that cover everything
+  // EXCEPT the circle.
+
+  SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+  SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255); // Background black
+
+  // Top mask
+  SDL_Rect topMask = {x_, y_, width_, mapRect_.y - y_};
+  if (topMask.h > 0)
+    SDL_RenderFillRect(renderer, &topMask);
+
+  // Bottom mask
+  SDL_Rect bottomMask = {x_, mapRect_.y + mapRect_.h, width_,
+                         y_ + height_ - (mapRect_.y + mapRect_.h)};
+  if (bottomMask.h > 0)
+    SDL_RenderFillRect(renderer, &bottomMask);
+
+  // Left mask
+  SDL_Rect leftMask = {x_, mapRect_.y, mapRect_.x - x_, mapRect_.h};
+  if (leftMask.w > 0)
+    SDL_RenderFillRect(renderer, &leftMask);
+
+  // Right mask
+  SDL_Rect rightMask = {mapRect_.x + mapRect_.w, mapRect_.y,
+                        x_ + width_ - (mapRect_.x + mapRect_.w), mapRect_.h};
+  if (rightMask.w > 0)
+    SDL_RenderFillRect(renderer, &rightMask);
+
+  // Now mask the 4 corners of the mapRect_ to crop to circle
+  // We can do this with small triangles or just many small rects.
+  // Or better: draw a pre-rendered circular mask texture if available.
+  // For now, let's just do the 4 corners using a simple algorithm.
+
+  for (int j = 0; j < mapRect_.h; ++j) {
+    int dy = j - radius;
+    int dx = (int)std::sqrt(
+        std::max(0.0, (double)radius * radius - (double)dy * dy));
+
+    // Left edge of circle at row j is centerX - dx
+    // Right edge of circle at row j is centerX + dx
+
+    SDL_Rect leftCrop = {mapRect_.x, mapRect_.y + j, centerX - dx - mapRect_.x,
+                         1};
+    if (leftCrop.w > 0)
+      SDL_RenderFillRect(renderer, &leftCrop);
+
+    SDL_Rect rightCrop = {centerX + dx, mapRect_.y + j,
+                          mapRect_.x + mapRect_.w - (centerX + dx), 1};
+    if (rightCrop.w > 0)
+      SDL_RenderFillRect(renderer, &rightCrop);
   }
 }

@@ -133,6 +133,7 @@ private:
   void renderWxMbOverlay(SDL_Renderer *renderer);
   void renderPropagationOverlay(SDL_Renderer *renderer);
   void updatePropagationOverlay();
+  void renderAzimuthalMask(SDL_Renderer *renderer);
 
   TextureManager &texMgr_;
   FontManager &fontMgr_;

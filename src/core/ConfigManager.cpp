@@ -284,7 +284,8 @@ bool ConfigManager::load(AppConfig &config) {
     auto &pa = json["panes"];
     auto loadRotation = [&](const std::string &key,
                             const std::string &legacyKey,
-                            std::vector<WidgetType> &vec, WidgetType fallback) {
+                            std::vector<WidgetType> &vec, WidgetType fallback,
+                            bool allowEmpty = false) {
       if (pa.contains(key) && pa[key].is_array()) {
         vec.clear();
         for (auto &item : pa[key]) {
@@ -296,7 +297,7 @@ bool ConfigManager::load(AppConfig &config) {
       } else if (pa.contains(legacyKey)) {
         vec = {widgetTypeFromString(pa.value(legacyKey, ""), fallback)};
       }
-      if (vec.empty())
+      if (vec.empty() && !allowEmpty)
         vec = {fallback};
     };
 
@@ -308,6 +309,10 @@ bool ConfigManager::load(AppConfig &config) {
                  WidgetType::LIVE_SPOTS);
     loadRotation("pane4_rotation", "pane4_widget", config.pane4Rotation,
                  WidgetType::BAND_CONDITIONS);
+    loadRotation("pane5_rotation", "pane5_widget", config.pane5Rotation,
+                 WidgetType::DE_INFO);
+    loadRotation("pane6_rotation", "pane6_widget", config.pane6Rotation,
+                 WidgetType::DX_INFO, /*allowEmpty=*/true);
     config.rotationIntervalS = pa.value("rotation_interval_s", 30);
     config.syncRotation = pa.value("sync_rotation", false);
     if (pa.contains("watchlist") && pa["watchlist"].is_array()) {
@@ -522,6 +527,8 @@ bool ConfigManager::save(const AppConfig &config) {
   saveRotation("pane2_rotation", config.pane2Rotation);
   saveRotation("pane3_rotation", config.pane3Rotation);
   saveRotation("pane4_rotation", config.pane4Rotation);
+  saveRotation("pane5_rotation", config.pane5Rotation);
+  saveRotation("pane6_rotation", config.pane6Rotation);
   json["panes"]["rotation_interval_s"] = config.rotationIntervalS;
   json["panes"]["sync_rotation"] = config.syncRotation;
   {

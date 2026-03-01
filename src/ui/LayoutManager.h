@@ -23,6 +23,13 @@ public:
   }
 
   void setFidelityMode(bool on) { fidelityMode_ = on; }
+
+  void removeWidget(Widget *w) {
+    entries_.erase(
+        std::remove_if(entries_.begin(), entries_.end(),
+                       [w](const Entry &e) { return e.widget == w; }),
+        entries_.end());
+  }
   bool fidelityMode() const { return fidelityMode_; }
 
   void recalculate(int winW, int winH, int offX = 0, int offY = 0) {
@@ -108,8 +115,14 @@ private:
         {0, 148, 139, 147}, // LocalPanel (top half)
         {0, 295, 139, 185}, // DXSatPane (bottom half)
     };
+    static constexpr SDL_Rect kSideSingle = {0, 148, 139, 332}; // full height
     // MainStage
     static constexpr SDL_Rect kMain = {139, 149, 660, 330};
+
+    // Count SidePanel entries to pick single vs split layout
+    int nSide = 0;
+    for (auto &e : entries_)
+      if (e.zone == Zone::SidePanel) ++nSide;
 
     int topIdx = 0, sideIdx = 0;
     for (auto &entry : entries_) {
@@ -122,7 +135,8 @@ private:
         break;
       case Zone::SidePanel:
         if (sideIdx < static_cast<int>(std::size(kSide))) {
-          auto &r = kSide[sideIdx++];
+          SDL_Rect r = (nSide == 1) ? kSideSingle : kSide[sideIdx];
+          sideIdx++;
           entry.widget->onResize(r.x + offX, r.y + offY, r.w, r.h);
         }
         break;

@@ -26,6 +26,7 @@ public:
   bool onMouseDown(int mx, int my, Uint16 mod, int clicks) override;
   bool onMouseUp(int mx, int my, Uint16 mod, int clicks) override;
   void onMouseMove(int mx, int my) override;
+  bool onMouseWheel(int scrollY) override;
   bool onKeyDown(SDL_Keycode key, Uint16 mod) override;
   bool onTextInput(const char *text) override;
   bool isModalActive() const override;
@@ -128,7 +129,7 @@ private:
   TextInput rigPortInput_;
   bool rigAutoTune_ = true;
 
-  std::vector<WidgetType> paneRotations_[4];
+  std::vector<WidgetType> paneRotations_[6];
   bool syncRotation_ = false;
   SDL_Rect syncRotationRect_ = {0, 0, 0, 0};
 
@@ -139,6 +140,11 @@ private:
   SDL_Rect watchlistAddRect_ = {0, 0, 0, 0};
   std::vector<SDL_Rect> watchlistDeleteRects_;
   int watchlistScrollOffset_ = 0;
+  int widgetListScrollOffset_ = 0;
+  int widgetListStartY_ = 0;
+  int widgetListEndY_ = 0;
+  int widgetListMaxScroll_ = 0;
+  SDL_Rect sidePanelModeRects_[4] = {};
   int activePane_ = 0;
   int activeField_ = 0;
   bool complete_ = false;

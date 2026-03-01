@@ -94,6 +94,8 @@ void PaneContainer::update() {
 }
 
 void PaneContainer::render(SDL_Renderer *renderer) {
+  if (width_ <= 0 || height_ <= 0)
+    return;
   // Draw content
   if (activeWidget_) {
     activeWidget_->render(renderer);

@@ -52,6 +52,8 @@ struct AppConfig {
   std::vector<WidgetType> pane2Rotation = {WidgetType::DX_CLUSTER};
   std::vector<WidgetType> pane3Rotation = {WidgetType::LIVE_SPOTS};
   std::vector<WidgetType> pane4Rotation = {WidgetType::BAND_CONDITIONS};
+  std::vector<WidgetType> pane5Rotation = {WidgetType::DE_INFO};
+  std::vector<WidgetType> pane6Rotation = {WidgetType::DX_INFO};
   int rotationIntervalS = 30;
   bool syncRotation = false; // true = all panes advance on the same wall-clock tick
   std::vector<std::string> watchlist; // persisted callsign watchlist
