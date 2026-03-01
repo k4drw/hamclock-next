@@ -28,6 +28,7 @@ private:
   Callback callback_;
   mutable std::mutex mutex_;
   LightningData data_;
+  static constexpr uint32_t kFetchIntervalMs = 60'000; // 1 minute
   uint32_t lastFetch_ = 0;
   std::string lastTimestamp_;
 };

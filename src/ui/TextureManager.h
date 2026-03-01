@@ -66,6 +66,7 @@ public:
     return texture;
   }
 
+  // Convenience overload for std::string payloads.
   SDL_Texture *loadFromMemory(SDL_Renderer *renderer, const std::string &key,
                               const std::string &data) {
     return loadFromMemory(renderer, key,
@@ -73,6 +74,11 @@ public:
                           static_cast<unsigned int>(data.size()));
   }
 
+  // Decode image bytes and upload to GPU, replacing any existing texture for
+  // this key. Always re-decodes and re-uploads regardless of whether the data
+  // has changed — callers must gate invocations on actual data changes (e.g.,
+  // a dirty flag set by the background fetch callback) to avoid unnecessary
+  // CPU decode and VRAM bandwidth usage.
   SDL_Texture *loadFromMemory(SDL_Renderer *renderer, const std::string &key,
                               const unsigned char *data, unsigned int size) {
     SDL_RWops *rw = SDL_RWFromConstMem(data, static_cast<int>(size));

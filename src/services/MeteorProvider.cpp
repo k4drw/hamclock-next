@@ -31,7 +31,7 @@ float MeteorProvider::getDiurnalMultiplier(int localHour) {
 
 void MeteorProvider::update(double lat, double lon) {
   uint32_t now = SDL_GetTicks();
-  if (lastUpdate_ > 0 && (now - lastUpdate_) < 600000) { // 10 min cache
+  if (lastUpdate_ > 0 && (now - lastUpdate_) < kUpdateIntervalMs) {
     return;
   }
   lastUpdate_ = now;

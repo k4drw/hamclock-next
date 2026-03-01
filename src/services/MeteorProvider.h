@@ -26,6 +26,7 @@ private:
   mutable std::mutex mutex_;
   MeteorData data_;
   std::vector<MeteorShower> showers_;
+  static constexpr uint32_t kUpdateIntervalMs = 600'000; // 10 minutes
   uint32_t lastUpdate_ = 0;
 };
 
