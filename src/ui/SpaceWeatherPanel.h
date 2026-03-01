@@ -31,8 +31,8 @@ public:
 
 private:
   void destroyCache();
-  static SDL_Color colorForK(int k);
-  static SDL_Color colorForSFI(int sfi);
+  static SDL_Color colorForK(int k, const ThemeColors &themes);
+  static SDL_Color colorForSFI(int sfi, const ThemeColors &themes);
   static SDL_Color colorForNOAAScale(int scale, const ThemeColors &themes);
 
   FontManager &fontMgr_;

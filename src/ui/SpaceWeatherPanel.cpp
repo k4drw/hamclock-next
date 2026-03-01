@@ -30,20 +30,20 @@ SpaceWeatherPanel::SpaceWeatherPanel(int x, int y, int w, int h,
   items_[14].label = "G-Scale";
 }
 
-SDL_Color SpaceWeatherPanel::colorForK(int k) {
+SDL_Color SpaceWeatherPanel::colorForK(int k, const ThemeColors &themes) {
   if (k < 3)
-    return {0, 255, 0, 255}; // Green
+    return themes.success; // Green
   if (k <= 4)
-    return {255, 255, 0, 255}; // Yellow
-  return {255, 50, 50, 255};   // Red
+    return themes.warning; // Yellow
+  return themes.danger;    // Red
 }
 
-SDL_Color SpaceWeatherPanel::colorForSFI(int sfi) {
+SDL_Color SpaceWeatherPanel::colorForSFI(int sfi, const ThemeColors &themes) {
   if (sfi > 100)
-    return {0, 255, 0, 255}; // Green
+    return themes.success; // Green
   if (sfi > 70)
-    return {255, 255, 0, 255}; // Yellow
-  return {255, 50, 50, 255};   // Red
+    return themes.warning; // Yellow
+  return themes.danger;    // Red
 }
 
 SDL_Color SpaceWeatherPanel::colorForNOAAScale(int scale,
@@ -87,7 +87,6 @@ void SpaceWeatherPanel::update() {
 
   std::snprintf(buf, sizeof(buf), "%d", data.sfi);
   items_[0].value = buf;
-  items_[0].valueColor = colorForSFI(data.sfi);
 
   std::snprintf(buf, sizeof(buf), "%d", data.sunspot_number);
   items_[1].value = buf;
@@ -99,7 +98,6 @@ void SpaceWeatherPanel::update() {
 
   std::snprintf(buf, sizeof(buf), "%d", data.k_index);
   items_[3].value = buf;
-  items_[3].valueColor = colorForK(data.k_index);
 
   // Solar wind speed: km/s (metric) or mph (imperial)
   // 1 km/s = 2236.94 mph;  previous code used 0.621371 (km→mi) which was wrong
@@ -111,6 +109,8 @@ void SpaceWeatherPanel::update() {
   items_[4].valueColor = {255, 128, 0, 255};
 
   ThemeColors themes = getThemeColors(theme_);
+  items_[0].valueColor = colorForSFI(data.sfi, themes);
+  items_[3].valueColor = colorForK(data.k_index, themes);
 
   std::snprintf(buf, sizeof(buf), "%.1f", data.solar_wind_density);
   items_[5].value = buf;

@@ -13,18 +13,19 @@ void BandConditionsPanel::update() {
   dataValid_ = currentData_.valid;
 }
 
-SDL_Color BandConditionsPanel::colorForCondition(BandCondition cond) {
+SDL_Color BandConditionsPanel::colorForCondition(BandCondition cond,
+                                                  const ThemeColors &themes) {
   switch (cond) {
   case BandCondition::EXCELLENT:
-    return {0, 255, 255, 255}; // Cyan
+    return themes.info;    // Cyan/info
   case BandCondition::GOOD:
-    return {0, 255, 0, 255}; // Green
+    return themes.success; // Green
   case BandCondition::FAIR:
-    return {255, 255, 0, 255}; // Yellow
+    return themes.warning; // Yellow
   case BandCondition::POOR:
-    return {255, 50, 50, 255}; // Red
+    return themes.danger;  // Red
   default:
-    return {150, 150, 150, 255};
+    return themes.textDim;
   }
 }
 
@@ -136,9 +137,9 @@ void BandConditionsPanel::render(SDL_Renderer *renderer) {
   for (const auto &status : currentData_.statuses) {
     drawInCol(status.band, 0, labelColor, cellStyle);
     drawInCol(stringForCondition(status.day, useShort), 1,
-              colorForCondition(status.day), cellStyle);
+              colorForCondition(status.day, themes), cellStyle);
     drawInCol(stringForCondition(status.night, useShort), 2,
-              colorForCondition(status.night), cellStyle);
+              colorForCondition(status.night, themes), cellStyle);
     curY += rowHeight;
   }
 }
