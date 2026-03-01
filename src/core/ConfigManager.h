@@ -21,6 +21,26 @@ struct ReminderEntry {
   std::string acknowledgedDate; // If == date, notification has been dismissed
 };
 
+struct ConfigPreset {
+  std::string name;
+  std::vector<WidgetType> pane1Rotation;
+  std::vector<WidgetType> pane2Rotation;
+  std::vector<WidgetType> pane3Rotation;
+  std::vector<WidgetType> pane4Rotation;
+  std::vector<WidgetType> pane5Rotation;
+  std::vector<WidgetType> pane6Rotation;
+  int rotationIntervalS = 30;
+  PropOverlayType propOverlay = PropOverlayType::None;
+  WeatherOverlayType weatherOverlay = WeatherOverlayType::None;
+  std::string mapStyle = "nasa";
+  bool mapNightLights = true;
+  bool showGrid = false;
+  std::string gridType = "latlon";
+  std::string propBand = "20m";
+  std::string propMode = "SSB";
+  int propPower = 100;
+};
+
 struct AppConfig {
   // Identity
   std::string callsign;
@@ -156,6 +176,9 @@ struct AppConfig {
   std::string corsProxyUrl = "";
 #endif
   std::map<std::string, SDL_Color> colorOverrides;
+
+  // Presets
+  std::vector<ConfigPreset> presets;
 };
 
 class ConfigManager {

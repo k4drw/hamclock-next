@@ -1114,6 +1114,16 @@ DashboardContext::DashboardContext(AppContext &ctx)
       p->forceAdvance();
   });
 
+  timePanel->initPresets(&appCfg, [this, &ctx]() {
+    panes[0]->setRotation(ctx.appCfg.pane1Rotation, ctx.appCfg.rotationIntervalS, ctx.appCfg.syncRotation);
+    panes[1]->setRotation(ctx.appCfg.pane2Rotation, ctx.appCfg.rotationIntervalS, ctx.appCfg.syncRotation);
+    panes[2]->setRotation(ctx.appCfg.pane3Rotation, ctx.appCfg.rotationIntervalS, ctx.appCfg.syncRotation);
+    panes[3]->setRotation(ctx.appCfg.pane4Rotation, ctx.appCfg.rotationIntervalS, ctx.appCfg.syncRotation);
+    panes[4]->setRotation(ctx.appCfg.pane5Rotation, ctx.appCfg.rotationIntervalS, ctx.appCfg.syncRotation);
+    panes[5]->setRotation(ctx.appCfg.pane6Rotation, ctx.appCfg.rotationIntervalS, ctx.appCfg.syncRotation);
+    ctx.cfgMgr.save(ctx.appCfg);
+  });
+
   widgetSelector = std::make_unique<WidgetSelector>(fontMgr);
 
   // Helper for pool (Lazy loading) — assigned to a member so pane-container

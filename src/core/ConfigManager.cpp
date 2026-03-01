@@ -11,6 +11,40 @@
 #include <emscripten.h>
 #endif
 
+static std::string propOverlayToStr(PropOverlayType t) {
+  switch (t) {
+  case PropOverlayType::Muf:         return "muf";
+  case PropOverlayType::Voacap:      return "voacap";
+  case PropOverlayType::Reliability: return "reliability";
+  case PropOverlayType::Toa:         return "toa";
+  case PropOverlayType::Heatmap:     return "heatmap";
+  case PropOverlayType::Drap:        return "drap";
+  default:                           return "none";
+  }
+}
+
+static PropOverlayType propOverlayFromStr(const std::string &s) {
+  if (s == "muf")         return PropOverlayType::Muf;
+  if (s == "voacap")      return PropOverlayType::Voacap;
+  if (s == "reliability") return PropOverlayType::Reliability;
+  if (s == "toa")         return PropOverlayType::Toa;
+  if (s == "heatmap")     return PropOverlayType::Heatmap;
+  if (s == "drap")        return PropOverlayType::Drap;
+  return PropOverlayType::None;
+}
+
+static std::string weatherOverlayToStr(WeatherOverlayType t) {
+  if (t == WeatherOverlayType::Clouds) return "clouds";
+  if (t == WeatherOverlayType::WxMb)   return "wxmb";
+  return "none";
+}
+
+static WeatherOverlayType weatherOverlayFromStr(const std::string &s) {
+  if (s == "clouds") return WeatherOverlayType::Clouds;
+  if (s == "wxmb")   return WeatherOverlayType::WxMb;
+  return WeatherOverlayType::None;
+}
+
 static std::string colorToHex(SDL_Color c) {
   char buf[8];
   std::snprintf(buf, sizeof(buf), "#%02X%02X%02X", c.r, c.g, c.b);
@@ -406,6 +440,50 @@ bool ConfigManager::load(AppConfig &config) {
     config.rigAutoTune = r.value("auto_tune", true);
   }
 
+  // Presets
+  if (json.contains("presets") && json["presets"].is_array()) {
+    config.presets.clear();
+    for (auto &jp : json["presets"]) {
+      ConfigPreset p;
+      p.name = jp.value("name", "");
+      if (jp.contains("pane1_rotation") && jp["pane1_rotation"].is_array())
+        for (auto &e : jp["pane1_rotation"])
+          if (e.is_string())
+            p.pane1Rotation.push_back(widgetTypeFromString(e.get<std::string>(), WidgetType::SOLAR));
+      if (jp.contains("pane2_rotation") && jp["pane2_rotation"].is_array())
+        for (auto &e : jp["pane2_rotation"])
+          if (e.is_string())
+            p.pane2Rotation.push_back(widgetTypeFromString(e.get<std::string>(), WidgetType::DX_CLUSTER));
+      if (jp.contains("pane3_rotation") && jp["pane3_rotation"].is_array())
+        for (auto &e : jp["pane3_rotation"])
+          if (e.is_string())
+            p.pane3Rotation.push_back(widgetTypeFromString(e.get<std::string>(), WidgetType::LIVE_SPOTS));
+      if (jp.contains("pane4_rotation") && jp["pane4_rotation"].is_array())
+        for (auto &e : jp["pane4_rotation"])
+          if (e.is_string())
+            p.pane4Rotation.push_back(widgetTypeFromString(e.get<std::string>(), WidgetType::BAND_CONDITIONS));
+      if (jp.contains("pane5_rotation") && jp["pane5_rotation"].is_array())
+        for (auto &e : jp["pane5_rotation"])
+          if (e.is_string())
+            p.pane5Rotation.push_back(widgetTypeFromString(e.get<std::string>(), WidgetType::DE_INFO));
+      if (jp.contains("pane6_rotation") && jp["pane6_rotation"].is_array())
+        for (auto &e : jp["pane6_rotation"])
+          if (e.is_string())
+            p.pane6Rotation.push_back(widgetTypeFromString(e.get<std::string>(), WidgetType::DX_INFO));
+      p.rotationIntervalS = jp.value("rotation_interval_s", 30);
+      p.propOverlay  = propOverlayFromStr(jp.value("prop_overlay", "none"));
+      p.weatherOverlay = weatherOverlayFromStr(jp.value("weather_overlay", "none"));
+      p.mapStyle     = jp.value("map_style", "nasa");
+      p.mapNightLights = jp.value("map_night_lights", true);
+      p.showGrid     = jp.value("show_grid", false);
+      p.gridType     = jp.value("grid_type", "latlon");
+      p.propBand     = jp.value("prop_band", "20m");
+      p.propMode     = jp.value("prop_mode", "SSB");
+      p.propPower    = jp.value("prop_power", 100);
+      config.presets.push_back(std::move(p));
+    }
+  }
+
   // Sync internal state
   config_ = config;
 
@@ -577,6 +655,38 @@ bool ConfigManager::save(const AppConfig &config) {
     for (auto const &[key, val] : config.colorOverrides) {
       json["color_overrides"][key] = colorToHex(val);
     }
+  }
+
+  // Presets
+  {
+    auto savePresetRotation = [](const std::vector<WidgetType> &vec) {
+      auto arr = nlohmann::json::array();
+      for (auto t : vec) arr.push_back(widgetTypeToString(t));
+      return arr;
+    };
+    auto presetsArr = nlohmann::json::array();
+    for (const auto &p : config.presets) {
+      nlohmann::json jp;
+      jp["name"]               = p.name;
+      jp["pane1_rotation"]     = savePresetRotation(p.pane1Rotation);
+      jp["pane2_rotation"]     = savePresetRotation(p.pane2Rotation);
+      jp["pane3_rotation"]     = savePresetRotation(p.pane3Rotation);
+      jp["pane4_rotation"]     = savePresetRotation(p.pane4Rotation);
+      jp["pane5_rotation"]     = savePresetRotation(p.pane5Rotation);
+      jp["pane6_rotation"]     = savePresetRotation(p.pane6Rotation);
+      jp["rotation_interval_s"] = p.rotationIntervalS;
+      jp["prop_overlay"]       = propOverlayToStr(p.propOverlay);
+      jp["weather_overlay"]    = weatherOverlayToStr(p.weatherOverlay);
+      jp["map_style"]          = p.mapStyle;
+      jp["map_night_lights"]   = p.mapNightLights;
+      jp["show_grid"]          = p.showGrid;
+      jp["grid_type"]          = p.gridType;
+      jp["prop_band"]          = p.propBand;
+      jp["prop_mode"]          = p.propMode;
+      jp["prop_power"]         = p.propPower;
+      presetsArr.push_back(jp);
+    }
+    json["presets"] = presetsArr;
   }
 
   std::ofstream ofs(configPath_);

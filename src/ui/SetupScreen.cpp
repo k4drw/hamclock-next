@@ -28,9 +28,11 @@ void SetupScreen::autoPopulateLatLon() {
   std::string g = gridInput_.getValue();
   for (size_t i = 0; i < g.size(); ++i) {
     if (i < 2) {
-      if (g[i] >= 'a' && g[i] <= 'z') g[i] -= 32;
+      if (g[i] >= 'a' && g[i] <= 'z')
+        g[i] -= 32;
     } else if (i >= 4) {
-      if (g[i] >= 'A' && g[i] <= 'Z') g[i] += 32;
+      if (g[i] >= 'A' && g[i] <= 'Z')
+        g[i] += 32;
     }
   }
   gridInput_.setValue(g);
@@ -107,7 +109,6 @@ TextInput *SetupScreen::getActiveInput() {
   return nullptr;
 }
 
-
 void SetupScreen::update() {
   if (themeCustomizer_ && themeCustomizer_->isActive()) {
     themeCustomizer_->update();
@@ -116,7 +117,8 @@ void SetupScreen::update() {
   autoPopulateLatLon();
 
   mismatchWarning_ = false;
-  if (latLonManual_ && gridValid_ && !latInput_.getValue().empty() && !lonInput_.getValue().empty()) {
+  if (latLonManual_ && gridValid_ && !latInput_.getValue().empty() &&
+      !lonInput_.getValue().empty()) {
     double manLat = std::atof(latInput_.getValue().c_str());
     double manLon = std::atof(lonInput_.getValue().c_str());
     double tolLat = (gridInput_.getValue().size() >= 6) ? 0.5 : 1.0;
@@ -131,7 +133,6 @@ void SetupScreen::update() {
 bool SetupScreen::isModalActive() const {
   return themeCustomizer_ && themeCustomizer_->isActive();
 }
-
 
 void SetupScreen::render(SDL_Renderer *renderer) {
   if (themeCustomizer_ && themeCustomizer_->isActive()) {
@@ -191,9 +192,9 @@ void SetupScreen::render(SDL_Renderer *renderer) {
        pad / 2; // tightened: was +pad, halved gap to tab bar
 
   // Appearance tab absorbs brightness/display settings — 9 tabs total
-  const char *tabs[] = {"Identity", "Spotting", "Appearance", "Rig",
-                        "Services", "Network",  "Widgets",    "Watchlist",
-                        "Update"};
+  const char *tabs[] = {"Identity", "Spotting",  "Appearance",
+                        "Rig",      "Services",  "Network",
+                        "Widgets",  "Watchlist", "Update"};
   int numTabs = 9;
   int tabW = fieldW / numTabs;
 
@@ -334,7 +335,8 @@ void SetupScreen::renderTabIdentity(SDL_Renderer *renderer, int, int pad,
   y += labelH;
   gridInput_.render(renderer, fontMgr_, fieldX, y, fieldW, fieldH,
                     FontStyle::SmallRegular, textPad, activeField_ == 1,
-                    gridValid_, orange, gray, green, white, gray, "e.g. EL87qr");
+                    gridValid_, orange, gray, green, white, gray,
+                    "e.g. EL87qr");
   y += fieldH + vSpace;
 
   int halfFieldW = (fieldW - pad) / 2;
@@ -363,7 +365,7 @@ void SetupScreen::renderTabIdentity(SDL_Renderer *renderer, int, int pad,
                   red, FontStyle::Fast);
   } else if (gridValid_ && !latLonManual_) {
     cat->drawText(renderer, "Auto-calculated from grid", fieldX, y, gray,
-                  FontStyle::Fast);
+                  FontStyle::Fast, false, false, true);
   }
   y += pad;
 
@@ -406,15 +408,16 @@ void SetupScreen::renderTabDXCluster(SDL_Renderer *renderer, int cx, int pad,
   int halfW = (fieldW - pad) / 2;
   int hostY = y;
   clusterHostInput_.render(renderer, fontMgr_, fieldX, hostY, halfW, fieldH,
-                           FontStyle::SmallRegular, textPad,
-                           activeField_ == 0, !clusterHostInput_.getValue().empty(),
-                           orange, gray, white, white, gray, "dxusa.net");
+                           FontStyle::SmallRegular, textPad, activeField_ == 0,
+                           !clusterHostInput_.getValue().empty(), orange, gray,
+                           white, white, gray, "dxusa.net");
   clusterHostRect_ = {fieldX, hostY, halfW, fieldH};
   int portY = y;
   clusterPortInput_.render(renderer, fontMgr_, fieldX + halfW + pad, portY,
                            halfW, fieldH, FontStyle::SmallRegular, textPad,
-                           activeField_ == 1, !clusterPortInput_.getValue().empty(),
-                           orange, gray, white, white, gray, "7300");
+                           activeField_ == 1,
+                           !clusterPortInput_.getValue().empty(), orange, gray,
+                           white, white, gray, "7300");
   clusterPortRect_ = {fieldX + halfW + pad, portY, halfW, fieldH};
   y += fieldH + vSpace;
 
@@ -422,8 +425,8 @@ void SetupScreen::renderTabDXCluster(SDL_Renderer *renderer, int cx, int pad,
   y += cat->ptSize(FontStyle::SmallBold) + 4;
   clusterLoginInput_.render(renderer, fontMgr_, fieldX, y, fieldW, fieldH,
                             FontStyle::SmallRegular, textPad, activeField_ == 2,
-                            !clusterLoginInput_.getValue().empty(),
-                            orange, gray, white, white, gray, "NOCALL");
+                            !clusterLoginInput_.getValue().empty(), orange,
+                            gray, white, white, gray, "NOCALL");
   clusterLoginRect_ = {fieldX, y, fieldW, fieldH};
   y += fieldH + vSpace;
 
@@ -463,8 +466,8 @@ void SetupScreen::renderTabDXCluster(SDL_Renderer *renderer, int cx, int pad,
     wsjtxPortRect_ = {portX, y, wPortW, fieldH};
     wsjtxPortInput_.render(renderer, fontMgr_, portX, y, wPortW, fieldH,
                            FontStyle::SmallRegular, textPad, activeField_ == 3,
-                           !wsjtxPortInput_.getValue().empty(),
-                           orange, gray, white, white, gray, "2237");
+                           !wsjtxPortInput_.getValue().empty(), orange, gray,
+                           white, white, gray, "2237");
   } else {
     wsjtxPortRect_ = {0, 0, 0, 0};
   }
@@ -648,7 +651,8 @@ void SetupScreen::renderTabServices(SDL_Renderer *renderer, int cx, int pad,
   y += labelH;
   qrzUsernameInput_.render(renderer, fontMgr_, fieldX, y, fieldW, fieldH,
                            FontStyle::SmallRegular, textPad, activeField_ == 0,
-                           true, orange, gray, white, white, gray, "e.g. K4DRW");
+                           true, orange, gray, white, white, gray,
+                           "e.g. K4DRW");
   y += fieldH + vSpace;
 
   cat->drawText(renderer, "QRZ Password:", fieldX, y, white,
@@ -762,7 +766,8 @@ void SetupScreen::renderTabRig(SDL_Renderer *renderer, int cx, int pad,
   y += rigLabelH;
   rigHostInput_.render(renderer, fontMgr_, fieldX, y, fieldW, fieldH,
                        FontStyle::SmallRegular, textPad, activeField_ == 0,
-                       true, orange, gray, white, white, gray, "e.g. localhost");
+                       true, orange, gray, white, white, gray,
+                       "e.g. localhost");
   y += fieldH + vSpace;
 
   cat->drawText(renderer, "rigctld Port:", fieldX, y, white,
@@ -798,7 +803,8 @@ void SetupScreen::renderTabWidgets(SDL_Renderer *renderer, int cx, int pad,
                                    int /*textPad*/) {
   auto *cat = fontMgr_.catalog();
   // Clamp activePane_ to top-bar panes only (0-3)
-  if (activePane_ > 3) activePane_ = 0;
+  if (activePane_ > 3)
+    activePane_ = 0;
 
   int y =
       (modalRect_.y + cat->ptSize(FontStyle::MediumBold) + 2 * pad + fieldH);
@@ -825,7 +831,7 @@ void SetupScreen::renderTabWidgets(SDL_Renderer *renderer, int cx, int pad,
                            active ? 255 : 80, 255);
     SDL_RenderDrawRect(renderer, &pr);
     cat->drawText(renderer, kTopLabels[i], pr.x + pr.w / 2, pr.y + pr.h / 2,
-                  active ? white : gray, FontStyle::Fast, true);
+                  active ? white : gray, FontStyle::Fast, true, false, true);
   }
   y += btnH + btnGap;
 
@@ -855,31 +861,49 @@ void SetupScreen::renderTabWidgets(SDL_Renderer *renderer, int cx, int pad,
   int listEndY = sideSecY - pad / 2;
   int listAvailH = listEndY - y;
 
-  static const WidgetType kAllTypes[] = {
-      WidgetType::ADIF,          WidgetType::ASTEROID,
-      WidgetType::AURORA,        WidgetType::AURORA_GRAPH,
-      WidgetType::BAND_CONDITIONS, WidgetType::CALLBOOK,
-      WidgetType::CLOCK_AUX,    WidgetType::CONTESTS,
-      WidgetType::COUNTDOWN,    WidgetType::DE_WEATHER,
-      WidgetType::DRAP,          WidgetType::DST_INDEX,
-      WidgetType::DX_CLUSTER,   WidgetType::DX_PEDITIONS,
-      WidgetType::DX_WEATHER,   WidgetType::EME_TOOL,
-      WidgetType::FORECAST,     WidgetType::GIMBAL,
-      WidgetType::HISTORY_KP,   WidgetType::LIVE_SPOTS,
-      WidgetType::MARINE,        WidgetType::MOON,
-      WidgetType::NCDXF,         WidgetType::ON_THE_AIR,
-      WidgetType::REMINDER,     WidgetType::SANTA_TRACKER,
-      WidgetType::SDO,           WidgetType::SOLAR,
-      WidgetType::HISTORY_FLUX, WidgetType::STOPWATCH,
-      WidgetType::HISTORY_SSN,  WidgetType::SYS_INFO,
-      WidgetType::HURRICANE,    WidgetType::WATCHLIST,
-      WidgetType::ALERTS};
-  constexpr int kNWidgets = static_cast<int>(sizeof(kAllTypes) / sizeof(kAllTypes[0]));
+  static const WidgetType kAllTypes[] = {WidgetType::ADIF,
+                                         WidgetType::ASTEROID,
+                                         WidgetType::AURORA,
+                                         WidgetType::AURORA_GRAPH,
+                                         WidgetType::BAND_CONDITIONS,
+                                         WidgetType::CALLBOOK,
+                                         WidgetType::CLOCK_AUX,
+                                         WidgetType::CONTESTS,
+                                         WidgetType::COUNTDOWN,
+                                         WidgetType::DE_WEATHER,
+                                         WidgetType::DRAP,
+                                         WidgetType::DST_INDEX,
+                                         WidgetType::DX_CLUSTER,
+                                         WidgetType::DX_PEDITIONS,
+                                         WidgetType::DX_WEATHER,
+                                         WidgetType::EME_TOOL,
+                                         WidgetType::FORECAST,
+                                         WidgetType::GIMBAL,
+                                         WidgetType::HISTORY_KP,
+                                         WidgetType::LIVE_SPOTS,
+                                         WidgetType::MARINE,
+                                         WidgetType::MOON,
+                                         WidgetType::NCDXF,
+                                         WidgetType::ON_THE_AIR,
+                                         WidgetType::REMINDER,
+                                         WidgetType::SANTA_TRACKER,
+                                         WidgetType::SDO,
+                                         WidgetType::SOLAR,
+                                         WidgetType::HISTORY_FLUX,
+                                         WidgetType::STOPWATCH,
+                                         WidgetType::HISTORY_SSN,
+                                         WidgetType::SYS_INFO,
+                                         WidgetType::HURRICANE,
+                                         WidgetType::WATCHLIST,
+                                         WidgetType::ALERTS};
+  constexpr int kNWidgets =
+      static_cast<int>(sizeof(kAllTypes) / sizeof(kAllTypes[0]));
   constexpr int kColItems = (kNWidgets + 2) / 3; // items per column = 12
 
   int visRows = std::max(1, listAvailH / rowH);
   widgetListMaxScroll_ = std::max(0, kColItems - visRows);
-  widgetListScrollOffset_ = std::max(0, std::min(widgetListScrollOffset_, widgetListMaxScroll_));
+  widgetListScrollOffset_ =
+      std::max(0, std::min(widgetListScrollOffset_, widgetListMaxScroll_));
   widgetListStartY_ = y;
   widgetListEndY_ = y + visRows * rowH;
 
@@ -895,7 +919,8 @@ void SetupScreen::renderTabWidgets(SDL_Renderer *renderer, int cx, int pad,
   for (int col = 0; col < 3; ++col) {
     for (int row = 0; row < visRows; ++row) {
       int idx = col * kColItems + widgetListScrollOffset_ + row;
-      if (idx >= kNWidgets) break;
+      if (idx >= kNWidgets)
+        break;
       WidgetType t = kAllTypes[idx];
 
       bool allowed = true;
@@ -956,9 +981,12 @@ void SetupScreen::renderTabWidgets(SDL_Renderer *renderer, int cx, int pad,
   int curMode = 0;
   if (!paneRotations_[4].empty()) {
     WidgetType t5 = paneRotations_[4][0];
-    if (t5 == WidgetType::DX_CLUSTER)  curMode = 1;
-    else if (t5 == WidgetType::ON_THE_AIR) curMode = 2;
-    else if (t5 == WidgetType::LIVE_SPOTS) curMode = 3;
+    if (t5 == WidgetType::DX_CLUSTER)
+      curMode = 1;
+    else if (t5 == WidgetType::ON_THE_AIR)
+      curMode = 2;
+    else if (t5 == WidgetType::LIVE_SPOTS)
+      curMode = 3;
     // else curMode = 0 (DE_INFO + DX_INFO or default)
   }
 
@@ -1070,9 +1098,9 @@ bool SetupScreen::onMouseDown(int mx, int my, Uint16 mod, int clicks) {
   // 1. Tab Switching (Highest Priority)
   int yTabs = modalRect_.y + cat->ptSize(FontStyle::MediumBold) + 3 * pad / 2;
   if (my >= yTabs && my <= yTabs + fieldH) {
-    const Tab tabValues[] = {Tab::Identity,  Tab::Spotting, Tab::Appearance,
-                             Tab::Rig,       Tab::Services, Tab::Network,
-                             Tab::Widgets,   Tab::Watchlist, Tab::Update};
+    const Tab tabValues[] = {Tab::Identity, Tab::Spotting,  Tab::Appearance,
+                             Tab::Rig,      Tab::Services,  Tab::Network,
+                             Tab::Widgets,  Tab::Watchlist, Tab::Update};
     int numTabs = 9;
     int tabW = fieldW / numTabs;
     for (int i = 0; i < numTabs; ++i) {
@@ -1153,8 +1181,8 @@ bool SetupScreen::onMouseDown(int mx, int my, Uint16 mod, int clicks) {
       return true;
   } else if (activeTab_ == Tab::Widgets) {
     // 1. Pane Switching (4 top-bar panes, 1 row)
-    int yW = modalRect_.y + cat->ptSize(FontStyle::MediumBold) + 2 * pad + fieldH +
-             cat->ptSize(FontStyle::SmallBold) + pad / 2;
+    int yW = modalRect_.y + cat->ptSize(FontStyle::MediumBold) + 2 * pad +
+             fieldH + cat->ptSize(FontStyle::SmallBold) + pad / 2;
     const int btnH = 22;
     int paneW = fieldW / 4;
     for (int i = 0; i < 4; ++i) {
@@ -1169,8 +1197,10 @@ bool SetupScreen::onMouseDown(int mx, int my, Uint16 mod, int clicks) {
     }
 
     // 2. Sync Rotation Toggle
-    if (mx >= syncRotationRect_.x && mx < syncRotationRect_.x + syncRotationRect_.w &&
-        my >= syncRotationRect_.y && my < syncRotationRect_.y + syncRotationRect_.h) {
+    if (mx >= syncRotationRect_.x &&
+        mx < syncRotationRect_.x + syncRotationRect_.w &&
+        my >= syncRotationRect_.y &&
+        my < syncRotationRect_.y + syncRotationRect_.h) {
       syncRotation_ = !syncRotation_;
       return true;
     }
@@ -1178,12 +1208,13 @@ bool SetupScreen::onMouseDown(int mx, int my, Uint16 mod, int clicks) {
     // 3. Widget Selection (only within visible list area)
     if (my >= widgetListStartY_ && my < widgetListEndY_) {
       for (auto &wr : widgetRects_) {
-        if (mx >= wr.rect.x && mx < wr.rect.x + wr.rect.w &&
-            my >= wr.rect.y && my < wr.rect.y + wr.rect.h) {
+        if (mx >= wr.rect.x && mx < wr.rect.x + wr.rect.w && my >= wr.rect.y &&
+            my < wr.rect.y + wr.rect.h) {
           auto &cur = paneRotations_[activePane_];
           auto it = std::find(cur.begin(), cur.end(), wr.type);
           if (it != cur.end()) {
-            if (cur.size() > 1) cur.erase(it);
+            if (cur.size() > 1)
+              cur.erase(it);
           } else {
             cur.push_back(wr.type);
           }
@@ -1193,15 +1224,17 @@ bool SetupScreen::onMouseDown(int mx, int my, Uint16 mod, int clicks) {
     }
 
     // 4. Side Panel Mode
-    static const WidgetType kMode5[] = {WidgetType::DE_INFO, WidgetType::DX_CLUSTER,
-                                        WidgetType::ON_THE_AIR, WidgetType::LIVE_SPOTS};
+    static const WidgetType kMode5[] = {
+        WidgetType::DE_INFO, WidgetType::DX_CLUSTER, WidgetType::ON_THE_AIR,
+        WidgetType::LIVE_SPOTS};
     for (int i = 0; i < 4; ++i) {
       auto &sr = sidePanelModeRects_[i];
-      if (sr.w > 0 && mx >= sr.x && mx < sr.x + sr.w &&
-          my >= sr.y && my < sr.y + sr.h) {
+      if (sr.w > 0 && mx >= sr.x && mx < sr.x + sr.w && my >= sr.y &&
+          my < sr.y + sr.h) {
         paneRotations_[4] = {kMode5[i]};
-        paneRotations_[5] = (i == 0) ? std::vector<WidgetType>{WidgetType::DX_INFO}
-                                     : std::vector<WidgetType>{};
+        paneRotations_[5] = (i == 0)
+                                ? std::vector<WidgetType>{WidgetType::DX_INFO}
+                                : std::vector<WidgetType>{};
         return true;
       }
     }
@@ -1376,7 +1409,8 @@ bool SetupScreen::onKeyDown(SDL_Keycode key, Uint16 mod) {
   case SDLK_TAB: {
     activeField_ = (activeField_ + 1) % nFields;
     TextInput *ni = getActiveInput();
-    if (ni) ni->setCursorToEnd();
+    if (ni)
+      ni->setCursorToEnd();
     return true;
   }
   case SDLK_RETURN:
@@ -1391,16 +1425,19 @@ bool SetupScreen::onKeyDown(SDL_Keycode key, Uint16 mod) {
                      (activeField_ == 2 || activeField_ == 3));
     bool isRotInterval = (activeTab_ == Tab::Appearance && activeField_ == 0);
     if (isRotInterval) {
-      if (key == SDLK_BACKSPACE) rotationInterval_ /= 10;
+      if (key == SDLK_BACKSPACE)
+        rotationInterval_ /= 10;
       return true;
     }
     TextInput *ti = getActiveInput();
     if (ti) {
       bool hadContent = ti->hasSelection() ||
-          (key == SDLK_BACKSPACE ? ti->getCursorPos() > 0
-                                 : ti->getCursorPos() < (int)ti->getValue().size());
+                        (key == SDLK_BACKSPACE
+                             ? ti->getCursorPos() > 0
+                             : ti->getCursorPos() < (int)ti->getValue().size());
       ti->onKeyDown(key, mod);
-      if (hadContent && isLatLon) latLonManual_ = true;
+      if (hadContent && isLatLon)
+        latLonManual_ = true;
     }
     return true;
   }
@@ -1417,12 +1454,14 @@ bool SetupScreen::onKeyDown(SDL_Keycode key, Uint16 mod) {
     // fall through to default for non-ctrl v
     {
       TextInput *ti = getActiveInput();
-      if (ti) ti->onKeyDown(key, mod);
+      if (ti)
+        ti->onKeyDown(key, mod);
     }
     return true;
   default: {
     TextInput *ti = getActiveInput();
-    if (ti) ti->onKeyDown(key, mod);
+    if (ti)
+      ti->onKeyDown(key, mod);
     return true;
   }
   }
@@ -1444,7 +1483,8 @@ bool SetupScreen::onTextInput(const char *inputText) {
     if (ti && ti->getValue().size() == 2 && inputText[0] != ':') {
       ti->onTextInput(":");
     }
-    if (ti) ti->onTextInput(inputText);
+    if (ti)
+      ti->onTextInput(inputText);
     return true;
   }
 
@@ -1502,7 +1542,8 @@ bool SetupScreen::onTextInput(const char *inputText) {
     }
     std::string formatted = inputText;
     for (size_t i = 0; i < formatted.size(); ++i) {
-      int pos = static_cast<int>(gridInput_.getValue().size()) + static_cast<int>(i);
+      int pos =
+          static_cast<int>(gridInput_.getValue().size()) + static_cast<int>(i);
       if (pos < 2) {
         formatted[i] = std::toupper(formatted[i]);
       } else if (pos >= 4) {
@@ -1523,7 +1564,8 @@ bool SetupScreen::onTextInput(const char *inputText) {
     }
     latLonManual_ = true;
     TextInput *ti = getActiveInput();
-    if (ti) ti->onTextInput(inputText);
+    if (ti)
+      ti->onTextInput(inputText);
     return true;
   }
 
@@ -1549,7 +1591,8 @@ bool SetupScreen::onTextInput(const char *inputText) {
 
   // === DEFAULT INSERTION ===
   TextInput *ti = getActiveInput();
-  if (ti) ti->onTextInput(inputText);
+  if (ti)
+    ti->onTextInput(inputText);
 
   return true;
 }
@@ -1574,8 +1617,8 @@ void SetupScreen::renderTabWatchlist(SDL_Renderer *renderer, int /*cx*/,
   const int delBtnW = 36;
 
   watchlistDeleteRects_.clear();
-  int visCount =
-      std::min(maxVisible, (int)watchlistEntries_.size() - watchlistScrollOffset_);
+  int visCount = std::min(maxVisible, (int)watchlistEntries_.size() -
+                                          watchlistScrollOffset_);
   visCount = std::max(0, visCount);
 
   for (int i = 0; i < visCount; ++i) {
@@ -1590,9 +1633,8 @@ void SetupScreen::renderTabWatchlist(SDL_Renderer *renderer, int /*cx*/,
     SDL_RenderDrawRect(renderer, &rowR);
 
     // Callsign text
-    cat->drawText(renderer, call.c_str(), fieldX + textPad,
-                  y + fieldH / 2, white, FontStyle::SmallRegular, false, false,
-                  true);
+    cat->drawText(renderer, call.c_str(), fieldX + textPad, y + fieldH / 2,
+                  white, FontStyle::SmallRegular, false, false, true);
 
     // [X] delete button
     SDL_Rect delR = {fieldX + fieldW - delBtnW, y + 2, delBtnW, fieldH - 4};
@@ -1600,8 +1642,8 @@ void SetupScreen::renderTabWatchlist(SDL_Renderer *renderer, int /*cx*/,
     SDL_RenderFillRect(renderer, &delR);
     SDL_SetRenderDrawColor(renderer, 140, 60, 60, 255);
     SDL_RenderDrawRect(renderer, &delR);
-    cat->drawText(renderer, "X", delR.x + delR.w / 2, delR.y + delR.h / 2,
-                  red, FontStyle::SmallBold, true, false, true);
+    cat->drawText(renderer, "X", delR.x + delR.w / 2, delR.y + delR.h / 2, red,
+                  FontStyle::SmallBold, true, false, true);
     watchlistDeleteRects_.push_back(delR);
 
     y += rowH;
@@ -1625,9 +1667,8 @@ void SetupScreen::renderTabWatchlist(SDL_Renderer *renderer, int /*cx*/,
       SDL_RenderFillRect(renderer, &downR);
       SDL_SetRenderDrawColor(renderer, 80, 80, 100, 255);
       SDL_RenderDrawRect(renderer, &downR);
-      cat->drawText(renderer, "v", downR.x + downR.w / 2,
-                    downR.y + downR.h / 2, arrowCol, FontStyle::Fast, true,
-                    false, true);
+      cat->drawText(renderer, "v", downR.x + downR.w / 2, downR.y + downR.h / 2,
+                    arrowCol, FontStyle::Fast, true, false, true);
     }
     y += rowH;
   }
@@ -1651,11 +1692,10 @@ void SetupScreen::renderTabWatchlist(SDL_Renderer *renderer, int /*cx*/,
   watchlistInputRect_ = {fieldX, y, inputW, fieldH};
   watchlistAddRect_ = {fieldX + inputW + pad / 2, y, addBtnW, fieldH};
 
-  watchlistInputField_.render(renderer, fontMgr_, fieldX, y, inputW, fieldH,
-                              FontStyle::SmallRegular, textPad,
-                              activeTab_ == Tab::Watchlist && activeField_ == 0,
-                              false, orange, gray, white, white, gray,
-                              "Enter callsign...");
+  watchlistInputField_.render(
+      renderer, fontMgr_, fieldX, y, inputW, fieldH, FontStyle::SmallRegular,
+      textPad, activeTab_ == Tab::Watchlist && activeField_ == 0, false, orange,
+      gray, white, white, gray, "Enter callsign...");
   y += fieldH;
 
   SDL_SetRenderDrawColor(renderer, 40, 80, 40, 255);
@@ -1807,7 +1847,8 @@ AppConfig SetupScreen::getConfig() const {
     cfg.dimHour = dh;
     cfg.dimMinute = dm;
   }
-  if (std::sscanf(brightTimeInput_.getValue().c_str(), "%d:%d", &bh, &bm) == 2) {
+  if (std::sscanf(brightTimeInput_.getValue().c_str(), "%d:%d", &bh, &bm) ==
+      2) {
     cfg.brightHour = bh;
     cfg.brightMinute = bm;
   }

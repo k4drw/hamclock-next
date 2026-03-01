@@ -550,6 +550,7 @@ set(HAMCLOCK_SOURCES
     src/ui/DRAPPanel.cpp
     src/ui/GimbalPanel.cpp
     src/ui/GreylineModal.cpp
+    src/ui/PresetsModal.cpp
     src/ui/HistoryPanel.cpp
     src/ui/MoonPanel.cpp
     src/ui/SDOPanel.cpp

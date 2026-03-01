@@ -248,8 +248,19 @@ void ActivityProvider::fetchSOTA() {
             os.lat = slat;
             os.lon = slon;
           } else {
-            // Only trigger API lookup for valid-looking refs (no '?' placeholders).
-            if (os.ref.find('?') == std::string::npos)
+            // Only trigger API lookup for well-formed SOTA refs (ASSOC/REGION-NNN
+            // where the summit number is all digits, ruling out placeholders like
+            // CS-0XX or CS-??X that the upstream API occasionally emits).
+            auto slash = os.ref.find('/');
+            auto dash  = os.ref.rfind('-');
+            bool valid = (slash != std::string::npos && dash != std::string::npos &&
+                          dash > slash && dash + 1 < os.ref.size());
+            if (valid) {
+              for (size_t i = dash + 1; i < os.ref.size(); ++i)
+                if (!std::isdigit(static_cast<unsigned char>(os.ref[i])))
+                  { valid = false; break; }
+            }
+            if (valid)
               ActivityLocationManager::getInstance().resolveSummitAsync(os.ref);
           }
 

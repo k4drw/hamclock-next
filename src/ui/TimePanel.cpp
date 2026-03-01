@@ -116,6 +116,7 @@ void TimePanel::destroyCache() {
   MemoryMonitor::getInstance().destroyTexture(hmTex_);
   MemoryMonitor::getInstance().destroyTexture(secTex_);
   MemoryMonitor::getInstance().destroyTexture(dateTex_);
+  MemoryMonitor::getInstance().destroyTexture(starTex_);
 }
 
 void TimePanel::update() {
@@ -328,10 +329,44 @@ void TimePanel::render(SDL_Renderer *renderer) {
     SDL_RenderCopy(renderer, dateTex_, nullptr, &dst);
   }
 
+  // Star (presets) button — bottom-left of date row
+  if (!editing_ && presetsRect_.w > 0) {
+    SDL_SetRenderDrawColor(renderer, 20, 25, 35, 255);
+    SDL_RenderFillRect(renderer, &presetsRect_);
+    SDL_SetRenderDrawColor(renderer, 80, 90, 110, 255);
+    SDL_RenderDrawRect(renderer, &presetsRect_);
+    if (!starTex_) {
+      SDL_Color starCol = {200, 180, 60, 255};
+      int ptSize = std::max(8, presetsRect_.h - 2);
+      starTex_ = fontMgr_.renderText(renderer, "\xe2\x9c\xaf", starCol, ptSize,
+                                     &starW_, &starH_);
+    }
+    if (starTex_) {
+      SDL_Rect dst = {presetsRect_.x + (presetsRect_.w - starW_) / 2,
+                      presetsRect_.y + (presetsRect_.h - starH_) / 2,
+                      starW_, starH_};
+      SDL_RenderCopy(renderer, starTex_, nullptr, &dst);
+    }
+  }
+
   // Editor overlay on top of everything
   if (editing_) {
     renderEditOverlay(renderer);
   }
+}
+
+void TimePanel::initPresets(AppConfig *cfg, std::function<void()> onApply) {
+  presetsModal_ = std::make_unique<PresetsModal>(fontMgr_);
+  presetsModal_->init(cfg, std::move(onApply));
+}
+
+bool TimePanel::isModalActive() const {
+  return presetsModal_ && presetsModal_->isActive();
+}
+
+void TimePanel::renderModal(SDL_Renderer *renderer) {
+  if (presetsModal_)
+    presetsModal_->render(renderer);
 }
 
 void TimePanel::onResize(int x, int y, int w, int h) {
@@ -347,6 +382,14 @@ void TimePanel::onResize(int x, int y, int w, int h) {
   gearSize_ = std::clamp(static_cast<int>(h * 0.10f), 8, 18);
   gearRect_ = {x_ + width_ - gearSize_ - pad, y_ + height_ - gearSize_ - pad,
                gearSize_, gearSize_};
+
+  // Star button: 22×22 in the date row, left side
+  int callRowH = h * 50 / 148;
+  int infoRowH = h * 16 / 148;
+  int timeRowH = h * 50 / 148;
+  int dateBaseY = y_ + callRowH + infoRowH + timeRowH;
+  int dateRowH  = y_ + h - dateBaseY;
+  presetsRect_ = {x_ + 4, dateBaseY + (dateRowH - 22) / 2, 22, 22};
 
   destroyCache();
 }
@@ -379,7 +422,13 @@ void TimePanel::stopEditing(bool apply) {
   SDL_StopTextInput();
 }
 
-bool TimePanel::onMouseUp(int mx, int my, Uint16 /*mod*/, int clicks) {
+bool TimePanel::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
+  // Delegate to presets modal when active
+  if (presetsModal_ && presetsModal_->isActive()) {
+    presetsModal_->onMouseUp(mx, my, mod);
+    return true;
+  }
+
   // Transport controls (pause / next) — check before gear
   if (!editing_) {
     if (pauseRect_.w > 0 && mx >= pauseRect_.x &&
@@ -409,6 +458,15 @@ bool TimePanel::onMouseUp(int mx, int my, Uint16 /*mod*/, int clicks) {
   if (!editing_ && mx >= hit.x && mx < hit.x + hit.w && my >= hit.y &&
       my < hit.y + hit.h) {
     setupRequested_ = true;
+    return true;
+  }
+
+  // Star (presets) button
+  if (!editing_ && presetsRect_.w > 0 && mx >= presetsRect_.x &&
+      mx < presetsRect_.x + presetsRect_.w && my >= presetsRect_.y &&
+      my < presetsRect_.y + presetsRect_.h) {
+    if (presetsModal_)
+      presetsModal_->open();
     return true;
   }
 
@@ -470,6 +528,9 @@ bool TimePanel::onMouseUp(int mx, int my, Uint16 /*mod*/, int clicks) {
 }
 
 bool TimePanel::onKeyDown(SDL_Keycode key, Uint16 mod) {
+  if (presetsModal_ && presetsModal_->isActive())
+    return presetsModal_->onKeyDown(key, mod);
+
   if (!editing_)
     return false;
 
@@ -488,6 +549,9 @@ bool TimePanel::onKeyDown(SDL_Keycode key, Uint16 mod) {
 }
 
 bool TimePanel::onTextInput(const char *text) {
+  if (presetsModal_ && presetsModal_->isActive())
+    return presetsModal_->onTextInput(text);
+
   if (!editing_)
     return false;
   editInput_.onTextInput(text);
