@@ -2523,8 +2523,8 @@ void main_tick() {
 
       int setupW = LOGICAL_WIDTH;
       int setupH = LOGICAL_HEIGHT;
-      int setupX = 0;
-      int setupY = 0;
+      int setupX = ctx.layLogicalOffX;
+      int setupY = ctx.layLogicalOffY;
 
       if (ctx.activeSetup == AppContext::SetupMode::Main) {
         auto s = std::make_unique<SetupScreen>(setupX, setupY, setupW, setupH,
@@ -2612,7 +2612,7 @@ void main_tick() {
         } else if (event.type == SDL_WINDOWEVENT &&
                    event.window.event == SDL_WINDOWEVENT_SIZE_CHANGED) {
           ctx.updateLayoutMetrics();
-          ctx.setupWidget->onResize(0, 0, LOGICAL_WIDTH, LOGICAL_HEIGHT);
+          ctx.setupWidget->onResize(ctx.layLogicalOffX, ctx.layLogicalOffY, LOGICAL_WIDTH, LOGICAL_HEIGHT);
         }
       }
     }

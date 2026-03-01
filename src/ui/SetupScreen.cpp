@@ -159,11 +159,11 @@ void SetupScreen::render(SDL_Renderer *renderer) {
   SDL_RenderFillRect(renderer, &full);
   SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
 
-  // Main Modal Box (Match standard max bounds, properly centered)
-  int modalW = std::min(600, width_ - 40);
-  int modalH = std::min(480, height_ - 40);
-  int modalX = x_ + (width_ - modalW) / 2;
-  int modalY = y_ + (height_ - modalH) / 2;
+  // Main Modal Box — fill the entire app canvas
+  int modalW = width_;
+  int modalH = height_;
+  int modalX = x_;
+  int modalY = y_;
   modalRect_ = {modalX, modalY, modalW, modalH};
 
   ThemeColors themes = getThemeColors(theme_, &colorOverrides_);
@@ -980,7 +980,7 @@ void SetupScreen::renderTabWidgets(SDL_Renderer *renderer, int cx, int pad,
       SDL_Rect inner = {rr.x + 3, rr.y + 3, 8, 8};
       SDL_RenderFillRect(renderer, &inner);
     }
-    cat->drawText(renderer, kSideLabels[i], rr.x + 20, rr.y,
+    cat->drawText(renderer, kSideLabels[i], rr.x + 22, rr.y,
                   curMode == i ? white : gray, FontStyle::Fast);
     y += rowH + 2;
   }
