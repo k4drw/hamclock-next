@@ -91,6 +91,13 @@ private:
   bool clusterWSJTX_ = false;
   TextInput wsjtxPortInput_;
   SDL_Rect wsjtxPortRect_ = {0, 0, 0, 0};
+  SDL_Rect clusterHostRect_ = {0, 0, 0, 0};
+  SDL_Rect clusterPortRect_ = {0, 0, 0, 0};
+  SDL_Rect clusterLoginRect_ = {0, 0, 0, 0};
+  SDL_Rect callsignRect_ = {0, 0, 0, 0};
+  SDL_Rect gridRect_ = {0, 0, 0, 0};
+  SDL_Rect latRect_ = {0, 0, 0, 0};
+  SDL_Rect lonRect_ = {0, 0, 0, 0};
   bool rbnEnabled_ = false;
   bool pskOfDe_ = true;
   bool pskUseCall_ = true;

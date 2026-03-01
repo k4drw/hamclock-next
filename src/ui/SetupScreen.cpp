@@ -323,6 +323,7 @@ void SetupScreen::renderTabIdentity(SDL_Renderer *renderer, int, int pad,
                         FontStyle::SmallRegular, textPad,
                         activeField_ == 0, !callsignInput_.getValue().empty(),
                         orange, gray, white, white, gray, "e.g. K4DRW");
+  callsignRect_ = {fieldX, y, fieldW, fieldH};
   y += fieldH + vSpace;
 
   cat->drawText(renderer, "Grid Square:", fieldX, y, white,
@@ -331,6 +332,7 @@ void SetupScreen::renderTabIdentity(SDL_Renderer *renderer, int, int pad,
   gridInput_.render(renderer, fontMgr_, fieldX, y, fieldW, fieldH,
                     FontStyle::SmallRegular, textPad, activeField_ == 1,
                     gridValid_, orange, gray, green, white, gray, "e.g. EL87qr");
+  gridRect_ = {fieldX, y, fieldW, fieldH};
   y += fieldH + vSpace;
 
   int halfFieldW = (fieldW - pad) / 2;
@@ -344,6 +346,7 @@ void SetupScreen::renderTabIdentity(SDL_Renderer *renderer, int, int pad,
                    FontStyle::SmallRegular, textPad,
                    activeField_ == 2, !latInput_.getValue().empty(),
                    orange, gray, white, white, gray, "e.g. 27.76");
+  latRect_ = {fieldX, latY, halfFieldW, fieldH};
   latY += fieldH;
 
   int lonY = y;
@@ -351,6 +354,7 @@ void SetupScreen::renderTabIdentity(SDL_Renderer *renderer, int, int pad,
                    halfFieldW, fieldH, FontStyle::SmallRegular, textPad,
                    activeField_ == 3, !lonInput_.getValue().empty(),
                    orange, gray, white, white, gray, "e.g. -82.64");
+  lonRect_ = {fieldX + halfFieldW + pad, lonY, halfFieldW, fieldH};
   lonY += fieldH;
   y = std::max(latY, lonY) + pad / 2;
 
@@ -405,11 +409,13 @@ void SetupScreen::renderTabDXCluster(SDL_Renderer *renderer, int cx, int pad,
                            FontStyle::SmallRegular, textPad,
                            activeField_ == 0, !clusterHostInput_.getValue().empty(),
                            orange, gray, white, white, gray, "dxusa.net");
+  clusterHostRect_ = {fieldX, hostY, halfW, fieldH};
   int portY = y;
   clusterPortInput_.render(renderer, fontMgr_, fieldX + halfW + pad, portY,
                            halfW, fieldH, FontStyle::SmallRegular, textPad,
                            activeField_ == 1, !clusterPortInput_.getValue().empty(),
                            orange, gray, white, white, gray, "7300");
+  clusterPortRect_ = {fieldX + halfW + pad, portY, halfW, fieldH};
   y += fieldH + vSpace;
 
   cat->drawText(renderer, "Login:", fieldX, y, white, FontStyle::SmallBold);
@@ -418,6 +424,7 @@ void SetupScreen::renderTabDXCluster(SDL_Renderer *renderer, int cx, int pad,
                             FontStyle::SmallRegular, textPad, activeField_ == 2,
                             !clusterLoginInput_.getValue().empty(),
                             orange, gray, white, white, gray, "NOCALL");
+  clusterLoginRect_ = {fieldX, y, fieldW, fieldH};
   y += fieldH + vSpace;
 
   // Toggles row 1
@@ -1012,6 +1019,41 @@ bool SetupScreen::onMouseDown(int mx, int my, Uint16 mod) {
       return true;
   }
 
+  // Identity and Spotting tabs use stored rects (layout too complex for stride formula)
+  auto hitStoredField = [&](SDL_Rect &r, int idx) -> bool {
+    if (r.w > 0 && mx >= r.x && mx < r.x + r.w && my >= r.y &&
+        my < r.y + r.h) {
+      int oldField = activeField_;
+      activeField_ = idx;
+      TextInput *ti = getActiveInput();
+      if (ti) {
+        if (oldField == idx)
+          ti->onMouseDown(mx, my, fontMgr_, r.x, r.y, r.w, r.h,
+                          FontStyle::SmallRegular, textPad);
+        else
+          ti->setCursorToEnd();
+      }
+      return true;
+    }
+    return false;
+  };
+  if (activeTab_ == Tab::Identity) {
+    if (hitStoredField(callsignRect_, 0)) return true;
+    if (hitStoredField(gridRect_, 1)) return true;
+    if (hitStoredField(latRect_, 2)) return true;
+    if (hitStoredField(lonRect_, 3)) return true;
+    return false;
+  }
+  if (activeTab_ == Tab::Spotting) {
+    if (hitStoredField(clusterHostRect_, 0)) return true;
+    if (hitStoredField(clusterPortRect_, 1)) return true;
+    if (hitStoredField(clusterLoginRect_, 2)) return true;
+    if (clusterWSJTX_ && wsjtxPortRect_.w > 0) {
+      if (hitStoredField(wsjtxPortRect_, 3)) return true;
+    }
+    return false;
+  }
+
   if (activeTab_ == Tab::Network && hubMode_ == HubMode::Client) {
     if (hubIpRect_.w > 0 && mx >= hubIpRect_.x &&
         mx <= hubIpRect_.x + hubIpRect_.w && my >= hubIpRect_.y &&
@@ -1082,16 +1124,6 @@ bool SetupScreen::onMouseDown(int mx, int my, Uint16 mod) {
           fieldInput->setCursorToEnd();
         }
       }
-      return true;
-    }
-  }
-
-  // Also check WSJT-X Port rect specifically
-  if (activeTab_ == Tab::Spotting && clusterWSJTX_ && wsjtxPortRect_.w > 0) {
-    if (mx >= wsjtxPortRect_.x && mx <= wsjtxPortRect_.x + wsjtxPortRect_.w &&
-        my >= wsjtxPortRect_.y && my <= wsjtxPortRect_.y + wsjtxPortRect_.h) {
-      activeField_ = 3;
-      wsjtxPortInput_.setCursorToEnd();
       return true;
     }
   }
