@@ -11,7 +11,7 @@ void SolarPanel::update() {
     currentText_ = "Solar: awaiting data...";
   } else {
     char buf[128];
-    std::snprintf(buf, sizeof(buf), "SFI:%d  K:%d  A:%d  SSN:%d", data.sfi,
+    std::snprintf(buf, sizeof(buf), "SFI:%d  K:%.1f  A:%d  SSN:%d", data.sfi,
                   data.k_index, data.a_index, data.sunspot_number);
     currentText_ = buf;
   }
@@ -69,7 +69,7 @@ void SolarPanel::render(SDL_Renderer *renderer) {
       // Mixed A/K row
       int ry = y_ + titleH + 2 * rowH;
       char akBuf[32];
-      std::snprintf(akBuf, sizeof(akBuf), "A%d K%d", data.a_index,
+      std::snprintf(akBuf, sizeof(akBuf), "A%d K%.1f", data.a_index,
                     data.k_index);
       fontMgr_.catalog()->drawText(renderer, akBuf, centerX, ry + rowH * 0.35f,
                                    themes.success, FontStyle::MediumBold,

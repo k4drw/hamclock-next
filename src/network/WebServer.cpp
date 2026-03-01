@@ -1712,7 +1712,7 @@ void WebServer::run() {
     std::string out;
     out += "SFI     " + std::to_string(sd.sfi) + "\n";
     out += "SSN     " + std::to_string(sd.sunspot_number) + "\n";
-    out += "Kp      " + std::to_string(sd.k_index) + "\n";
+    { char kbuf[16]; std::snprintf(kbuf, sizeof(kbuf), "%.1f", sd.k_index); out += "Kp      " + std::string(kbuf) + "\n"; }
     out += "Ap      " + std::to_string(sd.a_index) + "\n";
     out += "Bz      " + std::to_string(sd.bz) + "\n";
     out += "Bt      " + std::to_string(sd.bt) + "\n";

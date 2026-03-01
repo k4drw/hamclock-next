@@ -17,7 +17,7 @@ struct BandConditionsData {
   std::vector<BandStatus> statuses;
   std::chrono::system_clock::time_point lastUpdate;
   int sfi = 0;       // Solar Flux Index used for calculations
-  int k_index = 0;   // K-index used for calculations
+  float k_index = 0.0f; // K-index used for calculations
   bool valid = false;
 };
 

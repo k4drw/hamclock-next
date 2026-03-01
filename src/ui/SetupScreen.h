@@ -25,6 +25,7 @@ public:
   void onResize(int x, int y, int w, int h) override;
   bool onMouseDown(int mx, int my, Uint16 mod) override;
   bool onMouseUp(int mx, int my, Uint16 mod, int clicks) override;
+  void onMouseMove(int mx, int my) override;
   bool onKeyDown(SDL_Keycode key, Uint16 mod) override;
   bool onTextInput(const char *text) override;
   bool isModalActive() const override;

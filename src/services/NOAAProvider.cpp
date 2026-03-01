@@ -112,7 +112,7 @@ void NOAAProvider::fetchKIndex() {
 
       auto *update = new SolarData();
       double kp = StringUtils::safe_stod(row[1].get<std::string>());
-      update->k_index = static_cast<int>(kp);
+      update->k_index = static_cast<float>(kp);
       update->a_index = StringUtils::safe_stoi(row[2].get<std::string>());
       update->noaa_g_scale = calculateGScale(update->k_index);
       update->last_updated = std::chrono::system_clock::now();

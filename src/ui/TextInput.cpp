@@ -204,7 +204,46 @@ bool TextInput::onMouseDown(int mx, int my,
         }
     }
     moveCursor(bestPos, false);
+    mouseDown_ = true;
     return true;
+}
+
+void TextInput::onMouseMove(int mx, FontManager &fontMgr,
+                            int fieldX, int fieldW,
+                            FontStyle style, int textPad) {
+    if (!mouseDown_ || text_.empty())
+        return;
+
+    auto *cat = fontMgr.catalog();
+    int fontSize = cat->ptSize(style);
+    bool bold = FontCatalog::isBold(style);
+    int textStartX = fieldX + textPad;
+    int relX = mx - textStartX;
+
+    int newPos = 0;
+    if (relX > 0) {
+        int fullW = fontMgr.getLogicalWidth(text_, fontSize, bold);
+        if (relX >= fullW) {
+            newPos = static_cast<int>(text_.size());
+        } else {
+            int bestDist = std::abs(relX);
+            for (int i = 1; i <= static_cast<int>(text_.size()); ++i) {
+                int w = fontMgr.getLogicalWidth(text_.substr(0, i), fontSize, bold);
+                int dist = std::abs(relX - w);
+                if (dist < bestDist) {
+                    bestDist = dist;
+                    newPos = i;
+                } else {
+                    break;
+                }
+            }
+        }
+    }
+    moveCursor(newPos, true); // extend selection from anchor
+}
+
+void TextInput::onMouseUp() {
+    mouseDown_ = false;
 }
 
 // ─── Render ──────────────────────────────────────────────────────────────────

@@ -30,6 +30,13 @@ public:
                      int fieldX, int fieldY, int fieldW, int fieldH,
                      FontStyle style, int textPad);
 
+    // Mouse drag → extend selection while button held; call after onMouseDown
+    void onMouseMove(int mx, FontManager &fontMgr,
+                     int fieldX, int fieldW, FontStyle style, int textPad);
+
+    // Mouse release → end drag
+    void onMouseUp();
+
     // Render the field box at (fieldX, fieldY, fieldW, fieldH).
     // Does NOT advance y — caller controls layout.
     void render(SDL_Renderer *renderer, FontManager &fontMgr,
@@ -60,6 +67,7 @@ private:
     int cursorPos_ = 0;
     int selectionAnchor_ = 0;
     bool active_ = false;
+    bool mouseDown_ = false;
     int maxLen_ = 0; // 0 = no limit
 
     bool deleteSelection();

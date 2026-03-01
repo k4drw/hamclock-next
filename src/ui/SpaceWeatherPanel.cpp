@@ -32,7 +32,7 @@ SpaceWeatherPanel::SpaceWeatherPanel(int x, int y, int w, int h,
   items_[14].label = "G-Scale";
 }
 
-SDL_Color SpaceWeatherPanel::colorForK(int k, const ThemeColors &themes) {
+SDL_Color SpaceWeatherPanel::colorForK(float k, const ThemeColors &themes) {
   if (k < 3)
     return themes.success; // Green
   if (k <= 4)
@@ -98,7 +98,7 @@ void SpaceWeatherPanel::update() {
   items_[2].value = buf;
   items_[2].valueColor = {255, 255, 255, 255};
 
-  std::snprintf(buf, sizeof(buf), "%d", data.k_index);
+  std::snprintf(buf, sizeof(buf), "%.1f", data.k_index);
   items_[3].value = buf;
 
   // Solar wind speed: km/s (metric) or mph (imperial)

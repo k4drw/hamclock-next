@@ -1136,6 +1136,10 @@ bool SetupScreen::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
     return themeCustomizer_->onMouseUp(mx, my, mod, clicks);
   }
 
+  // End any drag selection in the active text field
+  if (TextInput *ti = getActiveInput())
+    ti->onMouseUp();
+
   // If clicked outside modal, cancel (like a true modal)
   if (mx < modalRect_.x || mx >= modalRect_.x + modalRect_.w ||
       my < modalRect_.y || my >= modalRect_.y + modalRect_.h) {
@@ -1188,6 +1192,20 @@ bool SetupScreen::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
   }
 
   if (activeTab_ == Tab::Identity) {
+    auto dblClickIdentity = [&](SDL_Rect &r, int idx) -> bool {
+      if (clicks == 2 && r.w > 0 && mx >= r.x && mx < r.x + r.w &&
+          my >= r.y && my < r.y + r.h) {
+        activeField_ = idx;
+        TextInput *ti = getActiveInput();
+        if (ti) ti->onKeyDown(SDLK_a, KMOD_CTRL);
+        return true;
+      }
+      return false;
+    };
+    if (dblClickIdentity(callsignRect_, 0)) return true;
+    if (dblClickIdentity(gridRect_, 1)) return true;
+    if (dblClickIdentity(latRect_, 2)) return true;
+    if (dblClickIdentity(lonRect_, 3)) return true;
     if (mx >= gpsToggleRect_.x && mx <= gpsToggleRect_.x + gpsToggleRect_.w &&
         my >= gpsToggleRect_.y && my <= gpsToggleRect_.y + gpsToggleRect_.h) {
       gpsEnabled_ = !gpsEnabled_;
@@ -1196,6 +1214,20 @@ bool SetupScreen::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
   }
 
   if (activeTab_ == Tab::Spotting) {
+    auto dblClickSpotting = [&](SDL_Rect &r, int idx) -> bool {
+      if (clicks == 2 && r.w > 0 && mx >= r.x && mx < r.x + r.w &&
+          my >= r.y && my < r.y + r.h) {
+        activeField_ = idx;
+        TextInput *ti = getActiveInput();
+        if (ti) ti->onKeyDown(SDLK_a, KMOD_CTRL);
+        return true;
+      }
+      return false;
+    };
+    if (dblClickSpotting(clusterHostRect_, 0)) return true;
+    if (dblClickSpotting(clusterPortRect_, 1)) return true;
+    if (dblClickSpotting(clusterLoginRect_, 2)) return true;
+    if (clusterWSJTX_ && dblClickSpotting(wsjtxPortRect_, 3)) return true;
     if (mx >= clusterToggleRect_.x &&
         mx <= clusterToggleRect_.x + clusterToggleRect_.w &&
         my >= clusterToggleRect_.y &&
@@ -1461,6 +1493,29 @@ bool SetupScreen::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
   }
 
   return true;
+}
+
+void SetupScreen::onMouseMove(int mx, int /*my*/) {
+  TextInput *ti = getActiveInput();
+  if (!ti)
+    return;
+
+  // Resolve the stored rect for the active field so we can pass field bounds
+  SDL_Rect r = {0, 0, 0, 0};
+  if (activeTab_ == Tab::Identity) {
+    const SDL_Rect *rects[] = {&callsignRect_, &gridRect_, &latRect_, &lonRect_};
+    if (activeField_ >= 0 && activeField_ < 4)
+      r = *rects[activeField_];
+  } else if (activeTab_ == Tab::Spotting) {
+    const SDL_Rect *rects[] = {&clusterHostRect_, &clusterPortRect_,
+                                &clusterLoginRect_, &wsjtxPortRect_};
+    if (activeField_ >= 0 && activeField_ < 4)
+      r = *rects[activeField_];
+  }
+  if (r.w > 0) {
+    int textPad = 7;
+    ti->onMouseMove(mx, fontMgr_, r.x, r.w, FontStyle::SmallRegular, textPad);
+  }
 }
 
 bool SetupScreen::onKeyDown(SDL_Keycode key, Uint16 mod) {
