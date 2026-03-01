@@ -78,9 +78,9 @@ void DRAPPanel::render(SDL_Renderer *renderer) {
   // > 10 MHz: Red (poor)
   SDL_Color valueColor;
   if (freq < 5.0f) {
-    valueColor = {0, 255, 0, 255}; // Green
+    valueColor = themes.success; // Green
   } else if (freq < 10.0f) {
-    valueColor = {255, 255, 0, 255}; // Yellow
+    valueColor = themes.warning; // Yellow
   } else {
     valueColor = {255, 50, 50, 255}; // Red
   }

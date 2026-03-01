@@ -134,11 +134,19 @@ void HistoryPanel::render(SDL_Renderer *renderer) {
                                 {255, 255, 0, 255});
     }
 
-    // Show current value inside graph area (right edge, top of graph)
-    char buf[16];
-    std::snprintf(buf, sizeof(buf), "%.0f", currentSeries_.points.back().value);
-    cat->drawText(renderer, buf, graphX + graphW - 20, graphY + 10,
-                  {255, 255, 255, 255}, FontStyle::Fast, true);
+    // Current value as large overlay (matching Kp style)
+    {
+      float valNow = currentSeries_.points.back().value;
+      char buf[16];
+      if (seriesName_ == "flux") {
+        std::snprintf(buf, sizeof(buf), "%.1f", valNow);
+      } else {
+        std::snprintf(buf, sizeof(buf), "%.0f", valNow);
+      }
+      cat->drawText(renderer, buf, graphX + graphW / 2, graphY + 15,
+                    {255, 255, 255, 255}, FontStyle::MediumBold, true, false,
+                    true);
+    }
   }
 
   // X-axis time labels at 4 evenly-spaced positions

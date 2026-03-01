@@ -55,7 +55,7 @@ void SolarPanel::render(SDL_Renderer *renderer) {
       char valBuf[16];
       std::snprintf(valBuf, sizeof(valBuf), "%d", val);
       fontMgr_.catalog()->drawText(renderer, valBuf, centerX, ry + rowH * 0.35f,
-                                   {0, 255, 0, 255}, FontStyle::MediumBold,
+                                   themes.success, FontStyle::MediumBold,
                                    true);
       // Label (Small)
       fontMgr_.catalog()->drawText(renderer, lbl, centerX, ry + rowH * 0.75f,
@@ -72,7 +72,7 @@ void SolarPanel::render(SDL_Renderer *renderer) {
       std::snprintf(akBuf, sizeof(akBuf), "A%d K%d", data.a_index,
                     data.k_index);
       fontMgr_.catalog()->drawText(renderer, akBuf, centerX, ry + rowH * 0.35f,
-                                   {0, 255, 0, 255}, FontStyle::MediumBold,
+                                   themes.success, FontStyle::MediumBold,
                                    true);
       fontMgr_.catalog()->drawText(renderer, "A & K", centerX, ry + rowH * 0.75f,
                                    themes.textDim, FontStyle::Micro, true);

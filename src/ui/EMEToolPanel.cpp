@@ -50,12 +50,12 @@ void EMEToolPanel::render(SDL_Renderer *renderer) {
 
   std::snprintf(buf, sizeof(buf), "%.1f deg", currentData_.elevation);
   drawRow("DE Elev:", buf,
-          (currentData_.elevation > 0) ? SDL_Color{0, 255, 0, 255}
+          (currentData_.elevation > 0) ? themes.success
                                        : themes.textDim);
 
   std::snprintf(buf, sizeof(buf), "%.1f deg", currentData_.dx_elevation);
   drawRow("DX Elev:", buf,
-          (currentData_.dx_elevation > 0) ? SDL_Color{0, 255, 0, 255}
+          (currentData_.dx_elevation > 0) ? themes.success
                                           : themes.textDim);
 
   SDL_Color windowCol = currentData_.mutual_window
