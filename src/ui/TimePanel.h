@@ -2,6 +2,7 @@
 
 #include "../core/MemoryMonitor.h"
 #include "FontManager.h"
+#include "TextInput.h"
 #include "Widget.h"
 
 #include <SDL.h>
@@ -88,8 +89,7 @@ private:
 
   // Editor state
   bool editing_ = false;
-  std::string editText_;
-  int cursorPos_ = 0;
+  TextInput editInput_;
   int selectedColorIdx_ = 2; // default to orange
 
   static constexpr int kNumColors = 12;

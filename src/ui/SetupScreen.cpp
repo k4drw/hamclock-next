@@ -25,18 +25,18 @@ void SetupScreen::recalcLayout() {
 }
 
 void SetupScreen::autoPopulateLatLon() {
-  for (size_t i = 0; i < gridText_.size(); ++i) {
+  std::string g = gridInput_.getValue();
+  for (size_t i = 0; i < g.size(); ++i) {
     if (i < 2) {
-      if (gridText_[i] >= 'a' && gridText_[i] <= 'z')
-        gridText_[i] -= 32;
+      if (g[i] >= 'a' && g[i] <= 'z') g[i] -= 32;
     } else if (i >= 4) {
-      if (gridText_[i] >= 'A' && gridText_[i] <= 'Z')
-        gridText_[i] += 32;
+      if (g[i] >= 'A' && g[i] <= 'Z') g[i] += 32;
     }
   }
+  gridInput_.setValue(g);
 
-  if (gridText_.size() >= 4) {
-    gridValid_ = Astronomy::gridToLatLon(gridText_, gridLat_, gridLon_);
+  if (g.size() >= 4) {
+    gridValid_ = Astronomy::gridToLatLon(g, gridLat_, gridLon_);
   } else {
     gridValid_ = false;
   }
@@ -44,121 +44,69 @@ void SetupScreen::autoPopulateLatLon() {
   if (gridValid_ && !latLonManual_) {
     char buf[32];
     std::snprintf(buf, sizeof(buf), "%.4f", gridLat_);
-    latText_ = buf;
+    latInput_.setValue(buf);
     std::snprintf(buf, sizeof(buf), "%.4f", gridLon_);
-    lonText_ = buf;
+    lonInput_.setValue(buf);
   }
 }
 
-std::string *SetupScreen::getActiveFieldText() {
+TextInput *SetupScreen::getActiveInput() {
   if (activeTab_ == Tab::Identity) {
     switch (activeField_) {
     case 0:
-      return &callsignText_;
+      return &callsignInput_;
     case 1:
-      return &gridText_;
+      return &gridInput_;
     case 2:
-      return &latText_;
+      return &latInput_;
     case 3:
-      return &lonText_;
+      return &lonInput_;
     }
   } else if (activeTab_ == Tab::Spotting) {
     switch (activeField_) {
     case 0:
-      return &clusterHost_;
+      return &clusterHostInput_;
     case 1:
-      return &clusterPort_;
+      return &clusterPortInput_;
     case 2:
-      return &clusterLogin_;
+      return &clusterLoginInput_;
     case 3:
-      return &wsjtxPort_;
+      return &wsjtxPortInput_;
     }
   } else if (activeTab_ == Tab::Appearance) {
     switch (activeField_) {
     case 1:
-      return &dimTime_;
+      return &dimTimeInput_;
     case 2:
-      return &brightTime_;
+      return &brightTimeInput_;
     }
   } else if (activeTab_ == Tab::Services) {
     switch (activeField_) {
     case 0:
-      return &qrzUsername_;
+      return &qrzUsernameInput_;
     case 1:
-      return &qrzPassword_;
+      return &qrzPasswordInput_;
     }
   } else if (activeTab_ == Tab::Rig) {
     switch (activeField_) {
     case 0:
-      return &rigHost_;
+      return &rigHostInput_;
     case 1:
-      return &rigPort_;
+      return &rigPortInput_;
     }
   } else if (activeTab_ == Tab::Network) {
     switch (activeField_) {
     case 0:
-      return &hubIp_;
+      return &hubIpInput_;
     case 1:
-      return &hubPortStr_;
+      return &hubPortInput_;
     }
+  } else if (activeTab_ == Tab::Watchlist) {
+    return &watchlistInputField_;
   }
   return nullptr;
 }
 
-bool SetupScreen::deleteSelection(std::string *text) {
-  if (!text || cursorPos_ == selectionAnchor_)
-    return false;
-  int start = std::min(cursorPos_, selectionAnchor_);
-  int end = std::max(cursorPos_, selectionAnchor_);
-  text->erase(start, end - start);
-  cursorPos_ = start;
-  selectionAnchor_ = cursorPos_;
-  return true;
-}
-
-int SetupScreen::calculateCursorPosFromClick(int clickX, int fieldStartX,
-                                             const std::string &text,
-                                             FontStyle style) {
-  if (text.empty())
-    return 0;
-
-  int relativeX = clickX - fieldStartX;
-  if (relativeX <= 0)
-    return 0; // Clicked before text start
-
-  auto *cat = fontMgr_.catalog();
-  int fontSize = cat->ptSize(style);
-  bool bold = FontCatalog::isBold(style);
-
-  // Measure full text width first
-  int fullWidth = fontMgr_.getLogicalWidth(text, fontSize, bold);
-
-  // If clicked past end of text, return end position
-  if (relativeX >= fullWidth) {
-    return text.size();
-  }
-
-  // Find character closest to click position
-  int bestPos = 0;
-  int bestDist = std::abs(relativeX); // Distance to position 0
-
-  for (size_t i = 1; i <= text.size(); ++i) {
-    std::string substr = text.substr(0, i);
-    int w = fontMgr_.getLogicalWidth(substr, fontSize, bold);
-
-    // Check if click is closer to this position than previous best
-    int dist = std::abs(relativeX - w);
-    if (dist < bestDist) {
-      bestDist = dist;
-      bestPos = static_cast<int>(i);
-    } else {
-      // Distances are increasing, we've found the closest
-      break;
-    }
-  }
-
-  return bestPos;
-}
 
 void SetupScreen::update() {
   if (themeCustomizer_ && themeCustomizer_->isActive()) {
@@ -168,11 +116,11 @@ void SetupScreen::update() {
   autoPopulateLatLon();
 
   mismatchWarning_ = false;
-  if (latLonManual_ && gridValid_ && !latText_.empty() && !lonText_.empty()) {
-    double manLat = std::atof(latText_.c_str());
-    double manLon = std::atof(lonText_.c_str());
-    double tolLat = (gridText_.size() >= 6) ? 0.5 : 1.0;
-    double tolLon = (gridText_.size() >= 6) ? 1.0 : 2.0;
+  if (latLonManual_ && gridValid_ && !latInput_.getValue().empty() && !lonInput_.getValue().empty()) {
+    double manLat = std::atof(latInput_.getValue().c_str());
+    double manLon = std::atof(lonInput_.getValue().c_str());
+    double tolLat = (gridInput_.getValue().size() >= 6) ? 0.5 : 1.0;
+    double tolLon = (gridInput_.getValue().size() >= 6) ? 1.0 : 2.0;
     if (std::fabs(manLat - gridLat_) > tolLat ||
         std::fabs(manLon - gridLon_) > tolLon) {
       mismatchWarning_ = true;
@@ -184,80 +132,6 @@ bool SetupScreen::isModalActive() const {
   return themeCustomizer_ && themeCustomizer_->isActive();
 }
 
-static void renderField(SDL_Renderer *renderer, FontManager &fontMgr,
-                        const std::string &text, const std::string &placeholder,
-                        int fieldX, int &y, int fieldW, int fieldH,
-                        FontStyle fieldStyle, int textPad, bool active,
-                        bool valid, int cursorPos, int selectionAnchor,
-                        SDL_Color activeBorder, SDL_Color inactiveBorder,
-                        SDL_Color validColor, SDL_Color textColor,
-                        SDL_Color placeholderColor) {
-  SDL_Color border = active ? activeBorder : inactiveBorder;
-  auto *cat = fontMgr.catalog();
-
-  SDL_SetRenderDrawColor(renderer, 30, 30, 40, 255);
-  SDL_Rect rect = {fieldX, y, fieldW, fieldH};
-  SDL_RenderFillRect(renderer, &rect);
-  SDL_SetRenderDrawColor(renderer, border.r, border.g, border.b, 255);
-  SDL_RenderDrawRect(renderer, &rect);
-  if (active) {
-    SDL_Rect glow = {fieldX - 1, y - 1, fieldW + 2, fieldH + 2};
-    SDL_SetRenderDrawColor(renderer, border.r / 2, border.g / 2, border.b / 2,
-                           255);
-    SDL_RenderDrawRect(renderer, &glow);
-  }
-
-  // Set clipping rectangle to prevent text overflow
-  SDL_Rect clipRect = {fieldX + 2, y + 2, fieldW - 4, fieldH - 4};
-  SDL_RenderSetClipRect(renderer, &clipRect);
-
-  // Selection highlight
-  if (active && cursorPos != selectionAnchor && !text.empty()) {
-    int start = std::min(cursorPos, selectionAnchor);
-    int end = std::max(cursorPos, selectionAnchor);
-    int selX = fieldX + textPad;
-    if (start > 0) {
-      selX += fontMgr.getLogicalWidth(text.substr(0, start),
-                                      cat->ptSize(fieldStyle),
-                                      FontCatalog::isBold(fieldStyle));
-    }
-    int selW = fontMgr.getLogicalWidth(text.substr(start, end - start),
-                                       cat->ptSize(fieldStyle),
-                                       FontCatalog::isBold(fieldStyle));
-
-    SDL_Rect selRect = {selX, y + 4, selW, fieldH - 8};
-    SDL_SetRenderDrawColor(renderer, 60, 60, 100, 255);
-    SDL_RenderFillRect(renderer, &selRect);
-  }
-
-  if (!text.empty()) {
-    SDL_Color color = valid ? validColor : textColor;
-    cat->drawText(renderer, text, fieldX + textPad, y + textPad, color,
-                  fieldStyle);
-  } else if (!active) {
-    cat->drawText(renderer, placeholder, fieldX + textPad, y + textPad,
-                  placeholderColor, fieldStyle);
-  }
-
-  // Reset clipping
-  SDL_RenderSetClipRect(renderer, nullptr);
-
-  if (active) {
-    int cursorX = fieldX + textPad;
-    if (cursorPos > 0 && !text.empty()) {
-      std::string before = text.substr(0, cursorPos);
-      // Use logical width from font manager
-      cursorX += fontMgr.getLogicalWidth(before, cat->ptSize(fieldStyle),
-                                         FontCatalog::isBold(fieldStyle));
-    }
-    if ((SDL_GetTicks() / 500) % 2 == 0) {
-      SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
-      SDL_RenderDrawLine(renderer, cursorX, y + 4, cursorX, y + fieldH - 4);
-    }
-  }
-
-  y += fieldH;
-}
 
 void SetupScreen::render(SDL_Renderer *renderer) {
   if (themeCustomizer_ && themeCustomizer_->isActive()) {
@@ -445,20 +319,19 @@ void SetupScreen::renderTabIdentity(SDL_Renderer *renderer, int, int pad,
 
   cat->drawText(renderer, "Callsign:", fieldX, y, white, FontStyle::SmallBold);
   y += cat->ptSize(FontStyle::SmallBold) + 4;
-  renderField(renderer, fontMgr_, callsignText_, "e.g. K4DRW", fieldX, y,
-              fieldW, fieldH, FontStyle::SmallRegular, textPad,
-              activeField_ == 0, !callsignText_.empty(), cursorPos_,
-              selectionAnchor_, orange, gray, white, white, gray);
-  y += vSpace;
+  callsignInput_.render(renderer, fontMgr_, fieldX, y, fieldW, fieldH,
+                        FontStyle::SmallRegular, textPad,
+                        activeField_ == 0, !callsignInput_.getValue().empty(),
+                        orange, gray, white, white, gray, "e.g. K4DRW");
+  y += fieldH + vSpace;
 
   cat->drawText(renderer, "Grid Square:", fieldX, y, white,
                 FontStyle::SmallBold);
   y += cat->ptSize(FontStyle::SmallBold) + 4;
-  renderField(renderer, fontMgr_, gridText_, "e.g. EL87qr", fieldX, y, fieldW,
-              fieldH, FontStyle::SmallRegular, textPad, activeField_ == 1,
-              gridValid_, cursorPos_, selectionAnchor_, orange, gray, green,
-              white, gray);
-  y += vSpace;
+  gridInput_.render(renderer, fontMgr_, fieldX, y, fieldW, fieldH,
+                    FontStyle::SmallRegular, textPad, activeField_ == 1,
+                    gridValid_, orange, gray, green, white, gray, "e.g. EL87qr");
+  y += fieldH + vSpace;
 
   int halfFieldW = (fieldW - pad) / 2;
   cat->drawText(renderer, "Latitude:", fieldX, y, white, FontStyle::SmallBold);
@@ -467,17 +340,18 @@ void SetupScreen::renderTabIdentity(SDL_Renderer *renderer, int, int pad,
   y += cat->ptSize(FontStyle::SmallBold) + 4;
 
   int latY = y;
-  renderField(renderer, fontMgr_, latText_, "e.g. 27.76", fieldX, latY,
-              halfFieldW, fieldH, FontStyle::SmallRegular, textPad,
-              activeField_ == 2, !latText_.empty(), cursorPos_,
-              selectionAnchor_, orange, gray, white, white, gray);
+  latInput_.render(renderer, fontMgr_, fieldX, latY, halfFieldW, fieldH,
+                   FontStyle::SmallRegular, textPad,
+                   activeField_ == 2, !latInput_.getValue().empty(),
+                   orange, gray, white, white, gray, "e.g. 27.76");
+  latY += fieldH;
 
   int lonY = y;
-  renderField(renderer, fontMgr_, lonText_, "e.g. -82.64",
-              fieldX + halfFieldW + pad, lonY, halfFieldW, fieldH,
-              FontStyle::SmallRegular, textPad, activeField_ == 3,
-              !lonText_.empty(), cursorPos_, selectionAnchor_, orange, gray,
-              white, white, gray);
+  lonInput_.render(renderer, fontMgr_, fieldX + halfFieldW + pad, lonY,
+                   halfFieldW, fieldH, FontStyle::SmallRegular, textPad,
+                   activeField_ == 3, !lonInput_.getValue().empty(),
+                   orange, gray, white, white, gray, "e.g. -82.64");
+  lonY += fieldH;
   y = std::max(latY, lonY) + pad / 2;
 
   if (mismatchWarning_) {
@@ -527,23 +401,23 @@ void SetupScreen::renderTabDXCluster(SDL_Renderer *renderer, int cx, int pad,
 
   int halfW = (fieldW - pad) / 2;
   int hostY = y;
-  renderField(renderer, fontMgr_, clusterHost_, "dxusa.net", fieldX, hostY,
-              halfW, fieldH, FontStyle::SmallRegular, textPad,
-              activeField_ == 0, !clusterHost_.empty(), cursorPos_,
-              selectionAnchor_, orange, gray, white, white, gray);
+  clusterHostInput_.render(renderer, fontMgr_, fieldX, hostY, halfW, fieldH,
+                           FontStyle::SmallRegular, textPad,
+                           activeField_ == 0, !clusterHostInput_.getValue().empty(),
+                           orange, gray, white, white, gray, "dxusa.net");
   int portY = y;
-  renderField(renderer, fontMgr_, clusterPort_, "7300", fieldX + halfW + pad,
-              portY, halfW, fieldH, FontStyle::SmallRegular, textPad,
-              activeField_ == 1, !clusterPort_.empty(), cursorPos_,
-              selectionAnchor_, orange, gray, white, white, gray);
+  clusterPortInput_.render(renderer, fontMgr_, fieldX + halfW + pad, portY,
+                           halfW, fieldH, FontStyle::SmallRegular, textPad,
+                           activeField_ == 1, !clusterPortInput_.getValue().empty(),
+                           orange, gray, white, white, gray, "7300");
   y += fieldH + vSpace;
 
   cat->drawText(renderer, "Login:", fieldX, y, white, FontStyle::SmallBold);
   y += cat->ptSize(FontStyle::SmallBold) + 4;
-  renderField(renderer, fontMgr_, clusterLogin_, "NOCALL", fieldX, y, fieldW,
-              fieldH, FontStyle::SmallRegular, textPad, activeField_ == 2,
-              !clusterLogin_.empty(), cursorPos_, selectionAnchor_, orange,
-              gray, white, white, gray);
+  clusterLoginInput_.render(renderer, fontMgr_, fieldX, y, fieldW, fieldH,
+                            FontStyle::SmallRegular, textPad, activeField_ == 2,
+                            !clusterLoginInput_.getValue().empty(),
+                            orange, gray, white, white, gray, "NOCALL");
   y += fieldH + vSpace;
 
   // Toggles row 1
@@ -580,11 +454,10 @@ void SetupScreen::renderTabDXCluster(SDL_Renderer *renderer, int cx, int pad,
     int wPortW = std::min(120, halfW);
     int portX = fieldX + halfW + pad;
     wsjtxPortRect_ = {portX, y, wPortW, fieldH};
-    int tmpY = y;
-    renderField(renderer, fontMgr_, wsjtxPort_, "2237", portX, tmpY, wPortW,
-                fieldH, FontStyle::SmallRegular, textPad, activeField_ == 3,
-                !wsjtxPort_.empty(), cursorPos_, selectionAnchor_, orange, gray,
-                white, white, gray);
+    wsjtxPortInput_.render(renderer, fontMgr_, portX, y, wPortW, fieldH,
+                           FontStyle::SmallRegular, textPad, activeField_ == 3,
+                           !wsjtxPortInput_.getValue().empty(),
+                           orange, gray, white, white, gray, "2237");
   } else {
     wsjtxPortRect_ = {0, 0, 0, 0};
   }
@@ -732,20 +605,17 @@ void SetupScreen::renderTabAppearance(SDL_Renderer *renderer, int cx, int pad,
     int halfFieldW = (fieldW - pad - 60) / 2;
     int dimX = fieldX + 40;
     dimTimeRect_ = {dimX, y, halfFieldW, 24};
-    int tmpY = y;
-    renderField(renderer, fontMgr_, dimTime_, "HH:MM", dimX, tmpY, halfFieldW,
-                24, FontStyle::SmallRegular, textPad, activeField_ == 1, true,
-                cursorPos_, selectionAnchor_, orange, gray, white, white, gray);
+    dimTimeInput_.render(renderer, fontMgr_, dimX, y, halfFieldW, 24,
+                         FontStyle::SmallRegular, textPad, activeField_ == 1,
+                         true, orange, gray, white, white, gray, "HH:MM");
 
     cat->drawText(renderer, "Bright:", fieldX + halfW, y + 12, white,
                   FontStyle::SmallRegular, false, false, true);
     int brightX = fieldX + halfW + 55;
     brightTimeRect_ = {brightX, y, halfFieldW, 24};
-    tmpY = y;
-    renderField(renderer, fontMgr_, brightTime_, "HH:MM", brightX, tmpY,
-                halfFieldW, 24, FontStyle::SmallRegular, textPad,
-                activeField_ == 2, true, cursorPos_, selectionAnchor_, orange,
-                gray, white, white, gray);
+    brightTimeInput_.render(renderer, fontMgr_, brightX, y, halfFieldW, 24,
+                            FontStyle::SmallRegular, textPad, activeField_ == 2,
+                            true, orange, gray, white, white, gray, "HH:MM");
     y += 24 + vSpace;
   } else {
     dimTimeRect_ = {0, 0, 0, 0};
@@ -767,19 +637,26 @@ void SetupScreen::renderTabServices(SDL_Renderer *renderer, int cx, int pad,
   cat->drawText(renderer, "QRZ Username:", fieldX, y, white,
                 FontStyle::SmallBold);
   y += cat->ptSize(FontStyle::SmallBold) + 4;
-  renderField(renderer, fontMgr_, qrzUsername_, "e.g. K4DRW", fieldX, y, fieldW,
-              fieldH, FontStyle::SmallRegular, textPad, activeField_ == 0, true,
-              cursorPos_, selectionAnchor_, orange, gray, white, white, gray);
-  y += vSpace;
+  qrzUsernameInput_.render(renderer, fontMgr_, fieldX, y, fieldW, fieldH,
+                           FontStyle::SmallRegular, textPad, activeField_ == 0,
+                           true, orange, gray, white, white, gray, "e.g. K4DRW");
+  y += fieldH + vSpace;
 
   cat->drawText(renderer, "QRZ Password:", fieldX, y, white,
                 FontStyle::SmallBold);
   y += cat->ptSize(FontStyle::SmallBold) + 4;
-  std::string passMask(qrzPassword_.length(), '*');
-  renderField(renderer, fontMgr_, passMask, "********", fieldX, y, fieldW,
-              fieldH, FontStyle::SmallRegular, textPad, activeField_ == 1, true,
-              cursorPos_, selectionAnchor_, orange, gray, white, white, gray);
-  y += vSpace;
+  {
+    std::string passMask(qrzPasswordInput_.getValue().length(), '*');
+    TextInput tmpPwd;
+    tmpPwd.setValue(passMask);
+    if (activeField_ == 1) {
+      tmpPwd.setCursorPos(qrzPasswordInput_.getCursorPos());
+    }
+    tmpPwd.render(renderer, fontMgr_, fieldX, y, fieldW, fieldH,
+                  FontStyle::SmallRegular, textPad, activeField_ == 1, true,
+                  orange, gray, white, white, gray, "********");
+  }
+  y += fieldH + vSpace;
 }
 
 void SetupScreen::renderTabNetwork(SDL_Renderer *renderer, int /*cx*/, int pad,
@@ -820,21 +697,20 @@ void SetupScreen::renderTabNetwork(SDL_Renderer *renderer, int /*cx*/, int pad,
                   FontStyle::SmallRegular);
     y += cat->ptSize(FontStyle::SmallRegular) + 4;
     hubIpRect_ = {fieldX, y, fieldW, fieldH};
-    renderField(renderer, fontMgr_, hubIp_, "e.g. 192.168.1.100", fieldX, y,
-                fieldW, fieldH, FontStyle::SmallRegular, textPad,
-                activeField_ == 0, true, cursorPos_, selectionAnchor_, orange,
-                gray, white, white, gray);
-    y += vSpace;
+    hubIpInput_.render(renderer, fontMgr_, fieldX, y, fieldW, fieldH,
+                       FontStyle::SmallRegular, textPad, activeField_ == 0,
+                       true, orange, gray, white, white, gray,
+                       "e.g. 192.168.1.100");
+    y += fieldH + vSpace;
 
     cat->drawText(renderer, "Hub Port:", fieldX, y, white,
                   FontStyle::SmallRegular);
     y += cat->ptSize(FontStyle::SmallRegular) + 4;
     hubPortRect_ = {fieldX, y, fieldW, fieldH};
-    renderField(renderer, fontMgr_, hubPortStr_, "8080", fieldX, y, fieldW,
-                fieldH, FontStyle::SmallRegular, textPad, activeField_ == 1,
-                true, cursorPos_, selectionAnchor_, orange, gray, white, white,
-                gray);
-    y += vSpace;
+    hubPortInput_.render(renderer, fontMgr_, fieldX, y, fieldW, fieldH,
+                         FontStyle::SmallRegular, textPad, activeField_ == 1,
+                         true, orange, gray, white, white, gray, "8080");
+    y += fieldH + vSpace;
   } else {
     hubIpRect_ = {0, 0, 0, 0};
     hubPortRect_ = {0, 0, 0, 0};
@@ -870,18 +746,18 @@ void SetupScreen::renderTabRig(SDL_Renderer *renderer, int cx, int pad,
   cat->drawText(renderer, "rigctld Host (IP or Name):", fieldX, y, white,
                 FontStyle::SmallRegular);
   y += cat->ptSize(FontStyle::SmallRegular) + 4;
-  renderField(renderer, fontMgr_, rigHost_, "e.g. localhost", fieldX, y, fieldW,
-              fieldH, FontStyle::SmallRegular, textPad, activeField_ == 0, true,
-              cursorPos_, selectionAnchor_, orange, gray, white, white, gray);
-  y += vSpace;
+  rigHostInput_.render(renderer, fontMgr_, fieldX, y, fieldW, fieldH,
+                       FontStyle::SmallRegular, textPad, activeField_ == 0,
+                       true, orange, gray, white, white, gray, "e.g. localhost");
+  y += fieldH + vSpace;
 
   cat->drawText(renderer, "rigctld Port:", fieldX, y, white,
                 FontStyle::SmallRegular);
   y += cat->ptSize(FontStyle::SmallRegular) + 4;
-  renderField(renderer, fontMgr_, rigPort_, "4532", fieldX, y, fieldW, fieldH,
-              FontStyle::SmallRegular, textPad, activeField_ == 1, true,
-              cursorPos_, selectionAnchor_, orange, gray, white, white, gray);
-  y += vSpace;
+  rigPortInput_.render(renderer, fontMgr_, fieldX, y, fieldW, fieldH,
+                       FontStyle::SmallRegular, textPad, activeField_ == 1,
+                       true, orange, gray, white, white, gray, "4532");
+  y += fieldH + vSpace;
 
   // Auto-tune Toggle
   toggleRect_ = {fieldX, y, 20, 20};
@@ -1124,9 +1000,8 @@ bool SetupScreen::onMouseDown(int mx, int my, Uint16 mod) {
     auto hitTimeField = [&](SDL_Rect &r, int fieldIdx) {
       if (mx >= r.x && mx < r.x + r.w && my >= r.y && my < r.y + r.h) {
         activeField_ = fieldIdx;
-        std::string *ft = getActiveFieldText();
-        cursorPos_ = ft ? static_cast<int>(ft->size()) : 0;
-        selectionAnchor_ = cursorPos_;
+        TextInput *ti = getActiveInput();
+        if (ti) ti->setCursorToEnd();
         return true;
       }
       return false;
@@ -1142,16 +1017,14 @@ bool SetupScreen::onMouseDown(int mx, int my, Uint16 mod) {
         mx <= hubIpRect_.x + hubIpRect_.w && my >= hubIpRect_.y &&
         my <= hubIpRect_.y + hubIpRect_.h) {
       activeField_ = 0;
-      cursorPos_ = static_cast<int>(hubIp_.size());
-      selectionAnchor_ = cursorPos_;
+      hubIpInput_.setCursorToEnd();
       return true;
     }
     if (hubPortRect_.w > 0 && mx >= hubPortRect_.x &&
         mx <= hubPortRect_.x + hubPortRect_.w && my >= hubPortRect_.y &&
         my <= hubPortRect_.y + hubPortRect_.h) {
       activeField_ = 1;
-      cursorPos_ = static_cast<int>(hubPortStr_.size());
-      selectionAnchor_ = cursorPos_;
+      hubPortInput_.setCursorToEnd();
       return true;
     }
   }
@@ -1200,15 +1073,14 @@ bool SetupScreen::onMouseDown(int mx, int my, Uint16 mod) {
         my < fy + cat->ptSize(FontStyle::SmallBold) + fieldH) {
       int oldField = activeField_;
       activeField_ = i;
-      std::string *fieldText = getActiveFieldText();
-      if (fieldText) {
+      TextInput *fieldInput = getActiveInput();
+      if (fieldInput) {
         if (oldField == i) {
-          cursorPos_ = calculateCursorPosFromClick(
-              mx, fx + textPad, *fieldText, FontStyle::SmallRegular);
+          fieldInput->onMouseDown(mx, my, fontMgr_, fx, fy, fw, fieldH,
+                                  FontStyle::SmallRegular, textPad);
         } else {
-          cursorPos_ = static_cast<int>(fieldText->size());
+          fieldInput->setCursorToEnd();
         }
-        selectionAnchor_ = cursorPos_;
       }
       return true;
     }
@@ -1219,8 +1091,7 @@ bool SetupScreen::onMouseDown(int mx, int my, Uint16 mod) {
     if (mx >= wsjtxPortRect_.x && mx <= wsjtxPortRect_.x + wsjtxPortRect_.w &&
         my >= wsjtxPortRect_.y && my <= wsjtxPortRect_.y + wsjtxPortRect_.h) {
       activeField_ = 3;
-      cursorPos_ = static_cast<int>(wsjtxPort_.size());
-      selectionAnchor_ = cursorPos_;
+      wsjtxPortInput_.setCursorToEnd();
       return true;
     }
   }
@@ -1258,7 +1129,7 @@ bool SetupScreen::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
 
   if (mx >= okBtnRect_.x && mx <= okBtnRect_.x + okBtnRect_.w &&
       my >= okBtnRect_.y && my <= okBtnRect_.y + okBtnRect_.h) {
-    if (!callsignText_.empty() && gridValid_) {
+    if (!callsignInput_.getValue().empty() && gridValid_) {
       complete_ = true;
     }
     return true;
@@ -1275,7 +1146,10 @@ bool SetupScreen::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
       if (mx >= fieldX + i * tabW && mx <= fieldX + (i + 1) * tabW) {
         activeTab_ = tabValues[i];
         activeField_ = 0;
-        cursorPos_ = 0;
+        {
+          TextInput *ti = getActiveInput();
+          if (ti) ti->setCursorToEnd();
+        }
         return true;
       }
     }
@@ -1311,7 +1185,7 @@ bool SetupScreen::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
         mx <= wsjtxPortRect_.x + wsjtxPortRect_.w && my >= wsjtxPortRect_.y &&
         my <= wsjtxPortRect_.y + wsjtxPortRect_.h) {
       activeField_ = 3;
-      cursorPos_ = static_cast<int>(wsjtxPort_.size());
+      wsjtxPortInput_.setCursorToEnd();
       return true;
     }
   }
@@ -1391,13 +1265,12 @@ bool SetupScreen::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
     auto hitTimeField = [&](SDL_Rect &r, int fieldIdx) {
       if (mx >= r.x && mx < r.x + r.w && my >= r.y && my < r.y + r.h) {
         activeField_ = fieldIdx;
-        std::string *ft = getActiveFieldText();
+        TextInput *ft = getActiveInput();
         if (clicks == 2 && ft) {
-          selectionAnchor_ = 0;
-          cursorPos_ = static_cast<int>(ft->size());
-        } else {
-          cursorPos_ = ft ? static_cast<int>(ft->size()) : 0;
-          selectionAnchor_ = cursorPos_;
+          ft->setActive(true);
+          ft->onKeyDown(SDLK_a, KMOD_CTRL);
+        } else if (ft) {
+          ft->setCursorToEnd();
         }
         return true;
       }
@@ -1434,16 +1307,14 @@ bool SetupScreen::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
           mx <= hubIpRect_.x + hubIpRect_.w && my >= hubIpRect_.y &&
           my <= hubIpRect_.y + hubIpRect_.h) {
         activeField_ = 0;
-        cursorPos_ = static_cast<int>(hubIp_.size());
-        selectionAnchor_ = cursorPos_;
+        hubIpInput_.setCursorToEnd();
         return true;
       }
       if (hubPortRect_.w > 0 && mx >= hubPortRect_.x &&
           mx <= hubPortRect_.x + hubPortRect_.w && my >= hubPortRect_.y &&
           my <= hubPortRect_.y + hubPortRect_.h) {
         activeField_ = 1;
-        cursorPos_ = static_cast<int>(hubPortStr_.size());
-        selectionAnchor_ = cursorPos_;
+        hubPortInput_.setCursorToEnd();
         return true;
       }
     }
@@ -1535,8 +1406,7 @@ bool SetupScreen::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
         my >= watchlistInputRect_.y &&
         my < watchlistInputRect_.y + watchlistInputRect_.h) {
       activeField_ = 0;
-      cursorPos_ = static_cast<int>(watchlistInput_.size());
-      selectionAnchor_ = cursorPos_;
+      watchlistInputField_.setCursorToEnd();
       return true;
     }
     // Add button
@@ -1544,17 +1414,15 @@ bool SetupScreen::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
         mx < watchlistAddRect_.x + watchlistAddRect_.w &&
         my >= watchlistAddRect_.y &&
         my < watchlistAddRect_.y + watchlistAddRect_.h) {
-      if (!watchlistInput_.empty()) {
+      if (!watchlistInputField_.getValue().empty()) {
         // Uppercase + deduplicate
-        std::string call = watchlistInput_;
+        std::string call = watchlistInputField_.getValue();
         std::transform(call.begin(), call.end(), call.begin(), ::toupper);
         if (std::find(watchlistEntries_.begin(), watchlistEntries_.end(),
                       call) == watchlistEntries_.end()) {
           watchlistEntries_.push_back(call);
         }
-        watchlistInput_.clear();
-        cursorPos_ = 0;
-        selectionAnchor_ = 0;
+        watchlistInputField_.clear();
       }
       return true;
     }
@@ -1564,89 +1432,33 @@ bool SetupScreen::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
 }
 
 bool SetupScreen::onKeyDown(SDL_Keycode key, Uint16 mod) {
-  std::string *text = nullptr;
   int nFields = 1;
 
   if (activeTab_ == Tab::Identity) {
     nFields = 4;
-    switch (activeField_) {
-    case 0:
-      text = &callsignText_;
-      break;
-    case 1:
-      text = &gridText_;
-      break;
-    case 2:
-      text = &latText_;
-      break;
-    case 3:
-      text = &lonText_;
-      break;
-    }
   } else if (activeTab_ == Tab::Spotting) {
     nFields = clusterWSJTX_ ? 4 : 3;
-    switch (activeField_) {
-    case 0:
-      text = &clusterHost_;
-      break;
-    case 1:
-      text = &clusterPort_;
-      break;
-    case 2:
-      text = &clusterLogin_;
-      break;
-    case 3:
-      text = &wsjtxPort_;
-      break;
-    }
   } else if (activeTab_ == Tab::Appearance) {
     nFields = 3; // 0=rotation interval, 1=dimTime, 2=brightTime
-    switch (activeField_) {
-    case 1:
-      text = &dimTime_;
-      break;
-    case 2:
-      text = &brightTime_;
-      break;
-    }
   } else if (activeTab_ == Tab::Services) {
     nFields = 2;
-    switch (activeField_) {
-    case 0:
-      text = &qrzUsername_;
-      break;
-    case 1:
-      text = &qrzPassword_;
-      break;
-    }
   } else if (activeTab_ == Tab::Rig) {
     nFields = 2;
-    switch (activeField_) {
-    case 0:
-      text = &rigHost_;
-      break;
-    case 1:
-      text = &rigPort_;
-      break;
-    }
   } else if (activeTab_ == Tab::Watchlist) {
     nFields = 1;
-    text = &watchlistInput_;
   }
 
   // Watchlist: Enter adds the entry
   if (activeTab_ == Tab::Watchlist && activeField_ == 0 &&
       (key == SDLK_RETURN || key == SDLK_KP_ENTER)) {
-    if (!watchlistInput_.empty()) {
-      std::string call = watchlistInput_;
+    std::string call = watchlistInputField_.getValue();
+    if (!call.empty()) {
       std::transform(call.begin(), call.end(), call.begin(), ::toupper);
       if (std::find(watchlistEntries_.begin(), watchlistEntries_.end(), call) ==
           watchlistEntries_.end()) {
         watchlistEntries_.push_back(call);
       }
-      watchlistInput_.clear();
-      cursorPos_ = 0;
-      selectionAnchor_ = 0;
+      watchlistInputField_.clear();
     }
     return true;
   }
@@ -1658,75 +1470,35 @@ bool SetupScreen::onKeyDown(SDL_Keycode key, Uint16 mod) {
     return true;
   case SDLK_TAB: {
     activeField_ = (activeField_ + 1) % nFields;
-    std::string *nf = getActiveFieldText();
-    cursorPos_ = nf ? static_cast<int>(nf->size()) : 0;
-    selectionAnchor_ = cursorPos_;
+    TextInput *ni = getActiveInput();
+    if (ni) ni->setCursorToEnd();
     return true;
   }
   case SDLK_RETURN:
   case SDLK_KP_ENTER:
-    if (!callsignText_.empty() && gridValid_) {
+    if (!callsignInput_.getValue().empty() && gridValid_) {
       complete_ = true;
     }
     return true;
   case SDLK_BACKSPACE:
-    if (deleteSelection(text)) {
-      if (activeTab_ == Tab::Identity &&
-          (activeField_ == 2 || activeField_ == 3))
-        latLonManual_ = true;
-    } else if (text && cursorPos_ > 0) {
-      text->erase(cursorPos_ - 1, 1);
-      --cursorPos_;
-      selectionAnchor_ = cursorPos_;
-      if (activeTab_ == Tab::Identity &&
-          (activeField_ == 2 || activeField_ == 3))
-        latLonManual_ = true;
-    } else if (activeTab_ == Tab::Appearance && activeField_ == 0) {
-      rotationInterval_ /= 10;
-    }
-    return true;
-  case SDLK_DELETE:
-    if (deleteSelection(text)) {
-      if (activeTab_ == Tab::Identity &&
-          (activeField_ == 2 || activeField_ == 3))
-        latLonManual_ = true;
-    } else if (text && cursorPos_ < static_cast<int>(text->size())) {
-      text->erase(cursorPos_, 1);
-      selectionAnchor_ = cursorPos_;
-      if (activeTab_ == Tab::Identity &&
-          (activeField_ == 2 || activeField_ == 3))
-        latLonManual_ = true;
-    }
-    return true;
-  case SDLK_LEFT:
-    if (cursorPos_ > 0)
-      --cursorPos_;
-    selectionAnchor_ = cursorPos_;
-    return true;
-  case SDLK_RIGHT:
-    if (text && cursorPos_ < static_cast<int>(text->size()))
-      ++cursorPos_;
-    selectionAnchor_ = cursorPos_;
-    return true;
-  case SDLK_HOME:
-    cursorPos_ = 0;
-    selectionAnchor_ = cursorPos_;
-    return true;
-  case SDLK_END:
-    if (text)
-      cursorPos_ = static_cast<int>(text->size());
-    selectionAnchor_ = cursorPos_;
-    return true;
-  case SDLK_a:
-    if (mod & (KMOD_CTRL | KMOD_GUI)) {
-      std::string *txt = getActiveFieldText();
-      if (txt) {
-        selectionAnchor_ = 0;
-        cursorPos_ = static_cast<int>(txt->size());
-      }
+  case SDLK_DELETE: {
+    bool isLatLon = (activeTab_ == Tab::Identity &&
+                     (activeField_ == 2 || activeField_ == 3));
+    bool isRotInterval = (activeTab_ == Tab::Appearance && activeField_ == 0);
+    if (isRotInterval) {
+      if (key == SDLK_BACKSPACE) rotationInterval_ /= 10;
       return true;
     }
+    TextInput *ti = getActiveInput();
+    if (ti) {
+      bool hadContent = ti->hasSelection() ||
+          (key == SDLK_BACKSPACE ? ti->getCursorPos() > 0
+                                 : ti->getCursorPos() < (int)ti->getValue().size());
+      ti->onKeyDown(key, mod);
+      if (hadContent && isLatLon) latLonManual_ = true;
+    }
     return true;
+  }
   case SDLK_v:
     if (mod & (KMOD_CTRL | KMOD_GUI)) {
       char *clip = SDL_GetClipboardText();
@@ -1737,55 +1509,22 @@ bool SetupScreen::onKeyDown(SDL_Keycode key, Uint16 mod) {
       }
       return true;
     }
+    // fall through to default for non-ctrl v
+    {
+      TextInput *ti = getActiveInput();
+      if (ti) ti->onKeyDown(key, mod);
+    }
     return true;
-  default:
+  default: {
+    TextInput *ti = getActiveInput();
+    if (ti) ti->onKeyDown(key, mod);
     return true;
+  }
   }
 }
 
 bool SetupScreen::onTextInput(const char *inputText) {
-  std::string *field = nullptr;
-  int maxLen = 12;
-
-  if (activeTab_ == Tab::Identity) {
-    switch (activeField_) {
-    case 0:
-      field = &callsignText_;
-      maxLen = 12;
-      break;
-    case 1:
-      field = &gridText_;
-      maxLen = 6;
-      break;
-    case 2:
-      field = &latText_;
-      maxLen = 12;
-      break;
-    case 3:
-      field = &lonText_;
-      maxLen = 12;
-      break;
-    }
-  } else if (activeTab_ == Tab::Spotting) {
-    switch (activeField_) {
-    case 0:
-      field = &clusterHost_;
-      maxLen = 64;
-      break;
-    case 1:
-      field = &clusterPort_;
-      maxLen = 5;
-      break;
-    case 2:
-      field = &clusterLogin_;
-      maxLen = 12;
-      break;
-    case 3:
-      field = &wsjtxPort_;
-      maxLen = 5;
-      break;
-    }
-  } else if (activeTab_ == Tab::Appearance) {
+  if (activeTab_ == Tab::Appearance) {
     if (activeField_ == 0) {
       // Rotation interval: numeric only
       if (inputText[0] >= '0' && inputText[0] <= '9') {
@@ -1795,40 +1534,16 @@ bool SetupScreen::onTextInput(const char *inputText) {
       }
       return true;
     }
-    // Fields 1 & 2: dimTime_ / brightTime_ (HH:MM)
-    maxLen = 5;
-    switch (activeField_) {
-    case 1:
-      field = &dimTime_;
-      break;
-    case 2:
-      field = &brightTime_;
-      break;
+    // Fields 1 & 2: dimTime / brightTime (HH:MM) - auto-insert colon
+    TextInput *ti = getActiveInput();
+    if (ti && ti->getValue().size() == 2 && inputText[0] != ':') {
+      ti->onTextInput(":");
     }
-    if (field && field->size() == 2 && inputText[0] != ':') {
-      field->append(":");
-      cursorPos_ = 3;
-    }
-  } else if (activeTab_ == Tab::Services) {
-    switch (activeField_) {
-    case 0:
-      field = &qrzUsername_;
-      maxLen = 32;
-      break;
-    case 1:
-      field = &qrzPassword_;
-      maxLen = 32;
-      break;
-    case 2:
-      field = &countdownLabel_;
-      maxLen = 64;
-      break;
-    case 3:
-      field = &countdownTime_;
-      maxLen = 16;
-      break;
-    }
-  } else if (activeTab_ == Tab::Watchlist && activeField_ == 0) {
+    if (ti) ti->onTextInput(inputText);
+    return true;
+  }
+
+  if (activeTab_ == Tab::Watchlist && activeField_ == 0) {
     // Callsign: alphanumeric + slash only, auto-uppercase, max 12 chars
     for (const char *p = inputText; *p; ++p) {
       if (!((*p >= 'A' && *p <= 'Z') || (*p >= 'a' && *p <= 'z') ||
@@ -1836,81 +1551,60 @@ bool SetupScreen::onTextInput(const char *inputText) {
         return true;
       }
     }
-    if ((int)watchlistInput_.size() < 12) {
+    if ((int)watchlistInputField_.getValue().size() < 12) {
       std::string upper = inputText;
       std::transform(upper.begin(), upper.end(), upper.begin(), ::toupper);
-      watchlistInput_.insert(cursorPos_, upper);
-      cursorPos_ += static_cast<int>(upper.size());
-      selectionAnchor_ = cursorPos_;
+      watchlistInputField_.onTextInput(upper.c_str());
     }
     return true;
   }
 
-  if (!field)
-    return true;
-
-  deleteSelection(field);
-
-  if (static_cast<int>(field->size()) >= maxLen)
-    return true;
-
   // === CALLSIGN VALIDATION (Identity Tab, Field 0) ===
   if (activeTab_ == Tab::Identity && activeField_ == 0) {
-    // Validate: alphanumeric + forward slash only
     for (const char *p = inputText; *p; ++p) {
       if (!((*p >= 'A' && *p <= 'Z') || (*p >= 'a' && *p <= 'z') ||
             (*p >= '0' && *p <= '9') || *p == '/')) {
-        return true; // Reject invalid character
+        return true;
       }
     }
-    // Auto-uppercase
     std::string upper = inputText;
     std::transform(upper.begin(), upper.end(), upper.begin(), ::toupper);
-    field->insert(cursorPos_, upper);
-    cursorPos_ += upper.size();
+    callsignInput_.onTextInput(upper.c_str());
     return true;
   }
 
   // === GRID SQUARE VALIDATION (Identity Tab, Field 1) ===
   if (activeTab_ == Tab::Identity && activeField_ == 1) {
-    // Format: AA00aa (2 letters + 2 digits + optional 2 letters)
+    const std::string &cur = gridInput_.getValue();
     for (const char *p = inputText; *p; ++p) {
-      int pos = field->size();
+      int pos = static_cast<int>(cur.size());
       if (pos >= 6) {
-        return true; // Max 6 characters
+        return true;
       }
-
       if (pos < 2) {
-        // First 2: must be letter A-R
         if (!((*p >= 'A' && *p <= 'R') || (*p >= 'a' && *p <= 'r'))) {
-          return true; // Reject
+          return true;
         }
       } else if (pos < 4) {
-        // Next 2: must be digit
         if (!(*p >= '0' && *p <= '9')) {
-          return true; // Reject
+          return true;
         }
       } else {
-        // Optional last 2: must be letter A-X
         if (!((*p >= 'A' && *p <= 'X') || (*p >= 'a' && *p <= 'x'))) {
-          return true; // Reject
+          return true;
         }
       }
     }
-
-    // Auto-format: Uppercase first 2, lowercase last 2
     std::string formatted = inputText;
     for (size_t i = 0; i < formatted.size(); ++i) {
-      int pos = field->size() + i;
+      int pos = static_cast<int>(gridInput_.getValue().size()) + static_cast<int>(i);
       if (pos < 2) {
         formatted[i] = std::toupper(formatted[i]);
       } else if (pos >= 4) {
         formatted[i] = std::tolower(formatted[i]);
       }
     }
-
-    field->insert(cursorPos_, formatted);
-    cursorPos_ += formatted.size();
+    gridInput_.onTextInput(formatted.c_str());
     latLonManual_ = false;
     return true;
   }
@@ -1923,31 +1617,34 @@ bool SetupScreen::onTextInput(const char *inputText) {
       return true;
     }
     latLonManual_ = true;
+    TextInput *ti = getActiveInput();
+    if (ti) ti->onTextInput(inputText);
+    return true;
   }
 
   // === PORT VALIDATION (Spotting Tab, Fields 1 and 3) ===
   if (activeTab_ == Tab::Spotting && (activeField_ == 1 || activeField_ == 3)) {
-    // Port: digits only, validate 1-65535
     for (const char *p = inputText; *p; ++p) {
       if (!(*p >= '0' && *p <= '9')) {
-        return true; // Reject non-digit
+        return true;
       }
     }
-
-    // Check range (validate resulting value doesn't exceed 65535)
-    std::string testValue = *field;
-    testValue.insert(cursorPos_, inputText);
-    int port = std::atoi(testValue.c_str());
-    if (port > 65535 || port == 0) {
-      return true; // Reject if out of range
+    TextInput *ti = getActiveInput();
+    if (ti) {
+      std::string testValue = ti->getValue();
+      testValue += inputText;
+      int port = std::atoi(testValue.c_str());
+      if (port > 65535 || port == 0) {
+        return true;
+      }
+      ti->onTextInput(inputText);
     }
+    return true;
   }
 
   // === DEFAULT INSERTION ===
-  field->insert(cursorPos_, inputText);
-  cursorPos_ += static_cast<int>(std::strlen(inputText));
-  if (activeTab_ == Tab::Identity && activeField_ == 1)
-    latLonManual_ = false;
+  TextInput *ti = getActiveInput();
+  if (ti) ti->onTextInput(inputText);
 
   return true;
 }
@@ -2049,11 +1746,12 @@ void SetupScreen::renderTabWatchlist(SDL_Renderer *renderer, int /*cx*/,
   watchlistInputRect_ = {fieldX, y, inputW, fieldH};
   watchlistAddRect_ = {fieldX + inputW + pad / 2, y, addBtnW, fieldH};
 
-  bool inputActive = (activeTab_ == Tab::Watchlist && activeField_ == 0);
-  renderField(renderer, fontMgr_, watchlistInput_, "e.g. K1ABC", fieldX, y,
-              inputW, fieldH, FontStyle::SmallRegular, textPad, inputActive,
-              true, cursorPos_, selectionAnchor_, orange, gray, white, white,
-              gray);
+  watchlistInputField_.render(renderer, fontMgr_, fieldX, y, inputW, fieldH,
+                              FontStyle::SmallRegular, textPad,
+                              activeTab_ == Tab::Watchlist && activeField_ == 0,
+                              false, orange, gray, white, white, gray,
+                              "Enter callsign...");
+  y += fieldH;
 
   SDL_SetRenderDrawColor(renderer, 40, 80, 40, 255);
   SDL_RenderFillRect(renderer, &watchlistAddRect_);
@@ -2065,23 +1763,42 @@ void SetupScreen::renderTabWatchlist(SDL_Renderer *renderer, int /*cx*/,
 }
 
 void SetupScreen::setConfig(const AppConfig &cfg) {
+  // Set max lengths
+  callsignInput_.setMaxLength(12);
+  gridInput_.setMaxLength(6);
+  latInput_.setMaxLength(12);
+  lonInput_.setMaxLength(12);
+  clusterHostInput_.setMaxLength(64);
+  clusterPortInput_.setMaxLength(5);
+  clusterLoginInput_.setMaxLength(12);
+  wsjtxPortInput_.setMaxLength(5);
+  qrzUsernameInput_.setMaxLength(32);
+  qrzPasswordInput_.setMaxLength(32);
+  dimTimeInput_.setMaxLength(5);
+  brightTimeInput_.setMaxLength(5);
+  rigHostInput_.setMaxLength(64);
+  rigPortInput_.setMaxLength(5);
+  hubIpInput_.setMaxLength(40);
+  hubPortInput_.setMaxLength(5);
+  watchlistInputField_.setMaxLength(12);
+
   gpsEnabled_ = cfg.gpsEnabled;
-  callsignText_ = cfg.callsign;
-  gridText_ = cfg.grid;
+  callsignInput_.setValue(cfg.callsign);
+  gridInput_.setValue(cfg.grid);
   frnText_ = cfg.callsignFrn;
   if (cfg.lat != 0.0 || cfg.lon != 0.0) {
     char buf[32];
     std::snprintf(buf, sizeof(buf), "%.4f", cfg.lat);
-    latText_ = buf;
+    latInput_.setValue(buf);
     std::snprintf(buf, sizeof(buf), "%.4f", cfg.lon);
-    lonText_ = buf;
+    lonInput_.setValue(buf);
   }
-  clusterHost_ = cfg.dxClusterHost;
-  clusterPort_ = std::to_string(cfg.dxClusterPort);
-  clusterLogin_ = cfg.dxClusterLogin;
+  clusterHostInput_.setValue(cfg.dxClusterHost);
+  clusterPortInput_.setValue(std::to_string(cfg.dxClusterPort));
+  clusterLoginInput_.setValue(cfg.dxClusterLogin);
   clusterEnabled_ = cfg.dxClusterEnabled;
   clusterWSJTX_ = cfg.dxClusterUseWSJTX;
-  wsjtxPort_ = std::to_string(cfg.wsjtxPort);
+  wsjtxPortInput_.setValue(std::to_string(cfg.wsjtxPort));
   rbnEnabled_ = cfg.rbnEnabled;
   pskOfDe_ = cfg.liveSpotsOfDe;
   pskUseCall_ = cfg.liveSpotsUseCall;
@@ -2090,7 +1807,7 @@ void SetupScreen::setConfig(const AppConfig &cfg) {
   rotationInterval_ = cfg.rotationIntervalS;
   syncRotation_ = cfg.syncRotation;
   watchlistEntries_ = cfg.watchlist;
-  watchlistInput_.clear();
+  watchlistInputField_.clear();
   watchlistScrollOffset_ = 0;
   theme_ = cfg.theme;
   mapNightLights_ = cfg.mapNightLights;
@@ -2101,8 +1818,8 @@ void SetupScreen::setConfig(const AppConfig &cfg) {
   rssEnabled_ = cfg.rssEnabled;
   weatherOverlay_ = cfg.weatherOverlay;
 
-  qrzUsername_ = cfg.qrzUsername;
-  qrzPassword_ = cfg.qrzPassword;
+  qrzUsernameInput_.setValue(cfg.qrzUsername);
+  qrzPasswordInput_.setValue(cfg.qrzPassword);
   countdownLabel_ = cfg.countdownLabel;
   countdownTime_ = cfg.countdownTime;
   brightnessMgr_.setBrightness(cfg.brightness);
@@ -2113,18 +1830,18 @@ void SetupScreen::setConfig(const AppConfig &cfg) {
   char timeBuf[16];
   std::snprintf(timeBuf, sizeof(timeBuf), "%02d:%02d", cfg.dimHour,
                 cfg.dimMinute);
-  dimTime_ = timeBuf;
+  dimTimeInput_.setValue(timeBuf);
   std::snprintf(timeBuf, sizeof(timeBuf), "%02d:%02d", cfg.brightHour,
                 cfg.brightMinute);
-  brightTime_ = timeBuf;
+  brightTimeInput_.setValue(timeBuf);
 
-  rigHost_ = cfg.rigHost;
-  rigPort_ = std::to_string(cfg.rigPort);
+  rigHostInput_.setValue(cfg.rigHost);
+  rigPortInput_.setValue(std::to_string(cfg.rigPort));
   rigAutoTune_ = cfg.rigAutoTune;
 
   hubMode_ = cfg.hubMode;
-  hubIp_ = cfg.hubIp;
-  hubPortStr_ = std::to_string(cfg.hubPort);
+  hubIpInput_.setValue(cfg.hubIp);
+  hubPortInput_.setValue(std::to_string(cfg.hubPort));
 
   paneRotations_[0] = cfg.pane1Rotation;
   paneRotations_[1] = cfg.pane2Rotation;
@@ -2133,25 +1850,25 @@ void SetupScreen::setConfig(const AppConfig &cfg) {
 
   colorOverrides_ = cfg.colorOverrides;
 
-  cursorPos_ = static_cast<int>(callsignText_.size());
+  callsignInput_.setCursorToEnd();
 }
 
 AppConfig SetupScreen::getConfig() const {
   AppConfig cfg;
   cfg.gpsEnabled = gpsEnabled_;
-  cfg.callsign = callsignText_;
-  cfg.grid = gridText_;
+  cfg.callsign = callsignInput_.getValue();
+  cfg.grid = gridInput_.getValue();
   cfg.callsignFrn = frnText_;
-  cfg.lat = std::atof(latText_.c_str());
-  cfg.lon = std::atof(lonText_.c_str());
-  cfg.dxClusterHost = clusterHost_;
-  cfg.dxClusterPort = std::atoi(clusterPort_.c_str());
+  cfg.lat = std::atof(latInput_.getValue().c_str());
+  cfg.lon = std::atof(lonInput_.getValue().c_str());
+  cfg.dxClusterHost = clusterHostInput_.getValue();
+  cfg.dxClusterPort = std::atoi(clusterPortInput_.getValue().c_str());
   if (cfg.dxClusterPort == 0)
     cfg.dxClusterPort = 7300;
-  cfg.dxClusterLogin = clusterLogin_;
+  cfg.dxClusterLogin = clusterLoginInput_.getValue();
   cfg.dxClusterEnabled = clusterEnabled_;
   cfg.dxClusterUseWSJTX = clusterWSJTX_;
-  cfg.wsjtxPort = std::atoi(wsjtxPort_.c_str());
+  cfg.wsjtxPort = std::atoi(wsjtxPortInput_.getValue().c_str());
   if (cfg.wsjtxPort == 0)
     cfg.wsjtxPort = 2237;
   cfg.rbnEnabled = rbnEnabled_;
@@ -2171,19 +1888,19 @@ AppConfig SetupScreen::getConfig() const {
   cfg.panelMode = panelMode_;
   cfg.selectedSatellite = selectedSatellite_;
 
-  cfg.qrzUsername = qrzUsername_;
-  cfg.qrzPassword = qrzPassword_;
+  cfg.qrzUsername = qrzUsernameInput_.getValue();
+  cfg.qrzPassword = qrzPasswordInput_.getValue();
   cfg.countdownLabel = countdownLabel_;
   cfg.countdownTime = countdownTime_;
   cfg.brightness = brightnessMgr_.getBrightness();
   cfg.brightnessSchedule = brightnessMgr_.isScheduleEnabled();
 
   int dh, dm, bh, bm;
-  if (std::sscanf(dimTime_.c_str(), "%d:%d", &dh, &dm) == 2) {
+  if (std::sscanf(dimTimeInput_.getValue().c_str(), "%d:%d", &dh, &dm) == 2) {
     cfg.dimHour = dh;
     cfg.dimMinute = dm;
   }
-  if (std::sscanf(brightTime_.c_str(), "%d:%d", &bh, &bm) == 2) {
+  if (std::sscanf(brightTimeInput_.getValue().c_str(), "%d:%d", &bh, &bm) == 2) {
     cfg.brightHour = bh;
     cfg.brightMinute = bm;
   }
@@ -2193,15 +1910,15 @@ AppConfig SetupScreen::getConfig() const {
   cfg.pane3Rotation = paneRotations_[2];
   cfg.pane4Rotation = paneRotations_[3];
 
-  cfg.rigHost = rigHost_;
-  cfg.rigPort = std::atoi(rigPort_.c_str());
+  cfg.rigHost = rigHostInput_.getValue();
+  cfg.rigPort = std::atoi(rigPortInput_.getValue().c_str());
   if (cfg.rigPort == 0)
     cfg.rigPort = 4532;
   cfg.rigAutoTune = rigAutoTune_;
 
   cfg.hubMode = hubMode_;
-  cfg.hubIp = hubIp_;
-  cfg.hubPort = std::atoi(hubPortStr_.c_str());
+  cfg.hubIp = hubIpInput_.getValue();
+  cfg.hubPort = std::atoi(hubPortInput_.getValue().c_str());
   if (cfg.hubPort == 0)
     cfg.hubPort = 8080;
 

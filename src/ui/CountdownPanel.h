@@ -2,6 +2,7 @@
 
 #include "../core/ConfigManager.h"
 #include "FontManager.h"
+#include "TextInput.h"
 #include "Widget.h"
 #include <chrono>
 #include <string>
@@ -35,8 +36,7 @@ private:
   // Editor state
   bool editing_ = false;
   bool editingTime_ = false; // true if editing time, false if editing label
-  std::string editText_;
-  int cursorPos_ = 0;
+  TextInput editInput_;
   bool alarmTriggered_ = false;
 
   // Temp storage for Multi-field editing

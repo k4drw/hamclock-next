@@ -1793,6 +1793,18 @@ void DashboardContext::update(AppContext &ctx) {
 
   SDL_Event event;
   while (SDL_PollEvent(&event)) {
+    // Single modal/focus scan shared across all event-type branches below
+    Widget *focusedWidget = nullptr;
+    for (auto *w : eventWidgets) {
+      if (w->isModalActive()) { focusedWidget = w; break; }
+    }
+    // Also check inline-configuring widgets (e.g. SatelliteSetup, ReminderPanel)
+    if (!focusedWidget) {
+      for (auto *w : eventWidgets) {
+        if (w->isConfiguring()) { focusedWidget = w; break; }
+      }
+    }
+
     if (event.type == SDL_MOUSEMOTION || event.type == SDL_MOUSEBUTTONDOWN ||
         event.type == SDL_MOUSEBUTTONUP || event.type == SDL_FINGERDOWN ||
         event.type == SDL_FINGERMOTION) {
@@ -1814,16 +1826,9 @@ void DashboardContext::update(AppContext &ctx) {
       return;
     case SDL_KEYDOWN: {
       bool consumed = false;
-      Widget *activeModal = nullptr;
-      for (auto *w : eventWidgets) {
-        if (w->isModalActive()) {
-          activeModal = w;
-          break;
-        }
-      }
-      if (activeModal) {
+      if (focusedWidget) {
         consumed =
-            activeModal->onKeyDown(event.key.keysym.sym, event.key.keysym.mod);
+            focusedWidget->onKeyDown(event.key.keysym.sym, event.key.keysym.mod);
       } else {
         for (auto *w : eventWidgets) {
           if (w->onKeyDown(event.key.keysym.sym, event.key.keysym.mod)) {
@@ -1841,15 +1846,8 @@ void DashboardContext::update(AppContext &ctx) {
       break;
     }
     case SDL_TEXTINPUT: {
-      Widget *activeModal = nullptr;
-      for (auto *w : eventWidgets) {
-        if (w->isModalActive()) {
-          activeModal = w;
-          break;
-        }
-      }
-      if (activeModal) {
-        activeModal->onTextInput(event.text.text);
+      if (focusedWidget) {
+        focusedWidget->onTextInput(event.text.text);
       } else {
         for (auto *w : eventWidgets) {
           if (w->onTextInput(event.text.text)) {
@@ -1873,14 +1871,8 @@ void DashboardContext::update(AppContext &ctx) {
         smx = static_cast<int>(pixX / ctx.layScale);
         smy = static_cast<int>(pixY / ctx.layScale);
       }
-      Widget *activeModal = nullptr;
-      for (auto *w : eventWidgets)
-        if (w->isModalActive()) {
-          activeModal = w;
-          break;
-        }
-      if (activeModal)
-        activeModal->onMouseDown(smx, smy, SDL_GetModState());
+      if (focusedWidget)
+        focusedWidget->onMouseDown(smx, smy, SDL_GetModState());
       else
         for (auto *w : eventWidgets)
           if (w->onMouseDown(smx, smy, SDL_GetModState()))
@@ -2183,14 +2175,8 @@ void DashboardContext::update(AppContext &ctx) {
           mx = static_cast<int>(pixX / ctx.layScale);
           my = static_cast<int>(pixY / ctx.layScale);
         }
-        Widget *activeModal = nullptr;
-        for (auto *w : eventWidgets)
-          if (w->isModalActive()) {
-            activeModal = w;
-            break;
-          }
-        if (activeModal)
-          activeModal->onMouseMove(mx, my);
+        if (focusedWidget)
+          focusedWidget->onMouseMove(mx, my);
         else
           for (auto *w : eventWidgets)
             w->onMouseMove(mx, my);
@@ -2207,15 +2193,9 @@ void DashboardContext::update(AppContext &ctx) {
             mx = static_cast<int>(pixX / ctx.layScale);
             my = static_cast<int>(pixY / ctx.layScale);
           }
-          Widget *activeModal = nullptr;
-          for (auto *w : eventWidgets)
-            if (w->isModalActive()) {
-              activeModal = w;
-              break;
-            }
-          if (activeModal)
-            activeModal->onMouseUp(mx, my, SDL_GetModState(),
-                                   event.button.clicks);
+          if (focusedWidget)
+            focusedWidget->onMouseUp(mx, my, SDL_GetModState(),
+                                     event.button.clicks);
           else
             for (auto *w : eventWidgets)
               if (w->onMouseUp(mx, my, SDL_GetModState(), event.button.clicks))

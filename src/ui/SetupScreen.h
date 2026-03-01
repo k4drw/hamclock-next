@@ -4,6 +4,7 @@
 #include "../core/ConfigManager.h"
 #include "FontCatalog.h"
 #include "FontManager.h"
+#include "TextInput.h"
 #include "ThemeCustomizer.h"
 #include "Widget.h"
 
@@ -51,10 +52,7 @@ public:
 private:
   void recalcLayout();
   void autoPopulateLatLon();
-  std::string *getActiveFieldText();
-  bool deleteSelection(std::string *text);
-  int calculateCursorPosFromClick(int clickX, int fieldStartX,
-                                  const std::string &text, FontStyle style);
+  TextInput *getActiveInput();
   void renderTabIdentity(SDL_Renderer *renderer, int cx, int pad, int fieldW,
                          int fieldH, int fieldX, int textPad);
   void renderTabDXCluster(SDL_Renderer *renderer, int cx, int pad, int fieldW,
@@ -81,17 +79,17 @@ private:
   // there)
   Tab activeTab_ = Tab::Identity;
   bool gpsEnabled_ = false;
-  std::string callsignText_;
-  std::string gridText_;
-  std::string latText_;
-  std::string lonText_;
+  TextInput callsignInput_;
+  TextInput gridInput_;
+  TextInput latInput_;
+  TextInput lonInput_;
   std::string frnText_;
-  std::string clusterHost_;
-  std::string clusterPort_;
-  std::string clusterLogin_;
+  TextInput clusterHostInput_;
+  TextInput clusterPortInput_;
+  TextInput clusterLoginInput_;
   bool clusterEnabled_ = true;
   bool clusterWSJTX_ = false;
-  std::string wsjtxPort_;
+  TextInput wsjtxPortInput_;
   SDL_Rect wsjtxPortRect_ = {0, 0, 0, 0};
   bool rbnEnabled_ = false;
   bool pskOfDe_ = true;
@@ -108,18 +106,18 @@ private:
   WeatherOverlayType weatherOverlay_ = WeatherOverlayType::None;
 
   // Services & Rig
-  std::string qrzUsername_;
-  std::string qrzPassword_;
+  TextInput qrzUsernameInput_;
+  TextInput qrzPasswordInput_;
   std::string countdownLabel_;
   std::string countdownTime_; // YYYY-MM-DD HH:MM
-  std::string dimTime_;
-  std::string brightTime_;
+  TextInput dimTimeInput_;
+  TextInput brightTimeInput_;
 
   SDL_Rect brightTimeRect_ = {0, 0, 0, 0};
   SDL_Rect modalRect_ = {0, 0, 0, 0};
 
-  std::string rigHost_;
-  std::string rigPort_;
+  TextInput rigHostInput_;
+  TextInput rigPortInput_;
   bool rigAutoTune_ = true;
 
   std::vector<WidgetType> paneRotations_[4];
@@ -128,15 +126,13 @@ private:
 
   // Watchlist tab
   std::vector<std::string> watchlistEntries_;
-  std::string watchlistInput_;
+  TextInput watchlistInputField_;
   SDL_Rect watchlistInputRect_ = {0, 0, 0, 0};
   SDL_Rect watchlistAddRect_ = {0, 0, 0, 0};
   std::vector<SDL_Rect> watchlistDeleteRects_;
   int watchlistScrollOffset_ = 0;
   int activePane_ = 0;
   int activeField_ = 0;
-  int cursorPos_ = 0;
-  int selectionAnchor_ = 0;
   bool complete_ = false;
   bool cancelled_ = false;
   bool latLonManual_ = false;
@@ -170,8 +166,8 @@ private:
 
   // Network / Hub tab
   HubMode hubMode_ = HubMode::Off;
-  std::string hubIp_;
-  std::string hubPortStr_ = "8080";
+  TextInput hubIpInput_;
+  TextInput hubPortInput_;
   SDL_Rect hubModeRect_ = {0, 0, 0, 0};
   SDL_Rect hubIpRect_ = {0, 0, 0, 0};
   SDL_Rect hubPortRect_ = {0, 0, 0, 0};

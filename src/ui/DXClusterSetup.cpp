@@ -2,10 +2,13 @@
 #include "../core/Theme.h"
 #include "FontCatalog.h"
 #include <algorithm>
-#include <cstring>
 
 DXClusterSetup::DXClusterSetup(int x, int y, int w, int h, FontManager &fontMgr)
     : Widget(x, y, w, h), fontMgr_(fontMgr) {
+  hostInput_.setMaxLength(64);
+  portInput_.setMaxLength(5);
+  loginInput_.setMaxLength(32);
+  hostInput_.setActive(true);
   recalcLayout();
 }
 
@@ -15,44 +18,12 @@ void DXClusterSetup::recalcLayout() {
 
 void DXClusterSetup::update() {}
 
-static void renderField(SDL_Renderer *renderer, FontManager &fontMgr,
-                        const std::string &text, const std::string &placeholder,
-                        int fieldX, int &y, int fieldW, int fieldH,
-                        FontStyle fieldStyle, int textPad, bool active,
-                        int cursorPos, SDL_Color activeBorder,
-                        SDL_Color inactiveBorder, SDL_Color textColor,
-                        SDL_Color placeholderColor) {
-  SDL_Color border = active ? activeBorder : inactiveBorder;
-  auto *cat = fontMgr.catalog();
-
-  SDL_SetRenderDrawColor(renderer, 30, 30, 40, 255);
-  SDL_Rect rect = {fieldX, y, fieldW, fieldH};
-  SDL_RenderFillRect(renderer, &rect);
-  SDL_SetRenderDrawColor(renderer, border.r, border.g, border.b, 255);
-  SDL_RenderDrawRect(renderer, &rect);
-
-  if (!text.empty()) {
-    cat->drawText(renderer, text, fieldX + textPad, y + textPad, textColor,
-                  fieldStyle);
-  } else if (!active) {
-    cat->drawText(renderer, placeholder, fieldX + textPad, y + textPad,
-                  placeholderColor, fieldStyle);
+TextInput &DXClusterSetup::activeInput() {
+  switch (activeField_) {
+  case 1:  return portInput_;
+  case 2:  return loginInput_;
+  default: return hostInput_;
   }
-
-  if (active) {
-    int cursorX = fieldX + textPad;
-    if (cursorPos > 0 && !text.empty()) {
-      std::string before = text.substr(0, cursorPos);
-      int tw = fontMgr.getLogicalWidth(before, cat->ptSize(fieldStyle));
-      cursorX += tw;
-    }
-    if ((SDL_GetTicks() / 500) % 2 == 0) {
-      SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
-      SDL_RenderDrawLine(renderer, cursorX, y + 4, cursorX, y + fieldH - 4);
-    }
-  }
-
-  y += fieldH;
 }
 
 void DXClusterSetup::render(SDL_Renderer *renderer) {
@@ -92,25 +63,24 @@ void DXClusterSetup::render(SDL_Renderer *renderer) {
                 FontStyle::UI);
   y += cat->ptSize(FontStyle::UI) + 4;
 
-  int hostY = y;
-  renderField(renderer, fontMgr_, hostText_, "e.g. dxc.k3lr.com", fieldX, hostY,
-              fieldW - 110, fieldH, FontStyle::UI, textPad, activeField_ == 0,
-              cursorPos_, orange, gray, white, gray);
+  int hostFieldW = fieldW - 110;
+  hostInput_.render(renderer, fontMgr_, fieldX, y, hostFieldW, fieldH,
+                    FontStyle::UI, textPad, activeField_ == 0, false,
+                    orange, gray, white, white, gray, "e.g. dxc.k3lr.com");
 
-  int portY = y;
-  renderField(renderer, fontMgr_, portText_, "7000", fieldX + fieldW - 100,
-              portY, 100, fieldH, FontStyle::UI, textPad, activeField_ == 1,
-              cursorPos_, orange, gray, white, gray);
+  portInput_.render(renderer, fontMgr_, fieldX + fieldW - 100, y, 100, fieldH,
+                    FontStyle::UI, textPad, activeField_ == 1, false,
+                    orange, gray, white, white, gray, "7000");
 
-  y = std::max(hostY, portY) + pad;
+  y += fieldH + pad;
 
   // --- Login ---
   cat->drawText(renderer, "Callsign / Login:", fieldX, y, white, FontStyle::UI);
   y += cat->ptSize(FontStyle::UI) + 4;
-  renderField(renderer, fontMgr_, loginText_, "Your callsign", fieldX, y,
-              fieldW, fieldH, FontStyle::UI, textPad, activeField_ == 2,
-              cursorPos_, orange, gray, white, gray);
-  y += pad;
+  loginInput_.render(renderer, fontMgr_, fieldX, y, fieldW, fieldH,
+                     FontStyle::UI, textPad, activeField_ == 2, false,
+                     orange, gray, white, white, gray, "Your callsign");
+  y += fieldH + pad;
 
   // --- UDP / WSJT-X ---
   toggleRect_ = {fieldX, y, 24, 24};
@@ -184,7 +154,7 @@ bool DXClusterSetup::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
     return true;
   }
 
-  // Check fields
+  // Field hit-test: recalculate the same geometry used in render()
   auto *cat = fontMgr_.catalog();
   int cx = x_ + width_ / 2;
   int pad = std::max(20, width_ / 20);
@@ -192,70 +162,56 @@ bool DXClusterSetup::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
   int fieldX = cx - fieldW / 2;
   int fieldH = cat->ptSize(FontStyle::UI) + 14;
   int uiSize = cat->ptSize(FontStyle::UI);
+  int textPad = 8;
 
   int y = y_ + height_ / 10;
-  // Skip title
-  y += cat->ptSize(FontStyle::MediumBold) + pad;
+  y += cat->ptSize(FontStyle::MediumBold) + pad; // skip title
+  y += uiSize + 4;                                // skip "Cluster Host:" label
 
-  // Check Host (Field 0)
-  if (mx >= fieldX && mx < fieldX + fieldW - 110 && my >= y + uiSize + 4 &&
-      my < y + uiSize + 4 + fieldH) {
+  int hostFieldW = fieldW - 110;
+
+  // Host field
+  if (hostInput_.onMouseDown(mx, my, fontMgr_, fieldX, y, hostFieldW, fieldH,
+                              FontStyle::UI, textPad)) {
     activeField_ = 0;
-    cursorPos_ = hostText_.size();
+    hostInput_.setActive(true);
+    portInput_.setActive(false);
+    loginInput_.setActive(false);
     return true;
   }
-  // Check Port (Field 1)
-  if (mx >= fieldX + fieldW - 100 && mx < fieldX + fieldW &&
-      my >= y + uiSize + 4 && my < y + uiSize + 4 + fieldH) {
+  // Port field
+  if (portInput_.onMouseDown(mx, my, fontMgr_, fieldX + fieldW - 100, y, 100,
+                              fieldH, FontStyle::UI, textPad)) {
     activeField_ = 1;
-    cursorPos_ = portText_.size();
+    hostInput_.setActive(false);
+    portInput_.setActive(true);
+    loginInput_.setActive(false);
     return true;
   }
 
-  int hostY = y + uiSize + 4 + fieldH;
-  int portY = y + uiSize + 4 + fieldH;
-  y = std::max(hostY, portY) + pad;
+  y += fieldH + pad;            // advance past host/port row
+  y += uiSize + 4;              // skip "Callsign / Login:" label
 
-  // Check Login (Field 2)
-  if (mx >= fieldX && mx < fieldX + fieldW && my >= y + uiSize + 4 &&
-      my < y + uiSize + 4 + fieldH) {
+  // Login field
+  if (loginInput_.onMouseDown(mx, my, fontMgr_, fieldX, y, fieldW, fieldH,
+                               FontStyle::UI, textPad)) {
     activeField_ = 2;
-    cursorPos_ = loginText_.size();
+    hostInput_.setActive(false);
+    portInput_.setActive(false);
+    loginInput_.setActive(true);
     return true;
   }
 
   return true;
 }
 
-bool DXClusterSetup::onKeyDown(SDL_Keycode key, Uint16) {
-  std::string *text = nullptr;
-  switch (activeField_) {
-  case 0:
-    text = &hostText_;
-    break;
-  case 1:
-    text = &portText_;
-    break;
-  case 2:
-    text = &loginText_;
-    break;
-  }
-  if (!text)
-    return true;
-
+bool DXClusterSetup::onKeyDown(SDL_Keycode key, Uint16 mod) {
   if (key == SDLK_TAB) {
     activeField_ = (activeField_ + 1) % kNumFields;
-    switch (activeField_) {
-    case 0:
-      cursorPos_ = hostText_.size();
-      break;
-    case 1:
-      cursorPos_ = portText_.size();
-      break;
-    case 2:
-      cursorPos_ = loginText_.size();
-      break;
-    }
+    hostInput_.setActive(activeField_ == 0);
+    portInput_.setActive(activeField_ == 1);
+    loginInput_.setActive(activeField_ == 2);
+    activeInput().setCursorToEnd();
     return true;
   }
 
@@ -271,79 +227,36 @@ bool DXClusterSetup::onKeyDown(SDL_Keycode key, Uint16) {
     return true;
   }
 
-  if (key == SDLK_BACKSPACE && cursorPos_ > 0) {
-    text->erase(cursorPos_ - 1, 1);
-    --cursorPos_;
+  // Delegate navigation/edit keys to the active field
+  if (activeInput().onKeyDown(key, mod))
     return true;
-  }
-
-  if (key == SDLK_DELETE && cursorPos_ < (int)text->size()) {
-    text->erase(cursorPos_, 1);
-    return true;
-  }
-
-  if (key == SDLK_LEFT && cursorPos_ > 0) {
-    cursorPos_--;
-    return true;
-  }
-  if (key == SDLK_RIGHT && cursorPos_ < (int)text->size()) {
-    cursorPos_++;
-    return true;
-  }
-
-  if (key == SDLK_HOME) {
-    cursorPos_ = 0;
-    return true;
-  }
-  if (key == SDLK_END) {
-    cursorPos_ = text->size();
-    return true;
-  }
 
   return true;
 }
 
 bool DXClusterSetup::onTextInput(const char *inputText) {
-  std::string *field = nullptr;
-  int maxLen = 0;
-  switch (activeField_) {
-  case 0:
-    field = &hostText_;
-    maxLen = 64;
-    break;
-  case 1:
-    field = &portText_;
-    maxLen = 5;
-    break;
-  case 2:
-    field = &loginText_;
-    maxLen = 32;
-    break;
-  }
-  if (!field)
-    return true;
-  if ((int)field->size() >= maxLen)
-    return true;
-
-  field->insert(cursorPos_, inputText);
-  cursorPos_ += strlen(inputText);
+  activeInput().onTextInput(inputText);
   return true;
 }
 
 void DXClusterSetup::setConfig(const AppConfig &cfg) {
-  hostText_ = cfg.dxClusterHost;
-  portText_ = std::to_string(cfg.dxClusterPort);
-  loginText_ = cfg.dxClusterLogin;
+  hostInput_.setValue(cfg.dxClusterHost);
+  portInput_.setValue(std::to_string(cfg.dxClusterPort));
+  loginInput_.setValue(cfg.dxClusterLogin);
   useWSJTX_ = cfg.dxClusterUseWSJTX;
-  cursorPos_ = hostText_.size();
+  hostInput_.setCursorToEnd();
+  hostInput_.setActive(true);
+  portInput_.setActive(false);
+  loginInput_.setActive(false);
+  activeField_ = 0;
 }
 
 AppConfig DXClusterSetup::updateConfig(AppConfig cfg) const {
-  cfg.dxClusterHost = hostText_;
-  cfg.dxClusterPort = std::atoi(portText_.c_str());
+  cfg.dxClusterHost = hostInput_.getValue();
+  cfg.dxClusterPort = std::atoi(portInput_.getValue().c_str());
   if (cfg.dxClusterPort == 0)
     cfg.dxClusterPort = 7300;
-  cfg.dxClusterLogin = loginText_;
+  cfg.dxClusterLogin = loginInput_.getValue();
   cfg.dxClusterUseWSJTX = useWSJTX_;
   return cfg;
 }

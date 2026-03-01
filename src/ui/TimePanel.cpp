@@ -355,14 +355,16 @@ void TimePanel::onResize(int x, int y, int w, int h) {
 
 void TimePanel::startEditing() {
   editing_ = true;
-  editText_ = callsign_;
-  cursorPos_ = static_cast<int>(editText_.size());
+  editInput_.setValue(callsign_);
+  editInput_.setMaxLength(20);
+  editInput_.setCursorToEnd();
+  editInput_.setActive(true);
   SDL_StartTextInput();
 }
 
 void TimePanel::stopEditing(bool apply) {
-  if (apply && !editText_.empty()) {
-    callsign_ = editText_;
+  if (apply && !editInput_.getValue().empty()) {
+    callsign_ = editInput_.getValue();
     callColor_ = kPalette[selectedColorIdx_];
     // Force callsign texture rebuild
     if (callTex_) {
@@ -467,7 +469,7 @@ bool TimePanel::onMouseUp(int mx, int my, Uint16 /*mod*/, int clicks) {
   return false;
 }
 
-bool TimePanel::onKeyDown(SDL_Keycode key, Uint16 /*mod*/) {
+bool TimePanel::onKeyDown(SDL_Keycode key, Uint16 mod) {
   if (!editing_)
     return false;
 
@@ -479,46 +481,16 @@ bool TimePanel::onKeyDown(SDL_Keycode key, Uint16 /*mod*/) {
   case SDLK_ESCAPE:
     stopEditing(false);
     return true;
-  case SDLK_BACKSPACE:
-    if (cursorPos_ > 0) {
-      editText_.erase(cursorPos_ - 1, 1);
-      --cursorPos_;
-    }
-    return true;
-  case SDLK_DELETE:
-    if (cursorPos_ < static_cast<int>(editText_.size())) {
-      editText_.erase(cursorPos_, 1);
-    }
-    return true;
-  case SDLK_LEFT:
-    if (cursorPos_ > 0)
-      --cursorPos_;
-    return true;
-  case SDLK_RIGHT:
-    if (cursorPos_ < static_cast<int>(editText_.size()))
-      ++cursorPos_;
-    return true;
-  case SDLK_HOME:
-    cursorPos_ = 0;
-    return true;
-  case SDLK_END:
-    cursorPos_ = static_cast<int>(editText_.size());
-    return true;
   default:
-    return true; // consume all keys while editing
+    editInput_.onKeyDown(key, mod);
+    return true;
   }
 }
 
 bool TimePanel::onTextInput(const char *text) {
   if (!editing_)
     return false;
-
-  // Limit callsign length to 20 characters
-  if (editText_.size() >= 20)
-    return true;
-
-  editText_.insert(cursorPos_, text);
-  cursorPos_ += static_cast<int>(std::strlen(text));
+  editInput_.onTextInput(text);
   return true;
 }
 
@@ -549,15 +521,17 @@ void TimePanel::renderEditOverlay(SDL_Renderer *renderer) {
   int textY = fieldY + 6;
   auto *cat = fontMgr_.catalog();
 
-  if (!editText_.empty()) {
-    cat->drawText(renderer, editText_, textX, textY, selColor,
+  const std::string &editStr = editInput_.getValue();
+  if (!editStr.empty()) {
+    cat->drawText(renderer, editStr, textX, textY, selColor,
                   FontStyle::MediumBold);
   }
 
-  // Cursor: measure text up to cursorPos_ to find x offset
+  // Cursor: measure text up to cursorPos to find x offset
   int cursorX = textX;
-  if (cursorPos_ > 0) {
-    std::string beforeCursor = editText_.substr(0, cursorPos_);
+  int cp = editInput_.getCursorPos();
+  if (cp > 0) {
+    std::string beforeCursor = editStr.substr(0, cp);
     int tw = fontMgr_.getLogicalWidth(beforeCursor,
                                       cat->ptSize(FontStyle::MediumBold));
     cursorX = textX + tw;
@@ -663,8 +637,8 @@ nlohmann::json TimePanel::getDebugData() const {
   j["uptime"] = currentUptime_;
   j["editing"] = editing_;
   if (editing_) {
-    j["editText"] = editText_;
-    j["cursorPos"] = cursorPos_;
+    j["editText"] = editInput_.getValue();
+    j["cursorPos"] = editInput_.getCursorPos();
   }
   return j;
 }

@@ -570,6 +570,7 @@ set(HAMCLOCK_SOURCES
     src/ui/SatelliteSetup.cpp
     src/ui/SatPanel.cpp
     src/ui/SetupScreen.cpp
+    src/ui/TextInput.cpp
     src/ui/SpaceWeatherPanel.cpp
     src/ui/ThemeCustomizer.cpp
     src/ui/TimePanel.cpp

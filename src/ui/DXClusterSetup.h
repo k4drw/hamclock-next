@@ -2,9 +2,9 @@
 
 #include "../core/ConfigManager.h"
 #include "FontManager.h"
+#include "TextInput.h"
 #include "Widget.h"
 #include <SDL.h>
-#include <string>
 
 class DXClusterSetup : public Widget {
 public:
@@ -25,18 +25,18 @@ public:
 
 private:
   void recalcLayout();
+  TextInput &activeInput();
 
   FontManager &fontMgr_;
 
   // Fields: 0=host, 1=port, 2=login
   static constexpr int kNumFields = 3;
   int activeField_ = 0;
-  std::string hostText_;
-  std::string portText_;
-  std::string loginText_;
+  TextInput hostInput_;
+  TextInput portInput_;
+  TextInput loginInput_;
   bool useWSJTX_ = false;
 
-  int cursorPos_ = 0;
   bool complete_ = false;
   bool saved_ = false;
 

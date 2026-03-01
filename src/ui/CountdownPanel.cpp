@@ -133,10 +133,10 @@ bool CountdownPanel::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
       if (my >= startY && my < startY + boxH) {
         if (editingTime_) {
           // Switch to Label
-          tempTime_ = editText_;
-          editText_ = tempLabel_;
+          tempTime_ = editInput_.getValue();
+          editInput_.setValue(tempLabel_);
           editingTime_ = false;
-          cursorPos_ = editText_.size();
+          editInput_.setCursorToEnd();
         }
         return true;
       }
@@ -145,10 +145,10 @@ bool CountdownPanel::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
       if (my >= timeY && my < timeY + boxH) {
         if (!editingTime_) {
           // Switch to Time
-          tempLabel_ = editText_;
-          editText_ = tempTime_;
+          tempLabel_ = editInput_.getValue();
+          editInput_.setValue(tempTime_);
           editingTime_ = true;
-          cursorPos_ = editText_.size();
+          editInput_.setCursorToEnd();
         }
         return true;
       }
@@ -194,17 +194,18 @@ void CountdownPanel::startEditing(bool editingTime) {
   if (tempTime_.empty())
     tempTime_ = "2026-01-01 00:00";
 
-  editText_ = tempLabel_;
-  cursorPos_ = static_cast<int>(editText_.size());
+  editInput_.setValue(tempLabel_);
+  editInput_.setActive(true);
+  editInput_.setCursorToEnd();
   SDL_StartTextInput();
 }
 
 void CountdownPanel::stopEditing(bool apply) {
   if (apply) {
     if (editingTime_)
-      tempTime_ = editText_;
+      tempTime_ = editInput_.getValue();
     else
-      tempLabel_ = editText_;
+      tempLabel_ = editInput_.getValue();
 
     config_.countdownLabel = tempLabel_;
     config_.countdownTime = tempTime_;
@@ -217,37 +218,39 @@ void CountdownPanel::stopEditing(bool apply) {
   SDL_StopTextInput();
 }
 
-bool CountdownPanel::onKeyDown(SDL_Keycode key, Uint16) {
+bool CountdownPanel::onKeyDown(SDL_Keycode key, Uint16 mod) {
   if (!editing_)
     return false;
-  if (key == SDLK_RETURN || key == SDLK_KP_ENTER)
+  if (key == SDLK_RETURN || key == SDLK_KP_ENTER) {
     stopEditing(true);
-  else if (key == SDLK_ESCAPE)
+    return true;
+  }
+  if (key == SDLK_ESCAPE) {
     stopEditing(false);
-  else if (key == SDLK_TAB) {
+    return true;
+  }
+  if (key == SDLK_TAB) {
     // Switch fields
     if (editingTime_) {
-      tempTime_ = editText_;
-      editText_ = tempLabel_;
+      tempTime_ = editInput_.getValue();
+      editInput_.setValue(tempLabel_);
       editingTime_ = false;
     } else {
-      tempLabel_ = editText_;
-      editText_ = tempTime_;
+      tempLabel_ = editInput_.getValue();
+      editInput_.setValue(tempTime_);
       editingTime_ = true;
     }
-    cursorPos_ = editText_.size();
-  } else if (key == SDLK_BACKSPACE && cursorPos_ > 0) {
-    editText_.erase(cursorPos_ - 1, 1);
-    --cursorPos_;
+    editInput_.setCursorToEnd();
+    return true;
   }
+  editInput_.onKeyDown(key, mod);
   return true;
 }
 
 bool CountdownPanel::onTextInput(const char *text) {
   if (!editing_)
     return false;
-  editText_.insert(cursorPos_, text);
-  cursorPos_ += static_cast<int>(std::strlen(text));
+  editInput_.onTextInput(text);
   return true;
 }
 
@@ -280,12 +283,13 @@ void CountdownPanel::renderEditOverlay(SDL_Renderer *renderer) {
     SDL_SetRenderDrawColor(renderer, 100, 100, 100, 255);
   SDL_RenderDrawRect(renderer, &labelBox);
 
-  std::string labelText = !editingTime_ ? editText_ : tempLabel_;
+  const std::string &editVal = editInput_.getValue();
+  std::string labelText = !editingTime_ ? editVal : tempLabel_;
   cat->drawText(renderer, labelText, x_ + pad + 4, startY + 6, white,
                 FontStyle::UI);
 
   if (!editingTime_ && (SDL_GetTicks() / 500) % 2 == 0) {
-    int tw = fontMgr_.getLogicalWidth(editText_.substr(0, cursorPos_),
+    int tw = fontMgr_.getLogicalWidth(editVal.substr(0, editInput_.getCursorPos()),
                                       cat->ptSize(FontStyle::UI));
     SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
     SDL_RenderDrawLine(renderer, x_ + pad + 4 + tw, startY + 4,
@@ -305,12 +309,12 @@ void CountdownPanel::renderEditOverlay(SDL_Renderer *renderer) {
     SDL_SetRenderDrawColor(renderer, 100, 100, 100, 255);
   SDL_RenderDrawRect(renderer, &timeBox);
 
-  std::string timeStr = editingTime_ ? editText_ : tempTime_;
+  std::string timeStr = editingTime_ ? editVal : tempTime_;
   cat->drawText(renderer, timeStr, x_ + pad + 4, timeY + 6, white,
                 FontStyle::UI);
 
   if (editingTime_ && (SDL_GetTicks() / 500) % 2 == 0) {
-    int tw = fontMgr_.getLogicalWidth(editText_.substr(0, cursorPos_),
+    int tw = fontMgr_.getLogicalWidth(editVal.substr(0, editInput_.getCursorPos()),
                                       cat->ptSize(FontStyle::UI));
     SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
     SDL_RenderDrawLine(renderer, x_ + pad + 4 + tw, timeY + 4,
