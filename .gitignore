@@ -33,3 +33,21 @@ CLAUDE.md
 
 # Docker
 docker-build/
+
+# Claude Code sandbox
+.bash_profile
+.bashrc
+.gitconfig
+.gitmodules
+.idea
+.mcp.json
+.profile
+.ripgreprc
+.vscode
+.zprofile
+.zshrc
+HEAD
+config
+hooks
+objects
+refs

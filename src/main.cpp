@@ -1263,7 +1263,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
       break;
     case WidgetType::SYS_INFO:
       widgetPool[type] = std::make_unique<SysInfoPanel>(
-          0, 0, 0, 0, fontMgr, ctx.cpuMonitor, appCfg.useMetric);
+          0, 0, 0, 0, fontMgr, ctx.cpuMonitor, ctx.state, appCfg.useMetric);
       break;
     case WidgetType::ASTEROID:
       widgetPool[type] = std::make_unique<AsteroidPanel>(
