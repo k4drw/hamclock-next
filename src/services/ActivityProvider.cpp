@@ -1,3 +1,11 @@
+// ActivityProvider — Intentional architectural exception: uses SDL_PushEvent to
+// deliver burst/async activity data (DX Peditions, POTA, SOTA) rather than
+// Store-Push. The event-driven model is appropriate here because updates are
+// infrequent and the payload must be processed on the SDL main thread anyway.
+//
+// fetchDXPeds() parses HTML from ng3k.com (Announced DX Operations). No JSON
+// API is available from this source; HTML scraping is the only option. Any
+// upstream HTML layout change will silently break DX Peditions data ingestion.
 #include "ActivityProvider.h"
 #include "../core/ActivityLocationManager.h"
 #include "../core/Astronomy.h"

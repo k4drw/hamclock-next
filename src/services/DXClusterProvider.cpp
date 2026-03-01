@@ -1,3 +1,9 @@
+// DXClusterProvider — Intentional architectural exception to the Store-Push pattern.
+// This provider maintains its own background thread because it owns a persistent
+// streaming TCP connection (Telnet to a DX cluster). The read loop blocks on recv()
+// waiting for the next spot, which is intrinsic to the transport protocol. Polling
+// or a non-blocking loop would add latency and complexity for no benefit.
+// All other HTTP-based providers use Store-Push.
 #include "DXClusterProvider.h"
 #include "../core/Astronomy.h"
 #include "../core/HamClockState.h"
