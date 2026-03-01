@@ -26,7 +26,7 @@ public:
     bool onTextInput(const char *text);
 
     // Mouse click → place cursor at click position
-    bool onMouseDown(int mx, int my, FontManager &fontMgr,
+    bool onMouseDown(int mx, int my, int clicks, FontManager &fontMgr,
                      int fieldX, int fieldY, int fieldW, int fieldH,
                      FontStyle style, int textPad);
 
@@ -60,6 +60,8 @@ public:
     void setCursorToEnd();
     void setCursorPos(int pos);
     int getCursorPos() const { return cursorPos_; }
+    void setSelectionAnchor(int pos) { selectionAnchor_ = clamp(pos); }
+    int getSelectionAnchor() const { return selectionAnchor_; }
     void clearSelection() { selectionAnchor_ = cursorPos_; }
 
 private:

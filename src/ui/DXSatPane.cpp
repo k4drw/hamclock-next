@@ -217,12 +217,12 @@ bool DXSatPane::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
   return false;
 }
 
-bool DXSatPane::onMouseDown(int mx, int my, Uint16 mod) {
+bool DXSatPane::onMouseDown(int mx, int my, Uint16 mod, int clicks) {
   if (greylineModal_.isActive()) {
     return true; // Modal consumes
   }
   if (satelliteSetup_.isActive()) {
-    return satelliteSetup_.onMouseDown(mx, my, mod);
+    return satelliteSetup_.onMouseDown(mx, my, mod, clicks);
   }
   return false;
 }

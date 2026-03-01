@@ -1872,10 +1872,10 @@ void DashboardContext::update(AppContext &ctx) {
         smy = static_cast<int>(pixY / ctx.layScale);
       }
       if (focusedWidget)
-        focusedWidget->onMouseDown(smx, smy, SDL_GetModState());
+        focusedWidget->onMouseDown(smx, smy, SDL_GetModState(), event.button.clicks);
       else
         for (auto *w : eventWidgets)
-          if (w->onMouseDown(smx, smy, SDL_GetModState()))
+          if (w->onMouseDown(smx, smy, SDL_GetModState(), event.button.clicks))
             break;
     } break;
     case SDL_WINDOWEVENT:
@@ -2440,17 +2440,18 @@ void main_tick() {
         else if (event.type == SDL_TEXTINPUT)
           ctx.setupWidget->onTextInput(event.text.text);
         else if (event.type == SDL_MOUSEBUTTONDOWN) {
-          int smx = event.button.x, smy = event.button.y;
-          if (FIDELITY_MODE) {
-            float pixX = event.button.x * static_cast<float>(ctx.globalDrawW) /
-                         ctx.globalWinW;
-            float pixY = event.button.y * static_cast<float>(ctx.globalDrawH) /
-                         ctx.globalWinH;
-            smx = static_cast<int>(pixX / ctx.layScale);
-            smy = static_cast<int>(pixY / ctx.layScale);
+            int smx = event.button.x, smy = event.button.y;
+            if (FIDELITY_MODE) {
+              float pixX = event.button.x * static_cast<float>(ctx.globalDrawW) /
+                           ctx.globalWinW;
+              float pixY = event.button.y * static_cast<float>(ctx.globalDrawH) /
+                           ctx.globalWinH;
+              smx = static_cast<int>(pixX / ctx.layScale);
+              smy = static_cast<int>(pixY / ctx.layScale);
+            }
+            ctx.setupWidget->onMouseDown(smx, smy, SDL_GetModState(), event.button.clicks);
           }
-          ctx.setupWidget->onMouseDown(smx, smy, SDL_GetModState());
-        } else if (event.type == SDL_MOUSEBUTTONUP) {
+ else if (event.type == SDL_MOUSEBUTTONUP) {
           int smx = event.button.x, smy = event.button.y;
           if (FIDELITY_MODE) {
             float pixX = event.button.x * static_cast<float>(ctx.globalDrawW) /

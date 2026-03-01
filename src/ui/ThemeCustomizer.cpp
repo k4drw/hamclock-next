@@ -138,7 +138,7 @@ void ThemeCustomizer::render(SDL_Renderer *renderer) {
   drawBottomBtn(rectOk_, "Done", themes.success);
 }
 
-bool ThemeCustomizer::onMouseDown(int mx, int my, Uint16 mod) {
+bool ThemeCustomizer::onMouseDown(int mx, int my, Uint16 mod, int clicks) {
   if (!active_)
     return false;
 
@@ -167,7 +167,7 @@ bool ThemeCustomizer::onMouseDown(int mx, int my, Uint16 mod) {
     }
   }
 
-  return colorPicker_->onMouseDown(mx, my, mod);
+  return colorPicker_->onMouseDown(mx, my, mod, clicks);
 }
 
 bool ThemeCustomizer::onMouseUp(int mx, int my, Uint16 mod, int clicks) {

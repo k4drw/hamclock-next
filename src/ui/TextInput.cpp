@@ -161,13 +161,22 @@ bool TextInput::onTextInput(const char *text) {
 
 // ─── Mouse ───────────────────────────────────────────────────────────────────
 
-bool TextInput::onMouseDown(int mx, int my,
+bool TextInput::onMouseDown(int mx, int my, int clicks,
                             FontManager &fontMgr,
                             int fieldX, int fieldY, int fieldW, int fieldH,
                             FontStyle style, int textPad) {
     if (mx < fieldX || mx >= fieldX + fieldW ||
         my < fieldY || my >= fieldY + fieldH)
         return false;
+
+    active_ = true;
+
+    if (clicks == 2) {
+        selectionAnchor_ = 0;
+        cursorPos_ = static_cast<int>(text_.size());
+        mouseDown_ = false; // Disable drag on double-click
+        return true;
+    }
 
     auto *cat = fontMgr.catalog();
     int fontSize = cat->ptSize(style);

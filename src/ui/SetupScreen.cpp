@@ -317,45 +317,45 @@ void SetupScreen::renderTabIdentity(SDL_Renderer *renderer, int, int pad,
   SDL_Color green = {0, 200, 0, 255};
   SDL_Color red = {255, 80, 80, 255};
 
+  int labelH = cat->ptSize(FontStyle::SmallBold) + 4;
+
   cat->drawText(renderer, "Callsign:", fieldX, y, white, FontStyle::SmallBold);
-  y += cat->ptSize(FontStyle::SmallBold) + 4;
-  callsignInput_.render(renderer, fontMgr_, fieldX, y, fieldW, fieldH,
-                        FontStyle::SmallRegular, textPad,
-                        activeField_ == 0, !callsignInput_.getValue().empty(),
-                        orange, gray, white, white, gray, "e.g. K4DRW");
+  y += labelH;
   callsignRect_ = {fieldX, y, fieldW, fieldH};
+  callsignInput_.render(renderer, fontMgr_, fieldX, y, fieldW, fieldH,
+                        FontStyle::SmallRegular, textPad, activeField_ == 0,
+                        !callsignInput_.getValue().empty(), orange, gray, white,
+                        white, gray, "e.g. K4DRW");
   y += fieldH + vSpace;
 
   cat->drawText(renderer, "Grid Square:", fieldX, y, white,
                 FontStyle::SmallBold);
-  y += cat->ptSize(FontStyle::SmallBold) + 4;
+  y += labelH;
+  gridRect_ = {fieldX, y, fieldW, fieldH};
   gridInput_.render(renderer, fontMgr_, fieldX, y, fieldW, fieldH,
                     FontStyle::SmallRegular, textPad, activeField_ == 1,
                     gridValid_, orange, gray, green, white, gray, "e.g. EL87qr");
-  gridRect_ = {fieldX, y, fieldW, fieldH};
   y += fieldH + vSpace;
 
   int halfFieldW = (fieldW - pad) / 2;
   cat->drawText(renderer, "Latitude:", fieldX, y, white, FontStyle::SmallBold);
   cat->drawText(renderer, "Longitude:", fieldX + halfFieldW + pad, y, white,
                 FontStyle::SmallBold);
-  y += cat->ptSize(FontStyle::SmallBold) + 4;
+  y += labelH;
 
   int latY = y;
-  latInput_.render(renderer, fontMgr_, fieldX, latY, halfFieldW, fieldH,
-                   FontStyle::SmallRegular, textPad,
-                   activeField_ == 2, !latInput_.getValue().empty(),
-                   orange, gray, white, white, gray, "e.g. 27.76");
   latRect_ = {fieldX, latY, halfFieldW, fieldH};
-  latY += fieldH;
+  latInput_.render(renderer, fontMgr_, fieldX, latY, halfFieldW, fieldH,
+                   FontStyle::SmallRegular, textPad, activeField_ == 2,
+                   !latInput_.getValue().empty(), orange, gray, white, white,
+                   gray, "e.g. 27.76");
 
   int lonY = y;
+  lonRect_ = {fieldX + halfFieldW + pad, lonY, halfFieldW, fieldH};
   lonInput_.render(renderer, fontMgr_, fieldX + halfFieldW + pad, lonY,
                    halfFieldW, fieldH, FontStyle::SmallRegular, textPad,
-                   activeField_ == 3, !lonInput_.getValue().empty(),
-                   orange, gray, white, white, gray, "e.g. -82.64");
-  lonRect_ = {fieldX + halfFieldW + pad, lonY, halfFieldW, fieldH};
-  lonY += fieldH;
+                   activeField_ == 3, !lonInput_.getValue().empty(), orange,
+                   gray, white, white, gray, "e.g. -82.64");
   y = std::max(latY, lonY) + pad / 2;
 
   if (mismatchWarning_) {
@@ -643,7 +643,9 @@ void SetupScreen::renderTabServices(SDL_Renderer *renderer, int cx, int pad,
 
   cat->drawText(renderer, "QRZ Username:", fieldX, y, white,
                 FontStyle::SmallBold);
-  y += cat->ptSize(FontStyle::SmallBold) + 4;
+  int labelH = cat->ptSize(FontStyle::SmallBold) + 4;
+  y += labelH;
+  qrzUsernameRect_ = {fieldX, y, fieldW, fieldH};
   qrzUsernameInput_.render(renderer, fontMgr_, fieldX, y, fieldW, fieldH,
                            FontStyle::SmallRegular, textPad, activeField_ == 0,
                            true, orange, gray, white, white, gray, "e.g. K4DRW");
@@ -651,13 +653,15 @@ void SetupScreen::renderTabServices(SDL_Renderer *renderer, int cx, int pad,
 
   cat->drawText(renderer, "QRZ Password:", fieldX, y, white,
                 FontStyle::SmallBold);
-  y += cat->ptSize(FontStyle::SmallBold) + 4;
+  y += labelH;
+  qrzPasswordRect_ = {fieldX, y, fieldW, fieldH};
   {
     std::string passMask(qrzPasswordInput_.getValue().length(), '*');
     TextInput tmpPwd;
     tmpPwd.setValue(passMask);
     if (activeField_ == 1) {
       tmpPwd.setCursorPos(qrzPasswordInput_.getCursorPos());
+      tmpPwd.setSelectionAnchor(qrzPasswordInput_.getSelectionAnchor());
     }
     tmpPwd.render(renderer, fontMgr_, fieldX, y, fieldW, fieldH,
                   FontStyle::SmallRegular, textPad, activeField_ == 1, true,
@@ -700,9 +704,10 @@ void SetupScreen::renderTabNetwork(SDL_Renderer *renderer, int /*cx*/, int pad,
   y += fieldH + vSpace;
 
   if (hubMode_ == HubMode::Client) {
+    int labelH = cat->ptSize(FontStyle::SmallRegular) + 4;
     cat->drawText(renderer, "Hub IP:", fieldX, y, white,
                   FontStyle::SmallRegular);
-    y += cat->ptSize(FontStyle::SmallRegular) + 4;
+    y += labelH;
     hubIpRect_ = {fieldX, y, fieldW, fieldH};
     hubIpInput_.render(renderer, fontMgr_, fieldX, y, fieldW, fieldH,
                        FontStyle::SmallRegular, textPad, activeField_ == 0,
@@ -712,7 +717,7 @@ void SetupScreen::renderTabNetwork(SDL_Renderer *renderer, int /*cx*/, int pad,
 
     cat->drawText(renderer, "Hub Port:", fieldX, y, white,
                   FontStyle::SmallRegular);
-    y += cat->ptSize(FontStyle::SmallRegular) + 4;
+    y += labelH;
     hubPortRect_ = {fieldX, y, fieldW, fieldH};
     hubPortInput_.render(renderer, fontMgr_, fieldX, y, fieldW, fieldH,
                          FontStyle::SmallRegular, textPad, activeField_ == 1,
@@ -750,9 +755,11 @@ void SetupScreen::renderTabRig(SDL_Renderer *renderer, int cx, int pad,
                 FontStyle::SmallBold);
   y += cat->ptSize(FontStyle::SmallBold) + pad;
 
+  int rigLabelH = cat->ptSize(FontStyle::SmallRegular) + 4;
   cat->drawText(renderer, "rigctld Host (IP or Name):", fieldX, y, white,
                 FontStyle::SmallRegular);
-  y += cat->ptSize(FontStyle::SmallRegular) + 4;
+  y += rigLabelH;
+  rigHostRect_ = {fieldX, y, fieldW, fieldH};
   rigHostInput_.render(renderer, fontMgr_, fieldX, y, fieldW, fieldH,
                        FontStyle::SmallRegular, textPad, activeField_ == 0,
                        true, orange, gray, white, white, gray, "e.g. localhost");
@@ -760,7 +767,8 @@ void SetupScreen::renderTabRig(SDL_Renderer *renderer, int cx, int pad,
 
   cat->drawText(renderer, "rigctld Port:", fieldX, y, white,
                 FontStyle::SmallRegular);
-  y += cat->ptSize(FontStyle::SmallRegular) + 4;
+  y += rigLabelH;
+  rigPortRect_ = {fieldX, y, fieldW, fieldH};
   rigPortInput_.render(renderer, fontMgr_, fieldX, y, fieldW, fieldH,
                        FontStyle::SmallRegular, textPad, activeField_ == 1,
                        true, orange, gray, white, white, gray, "4532");
@@ -990,9 +998,9 @@ void SetupScreen::onResize(int x, int y, int w, int h) {
   recalcLayout();
 }
 
-bool SetupScreen::onMouseDown(int mx, int my, Uint16 mod) {
+bool SetupScreen::onMouseDown(int mx, int my, Uint16 mod, int clicks) {
   if (themeCustomizer_ && themeCustomizer_->isActive()) {
-    return themeCustomizer_->onMouseDown(mx, my, mod);
+    return themeCustomizer_->onMouseDown(mx, my, mod, clicks);
   }
 
   auto *cat = fontMgr_.catalog();
@@ -1002,232 +1010,100 @@ bool SetupScreen::onMouseDown(int mx, int my, Uint16 mod) {
   int fieldH = cat->ptSize(FontStyle::SmallRegular) + 14;
   int textPad = 7;
 
-  // Handle special field rects first
-  if (activeTab_ == Tab::Appearance) {
-    auto hitTimeField = [&](SDL_Rect &r, int fieldIdx) {
-      if (mx >= r.x && mx < r.x + r.w && my >= r.y && my < r.y + r.h) {
-        activeField_ = fieldIdx;
+  // 1. Tab Switching (Highest Priority)
+  int yTabs = modalRect_.y + cat->ptSize(FontStyle::MediumBold) + 3 * pad / 2;
+  if (my >= yTabs && my <= yTabs + fieldH) {
+    const Tab tabValues[] = {Tab::Identity,  Tab::Spotting, Tab::Appearance,
+                             Tab::Rig,       Tab::Services, Tab::Network,
+                             Tab::Widgets,   Tab::Watchlist, Tab::Update};
+    int numTabs = 9;
+    int tabW = fieldW / numTabs;
+    for (int i = 0; i < numTabs; ++i) {
+      if (mx >= fieldX + i * tabW && mx <= fieldX + (i + 1) * tabW) {
+        activeTab_ = tabValues[i];
+        activeField_ = 0;
         TextInput *ti = getActiveInput();
-        if (ti) ti->setCursorToEnd();
+        if (ti) {
+          ti->setActive(true);
+          ti->setCursorToEnd();
+        }
         return true;
       }
-      return false;
-    };
-    if (hitTimeField(dimTimeRect_, 1))
-      return true;
-    if (hitTimeField(brightTimeRect_, 2))
-      return true;
+    }
   }
 
-  // Identity and Spotting tabs use stored rects (layout too complex for stride formula)
-  auto hitStoredField = [&](SDL_Rect &r, int idx) -> bool {
-    if (r.w > 0 && mx >= r.x && mx < r.x + r.w && my >= r.y &&
-        my < r.y + r.h) {
+  // Helper for field hit-testing
+  auto hitField = [&](SDL_Rect &r, int idx, TextInput *ti) -> bool {
+    if (r.w > 0 && mx >= r.x && mx < r.x + r.w && my >= r.y && my < r.y + r.h) {
       int oldField = activeField_;
       activeField_ = idx;
-      TextInput *ti = getActiveInput();
       if (ti) {
-        if (oldField == idx)
-          ti->onMouseDown(mx, my, fontMgr_, r.x, r.y, r.w, r.h,
+        ti->setActive(true);
+        // If double-click or already active, position cursor/select
+        if (oldField == idx || clicks == 2) {
+          ti->onMouseDown(mx, my, clicks, fontMgr_, r.x, r.y, r.w, r.h,
                           FontStyle::SmallRegular, textPad);
-        else
+        } else {
+          // First click into field: just put cursor at end
           ti->setCursorToEnd();
+        }
       }
       return true;
     }
     return false;
   };
+
+  // 2. Tab-Specific Field Interaction
   if (activeTab_ == Tab::Identity) {
-    if (hitStoredField(callsignRect_, 0)) return true;
-    if (hitStoredField(gridRect_, 1)) return true;
-    if (hitStoredField(latRect_, 2)) return true;
-    if (hitStoredField(lonRect_, 3)) return true;
-    return false;
-  }
-  if (activeTab_ == Tab::Spotting) {
-    if (hitStoredField(clusterHostRect_, 0)) return true;
-    if (hitStoredField(clusterPortRect_, 1)) return true;
-    if (hitStoredField(clusterLoginRect_, 2)) return true;
+    if (hitField(callsignRect_, 0, &callsignInput_))
+      return true;
+    if (hitField(gridRect_, 1, &gridInput_))
+      return true;
+    if (hitField(latRect_, 2, &latInput_))
+      return true;
+    if (hitField(lonRect_, 3, &lonInput_))
+      return true;
+  } else if (activeTab_ == Tab::Spotting) {
+    if (hitField(clusterHostRect_, 0, &clusterHostInput_))
+      return true;
+    if (hitField(clusterPortRect_, 1, &clusterPortInput_))
+      return true;
+    if (hitField(clusterLoginRect_, 2, &clusterLoginInput_))
+      return true;
     if (clusterWSJTX_ && wsjtxPortRect_.w > 0) {
-      if (hitStoredField(wsjtxPortRect_, 3)) return true;
-    }
-    return false;
-  }
-
-  if (activeTab_ == Tab::Network && hubMode_ == HubMode::Client) {
-    if (hubIpRect_.w > 0 && mx >= hubIpRect_.x &&
-        mx <= hubIpRect_.x + hubIpRect_.w && my >= hubIpRect_.y &&
-        my <= hubIpRect_.y + hubIpRect_.h) {
-      activeField_ = 0;
-      hubIpInput_.setCursorToEnd();
-      return true;
-    }
-    if (hubPortRect_.w > 0 && mx >= hubPortRect_.x &&
-        mx <= hubPortRect_.x + hubPortRect_.w && my >= hubPortRect_.y &&
-        my <= hubPortRect_.y + hubPortRect_.h) {
-      activeField_ = 1;
-      hubPortInput_.setCursorToEnd();
-      return true;
-    }
-  }
-
-  int yStart = modalRect_.y + cat->ptSize(FontStyle::MediumBold) + 2 * pad +
-               fieldH + pad / 2;
-  if (activeTab_ == Tab::Rig)
-    yStart += cat->ptSize(FontStyle::SmallBold) + pad;
-
-  int nFields = 0;
-  if (activeTab_ == Tab::Identity)
-    nFields = 4;
-  else if (activeTab_ == Tab::Spotting)
-    nFields = clusterWSJTX_ ? 4 : 3;
-  else if (activeTab_ == Tab::Appearance)
-    nFields = 1; // Rotation interval
-  else if (activeTab_ == Tab::Rig)
-    nFields = 2;
-  else if (activeTab_ == Tab::Services)
-    nFields = 2;
-
-  for (int i = 0; i < nFields; ++i) {
-    int fy = yStart;
-    int fx = fieldX;
-    int fw = fieldW;
-    int vSpace = pad / 2;
-
-    if (activeTab_ == Tab::Identity) {
-      if (i < 2) {
-        fy += i * (cat->ptSize(FontStyle::SmallBold) + 4 + fieldH + vSpace);
-      } else { // lat/lon row
-        fy += 2 * (cat->ptSize(FontStyle::SmallBold) + 4 + fieldH + vSpace);
-        fw = (fieldW - pad) / 2;
-        if (i == 3)
-          fx += fw + pad;
-      }
-    } else if (activeTab_ == Tab::Spotting && i == 3) {
-      // WSJT-X Port is handled via wsjtxPortRect_ in onMouseUp, 
-      // but for onMouseDown we'll just skip here as it's a special layout.
-      continue;
-    } else {
-      fy += i * (cat->ptSize(FontStyle::SmallBold) + 4 + fieldH + vSpace);
-    }
-
-    if (mx >= fx && mx < fx + fw && my >= fy &&
-        my < fy + cat->ptSize(FontStyle::SmallBold) + fieldH) {
-      int oldField = activeField_;
-      activeField_ = i;
-      TextInput *fieldInput = getActiveInput();
-      if (fieldInput) {
-        if (oldField == i) {
-          fieldInput->onMouseDown(mx, my, fontMgr_, fx, fy, fw, fieldH,
-                                  FontStyle::SmallRegular, textPad);
-        } else {
-          fieldInput->setCursorToEnd();
-        }
-      }
-      return true;
-    }
-  }
-
-  return false;
-}
-
-bool SetupScreen::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
-  if (themeCustomizer_ && themeCustomizer_->isActive()) {
-    return themeCustomizer_->onMouseUp(mx, my, mod, clicks);
-  }
-
-  // End any drag selection in the active text field
-  if (TextInput *ti = getActiveInput())
-    ti->onMouseUp();
-
-  // If clicked outside modal, cancel (like a true modal)
-  if (mx < modalRect_.x || mx >= modalRect_.x + modalRect_.w ||
-      my < modalRect_.y || my >= modalRect_.y + modalRect_.h) {
-    cancelled_ = true;
-    complete_ = true;
-    return true;
-  }
-
-  auto *cat = fontMgr_.catalog();
-  int pad = 20;
-  int fieldW = modalRect_.w - 2 * pad;
-  int fieldX = modalRect_.x + pad;
-  int fieldH = cat->ptSize(FontStyle::SmallRegular) + 14;
-  int y = modalRect_.y + cat->ptSize(FontStyle::MediumBold) + 3 * pad / 2;
-
-  // Check Footer Buttons
-  if (mx >= cancelBtnRect_.x && mx <= cancelBtnRect_.x + cancelBtnRect_.w &&
-      my >= cancelBtnRect_.y && my <= cancelBtnRect_.y + cancelBtnRect_.h) {
-    complete_ = true;
-    cancelled_ = true;
-    return true;
-  }
-
-  if (mx >= okBtnRect_.x && mx <= okBtnRect_.x + okBtnRect_.w &&
-      my >= okBtnRect_.y && my <= okBtnRect_.y + okBtnRect_.h) {
-    if (!callsignInput_.getValue().empty() && gridValid_) {
-      complete_ = true;
-    }
-    return true;
-  }
-
-  const Tab tabValues[] = {Tab::Identity,  Tab::Spotting, Tab::Appearance,
-                           Tab::Rig,       Tab::Services, Tab::Network,
-                           Tab::Widgets,   Tab::Watchlist, Tab::Update};
-  int numTabs = 9;
-  int tabW = fieldW / numTabs;
-
-  if (my >= y && my <= y + fieldH) {
-    for (int i = 0; i < numTabs; ++i) {
-      if (mx >= fieldX + i * tabW && mx <= fieldX + (i + 1) * tabW) {
-        activeTab_ = tabValues[i];
-        activeField_ = 0;
-        {
-          TextInput *ti = getActiveInput();
-          if (ti) ti->setCursorToEnd();
-        }
+      if (hitField(wsjtxPortRect_, 3, &wsjtxPortInput_))
         return true;
-      }
     }
+  } else if (activeTab_ == Tab::Rig) {
+    if (hitField(rigHostRect_, 0, &rigHostInput_))
+      return true;
+    if (hitField(rigPortRect_, 1, &rigPortInput_))
+      return true;
+  } else if (activeTab_ == Tab::Services) {
+    if (hitField(qrzUsernameRect_, 0, &qrzUsernameInput_))
+      return true;
+    if (hitField(qrzPasswordRect_, 1, &qrzPasswordInput_))
+      return true;
+  } else if (activeTab_ == Tab::Network && hubMode_ == HubMode::Client) {
+    if (hitField(hubIpRect_, 0, &hubIpInput_))
+      return true;
+    if (hitField(hubPortRect_, 1, &hubPortInput_))
+      return true;
+  } else if (activeTab_ == Tab::Appearance) {
+    if (hitField(dimTimeRect_, 1, &dimTimeInput_))
+      return true;
+    if (hitField(brightTimeRect_, 2, &brightTimeInput_))
+      return true;
   }
 
+  // 3. Toggles and Buttons (Non-text fields)
   if (activeTab_ == Tab::Identity) {
-    auto dblClickIdentity = [&](SDL_Rect &r, int idx) -> bool {
-      if (clicks == 2 && r.w > 0 && mx >= r.x && mx < r.x + r.w &&
-          my >= r.y && my < r.y + r.h) {
-        activeField_ = idx;
-        TextInput *ti = getActiveInput();
-        if (ti) ti->onKeyDown(SDLK_a, KMOD_CTRL);
-        return true;
-      }
-      return false;
-    };
-    if (dblClickIdentity(callsignRect_, 0)) return true;
-    if (dblClickIdentity(gridRect_, 1)) return true;
-    if (dblClickIdentity(latRect_, 2)) return true;
-    if (dblClickIdentity(lonRect_, 3)) return true;
     if (mx >= gpsToggleRect_.x && mx <= gpsToggleRect_.x + gpsToggleRect_.w &&
         my >= gpsToggleRect_.y && my <= gpsToggleRect_.y + gpsToggleRect_.h) {
       gpsEnabled_ = !gpsEnabled_;
       return true;
     }
-  }
-
-  if (activeTab_ == Tab::Spotting) {
-    auto dblClickSpotting = [&](SDL_Rect &r, int idx) -> bool {
-      if (clicks == 2 && r.w > 0 && mx >= r.x && mx < r.x + r.w &&
-          my >= r.y && my < r.y + r.h) {
-        activeField_ = idx;
-        TextInput *ti = getActiveInput();
-        if (ti) ti->onKeyDown(SDLK_a, KMOD_CTRL);
-        return true;
-      }
-      return false;
-    };
-    if (dblClickSpotting(clusterHostRect_, 0)) return true;
-    if (dblClickSpotting(clusterPortRect_, 1)) return true;
-    if (dblClickSpotting(clusterLoginRect_, 2)) return true;
-    if (clusterWSJTX_ && dblClickSpotting(wsjtxPortRect_, 3)) return true;
+  } else if (activeTab_ == Tab::Spotting) {
     if (mx >= clusterToggleRect_.x &&
         mx <= clusterToggleRect_.x + clusterToggleRect_.w &&
         my >= clusterToggleRect_.y &&
@@ -1245,116 +1121,7 @@ bool SetupScreen::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
       rbnEnabled_ = !rbnEnabled_;
       return true;
     }
-    if (clusterWSJTX_ && wsjtxPortRect_.w > 0 && mx >= wsjtxPortRect_.x &&
-        mx <= wsjtxPortRect_.x + wsjtxPortRect_.w && my >= wsjtxPortRect_.y &&
-        my <= wsjtxPortRect_.y + wsjtxPortRect_.h) {
-      activeField_ = 3;
-      wsjtxPortInput_.setCursorToEnd();
-      return true;
-    }
-  }
-
-  if (activeTab_ == Tab::Appearance) {
-    if (mx >= themeRect_.x && mx <= themeRect_.x + themeRect_.w &&
-        my >= themeRect_.y && my <= themeRect_.y + themeRect_.h) {
-      if (theme_ == "default")
-        theme_ = "dark";
-      else if (theme_ == "dark")
-        theme_ = "glass";
-      else if (theme_ == "glass")
-        theme_ = "custom";
-      else
-        theme_ = "default";
-      return true;
-    }
-    if (mx >= customizeBtnRect_.x &&
-        mx <= customizeBtnRect_.x + customizeBtnRect_.w &&
-        my >= customizeBtnRect_.y &&
-        my <= customizeBtnRect_.y + customizeBtnRect_.h) {
-      themeCustomizer_->setActive(true);
-      theme_ = "custom"; // Switch to custom mode
-      return true;
-    }
-    if (mx >= nightLightsRect_.x &&
-        mx <= nightLightsRect_.x + nightLightsRect_.w &&
-        my >= nightLightsRect_.y &&
-        my <= nightLightsRect_.y + nightLightsRect_.h) {
-      mapNightLights_ = !mapNightLights_;
-      return true;
-    }
-    if (mx >= metricToggleRect_.x &&
-        mx <= metricToggleRect_.x + metricToggleRect_.w &&
-        my >= metricToggleRect_.y &&
-        my <= metricToggleRect_.y + metricToggleRect_.h) {
-      useMetric_ = !useMetric_;
-      return true;
-    }
-    if (mx >= rssToggleRect_.x && mx <= rssToggleRect_.x + rssToggleRect_.w &&
-        my >= rssToggleRect_.y && my <= rssToggleRect_.y + rssToggleRect_.h) {
-      rssEnabled_ = !rssEnabled_;
-      return true;
-    }
-    if (mx >= weatherOverlayRect_.x &&
-        mx <= weatherOverlayRect_.x + weatherOverlayRect_.w &&
-        my >= weatherOverlayRect_.y &&
-        my <= weatherOverlayRect_.y + weatherOverlayRect_.h) {
-      if (weatherOverlay_ == WeatherOverlayType::None)
-        weatherOverlay_ = WeatherOverlayType::Clouds;
-      else if (weatherOverlay_ == WeatherOverlayType::Clouds)
-        weatherOverlay_ = WeatherOverlayType::WxMb;
-      else
-        weatherOverlay_ = WeatherOverlayType::None;
-      return true;
-    }
-  }
-
-  if (activeTab_ == Tab::Appearance) {
-    if (mx >= brightnessSliderRect_.x &&
-        mx <= brightnessSliderRect_.x + brightnessSliderRect_.w &&
-        my >= brightnessSliderRect_.y &&
-        my <= brightnessSliderRect_.y + brightnessSliderRect_.h) {
-      int newBrightness =
-          (mx - brightnessSliderRect_.x) * 100 / brightnessSliderRect_.w;
-      brightnessMgr_.setBrightness(newBrightness);
-      return true;
-    }
-    if (mx >= scheduleToggleRect_.x &&
-        mx <= scheduleToggleRect_.x + scheduleToggleRect_.w &&
-        my >= scheduleToggleRect_.y &&
-        my <= scheduleToggleRect_.y + scheduleToggleRect_.h) {
-      brightnessMgr_.setScheduleEnabled(!brightnessMgr_.isScheduleEnabled());
-      return true;
-    }
-    // Dim / Bright time text fields (rects tracked by renderTabAppearance)
-    auto hitTimeField = [&](SDL_Rect &r, int fieldIdx) {
-      if (mx >= r.x && mx < r.x + r.w && my >= r.y && my < r.y + r.h) {
-        activeField_ = fieldIdx;
-        TextInput *ft = getActiveInput();
-        if (clicks == 2 && ft) {
-          ft->setActive(true);
-          ft->onKeyDown(SDLK_a, KMOD_CTRL);
-        } else if (ft) {
-          ft->setCursorToEnd();
-        }
-        return true;
-      }
-      return false;
-    };
-    if (hitTimeField(dimTimeRect_, 1))
-      return true;
-    if (hitTimeField(brightTimeRect_, 2))
-      return true;
-  }
-
-  if (activeTab_ == Tab::Rig) {
-    if (mx >= toggleRect_.x && mx <= toggleRect_.x + toggleRect_.w &&
-        my >= toggleRect_.y && my <= toggleRect_.y + toggleRect_.h) {
-      rigAutoTune_ = !rigAutoTune_;
-      return true;
-    }
-  }
-
-  if (activeTab_ == Tab::Network) {
+  } else if (activeTab_ == Tab::Network) {
     if (mx >= hubModeRect_.x && mx <= hubModeRect_.x + hubModeRect_.w &&
         my >= hubModeRect_.y && my <= hubModeRect_.y + hubModeRect_.h) {
       if (hubMode_ == HubMode::Off)
@@ -1366,130 +1133,41 @@ bool SetupScreen::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
       activeField_ = 0;
       return true;
     }
-    if (hubMode_ == HubMode::Client) {
-      if (hubIpRect_.w > 0 && mx >= hubIpRect_.x &&
-          mx <= hubIpRect_.x + hubIpRect_.w && my >= hubIpRect_.y &&
-          my <= hubIpRect_.y + hubIpRect_.h) {
-        activeField_ = 0;
-        hubIpInput_.setCursorToEnd();
-        return true;
-      }
-      if (hubPortRect_.w > 0 && mx >= hubPortRect_.x &&
-          mx <= hubPortRect_.x + hubPortRect_.w && my >= hubPortRect_.y &&
-          my <= hubPortRect_.y + hubPortRect_.h) {
-        activeField_ = 1;
-        hubPortInput_.setCursorToEnd();
-        return true;
-      }
-    }
   }
 
-  if (activeTab_ == Tab::Widgets) {
-    int yTabBase = modalRect_.y + cat->ptSize(FontStyle::MediumBold) + 2 * pad +
-                   fieldH; // matches content start
-    int ySelector = yTabBase + cat->ptSize(FontStyle::SmallBold) + pad / 2;
-    int paneW = fieldW / 4;
-    if (my >= ySelector && my <= ySelector + 30) {
-      for (int i = 0; i < 4; ++i) {
-        if (mx >= fieldX + i * paneW && mx <= fieldX + (i + 1) * paneW) {
-          activePane_ = i;
-          return true;
-        }
-      }
+  // 4. Footer Buttons
+  if (mx >= cancelBtnRect_.x && mx <= cancelBtnRect_.x + cancelBtnRect_.w &&
+      my >= cancelBtnRect_.y && my <= cancelBtnRect_.y + cancelBtnRect_.h) {
+    complete_ = true;
+    cancelled_ = true;
+    return true;
+  }
+  if (mx >= okBtnRect_.x && mx <= okBtnRect_.x + okBtnRect_.w &&
+      my >= okBtnRect_.y && my <= okBtnRect_.y + okBtnRect_.h) {
+    if (!callsignInput_.getValue().empty() && gridValid_) {
+      complete_ = true;
     }
-
-    // Sync rotation checkbox
-    if (mx >= syncRotationRect_.x &&
-        mx <= syncRotationRect_.x + syncRotationRect_.w &&
-        my >= syncRotationRect_.y &&
-        my <= syncRotationRect_.y + syncRotationRect_.h) {
-      syncRotation_ = !syncRotation_;
-      return true;
-    }
-
-    // Check widget selection clicks
-    for (const auto &wr : widgetRects_) {
-      if (mx >= wr.rect.x && mx <= wr.rect.x + wr.rect.w && my >= wr.rect.y &&
-          my <= wr.rect.y + wr.rect.h) {
-        auto &v = paneRotations_[activePane_];
-        auto it = std::find(v.begin(), v.end(), wr.type);
-        if (it != v.end()) {
-          v.erase(it);
-        } else {
-          v.push_back(wr.type);
-        }
-        return true;
-      }
-    }
+    return true;
   }
 
-  if (activeTab_ == Tab::Watchlist) {
-    // Delete buttons
-    for (int i = 0; i < (int)watchlistDeleteRects_.size(); ++i) {
-      const auto &r = watchlistDeleteRects_[i];
-      if (mx >= r.x && mx < r.x + r.w && my >= r.y && my < r.y + r.h) {
-        int realIdx = watchlistScrollOffset_ + i;
-        if (realIdx < (int)watchlistEntries_.size()) {
-          watchlistEntries_.erase(watchlistEntries_.begin() + realIdx);
-          if (watchlistScrollOffset_ > 0 &&
-              watchlistScrollOffset_ >= (int)watchlistEntries_.size())
-            --watchlistScrollOffset_;
-        }
-        return true;
-      }
-    }
-    // Scroll up arrow
-    if (watchlistScrollOffset_ > 0) {
-      int arrowY = watchlistInputRect_.y - fieldH - pad / 2;
-      SDL_Rect upR = {fieldX, arrowY, 40, fieldH};
-      if (mx >= upR.x && mx < upR.x + upR.w && my >= upR.y &&
-          my < upR.y + upR.h) {
-        --watchlistScrollOffset_;
-        return true;
-      }
-    }
-    // Scroll down arrow
-    {
-      int contentY = modalRect_.y + cat->ptSize(FontStyle::MediumBold) +
-                     2 * pad + fieldH;
-      int maxVisible = 8;
-      if ((int)watchlistEntries_.size() > watchlistScrollOffset_ + maxVisible) {
-        int arrowY = watchlistInputRect_.y - fieldH - pad / 2;
-        SDL_Rect downR = {fieldX + 44, arrowY, 40, fieldH};
-        (void)contentY;
-        if (mx >= downR.x && mx < downR.x + downR.w && my >= downR.y &&
-            my < downR.y + downR.h) {
-          ++watchlistScrollOffset_;
-          return true;
-        }
-      }
-    }
-    // Input field activation
-    if (watchlistInputRect_.w > 0 && mx >= watchlistInputRect_.x &&
-        mx < watchlistInputRect_.x + watchlistInputRect_.w &&
-        my >= watchlistInputRect_.y &&
-        my < watchlistInputRect_.y + watchlistInputRect_.h) {
-      activeField_ = 0;
-      watchlistInputField_.setCursorToEnd();
-      return true;
-    }
-    // Add button
-    if (watchlistAddRect_.w > 0 && mx >= watchlistAddRect_.x &&
-        mx < watchlistAddRect_.x + watchlistAddRect_.w &&
-        my >= watchlistAddRect_.y &&
-        my < watchlistAddRect_.y + watchlistAddRect_.h) {
-      if (!watchlistInputField_.getValue().empty()) {
-        // Uppercase + deduplicate
-        std::string call = watchlistInputField_.getValue();
-        std::transform(call.begin(), call.end(), call.begin(), ::toupper);
-        if (std::find(watchlistEntries_.begin(), watchlistEntries_.end(),
-                      call) == watchlistEntries_.end()) {
-          watchlistEntries_.push_back(call);
-        }
-        watchlistInputField_.clear();
-      }
-      return true;
-    }
+  return false;
+}
+
+bool SetupScreen::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
+  if (themeCustomizer_ && themeCustomizer_->isActive()) {
+    return themeCustomizer_->onMouseUp(mx, my, mod, clicks);
+  }
+
+  // End any drag selection in the active text field
+  if (TextInput *ti = getActiveInput())
+    ti->onMouseUp();
+
+  // If clicked outside modal, cancel
+  if (mx < modalRect_.x || mx >= modalRect_.x + modalRect_.w ||
+      my < modalRect_.y || my >= modalRect_.y + modalRect_.h) {
+    cancelled_ = true;
+    complete_ = true;
+    return true;
   }
 
   return true;
@@ -1503,15 +1181,35 @@ void SetupScreen::onMouseMove(int mx, int /*my*/) {
   // Resolve the stored rect for the active field so we can pass field bounds
   SDL_Rect r = {0, 0, 0, 0};
   if (activeTab_ == Tab::Identity) {
-    const SDL_Rect *rects[] = {&callsignRect_, &gridRect_, &latRect_, &lonRect_};
+    const SDL_Rect *rects[] = {&callsignRect_, &gridRect_, &latRect_,
+                               &lonRect_};
     if (activeField_ >= 0 && activeField_ < 4)
       r = *rects[activeField_];
   } else if (activeTab_ == Tab::Spotting) {
     const SDL_Rect *rects[] = {&clusterHostRect_, &clusterPortRect_,
-                                &clusterLoginRect_, &wsjtxPortRect_};
+                               &clusterLoginRect_, &wsjtxPortRect_};
     if (activeField_ >= 0 && activeField_ < 4)
       r = *rects[activeField_];
+  } else if (activeTab_ == Tab::Rig) {
+    const SDL_Rect *rects[] = {&rigHostRect_, &rigPortRect_};
+    if (activeField_ >= 0 && activeField_ < 2)
+      r = *rects[activeField_];
+  } else if (activeTab_ == Tab::Services) {
+    // Both Username and Password use full fieldW in render pass
+    int pad = 20;
+    int fieldW = modalRect_.w - 2 * pad;
+    int fieldX = modalRect_.x + pad;
+    r = {fieldX, 0, fieldW, 0}; // Y and H not strictly needed for onMouseMove
+  } else if (activeTab_ == Tab::Network) {
+    const SDL_Rect *rects[] = {&hubIpRect_, &hubPortRect_};
+    if (activeField_ >= 0 && activeField_ < 2)
+      r = *rects[activeField_];
+  } else if (activeTab_ == Tab::Appearance) {
+    const SDL_Rect *rects[] = {&dimTimeRect_, &brightTimeRect_};
+    if (activeField_ == 1 || activeField_ == 2)
+      r = *rects[activeField_ - 1];
   }
+
   if (r.w > 0) {
     int textPad = 7;
     ti->onMouseMove(mx, fontMgr_, r.x, r.w, FontStyle::SmallRegular, textPad);

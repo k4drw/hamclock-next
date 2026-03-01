@@ -133,7 +133,64 @@ void DXClusterSetup::onResize(int x, int y, int w, int h) {
   recalcLayout();
 }
 
+bool DXClusterSetup::onMouseDown(int mx, int my, Uint16 mod, int clicks) {
+  (void)mod;
+
+  // Field hit-test: recalculate the same geometry used in render()
+  auto *cat = fontMgr_.catalog();
+  int cx = x_ + width_ / 2;
+  int pad = std::max(20, width_ / 20);
+  int fieldW = std::min(500, width_ - 2 * pad);
+  int fieldX = cx - fieldW / 2;
+  int fieldH = cat->ptSize(FontStyle::UI) + 14;
+  int uiSize = cat->ptSize(FontStyle::UI);
+  int textPad = 8;
+
+  int y = y_ + height_ / 10;
+  y += cat->ptSize(FontStyle::MediumBold) + pad; // skip title
+  y += uiSize + 4;                                // skip "Cluster Host:" label
+
+  int hostFieldW = fieldW - 110;
+
+  // Host field
+  if (hostInput_.onMouseDown(mx, my, clicks, fontMgr_, fieldX, y, hostFieldW,
+                             fieldH, FontStyle::UI, textPad)) {
+    activeField_ = 0;
+    hostInput_.setActive(true);
+    portInput_.setActive(false);
+    loginInput_.setActive(false);
+    return true;
+  }
+  // Port field
+  if (portInput_.onMouseDown(mx, my, clicks, fontMgr_, fieldX + fieldW - 100, y,
+                             100, fieldH, FontStyle::UI, textPad)) {
+    activeField_ = 1;
+    hostInput_.setActive(false);
+    portInput_.setActive(true);
+    loginInput_.setActive(false);
+    return true;
+  }
+
+  y += fieldH + pad; // advance past host/port row
+  y += uiSize + 4;   // skip "Callsign / Login:" label
+
+  // Login field
+  if (loginInput_.onMouseDown(mx, my, clicks, fontMgr_, fieldX, y, fieldW,
+                              fieldH, FontStyle::UI, textPad)) {
+    activeField_ = 2;
+    hostInput_.setActive(false);
+    portInput_.setActive(false);
+    loginInput_.setActive(true);
+    return true;
+  }
+
+  return true;
+}
+
 bool DXClusterSetup::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
+  (void)mod;
+  (void)clicks;
+
   if (mx >= toggleRect_.x && mx < toggleRect_.x + toggleRect_.w &&
       my >= toggleRect_.y && my < toggleRect_.y + toggleRect_.h) {
     useWSJTX_ = !useWSJTX_;
@@ -154,55 +211,28 @@ bool DXClusterSetup::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
     return true;
   }
 
-  // Field hit-test: recalculate the same geometry used in render()
-  auto *cat = fontMgr_.catalog();
+  return true;
+}
+
+void DXClusterSetup::onMouseMove(int mx, int /*my*/) {
+  auto &ti = activeInput();
   int cx = x_ + width_ / 2;
   int pad = std::max(20, width_ / 20);
   int fieldW = std::min(500, width_ - 2 * pad);
   int fieldX = cx - fieldW / 2;
-  int fieldH = cat->ptSize(FontStyle::UI) + 14;
-  int uiSize = cat->ptSize(FontStyle::UI);
   int textPad = 8;
 
-  int y = y_ + height_ / 10;
-  y += cat->ptSize(FontStyle::MediumBold) + pad; // skip title
-  y += uiSize + 4;                                // skip "Cluster Host:" label
+  int fx = fieldX;
+  int fw = fieldW;
 
-  int hostFieldW = fieldW - 110;
-
-  // Host field
-  if (hostInput_.onMouseDown(mx, my, fontMgr_, fieldX, y, hostFieldW, fieldH,
-                              FontStyle::UI, textPad)) {
-    activeField_ = 0;
-    hostInput_.setActive(true);
-    portInput_.setActive(false);
-    loginInput_.setActive(false);
-    return true;
-  }
-  // Port field
-  if (portInput_.onMouseDown(mx, my, fontMgr_, fieldX + fieldW - 100, y, 100,
-                              fieldH, FontStyle::UI, textPad)) {
-    activeField_ = 1;
-    hostInput_.setActive(false);
-    portInput_.setActive(true);
-    loginInput_.setActive(false);
-    return true;
+  if (activeField_ == 1) { // Port
+    fw = 100;
+    fx = fieldX + fieldW - 100;
+  } else if (activeField_ == 0) { // Host
+    fw = fieldW - 110;
   }
 
-  y += fieldH + pad;            // advance past host/port row
-  y += uiSize + 4;              // skip "Callsign / Login:" label
-
-  // Login field
-  if (loginInput_.onMouseDown(mx, my, fontMgr_, fieldX, y, fieldW, fieldH,
-                               FontStyle::UI, textPad)) {
-    activeField_ = 2;
-    hostInput_.setActive(false);
-    portInput_.setActive(false);
-    loginInput_.setActive(true);
-    return true;
-  }
-
-  return true;
+  ti.onMouseMove(mx, fontMgr_, fx, fw, FontStyle::UI, textPad);
 }
 
 bool DXClusterSetup::onKeyDown(SDL_Keycode key, Uint16 mod) {

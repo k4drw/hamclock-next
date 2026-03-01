@@ -165,7 +165,7 @@ void SatelliteSetup::render(SDL_Renderer *renderer) {
   }
 }
 
-bool SatelliteSetup::onMouseDown(int mx, int my, Uint16 mod) {
+bool SatelliteSetup::onMouseDown(int mx, int my, Uint16 mod, int clicks) {
   if (!active_)
     return false;
 
@@ -174,9 +174,15 @@ bool SatelliteSetup::onMouseDown(int mx, int my, Uint16 mod) {
   };
 
   if (pointInRect(mx, my, rectSccInput_)) {
+    int oldMode = (int)inputMode_;
     inputMode_ = InputMode::SCC;
     sccInput_.setActive(true);
-    sccInput_.setCursorToEnd();
+    if (oldMode == (int)InputMode::SCC || clicks == 2)
+      sccInput_.onMouseDown(mx, my, clicks, fontMgr_, rectSccInput_.x,
+                            rectSccInput_.y, rectSccInput_.w, rectSccInput_.h,
+                            FontStyle::SmallRegular, 7);
+    else
+      sccInput_.setCursorToEnd();
     return true;
   }
   if (pointInRect(mx, my, rectTleInput_)) {

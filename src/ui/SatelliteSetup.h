@@ -20,7 +20,7 @@ public:
     Widget::onResize(x, y, w, h);
     calculateLayout();
   }
-  bool onMouseDown(int mx, int my, Uint16 mod) override;
+  bool onMouseDown(int mx, int my, Uint16 mod, int clicks) override;
   bool onMouseUp(int mx, int my, Uint16 mod, int clicks) override;
   bool onTextInput(const char *text) override;
   bool onKeyDown(SDL_Keycode key, Uint16 mod) override;

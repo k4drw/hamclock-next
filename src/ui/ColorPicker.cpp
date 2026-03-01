@@ -182,8 +182,9 @@ void ColorPicker::render(SDL_Renderer *renderer) {
   SDL_RenderDrawRect(renderer, &rectPreview_);
 }
 
-bool ColorPicker::onMouseDown(int mx, int my, Uint16 mod) {
+bool ColorPicker::onMouseDown(int mx, int my, Uint16 mod, int clicks) {
   (void)mod;
+  (void)clicks;
   if (mx >= rectHue_.x && mx < rectHue_.x + rectHue_.w && my >= rectHue_.y &&
       my < rectHue_.y + rectHue_.h) {
     draggingHue_ = true;
