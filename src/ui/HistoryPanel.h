@@ -20,7 +20,6 @@ public:
   void onMouseMove(int mx, int my) override;
 
 private:
-  void renderTooltip(SDL_Renderer *renderer);
   FontManager &fontMgr_;
   TextureManager &texMgr_;
   std::shared_ptr<HistoryStore> store_;

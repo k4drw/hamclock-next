@@ -30,7 +30,6 @@ private:
   } tooltip_;
 
   void drawGraph(SDL_Renderer *renderer, int x, int y, int w, int h, const std::vector<IonosondeStation>& stations);
-  void renderTooltip(SDL_Renderer *renderer);
 };
 
 } // namespace HamClock

@@ -26,7 +26,6 @@ private:
   void renderEditOverlay(SDL_Renderer *renderer);
 
   void onMouseMove(int mx, int my) override;
-  void renderTooltip(SDL_Renderer *renderer);
 
   FontManager &fontMgr_;
   AppConfig &config_;

@@ -57,7 +57,6 @@ private:
   std::vector<HoverZone> hoverZones_;
 
   void onMouseMove(int mx, int my) override;
-  void renderTooltip(SDL_Renderer *renderer);
 
   // ── Notification state ────────────────────────────────────────────────────
   bool notificationActive_ = false;

@@ -31,7 +31,6 @@ private:
 
   void drawSparkline(SDL_Renderer *renderer, int x, int y, int w, int h, const float* values);
   void drawBadge(SDL_Renderer *renderer, int x, int y, const std::string& label, SolarStormScale scale);
-  void renderTooltip(SDL_Renderer *renderer);
 };
 
 } // namespace HamClock

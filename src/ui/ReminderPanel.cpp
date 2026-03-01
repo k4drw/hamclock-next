@@ -756,7 +756,7 @@ void ReminderPanel::renderReminderList(SDL_Renderer *renderer) {
   }
 
   if (tooltip_.visible) {
-    renderTooltip(renderer);
+    renderTooltip(renderer, fontMgr_);
   }
 }
 
@@ -777,38 +777,3 @@ void ReminderPanel::onMouseMove(int mx, int my) {
   }
 }
 
-void ReminderPanel::renderTooltip(SDL_Renderer *renderer) {
-  if (tooltip_.text.empty())
-    return;
-
-  auto *cat = fontMgr_.catalog();
-  int tw, th;
-  cat->renderText(renderer, tooltip_.text, {255, 255, 255, 255},
-                  FontStyle::Micro, &tw, &th);
-
-  int padX = 8;
-  int padY = 4;
-  int boxW = tw + padX * 2;
-  int boxH = th + padY * 2;
-
-  int bx = tooltip_.x - boxW / 2;
-  int by = tooltip_.y - boxH - 12;
-
-  if (by < y_) {
-    by = tooltip_.y + 16;
-  }
-  if (bx < x_)
-    bx = x_;
-  if (bx + boxW > x_ + width_)
-    bx = x_ + width_ - boxW;
-
-  SDL_Rect box = {bx, by, boxW, boxH};
-  SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-  SDL_SetRenderDrawColor(renderer, 20, 20, 20, 200);
-  SDL_RenderFillRect(renderer, &box);
-  SDL_SetRenderDrawColor(renderer, 100, 100, 100, 255);
-  SDL_RenderDrawRect(renderer, &box);
-
-  cat->drawText(renderer, tooltip_.text, bx + padX, by + padY,
-                {255, 255, 255, 255}, FontStyle::Micro);
-}
