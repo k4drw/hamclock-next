@@ -1,11 +1,13 @@
 #include "SpaceWeatherPanel.h"
 #include "../core/Theme.h"
 #include "FontCatalog.h"
+#include "RenderUtils.h"
 
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <vector>
 
 SpaceWeatherPanel::SpaceWeatherPanel(int x, int y, int w, int h,
                                      FontManager &fontMgr,
@@ -340,21 +342,19 @@ void SpaceWeatherPanel::render(SDL_Renderer *renderer) {
       return slX + static_cast<int>(age / tSpan * slW);
     };
 
-    // Draw sparkline
-    SDL_SetRenderDrawColor(renderer, themes.info.r, themes.info.g,
-                           themes.info.b, 255);
-    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
-    int prevX = -1, prevY = -1;
+    // Draw sparkline (AA polyline)
+    std::vector<SDL_FPoint> slPts;
+    slPts.reserve(sparklineHistory_.size());
     for (const auto &pt : sparklineHistory_) {
       if (pt.timestamp < tMin)
         continue;
-      int px = timeToX(pt.timestamp);
-      int py = fluxToY(pt.flux);
-      if (prevX >= 0)
-        SDL_RenderDrawLine(renderer, prevX, prevY, px, py);
-      prevX = px;
-      prevY = py;
+      slPts.push_back({static_cast<float>(timeToX(pt.timestamp)),
+                       static_cast<float>(fluxToY(pt.flux))});
     }
+    if (slPts.size() >= 2)
+      RenderUtils::drawPolyline(renderer, slPts.data(),
+                                static_cast<int>(slPts.size()), 1.5f,
+                                themes.info);
   }
 
   // Draw pagination bar (bottom) - 4 segments

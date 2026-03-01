@@ -10,10 +10,6 @@
 #include <mutex>
 #include <nlohmann/json.hpp>
 
-static std::mutex sdoMutex;
-static std::string sdoPendingData;
-static bool sdoDataReady = false;
-
 SDOPanel::SDOPanel(int x, int y, int w, int h, FontManager &fontMgr,
                    TextureManager &texMgr, SDOProvider &provider)
     : Widget(x, y, w, h), fontMgr_(fontMgr), texMgr_(texMgr),
@@ -28,10 +24,13 @@ void SDOPanel::update() {
   // Hourly fetch or on ID change
   if (now - lastFetch_ > 60 * 60 * 1000 || lastFetch_ == 0) {
     lastFetch_ = now;
-    provider_.fetch(currentId_, [](const std::string &data) {
-      std::lock_guard<std::mutex> lock(sdoMutex);
-      sdoPendingData = data;
-      sdoDataReady = true;
+    auto mtx = pendingMutex_;
+    auto dat = pendingData_;
+    auto rdy = dataReady_;
+    provider_.fetch(currentId_, [mtx, dat, rdy](const std::string &data) {
+      std::lock_guard<std::mutex> lock(*mtx);
+      *dat = data;
+      *rdy = true;
     });
   }
 
@@ -55,11 +54,11 @@ void SDOPanel::update() {
 void SDOPanel::render(SDL_Renderer *renderer) {
   // 1. Check for new data
   {
-    std::lock_guard<std::mutex> lock(sdoMutex);
-    if (sdoDataReady) {
-      texMgr_.loadFromMemory(renderer, "sdo_latest", sdoPendingData);
-      sdoDataReady = false;
-      sdoPendingData.clear();
+    std::lock_guard<std::mutex> lock(*pendingMutex_);
+    if (*dataReady_) {
+      texMgr_.loadFromMemory(renderer, "sdo_latest", *pendingData_);
+      *dataReady_ = false;
+      pendingData_->clear();
       imageReady_ = true;
     }
   }

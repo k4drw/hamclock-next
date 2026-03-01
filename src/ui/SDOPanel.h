@@ -5,6 +5,8 @@
 #include "TextureManager.h"
 #include "Widget.h"
 #include <SDL.h>
+#include <memory>
+#include <mutex>
 #include <string>
 
 class SDOPanel : public Widget {
@@ -76,6 +78,11 @@ private:
   bool tempRotating_ = false;
   bool tempGrayline_ = false;
   bool tempMovie_ = false;
+
+  // Thread-safe image delivery bridge (shared so lambda outlives panel)
+  std::shared_ptr<std::mutex> pendingMutex_ = std::make_shared<std::mutex>();
+  std::shared_ptr<std::string> pendingData_ = std::make_shared<std::string>();
+  std::shared_ptr<bool> dataReady_ = std::make_shared<bool>(false);
 
   // Scaling
   int overlayFontSize_ = 14;

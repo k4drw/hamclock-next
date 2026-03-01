@@ -122,6 +122,11 @@ void ActivityProvider::fetchDXPeds() {
         pos += 16;
       }
 
+      if (update->dxpeds.empty())
+        LOG_W("ActivityProvider",
+              "fetchDXPeds: parsed 0 entries from non-empty HTTP response — "
+              "ng3k.com HTML layout may have changed");
+
       SDL_Event event;
       SDL_zero(event);
       event.type = HamClock::AE_BASE_EVENT + HamClock::AE_ACTIVITY_DATA_READY;
