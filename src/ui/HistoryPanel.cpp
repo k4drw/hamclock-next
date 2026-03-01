@@ -108,9 +108,9 @@ void HistoryPanel::render(SDL_Renderer *renderer) {
       if (kpNow >= 0.0f) {
         char kpBuf[8];
         std::snprintf(kpBuf, sizeof(kpBuf), "%.1f", kpNow);
-        SDL_Color kpCol = (kpNow >= 5.0f)   ? SDL_Color{255, 0, 0, 255}
-                          : (kpNow >= 4.0f) ? SDL_Color{255, 255, 0, 255}
-                                            : SDL_Color{0, 255, 0, 255};
+        SDL_Color kpCol = (kpNow >= 5.0f)   ? themes.danger
+                          : (kpNow >= 4.0f) ? themes.warning
+                                            : themes.success;
         cat->drawText(renderer, kpBuf, graphX + graphW / 2, graphY + 15, kpCol,
                       FontStyle::MediumBold, true, false, true);
       }

@@ -79,9 +79,9 @@ void DstPanel::render(SDL_Renderer *renderer) {
     // Color based on value
     SDL_Color col;
     if (p2.value < -50)
-      col = {255, 0, 0, 255}; // Red for strong storm
+      col = themes.danger; // Red for strong storm
     else if (p2.value < -20)
-      col = {255, 255, 0, 255}; // Yellow for moderate
+      col = themes.warning; // Yellow for moderate
     else
       col = {0, 255, 100, 255}; // Greenish-cyan for quiet
 
