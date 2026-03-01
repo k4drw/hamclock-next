@@ -2,6 +2,7 @@
 
 #include "../core/SatelliteManager.h"
 #include "FontManager.h"
+#include "TextInput.h"
 #include "Widget.h"
 #include <string>
 
@@ -39,9 +40,8 @@ private:
 
   enum class InputMode { None, SCC, TLE };
   InputMode inputMode_ = InputMode::None;
-  std::string sccInput_;
+  TextInput sccInput_;
   std::string tleInput_;
-  int cursor_ = 0;
 
   SDL_Rect rectOk_;
   SDL_Rect rectCancel_;
