@@ -4,24 +4,11 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
-import { readFile, writeFile, mkdir } from "fs/promises";
+import { readFile } from "fs/promises";
 import { join } from "path";
 
-import { indexRepo, findFiles, findSymbols, RepoIndex, FileIndex, SymbolEntry } from "./indexer.js";
+import { indexRepo, findFiles, findSymbols, RepoIndex, FileIndex } from "./indexer.js";
 import {
-  loadFeatureMap,
-  saveFeatureMap,
-  getFeature as getOriginalFeature,
-  listByCategory,
-  listByStatus,
-  getSummary as getOriginalSummary,
-  getCategories,
-  FeatureMap,
-  Feature,
-} from "./feature-map.js";
-
-import {
-  loadReport,
   getSummary,
   listFeatures,
   getFeature,
@@ -42,10 +29,6 @@ const ORIGINAL_PATH =
   process.env.HAMCLOCK_ORIGINAL_PATH ?? resolve(MCP_ROOT, "..", "hamclock-original");
 const NEXT_PATH =
   process.env.HAMCLOCK_NEXT_PATH ?? resolve(MCP_ROOT, "..", "hamclock-next");
-const FEATURE_MAP_PATH =
-  process.env.FEATURE_MAP_PATH ?? resolve(MCP_ROOT, "feature_map.json");
-// hamclock-next-mcp.json is the canonical project context document going forward.
-// feature_map.json is retained as the legacy data source for all existing feature-map tools.
 const PROJECT_CONTEXT_PATH =
   process.env.PROJECT_CONTEXT_PATH ?? resolve(MCP_ROOT, "hamclock-next-mcp.json");
 const DOCS_PATH = process.env.HAMCLOCK_DOCS_PATH ?? NEXT_PATH;
@@ -58,7 +41,6 @@ const PARITY_JSON_PATH = resolve(DATA_PATH, 'parity_v2.json');
 // ---------------------------------------------------------------------------
 let originalIndex: RepoIndex | null = null;
 let nextIndex: RepoIndex | null = null;
-let featureMap: FeatureMap | null = null;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let projectContext: Record<string, any> | null = null;
 
@@ -84,13 +66,6 @@ async function ensureIndexed(): Promise<void> {
   }
 }
 
-async function ensureFeatureMap(): Promise<FeatureMap> {
-  if (!featureMap) {
-    featureMap = await loadFeatureMap(FEATURE_MAP_PATH);
-  }
-  return featureMap;
-}
-
 async function loadParityData(): Promise<ParityData> {
   try {
     const fileContent = await readFile(PARITY_JSON_PATH, 'utf-8');
@@ -104,210 +79,6 @@ async function loadParityData(): Promise<ParityData> {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function formatFeatureRow(f: Feature): string {
-  const statusIcon =
-    f.status === "implemented"
-      ? "[done]"
-      : f.status === "partial"
-        ? "[partial]"
-        : f.status === "missing"
-          ? "[MISSING]"
-          : "[n/a]";
-  return `${statusIcon.padEnd(11)} ${f.feature_id.padEnd(28)} ${f.name.padEnd(30)} ${f.category}`;
-}
-
-function formatFeatureDetail(f: Feature): string {
-  const lines: string[] = [];
-  lines.push(`# ${f.name} (${f.feature_id})`);
-  lines.push(`Status: ${f.status.toUpperCase()}`);
-  lines.push(`Category: ${f.category}`);
-  lines.push("");
-  lines.push(`## Description`);
-  lines.push(f.description);
-  lines.push("");
-
-  lines.push(`## Original Code (hamclock-original)`);
-  if (f.original.files.length) {
-    lines.push("Files:");
-    for (const file of f.original.files) lines.push(`  - ${file}`);
-  }
-  if (f.original.symbols.length) {
-    lines.push("Key symbols:");
-    for (const sym of f.original.symbols) lines.push(`  - ${sym}`);
-  }
-  if (f.original.notes) lines.push(`Notes: ${f.original.notes}`);
-  lines.push("");
-
-  lines.push(`## Next Code (hamclock-next)`);
-  if (f.next.files.length) {
-    lines.push("Files:");
-    for (const file of f.next.files) lines.push(`  - ${file}`);
-  } else {
-    lines.push("Files: (none yet)");
-  }
-  if (f.next.symbols.length) {
-    lines.push("Key symbols:");
-    for (const sym of f.next.symbols) lines.push(`  - ${sym}`);
-  }
-  if (f.next.notes) lines.push(`Notes: ${f.next.notes}`);
-  lines.push("");
-
-  if (f.acceptance.length) {
-    lines.push(`## Acceptance Criteria`);
-    for (const a of f.acceptance) lines.push(`- [ ] ${a}`);
-    lines.push("");
-  }
-
-  if (f.notes) {
-    lines.push(`## Notes`);
-    lines.push(f.notes);
-  }
-
-  return lines.join("\n");
-}
-
-function generateTicket(f: Feature, originalIdx: RepoIndex, nextIdx: RepoIndex): string {
-  const lines: string[] = [];
-
-  lines.push(`# Implementation Ticket: ${f.name}`);
-  lines.push("");
-  lines.push(`## Goal`);
-  lines.push(f.description);
-  lines.push("");
-
-  // Reference implementation
-  lines.push(`## Reference Implementation (hamclock-original)`);
-  lines.push(`Repository: ${ORIGINAL_PATH}`);
-  lines.push("");
-  for (const filePath of f.original.files) {
-    const fileInfo = originalIdx.files.find((fi) => fi.path === filePath);
-    lines.push(`### \`${filePath}\``);
-    if (fileInfo) {
-      lines.push(`- ${fileInfo.line_count} lines, ${fileInfo.symbols.length} symbols`);
-      const keySymbols = fileInfo.symbols
-        .filter((s) => s.kind === "function" || s.kind === "class" || s.kind === "struct")
-        .slice(0, 20);
-      if (keySymbols.length) {
-        lines.push("- Key definitions:");
-        for (const s of keySymbols) {
-          lines.push(
-            `  - \`${s.name}\` (${s.kind}, line ${s.line})${s.signature ? `: ${s.signature}` : ""}`
-          );
-        }
-      }
-    }
-    lines.push("");
-  }
-
-  if (f.original.symbols.length) {
-    lines.push("### Key symbols to study");
-    for (const sym of f.original.symbols) {
-      // Find where this symbol is defined
-      const hits = findSymbols(originalIdx, `^${sym}$`);
-      if (hits.length) {
-        for (const h of hits.slice(0, 3)) {
-          lines.push(`- \`${sym}\` in \`${h.file}:${h.symbol.line}\` (${h.symbol.kind})`);
-        }
-      } else {
-        lines.push(`- \`${sym}\` (search original codebase)`);
-      }
-    }
-    lines.push("");
-  }
-
-  if (f.original.notes) {
-    lines.push(`### Reference notes`);
-    lines.push(f.original.notes);
-    lines.push("");
-  }
-
-  // Current state in next
-  lines.push(`## Current State (hamclock-next)`);
-  lines.push(`Repository: ${NEXT_PATH}`);
-  lines.push("");
-
-  if (f.next.files.length) {
-    for (const filePath of f.next.files) {
-      const fileInfo = nextIdx.files.find((fi) => fi.path === filePath);
-      lines.push(`### \`${filePath}\``);
-      if (fileInfo) {
-        lines.push(`- ${fileInfo.line_count} lines, ${fileInfo.symbols.length} symbols`);
-        const keySymbols = fileInfo.symbols
-          .filter(
-            (s) =>
-              s.kind === "function" || s.kind === "class" || s.kind === "struct" || s.kind === "method"
-          )
-          .slice(0, 15);
-        if (keySymbols.length) {
-          lines.push("- Existing definitions:");
-          for (const s of keySymbols) {
-            lines.push(`  - \`${s.name}\` (${s.kind}, line ${s.line})`);
-          }
-        }
-      } else {
-        lines.push("- (file listed but not found in index)");
-      }
-      lines.push("");
-    }
-  } else {
-    lines.push("No existing files - this is a new implementation.");
-    lines.push("");
-  }
-
-  if (f.next.notes) {
-    lines.push(`### Implementation notes`);
-    lines.push(f.next.notes);
-    lines.push("");
-  }
-
-  // What to implement
-  lines.push(`## What to Implement`);
-  if (f.status === "missing") {
-    lines.push(
-      "This feature does not exist in hamclock-next yet. You will need to create new files."
-    );
-    lines.push("");
-    lines.push("Suggested structure:");
-    lines.push("1. Create a data provider in `src/services/` if external data is needed");
-    lines.push("2. Create a data model header in `src/core/` if new state is needed");
-    lines.push("3. Create a UI panel in `src/ui/` that extends the Widget base class");
-    lines.push("4. Register the widget in `WidgetType.h` and `WidgetSelector.cpp`");
-  } else if (f.status === "partial") {
-    lines.push("Some code exists. Review the existing files above and identify gaps.");
-    lines.push("Compare the original implementation's behavior with what's currently in hamclock-next.");
-  }
-  lines.push("");
-
-  // Acceptance criteria
-  if (f.acceptance.length) {
-    lines.push(`## Acceptance Criteria`);
-    for (const a of f.acceptance) lines.push(`- [ ] ${a}`);
-    lines.push("");
-  }
-
-  // Architectural constraints
-  lines.push(`## Constraints & Conventions`);
-  lines.push("- hamclock-next uses SDL2 + SDL_ttf + libcurl (NOT Arduino/Adafruit libs)");
-  lines.push("- C++20, CMake build system");
-  lines.push("- Responsive/fluid layout (see hamclock_layout.md for reference dimensions)");
-  lines.push("- Font catalog: see hamclock_fonts.md");
-  lines.push("- Widget system: see hamclock_widgets.md for the full widget list");
-  lines.push("- All UI panels inherit from Widget base class (src/ui/Widget.h)");
-  lines.push("- Data providers are in src/services/, data models in src/core/");
-  lines.push("- Use NetworkManager for HTTP requests (src/network/NetworkManager.h)");
-  lines.push("- Configuration via ConfigManager (src/core/ConfigManager.h)");
-  lines.push("");
-
-  // Related docs
-  lines.push(`## Documentation References`);
-  lines.push(`- Layout: ${DOCS_PATH}/hamclock_layout.md`);
-  lines.push(`- Widgets: ${DOCS_PATH}/hamclock_widgets.md`);
-  lines.push(`- Fonts: ${DOCS_PATH}/hamclock_fonts.md`);
-  lines.push(`- API: ${DOCS_PATH}/API.md`);
-  lines.push(`- README: ${DOCS_PATH}/README.md`);
-
-  return lines.join("\n");
-}
 
 function formatRepoMap(index: RepoIndex): string {
   const lines: string[] = [];
@@ -370,142 +141,11 @@ function formatRepoMap(index: RepoIndex): string {
 // ---------------------------------------------------------------------------
 
 const server = new McpServer(
-  { name: "hamclock-feature-bridge", version: "0.4.0" },
+  { name: "hamclock-next", version: "1.0.0" },
   { capabilities: { tools: {}, resources: {} } }
 );
 
-// -- Original Tools --
-
-server.tool(
-  "feature_list",
-  "List all features with their implementation status. Optionally filter by category or status.",
-  {
-    category: z.string().optional().describe(
-      "Filter by category (e.g. 'data_panel', 'map', 'infrastructure', 'hardware', 'utility')"
-    ),
-    status: z
-      .enum(["implemented", "partial", "missing", "not_needed"])
-      .optional()
-      .describe("Filter by implementation status"),
-  },
-  async ({ category, status }) => {
-    const map = await ensureFeatureMap();
-    let features = map.features;
-
-    if (category) features = features.filter((f) => f.category === category);
-    if (status) features = features.filter((f) => f.status === status);
-
-    const summary = getOriginalSummary(map);
-    const lines: string[] = [];
-    lines.push(`# HamClock Feature Bridge`);
-    lines.push(
-      `Total: ${summary.total} features | Implemented: ${summary.implemented} | Partial: ${summary.partial} | Missing: ${summary.missing} | N/A: ${summary.not_needed}`
-    );
-    lines.push("");
-    lines.push("Categories: " + getCategories(map).join(", "));
-    lines.push("");
-    lines.push(`${"Status".padEnd(11)} ${"Feature ID".padEnd(28)} ${"Name".padEnd(30)} Category`);
-    lines.push("-".repeat(90));
-
-    for (const f of features) {
-      lines.push(formatFeatureRow(f));
-    }
-
-    return { content: [{ type: "text" as const, text: lines.join("\n") }] };
-  }
-);
-
-server.tool(
-  "feature_status",
-  "Get detailed implementation status for a specific feature, including code pointers in both repos.",
-  {
-    feature_id: z.string().describe("The feature ID (e.g. 'dx_cluster', 'satellite_tracking')"),
-  },
-  async ({ feature_id }) => {
-    const map = await ensureFeatureMap();
-    const feature = getOriginalFeature(map, feature_id);
-    if (!feature) {
-      const available = map.features.map((f) => f.feature_id).join(", ");
-      return {
-        content: [
-          {
-            type: "text" as const,
-            text: `Feature '${feature_id}' not found.\n\nAvailable features: ${available}`,
-          },
-        ],
-        isError: true,
-      };
-    }
-
-    await ensureIndexed();
-    let detail = formatFeatureDetail(feature);
-
-    // Enrich with live index data
-    if (originalIndex && feature.original.files.length) {
-      detail += "\n\n## Live Index: Original";
-      for (const filePath of feature.original.files) {
-        const fi = originalIndex.files.find((f) => f.path === filePath);
-        if (fi) {
-          detail += `\n\`${filePath}\`: ${fi.line_count} lines, ${fi.symbols.length} symbols`;
-          const fns = fi.symbols
-            .filter((s) => s.kind === "function")
-            .slice(0, 10);
-          if (fns.length)
-            detail +=
-              "\n  Functions: " + fns.map((s) => `${s.name}(line ${s.line})`).join(", ");
-        }
-      }
-    }
-
-    if (nextIndex && feature.next.files.length) {
-      detail += "\n\n## Live Index: Next";
-      for (const filePath of feature.next.files) {
-        const fi = nextIndex.files.find((f) => f.path === filePath);
-        if (fi) {
-          detail += `\n\`${filePath}\`: ${fi.line_count} lines, ${fi.symbols.length} symbols`;
-          const fns = fi.symbols
-            .filter((s) => s.kind === "function" || s.kind === "class")
-            .slice(0, 10);
-          if (fns.length)
-            detail +=
-              "\n  Definitions: " + fns.map((s) => `${s.name}(${s.kind}, line ${s.line})`).join(", ");
-        }
-      }
-    }
-
-    return { content: [{ type: "text" as const, text: detail }] };
-  }
-);
-
-server.tool(
-  "create_ticket",
-  "Generate a detailed implementation ticket/plan for a feature, analyzing both original and next codebases.",
-  {
-    feature_id: z.string().describe("The feature ID to generate a plan for"),
-  },
-  async ({ feature_id }) => {
-    const map = await ensureFeatureMap();
-    const feature = getOriginalFeature(map, feature_id);
-    if (!feature) {
-      return {
-        content: [{ type: "text", text: `Feature '${feature_id}' not found.` }],
-        isError: true,
-      };
-    }
-
-    await ensureIndexed();
-    // We can verify indices exist because ensureIndexed initializes them or throws
-    if (!originalIndex || !nextIndex) {
-      return {
-        content: [{ type: "text", text: "Failed to index repositories." }],
-        isError: true,
-      };
-    }
-
-    const ticket = generateTicket(feature, originalIndex, nextIndex);
-    return { content: [{ type: "text", text: ticket }] };
-  }
-);
+// -- Repo Index Tools --
 
 server.tool(
   "repo_map",
@@ -569,68 +209,6 @@ server.tool(
 );
 
 server.tool(
-  "list_by_category",
-  "List features in a specific category.",
-  {
-    category: z.string().describe("Category name"),
-  },
-  async ({ category }) => {
-    const map = await ensureFeatureMap();
-    const features = listByCategory(map, category);
-    return {
-      content: [{ type: "text", text: features.map(formatFeatureRow).join("\n") }]
-    };
-  }
-);
-
-server.tool(
-  "list_by_status",
-  "List features with a specific implementation status.",
-  {
-    status: z.enum(["implemented", "partial", "missing", "not_needed"]).describe("Status"),
-  },
-  async ({ status }) => {
-    const map = await ensureFeatureMap();
-    const features = listByStatus(map, status);
-    return {
-      content: [{ type: "text", text: features.map(formatFeatureRow).join("\n") }]
-    };
-  }
-);
-
-server.tool(
-  "get_categories",
-  "Get a list of all feature categories.",
-  {},
-  async () => {
-    const map = await ensureFeatureMap();
-    const cats = getCategories(map);
-    return { content: [{ type: "text", text: cats.join("\n") }] };
-  }
-);
-
-server.tool(
-  "update_feature_status",
-  "Update the status of a feature.",
-  {
-    feature_id: z.string().describe("Feature ID"),
-    status: z.enum(["implemented", "partial", "missing", "not_needed"]).describe("New status"),
-    notes: z.string().optional().describe("Optional notes"),
-  },
-  async ({ feature_id, status, notes }) => {
-    const map = await ensureFeatureMap();
-    const feature = getOriginalFeature(map, feature_id);
-    if (!feature) return { isError: true, content: [{ type: "text", text: "Feature not found" }] };
-
-    feature.status = status;
-    if (notes) feature.notes = notes;
-
-    await saveFeatureMap(FEATURE_MAP_PATH, map);
-    return { content: [{ type: "text", text: `Updated ${feature_id} to ${status}` }] };
-  }
-);
-
-server.tool(
   "reindex_repo",
   "Force re-indexing of a repository.",
   {
@@ -646,21 +224,7 @@ server.tool(
   }
 );
 
-// -- New Parity Tools --
-
-server.tool(
-  "parity_load_report",
-  "Load and parse the feature parity report from a markdown file.",
-  {
-    path: z.string().describe("The path to the feature_parity_report_v2.md file."),
-  },
-  async ({ path }) => {
-    const parityData = await loadReport(resolve(process.cwd(), path));
-    await mkdir(DATA_PATH, { recursive: true });
-    await writeFile(PARITY_JSON_PATH, JSON.stringify(parityData, null, 2));
-    return { content: [{ type: "text", text: `Parity data loaded and saved to ${PARITY_JSON_PATH}` }] };
-  }
-);
+// -- Parity Tools --
 
 server.tool(
   "parity_summary",
@@ -772,6 +336,8 @@ server.tool(
       "decisions",
       "gotchas",
       "api_examples",
+      "pr_workflow",
+      "open_issues",
     ]).optional().describe(
       "Specific section to retrieve. Omit to get the full project_context and source_layout summary."
     ),
@@ -889,23 +455,211 @@ server.tool(
 );
 
 // ---------------------------------------------------------------------------
-// Resources
+// Contributor Tools
 // ---------------------------------------------------------------------------
 
-server.resource(
-  "feature_list",
-  "hamclock://features",
-  async (uri) => {
-    const map = await ensureFeatureMap();
-    return {
-      contents: [{
-        uri: uri.href,
-        text: JSON.stringify(map.features, null, 2),
-        mimeType: "application/json"
-      }]
-    };
+server.tool(
+  "contributor_start",
+  "Single-call onboarding for a ham + AI assistant. Returns everything needed to begin contributing: project origin, tech stack, build instructions, PR workflow, where to start, and the AI execution rules.",
+  {},
+  async () => {
+    const ctx = await ensureProjectContext();
+    const pc = ctx["project_context"] as Record<string, any> | undefined;
+    const prw = ctx["pr_workflow"] as Record<string, any> | undefined;
+
+    const lines: string[] = [
+      "# Contributing to HamClock-Next",
+      "",
+      "## What is HamClock-Next?",
+      pc?.origin ?? "HamClock-Next is a full SDL2/C++20 rewrite of Elwood Downey (WB0OEW)'s HamClock — a feature-rich amateur radio dashboard for Linux, macOS, and Windows.",
+      "",
+      "## Tech Stack (what the AI will be writing)",
+      "- C++20, SDL2, CMake",
+      "- No external UI framework — all rendering is SDL2 primitives + SDL_ttf",
+      "- Widgets inherit from Widget base class (src/ui/Widget.h)",
+      "- Data providers in src/services/, display panels in src/ui/",
+      "- Embedded REST API in src/network/WebServer.cpp",
+      "- Config stored as JSON via ConfigManager",
+      "",
+      "## How to Build",
+      "```bash",
+      "cmake -S . -B build && cmake --build build --target hamclock-next -j$(nproc)",
+      "./build/hamclock-next",
+      "```",
+      "",
+      "## How to Submit a PR",
+    ];
+
+    if (prw) {
+      lines.push(`- **Branch naming:** ${prw.fork_and_branch ?? "feature/<name> or fix/<name>"}`);
+      lines.push(`- **Commit format:** ${prw.commit_format ?? "feat: one-line summary\\n\\n- bullet list"}`);
+      if (Array.isArray(prw.pr_checklist)) {
+        lines.push("- **PR Checklist:**");
+        for (const item of prw.pr_checklist) {
+          lines.push(`  - [ ] ${item}`);
+        }
+      }
+    }
+
+    lines.push(
+      "",
+      "## Where to Start",
+      "Run: `open_issues`                      → see what needs doing",
+      "Run: `parity_list` with status_filter=[\"PARTIAL\",\"MISSING\"]  → see parity gaps",
+      "Run: `get_scaffolding_template SolarFlux` → get boilerplate for a new widget",
+      "Run: `new_feature_checklist SolarFlux`    → registration checklist for a widget",
+      "",
+      "## Rules the AI Must Follow (from CLAUDE.md)",
+    );
+
+    if (prw?.execution_gate) {
+      lines.push(`- **Execution Gate:** ${prw.execution_gate}`);
+    }
+    lines.push(
+      "- No more than 5 files modified per task (Scope Lock)",
+      "- State parity impact before changing any code",
+      "- No refactoring unrelated systems",
+      "- No autonomous initiative — implement only what was asked",
+      "- After task completion: stop and wait for next instruction",
+    );
+
+    return { content: [{ type: "text", text: lines.join("\n") }] };
   }
 );
+
+server.tool(
+  "open_issues",
+  "Returns a curated, difficulty-ranked list of open work items for contributors. Use difficulty to filter.",
+  {
+    difficulty: z.enum(["easy", "medium", "hard", "all"]).optional().default("all")
+      .describe("Filter by difficulty level. Default: all"),
+  },
+  async ({ difficulty }) => {
+    const ctx = await ensureProjectContext();
+    const issues = ctx["open_issues"] as Record<string, any> | undefined;
+
+    if (!issues) {
+      return { isError: true, content: [{ type: "text", text: "open_issues section not found in hamclock-next-mcp.json" }] };
+    }
+
+    const lines: string[] = ["# Open Issues for HamClock-Next Contributors", ""];
+
+    const renderGroup = (label: string, key: string) => {
+      const items = issues[key] as Array<Record<string, any>> | undefined;
+      if (!items?.length) return;
+      lines.push(`## ${label}`);
+      for (const item of items) {
+        lines.push(`- [ ] **${item.title}**`);
+        if (item.description) lines.push(`  ${item.description}`);
+        if (item.files?.length) lines.push(`  Files: ${item.files.join(", ")}`);
+        if (item.hint) lines.push(`  Hint: ${item.hint}`);
+      }
+      lines.push("");
+    };
+
+    if (difficulty === "all" || difficulty === "easy") {
+      renderGroup("Easy (1–2 files, well-defined scope)", "easy");
+    }
+    if (difficulty === "all" || difficulty === "medium") {
+      renderGroup("Medium (2–4 files, new functionality)", "medium");
+    }
+    if (difficulty === "all" || difficulty === "hard") {
+      renderGroup("Hard (architectural or multi-system)", "hard");
+    }
+
+    // Also surface PARTIAL/MISSING from parity_v2
+    if (difficulty === "all") {
+      try {
+        const parityData = await loadParityData();
+        const gaps = parityData.features.filter((f: any) => f.status === "PARTIAL" || f.status === "MISSING");
+        if (gaps.length) {
+          lines.push("## Parity Gaps (from parity_v2.json)");
+          for (const f of gaps) {
+            lines.push(`- [ ] **${f.name}** [${f.status}] — ${f.notes}`);
+          }
+        }
+      } catch {
+        // parity data optional
+      }
+    }
+
+    return { content: [{ type: "text", text: lines.join("\n") }] };
+  }
+);
+
+server.tool(
+  "new_feature_checklist",
+  "Given a feature name and type, returns the exact registration checklist for adding it to hamclock-next. Prevents the AI from missing a registration step.",
+  {
+    name: z.string().describe("PascalCase feature name, e.g. 'SolarFlux' or 'AsteroidTracker'"),
+    type: z.enum(["widget", "endpoint", "config_field"]).optional().default("widget")
+      .describe("Type of feature to add. Default: widget"),
+  },
+  async ({ name, type }) => {
+    const lines: string[] = [];
+
+    if (type === "widget") {
+      lines.push(`# New Widget Checklist: ${name}`, "");
+      lines.push("## Files to Create");
+      lines.push(`1. \`src/ui/${name}Panel.h\`       — widget class declaration`);
+      lines.push(`2. \`src/ui/${name}Panel.cpp\`     — widget render + update logic`);
+      lines.push(`3. \`src/services/${name}Provider.h/.cpp\` — data fetch (if new data source needed)`, "");
+      lines.push("## Files to Modify");
+      lines.push(`4. \`src/core/WidgetType.h\`         — add ${name.toUpperCase()} to enum`);
+      lines.push(`5. \`src/ui/WidgetSelector.cpp\`     — add entry to allTypes[] array`);
+      lines.push(`6. \`CMakeLists.txt\`                — add ${name}Panel.cpp to SOURCES`, "");
+      lines.push("## Registration Pattern");
+      lines.push("- See: `src/ui/ENVPanel.cpp` for a minimal single-file example (added 2026-03-02)");
+      lines.push("- See: `src/ui/AsteroidPanel.cpp` for the data-provider pattern", "");
+      lines.push("## Testing");
+      lines.push(`- Build: \`cmake --build build --target hamclock-next\``);
+      lines.push(`- Open widget selector (gear icon), verify ${name} appears`);
+      lines.push(`- Select it in a pane, verify it renders without crash`);
+      lines.push(`- Run 5 minutes, verify data updates`, "");
+    } else if (type === "endpoint") {
+      lines.push(`# New REST Endpoint Checklist: ${name}`, "");
+      lines.push("## File to Modify");
+      lines.push("1. `src/network/WebServer.cpp` — add handler registration", "");
+      lines.push("## Pattern");
+      lines.push("```cpp");
+      lines.push(`svr_.Get("/${name}", [this](const httplib::Request& req, httplib::Response& res) {`);
+      lines.push(`    // read params: req.get_param_value("key")`);
+      lines.push(`    // respond: res.set_content(json, "application/json");`);
+      lines.push("});");
+      lines.push("```", "");
+      lines.push("## Documentation");
+      lines.push("- Add endpoint to `API.md` (method, path, params, return)");
+      lines.push("- Add to `hamclock-next-mcp.json` api_reference.endpoints array", "");
+    } else if (type === "config_field") {
+      lines.push(`# New Config Field Checklist: ${name}`, "");
+      lines.push("## Files to Modify");
+      lines.push("1. `src/core/ConfigManager.h` — add field to AppConfig struct");
+      lines.push("2. `src/core/ConfigManager.cpp` — add to fromJson() and toJson()");
+      lines.push("3. `src/ui/SetupScreen.cpp` — add UI control if user-facing", "");
+      lines.push("## Pattern");
+      lines.push("```cpp");
+      lines.push(`// In AppConfig struct:`);
+      lines.push(`std::string ${name.charAt(0).toLowerCase() + name.slice(1)} = "default_value";`);
+      lines.push(`// In fromJson: cfg.${name.charAt(0).toLowerCase() + name.slice(1)} = j.value("${name}", cfg.${name.charAt(0).toLowerCase() + name.slice(1)});`);
+      lines.push(`// In toJson:   j["${name}"] = cfg.${name.charAt(0).toLowerCase() + name.slice(1)};`);
+      lines.push("```", "");
+    }
+
+    lines.push("## CLAUDE.md Execution Gate");
+    lines.push("State before making any changes:");
+    lines.push("1. Task: [one sentence]");
+    lines.push("2. Exact files: [list]");
+    lines.push("3. No other files touched: [confirm]");
+    lines.push("4. Parity impact: [yes/no, explain]");
+    lines.push("5. Risk: Low / Medium / High");
+
+    return { content: [{ type: "text", text: lines.join("\n") }] };
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Resources
+// ---------------------------------------------------------------------------
 
 server.resource(
   "parity_report",
