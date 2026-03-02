@@ -1,7 +1,7 @@
 {
   "mcp_version": "2.6",
   "project": "hamclock-next",
-  "updated_at": "2026-02-27T14:00:00.000Z",
+  "updated_at": "2026-03-02T00:00:00.000Z",
   "project_context": {
     "title": "HamClock Next \u2014 SDL2 Rewrite",
     "callsign": "K4DRW",
@@ -180,13 +180,13 @@
     ]
   },
   "feature_status_summary": {
-    "total": 87,
-    "implemented": 85,
-    "partial": 1,
-    "missing": 0,
-    "not_needed": 2,
-    "percent_done": "~100% (85/86 features — 2026-02-27)",
-    "notes": "v1.0B02 stable. All original parity features implemented. New: Dynamic Theme Customizer, Unified Typography System, Resolution-Aware Scaling, and Real-time UI Preview. RPi 1GB adaptive memory mode active."
+    "total": 85,
+    "implemented": 71,
+    "partial": 5,
+    "missing": 7,
+    "not_needed": 4,
+    "percent_done": "~88% (71/81 features \u2014 ground-truth audit 2026-03-02)",
+    "notes": "v1.0B03. Ground-truth audit corrected: EME Tool downgraded to STUB (no 2-day chart), Gimbal downgraded to PARTIAL (upover missing), 4 ENV sensor panes MISSING, photosensor MISSING. WiFi meter and GPIO marked NOT_NEEDED (ESP-only). API parity: ~13/42 original REST endpoints present by name."
   },
   "implemented_features": [
     {
@@ -685,7 +685,7 @@
         "src/services/BME280Provider.cpp",
         "src/services/BME280Provider.h"
       ],
-      "notes": "Full Bosch datasheet §4.2.3 integer compensation math. Bank1 (0x88–0x9F: T1-T3, P1-P9, H1) + Bank2 (0xE1–0xE7: H2-H6, split-byte H4/H5). Outputs calibrated °C, hPa, %rH to WeatherStore every 60s. Hardware validation on RPi+sensor pending."
+      "notes": "Full Bosch datasheet \u00a74.2.3 integer compensation math. Bank1 (0x88\u20130x9F: T1-T3, P1-P9, H1) + Bank2 (0xE1\u20130xE7: H2-H6, split-byte H4/H5). Outputs calibrated \u00b0C, hPa, %rH to WeatherStore every 60s. Hardware validation on RPi+sensor pending."
     },
     {
       "feature_id": "sota_map_pins",
@@ -707,7 +707,7 @@
         "src/ui/FontManager.h",
         "src/core/MemoryMonitor.h"
       ],
-      "notes": "MemoryMonitor::isLowMemoryDevice() (RAM ≤ 1536 MB) gates memory limits at startup. Low-memory path: TextureManager cache 50→15, FontManager text cache 300→100, texture dimension cap 2048→1024px (Linux ARM only, excludes macOS ARM). 60-second RSS heartbeat log via MemoryMonitor::logStats('heartbeat'). Startup log: 'System RAM: N MB, low-memory mode: YES/NO'."
+      "notes": "MemoryMonitor::isLowMemoryDevice() (RAM \u2264 1536 MB) gates memory limits at startup. Low-memory path: TextureManager cache 50\u219215, FontManager text cache 300\u2192100, texture dimension cap 2048\u21921024px (Linux ARM only, excludes macOS ARM). 60-second RSS heartbeat log via MemoryMonitor::logStats('heartbeat'). Startup log: 'System RAM: N MB, low-memory mode: YES/NO'."
     },
     {
       "feature_id": "tropo_ducting",
@@ -1455,7 +1455,7 @@
       ]
     },
     "phase_54": {
-      "name": "Local Data Hub Phase 1 — Master/Client LAN Mode",
+      "name": "Local Data Hub Phase 1 \u2014 Master/Client LAN Mode",
       "completed": "2026-02-24",
       "summary": "Multiple HamClock instances on the same LAN now share NetworkManager fetch cache via hub mode. Master instance exposes /api/hub/fetch (base64 URL, max_age). Client instances proxy all fetchAsync calls through the hub with a 2s curl timeout and automatic silent fallback to direct fetch. SetupScreen gains a new 'Network' tab (8 tabs total) with Off/Master/Client mode cycle and conditional IP+Port fields. Config persists in hub.{mode,ip,port} JSON section.",
       "key_changes": [
@@ -1498,12 +1498,12 @@
     "phase_56": {
       "name": "RPi 1GB Low-Memory Adaptive Mode",
       "completed": "2026-02-25",
-      "summary": "Fixed primary cache-sizing bug: fidelityMode() gate replaced by isLowMemoryDevice() (RAM ≤ 1536 MB). On RPi 3B (972 MB): texture cache 50→15, font text cache 300→100, texture dimension cap 2048→1024px (Linux ARM only, macOS ARM excluded via corrected preprocessor guard). 60-second RSS heartbeat log. Confirmed working on RPi 3B and 64GB dev machine.",
+      "summary": "Fixed primary cache-sizing bug: fidelityMode() gate replaced by isLowMemoryDevice() (RAM \u2264 1536 MB). On RPi 3B (972 MB): texture cache 50\u219215, font text cache 300\u2192100, texture dimension cap 2048\u21921024px (Linux ARM only, macOS ARM excluded via corrected preprocessor guard). 60-second RSS heartbeat log. Confirmed working on RPi 3B and 64GB dev machine.",
       "key_changes": [
         "main.cpp: isLowMemoryDevice() replaces fidelityMode() as cache-sizing gate",
         "main.cpp: Startup log 'System RAM: N MB, low-memory mode: YES/NO'",
         "main.cpp: 60s RSS heartbeat via MemoryMonitor::logStats('heartbeat')",
-        "TextureManager.h: maxW_/maxH_ cap 2048→1024 for (Linux && ARM) only",
+        "TextureManager.h: maxW_/maxH_ cap 2048\u21921024 for (Linux && ARM) only",
         "FontManager.h: setTextCacheLimit(size_t) added; hardcoded 300 replaced by textCacheLimit_ member"
       ],
       "testing": "RPi 3B startup confirmed: 'System RAM: 972 MB, low-memory mode: YES', 'capping texture cache to 15', 'capping font text cache to 100'."
