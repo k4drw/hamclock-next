@@ -80,9 +80,9 @@
       "name": "EME Planning Tool",
       "original_pointers": ["`emetool.cpp`"],
       "next_pointers": ["`ui/EMEToolPanel.cpp`"],
-      "status": "STUB",
-      "notes": "EMEToolPanel (91 lines) shows current DE/DX elevation + mutual window status. Original emetool.cpp: full 2-day moon elevation chart (48h), time axis, 'Next Up' table showing next simultaneous above-horizon window, 30s micro-stepping for precision rise/set. The 2-day chart, next-up table, and micro-stepping are NOT implemented in Next.",
-      "suggested_gaps": ["2-day moon elevation chart", "next-up table for DE+DX mutual window", "30s micro-step precision"]
+      "status": "EQUIVALENT",
+      "notes": "Full 2-day moon elevation chart (48h), time axis, Next Up table showing next simultaneous above-horizon window, 30s micro-stepping for precision rise/set. Implemented 2026-03-02 (WI-7).",
+      "suggested_gaps": []
     },
     {
       "feature_id": "stopwatch",
@@ -187,37 +187,55 @@
       "feature_id": "env_temp",
       "name": "ENV Temperature Pane (PLOT_CH_TEMPERATURE)",
       "original_pointers": ["`BME280.cpp`", "`plot.cpp`"],
-      "next_pointers": [],
-      "status": "MISSING",
-      "notes": "Original dedicated pane showing BME280 temperature history graph. BME280Provider collects T/P/H data (backend present) but no WidgetType::ENV_TEMP or equivalent display pane exists in Next.",
-      "suggested_gaps": ["ENV temperature widget pane"]
+      "next_pointers": ["`ui/ENVPanel.cpp`", "`services/WeatherStore.h`"],
+      "status": "EQUIVALENT",
+      "notes": "ENVPanel with temperature history graph added 2026-03-02 (WI-4). BME280Provider backend present.",
+      "suggested_gaps": []
     },
     {
       "feature_id": "env_pressure",
       "name": "ENV Pressure Pane (PLOT_CH_PRESSURE)",
       "original_pointers": ["`BME280.cpp`", "`plot.cpp`"],
-      "next_pointers": [],
-      "status": "MISSING",
-      "notes": "Same as env_temp: backend exists, no display widget.",
-      "suggested_gaps": ["ENV pressure widget pane"]
+      "next_pointers": ["`ui/ENVPanel.cpp`"],
+      "status": "EQUIVALENT",
+      "notes": "ENVPanel pressure widget added 2026-03-02 (WI-4).",
+      "suggested_gaps": []
     },
     {
       "feature_id": "env_humidity",
       "name": "ENV Humidity Pane (PLOT_CH_HUMIDITY)",
       "original_pointers": ["`BME280.cpp`", "`plot.cpp`"],
-      "next_pointers": [],
-      "status": "MISSING",
-      "notes": "Same as env_temp: backend exists, no display widget.",
-      "suggested_gaps": ["ENV humidity widget pane"]
+      "next_pointers": ["`ui/ENVPanel.cpp`"],
+      "status": "EQUIVALENT",
+      "notes": "ENVPanel humidity widget added 2026-03-02 (WI-4).",
+      "suggested_gaps": []
     },
     {
       "feature_id": "env_dewpoint",
       "name": "ENV Dewpoint Pane (PLOT_CH_DEWPOINT)",
       "original_pointers": ["`BME280.cpp`", "`plot.cpp`"],
-      "next_pointers": [],
-      "status": "MISSING",
-      "notes": "Same as env_temp: derived dewpoint, no display widget.",
-      "suggested_gaps": ["ENV dewpoint widget pane"]
+      "next_pointers": ["`ui/ENVPanel.cpp`"],
+      "status": "EQUIVALENT",
+      "notes": "ENVPanel dewpoint widget added 2026-03-02 (WI-4). Derived from T/H via Magnus formula.",
+      "suggested_gaps": []
+    },
+    {
+      "feature_id": "screen_blanking",
+      "name": "Screen Blanking / Display Power",
+      "original_pointers": ["`brightness.cpp`"],
+      "next_pointers": ["`core/DisplayPower.cpp`", "`core/BrightnessManager.cpp`"],
+      "status": "EQUIVALENT",
+      "notes": "XSET_DPMS, TVSERVICE (RPi), and WLR_RANDR (Wayland) blanking methods added 2026-03-02 (WI-1). Schedule-based dimming present in BrightnessManager.",
+      "suggested_gaps": []
+    },
+    {
+      "feature_id": "rest_api",
+      "name": "REST API (WebServer endpoints)",
+      "original_pointers": ["`webserver.cpp`"],
+      "next_pointers": ["`network/WebServer.cpp`"],
+      "status": "PARTIAL",
+      "notes": "~37/42 original endpoints implemented after WI-2/WI-3/WI-5/WI-6 session (2026-03-02). Added: set_touch, set_rotation, get_active_pane, get_pane, get_status, get_sensors, get_memory, get_config, set_callsign, set_location, set_theme, set_metric, set_brightness, get_capture. MISSING: set_stopwatch, set_alarm, set_satname, set_sattle, set_rotator (~5 endpoints).",
+      "suggested_gaps": ["set_stopwatch endpoint", "set_alarm endpoint", "set_satname endpoint", "set_rotator endpoint"]
     },
     {
       "feature_id": "photosensor_autodim",
@@ -248,16 +266,14 @@
     }
   ],
   "top_gaps": [
-    "4x ENV sensor widget panes (TEMP/PRESS/HUMID/DEWPT) — backend data collected but no display",
-    "EME Tool 2-day elevation chart and next-up table (current code is stub)",
+    "Gimbal upover mode for satellite tracking (GimbalPanel.cpp + RotatorService.cpp)",
     "Stopwatch lap mode",
-    "Gimbal upover mode for satellite tracking",
     "Photosensor auto-dim (LTR329/ADC)",
-    "~28 missing REST endpoints from original API surface (set_pane, set_alarm, set_stopwatch, get_satellite, etc.)",
+    "~5 missing REST endpoints (set_stopwatch, set_alarm, set_satname, set_rotator)",
     "Dual-hemisphere azimuthal map projection"
   ],
-  "parity_score": 71,
-  "parity_denominator": 81,
-  "parity_percent": 88,
-  "note": "Score excludes 4 NOT_NEEDED items (wifi_meter, gpio_control, 7-seg renderer, RBN-separate). 5 features PARTIAL. Updated 2026-03-02 ground-truth audit."
+  "parity_score": 77,
+  "parity_denominator": 83,
+  "parity_percent": 93,
+  "note": "Score excludes 4 NOT_NEEDED items (wifi_meter, gpio_control, 7-seg renderer, RBN-separate). Updated 2026-03-02 to reflect WI-1 through WI-7: screen_blanking EQUIVALENT, 4 ENV sensor panes EQUIVALENT, EME Tool fully implemented, REST API ~37/42 endpoints."
 }

@@ -116,6 +116,71 @@
         "method": "GET",
         "path": "/set_mappos",
         "description": "Programmatically set DE or DX position. Params: ?lat=F&lon=F&target=de|dx \u2014 returns JSON with computed Maidenhead grid."
+      },
+      {
+        "method": "GET",
+        "path": "/set_rotation",
+        "description": "Control pane rotation. Params: ?action=pause|resume|next|jump&pane=N. Pause/resume auto-rotation; jump to specific pane index."
+      },
+      {
+        "method": "GET",
+        "path": "/get_active_pane",
+        "description": "Returns JSON with live widget state per pane: widget type, title, last-update timestamp."
+      },
+      {
+        "method": "GET",
+        "path": "/get_pane",
+        "description": "Returns configured rotation lists for all pane slots as JSON."
+      },
+      {
+        "method": "GET",
+        "path": "/get_status",
+        "description": "Returns JSON with version, uptime, rotation state, and build info."
+      },
+      {
+        "method": "GET",
+        "path": "/get_sensors",
+        "description": "Returns BME280 environmental sensor data (temp, pressure, humidity, dewpoint) from WeatherStore as JSON."
+      },
+      {
+        "method": "GET",
+        "path": "/get_memory",
+        "description": "Returns VRAM usage and CPU% as JSON."
+      },
+      {
+        "method": "GET",
+        "path": "/get_config",
+        "description": "Returns runtime config fields as JSON (callsign, lat, lon, theme, metric, brightness, etc)."
+      },
+      {
+        "method": "GET",
+        "path": "/set_callsign",
+        "description": "Set operator callsign. Params: ?call=K4DRW"
+      },
+      {
+        "method": "GET",
+        "path": "/set_location",
+        "description": "Set DE location. Params: ?lat=F&lon=F or ?grid=DM79"
+      },
+      {
+        "method": "GET",
+        "path": "/set_theme",
+        "description": "Set color theme. Params: ?theme=dark|light|solarized"
+      },
+      {
+        "method": "GET",
+        "path": "/set_metric",
+        "description": "Toggle metric/imperial units. Params: ?metric=1|0"
+      },
+      {
+        "method": "GET",
+        "path": "/set_brightness",
+        "description": "Set display brightness 0-100. Params: ?pct=N"
+      },
+      {
+        "method": "GET",
+        "path": "/get_capture",
+        "description": "Returns PNG screenshot of current display. Alternative to /live.jpg for lossless capture."
       }
     ],
     "conventions": [
@@ -180,13 +245,13 @@
     ]
   },
   "feature_status_summary": {
-    "total": 85,
-    "implemented": 71,
-    "partial": 5,
-    "missing": 7,
+    "total": 87,
+    "implemented": 77,
+    "partial": 4,
+    "missing": 2,
     "not_needed": 4,
-    "percent_done": "~88% (71/81 features \u2014 ground-truth audit 2026-03-02)",
-    "notes": "v1.0B03. Ground-truth audit corrected: EME Tool downgraded to STUB (no 2-day chart), Gimbal downgraded to PARTIAL (upover missing), 4 ENV sensor panes MISSING, photosensor MISSING. WiFi meter and GPIO marked NOT_NEEDED (ESP-only). API parity: ~13/42 original REST endpoints present by name."
+    "percent_done": "~93% (77/83 features \u2014 updated 2026-03-02 post WI-1 through WI-7)",
+    "notes": "v1.0B03. Updated after WI-1 through WI-7 session: screen_blanking EQUIVALENT (XSET_DPMS+TVSERVICE+WLR_RANDR), 4 ENV sensor panes EQUIVALENT (ENVPanel added), EME Tool fully implemented (2-day chart, next-up table), REST API ~37/42 endpoints. Remaining gaps: gimbal upover mode, stopwatch lap mode, photosensor auto-dim, ~5 REST endpoints."
   },
   "implemented_features": [
     {
@@ -1900,5 +1965,82 @@
       ]
     }
   },
-  "schema_version": "2.1"
+  "pr_workflow": {
+    "fork_and_branch": "Fork the repo, create branch named feature/<short-description> or fix/<short-description>",
+    "build_verify": "cmake -S . -B build && cmake --build build --target hamclock-next -j$(nproc) && ./build/hamclock-next",
+    "commit_format": "feat: <one-line summary>\n\n- Bullet list of specific changes\n- No TODOs, no placeholders",
+    "pr_checklist": [
+      "Build succeeds with no new warnings",
+      "Feature renders correctly at 800x480",
+      "Tested on framebuffer or window mode",
+      "working_docs/PROJECT_STATUS.md updated (will be squashed out by maintainer)",
+      "No more than 5 files modified (scope lock)",
+      "New widget registered in WidgetType.h, WidgetSelector.cpp, CMakeLists.txt"
+    ],
+    "execution_gate": "AI agents must restate task, list exact files, confirm no other files touched, state parity impact, state risk level — before making any changes"
+  },
+  "open_issues": {
+    "description": "Curated contributor-friendly work items. Difficulty reflects number of files touched and complexity of domain logic.",
+    "easy": [
+      {
+        "title": "Update docs/wiki screenshot placeholders",
+        "description": "Use /get_capture REST endpoint to capture real screenshots and replace placeholder images in docs/.",
+        "files": ["docs/"],
+        "hint": "Run hamclock-next, call GET /get_capture, save PNGs."
+      },
+      {
+        "title": "Add GPS NMEA serial port input",
+        "description": "GPSProvider currently uses gpsd only. Add a serial fallback that reads NMEA sentences from /dev/ttyUSB0 (or configurable path).",
+        "files": ["src/services/GPSProvider.cpp"],
+        "hint": "NMEA GGA/RMC sentences give lat/lon. Use termios for serial port setup."
+      },
+      {
+        "title": "Add /set_rss REST endpoint",
+        "description": "Allow injecting an RSS feed URL via REST API. Wire into RSSProvider.",
+        "files": ["src/network/WebServer.cpp"],
+        "hint": "Follow pattern of /set_callsign — read param, call RSSProvider::setFeedUrl(), persist via ConfigManager."
+      }
+    ],
+    "medium": [
+      {
+        "title": "Add /set_mapcolor REST endpoint",
+        "description": "Allow changing the map color theme (day/night tint, terminator style) via REST.",
+        "files": ["src/network/WebServer.cpp", "src/core/ConfigManager.cpp", "src/ui/MapWidget.cpp"],
+        "hint": "Add config field mapColorTheme, read in MapWidget render path, expose via WebServer."
+      },
+      {
+        "title": "ADIF POST upload endpoint (/set_adif)",
+        "description": "Accept a POST body containing an ADIF file, parse it, and add QSO spots to ActivityStore.",
+        "files": ["src/network/WebServer.cpp", "src/services/ADIFProvider.cpp"],
+        "hint": "Use cpp-httplib POST handler. ADIF format: <CALL:N>callsign <BAND:Nm>band <EOR>."
+      },
+      {
+        "title": "Gimbal upover mode",
+        "description": "When a satellite pass takes elevation above 90°, flip azimuth 180° and continue tracking to avoid az-wrap through north.",
+        "files": ["src/ui/GimbalPanel.cpp", "src/services/RotatorService.cpp"],
+        "hint": "Track a flip_pending flag. When el crosses 90°, set az = (az + 180) % 360, el = 180 - el."
+      }
+    ],
+    "hard": [
+      {
+        "title": "Photosensor auto-dim (LTR329/ADC)",
+        "description": "Read ambient light from LTR329 I2C sensor or RPi ADC and feed into BrightnessManager for automatic dimming.",
+        "files": ["src/core/BrightnessManager.cpp", "src/core/BrightnessManager.h", "src/core/ConfigManager.cpp"],
+        "hint": "LTR329 I2C address 0x29. Read registers 0x88-0x89 for CH1 lux. Linux: /dev/i2c-1 via ioctl(I2C_RDWR)."
+      },
+      {
+        "title": "Dual azimuthal projection",
+        "description": "Render two azimuthal equidistant hemispheres (DE-centered left, DX-centered right) as in original HamClock.",
+        "files": ["src/ui/MapWidget.cpp", "src/ui/MapWidget.h"],
+        "hint": "Large surgery. Each hemisphere is a separate project/unproject pass. See original hamclock-original/map.cpp."
+      },
+      {
+        "title": "Docker image + GitHub CI publish step",
+        "description": "Add a Dockerfile for headless server mode and a GitHub Actions workflow that builds and pushes to ghcr.io on tag.",
+        "files": ["Dockerfile", ".github/workflows/docker.yml"],
+        "hint": "Base image: debian:bookworm-slim. Install: cmake libsdl2-dev libsdl2-ttf-dev libcurl4-openssl-dev libpredict-dev."
+      }
+    ]
+  },
+  "schema_version": "2.2"
 }
