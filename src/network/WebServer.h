@@ -48,6 +48,12 @@ public:
   void setActivityStore(ActivityDataStore *a) { activityStore_ = a; }
   void setSatelliteManager(SatelliteManager *s) { satMgr_ = s; }
   void setRotatorService(RotatorService *r) { rotatorSvc_ = r; }
+  void setRotationControl(std::atomic<int> *cmd, std::atomic<int> *pane,
+                          std::atomic<int> *widget) {
+    rotationCmd_ = cmd;
+    rotationCmdPane_ = pane;
+    rotationCmdWidget_ = widget;
+  }
 
 private:
   void run();
@@ -69,6 +75,9 @@ private:
   ActivityDataStore *activityStore_ = nullptr;
   SatelliteManager *satMgr_ = nullptr;
   RotatorService *rotatorSvc_ = nullptr;
+  std::atomic<int> *rotationCmd_ = nullptr;
+  std::atomic<int> *rotationCmdPane_ = nullptr;
+  std::atomic<int> *rotationCmdWidget_ = nullptr;
   bool screenLocked_ = false;
   bool liveWebEnabled_ = false;
   int port_;

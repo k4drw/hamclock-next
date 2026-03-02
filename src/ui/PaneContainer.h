@@ -16,6 +16,7 @@ public:
   void setPaused(bool paused);
   bool isPaused() const;
   void forceAdvance();
+  void jumpToType(WidgetType type);
   const std::vector<WidgetType> &getRotation() const { return rotation_; }
   WidgetType getActiveType() const { return currentType_; }
 

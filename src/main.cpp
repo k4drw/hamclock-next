@@ -241,6 +241,13 @@ struct AppContext {
   // it, then re-applies the in-memory config to live state (callsign, proxy,
   // themes, etc.) without tearing down the dashboard.
   std::atomic<bool> configReloadRequested{false};
+  // Rotation control commands written by WebServer thread, consumed on main thread.
+  // rotationCmd: 0=none, 1=pause, 2=resume, 3=next, 4=jump-to-widget
+  // rotationCmdPane: -1=all panes, 0-5=specific pane
+  // rotationCmdWidget: WidgetType as int (used with cmd=4)
+  std::atomic<int> rotationCmd{0};
+  std::atomic<int> rotationCmdPane{-1};
+  std::atomic<int> rotationCmdWidget{-1};
   bool startOnUpdateTab = false;
   bool startOnServicesTab = false;
 
@@ -751,6 +758,8 @@ int main(int argc, char *argv[]) {
   ctx.webServer->setLiveWebEnabled(liveWebEnabled);
   ctx.webServer->setNetworkManager(ctx.netManager.get());
   ctx.webServer->setActivityStore(ctx.activityStore.get());
+  ctx.webServer->setRotationControl(&ctx.rotationCmd, &ctx.rotationCmdPane,
+                                    &ctx.rotationCmdWidget);
   ctx.webServer->start();
 
   ctx.gpsProvider = std::make_unique<GPSProvider>(ctx.state.get(), ctx.appCfg);
@@ -2746,6 +2755,25 @@ void main_tick() {
       }
       LOG_I("Main", "Config reloaded from remote API: callsign={}",
             ctx.appCfg.callsign);
+    }
+
+    // Process rotation control commands from REST API (WebServer thread).
+    int rcmd = ctx.rotationCmd.exchange(0, std::memory_order_acq_rel);
+    if (rcmd != 0 && ctx.dashboard) {
+      int rpane = ctx.rotationCmdPane.load(std::memory_order_relaxed);
+      int rwidget = ctx.rotationCmdWidget.load(std::memory_order_relaxed);
+      auto applyPane = [&](PaneContainer &p) {
+        if (rcmd == 1) p.setPaused(true);
+        else if (rcmd == 2) p.setPaused(false);
+        else if (rcmd == 3) p.forceAdvance();
+        else if (rcmd == 4 && rwidget >= 0)
+          p.jumpToType(static_cast<WidgetType>(rwidget));
+      };
+      if (rpane >= 0 && rpane < (int)ctx.dashboard->panes.size()) {
+        applyPane(*ctx.dashboard->panes[rpane]);
+      } else {
+        for (auto &p : ctx.dashboard->panes) applyPane(*p);
+      }
     }
 
     ctx.dashboard->update(ctx);

@@ -37,6 +37,15 @@ void PaneContainer::setPaused(bool paused) {
 
 bool PaneContainer::isPaused() const { return paused_; }
 
+void PaneContainer::jumpToType(WidgetType type) {
+  for (size_t i = 0; i < rotation_.size(); ++i) {
+    if (rotation_[i] == type) {
+      activateRotationIndex(i);
+      return;
+    }
+  }
+}
+
 void PaneContainer::forceAdvance() {
   if (rotation_.size() < 2)
     return;

@@ -2572,6 +2572,56 @@ void WebServer::run() {
             res.set_content(buf, "text/plain");
           });
 
+  // GET /set_rotation?pause|resume|next[&pane=N] or ?widget=NAME[&pane=N]
+  // Pause/resume/advance pane widget rotation; optionally target a single pane.
+  svr.Get("/set_rotation",
+          [this](const httplib::Request &req, httplib::Response &res) {
+            if (!rotationCmd_) {
+              res.status = 503;
+              res.set_content("Rotation control not available\n", "text/plain");
+              return;
+            }
+            int pane = -1; // -1 = all panes
+            if (req.has_param("pane")) {
+              pane = std::stoi(req.get_param_value("pane"));
+              if (pane < 0 || pane > 5) {
+                res.status = 400;
+                res.set_content("pane must be 0-5\n", "text/plain");
+                return;
+              }
+            }
+            rotationCmdPane_->store(pane, std::memory_order_relaxed);
+            rotationCmdWidget_->store(-1, std::memory_order_relaxed);
+            if (req.has_param("pause")) {
+              rotationCmd_->store(1, std::memory_order_release);
+              res.set_content("ok\n", "text/plain");
+            } else if (req.has_param("resume")) {
+              rotationCmd_->store(2, std::memory_order_release);
+              res.set_content("ok\n", "text/plain");
+            } else if (req.has_param("next")) {
+              rotationCmd_->store(3, std::memory_order_release);
+              res.set_content("ok\n", "text/plain");
+            } else if (req.has_param("widget")) {
+              static constexpr WidgetType kInvalid = static_cast<WidgetType>(-1);
+              WidgetType wt = widgetTypeFromString(
+                  req.get_param_value("widget"), kInvalid);
+              if (wt == kInvalid) {
+                res.status = 400;
+                res.set_content("unknown widget name\n", "text/plain");
+                return;
+              }
+              rotationCmdWidget_->store(static_cast<int>(wt),
+                                        std::memory_order_relaxed);
+              rotationCmd_->store(4, std::memory_order_release);
+              res.set_content("ok\n", "text/plain");
+            } else {
+              res.status = 400;
+              res.set_content(
+                  "usage: ?pause, ?resume, ?next, or ?widget=NAME (optional: &pane=0-5)\n",
+                  "text/plain");
+            }
+          });
+
   // GET /set_rotator?state=stop|auto&az=X&el=X — rotator control
   svr.Get("/set_rotator",
           [this](const httplib::Request &req, httplib::Response &res) {
