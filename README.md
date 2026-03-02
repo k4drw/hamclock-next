@@ -1,11 +1,11 @@
-# HamClock-Next (v1.0B02)
+# HamClock-Next (v1.0B03)
 
 HamClock-Next is a modern, SDL2-based reconstruction of the classic HamClock. It focuses on visual fidelity, high-DPI support, and a smooth user experience while maintaining the essential functionality loved by amateur radio operators.
 
 ## [Feature Overview](feature_overview.md) — The Story, philosophy, and full feature list
 
 > [!WARNING]
-> **BETA RELEASE NOTICE**: This is a Beta release (**v1.0B02**). While functional, it is still under active development and contains known bugs. Breaking changes and refinements are ongoing. Please report issues on GitHub.
+> **BETA RELEASE NOTICE**: This is a Beta release (**v1.0B03**). While functional, it is still under active development and contains known bugs. Breaking changes and refinements are ongoing. Please report issues on GitHub.
 
 ## Key Accomplishments
 
