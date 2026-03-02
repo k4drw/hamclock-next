@@ -67,6 +67,14 @@ void ActivityProvider::fetchDXPeds() {
           size_t end = html.find("<", start);
           if (end == std::string::npos)
             return "";
+          // Dig through nested empty-content tags (e.g. <span><a>text</a></span>)
+          for (int depth = 0; depth < 3 && start == end; ++depth) {
+            size_t nxt = html.find(">", end);
+            if (nxt == std::string::npos) return "";
+            start = nxt + 1;
+            end = html.find("<", start);
+            if (end == std::string::npos) return "";
+          }
           searchPos = end;
           return html.substr(start, end - start);
         };
@@ -92,10 +100,31 @@ void ActivityProvider::fetchDXPeds() {
           de.call = call;
           de.location = loc;
 
+          auto parseAdxoDate = [](const std::string &s, int &year, char *mon,
+                                  int &day) -> bool {
+            // Old format: "12 Jan 2026" — three space-separated tokens
+            if (sscanf(s.c_str(), "%d %9s %d", &year, mon, &day) == 3)
+              return true;
+            // New format: "2026 Jan12" — year then Mmmdd concatenated
+            char tmp[16] = {};
+            if (sscanf(s.c_str(), "%d %15s", &year, tmp) == 2) {
+              int i = 0;
+              while (tmp[i] && !isdigit((unsigned char)tmp[i]))
+                ++i;
+              if (i > 0 && tmp[i]) {
+                sscanf(tmp + i, "%d", &day);
+                int copy = i < 9 ? i : 9;
+                strncpy(mon, tmp, copy);
+                mon[copy] = '\0';
+                return day > 0;
+              }
+            }
+            return false;
+          };
           int y1, dy1, y2, dy2;
           char m1[10], m2[10];
-          if (sscanf(d1.c_str(), "%d %s %d", &y1, m1, &dy1) == 3 &&
-              sscanf(d2.c_str(), "%d %s %d", &y2, m2, &dy2) == 3) {
+          if (parseAdxoDate(d1, y1, m1, dy1) &&
+              parseAdxoDate(d2, y2, m2, dy2)) {
 
             std::tm tm1 = {};
             tm1.tm_year = y1 - 1900;
