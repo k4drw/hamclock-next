@@ -4,6 +4,7 @@
 #include <atomic>
 #include <memory>
 #include <thread>
+#include <vector>
 
 // Forward declaration to avoid pulling SDL into the header
 struct SDL_Renderer;
@@ -23,6 +24,9 @@ class NetworkManager;
 class ActivityDataStore;
 class SatelliteManager;
 class RotatorService;
+class PaneContainer;
+class WeatherStore;
+class BrightnessManager;
 
 class WebServer {
 public:
@@ -54,6 +58,13 @@ public:
     rotationCmdPane_ = pane;
     rotationCmdWidget_ = widget;
   }
+  void setPanes(std::vector<std::unique_ptr<PaneContainer>> *panes) {
+    panes_ = panes;
+  }
+  void setWeatherStore(std::shared_ptr<WeatherStore> ws) { weatherStore_ = ws; }
+  void setBrightnessManager(std::shared_ptr<BrightnessManager> bm) {
+    brightnessMgr_ = bm;
+  }
 
 private:
   void run();
@@ -78,6 +89,9 @@ private:
   std::atomic<int> *rotationCmd_ = nullptr;
   std::atomic<int> *rotationCmdPane_ = nullptr;
   std::atomic<int> *rotationCmdWidget_ = nullptr;
+  std::vector<std::unique_ptr<PaneContainer>> *panes_ = nullptr;
+  std::shared_ptr<WeatherStore> weatherStore_;
+  std::shared_ptr<BrightnessManager> brightnessMgr_;
   bool screenLocked_ = false;
   bool liveWebEnabled_ = false;
   int port_;

@@ -1,5 +1,6 @@
 #include "WebServer.h"
 #include "NetworkManager.h"
+#include "../ui/PaneContainer.h"
 
 #include <SDL.h>
 
@@ -21,7 +22,10 @@
 #include <sstream>
 
 #include "../core/ActivityData.h"
+#include "../core/BrightnessManager.h"
 #include "../core/CPUMonitor.h"
+#include "../core/MemoryMonitor.h"
+#include "../core/WeatherData.h"
 #include "../services/RotatorService.h"
 #ifdef __linux__
 #include <sys/time.h>
@@ -1913,8 +1917,8 @@ void WebServer::run() {
             res.set_content(out, "text/plain");
           });
 
-  // GET /get_capture.bmp — BMP screenshot
-  svr.Get("/get_capture.bmp",
+  // GET /get_capture — JPEG screenshot of current frame
+  svr.Get("/get_capture",
           [this](const httplib::Request &, httplib::Response &res) {
             if (!frameCapture_) {
               res.status = 503;
@@ -2408,6 +2412,42 @@ void WebServer::run() {
             }
             satMgr_->addCustomTLE(tle);
             res.set_content("ok\n", "text/plain");
+          });
+
+  // GET /get_active_pane.txt — return widget currently visible in each pane
+  svr.Get("/get_active_pane.txt",
+          [this](const httplib::Request &, httplib::Response &res) {
+            if (!panes_ || panes_->empty()) {
+              res.status = 503;
+              res.set_content("Dashboard not ready\n", "text/plain");
+              return;
+            }
+            std::string out;
+            for (size_t i = 0; i < panes_->size(); ++i) {
+              out += "Pane" + std::to_string(i + 1) + "=";
+              out += widgetTypeToString((*panes_)[i]->getActiveType());
+              out += '\n';
+            }
+            res.set_content(out, "text/plain");
+          });
+
+  // GET /get_pane.txt — return current widget rotation for all 6 panes
+  svr.Get("/get_pane.txt",
+          [this](const httplib::Request &, httplib::Response &res) {
+            const std::vector<WidgetType> *panes[6] = {
+                &cfg_->pane1Rotation, &cfg_->pane2Rotation,
+                &cfg_->pane3Rotation, &cfg_->pane4Rotation,
+                &cfg_->pane5Rotation, &cfg_->pane6Rotation};
+            std::string out;
+            for (int i = 0; i < 6; ++i) {
+              out += "Pane" + std::to_string(i + 1) + "=";
+              for (size_t j = 0; j < panes[i]->size(); ++j) {
+                if (j > 0) out += ',';
+                out += widgetTypeToString((*panes[i])[j]);
+              }
+              out += '\n';
+            }
+            res.set_content(out, "text/plain");
           });
 
   // GET /set_pane?Pane1=WIDGET&Pane2=WIDGET... — set pane widget rotation lists
@@ -3019,6 +3059,209 @@ void WebServer::run() {
              }
              res.set_content(j.dump(), "application/json");
            });
+  // -----------------------------------------------------------------------
+  // Utility & headless-control endpoints
+  // -----------------------------------------------------------------------
+
+  // GET /get_status.txt — app health: version, uptime, pane states
+  svr.Get("/get_status.txt",
+          [this](const httplib::Request &, httplib::Response &res) {
+            auto now = std::chrono::system_clock::now();
+            int uptimeSec = static_cast<int>(
+                std::chrono::duration_cast<std::chrono::seconds>(
+                    now - startTime_).count());
+            std::string out;
+            out += "version=" HAMCLOCK_VERSION "\n";
+            out += "uptime=" + std::to_string(uptimeSec) + "\n";
+            bool paused = panes_ && !panes_->empty() &&
+                          (*panes_)[0]->isPaused();
+            out += std::string("rotation_paused=") + (paused ? "true" : "false") + "\n";
+            if (panes_) {
+              for (size_t i = 0; i < panes_->size(); ++i) {
+                out += "Pane" + std::to_string(i + 1) + "=";
+                out += widgetTypeToString((*panes_)[i]->getActiveType());
+                out += '\n';
+              }
+            }
+            res.set_content(out, "text/plain");
+          });
+
+  // GET /get_sensors.txt — local BME280 sensor readings (if present)
+  svr.Get("/get_sensors.txt",
+          [this](const httplib::Request &, httplib::Response &res) {
+            if (!weatherStore_) {
+              res.status = 503;
+              res.set_content("Sensor store not available\n", "text/plain");
+              return;
+            }
+            WeatherData wd = weatherStore_->get();
+            if (!wd.valid) {
+              res.set_content("valid=false\n", "text/plain");
+              return;
+            }
+            char buf[256];
+            std::snprintf(buf, sizeof(buf),
+                          "valid=true\ntempC=%.1f\npressureHpa=%.1f\nhumidity=%d\n",
+                          wd.temp, wd.pressure, wd.humidity);
+            res.set_content(buf, "text/plain");
+          });
+
+  // GET /get_memory.txt — RAM and VRAM usage
+  svr.Get("/get_memory.txt",
+          [this](const httplib::Request &, httplib::Response &res) {
+            int64_t vram = MemoryMonitor::getInstance().getVramEstimated();
+            float cpuPct = cpu_ ? cpu_->getCpuPercent() : -1.0f;
+            char buf[256];
+            std::snprintf(buf, sizeof(buf),
+                          "vram_bytes=%lld\ncpu_percent=%.1f\n",
+                          (long long)vram, cpuPct);
+            res.set_content(buf, "text/plain");
+          });
+
+  // GET /get_config.txt — key runtime config fields
+  svr.Get("/get_config.txt",
+          [this](const httplib::Request &, httplib::Response &res) {
+            char buf[512];
+            std::snprintf(buf, sizeof(buf),
+                          "callsign=%s\ngrid=%s\nlat=%.5f\nlon=%.5f\n"
+                          "theme=%s\nmetric=%s\nbrightness=%d\n"
+                          "rotation_interval=%d\n",
+                          cfg_->callsign.c_str(), cfg_->grid.c_str(),
+                          cfg_->lat, cfg_->lon,
+                          cfg_->theme.c_str(),
+                          cfg_->useMetric ? "true" : "false",
+                          cfg_->brightness,
+                          cfg_->rotationIntervalS);
+            res.set_content(buf, "text/plain");
+          });
+
+  // GET /set_callsign?call=W1AW — change operator callsign live
+  svr.Get("/set_callsign",
+          [this](const httplib::Request &req, httplib::Response &res) {
+            if (!req.has_param("call") || req.get_param_value("call").empty()) {
+              res.status = 400;
+              res.set_content("usage: ?call=CALLSIGN\n", "text/plain");
+              return;
+            }
+            cfg_->callsign = req.get_param_value("call");
+            cfgMgr_->save(*cfg_);
+            reloadFlag_->store(true, std::memory_order_release);
+            res.set_content("ok\n", "text/plain");
+          });
+
+  // GET /set_location?lat=X&lon=Y[&grid=FN31] — change DE location live
+  svr.Get("/set_location",
+          [this](const httplib::Request &req, httplib::Response &res) {
+            if (!req.has_param("lat") || !req.has_param("lon")) {
+              res.status = 400;
+              res.set_content("usage: ?lat=X&lon=Y[&grid=GRID]\n", "text/plain");
+              return;
+            }
+            double lat = StringUtils::safe_stod(req.get_param_value("lat"));
+            double lon = StringUtils::safe_stod(req.get_param_value("lon"));
+            if (lat < -90.0 || lat > 90.0 || lon < -180.0 || lon > 180.0) {
+              res.status = 400;
+              res.set_content("lat out of [-90,90] or lon out of [-180,180]\n",
+                              "text/plain");
+              return;
+            }
+            cfg_->lat = lat;
+            cfg_->lon = lon;
+            if (req.has_param("grid"))
+              cfg_->grid = req.get_param_value("grid");
+            cfgMgr_->save(*cfg_);
+            reloadFlag_->store(true, std::memory_order_release);
+            res.set_content("ok\n", "text/plain");
+          });
+
+  // GET /set_theme?theme=dark|light|glass|default — switch UI theme live
+  svr.Get("/set_theme",
+          [this](const httplib::Request &req, httplib::Response &res) {
+            if (!req.has_param("theme")) {
+              res.status = 400;
+              res.set_content("usage: ?theme=dark|light|glass|default\n",
+                              "text/plain");
+              return;
+            }
+            std::string t = req.get_param_value("theme");
+            if (t != "dark" && t != "light" && t != "glass" && t != "default") {
+              res.status = 400;
+              res.set_content("unknown theme\n", "text/plain");
+              return;
+            }
+            cfg_->theme = t;
+            cfgMgr_->save(*cfg_);
+            reloadFlag_->store(true, std::memory_order_release);
+            res.set_content("ok\n", "text/plain");
+          });
+
+  // GET /set_metric?units=metric|imperial — toggle unit system live
+  svr.Get("/set_metric",
+          [this](const httplib::Request &req, httplib::Response &res) {
+            if (!req.has_param("units")) {
+              res.status = 400;
+              res.set_content("usage: ?units=metric|imperial\n", "text/plain");
+              return;
+            }
+            std::string u = req.get_param_value("units");
+            if (u == "metric") cfg_->useMetric = true;
+            else if (u == "imperial") cfg_->useMetric = false;
+            else {
+              res.status = 400;
+              res.set_content("units must be metric or imperial\n", "text/plain");
+              return;
+            }
+            cfgMgr_->save(*cfg_);
+            reloadFlag_->store(true, std::memory_order_release);
+            res.set_content("ok\n", "text/plain");
+          });
+
+  // GET /set_brightness?pct=0-100 — set display brightness
+  svr.Get("/set_brightness",
+          [this](const httplib::Request &req, httplib::Response &res) {
+            if (!req.has_param("pct")) {
+              res.status = 400;
+              res.set_content("usage: ?pct=0-100\n", "text/plain");
+              return;
+            }
+            int pct = std::stoi(req.get_param_value("pct"));
+            if (pct < 0 || pct > 100) {
+              res.status = 400;
+              res.set_content("pct must be 0-100\n", "text/plain");
+              return;
+            }
+            cfg_->brightness = pct;
+            cfgMgr_->save(*cfg_);
+            if (brightnessMgr_)
+              brightnessMgr_->setBrightness(pct);
+            res.set_content("ok\n", "text/plain");
+          });
+
+  // GET /set_touch?x=X&y=Y — inject a virtual left-click at logical coords
+  // Coordinates are in logical space (0-799 x, 0-479 y) regardless of window size.
+  svr.Get("/set_touch",
+          [](const httplib::Request &req, httplib::Response &res) {
+            if (!req.has_param("x") || !req.has_param("y")) {
+              res.status = 400;
+              res.set_content("usage: ?x=X&y=Y (logical 0-799, 0-479)\n",
+                              "text/plain");
+              return;
+            }
+            int x = std::stoi(req.get_param_value("x"));
+            int y = std::stoi(req.get_param_value("y"));
+            if (x < 0 || x > 799 || y < 0 || y > 479) {
+              res.status = 400;
+              res.set_content("x must be 0-799, y must be 0-479\n", "text/plain");
+              return;
+            }
+            SDL_Event ev = {};
+            ev.type = AE_BASE_EVENT + HamClock::AE_TOUCH;
+            ev.user.data1 = reinterpret_cast<void *>(static_cast<intptr_t>(x));
+            ev.user.data2 = reinterpret_cast<void *>(static_cast<intptr_t>(y));
+            SDL_PushEvent(&ev);
+            res.set_content("ok\n", "text/plain");
+          });
+
   if (liveWebEnabled_)
     LOG_I("WebServer", "Live web interface ENABLED (interactive /live)");
   LOG_I("WebServer", "Listening on port {}...", port_);

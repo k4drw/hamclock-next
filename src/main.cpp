@@ -2263,6 +2263,13 @@ void DashboardContext::update(AppContext &ctx) {
           delete update;
           break;
         }
+        case AE_TOUCH: {
+          int mx = static_cast<int>(reinterpret_cast<intptr_t>(event.user.data1));
+          int my = static_cast<int>(reinterpret_cast<intptr_t>(event.user.data2));
+          for (auto *w : ctx.dashboard->eventWidgets)
+            if (w->onMouseUp(mx, my, 0, 1)) break;
+          break;
+        }
         }
       }
       break;
@@ -2726,6 +2733,9 @@ void main_tick() {
       if (ctx.webServer) {
         ctx.webServer->setSatelliteManager(ctx.dashboard->satMgr.get());
         ctx.webServer->setRotatorService(ctx.dashboard->rotatorService.get());
+        ctx.webServer->setPanes(&ctx.dashboard->panes);
+        ctx.webServer->setWeatherStore(ctx.deWeatherStore);
+        ctx.webServer->setBrightnessManager(ctx.brightnessMgr);
       }
     }
 
