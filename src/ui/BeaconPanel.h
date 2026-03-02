@@ -52,4 +52,5 @@ private:
   std::map<std::string, CachedText> textCache_;
   int lastWidth_ = 0;
   int lastHeight_ = 0;
+  float lastRenderScale_ = 0.0f;
 };

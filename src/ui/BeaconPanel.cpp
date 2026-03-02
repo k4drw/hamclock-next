@@ -209,11 +209,13 @@ void BeaconPanel::render(SDL_Renderer *renderer) {
 void BeaconPanel::onResize(int x, int y, int w, int h) {
   Widget::onResize(x, y, w, h);
 
-  // Clear texture cache if dimensions changed (font sizes will change)
-  if (w != lastWidth_ || h != lastHeight_) {
+  // Clear texture cache if dimensions or render scale changed
+  float currentScale = fontMgr_.renderScale();
+  if (w != lastWidth_ || h != lastHeight_ || currentScale != lastRenderScale_) {
     clearTextCache();
     lastWidth_ = w;
     lastHeight_ = h;
+    lastRenderScale_ = currentScale;
   }
 
   auto *cat = fontMgr_.catalog();

@@ -32,9 +32,9 @@ void WidgetSelector::show(
   focusedIdx_ = 0;
 
   // Center the menu
-  int numCols = 3; // Use 3 columns to handle more widgets
-  int itemH = 28;  // Shrink from 34
-  int baseW = 180; // Narrower columns for 3-column layout
+  int numCols = 4; // 4 columns to fit ~47 widgets without scrolling
+  int itemH = 28;
+  int baseW = 180; // 4 × 180 = 720px, fits in 800px logical width
   int menuW = baseW * numCols;
   int footerH = 50;
 
@@ -126,7 +126,7 @@ void WidgetSelector::render(SDL_Renderer *renderer) {
                   FontStyle::SmallRegular, true);
 
     // Draw separator (if not last row)
-    int numCols = 3;
+    int numCols = 4;
     int row = static_cast<int>(i) / numCols;
     int numRows = (static_cast<int>(available_.size()) + numCols - 1) / numCols;
     if (row < numRows - 1) {
@@ -235,7 +235,7 @@ bool WidgetSelector::onKeyDown(SDL_Keycode key, Uint16 /*mod*/) {
   }
 
   // Navigation
-  int numCols = 3;
+  int numCols = 4;
   if (key == SDLK_UP) {
     if (focusedIdx_ >= numCols)
       focusedIdx_ -= numCols;
