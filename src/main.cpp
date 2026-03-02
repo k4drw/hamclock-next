@@ -72,6 +72,7 @@
 #include "ui/BeaconPanel.h"
 #include "ui/CallbookPanel.h"
 #include "ui/ClockAuxPanel.h"
+#include "ui/ENVPanel.h"
 #include "ui/ContestPanel.h"
 #include "ui/CountdownPanel.h"
 #include "ui/DRAPPanel.h"
@@ -749,6 +750,7 @@ int main(int argc, char *argv[]) {
   ctx.webServer->setFrameCapture(ctx.frameCapture.get());
   ctx.webServer->setLiveWebEnabled(liveWebEnabled);
   ctx.webServer->setNetworkManager(ctx.netManager.get());
+  ctx.webServer->setActivityStore(ctx.activityStore.get());
   ctx.webServer->start();
 
   ctx.gpsProvider = std::make_unique<GPSProvider>(ctx.state.get(), ctx.appCfg);
@@ -1354,6 +1356,22 @@ DashboardContext::DashboardContext(AppContext &ctx)
       widgetPool[type] = std::move(p);
       break;
     }
+    case WidgetType::ENV_TEMP:
+      widgetPool[type] = std::make_unique<ENVPanel>(
+          0, 0, 0, 0, fontMgr, deWeatherStore, WidgetType::ENV_TEMP);
+      break;
+    case WidgetType::ENV_PRESSURE:
+      widgetPool[type] = std::make_unique<ENVPanel>(
+          0, 0, 0, 0, fontMgr, deWeatherStore, WidgetType::ENV_PRESSURE);
+      break;
+    case WidgetType::ENV_HUMIDITY:
+      widgetPool[type] = std::make_unique<ENVPanel>(
+          0, 0, 0, 0, fontMgr, deWeatherStore, WidgetType::ENV_HUMIDITY);
+      break;
+    case WidgetType::ENV_DEWPOINT:
+      widgetPool[type] = std::make_unique<ENVPanel>(
+          0, 0, 0, 0, fontMgr, deWeatherStore, WidgetType::ENV_DEWPOINT);
+      break;
     default:
       widgetPool[type] = std::make_unique<PlaceholderWidget>(
           0, 0, 0, 0, fontMgr, widgetTypeDisplayName(type),
@@ -1440,7 +1458,9 @@ DashboardContext::DashboardContext(AppContext &ctx)
       WidgetType::REMINDER,      WidgetType::TROPO,
       WidgetType::LIGHTNING,     WidgetType::METEOR,
       WidgetType::IONOSONDE,     WidgetType::SOLAR_STORM,
-      WidgetType::DE_INFO,       WidgetType::DX_INFO};
+      WidgetType::DE_INFO,       WidgetType::DX_INFO,
+      WidgetType::ENV_TEMP,      WidgetType::ENV_PRESSURE,
+      WidgetType::ENV_HUMIDITY,  WidgetType::ENV_DEWPOINT};
   // Note: REPEATER_DIR omitted — RepeaterBook API requires auth key (TODO).
   // Note: WINLINK omitted — Winlink API requires access key (TODO).
 
@@ -2694,6 +2714,10 @@ void main_tick() {
     // Dashboard
     if (!ctx.dashboard) {
       ctx.dashboard = std::make_unique<DashboardContext>(ctx);
+      if (ctx.webServer) {
+        ctx.webServer->setSatelliteManager(ctx.dashboard->satMgr.get());
+        ctx.webServer->setRotatorService(ctx.dashboard->rotatorService.get());
+      }
     }
 
     // Apply any config changes injected by the WebServer API (RPi/framebuffer

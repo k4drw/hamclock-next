@@ -20,6 +20,9 @@ class DXClusterDataStore;
 class LiveSpotDataStore;
 class CPUMonitor;
 class NetworkManager;
+class ActivityDataStore;
+class SatelliteManager;
+class RotatorService;
 
 class WebServer {
 public:
@@ -42,6 +45,9 @@ public:
   void setLiveWebEnabled(bool enabled) { liveWebEnabled_ = enabled; }
   bool isLiveWebEnabled() const { return liveWebEnabled_; }
   void setNetworkManager(NetworkManager *nm) { netMgr_ = nm; }
+  void setActivityStore(ActivityDataStore *a) { activityStore_ = a; }
+  void setSatelliteManager(SatelliteManager *s) { satMgr_ = s; }
+  void setRotatorService(RotatorService *r) { rotatorSvc_ = r; }
 
 private:
   void run();
@@ -60,6 +66,10 @@ private:
   std::atomic<bool> *reloadFlag_; // points to AppContext::configReloadRequested
   FrameCapture *frameCapture_ = nullptr;
   NetworkManager *netMgr_ = nullptr;
+  ActivityDataStore *activityStore_ = nullptr;
+  SatelliteManager *satMgr_ = nullptr;
+  RotatorService *rotatorSvc_ = nullptr;
+  bool screenLocked_ = false;
   bool liveWebEnabled_ = false;
   int port_;
   std::thread thread_;

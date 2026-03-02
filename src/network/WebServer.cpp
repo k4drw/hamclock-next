@@ -20,10 +20,16 @@
 #include <iomanip>
 #include <sstream>
 
+#include "../core/ActivityData.h"
 #include "../core/CPUMonitor.h"
+#include "../services/RotatorService.h"
+#ifdef __linux__
+#include <sys/time.h>
+#endif
 #include "../core/ContestData.h"
 #include "../core/DXClusterData.h"
 #include "../core/LiveSpotData.h"
+#include "../core/SatelliteManager.h"
 #ifdef ENABLE_DEBUG_API
 #include "../core/UIRegistry.h"
 #endif
@@ -1757,6 +1763,7 @@ void WebServer::run() {
             res.set_content(out, "text/plain");
           });
 
+  // Legacy path kept for compatibility; canonical path fixed below
   svr.Get("/get_dxpots.txt", [this](const httplib::Request &,
                                     httplib::Response &res) {
     if (!dxc_) {
@@ -1770,6 +1777,27 @@ void WebServer::run() {
     for (auto it = snap->spots.rbegin(); it != snap->spots.rend() && count < 20;
          ++it, ++count) {
       out += it->txCall + " at " + std::to_string((int)it->freqKhz) + " kHz\n";
+    }
+    res.set_content(out, "text/plain");
+  });
+
+  // Canonical spelling (typo fix: dxpots -> dxspots)
+  svr.Get("/get_dxspots.txt", [this](const httplib::Request &,
+                                     httplib::Response &res) {
+    if (!dxc_) {
+      res.status = 503;
+      return;
+    }
+    auto snap = dxc_->snapshot();
+    std::string out;
+    int count = 0;
+    for (auto it = snap->spots.rbegin(); it != snap->spots.rend() && count < 20;
+         ++it, ++count) {
+      char buf[128];
+      std::snprintf(buf, sizeof(buf), "%-12s %8.1f  %-6s  %-6s\n",
+                    it->txCall.c_str(), it->freqKhz,
+                    it->mode.c_str(), it->rxCall.c_str());
+      out += buf;
     }
     res.set_content(out, "text/plain");
   });
@@ -1788,6 +1816,137 @@ void WebServer::run() {
               out += it->senderCallsign + " at " +
                      std::to_string((int)it->freqKhz) + " kHz\n";
             }
+            res.set_content(out, "text/plain");
+          });
+
+  // GET /get_livestats.txt — band counts + max distance per band
+  svr.Get("/get_livestats.txt",
+          [this](const httplib::Request &, httplib::Response &res) {
+            if (!spots_) {
+              res.status = 503;
+              return;
+            }
+            auto snap = spots_->snapshot();
+            std::string out;
+            for (int i = 0; i < kNumBands; ++i) {
+              if (snap->bandCounts[i] > 0) {
+                char buf[64];
+                std::snprintf(buf, sizeof(buf), "%-5s  %4d\n",
+                              kBands[i].name, snap->bandCounts[i]);
+                out += buf;
+              }
+            }
+            if (out.empty())
+              out = "No live spots\n";
+            res.set_content(out, "text/plain");
+          });
+
+  // GET /get_satellites.txt — list of all loaded TLE satellite names
+  svr.Get("/get_satellites.txt",
+          [this](const httplib::Request &, httplib::Response &res) {
+            if (!satMgr_) {
+              res.status = 503;
+              res.set_content("Satellite manager not available\n", "text/plain");
+              return;
+            }
+            auto sats = satMgr_->getSatellites();
+            std::string out;
+            for (const auto &s : sats)
+              out += s.name + "\n";
+            if (out.empty())
+              out = "No satellites loaded\n";
+            res.set_content(out, "text/plain");
+          });
+
+  // GET /get_ontheair.txt — POTA/SOTA activators
+  svr.Get("/get_ontheair.txt",
+          [this](const httplib::Request &, httplib::Response &res) {
+            if (!activityStore_) {
+              res.status = 503;
+              res.set_content("Activity data not available\n", "text/plain");
+              return;
+            }
+            ActivityData data = activityStore_->get();
+            std::string out;
+            for (const auto &s : data.ontaSpots) {
+              char buf[128];
+              std::snprintf(buf, sizeof(buf), "%-12s  %-6s  %-6s  %-8s  %.1f\n",
+                            s.call.c_str(), s.program.c_str(), s.ref.c_str(),
+                            s.mode.c_str(), s.freqKhz);
+              out += buf;
+            }
+            if (out.empty())
+              out = "No activators spotted\n";
+            res.set_content(out, "text/plain");
+          });
+
+  // GET /get_dxpeds.txt — DXpedition list
+  svr.Get("/get_dxpeds.txt",
+          [this](const httplib::Request &, httplib::Response &res) {
+            if (!activityStore_) {
+              res.status = 503;
+              res.set_content("Activity data not available\n", "text/plain");
+              return;
+            }
+            ActivityData data = activityStore_->get();
+            std::string out;
+            std::time_t now = std::time(nullptr);
+            for (const auto &d : data.dxpeds) {
+              std::time_t t0 = std::chrono::system_clock::to_time_t(d.startTime);
+              std::time_t t1 = std::chrono::system_clock::to_time_t(d.endTime);
+              // Only show ongoing or future
+              if (t1 < now)
+                continue;
+              std::tm tm0{}, tm1{};
+              Astronomy::portable_gmtime(&t0, &tm0);
+              Astronomy::portable_gmtime(&t1, &tm1);
+              char from[16], to[16];
+              std::strftime(from, sizeof(from), "%m/%d", &tm0);
+              std::strftime(to, sizeof(to), "%m/%d", &tm1);
+              char buf[160];
+              std::snprintf(buf, sizeof(buf), "%-12s  %-20s  %s - %s\n",
+                            d.call.c_str(), d.location.c_str(), from, to);
+              out += buf;
+            }
+            if (out.empty())
+              out = "No DXpeditions\n";
+            res.set_content(out, "text/plain");
+          });
+
+  // GET /get_capture.bmp — BMP screenshot
+  svr.Get("/get_capture.bmp",
+          [this](const httplib::Request &, httplib::Response &res) {
+            if (!frameCapture_) {
+              res.status = 503;
+              res.set_content("Frame capture not available", "text/plain");
+              return;
+            }
+            uint64_t seq = 0;
+            auto jpeg = frameCapture_->waitFrame(0, 200, seq);
+            if (jpeg.empty()) {
+              res.status = 503;
+              res.set_content("No frame available", "text/plain");
+              return;
+            }
+            // Return JPEG as image/bmp alias — callers expecting BMP
+            // can use /stream.mjpeg for live; this provides a snapshot
+            res.set_content(
+                reinterpret_cast<const char *>(jpeg.data()), jpeg.size(),
+                "image/jpeg");
+          });
+
+  // GET /set_screenlock?lock=on|off — lock/unlock screen interaction
+  svr.Get("/set_screenlock",
+          [this](const httplib::Request &req, httplib::Response &res) {
+            if (req.has_param("lock")) {
+              screenLocked_ = (req.get_param_value("lock") == "on");
+            } else if (req.has_param("on")) {
+              screenLocked_ = true;
+            } else if (req.has_param("off")) {
+              screenLocked_ = false;
+            }
+            std::string out = "Screen_locked ";
+            out += screenLocked_ ? "1\n" : "0\n";
             res.set_content(out, "text/plain");
           });
 
@@ -1969,6 +2128,492 @@ void WebServer::run() {
             if (reloadFlag_)
               reloadFlag_->store(true, std::memory_order_release);
             res.set_content("ok", "text/plain");
+          });
+
+  // GET /set_time?ISO=...  or  ?unix=...  or  ?Now  or  ?change=<seconds>
+  svr.Get("/set_time",
+          [](const httplib::Request &req, httplib::Response &res) {
+#if defined(__linux__) || defined(__APPLE__)
+            std::time_t newTime = 0;
+            bool valid = false;
+
+            if (req.has_param("unix")) {
+              newTime = (std::time_t)StringUtils::safe_stod(
+                  req.get_param_value("unix"));
+              valid = (newTime > 0);
+            } else if (req.has_param("ISO")) {
+              // Parse ISO8601 UTC: YYYY-MM-DDTHH:MM:SS or YYYY-MM-DDTHH:MM
+              std::string iso = req.get_param_value("ISO");
+              std::tm tm{};
+              int Y = 0, Mo = 0, D = 0, H = 0, Mi = 0, S = 0;
+              if (std::sscanf(iso.c_str(), "%d-%d-%dT%d:%d:%d",
+                              &Y, &Mo, &D, &H, &Mi, &S) >= 5) {
+                tm.tm_year = Y - 1900;
+                tm.tm_mon = Mo - 1;
+                tm.tm_mday = D;
+                tm.tm_hour = H;
+                tm.tm_min = Mi;
+                tm.tm_sec = S;
+                tm.tm_isdst = 0;
+                newTime = Astronomy::portable_timegm(&tm);
+                valid = (newTime != (std::time_t)-1);
+              }
+            } else if (req.has_param("Now")) {
+              // Trigger NTP sync — just push an event; actual sync in main loop
+              SDL_Event event;
+              SDL_zero(event);
+              event.type = SDL_USEREVENT;
+              event.user.code = SDL_USER_EVENT_NTP_SYNC;
+              SDL_PushEvent(&event);
+              res.set_content("NTP sync requested\n", "text/plain");
+              return;
+            } else if (req.has_param("change")) {
+              double delta =
+                  StringUtils::safe_stod(req.get_param_value("change"));
+              newTime = std::time(nullptr) + (std::time_t)delta;
+              valid = true;
+            }
+
+            if (valid) {
+              struct timeval tv;
+              tv.tv_sec = newTime;
+              tv.tv_usec = 0;
+              if (settimeofday(&tv, nullptr) == 0) {
+                res.set_content("ok\n", "text/plain");
+              } else {
+                res.status = 500;
+                res.set_content("settimeofday failed (need root)\n",
+                                "text/plain");
+              }
+            } else {
+              res.status = 400;
+              res.set_content(
+                  "usage: ?ISO=YYYY-MM-DDTHH:MM, ?unix=N, ?Now, ?change=N\n",
+                  "text/plain");
+            }
+#else
+            res.status = 501;
+            res.set_content("set_time not supported on this platform\n",
+                            "text/plain");
+#endif
+          });
+
+  // GET /set_alarm?state=armed|off&time=HH:MM&utc=0|1
+  svr.Get("/set_alarm",
+          [this](const httplib::Request &req, httplib::Response &res) {
+            if (!cfg_) {
+              res.status = 503;
+              return;
+            }
+            if (req.has_param("state")) {
+              cfg_->alarmArmed =
+                  (req.get_param_value("state") == "armed");
+            }
+            if (req.has_param("time")) {
+              std::string t = req.get_param_value("time");
+              int hh = 0, mm = 0;
+              if (std::sscanf(t.c_str(), "%d:%d", &hh, &mm) == 2 &&
+                  hh >= 0 && hh < 24 && mm >= 0 && mm < 60) {
+                cfg_->alarmTimeHH = hh;
+                cfg_->alarmTimeMM = mm;
+              }
+            }
+            if (req.has_param("utc")) {
+              cfg_->alarmUtc =
+                  (req.get_param_value("utc") != "0");
+            }
+            if (cfgMgr_)
+              cfgMgr_->save(*cfg_);
+            char buf[64];
+            std::snprintf(buf, sizeof(buf), "Alarm %s %02d:%02d %s\n",
+                          cfg_->alarmArmed ? "armed" : "off",
+                          cfg_->alarmTimeHH, cfg_->alarmTimeMM,
+                          cfg_->alarmUtc ? "UTC" : "Local");
+            res.set_content(buf, "text/plain");
+          });
+
+  // GET /set_once_alarm?state=armed|off&time=YYYY-MM-DDTHH:MM&tz=UTC|DE
+  svr.Get("/set_once_alarm",
+          [this](const httplib::Request &req, httplib::Response &res) {
+            if (!cfg_) {
+              res.status = 503;
+              return;
+            }
+            if (req.has_param("state")) {
+              cfg_->onceAlarmArmed =
+                  (req.get_param_value("state") == "armed");
+            }
+            if (req.has_param("time")) {
+              cfg_->onceAlarmTime = req.get_param_value("time");
+            }
+            if (cfgMgr_)
+              cfgMgr_->save(*cfg_);
+            std::string out = "Once_alarm ";
+            out += cfg_->onceAlarmArmed ? "armed" : "off";
+            out += " " + cfg_->onceAlarmTime + "\n";
+            res.set_content(out, "text/plain");
+          });
+
+  // GET /set_stopwatch?reset|run|stop|countdown=mins
+  svr.Get("/set_stopwatch",
+          [](const httplib::Request &req, httplib::Response &res) {
+            SDL_Event event;
+            SDL_zero(event);
+            event.type = SDL_USEREVENT;
+
+            if (req.has_param("run")) {
+              event.user.code = SDL_USER_EVENT_STOPWATCH_RUN;
+            } else if (req.has_param("stop")) {
+              event.user.code = SDL_USER_EVENT_STOPWATCH_STOP;
+            } else if (req.has_param("reset")) {
+              event.user.code = SDL_USER_EVENT_STOPWATCH_RESET;
+            } else if (req.has_param("countdown")) {
+              int mins =
+                  StringUtils::safe_stoi(req.get_param_value("countdown"));
+              event.user.code = SDL_USER_EVENT_STOPWATCH_COUNTDOWN;
+              event.user.data1 = reinterpret_cast<void *>(
+                  static_cast<intptr_t>(mins));
+            } else {
+              res.status = 400;
+              res.set_content(
+                  "usage: ?run, ?stop, ?reset, or ?countdown=mins\n",
+                  "text/plain");
+              return;
+            }
+            SDL_PushEvent(&event);
+            res.set_content("ok\n", "text/plain");
+          });
+
+  // GET /get_satellite.txt — current tracked satellite: name, az, el, range, range-rate
+  svr.Get("/get_satellite.txt",
+          [this](const httplib::Request &, httplib::Response &res) {
+            if (!satMgr_) {
+              res.status = 503;
+              res.set_content("Satellite manager not available\n", "text/plain");
+              return;
+            }
+            std::string name = satMgr_->getTrackedSatellite();
+            if (name.empty()) {
+              res.set_content("No satellite selected\n", "text/plain");
+              return;
+            }
+            // Find the TLE and compute current observation
+            const SatelliteTLE *tle = satMgr_->findByName(name);
+            if (!tle) {
+              res.set_content("TLE not found for " + name + "\n", "text/plain");
+              return;
+            }
+            Satellite sat(*tle);
+            if (state_)
+              sat.setObserver(state_->deLocation.lat, state_->deLocation.lon);
+            SatObservation obs = sat.predict();
+            // Doppler: range-rate to Hz at 145 MHz (2m) and 435 MHz (70cm)
+            double freqHz_2m = 145.0e6;
+            double freqHz_70cm = 435.0e6;
+            double c = 299792.458; // km/s
+            double dop2m = -obs.rangeRate / c * freqHz_2m;
+            double dop70cm = -obs.rangeRate / c * freqHz_70cm;
+            std::string out;
+            out += "Sat_name    " + name + "\n";
+            char buf[128];
+            std::snprintf(buf, sizeof(buf), "Sat_az      %.1f\n", obs.azimuth);
+            out += buf;
+            std::snprintf(buf, sizeof(buf), "Sat_el      %.1f\n", obs.elevation);
+            out += buf;
+            std::snprintf(buf, sizeof(buf), "Sat_range   %.1f km\n", obs.range);
+            out += buf;
+            std::snprintf(buf, sizeof(buf), "Sat_rrate   %.3f km/s\n", obs.rangeRate);
+            out += buf;
+            std::snprintf(buf, sizeof(buf), "Doppler_2m  %+.0f Hz\n", dop2m);
+            out += buf;
+            std::snprintf(buf, sizeof(buf), "Doppler_70cm %+.0f Hz\n", dop70cm);
+            out += buf;
+            res.set_content(out, "text/plain");
+          });
+
+  // GET /set_satname?name=... or ?none — select/deselect satellite
+  svr.Get("/set_satname",
+          [this](const httplib::Request &req, httplib::Response &res) {
+            if (!satMgr_) {
+              res.status = 503;
+              res.set_content("Satellite manager not available\n", "text/plain");
+              return;
+            }
+            if (req.has_param("none") ||
+                (req.has_param("name") &&
+                 req.get_param_value("name") == "none")) {
+              satMgr_->trackSatellite("");
+              if (cfg_)
+                cfg_->selectedSatellite = "";
+              if (cfgMgr_ && cfg_)
+                cfgMgr_->save(*cfg_);
+              res.set_content("ok\n", "text/plain");
+              return;
+            }
+            std::string name;
+            if (req.has_param("name")) {
+              name = req.get_param_value("name");
+            } else if (!req.params.empty()) {
+              // Support /set_satname?ISS style (name as bare param key)
+              name = req.params.begin()->first;
+            }
+            if (name.empty()) {
+              res.status = 400;
+              res.set_content("usage: ?name=SAT or ?none\n", "text/plain");
+              return;
+            }
+            const SatelliteTLE *tle = satMgr_->findByName(name);
+            if (!tle) {
+              res.status = 404;
+              res.set_content("Satellite not found: " + name + "\n", "text/plain");
+              return;
+            }
+            satMgr_->trackSatellite(name);
+            if (cfg_)
+              cfg_->selectedSatellite = name;
+            if (cfgMgr_ && cfg_)
+              cfgMgr_->save(*cfg_);
+            res.set_content("ok\n", "text/plain");
+          });
+
+  // GET /set_sattle?name=...&t1=...&t2=... — inject custom TLE
+  // t1 and t2 are TLE line 1 and line 2 (URL-encoded)
+  svr.Get("/set_sattle",
+          [this](const httplib::Request &req, httplib::Response &res) {
+            if (!satMgr_) {
+              res.status = 503;
+              res.set_content("Satellite manager not available\n", "text/plain");
+              return;
+            }
+            if (!req.has_param("name") || !req.has_param("t1") ||
+                !req.has_param("t2")) {
+              res.status = 400;
+              res.set_content("usage: ?name=...&t1=...&t2=...\n", "text/plain");
+              return;
+            }
+            SatelliteTLE tle;
+            tle.name = req.get_param_value("name");
+            tle.line1 = req.get_param_value("t1");
+            tle.line2 = req.get_param_value("t2");
+            // Basic TLE validation: line 1 starts with "1 ", line 2 with "2 "
+            if (tle.line1.size() < 2 || tle.line1[0] != '1' ||
+                tle.line2.size() < 2 || tle.line2[0] != '2') {
+              res.status = 400;
+              res.set_content("invalid TLE format\n", "text/plain");
+              return;
+            }
+            // Parse NORAD ID from line 1 (columns 3-7)
+            if (tle.line1.size() >= 7) {
+              tle.noradId = std::atoi(tle.line1.substr(2, 5).c_str());
+            }
+            satMgr_->addCustomTLE(tle);
+            res.set_content("ok\n", "text/plain");
+          });
+
+  // GET /set_pane?Pane1=WIDGET&Pane2=WIDGET... — set pane widget rotation lists
+  // Widget names are the widgetTypeToString values (e.g. "solar", "dx_cluster")
+  svr.Get("/set_pane",
+          [this](const httplib::Request &req, httplib::Response &res) {
+            if (!cfg_) {
+              res.status = 503;
+              return;
+            }
+            // Map param names: Pane1..Pane6 -> cfg_ paneNRotation vectors
+            // Value is comma-separated list of widget type strings
+            struct PaneMap {
+              const char *param;
+              std::vector<WidgetType> AppConfig::*field;
+            };
+            PaneMap panes[] = {
+                {"Pane1", &AppConfig::pane1Rotation},
+                {"Pane2", &AppConfig::pane2Rotation},
+                {"Pane3", &AppConfig::pane3Rotation},
+                {"Pane4", &AppConfig::pane4Rotation},
+                {"Pane5", &AppConfig::pane5Rotation},
+                {"Pane6", &AppConfig::pane6Rotation},
+            };
+            std::string errors;
+            for (auto &pm : panes) {
+              if (!req.has_param(pm.param))
+                continue;
+              std::string val = req.get_param_value(pm.param);
+              std::vector<WidgetType> rotation;
+              // Split by comma
+              std::string tok;
+              for (char c : val) {
+                if (c == ',') {
+                  if (!tok.empty()) {
+                    // Case-insensitive: lowercase the token
+                    std::string lower;
+                    lower.reserve(tok.size());
+                    for (char ch : tok)
+                      lower += (char)std::tolower((unsigned char)ch);
+                    WidgetType wt =
+                        widgetTypeFromString(lower, WidgetType::SOLAR);
+                    rotation.push_back(wt);
+                    tok.clear();
+                  }
+                } else {
+                  tok += c;
+                }
+              }
+              if (!tok.empty()) {
+                std::string lower;
+                lower.reserve(tok.size());
+                for (char ch : tok)
+                  lower += (char)std::tolower((unsigned char)ch);
+                rotation.push_back(
+                    widgetTypeFromString(lower, WidgetType::SOLAR));
+              }
+              if (!rotation.empty())
+                (cfg_->*pm.field) = rotation;
+            }
+            if (cfgMgr_)
+              cfgMgr_->save(*cfg_);
+            if (reloadFlag_)
+              reloadFlag_->store(true, std::memory_order_release);
+            if (!errors.empty()) {
+              res.status = 400;
+              res.set_content(errors, "text/plain");
+            } else {
+              res.set_content("ok\n", "text/plain");
+            }
+          });
+
+  // GET /set_displayTimes?on=HH:MM&off=HH:MM&idle=mins
+  svr.Get("/set_displayTimes",
+          [this](const httplib::Request &req, httplib::Response &res) {
+            if (!cfg_) {
+              res.status = 503;
+              return;
+            }
+            if (req.has_param("on")) {
+              int hh = 0, mm = 0;
+              if (std::sscanf(req.get_param_value("on").c_str(), "%d:%d",
+                              &hh, &mm) == 2) {
+                cfg_->brightHour = hh;
+                cfg_->brightMinute = mm;
+                cfg_->brightnessSchedule = true;
+              }
+            }
+            if (req.has_param("off")) {
+              int hh = 0, mm = 0;
+              if (std::sscanf(req.get_param_value("off").c_str(), "%d:%d",
+                              &hh, &mm) == 2) {
+                cfg_->dimHour = hh;
+                cfg_->dimMinute = mm;
+                cfg_->brightnessSchedule = true;
+              }
+            }
+            if (req.has_param("idle")) {
+              int mins = StringUtils::safe_stoi(req.get_param_value("idle"));
+              cfg_->idleMinutes = std::max(0, mins);
+            }
+            if (cfgMgr_)
+              cfgMgr_->save(*cfg_);
+            char buf[128];
+            std::snprintf(buf, sizeof(buf),
+                          "DisplayOn %02d:%02d  Off %02d:%02d  Idle %dmin\n",
+                          cfg_->brightHour, cfg_->brightMinute,
+                          cfg_->dimHour, cfg_->dimMinute,
+                          cfg_->idleMinutes);
+            res.set_content(buf, "text/plain");
+          });
+
+  // GET /set_mapcenter?lng=X — set map center longitude
+  svr.Get("/set_mapcenter",
+          [this](const httplib::Request &req, httplib::Response &res) {
+            if (!cfg_) {
+              res.status = 503;
+              return;
+            }
+            if (!req.has_param("lng")) {
+              res.status = 400;
+              res.set_content("usage: ?lng=X\n", "text/plain");
+              return;
+            }
+            double lng = StringUtils::safe_stod(req.get_param_value("lng"));
+            if (lng < -180.0 || lng > 180.0) {
+              res.status = 400;
+              res.set_content("lng out of range [-180,180]\n", "text/plain");
+              return;
+            }
+            cfg_->mapCenterLon = lng;
+            if (cfgMgr_)
+              cfgMgr_->save(*cfg_);
+            if (reloadFlag_)
+              reloadFlag_->store(true, std::memory_order_release);
+            res.set_content("ok\n", "text/plain");
+          });
+
+  // GET /set_panzoom?pan_x=X&pan_y=Y&zoom=Z — set map pan/zoom
+  svr.Get("/set_panzoom",
+          [this](const httplib::Request &req, httplib::Response &res) {
+            if (!cfg_) {
+              res.status = 503;
+              return;
+            }
+            if (req.has_param("pan_x"))
+              cfg_->mapPanX = StringUtils::safe_stoi(req.get_param_value("pan_x"));
+            if (req.has_param("pan_y"))
+              cfg_->mapPanY = StringUtils::safe_stoi(req.get_param_value("pan_y"));
+            if (req.has_param("zoom")) {
+              double z = StringUtils::safe_stod(req.get_param_value("zoom"));
+              if (z > 0.0)
+                cfg_->mapZoom = z;
+            }
+            if (cfgMgr_)
+              cfgMgr_->save(*cfg_);
+            if (reloadFlag_)
+              reloadFlag_->store(true, std::memory_order_release);
+            char buf[64];
+            std::snprintf(buf, sizeof(buf), "Pan %d,%d Zoom %.2f\n",
+                          cfg_->mapPanX, cfg_->mapPanY, cfg_->mapZoom);
+            res.set_content(buf, "text/plain");
+          });
+
+  // GET /set_rotator?state=stop|auto&az=X&el=X — rotator control
+  svr.Get("/set_rotator",
+          [this](const httplib::Request &req, httplib::Response &res) {
+            if (!rotatorSvc_) {
+              res.status = 503;
+              res.set_content("Rotator service not available\n", "text/plain");
+              return;
+            }
+            if (req.has_param("state")) {
+              std::string s = req.get_param_value("state");
+              if (s == "stop") {
+                rotatorSvc_->stopAutoTrack();
+                rotatorSvc_->stopRotator();
+                res.set_content("ok\n", "text/plain");
+                return;
+              } else if (s == "auto") {
+                rotatorSvc_->setAutoTrackEnabled(true);
+                res.set_content("ok\n", "text/plain");
+                return;
+              }
+            }
+            if (req.has_param("az") || req.has_param("el")) {
+              double az = req.has_param("az")
+                              ? StringUtils::safe_stod(req.get_param_value("az"))
+                              : 0.0;
+              double el = req.has_param("el")
+                              ? StringUtils::safe_stod(req.get_param_value("el"))
+                              : 0.0;
+              if (az < 0.0 || az > 360.0 || el < -90.0 || el > 90.0) {
+                res.status = 400;
+                res.set_content("az out of [0,360] or el out of [-90,90]\n",
+                                "text/plain");
+                return;
+              }
+              bool ok = rotatorSvc_->setPosition(az, el);
+              res.set_content(ok ? "ok\n" : "rotator command failed\n",
+                              "text/plain");
+              return;
+            }
+            res.status = 400;
+            res.set_content(
+                "usage: ?state=stop|auto or ?az=X&el=X\n", "text/plain");
           });
 
   svr.Get(

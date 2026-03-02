@@ -10,6 +10,9 @@ public:
     BL_POWER,    // /sys/class/backlight/*/bl_power (DSI)
     FRAMEBUFFER, // Write black to /dev/fb0 (visual fallback)
     SOFTWARE,    // Software-controlled blanking (e.g., SDL)
+    XSET_DPMS,  // xset dpms force off/on (X11 DPMS)
+    TVSERVICE,  // tvservice -o/-p (legacy RPi)
+    WLR_RANDR,  // wlr-randr --output ... --off/--on (Wayland)
     NONE
   };
 
@@ -31,4 +34,11 @@ private:
   bool writeSysfs(const std::string &path, const std::string &value);
   bool runVcgencmd(bool on);
   bool blankFramebuffer(bool blank);
+  bool runXsetDpms(bool on);
+  bool runTvservice(bool on);
+  bool runWlrRandr(bool on);
+  static bool binaryExists(const char *name);
+  std::string xDisplayEnv_;
+  std::string wlDisplayEnv_;
+  std::string wlrRandrOutput_;
 };

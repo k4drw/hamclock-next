@@ -125,6 +125,16 @@ struct AppConfig {
   std::string qrzUsername;
   std::string qrzPassword;
 
+  // Daily alarm
+  bool alarmArmed = false;
+  int alarmTimeHH = 7;
+  int alarmTimeMM = 0;
+  bool alarmUtc = true;
+
+  // One-time alarm (ISO8601 date-time string, UTC)
+  bool onceAlarmArmed = false;
+  std::string onceAlarmTime; // e.g. "2026-03-15T14:00"
+
   // Countdown
   std::string countdownLabel;
   std::string countdownTime;
@@ -137,13 +147,20 @@ struct AppConfig {
   int64_t callsignExpiryLastCheck = 0; // epoch seconds; 0 = never checked
   std::vector<ReminderEntry> reminders;
 
-  // Brightness
+  // Brightness / display schedule
   int brightness = 100;
   bool brightnessSchedule = false;
   int dimHour = 22;
   int dimMinute = 0;
   int brightHour = 6;
   int brightMinute = 0;
+  int idleMinutes = 0; // 0 = no idle blanking
+
+  // Map view
+  double mapCenterLon = 0.0;
+  int mapPanX = 0;
+  int mapPanY = 0;
+  double mapZoom = 1.0;
 
   // RSS
   bool rssEnabled = true; // Show RSS news banner

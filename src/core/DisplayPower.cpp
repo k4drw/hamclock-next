@@ -46,7 +46,47 @@ void DisplayPower::init() {
           "Detected screen control: Framebuffer blanking (visual only)");
   }
 
-  // 4. Always add SOFTWARE blanking as a robust fallback
+  // 4. X11 DPMS via xset (works when KMS is active, $DISPLAY is set)
+  {
+    const char *disp = std::getenv("DISPLAY");
+    if (disp && disp[0] && binaryExists("xset")) {
+      xDisplayEnv_ = disp;
+      methods_.push_back(Method::XSET_DPMS);
+      LOG_I("Display", "Detected screen control: xset dpms (X11)");
+    }
+  }
+
+  // 5. tvservice (legacy RPi firmware stack)
+  if (binaryExists("tvservice")) {
+    methods_.push_back(Method::TVSERVICE);
+    LOG_I("Display", "Detected screen control: tvservice (legacy RPi)");
+  }
+
+  // 6. wlr-randr (Wayland compositors: sway, labwc, etc.)
+  {
+    const char *wdisp = std::getenv("WAYLAND_DISPLAY");
+    if (wdisp && wdisp[0] && binaryExists("wlr-randr")) {
+      wlDisplayEnv_ = wdisp;
+      // Detect first output name for --off/--on
+      FILE *fp = popen("wlr-randr 2>/dev/null | head -1", "r");
+      if (fp) {
+        char buf[128] = {};
+        if (fgets(buf, sizeof(buf), fp)) {
+          // Output line format: "HDMI-A-1 ..."
+          char *sp = std::strchr(buf, ' ');
+          if (sp) *sp = '\0';
+          wlrRandrOutput_ = buf;
+        }
+        pclose(fp);
+      }
+      if (!wlrRandrOutput_.empty()) {
+        methods_.push_back(Method::WLR_RANDR);
+        LOG_I("Display", "Detected screen control: wlr-randr ({})", wlrRandrOutput_);
+      }
+    }
+  }
+
+  // 7. Always add SOFTWARE blanking as a robust fallback
   methods_.push_back(Method::SOFTWARE);
   LOG_I("Display", "Detected screen control: Software blanking");
 #else
@@ -78,6 +118,15 @@ bool DisplayPower::setPower(bool on) {
       // perspective. The application (main.cpp) will check getPower() to
       // perform actual blanking.
       m_success = true;
+      break;
+    case Method::XSET_DPMS:
+      m_success = runXsetDpms(on);
+      break;
+    case Method::TVSERVICE:
+      m_success = runTvservice(on);
+      break;
+    case Method::WLR_RANDR:
+      m_success = runWlrRandr(on);
       break;
     case Method::NONE:
       m_success = false;
@@ -124,6 +173,15 @@ std::string DisplayPower::getMethodName() const {
       break;
     case Method::SOFTWARE:
       name += "software";
+      break;
+    case Method::XSET_DPMS:
+      name += "xset dpms";
+      break;
+    case Method::TVSERVICE:
+      name += "tvservice";
+      break;
+    case Method::WLR_RANDR:
+      name += "wlr-randr";
       break;
     case Method::NONE:
       name += "none";
@@ -226,6 +284,57 @@ bool DisplayPower::blankFramebuffer(bool blank) {
 #endif
 #else
   (void)blank;
+  return false;
+#endif
+}
+
+bool DisplayPower::binaryExists(const char *name) {
+#if !defined(__EMSCRIPTEN__) && !defined(_WIN32)
+  std::string cmd = std::string("which ") + name + " > /dev/null 2>&1";
+  return std::system(cmd.c_str()) == 0;
+#else
+  (void)name;
+  return false;
+#endif
+}
+
+bool DisplayPower::runXsetDpms(bool on) {
+#if !defined(__EMSCRIPTEN__) && !defined(_WIN32)
+  std::string cmd;
+  if (!xDisplayEnv_.empty())
+    cmd = "DISPLAY=" + xDisplayEnv_ + " ";
+  cmd += on ? "xset dpms force on > /dev/null 2>&1"
+             : "xset dpms force off > /dev/null 2>&1";
+  return std::system(cmd.c_str()) == 0;
+#else
+  (void)on;
+  return false;
+#endif
+}
+
+bool DisplayPower::runTvservice(bool on) {
+#if !defined(__EMSCRIPTEN__) && !defined(_WIN32)
+  std::string cmd = on ? "tvservice -p > /dev/null 2>&1"
+                       : "tvservice -o > /dev/null 2>&1";
+  return std::system(cmd.c_str()) == 0;
+#else
+  (void)on;
+  return false;
+#endif
+}
+
+bool DisplayPower::runWlrRandr(bool on) {
+#if !defined(__EMSCRIPTEN__) && !defined(_WIN32)
+  if (wlrRandrOutput_.empty())
+    return false;
+  std::string cmd;
+  if (!wlDisplayEnv_.empty())
+    cmd = "WAYLAND_DISPLAY=" + wlDisplayEnv_ + " ";
+  cmd += "wlr-randr --output " + wlrRandrOutput_ +
+         (on ? " --on" : " --off") + " > /dev/null 2>&1";
+  return std::system(cmd.c_str()) == 0;
+#else
+  (void)on;
   return false;
 #endif
 }

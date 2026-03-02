@@ -425,4 +425,74 @@ public:
     double x = std::tan(phi) * std::cos(d) - std::sin(d) * std::cos(h);
     return std::atan2(y, x) * kRad2Deg;
   }
+
+  // Low-precision moon azimuth and elevation for a given observer and UTC time.
+  // Based on Jean Meeus "Astronomical Algorithms" chapter 22 simplified.
+  // az and el are in degrees. Accuracy: ~1-2 degrees.
+  static void moonAzEl(double obsLat, double obsLon, std::time_t utc,
+                       double &az, double &el) {
+    // Julian date
+    double JD = utc / 86400.0 + 2440587.5;
+    double T = (JD - 2451545.0) / 36525.0; // Julian centuries from J2000.0
+
+    // Moon's mean quantities (degrees)
+    double L0 = std::fmod(218.3164477 + 481267.88123421 * T, 360.0);
+    double M  = std::fmod(357.5291092 + 35999.0502909 * T, 360.0); // Sun anomaly
+    double Mp = std::fmod(134.9633964 + 477198.8675055 * T, 360.0); // Moon anomaly
+    double D  = std::fmod(297.8501921 + 445267.1114034 * T, 360.0); // Moon elongation
+    double F  = std::fmod(93.2720950  + 483202.0175233 * T, 360.0); // Lat arg
+
+    // Convert to radians
+    auto r = [](double d) { return d * 3.14159265358979 / 180.0; };
+
+    // Longitude correction (major terms, degrees)
+    double dL = 6.289 * std::sin(r(Mp))
+              + 1.274 * std::sin(r(2*D - Mp))
+              + 0.658 * std::sin(r(2*D))
+              + 0.214 * std::sin(r(2*Mp))
+              - 0.186 * std::sin(r(M))
+              - 0.114 * std::sin(r(2*F));
+
+    // Latitude correction (major terms, degrees)
+    double dB = 5.128 * std::sin(r(F))
+              + 0.281 * std::sin(r(Mp + F))
+              - 0.280 * std::sin(r(Mp - F))
+              - 0.173 * std::sin(r(2*D - F));
+
+    double moonLon = L0 + dL; // Ecliptic longitude (deg)
+    double moonLat = dB;       // Ecliptic latitude (deg)
+
+    // Convert ecliptic to equatorial (J2000.0 obliquity ~23.439)
+    double eps = 23.439 - 0.013 * T; // approximate
+    double sinEps = std::sin(r(eps)), cosEps = std::cos(r(eps));
+    double sinLon = std::sin(r(moonLon)), cosLon = std::cos(r(moonLon));
+    double sinLat = std::sin(r(moonLat)), cosLat = std::cos(r(moonLat));
+
+    double ra_rad  = std::atan2(sinLon * cosEps - sinLat / cosLat * sinEps, cosLon);
+    double dec_rad = std::asin(sinLat * cosEps + cosLat * sinEps * sinLon);
+    double ra_h    = std::fmod(ra_rad * 180.0 / 3.14159265358979 / 15.0 + 24.0, 24.0);
+    double dec_deg = dec_rad * 180.0 / 3.14159265358979;
+
+    // Local Sidereal Time
+    double GST = calculateGST(std::chrono::system_clock::from_time_t(utc));
+    double LST = std::fmod(GST + obsLon / 15.0 + 48.0, 24.0);
+    double HA_deg = (LST - ra_h) * 15.0; // Hour angle in degrees
+
+    // Altitude and azimuth
+    double phi = r(obsLat);
+    double ha  = r(HA_deg);
+    double dec = r(dec_deg);
+
+    double sinAlt = std::sin(phi) * std::sin(dec) +
+                    std::cos(phi) * std::cos(dec) * std::cos(ha);
+    double alt = std::asin(std::max(-1.0, std::min(1.0, sinAlt)));
+
+    double cosAz = (std::sin(dec) - std::sin(phi) * sinAlt) /
+                   (std::cos(phi) * std::cos(alt));
+    double azRad = std::acos(std::max(-1.0, std::min(1.0, cosAz)));
+    if (std::sin(ha) > 0.0) azRad = 2.0 * 3.14159265358979 - azRad;
+
+    az = azRad * 180.0 / 3.14159265358979;
+    el = alt * 180.0 / 3.14159265358979;
+  }
 };

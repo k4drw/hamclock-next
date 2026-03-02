@@ -48,6 +48,10 @@ enum class WidgetType {
   SOLAR_STORM,
   DE_INFO,
   DX_INFO,
+  ENV_TEMP,      // BME280 temperature
+  ENV_PRESSURE,  // BME280 pressure (hPa)
+  ENV_HUMIDITY,  // BME280 humidity (%)
+  ENV_DEWPOINT,  // Derived dewpoint (C)
 };
 
 inline const char *widgetTypeToString(WidgetType t) {
@@ -140,6 +144,14 @@ inline const char *widgetTypeToString(WidgetType t) {
     return "de_info";
   case WidgetType::DX_INFO:
     return "dx_info";
+  case WidgetType::ENV_TEMP:
+    return "env_temp";
+  case WidgetType::ENV_PRESSURE:
+    return "env_pressure";
+  case WidgetType::ENV_HUMIDITY:
+    return "env_humidity";
+  case WidgetType::ENV_DEWPOINT:
+    return "env_dewpoint";
   }
   return "solar";
 }
@@ -234,6 +246,14 @@ inline const char *widgetTypeDisplayName(WidgetType t) {
     return "DE Info";
   case WidgetType::DX_INFO:
     return "DX Info";
+  case WidgetType::ENV_TEMP:
+    return "ENV Temp";
+  case WidgetType::ENV_PRESSURE:
+    return "ENV Pressure";
+  case WidgetType::ENV_HUMIDITY:
+    return "ENV Humidity";
+  case WidgetType::ENV_DEWPOINT:
+    return "ENV Dewpoint";
   }
   return "Solar";
 }
@@ -328,6 +348,14 @@ inline WidgetType widgetTypeFromString(const std::string &s,
     return WidgetType::DE_INFO;
   if (s == "dx_info")
     return WidgetType::DX_INFO;
+  if (s == "env_temp")
+    return WidgetType::ENV_TEMP;
+  if (s == "env_pressure")
+    return WidgetType::ENV_PRESSURE;
+  if (s == "env_humidity")
+    return WidgetType::ENV_HUMIDITY;
+  if (s == "env_dewpoint")
+    return WidgetType::ENV_DEWPOINT;
   std::fprintf(stderr, "WidgetType: unknown '%s', using fallback\n", s.c_str());
   return fallback;
 }
