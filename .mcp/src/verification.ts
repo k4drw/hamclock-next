@@ -1,23 +1,4 @@
-import { ParityFeature } from './parity.js';
-
-export interface VerificationResult {
-  runtime_verification: 'disabled' | 'enabled';
-  reachable?: boolean;
-  widgets_found?: string[];
-  screenshots?: string[];
-  violations_report?: string[];
-  memory_stress_test?: MemoryStressTestResult;
-}
-
-export interface MemoryStressTestResult {
-  test_duration_seconds: number;
-  initial_fps: number;
-  final_fps: number;
-  fps_stability: 'stable' | 'degraded' | 'critical';
-  performance_samples: number;
-  issues_detected: string[];
-  recommendations: string[];
-}
+import { ParityFeature, VerificationResult, MemoryStressTestResult } from './types.js';
 
 /**
  * Run a memory stress test by monitoring performance metrics over time.

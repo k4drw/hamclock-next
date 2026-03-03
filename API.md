@@ -1,165 +1,156 @@
-# HamClock-Next API Documentation
+# HamClock-Next REST API Documentation
 
-HamClock-Next includes an embedded web server (defaulting to port 8080) that provides a live view and a REST-like API for remote control and debugging.
+HamClock-Next includes an embedded web server (defaulting to port 8080) that provides a live view and a REST API for remote control, monitoring, and debugging.
 
-## Remote View & Interaction
+---
+
+## 1. Remote View & Interaction
 
 ### `GET /`
-Provides a web-based live view of the HamClock screen. It supports mouse/touch interaction and keyboard input.
+Provides the primary web-based live view. This is an interactive application that supports mouse clicks and keyboard passthrough.
+
+### `GET /live`
+A simplified live viewer.
+
+### `GET /stream.mjpeg`
+Provides a live MJPEG video stream of the HamClock display.
+- **Refresh Rate**: 1 FPS (default to conserve CPU)
 
 ### `GET /live.jpg`
-Returns the current screen as a JPEG image. Useful for lightweight monitoring.
+Returns the current screen as a JPEG image.
+
+### `GET /get_capture`
+Alias for `/live.jpg`.
+
+### `GET /live/touch?x=N&y=N[&button=0|1]`
+Simulates a touch/click at the specified pixel coordinates (normalized to the 800x480 logical size).
+- `x`: 0-799
+- `y`: 0-479
+- `button`: 0=left, 1=right
+
+### `GET /live/key?k=S`
+Simulates a key press. `k` can be a character or a special name (Enter, Escape, etc.).
+
+### `GET /debug/keypress?key=N&mod=N`
+Simulates a raw SDL keycode with modifiers.
 
 ---
 
-## Remote Control API
+## 2. Telemetry & Reporting
 
-### `GET /set_touch?rx=F&ry=F`
-Simulates a mouse click/touch event at the specified normalized coordinates.
-- `rx`: Horizontal position (0.0 to 1.0)
-- `ry`: Vertical position (0.0 to 1.0)
-- **Example**: `GET /set_touch?rx=0.5&ry=0.5` (clicks center of screen)
-
-### `GET /set_char?k=S`
-Simulates a keyboard event.
-- `k`: A single character (e.g., `a`, `1`, `+`) or a named key:
-  - `Enter`, `Backspace`, `Tab`, `Escape`, `Space`
-  - `ArrowLeft`, `ArrowRight`, `ArrowUp`, `ArrowDown`
-  - `Delete`, `Home`, `End`, `F11`
-- **Example**: `GET /set_char?k=Enter`
-
-### `POST /api/display/power`
-Turns the display on or off.
-- **Request (JSON)**: `{"state": "on"}` or `{"state": "off"}`
-- **Fallback**: Also supports `GET /api/display/power?state=on`
-- **Returns**: JSON with success status and method used.
-
-### `GET /api/display/status`
-Returns the current display power state and the control methodology being used (e.g., `vcgencmd`, `bl_power`).
-- **Returns**: JSON with `power` ("on"/"off") and `method`.
-
----
-
----
-
-## Reporting API
-
-### `GET /get_config.txt`
-Returns basic configuration fields in a plain-text format (HamClock compatible).
-- Fields included: `Callsign`, `Grid`, `Theme`, `Lat`, `Lon`
+These endpoints return plain-text or JSON data about the current state.
 
 ### `GET /get_time.txt`
-Returns the current UTC time in the standard HamClock format:
-`Clock_UTC YYYY-MM-DDTHH:MM:SS Z`
+Returns `Clock_UTC YYYY-MM-DDTHH:MM:SS Z`.
 
 ### `GET /get_de.txt`
-Returns current DE (Designated Entry) location information.
-- Fields: `DE_Callsign`, `DE_Grid`, `DE_Lat`, `DE_Lon`
+Returns DE (Designated Entry) location: Callsign, Grid, Lat, Lon.
 
 ### `GET /get_dx.txt`
-Returns current DX (target) location and path information.
-- Fields: `DX_Grid`, `DX_Lat`, `DX_Lon`, `DX_Dist_km`, `DX_Bearing`
-- Returns "DX not set" if no DX location is active.
+Returns DX (Target) location: Callsign, Grid, Lat, Lon, Distance, Bearing.
 
-### `GET /get_spacewx.txt` [Legacy-Compatible]
-Returns current space weather indices in plain-text format.
-- Fields: `SFI`, `SSN`, `Kp`, `Ap`, `Bz`, `Bt`, `Wind`, `Density`, `Aurora`, `Dst`.
+### `GET /get_spacewx.txt`
+Returns current space weather indices (SFI, SSN, Kp, etc.).
 
-### `GET /get_sys.txt` [Legacy-Compatible]
-Returns system telemetry.
-- Fields: `Temp_C`, `Temp_F`, `Uptime_S`.
+### `GET /get_sys.txt`
+Returns system telemetry (Temperature, Uptime).
 
-### `GET /get_contests.txt` [Legacy-Compatible]
-Returns a list of upcoming contests.
+### `GET /get_sensors.txt`
+Returns I2C/Environment sensor data (BME280) if available.
 
-### `GET /get_dxpots.txt` [Legacy-Compatible]
-Returns the latest 20 DX spots.
+### `GET /get_memory.txt`
+Returns memory diagnostic info (RSS, Texture count).
 
-### `GET /get_livespots.txt` [Legacy-Compatible]
-Returns the latest 20 live spots (PSK/RBN/WSPR).
+### `GET /api/config`
+Returns the complete `AppConfig` as a JSON object.
 
 ---
 
-## Legacy Control Aliases (HamClock-Original Parity)
+## 3. Command & Control
 
-These endpoints are provided for compatibility with existing automation scripts and hardware controllers designed for the original HamClock.
+### `GET /set_callsign?call=S`
+Sets the station callsign.
+
+### `GET /set_location?lat=F&lon=F` or `?grid=S`
+Sets the DE (station) location.
+
+### `GET /set_newdx?lat=F&lon=F` or `?grid=S`
+Sets the DX (target) location.
+
+### `GET /set_mappos?lat=F&lon=F&target=[de|dx]`
+Sets DE or DX position.
 
 ### `GET /set_displayOnOff?[on|off]`
-Legacy alias for display power control.
-- `on`: Turn display on.
-- `off`: Turn display off.
-- **Example**: `GET /set_displayOnOff?off`
+Controls the display power state.
 
-### `GET /set_newde?lat=F&lon=F` or `GET /set_newde?grid=S`
-Legacy alias for setting the DE location.
-- **Example**: `GET /set_newde?grid=FN20`
+### `POST /api/display/power`
+Controls the display power state via JSON payload.
+- **Body**: `{"state": "on"|"off"}`
 
-### `GET /set_newdx?lat=F&lon=F` or `GET /set_newdx?grid=S`
-Legacy alias for setting the DX location.
-- **Example**: `GET /set_newdx?lat=35.0&lon=139.0`
+### `GET /api/display/status`
+Returns JSON with current power state and control method.
 
-### `GET /set_cluster?host=S&port=N&user=S`
-Legacy alias for updating DX Cluster settings.
+### `GET /set_brightness?n=N`
+Sets screen brightness (0-100).
 
-### `GET /set_title?call=S`
-Legacy alias for updating the station callsign.
+### `GET /set_theme?name=S`
+Changes the UI theme (default, dark, glass).
 
 ---
 
-## Remote Control & Navigation
+## 4. Pane & Rotation Control
 
-### `GET /set_mappos?lat=F&lon=F[&target=S]`
-Programmatically sets the DE or DX location on the map.
-- `lat`: Latitude in degrees (-90 to 90)
-- `lon`: Longitude in degrees (-180 to 180)
-- `target`: `de` or `dx` (default: `dx`)
-- **Returns**: JSON with `target`, `lat`, `lon`, `grid`
-- **Example**: `GET /set_mappos?lat=40.7&lon=-74.0&target=dx`
+### `GET /set_pane?pane=N&widget=S`
+Sets a specific pane to a specific widget.
+- `pane`: 1-6
+- `widget`: lowercase widget name (e.g., `solar`, `dx_cluster`, `marine`)
+
+### `GET /get_pane.txt?pane=N`
+Returns the name of the widget currently in the specified pane.
+
+### `GET /set_rotation?[pause|resume]`
+Pauses or resumes the automatic rotation of widgets in all panes.
+
+### `GET /set_rotation?widget=S&pane=N`
+Instantly jumps a specific pane to a widget and pauses rotation.
 
 ---
 
-## Debugging & Automation API
+## 5. Propagation & Hub
+
+### `GET /api/propagation/voacap?tx_lat=F&tx_lon=F&overlay_type=[muf|reliability|toa]`
+Returns VOACAP propagation heatmap metadata.
+
+### `GET /api/propagation/muf_rt`
+Returns KC2G real-time MUF map metadata.
+
+### `GET /api/hub/fetch?url=S`
+(Client Mode) Proxies a request through the Master hub to avoid external rate limits.
+
+---
+
+## 6. Debug & Diagnostics
 
 ### `GET /debug/widgets`
-Returns a JSON snapshot of all currently active UI widgets and their "semantic actions".
-- **Enhanced Data**: Now includes a `data` field for each widget containing high-level state (e.g., current SFI, active watchlist hits, etc.).
-- **Map Widget**: The `data` field includes DE/DX positions, sun position, satellite info, spot counts, and current tooltip text.
+Returns a detailed JSON map of all active widgets and their current data/actions.
 
-### `GET /debug/click?widget=W&action=A`
-Performs a semantic click on a specific widget action.
-- `widget`: The ID of the widget (e.g., `SolarPanel`)
-- `action`: The name of the action (e.g., `ToggleMode`)
-- **Example**: `GET /debug/click?widget=SolarPanel&action=Cycle`
+### `GET /debug/click?widget=S&action=S`
+Performs a "Semantic Click" on a widget action (e.g., `SolarPanel` / `Cycle`).
 
 ### `GET /debug/performance`
-Returns real-time performance metrics in JSON format.
-- `fps`: Current frames per second.
-- `running_since`: Application uptime in seconds.
+Returns real-time FPS and uptime.
 
 ### `GET /debug/health`
-Returns a JSON map of background service statuses.
-- Shows `ok` status, `lastError`, and `lastSuccess` timestamp for services like NOAA, PSK Reporter, etc.
+Returns status of all background data services.
 
 ### `GET /debug/logs`
-Returns the recent internal application log buffer (last 500 entries) in JSON format.
+Returns the recent internal log buffer.
 
-### `GET /debug/store/set_solar?sfi=N&k=N&sn=N`
-Allows manual injection of solar weather data for testing purposes.
-
-### `GET /debug/watchlist/add?call=XY1ABC`
-programmatically adds a callsign to the monitor watchlist.
-
-### `GET /debug/type?text=T`
-Simulates typing a full string into the application.
-- **Example**: `GET /debug/type?text=K4DRW`
+### `GET /debug/store/set_solar?sfi=N&sn=N&k=N`
+Injects manual solar data (for testing).
 
 ---
 
-## Proposed Future Endpoints
+## Legacy Compatibility
 
-The following endpoints are suggested for future implementation to improve remote management:
-
-- `GET /screenshot.png`: High-quality PNG capture (lossless).
-- `POST /restart`: Software-initiated application restart.
-- `POST /factory_reset`: Clear all settings and caches.
-
+HamClock-Next maintains 100% compatibility with all `GET /set_...` and `GET /get_...` endpoints from the original HamClock. Hardware controllers like the **Quadra** or **MegaClock** will work without modification.

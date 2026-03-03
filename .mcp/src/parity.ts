@@ -1,25 +1,7 @@
 import { marked } from 'marked';
 import { readFile, writeFile, mkdir } from 'fs/promises';
 import { dirname, join } from 'path';
-
-// Define the JSON schema for the parity data
-export interface ParityFeature {
-  feature_id: string;
-  name: string;
-  status: 'EQUIVALENT' | 'EQUIVALENT+' | 'PARTIAL' | 'STUB' | 'MISSING';
-  source_strategy: 'proxy-dependent -> direct-source' | 'unknown -> direct-source' | 'mixed -> unknown' | 'mixed -> direct-source' | 'mixed -> mixed' | 'N/A';
-  original_pointers: string[];
-  next_pointers: string[];
-  notes: string;
-  suggested_gaps: string[];
-}
-
-export interface ParityData {
-  features: ParityFeature[];
-  top_improvements: string[];
-  top_gaps: string[];
-  parity_score: number;
-}
+import { ParityFeature, ParityData } from './types.js';
 
 function toSnakeCase(str: string): string {
   return str.toLowerCase().replace(/\s+/g, '_').replace(/[^\w_]/g, '');
@@ -102,6 +84,11 @@ export async function loadReport(path: string): Promise<ParityData> {
   }
 
   return { features, top_improvements, top_gaps, parity_score };
+}
+
+export async function saveReport(path: string, data: ParityData): Promise<void> {
+  await mkdir(dirname(path), { recursive: true });
+  await writeFile(path, JSON.stringify(data, null, 2));
 }
 
 export function getSummary(data: ParityData): { score: number; counts: Record<string, number>; improvements: string[]; gaps: string[] } {

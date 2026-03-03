@@ -89,6 +89,10 @@ TextInput *SetupScreen::getActiveInput() {
       return &qrzUsernameInput_;
     case 1:
       return &qrzPasswordInput_;
+    case 2:
+      return &repeaterBookInput_;
+    case 3:
+      return &winlinkInput_;
     }
   } else if (activeTab_ == Tab::Rig) {
     switch (activeField_) {
@@ -687,6 +691,24 @@ void SetupScreen::renderTabServices(SDL_Renderer *renderer, int cx, int pad,
                   orange, gray, white, white, gray, "********");
   }
   y += fieldH + vSpace;
+
+  cat->drawText(renderer, "RepeaterBook Key:", fieldX, y, white,
+                FontStyle::SmallBold);
+  repeaterBookRect_ = {fieldX, y, fieldW, labelH + fieldH};
+  y += labelH;
+  repeaterBookInput_.render(renderer, fontMgr_, fieldX, y, fieldW, fieldH,
+                            FontStyle::SmallRegular, textPad, activeField_ == 2,
+                            true, orange, gray, white, white, gray, "Key");
+  y += fieldH + vSpace;
+
+  cat->drawText(renderer, "Winlink Key:", fieldX, y, white,
+                FontStyle::SmallBold);
+  winlinkRect_ = {fieldX, y, fieldW, labelH + fieldH};
+  y += labelH;
+  winlinkInput_.render(renderer, fontMgr_, fieldX, y, fieldW, fieldH,
+                       FontStyle::SmallRegular, textPad, activeField_ == 3,
+                       true, orange, gray, white, white, gray, "Key");
+  y += fieldH + vSpace;
 }
 
 void SetupScreen::renderTabNetwork(SDL_Renderer *renderer, int /*cx*/, int pad,
@@ -1177,6 +1199,10 @@ bool SetupScreen::onMouseDown(int mx, int my, Uint16 mod, int clicks) {
       return true;
     if (hitField(qrzPasswordRect_, 1, &qrzPasswordInput_))
       return true;
+    if (hitField(repeaterBookRect_, 2, &repeaterBookInput_))
+      return true;
+    if (hitField(winlinkRect_, 3, &winlinkInput_))
+      return true;
   } else if (activeTab_ == Tab::Network && hubMode_ == HubMode::Client) {
     if (hitField(hubIpRect_, 0, &hubIpInput_))
       return true;
@@ -1476,7 +1502,7 @@ bool SetupScreen::onKeyDown(SDL_Keycode key, Uint16 mod) {
   } else if (activeTab_ == Tab::Appearance) {
     nFields = 3; // 0=rotation interval, 1=dimTime, 2=brightTime
   } else if (activeTab_ == Tab::Services) {
-    nFields = 2;
+    nFields = 4;
   } else if (activeTab_ == Tab::Rig) {
     nFields = 2;
   } else if (activeTab_ == Tab::Watchlist) {
@@ -1879,6 +1905,8 @@ void SetupScreen::setConfig(const AppConfig &cfg) {
 
   qrzUsernameInput_.setValue(cfg.qrzUsername);
   qrzPasswordInput_.setValue(cfg.qrzPassword);
+  repeaterBookInput_.setValue(cfg.repeaterBookKey);
+  winlinkInput_.setValue(cfg.winlinkKey);
   countdownLabel_ = cfg.countdownLabel;
   countdownTime_ = cfg.countdownTime;
   brightnessMgr_.setBrightness(cfg.brightness);
@@ -1953,6 +1981,8 @@ AppConfig SetupScreen::getConfig() const {
 
   cfg.qrzUsername = qrzUsernameInput_.getValue();
   cfg.qrzPassword = qrzPasswordInput_.getValue();
+  cfg.repeaterBookKey = repeaterBookInput_.getValue();
+  cfg.winlinkKey = winlinkInput_.getValue();
   cfg.countdownLabel = countdownLabel_;
   cfg.countdownTime = countdownTime_;
   cfg.brightness = brightnessMgr_.getBrightness();

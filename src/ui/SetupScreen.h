@@ -119,11 +119,17 @@ private:
   // Services & Rig
   TextInput qrzUsernameInput_;
   TextInput qrzPasswordInput_;
+  TextInput repeaterBookInput_;
+  TextInput winlinkInput_;
   std::string countdownLabel_;
   std::string countdownTime_; // YYYY-MM-DD HH:MM
   TextInput dimTimeInput_;
   TextInput brightTimeInput_;
 
+  SDL_Rect qrzUsernameRect_ = {0, 0, 0, 0};
+  SDL_Rect qrzPasswordRect_ = {0, 0, 0, 0};
+  SDL_Rect repeaterBookRect_ = {0, 0, 0, 0};
+  SDL_Rect winlinkRect_ = {0, 0, 0, 0};
   SDL_Rect brightTimeRect_ = {0, 0, 0, 0};
   SDL_Rect modalRect_ = {0, 0, 0, 0};
 
@@ -192,8 +198,6 @@ private:
   SDL_Rect hubPortRect_ = {0, 0, 0, 0};
   SDL_Rect rigHostRect_ = {0, 0, 0, 0};
   SDL_Rect rigPortRect_ = {0, 0, 0, 0};
-  SDL_Rect qrzUsernameRect_ = {0, 0, 0, 0};
-  SDL_Rect qrzPasswordRect_ = {0, 0, 0, 0};
   std::map<std::string, SDL_Color> colorOverrides_;
 
   // Track dimensions to detect size changes

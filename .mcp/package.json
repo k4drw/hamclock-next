@@ -1,6 +1,6 @@
 {
   "name": "hamclock-feature-bridge",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "MCP server for HamClock feature mapping between original and next codebases",
   "type": "module",
   "main": "dist/index.js",

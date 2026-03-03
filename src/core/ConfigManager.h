@@ -109,6 +109,10 @@ struct AppConfig {
   bool sdoPfss = false;
   bool sdoShowMovie = false;
 
+  // Marine Widget settings
+  std::string marineStation = "8722670"; // NOAA Tide station (Lake Worth FL)
+  std::string marineBuoy = "41114";       // NDBC Buoy ID (FL Atlantic)
+
   // Power / Screen
   bool preventSleep = true; // true to call SDL_DisableScreenSaver()
 
@@ -125,6 +129,10 @@ struct AppConfig {
   // QRZ
   std::string qrzUsername;
   std::string qrzPassword;
+
+  // Additional Services
+  std::string repeaterBookKey;
+  std::string winlinkKey;
 
   // Daily alarm
   bool alarmArmed = false;

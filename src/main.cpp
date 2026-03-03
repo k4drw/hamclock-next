@@ -1052,7 +1052,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
   // Default NOAA tide station (Lake Worth FL) + NDBC buoy 41114 (FL Atlantic).
   // TODO: make configurable via settings.
   if (isMasterMode || isWidgetConfigured(WidgetType::MARINE))
-    marineProvider->fetch("8722670", "41114");
+    marineProvider->fetch(appCfg.marineStation, appCfg.marineBuoy);
 
   winlinkProvider =
       std::make_unique<WinlinkProvider>(netManager, ctx.winlinkStore);

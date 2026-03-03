@@ -34,6 +34,7 @@ private:
   void runUDP(int port);
 
   void processLine(const std::string &line);
+  void processWSJTX(const uint8_t *packet, size_t len);
 
   std::shared_ptr<DXClusterDataStore> store_;
   PrefixManager &pm_;

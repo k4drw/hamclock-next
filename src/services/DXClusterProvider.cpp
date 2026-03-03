@@ -23,6 +23,44 @@
 #endif
 #include <cstring>
 
+namespace {
+// WSJT-X parsing helpers (big-endian)
+bool wsjtx_bool(const uint8_t **bpp, const uint8_t *end) {
+  if (*bpp + 1 > end)
+    return false;
+  bool x = **bpp > 0;
+  *bpp += 1;
+  return x;
+}
+
+uint32_t wsjtx_uint32(const uint8_t **bpp, const uint8_t *end) {
+  if (*bpp + 4 > end)
+    return 0;
+  uint32_t x = ((*bpp)[0] << 24) | ((*bpp)[1] << 16) | ((*bpp)[2] << 8) | (*bpp)[3];
+  *bpp += 4;
+  return x;
+}
+
+uint64_t wsjtx_uint64(const uint8_t **bpp, const uint8_t *end) {
+  if (*bpp + 8 > end)
+    return 0;
+  uint64_t x = ((uint64_t)wsjtx_uint32(bpp, end)) << 32;
+  x |= wsjtx_uint32(bpp, end);
+  return x;
+}
+
+std::string wsjtx_utf8(const uint8_t **bpp, const uint8_t *end) {
+  uint32_t len = wsjtx_uint32(bpp, end);
+  if (len == 0xffffffff)
+    len = 0;
+  if (*bpp + len > end)
+    return "";
+  std::string s((const char *)*bpp, len);
+  *bpp += len;
+  return s;
+}
+} // namespace
+
 DXClusterProvider::DXClusterProvider(std::shared_ptr<DXClusterDataStore> store,
                                      PrefixManager &pm,
                                      std::shared_ptr<WatchlistStore> watchlist,
@@ -291,16 +329,14 @@ void DXClusterProvider::runUDP(int port) {
       break;
 
     if (ret > 0) {
-      char tmp[2048];
-      ssize_t n = recv(sock, tmp, sizeof(tmp), 0);
+      uint8_t tmp[2048];
+      ssize_t n = recv(sock, (char *)tmp, sizeof(tmp), 0);
       if (n > 0) {
-        // For UDP, we might have binary protocols (WSJT-X) or XML/ADIF
-        // For now, let's assume simple string lines or binary
         // WSJT-X starts with 0xADBCCBDA
-        if (n >= 4 && (uint32_t)ntohl(*(uint32_t *)tmp) == 0xADBCCBDA) {
-          // TODO: WSJT-X parsing
+        if (n >= 12 && (uint32_t)ntohl(*(uint32_t *)tmp) == 0xADBCCBDA) {
+          processWSJTX(tmp, n);
         } else {
-          std::string line(tmp, n);
+          std::string line((char *)tmp, n);
           processLine(line);
         }
       }
@@ -308,6 +344,76 @@ void DXClusterProvider::runUDP(int port) {
   }
 
   close(sock);
+}
+
+void DXClusterProvider::processWSJTX(const uint8_t *packet, size_t len) {
+  const uint8_t *bp = packet;
+  const uint8_t *end = packet + len;
+
+  uint32_t magic = wsjtx_uint32(&bp, end);
+  if (magic != 0xADBCCBDA)
+    return;
+
+  (void)wsjtx_uint32(&bp, end); // skip max schema
+  uint32_t msgtype = wsjtx_uint32(&bp, end);
+
+  if (msgtype == 1) { // Status message
+    (void)wsjtx_utf8(&bp, end); // ID
+    uint64_t hz = wsjtx_uint64(&bp, end);
+    (void)wsjtx_utf8(&bp, end);   // mode
+    std::string dx_call = wsjtx_utf8(&bp, end);
+    (void)wsjtx_utf8(&bp, end);   // report
+    (void)wsjtx_utf8(&bp, end);   // tx mode
+    (void)wsjtx_bool(&bp, end);   // tx enabled
+    (void)wsjtx_bool(&bp, end);   // transmitting
+    (void)wsjtx_bool(&bp, end);   // decoding
+    (void)wsjtx_uint32(&bp, end); // rx df
+    (void)wsjtx_uint32(&bp, end); // tx df
+    std::string de_call = wsjtx_utf8(&bp, end);
+    std::string de_grid = wsjtx_utf8(&bp, end);
+    std::string dx_grid = wsjtx_utf8(&bp, end);
+
+    if (hz == 0 || dx_call.empty() || de_call.empty())
+      return;
+
+    DXClusterSpot spot;
+    spot.txCall = dx_call;
+    spot.rxCall = de_call;
+    spot.txGrid = dx_grid;
+    spot.rxGrid = de_grid;
+    spot.freqKhz = hz * 1e-3f;
+    spot.spottedAt = std::chrono::system_clock::now();
+
+    LatLong ll;
+    if (!dx_grid.empty()) {
+      Astronomy::gridToLatLon(dx_grid, spot.txLat, spot.txLon);
+    } else {
+      pm_.findLocation(dx_call, ll);
+      spot.txLat = ll.lat;
+      spot.txLon = ll.lon;
+    }
+
+    if (!de_grid.empty()) {
+      Astronomy::gridToLatLon(de_grid, spot.rxLat, spot.rxLon);
+    } else {
+      pm_.findLocation(de_call, ll);
+      spot.rxLat = ll.lat;
+      spot.rxLon = ll.lon;
+    }
+
+    store_->addSpot(spot);
+
+    // Watchlist check
+    if (watchlist_ && hits_ && watchlist_->contains(spot.txCall)) {
+      WatchlistHit hit;
+      hit.call = spot.txCall;
+      hit.freqKhz = spot.freqKhz;
+      hit.mode = "WSJT";
+      hit.source = "WSJT-X";
+      hit.time = spot.spottedAt;
+      hits_->addHit(hit);
+    }
+  }
 }
 
 void DXClusterProvider::processLine(const std::string &line) {

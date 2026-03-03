@@ -426,6 +426,13 @@ bool ConfigManager::load(AppConfig &config) {
     config.sdoShowMovie = s.value("show_movie", false);
   }
 
+  // Marine
+  if (json.contains("marine")) {
+    auto &m = json["marine"];
+    config.marineStation = m.value("station", "8722670");
+    config.marineBuoy = m.value("buoy", "41114");
+  }
+
   // Power
   if (json.contains("power")) {
     auto &p = json["power"];
@@ -443,6 +450,7 @@ bool ConfigManager::load(AppConfig &config) {
   }
 
   // Rig (Hamlib rigctld)
+  // Rig
   if (json.contains("rig")) {
     auto &r = json["rig"];
     config.rigHost = r.value("host", "");
@@ -450,6 +458,12 @@ bool ConfigManager::load(AppConfig &config) {
     config.rigAutoTune = r.value("auto_tune", true);
   }
 
+  // API Keys
+  if (json.contains("api_keys")) {
+    auto &k = json["api_keys"];
+    config.repeaterBookKey = k.value("repeaterbook", "");
+    config.winlinkKey = k.value("winlink", "");
+  }
   // Presets
   if (json.contains("presets") && json["presets"].is_array()) {
     config.presets.clear();
@@ -599,6 +613,9 @@ bool ConfigManager::save(const AppConfig &config) {
   json["sdo"]["pfss"] = config.sdoPfss;
   json["sdo"]["show_movie"] = config.sdoShowMovie;
 
+  json["marine"]["station"] = config.marineStation;
+  json["marine"]["buoy"] = config.marineBuoy;
+
   json["rotator"]["host"] = config.rotatorHost;
   json["rotator"]["port"] = config.rotatorPort;
   json["rotator"]["auto_track"] = config.rotatorAutoTrack;
@@ -606,6 +623,9 @@ bool ConfigManager::save(const AppConfig &config) {
   json["rig"]["host"] = config.rigHost;
   json["rig"]["port"] = config.rigPort;
   json["rig"]["auto_tune"] = config.rigAutoTune;
+
+  json["api_keys"]["repeaterbook"] = config.repeaterBookKey;
+  json["api_keys"]["winlink"] = config.winlinkKey;
 
   auto saveRotation = [&](const std::string &key,
                           const std::vector<WidgetType> &vec) {
