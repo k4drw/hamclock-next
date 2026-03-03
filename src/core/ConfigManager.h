@@ -105,7 +105,8 @@ struct AppConfig {
 
   // SDO Widget settings
   std::string sdoWavelength = "0193";
-  bool sdoGrayline = false;
+  bool sdoRotating = false;
+  bool sdoPfss = false;
   bool sdoShowMovie = false;
 
   // Power / Screen

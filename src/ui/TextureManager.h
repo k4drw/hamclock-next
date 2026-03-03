@@ -68,10 +68,11 @@ public:
 
   // Convenience overload for std::string payloads.
   SDL_Texture *loadFromMemory(SDL_Renderer *renderer, const std::string &key,
-                              const std::string &data) {
+                              const std::string &data,
+                              SDL_Color tint = {255, 255, 255, 255}) {
     return loadFromMemory(renderer, key,
                           reinterpret_cast<const unsigned char *>(data.data()),
-                          static_cast<unsigned int>(data.size()));
+                          static_cast<unsigned int>(data.size()), tint);
   }
 
   // Decode image bytes and upload to GPU, replacing any existing texture for
@@ -80,7 +81,8 @@ public:
   // a dirty flag set by the background fetch callback) to avoid unnecessary
   // CPU decode and VRAM bandwidth usage.
   SDL_Texture *loadFromMemory(SDL_Renderer *renderer, const std::string &key,
-                              const unsigned char *data, unsigned int size) {
+                              const unsigned char *data, unsigned int size,
+                              SDL_Color tint = {255, 255, 255, 255}) {
     SDL_RWops *rw = SDL_RWFromConstMem(data, static_cast<int>(size));
     if (!rw)
       return nullptr;
@@ -105,6 +107,8 @@ public:
       return nullptr;
     surface = rgbaSurface;
 
+    bool hasTint = (tint.r != 255 || tint.g != 255 || tint.b != 255);
+
     if (key == "nasa_moon" || key == "sdo_latest") {
       uint8_t *pixels = (uint8_t *)surface->pixels;
       for (int y = 0; y < surface->h; ++y) {
@@ -114,13 +118,28 @@ public:
           uint8_t r, g, b, a;
           SDL_GetRGBA(p, surface->format, &r, &g, &b, &a);
           uint8_t br = std::max({r, g, b});
+          
           if (key == "nasa_moon") {
             if (br < 20)
               br = 0;
             else if (br < 100)
               br = (uint8_t)(((br - 20) / 80.0f) * br);
+            row[x] = SDL_MapRGBA(surface->format, r, g, b, br);
+          } else if (key == "sdo_latest") {
+            if (hasTint) {
+              // Map grayscale brightness to tint color
+              r = (uint8_t)((br / 255.0f) * tint.r);
+              g = (uint8_t)((br / 255.0f) * tint.g);
+              b = (uint8_t)((br / 255.0f) * tint.b);
+            }
+            // Remove black background by setting alpha based on brightness.
+            // We use a small threshold to kill compression noise.
+            uint8_t alpha = 255;
+            if (br < 15) alpha = 0;
+            else if (br < 40) alpha = (uint8_t)(((br - 15) / 25.0f) * 255);
+            
+            row[x] = SDL_MapRGBA(surface->format, r, g, b, alpha);
           }
-          row[x] = SDL_MapRGBA(surface->format, r, g, b, br);
         }
       }
     }

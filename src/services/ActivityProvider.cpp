@@ -114,7 +114,7 @@ void ActivityProvider::fetchDXPeds() {
               if (i > 0 && tmp[i]) {
                 sscanf(tmp + i, "%d", &day);
                 int copy = i < 9 ? i : 9;
-                strncpy(mon, tmp, copy);
+                memcpy(mon, tmp, copy);
                 mon[copy] = '\0';
                 return day > 0;
               }

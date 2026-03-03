@@ -416,6 +416,16 @@ bool ConfigManager::load(AppConfig &config) {
       config.liveSpotsBands = psk.value("bands_mask", 0xFFF);
     }
   }
+
+  // SDO Settings
+  if (json.contains("sdo")) {
+    auto &s = json["sdo"];
+    config.sdoWavelength = s.value("wavelength", "0193");
+    config.sdoRotating = s.value("rotating", false);
+    config.sdoPfss = s.value("pfss", s.value("grayline", false));
+    config.sdoShowMovie = s.value("show_movie", false);
+  }
+
   // Power
   if (json.contains("power")) {
     auto &p = json["power"];
@@ -583,6 +593,11 @@ bool ConfigManager::save(const AppConfig &config) {
                                                               : "off";
   json["hub"]["ip"] = config.hubIp;
   json["hub"]["port"] = config.hubPort;
+
+  json["sdo"]["wavelength"] = config.sdoWavelength;
+  json["sdo"]["rotating"] = config.sdoRotating;
+  json["sdo"]["pfss"] = config.sdoPfss;
+  json["sdo"]["show_movie"] = config.sdoShowMovie;
 
   json["rotator"]["host"] = config.rotatorHost;
   json["rotator"]["port"] = config.rotatorPort;

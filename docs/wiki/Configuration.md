@@ -107,11 +107,12 @@ If `lat`/`lon` are omitted, they are derived from the center of your grid square
 
 ## SDO Widget
 
-| Field           | Type   | Default  | Description                                                                                               |
-| --------------- | ------ | -------- | --------------------------------------------------------------------------------------------------------- |
-| `sdoWavelength` | string | `"0193"` | SDO AIA wavelength (e.g., `0094`, `0131`, `0171`, `0193`, `0211`, `0304`, `0335`, `1600`, `1700`, `4500`) |
-| `sdoGrayline`   | bool   | `false`  | Overlay the solar limb/terminator on SDO image                                                            |
-| `sdoShowMovie`  | bool   | `false`  | Show SDO image as a time-lapse movie loop                                                                 |
+| Field           | Type   | Default  | Description                                                                                              |
+| --------------- | ------ | -------- | -------------------------------------------------------------------------------------------------------- |
+| `sdoWavelength` | string | `"0193"` | SDO wavelength (e.g., `211193171`, `HMIB`, `HMIIC`, `0131`, `0193`, `0211`, `0304`, `1600`, `1700`)      |
+| `sdoRotating`   | bool   | `false`  | Automatically rotate through available wavelengths every 30 seconds                                      |
+| `sdoPfss`       | bool   | `false`  | Overlay solar magnetic field lines (PFSS) on supported wavelengths                                       |
+| `sdoShowMovie`  | bool   | `false`  | Show SDO image as a time-lapse movie loop (currently inactive)                                           |
 
 ---
 
