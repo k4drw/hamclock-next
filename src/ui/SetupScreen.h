@@ -110,6 +110,8 @@ private:
   std::string panelMode_ = "dx";
   std::string selectedSatellite_;
   bool mapNightLights_ = true;
+  std::string mapStyle_ = "nasa";
+  std::string projection_ = "equirectangular";
   bool useMetric_ = true;
   bool rssEnabled_ = true;
   WeatherOverlayType weatherOverlay_ = WeatherOverlayType::None;
@@ -163,6 +165,9 @@ private:
   SDL_Rect metricToggleRect_ = {0, 0, 0, 0};
   SDL_Rect rssToggleRect_ = {0, 0, 0, 0};
   SDL_Rect weatherOverlayRect_ = {0, 0, 0, 0};
+  SDL_Rect mapStyleRect_ = {0, 0, 0, 0};
+  SDL_Rect projectionRect_ = {0, 0, 0, 0};
+  SDL_Rect rotationToggleRect_ = {0, 0, 0, 0};
   SDL_Rect okBtnRect_ = {0, 0, 0, 0};
   SDL_Rect cancelBtnRect_ = {0, 0, 0, 0};
   SDL_Rect brightnessSliderRect_ = {0, 0, 0, 0};

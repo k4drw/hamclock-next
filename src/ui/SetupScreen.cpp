@@ -35,7 +35,8 @@ void SetupScreen::autoPopulateLatLon() {
         g[i] += 32;
     }
   }
-  gridInput_.setValue(g);
+  if (g != gridInput_.getValue())
+    gridInput_.setValue(g);
 
   if (g.size() >= 4) {
     gridValid_ = Astronomy::gridToLatLon(g, gridLat_, gridLon_);
@@ -321,8 +322,8 @@ void SetupScreen::renderTabIdentity(SDL_Renderer *renderer, int, int pad,
   int labelH = cat->ptSize(FontStyle::SmallBold) + 4;
 
   cat->drawText(renderer, "Callsign:", fieldX, y, white, FontStyle::SmallBold);
-  callsignRect_ = {fieldX, y, fieldW, labelH + fieldH};
   y += labelH;
+  callsignRect_ = {fieldX, y, fieldW, fieldH};
   callsignInput_.render(renderer, fontMgr_, fieldX, y, fieldW, fieldH,
                         FontStyle::SmallRegular, textPad, activeField_ == 0,
                         !callsignInput_.getValue().empty(), orange, gray, white,
@@ -331,8 +332,8 @@ void SetupScreen::renderTabIdentity(SDL_Renderer *renderer, int, int pad,
 
   cat->drawText(renderer, "Grid Square:", fieldX, y, white,
                 FontStyle::SmallBold);
-  gridRect_ = {fieldX, y, fieldW, labelH + fieldH};
   y += labelH;
+  gridRect_ = {fieldX, y, fieldW, fieldH};
   gridInput_.render(renderer, fontMgr_, fieldX, y, fieldW, fieldH,
                     FontStyle::SmallRegular, textPad, activeField_ == 1,
                     gridValid_, orange, gray, green, white, gray,
@@ -568,19 +569,33 @@ void SetupScreen::renderTabAppearance(SDL_Renderer *renderer, int cx, int pad,
   drawBtn(weatherOverlayRect_, wStr);
   y += 24 + vSpace;
 
-  // Row 4: Rotation Interval
+  // Row 4: Map Style & Projection
+  cat->drawText(renderer, "Map Style:", fieldX, y + 12, white,
+                FontStyle::SmallRegular, false, false, true);
+  mapStyleRect_ = {fieldX + halfW - 80, y, 80, 24};
+  drawBtn(mapStyleRect_, mapStyle_);
+
+  cat->drawText(renderer, "Projection:", fieldX + halfW, y + 12, white,
+                FontStyle::SmallRegular, false, false, true);
+  projectionRect_ = {fieldX + fieldW - 80, y, 80, 24};
+  drawBtn(projectionRect_,
+          projection_ == "equirectangular" ? "Mercator" : "Azimuthal");
+  y += 24 + vSpace;
+
+  // Row 5: Rotation Interval
   cat->drawText(renderer, "Pane Rotation (s):", fieldX, y + 12, white,
                 FontStyle::SmallRegular, false, false, true);
   int rotBtnW = 60;
-  SDL_Rect rotBtn = {fieldX + fieldW - rotBtnW, y, rotBtnW, 24};
+  rotationToggleRect_ = {fieldX + fieldW - rotBtnW, y, rotBtnW, 24};
   SDL_SetRenderDrawColor(renderer, 30, 30, 40, 255);
-  SDL_RenderFillRect(renderer, &rotBtn);
+  SDL_RenderFillRect(renderer, &rotationToggleRect_);
   SDL_SetRenderDrawColor(renderer, activeField_ == 0 ? 255 : 80,
                          activeField_ == 0 ? 165 : 80,
                          activeField_ == 0 ? 0 : 80, 255);
-  SDL_RenderDrawRect(renderer, &rotBtn);
+  SDL_RenderDrawRect(renderer, &rotationToggleRect_);
   cat->drawText(renderer, std::to_string(rotationInterval_),
-                rotBtn.x + rotBtnW / 2, rotBtn.y + rotBtn.h / 2, white,
+                rotationToggleRect_.x + rotBtnW / 2,
+                rotationToggleRect_.y + rotationToggleRect_.h / 2, white,
                 FontStyle::SmallRegular, true, false, true);
   y += 24 + vSpace;
 
@@ -704,7 +719,7 @@ void SetupScreen::renderTabNetwork(SDL_Renderer *renderer, int /*cx*/, int pad,
   SDL_RenderDrawRect(renderer, &hubModeRect_);
   cat->drawText(renderer, modeLabel, hubModeRect_.x + hubModeRect_.w / 2,
                 hubModeRect_.y + hubModeRect_.h / 2, orange,
-                FontStyle::SmallRegular, true);
+                FontStyle::SmallRegular, true, false, true);
   y += fieldH + vSpace;
 
   if (hubMode_ == HubMode::Client) {
@@ -1120,18 +1135,11 @@ bool SetupScreen::onMouseDown(int mx, int my, Uint16 mod, int clicks) {
   // Helper for field hit-testing
   auto hitField = [&](SDL_Rect &r, int idx, TextInput *ti) -> bool {
     if (r.w > 0 && mx >= r.x && mx < r.x + r.w && my >= r.y && my < r.y + r.h) {
-      int oldField = activeField_;
       activeField_ = idx;
       if (ti) {
         ti->setActive(true);
-        // If double-click or already active, position cursor/select
-        if (oldField == idx || clicks == 2) {
-          ti->onMouseDown(mx, my, clicks, fontMgr_, r.x, r.y, r.w, r.h,
-                          FontStyle::SmallRegular, textPad);
-        } else {
-          // First click into field: just put cursor at end
-          ti->setCursorToEnd();
-        }
+        ti->onMouseDown(mx, my, clicks, fontMgr_, r.x, r.y, r.w, r.h,
+                        FontStyle::SmallRegular, textPad);
       }
       return true;
     }
@@ -1275,6 +1283,95 @@ bool SetupScreen::onMouseDown(int mx, int my, Uint16 mod, int clicks) {
       else
         hubMode_ = HubMode::Off;
       activeField_ = 0;
+      return true;
+    }
+  } else if (activeTab_ == Tab::Appearance) {
+    if (mx >= themeRect_.x && mx < themeRect_.x + themeRect_.w &&
+        my >= themeRect_.y && my < themeRect_.y + themeRect_.h) {
+      if (theme_ == "default")
+        theme_ = "dark";
+      else if (theme_ == "dark")
+        theme_ = "glass";
+      else
+        theme_ = "default";
+      return true;
+    }
+    if (mx >= customizeBtnRect_.x &&
+        mx < customizeBtnRect_.x + customizeBtnRect_.w &&
+        my >= customizeBtnRect_.y &&
+        my < customizeBtnRect_.y + customizeBtnRect_.h) {
+      themeCustomizer_->setActive(true);
+      return true;
+    }
+    if (mx >= nightLightsRect_.x &&
+        mx < nightLightsRect_.x + nightLightsRect_.w &&
+        my >= nightLightsRect_.y &&
+        my < nightLightsRect_.y + nightLightsRect_.h) {
+      mapNightLights_ = !mapNightLights_;
+      return true;
+    }
+    if (mx >= metricToggleRect_.x &&
+        mx < metricToggleRect_.x + metricToggleRect_.w &&
+        my >= metricToggleRect_.y &&
+        my < metricToggleRect_.y + metricToggleRect_.h) {
+      useMetric_ = !useMetric_;
+      return true;
+    }
+    if (mx >= rssToggleRect_.x && mx < rssToggleRect_.x + rssToggleRect_.w &&
+        my >= rssToggleRect_.y && my < rssToggleRect_.y + rssToggleRect_.h) {
+      rssEnabled_ = !rssEnabled_;
+      return true;
+    }
+    if (mx >= weatherOverlayRect_.x &&
+        mx < weatherOverlayRect_.x + weatherOverlayRect_.w &&
+        my >= weatherOverlayRect_.y &&
+        my < weatherOverlayRect_.y + weatherOverlayRect_.h) {
+      if (weatherOverlay_ == WeatherOverlayType::None)
+        weatherOverlay_ = WeatherOverlayType::Clouds;
+      else if (weatherOverlay_ == WeatherOverlayType::Clouds)
+        weatherOverlay_ = WeatherOverlayType::WxMb;
+      else
+        weatherOverlay_ = WeatherOverlayType::None;
+      return true;
+    }
+    if (mx >= mapStyleRect_.x && mx < mapStyleRect_.x + mapStyleRect_.w &&
+        my >= mapStyleRect_.y && my < mapStyleRect_.y + mapStyleRect_.h) {
+      if (mapStyle_ == "nasa")
+        mapStyle_ = "terrain";
+      else if (mapStyle_ == "terrain")
+        mapStyle_ = "countries";
+      else
+        mapStyle_ = "nasa";
+      return true;
+    }
+    if (mx >= projectionRect_.x && mx < projectionRect_.x + projectionRect_.w &&
+        my >= projectionRect_.y && my < projectionRect_.y + projectionRect_.h) {
+      if (projection_ == "equirectangular")
+        projection_ = "azimuthal";
+      else
+        projection_ = "equirectangular";
+      return true;
+    }
+    if (mx >= brightnessSliderRect_.x &&
+        mx < brightnessSliderRect_.x + brightnessSliderRect_.w &&
+        my >= brightnessSliderRect_.y &&
+        my < brightnessSliderRect_.y + brightnessSliderRect_.h) {
+      int val = (mx - brightnessSliderRect_.x) * 100 / brightnessSliderRect_.w;
+      brightnessMgr_.setBrightness(val);
+      return true;
+    }
+    if (mx >= scheduleToggleRect_.x &&
+        mx < scheduleToggleRect_.x + scheduleToggleRect_.w &&
+        my >= scheduleToggleRect_.y &&
+        my < scheduleToggleRect_.y + scheduleToggleRect_.h) {
+      brightnessMgr_.setScheduleEnabled(!brightnessMgr_.isScheduleEnabled());
+      return true;
+    }
+    if (mx >= rotationToggleRect_.x &&
+        mx < rotationToggleRect_.x + rotationToggleRect_.w &&
+        my >= rotationToggleRect_.y &&
+        my < rotationToggleRect_.y + rotationToggleRect_.h) {
+      activeField_ = 0; // Focus rotation interval input
       return true;
     }
   }
@@ -1506,6 +1603,16 @@ bool SetupScreen::onTextInput(const char *inputText) {
 
   // === CALLSIGN VALIDATION (Identity Tab, Field 0) ===
   if (activeTab_ == Tab::Identity && activeField_ == 0) {
+    if (callsignInput_.hasSelection()) {
+      // If we have a selection, we're replacing it - just pass it through
+      // and TextInput will handle upper/lower as needed via its own
+      // render/storage but here we still want to force upper case for
+      // callsigns.
+      std::string upper = inputText;
+      std::transform(upper.begin(), upper.end(), upper.begin(), ::toupper);
+      callsignInput_.onTextInput(upper.c_str());
+      return true;
+    }
     for (const char *p = inputText; *p; ++p) {
       if (!((*p >= 'A' && *p <= 'Z') || (*p >= 'a' && *p <= 'z') ||
             (*p >= '0' && *p <= '9') || *p == '/')) {
@@ -1520,6 +1627,11 @@ bool SetupScreen::onTextInput(const char *inputText) {
 
   // === GRID SQUARE VALIDATION (Identity Tab, Field 1) ===
   if (activeTab_ == Tab::Identity && activeField_ == 1) {
+    if (gridInput_.hasSelection()) {
+      gridInput_.onTextInput(inputText); // Let it through
+      autoPopulateLatLon();
+      return true;
+    }
     const std::string &cur = gridInput_.getValue();
     for (const char *p = inputText; *p; ++p) {
       int pos = static_cast<int>(cur.size());
@@ -1755,6 +1867,8 @@ void SetupScreen::setConfig(const AppConfig &cfg) {
   watchlistInputField_.clear();
   watchlistScrollOffset_ = 0;
   theme_ = cfg.theme;
+  mapStyle_ = cfg.mapStyle;
+  projection_ = cfg.projection;
   mapNightLights_ = cfg.mapNightLights;
   useMetric_ = cfg.useMetric;
   callsignColor_ = cfg.callsignColor;
@@ -1827,6 +1941,8 @@ AppConfig SetupScreen::getConfig() const {
   cfg.syncRotation = syncRotation_;
   cfg.watchlist = watchlistEntries_;
   cfg.theme = theme_;
+  cfg.mapStyle = mapStyle_;
+  cfg.projection = projection_;
   cfg.mapNightLights = mapNightLights_;
   cfg.useMetric = useMetric_;
   cfg.rssEnabled = rssEnabled_;
