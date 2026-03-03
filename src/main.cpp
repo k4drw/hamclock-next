@@ -1517,6 +1517,17 @@ DashboardContext::DashboardContext(AppContext &ctx)
       return;
     }
     std::vector<WidgetType> available = allTypes;
+    if (!ctx.bmeProvider->isAvailable()) {
+      available.erase(
+          std::remove_if(available.begin(), available.end(),
+                         [](WidgetType t) {
+                           return t == WidgetType::ENV_TEMP ||
+                                  t == WidgetType::ENV_PRESSURE ||
+                                  t == WidgetType::ENV_HUMIDITY ||
+                                  t == WidgetType::ENV_DEWPOINT;
+                         }),
+          available.end());
+    }
     if (paneIdx == 3) { // Pane 4 (top-right small pane)
       available = {WidgetType::NCDXF, WidgetType::SOLAR, WidgetType::DX_WEATHER,
                    WidgetType::DE_WEATHER};
