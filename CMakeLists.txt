@@ -529,6 +529,7 @@ set(HAMCLOCK_SOURCES
     src/services/HurricaneProvider.cpp
     src/services/MarineProvider.cpp
     src/services/WinlinkProvider.cpp
+    src/services/GreylineDXProvider.cpp
     src/ui/ActivityPanels.cpp
     src/ui/ADIFPanel.cpp
     src/ui/AlertsPanel.cpp
@@ -538,6 +539,7 @@ set(HAMCLOCK_SOURCES
     src/ui/MarinePanel.cpp
     src/ui/RepeaterPanel.cpp
     src/ui/WinlinkPanel.cpp
+    src/ui/GreylineDXPanel.cpp
     src/ui/AuroraPanel.cpp
     src/ui/AuroraGraphPanel.cpp
     src/ui/DXClusterPanel.cpp

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../core/AuroraHistoryStore.h"
+#include "../core/AuroraMapData.h"
 #include "../core/DRAPData.h"
 #include "../core/SolarData.h"
 #include "../core/XRayData.h"
@@ -32,8 +33,12 @@ public:
 
   void fetch();
   void fetchDRAP();
+  void fetchAuroraMap();
   void setDrapStore(std::shared_ptr<DRAPDataStore> s) {
     drapStore_ = std::move(s);
+  }
+  void setAuroraMapStore(std::shared_ptr<AuroraMapStore> s) {
+    auroraMapStore_ = std::move(s);
   }
 
 private:
@@ -81,5 +86,6 @@ private:
   std::shared_ptr<AuroraHistoryStore> auroraStore_;
   std::shared_ptr<XRayHistoryStore> xrayStore_;
   std::shared_ptr<DRAPDataStore> drapStore_;
+  std::shared_ptr<AuroraMapStore> auroraMapStore_;
   HamClockState *state_;
 };

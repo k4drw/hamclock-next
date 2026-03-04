@@ -49,6 +49,9 @@ public:
   // Get ITU zone from DXCC number. Returns -1 if not found.
   int getITUZone(int dxcc);
 
+  // Get a representative prefix for a DXCC number.
+  std::string getPrefix(int dxcc);
+
 private:
   const StaticPrefixEntry *findEntry(const std::string &call);
   std::mutex mutex_;

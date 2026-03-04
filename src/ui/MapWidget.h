@@ -4,6 +4,7 @@
 #include "../core/ActivityData.h"
 #include "../core/AsteroidData.h"
 #include "../core/AuroraHistoryStore.h"
+#include "../core/AuroraMapData.h"
 #include "../core/ConfigManager.h"
 #include "../core/DRAPData.h"
 #include "../core/DXClusterData.h"
@@ -69,6 +70,10 @@ public:
 
   void setAuroraStore(std::shared_ptr<AuroraHistoryStore> store) {
     auroraStore_ = std::move(store);
+  }
+
+  void setAuroraMapStore(std::shared_ptr<AuroraMapStore> store) {
+    auroraMapStore_ = std::move(store);
   }
 
   void setDrapStore(std::shared_ptr<DRAPDataStore> store) {
@@ -142,6 +147,7 @@ private:
   std::shared_ptr<LiveSpotDataStore> spotStore_;
   std::shared_ptr<DXClusterDataStore> dxcStore_;
   std::shared_ptr<AuroraHistoryStore> auroraStore_;
+  std::shared_ptr<AuroraMapStore> auroraMapStore_;
   std::shared_ptr<DRAPDataStore> drapStore_;
   std::shared_ptr<ADIFStore> adifStore_;
   std::shared_ptr<ActivityDataStore> activityStore_;
@@ -179,6 +185,8 @@ private:
   std::vector<SDL_Vertex> propVerts_;
   std::vector<int> nightIndices_;
   std::vector<int> propIndices_;
+  std::vector<SDL_Vertex> auroraVerts_;
+  std::vector<int> auroraIndices_;
 
   // Caches for render-ready geometry to avoid per-frame recalculation
   bool greatCircleDirty_ = true;
@@ -234,6 +242,9 @@ private:
   uint32_t lastMufUpdateMs_ = 0;
   uint64_t wxLastCheckMs_ = 0;
   uint32_t lastPropUpdateMs_ = 0;
+  std::chrono::system_clock::time_point lastAuroraUpdateTime_;
+  std::string lastAuroraProjection_;
+  SDL_Texture *auroraTexture_ = nullptr;
   PropOverlayType lastPropType_ = PropOverlayType::None;
   std::string lastBand_;
   std::string lastMode_;

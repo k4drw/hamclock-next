@@ -52,6 +52,7 @@ enum class WidgetType {
   ENV_PRESSURE,  // BME280 pressure (hPa)
   ENV_HUMIDITY,  // BME280 humidity (%)
   ENV_DEWPOINT,  // Derived dewpoint (C)
+  GREYLINE_DX,   // Entities currently in greyline
 };
 
 inline const char *widgetTypeToString(WidgetType t) {
@@ -152,6 +153,8 @@ inline const char *widgetTypeToString(WidgetType t) {
     return "env_humidity";
   case WidgetType::ENV_DEWPOINT:
     return "env_dewpoint";
+  case WidgetType::GREYLINE_DX:
+    return "greyline_dx";
   }
   return "solar";
 }
@@ -254,6 +257,8 @@ inline const char *widgetTypeDisplayName(WidgetType t) {
     return "ENV Humidity";
   case WidgetType::ENV_DEWPOINT:
     return "ENV Dewpoint";
+  case WidgetType::GREYLINE_DX:
+    return "Greyline DX";
   }
   return "Solar";
 }
@@ -356,6 +361,8 @@ inline WidgetType widgetTypeFromString(const std::string &s,
     return WidgetType::ENV_HUMIDITY;
   if (s == "env_dewpoint")
     return WidgetType::ENV_DEWPOINT;
+  if (s == "greyline_dx")
+    return WidgetType::GREYLINE_DX;
   std::fprintf(stderr, "WidgetType: unknown '%s', using fallback\n", s.c_str());
   return fallback;
 }

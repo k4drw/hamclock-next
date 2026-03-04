@@ -10,7 +10,7 @@
 #include <SDL.h>
 
 enum class LiveSpotSource { PSK, RBN, WSPR };
-enum class PropOverlayType { None, Muf, Voacap, Reliability, Toa, Heatmap, Drap };
+enum class PropOverlayType { None, Muf, Voacap, Reliability, Toa, Heatmap, Drap, Aurora };
 enum class WeatherOverlayType { None, Clouds, WxMb };
 enum class HubMode { Off, Master, Client };
 

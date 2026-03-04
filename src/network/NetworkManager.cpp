@@ -275,13 +275,21 @@ void NetworkManager::fetchDirect(const std::string &url,
   curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
   curl_easy_setopt(curl, CURLOPT_TIMEOUT, 15L);
   curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
-  curl_easy_setopt(curl, CURLOPT_USERAGENT, "HamClock-Next/1.0");
+  
+  if (url.find("pskreporter.info") != std::string::npos) {
+    curl_easy_setopt(curl, CURLOPT_USERAGENT, "HamClock/1.0");
+    curl_easy_setopt(curl, CURLOPT_REFERER, "https://pskreporter.info/pskmap.html");
+  } else {
+    curl_easy_setopt(curl, CURLOPT_USERAGENT, "HamClock-Next/1.0");
+  }
+
   curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, headerCallback);
   curl_easy_setopt(curl, CURLOPT_HEADERDATA, &headers);
   curl_easy_setopt(curl, CURLOPT_FILETIME, 1L);
 
-  // Workaround for lmsal.com certificate issues
-  if (url.find("lmsal.com") != std::string::npos) {
+  // Workaround for lmsal.com and pskreporter.info certificate issues
+  if (url.find("lmsal.com") != std::string::npos ||
+      url.find("pskreporter.info") != std::string::npos) {
     curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
     curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
   }

@@ -1572,9 +1572,16 @@ void WebServer::run() {
     }
     std::promise<std::string> prom;
     auto fut = prom.get_future();
-    netMgr_->fetchAsync(targetUrl, [&prom](std::string body) {
-      prom.set_value(std::move(body));
-    }, maxAge);
+    netMgr_->fetchAsync(
+        targetUrl, [&prom](std::string body) { prom.set_value(std::move(body)); },
+        maxAge);
+
+    if (fut.wait_for(std::chrono::seconds(20)) == std::future_status::timeout) {
+      res.status = 504;
+      res.set_content("upstream fetch timeout", "text/plain");
+      return;
+    }
+
     std::string body = fut.get();
     if (body.empty()) {
       res.status = 502;

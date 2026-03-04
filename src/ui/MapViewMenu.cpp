@@ -152,6 +152,8 @@ void MapViewMenu::render(SDL_Renderer *renderer) {
     propLabel = "Heatmap";
   else if (propOverlay_ == PropOverlayType::Drap)
     propLabel = "DRAP";
+  else if (propOverlay_ == PropOverlayType::Aurora)
+    propLabel = "Aurora";
   drawDropdown(renderer, overlayRec_, propLabel, openCombo_ == COMBO_OVERLAY);
 
   // Weather Section
@@ -404,6 +406,8 @@ bool MapViewMenu::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
                   propOverlay_ = PropOverlayType::Heatmap;
                 else if (idx == 6)
                   propOverlay_ = PropOverlayType::Drap;
+                else if (idx == 7)
+                  propOverlay_ = PropOverlayType::Aurora;
               }))
             return true;
       

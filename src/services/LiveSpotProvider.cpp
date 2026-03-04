@@ -172,7 +172,7 @@ void LiveSpotProvider::fetchPSK() {
         data.valid = true;
         store->set(data);
       },
-      300); // 5 minute cache age
+      600); // 10 minute cache age
 }
 
 // Parse one field from a ClickHouse FORMAT CSV line.

@@ -182,6 +182,7 @@ MapWidget::MapWidget(int x, int y, int w, int h, TextureManager &texMgr,
 MapWidget::~MapWidget() {
   MemoryMonitor::getInstance().destroyTexture(nightOverlayTexture_);
   MemoryMonitor::getInstance().destroyTexture(propTexture_);
+  MemoryMonitor::getInstance().destroyTexture(auroraTexture_);
   MemoryMonitor::getInstance().destroyTexture(tooltip_.cachedTexture);
 }
 void MapWidget::recalcMapRect() {
@@ -2025,7 +2026,8 @@ void MapWidget::renderMufRtOverlay(SDL_Renderer *renderer) {
 }
 
 void MapWidget::renderPropagationOverlay(SDL_Renderer *renderer) {
-  if (config_.propOverlay == PropOverlayType::None)
+  if (config_.propOverlay == PropOverlayType::None ||
+      config_.propOverlay == PropOverlayType::Aurora)
     return;
 
   if (!propTexture_)
@@ -2195,8 +2197,15 @@ void MapWidget::updatePropagationOverlay() {
           grid.valid, grid.rows, grid.cols, (int)grid.cells.size());
     if (!grid.valid || grid.cells.empty() || grid.cols <= 0 || grid.rows <= 0) {
       // Clear stale texture from previous overlay so nothing is rendered
-      MemoryMonitor::getInstance().destroyTexture(propTexture_);
+      if (propTexture_)
+        MemoryMonitor::getInstance().destroyTexture(propTexture_);
+      if (auroraTexture_)
+        MemoryMonitor::getInstance().destroyTexture(auroraTexture_);
+      if (nightOverlayTexture_)
+        MemoryMonitor::getInstance().destroyTexture(nightOverlayTexture_);
       propTexture_ = nullptr;
+      auroraTexture_ = nullptr;
+      nightOverlayTexture_ = nullptr;
       return;
     }
 
@@ -2470,9 +2479,12 @@ void MapWidget::renderLegend(SDL_Renderer *renderer) {
     title = "Reach";
     labelMin = "Low";
     labelMax = "High";
+  } else if (type == PropOverlayType::Aurora) {
+    title = "Aurora (%)";
+    labelMin = "0";
+    labelMax = "100";
   } else {
     // VOACAP uses Reliability scale/colors internally
-    title = "Reliability";
     labelMin = "0";
     labelMax = "100";
   }
@@ -2559,6 +2571,11 @@ void MapWidget::renderLegend(SDL_Renderer *renderer) {
         g = 255;
         b = (uint8_t)(f * 255);
       }
+    } else if (type == PropOverlayType::Aurora) {
+      // Aurora: black -> green
+      r = 0;
+      g = (uint8_t)(t * 255);
+      b = 0;
     } else { // MUF
       if (t < 0.25f) {
         float f = t / 0.25f;
@@ -2845,70 +2862,103 @@ void MapWidget::renderGridOverlay(SDL_Renderer *renderer) {
     }
   }
 }
-
 void MapWidget::renderAuroraOverlay(SDL_Renderer *renderer) {
-  if (!auroraStore_)
+  if (!auroraMapStore_ || config_.propOverlay != PropOverlayType::Aurora)
     return;
 
-  // For now, we'll fetch the JSON data directly from NOAA
-  // In a production implementation, this should be cached/shared with
-  // NOAAProvider
-  static std::string cachedAuroraData;
-  static uint32_t lastFetchTime = 0;
-  uint32_t now = SDL_GetTicks();
-
-  // Fetch every 30 minutes
-  if (cachedAuroraData.empty() || (now - lastFetchTime) > 1800000) {
-    // For now, skip the fetch and just return
-    // TODO: Share the Aurora JSON data from NOAAProvider
-    return;
-  }
-
-  // Parse the JSON and render green glows
-  // Format: "coordinates":[[lon,lat,val],...]
-  size_t coords_pos = cachedAuroraData.find("\"coordinates\"");
-  if (coords_pos == std::string::npos)
+  AuroraMapData data = auroraMapStore_->get();
+  if (!data.valid)
     return;
 
+  SDL_RenderSetClipRect(renderer, &mapRect_);
   SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
 
-  size_t p = coords_pos;
-  while ((p = cachedAuroraData.find('[', p)) != std::string::npos) {
-    int lon, lat, val;
-    if (sscanf(cachedAuroraData.c_str() + p, "[%d,%d,%d]", &lon, &lat, &val) ==
-            3 ||
-        sscanf(cachedAuroraData.c_str() + p, "[%d, %d, %d]", &lon, &lat,
-               &val) == 3) {
-      if (val > 0) {
-        // Convert lon (0-359) to -180 to 180
-        double longitude = lon;
-        if (longitude >= 180)
-          longitude -= 360;
+  // We use a 2-degree grid for rendering.
+  const int step = 2;
+  const int gridW = 360 / step;
+  const int gridH = 180 / step;
 
-        // Map to screen coordinates
-        SDL_FPoint screenPos = latLonToScreen(lat, longitude);
+  bool needsUpdate = auroraVerts_.empty() || (lastAuroraProjection_ != config_.projection) || 
+                     (data.lastUpdate > lastAuroraUpdateTime_);
 
-        // Calculate alpha based on value (0-100)
-        int calculatedAlpha = (val * 255) / 100;
-        Uint8 alpha = static_cast<Uint8>(std::clamp(calculatedAlpha, 0, 255));
+  if (needsUpdate) {
+    auroraVerts_.clear();
+    auroraIndices_.clear();
+    
+    for (int j = 0; j <= gridH; ++j) {
+      double lat = 90.0 - j * step;
+      // Grid row is 0..180 matching Lat -90..90
+      int dataRow = static_cast<int>(std::round(lat + 90.0));
+      dataRow = std::clamp(dataRow, 0, 180);
 
-        // Draw green glow
-        SDL_SetRenderDrawColor(renderer, 0, 255, 0, alpha);
+      for (int i = 0; i <= gridW; ++i) {
+        // worldLon is -180 to 180
+        double worldLon = -180.0 + i * step;
+        
+        // Map worldLon (-180..180) to data grid column (0..359)
+        int dataCol = static_cast<int>(std::round(worldLon));
+        while (dataCol < 0) dataCol += 360;
+        while (dataCol >= 360) dataCol -= 360;
 
-        // Draw a small filled circle for the glow
-        int radius = 3;
-        for (int dy = -radius; dy <= radius; dy++) {
-          for (int dx = -radius; dx <= radius; dx++) {
-            if (dx * dx + dy * dy <= radius * radius) {
-              SDL_RenderDrawPoint(renderer, static_cast<int>(screenPos.x) + dx,
-                                  static_cast<int>(screenPos.y) + dy);
-            }
-          }
+        uint8_t val = data.grid[dataRow * 360 + dataCol];
+        SDL_FPoint pt = latLonToScreen(lat, worldLon);
+        
+        SDL_Color color = {0, 255, 0, 0};
+        if (val >= 5) {
+          // Green with alpha based on probability
+          color.a = static_cast<uint8_t>(std::clamp(40 + (val * 160 / 100), 0, 200));
+        }
+        
+        auroraVerts_.push_back({pt, color, {0, 0}});
+      }
+    }
+
+    for (int j = 0; j < gridH; ++j) {
+      for (int i = 0; i < gridW; ++i) {
+        int p0 = j * (gridW + 1) + i;
+        int p1 = p0 + 1;
+        int p2 = (j + 1) * (gridW + 1) + i;
+        int p3 = p2 + 1;
+
+        if (auroraVerts_[p0].color.a < 5 && auroraVerts_[p1].color.a < 5 &&
+            auroraVerts_[p2].color.a < 5 && auroraVerts_[p3].color.a < 5) {
+          continue;
+        }
+
+        bool wrap = false;
+        // Check for date-line wrap in longitude
+        float lon0 = -180.0f + i * step;
+        float lon1 = -180.0f + (i + 1) * step;
+        if (std::abs(lon0 - lon1) > 180.0f) wrap = true;
+
+        // Also check screen-space jump for projections that warp significantly
+        if (!wrap && (config_.projection == "azimuthal" || config_.projection == "robinson")) {
+          float d1 = std::abs(auroraVerts_[p0].position.x - auroraVerts_[p1].position.x);
+          if (d1 > mapRect_.w / 2) wrap = true;
+        }
+
+        if (!wrap) {
+          auroraIndices_.push_back(p0);
+          auroraIndices_.push_back(p1);
+          auroraIndices_.push_back(p2);
+          auroraIndices_.push_back(p2);
+          auroraIndices_.push_back(p1);
+          auroraIndices_.push_back(p3);
         }
       }
     }
-    p++;
+    lastAuroraUpdateTime_ = data.lastUpdate;
+    lastAuroraProjection_ = config_.projection;
   }
+
+  if (!auroraVerts_.empty()) {
+    texMgr_.generateWhiteTexture(renderer);
+    SDL_Texture *whiteTex = texMgr_.get("white");
+    SDL_RenderGeometry(renderer, whiteTex, auroraVerts_.data(), (int)auroraVerts_.size(),
+                       auroraIndices_.data(), (int)auroraIndices_.size());
+  }
+
+  SDL_RenderSetClipRect(renderer, nullptr);
 }
 
 void MapWidget::renderProjectionSelect(SDL_Renderer *renderer) {
@@ -2977,6 +3027,8 @@ void MapWidget::renderOverlayInfo(SDL_Renderer *renderer) {
     text = "DRAP Absorption";
   } else if (config_.propOverlay == PropOverlayType::Heatmap) {
     text = "Reach Heatmap";
+  } else if (config_.propOverlay == PropOverlayType::Aurora) {
+    text = "Aurora Forecast";
   }
 
   if (config_.weatherOverlay == WeatherOverlayType::WxMb) {
@@ -3040,9 +3092,9 @@ void MapWidget::renderAzimuthalMask(SDL_Renderer *renderer) {
   // we could use a custom mesh. Given the "Masking Overlay" recommendation,
   // let's at least cover the outer rectangular areas that bleed.
 
-  // Actually, some overlays (like propagation) are drawn on the whole mapRect_.
-  // The simplest effective mask is to draw 4 large rects that cover everything
-  // EXCEPT the circle.
+  // Actually, some overlays (like propagation) are drawn on the whole
+  // mapRect_. The simplest effective mask is to draw 4 large rects that cover
+  // everything EXCEPT the circle.
 
   SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
   SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255); // Background black

@@ -79,6 +79,7 @@ void NOAAProvider::fetch() {
   fetchMag();
   fetchDST();
   fetchAurora();
+  fetchAuroraMap();
   if (auroraStore_ && auroraStore_->needsBackfill())
     fetchAuroraHistory();
   fetchDRAP();
@@ -394,8 +395,9 @@ struct SolarWindBackfill {
   std::mutex mu;
   int pending{2};
   // keyed by unix timestamp rounded to the nearest minute
-  std::unordered_map<int64_t, std::pair<float, float>> mag; // t → (bz, bt_transverse)
-  std::unordered_map<int64_t, float> speed;                 // t → km/s
+  std::unordered_map<int64_t, std::pair<float, float>>
+      mag;                                  // t → (bz, bt_transverse)
+  std::unordered_map<int64_t, float> speed; // t → km/s
   std::shared_ptr<AuroraHistoryStore> store;
 };
 
@@ -441,8 +443,7 @@ static void computeAndMerge(std::shared_ptr<SolarWindBackfill> state) {
                      std::pow(sin2, 4.0f / 3.0f);
 
     // Scale to 0-100%: power-law, ~50 000 Wb/s ≈ extreme storm
-    float pct =
-        std::min(100.0f, std::pow(coupling / 50000.0f, 0.4f) * 100.0f);
+    float pct = std::min(100.0f, std::pow(coupling / 50000.0f, 0.4f) * 100.0f);
 
     AuroraDataPoint dp;
     dp.percent = pct;
@@ -522,8 +523,65 @@ void NOAAProvider::fetchAuroraHistory() {
   });
 }
 
+void NOAAProvider::fetchAuroraMap() {
+  auto auroraMapStore = auroraMapStore_;
+  net_.fetchAsync(AURORA_URL, [auroraMapStore](std::string body) {
+    if (body.empty())
+      return;
+
+    WorkerService::getInstance().submitTask([body, auroraMapStore]() {
+      try {
+        if (!auroraMapStore)
+          return;
+
+        auto j = nlohmann::json::parse(body, nullptr, false);
+        if (j.is_discarded() || !j.contains("coordinates"))
+          return;
+
+        AuroraMapData data;
+        const auto &coords = j["coordinates"];
+        if (!coords.is_array())
+          return;
+
+        for (const auto &point : coords) {
+          if (point.is_array() && point.size() >= 3) {
+            // NOAA OVATION spec: [longitude, latitude, probability].
+            // Longitude: 0 to 360, Latitude: -90 to 90.
+            double d_lon = point[0].get<double>();
+            double d_lat = point[1].get<double>();
+            int val = point[2].get<int>();
+
+            int lon = static_cast<int>(std::round(d_lon));
+            int lat = static_cast<int>(std::round(d_lat));
+
+            // Normalize longitude to 0..359
+            while (lon < 0)
+              lon += 360;
+            while (lon >= 360)
+              lon -= 360;
+
+            if (lat >= -90 && lat <= 90) {
+              int row = lat + 90; // 0 to 180
+              data.grid[row * 360 + lon] =
+                  static_cast<uint8_t>(std::clamp(val, 0, 100));
+            }
+          }
+        }
+        data.valid = true;
+        data.lastUpdate = std::chrono::system_clock::now();
+        auroraMapStore->update(data);
+        LOG_I("NOAAProvider", "Aurora map grid updated ({} points).",
+              (int)coords.size());
+      } catch (const std::exception &e) {
+        LOG_E("NOAAProvider", "Aurora JSON error: {}", e.what());
+      }
+    });
+  });
+}
+
 void NOAAProvider::fetchDRAP() {
-  LOG_I("NOAAProvider", "DRAP fetch started (drapStore_={})", drapStore_ ? "set" : "null");
+  LOG_I("NOAAProvider", "DRAP fetch started (drapStore_={})",
+        drapStore_ ? "set" : "null");
   auto drapStore = drapStore_;
   net_.fetchAsync(DRAP_URL, [drapStore](std::string body) {
     if (body.empty()) {
@@ -573,10 +631,12 @@ void NOAAProvider::fetchDRAP() {
             grid.valid = true;
             grid.updated = std::chrono::system_clock::now();
             drapStore->set(grid);
-            LOG_I("NOAAProvider", "DRAP grid stored: {}x{}, {} cells, max={:.1f} MHz",
+            LOG_I("NOAAProvider",
+                  "DRAP grid stored: {}x{}, {} cells, max={:.1f} MHz",
                   grid.rows, grid.cols, (int)grid.cells.size(), max_freq);
           } else {
-            LOG_W("NOAAProvider", "DRAP grid parsed but drapStore is null (rows={} cols={})",
+            LOG_W("NOAAProvider",
+                  "DRAP grid parsed but drapStore is null (rows={} cols={})",
                   grid.rows, maxCols);
           }
 
@@ -636,8 +696,7 @@ void NOAAProvider::fetchXRay() {
           // Push to history store with parsed timestamp
           if (xrayStore && entry.contains("time_tag") &&
               entry["time_tag"].is_string()) {
-            int64_t t =
-                parseNoaaMinute(entry["time_tag"].get<std::string>());
+            int64_t t = parseNoaaMinute(entry["time_tag"].get<std::string>());
             if (t >= 0) {
               XRayDataPoint pt;
               pt.timestamp = std::chrono::system_clock::from_time_t(

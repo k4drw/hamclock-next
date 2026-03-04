@@ -121,7 +121,10 @@
 #include "ui/icon_png.h"
 
 #include "core/Constants.h"
+#include "core/GreylineDXData.h"
 #include "core/Logger.h"
+#include "services/GreylineDXProvider.h"
+#include "ui/GreylineDXPanel.h"
 #include <SDL.h>
 #include <SDL_image.h>
 #include <SDL_ttf.h>
@@ -213,6 +216,8 @@ struct AppContext {
   std::shared_ptr<WinlinkStore> winlinkStore;
   std::shared_ptr<DRAPDataStore> drapDataStore;
   std::shared_ptr<XRayHistoryStore> xrayHistoryStore;
+  std::shared_ptr<GreylineDXStore> greylineDXStore;
+  std::shared_ptr<AuroraMapStore> auroraMapStore;
 
   // Managers & Services
   std::unique_ptr<NetworkManager> netManager;
@@ -303,6 +308,7 @@ struct DashboardContext {
   std::unique_ptr<HurricaneProvider> hurricaneProvider;
   std::unique_ptr<MarineProvider> marineProvider;
   std::unique_ptr<WinlinkProvider> winlinkProvider;
+  std::unique_ptr<GreylineDXProvider> greylineDXProvider;
 
   // Services
 #ifndef __EMSCRIPTEN__
@@ -330,6 +336,7 @@ struct DashboardContext {
 
   // State
   Uint32 lastFetchMs = 0;
+  Uint32 lastGreylineFetchMs = 0;
   Uint32 lastReachFetchMs = 0;
   Uint32 lastDrapFetchMs = 0;
   Uint32 lastResizeMs = 0;
@@ -717,6 +724,8 @@ int main(int argc, char *argv[]) {
   ctx.hurricaneStore = std::make_shared<HurricaneStore>();
   ctx.marineStore = std::make_shared<MarineStore>();
   ctx.winlinkStore = std::make_shared<WinlinkStore>();
+  ctx.greylineDXStore = std::make_shared<GreylineDXStore>();
+  ctx.auroraMapStore = std::make_shared<AuroraMapStore>();
   ctx.state = std::make_shared<HamClockState>();
 
   ctx.state->deCallsign = ctx.appCfg.callsign;
@@ -871,6 +880,8 @@ DashboardContext::DashboardContext(AppContext &ctx)
   auto contestStore = ctx.contestStore;
   auto moonStore = ctx.moonStore;
   auto historyStore = ctx.historyStore;
+  auto auroraHistoryStore = ctx.auroraHistoryStore;
+  auto auroraMapStore = ctx.auroraMapStore;
   auto deWeatherStore = ctx.deWeatherStore;
   auto dxWeatherStore = ctx.dxWeatherStore;
   auto callbookStore = ctx.callbookStore;
@@ -911,20 +922,23 @@ DashboardContext::DashboardContext(AppContext &ctx)
   };
   const bool isMasterMode = (appCfg.hubMode == HubMode::Master);
 
-  auto auroraHistoryStore = ctx.auroraHistoryStore;
   ctx.xrayHistoryStore = std::make_shared<XRayHistoryStore>();
   ctx.drapDataStore = std::make_shared<DRAPDataStore>();
   noaaProvider =
       std::make_unique<NOAAProvider>(netManager, solarStore, auroraHistoryStore,
                                      ctx.xrayHistoryStore, state.get());
   noaaProvider->setDrapStore(ctx.drapDataStore);
+  noaaProvider->setAuroraMapStore(ctx.auroraMapStore);
   if (isMasterMode || isWidgetConfigured(WidgetType::SOLAR) ||
       isWidgetConfigured(WidgetType::AURORA) ||
       isWidgetConfigured(WidgetType::AURORA_GRAPH) ||
-      isWidgetConfigured(WidgetType::DRAP))
+      isWidgetConfigured(WidgetType::DRAP) ||
+      appCfg.propOverlay == PropOverlayType::Aurora)
     noaaProvider->fetch();
   if (appCfg.propOverlay == PropOverlayType::Drap)
     noaaProvider->fetchDRAP();
+  if (appCfg.propOverlay == PropOverlayType::Aurora)
+    noaaProvider->fetchAuroraMap();
 
   rssProvider = std::make_unique<RSSProvider>(netManager, rssStore);
   rssProvider->fetch();
@@ -1058,6 +1072,10 @@ DashboardContext::DashboardContext(AppContext &ctx)
       std::make_unique<WinlinkProvider>(netManager, ctx.winlinkStore);
   // Winlink API requires access key — fetch disabled until configured.
   // winlinkProvider->fetch(appCfg.lat, appCfg.lon);
+
+  greylineDXProvider =
+      std::make_unique<GreylineDXProvider>(ctx.prefixMgr, ctx.greylineDXStore);
+  greylineDXProvider->update();
 
   santaProvider = std::make_unique<SantaProvider>(santaStore);
   santaProvider->update();
@@ -1337,6 +1355,10 @@ DashboardContext::DashboardContext(AppContext &ctx)
       widgetPool[type] =
           std::make_unique<WinlinkPanel>(0, 0, 0, 0, fontMgr, ctx.winlinkStore);
       break;
+    case WidgetType::GREYLINE_DX:
+      widgetPool[type] = std::make_unique<GreylineDXPanel>(
+          0, 0, 0, 0, fontMgr, ctx.greylineDXStore);
+      break;
     case WidgetType::STOPWATCH:
       widgetPool[type] = std::make_unique<StopwatchPanel>(0, 0, 0, 0, fontMgr);
       break;
@@ -1490,9 +1512,15 @@ DashboardContext::DashboardContext(AppContext &ctx)
       WidgetType::IONOSONDE,     WidgetType::SOLAR_STORM,
       WidgetType::DE_INFO,       WidgetType::DX_INFO,
       WidgetType::ENV_TEMP,      WidgetType::ENV_PRESSURE,
-      WidgetType::ENV_HUMIDITY,  WidgetType::ENV_DEWPOINT};
-  // Note: REPEATER_DIR omitted — RepeaterBook API requires auth key (TODO).
-  // Note: WINLINK omitted — Winlink API requires access key (TODO).
+      WidgetType::ENV_HUMIDITY,  WidgetType::ENV_DEWPOINT,
+      WidgetType::GREYLINE_DX};
+
+  if (!appCfg.repeaterBookKey.empty()) {
+    allTypes.push_back(WidgetType::REPEATER_DIR);
+  }
+  if (!appCfg.winlinkKey.empty()) {
+    allTypes.push_back(WidgetType::WINLINK);
+  }
 
   // Remove eager loading loop
   // for (auto t : allTypes)
@@ -1601,6 +1629,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
   mapArea->setCloudProvider(cloudProvider.get());
   mapArea->setBeaconProvider(beaconProvider.get());
   mapArea->setAuroraStore(auroraHistoryStore);
+  mapArea->setAuroraMapStore(auroraMapStore);
   mapArea->setDrapStore(ctx.drapDataStore);
   mapArea->setIonosondeProvider(ionosondeProvider.get());
   mapArea->setSolarDataStore(ctx.solarStore.get());
@@ -1906,6 +1935,12 @@ void DashboardContext::update(AppContext &ctx) {
   // 1m/5m) ---
   if (isWidgetActive(WidgetType::SOLAR_STORM)) {
     solarStormProvider->update();
+  }
+
+  if (isWidgetActive(WidgetType::GREYLINE_DX) &&
+      now - lastGreylineFetchMs > 60000) {
+    greylineDXProvider->update();
+    lastGreylineFetchMs = now;
   }
 
   if (appCfg.propOverlay == PropOverlayType::Heatmap &&
