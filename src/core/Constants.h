@@ -56,5 +56,6 @@ static constexpr uint32_t AE_HURRICANE_DATA_READY = 14;
 static constexpr uint32_t AE_MARINE_DATA_READY = 15;
 static constexpr uint32_t AE_WINLINK_DATA_READY = 16;
 static constexpr uint32_t AE_TOUCH = 17; // REST /set_touch: data1=x, data2=y (logical)
+static constexpr uint32_t AE_WHEEL = 18; // REST /set_wheel: data1=deltaY (positive=up, negative=down)
 
 } // namespace HamClock

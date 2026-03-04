@@ -222,10 +222,14 @@ void NetworkManager::fetchAsync(const std::string &url,
       std::string hubUrl = "http://" + hubIp_ + ":" + std::to_string(hubPort_) +
                            "/api/hub/fetch?url=" + encoded +
                            "&max_age=" + std::to_string(cacheAgeSeconds);
+      
+      LOG_D("NetworkManager", "Hub client: Proxying request for {} to Hub at {}", url, hubUrl);
+
       std::thread([this, hubUrl, url, callback = std::move(callback), hasCache,
                    cached]() mutable {
         std::string body = fetchFromHubSync(hubUrl);
         if (!body.empty()) {
+          LOG_D("NetworkManager", "Hub client: Received {} bytes from Hub for {}", body.size(), url);
           {
             std::lock_guard<std::mutex> lock(cacheMutex_);
             CacheEntry entry;
@@ -237,7 +241,7 @@ void NetworkManager::fetchAsync(const std::string &url,
           callback(std::move(body));
           return;
         }
-        LOG_D("NetworkManager", "Hub miss for {}, falling back to direct", url);
+        LOG_D("NetworkManager", "Hub client: Hub miss or error for {}, falling back to direct", url);
         fetchDirect(url, std::move(callback), hasCache, cached);
       }).detach();
       return;

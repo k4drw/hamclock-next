@@ -1356,8 +1356,8 @@ DashboardContext::DashboardContext(AppContext &ctx)
           std::make_unique<WinlinkPanel>(0, 0, 0, 0, fontMgr, ctx.winlinkStore);
       break;
     case WidgetType::GREYLINE_DX:
-      widgetPool[type] = std::make_unique<GreylineDXPanel>(
-          0, 0, 0, 0, fontMgr, ctx.greylineDXStore);
+      widgetPool[type] = std::make_unique<GreylineDXPanel>(0, 0, 0, 0, fontMgr,
+                                                           ctx.greylineDXStore);
       break;
     case WidgetType::STOPWATCH:
       widgetPool[type] = std::make_unique<StopwatchPanel>(0, 0, 0, 0, fontMgr);
@@ -2363,9 +2363,41 @@ void DashboardContext::update(AppContext &ctx) {
               static_cast<int>(reinterpret_cast<intptr_t>(event.user.data1));
           int my =
               static_cast<int>(reinterpret_cast<intptr_t>(event.user.data2));
-          for (auto *w : ctx.dashboard->eventWidgets)
-            if (w->onMouseUp(mx, my, 0, 1))
-              break;
+          // If setup active, send to setup widget
+          if (ctx.activeSetup != AppContext::SetupMode::None &&
+              ctx.setupWidget) {
+            ctx.setupWidget->onMouseDown(mx, my, 0, 1);
+            ctx.setupWidget->onMouseUp(mx, my, 0, 1);
+          } else {
+            // Check Map Modal first (MapViewMenu) via mapArea
+            if (ctx.dashboard->mapArea->isModalActive()) {
+              ctx.dashboard->mapArea->onMouseUp(mx, my, 0, 1);
+            } else {
+              // Dashboard widgets (normal mode)
+              for (auto *w : ctx.dashboard->eventWidgets)
+                if (w->onMouseUp(mx, my, 0, 1))
+                  break;
+            }
+          }
+          break;
+        }
+        case AE_WHEEL: {
+          int dy =
+              static_cast<int>(reinterpret_cast<intptr_t>(event.user.data1));
+          if (ctx.activeSetup != AppContext::SetupMode::None &&
+              ctx.setupWidget) {
+            ctx.setupWidget->onMouseWheel(dy);
+          } else {
+            // Check Map Modal first (MapViewMenu) via mapArea
+            if (ctx.dashboard->mapArea->isModalActive()) {
+              ctx.dashboard->mapArea->onMouseWheel(dy);
+            } else {
+              // Dashboard widgets (e.g. scrollable top bar panes)
+              for (auto *w : ctx.dashboard->eventWidgets)
+                if (w->onMouseWheel(dy))
+                  break;
+            }
+          }
           break;
         }
         }
@@ -2785,6 +2817,10 @@ void main_tick() {
       SDL_RenderSetScale(ctx.renderer, ctx.layScale, ctx.layScale);
     }
     ctx.setupWidget->render(ctx.renderer);
+#ifndef __EMSCRIPTEN__
+    if (ctx.frameCapture)
+      ctx.frameCapture->capture(ctx.renderer);
+#endif
     SDL_RenderPresent(ctx.renderer);
     if (FIDELITY_MODE) {
       SDL_RenderSetScale(ctx.renderer, 1.0f, 1.0f);

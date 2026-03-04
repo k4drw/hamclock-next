@@ -1148,20 +1148,30 @@ void WebServer::run() {
       SDL_PushEvent(&sdown);
     }
 
-    SDL_Event down{}, up{};
-    SDL_zero(down);
-    down.type = SDL_MOUSEBUTTONDOWN;
-    down.button.button = (button == 1) ? SDL_BUTTON_RIGHT : SDL_BUTTON_LEFT;
-    down.button.x = px;
-    down.button.y = py;
-    down.button.state = SDL_PRESSED;
-    down.button.clicks = 1;
-    up = down;
-    up.type = SDL_MOUSEBUTTONUP;
-    up.button.state = SDL_RELEASED;
-    up.button.clicks = 1;
-    SDL_PushEvent(&down);
-    SDL_PushEvent(&up);
+    if (button == 0 && !shift) {
+      // Left click without shift: Use AE_TOUCH for robust modal handling
+      SDL_Event ev = {};
+      ev.type = HamClock::AE_BASE_EVENT + HamClock::AE_TOUCH;
+      ev.user.data1 = reinterpret_cast<void *>(static_cast<intptr_t>(lx));
+      ev.user.data2 = reinterpret_cast<void *>(static_cast<intptr_t>(ly));
+      SDL_PushEvent(&ev);
+    } else {
+      // Right click or shifted: use raw mouse events
+      SDL_Event down{}, up{};
+      SDL_zero(down);
+      down.type = SDL_MOUSEBUTTONDOWN;
+      down.button.button = (button == 1) ? SDL_BUTTON_RIGHT : SDL_BUTTON_LEFT;
+      down.button.x = px;
+      down.button.y = py;
+      down.button.state = SDL_PRESSED;
+      down.button.clicks = 1;
+      up = down;
+      up.type = SDL_MOUSEBUTTONUP;
+      up.button.state = SDL_RELEASED;
+      up.button.clicks = 1;
+      SDL_PushEvent(&down);
+      SDL_PushEvent(&up);
+    }
 
     if (shift) {
       SDL_Event sup{};
@@ -1172,6 +1182,30 @@ void WebServer::run() {
       SDL_PushEvent(&sup);
     }
 
+    res.set_content("ok", "text/plain");
+  });
+
+  // /live/wheel — inject mouse wheel (scroll)
+  // GET /live/wheel?y=<int>
+  // -------------------------------------------------------------------------
+  svr.Get("/live/wheel", [this](const httplib::Request &req,
+                                httplib::Response &res) {
+    if (!liveWebEnabled_) {
+      res.status = 403;
+      res.set_content("Live web not enabled", "text/plain");
+      return;
+    }
+    if (!req.has_param("y")) {
+      res.status = 400;
+      res.set_content("missing y", "text/plain");
+      return;
+    }
+    int dy = StringUtils::safe_stoi(req.get_param_value("y"));
+
+    SDL_Event ev = {};
+    ev.type = HamClock::AE_BASE_EVENT + HamClock::AE_WHEEL;
+    ev.user.data1 = reinterpret_cast<void *>(static_cast<intptr_t>(dy));
+    SDL_PushEvent(&ev);
     res.set_content("ok", "text/plain");
   });
 
@@ -1353,14 +1387,30 @@ void WebServer::run() {
     };
 
     function getCoords(clientX, clientY) {
-      var scale = Math.min(window.innerWidth / APP_W, window.innerHeight / APP_H);
-      var imgW  = APP_W * scale;
-      var imgH  = APP_H * scale;
-      var offX  = (window.innerWidth  - imgW) / 2;
-      var offY  = (window.innerHeight - imgH) / 2;
+      // The MJPEG image 'feed' might have a different aspect ratio than APP_W:APP_H 
+      // if the original app window isn't exactly 800x480.
+      var imgW = feed.clientWidth;
+      var imgH = feed.clientHeight;
+      var natW = feed.naturalWidth || APP_W;
+      var natH = feed.naturalHeight || APP_H;
+
+      // Calculate letterboxing/pillarboxing of the image within its client box
+      var scale = Math.min(imgW / natW, imgH / natH);
+      var viewW = natW * scale;
+      var viewH = natH * scale;
+      var offX = (imgW - viewW) / 2 + feed.offsetLeft;
+      var offY = (imgH - viewH) / 2 + feed.offsetTop;
+
+      // Mouse position relative to the ACTUAL pixels in the JPEG
+      var jx = (clientX - offX) / scale;
+      var jy = (clientY - offY) / scale;
+
+      // Map JPEG pixels back to logical 800x480 space
+      // Note: In HamClock-Next, the content is always rendered at scale 
+      // starting at 0,0 in the window (no centering viewport in current main.cpp).
       return {
-        x: Math.round((clientX - offX) / scale),
-        y: Math.round((clientY - offY) / scale)
+        x: Math.round(jx * APP_W / natW),
+        y: Math.round(jy * APP_H / natH)
       };
     }
     function inBounds(p) { return p.x >= 0 && p.x < APP_W && p.y >= 0 && p.y < APP_H; }
@@ -1380,8 +1430,19 @@ void WebServer::run() {
       if (!liveEnabled) return;
       fetch('/live/key?key=' + encodeURIComponent(key) + '&ctrl=' + (ctrl?1:0) + '&shift=' + (shift?1:0));
     }
+    function sendWheel(delta) {
+      if (!liveEnabled) return;
+      fetch('/live/wheel?y=' + delta);
+    }
 
     // Pointer events
+    overlay.addEventListener('wheel', function(e) {
+      if (!liveEnabled) return;
+      e.preventDefault();
+      // Forward direction: -1 for scroll down, 1 for scroll up
+      sendWheel(e.deltaY > 0 ? -1 : 1);
+    }, {passive:false});
+
     overlay.addEventListener('pointerdown', function(e) {
       if (!liveEnabled) return;
       var p = getCoords(e.clientX, e.clientY);
@@ -1547,18 +1608,22 @@ void WebServer::run() {
       return;
     }
     std::string targetUrl = base64Decode(req.get_param_value("url"));
+    LOG_D("WebServer", "Hub master: Received proxy request from {} for {}", req.remote_addr, targetUrl);
     if (targetUrl.size() > 2048) {
+      LOG_W("WebServer", "Hub master: URL too long ({} bytes) from {}", targetUrl.size(), req.remote_addr);
       res.status = 400;
       res.set_content("url too long", "text/plain");
       return;
     }
     if (targetUrl.empty() ||
         (targetUrl.find("http://") != 0 && targetUrl.find("https://") != 0)) {
+      LOG_W("WebServer", "Hub master: Invalid URL protocol from {}", req.remote_addr);
       res.status = 400;
       res.set_content("bad url: must start with http:// or https://", "text/plain");
       return;
     }
     if (isPrivateOrLoopbackUrl(targetUrl)) {
+      LOG_W("WebServer", "Hub master: Forbidden private/loopback URL requested by {}: {}", req.remote_addr, targetUrl);
       res.status = 403;
       res.set_content("forbidden: private/loopback addresses not allowed", "text/plain");
       return;
@@ -1566,6 +1631,7 @@ void WebServer::run() {
     int maxAge = req.has_param("max_age")
         ? StringUtils::safe_stoi(req.get_param_value("max_age")) : 3600;
     if (!netMgr_) {
+      LOG_E("WebServer", "Hub master: NetworkManager null, cannot proxy for {}", req.remote_addr);
       res.status = 503;
       res.set_content("network manager unavailable", "text/plain");
       return;
@@ -1577,6 +1643,7 @@ void WebServer::run() {
         maxAge);
 
     if (fut.wait_for(std::chrono::seconds(20)) == std::future_status::timeout) {
+      LOG_W("WebServer", "Hub master: Upstream fetch timeout for {}", targetUrl);
       res.status = 504;
       res.set_content("upstream fetch timeout", "text/plain");
       return;
@@ -1584,10 +1651,12 @@ void WebServer::run() {
 
     std::string body = fut.get();
     if (body.empty()) {
+      LOG_W("WebServer", "Hub master: Upstream fetch failed for {}", targetUrl);
       res.status = 502;
       res.set_content("upstream fetch failed", "text/plain");
       return;
     }
+    LOG_D("WebServer", "Hub master: Returning {} bytes to client {} for {}", body.size(), req.remote_addr, targetUrl);
     res.set_content(body, "application/octet-stream");
 #endif
           });
@@ -3265,6 +3334,24 @@ void WebServer::run() {
             ev.type = AE_BASE_EVENT + HamClock::AE_TOUCH;
             ev.user.data1 = reinterpret_cast<void *>(static_cast<intptr_t>(x));
             ev.user.data2 = reinterpret_cast<void *>(static_cast<intptr_t>(y));
+            SDL_PushEvent(&ev);
+            res.set_content("ok\n", "text/plain");
+          });
+
+  // GET /set_wheel?y=DELTA — inject a virtual mouse wheel event
+  // delta > 0 is scroll up, delta < 0 is scroll down.
+  svr.Get("/set_wheel",
+          [](const httplib::Request &req, httplib::Response &res) {
+            if (!req.has_param("y")) {
+              res.status = 400;
+              res.set_content("usage: ?y=DELTA (positive=up, negative=down)\n",
+                              "text/plain");
+              return;
+            }
+            int delta = std::stoi(req.get_param_value("y"));
+            SDL_Event ev = {};
+            ev.type = HamClock::AE_BASE_EVENT + HamClock::AE_WHEEL;
+            ev.user.data1 = reinterpret_cast<void *>(static_cast<intptr_t>(delta));
             SDL_PushEvent(&ev);
             res.set_content("ok\n", "text/plain");
           });

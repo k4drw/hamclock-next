@@ -133,7 +133,7 @@ void LiveSpotProvider::fetchPSK() {
                                 "query?{}{}&flowStartSeconds={}&rronly=1",
                                 param, target, windowStart);
 
-  LOG_I("LiveSpot", "Fetching PSK {}", url);
+  LOG_D("LiveSpot", "Fetching PSK {}", url);
   if (state_) {
     state_->services["LiveSpot"].lastError = "Fetching...";
   }
