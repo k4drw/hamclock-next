@@ -1204,7 +1204,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
     switch (type) {
     case WidgetType::SOLAR:
       widgetPool[type] = std::make_unique<SpaceWeatherPanel>(
-          0, 0, 0, 0, fontMgr, solarStore, ctx.xrayHistoryStore);
+          0, 0, 0, 0, fontMgr, texMgr, solarStore, ctx.xrayHistoryStore);
       break;
     case WidgetType::DX_CLUSTER:
 #ifndef __EMSCRIPTEN__
@@ -1240,8 +1240,8 @@ DashboardContext::DashboardContext(AppContext &ctx)
           0, 0, 0, 0, fontMgr, watchlistStore, watchlistHitStore);
       break;
     case WidgetType::EME_TOOL:
-      widgetPool[type] =
-          std::make_unique<EMEToolPanel>(0, 0, 0, 0, fontMgr, texMgr, moonStore);
+      widgetPool[type] = std::make_unique<EMEToolPanel>(0, 0, 0, 0, fontMgr,
+                                                        texMgr, moonStore);
       break;
     case WidgetType::SANTA_TRACKER:
       widgetPool[type] =
@@ -1263,8 +1263,8 @@ DashboardContext::DashboardContext(AppContext &ctx)
           0, 0, 0, 0, fontMgr, *activityProvider, activityStore);
       break;
     case WidgetType::GIMBAL:
-      widgetPool[type] =
-          std::make_unique<GimbalPanel>(0, 0, 0, 0, fontMgr, rotatorStore);
+      widgetPool[type] = std::make_unique<GimbalPanel>(0, 0, 0, 0, fontMgr,
+                                                       texMgr, rotatorStore);
       break;
     case WidgetType::MOON:
       widgetPool[type] = std::make_unique<MoonPanel>(

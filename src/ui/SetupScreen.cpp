@@ -78,9 +78,9 @@ TextInput *SetupScreen::getActiveInput() {
     }
   } else if (activeTab_ == Tab::Appearance) {
     switch (activeField_) {
-    case 1:
+    case 0:
       return &dimTimeInput_;
-    case 2:
+    case 1:
       return &brightTimeInput_;
     }
   } else if (activeTab_ == Tab::Services) {
@@ -108,6 +108,10 @@ TextInput *SetupScreen::getActiveInput() {
     case 1:
       return &hubPortInput_;
     }
+  } else if (activeTab_ == Tab::Widgets) {
+    // Rotation interval field is actually numeric-only handled in onTextInput
+    // but we can return nullptr as it's not a TextInput widget.
+    return nullptr;
   } else if (activeTab_ == Tab::Watchlist) {
     return &watchlistInputField_;
   }
@@ -311,7 +315,7 @@ void SetupScreen::render(SDL_Renderer *renderer) {
   okBtnRect_ = okBtn;
 }
 
-void SetupScreen::renderTabIdentity(SDL_Renderer *renderer, int, int pad,
+void SetupScreen::renderTabIdentity(SDL_Renderer *renderer, int cx, int pad,
                                     int fieldW, int fieldH, int fieldX,
                                     int textPad) {
   auto *cat = fontMgr_.catalog();
@@ -346,9 +350,23 @@ void SetupScreen::renderTabIdentity(SDL_Renderer *renderer, int, int pad,
   y += fieldH + vSpace;
 
   int halfFieldW = (fieldW - pad) / 2;
-  cat->drawText(renderer, "Latitude:", fieldX, y, white, FontStyle::SmallBold);
-  cat->drawText(renderer, "Longitude:", fieldX + halfFieldW + pad, y, white,
+  int labelY = y;
+  cat->drawText(renderer, "Latitude:", fieldX, labelY, white,
                 FontStyle::SmallBold);
+  cat->drawText(renderer, "Longitude:", fieldX + halfFieldW + pad, labelY,
+                white, FontStyle::SmallBold);
+
+  // Mismatch or Auto-calc status: right-aligned to the Latitude input's right
+  // edge
+  if (mismatchWarning_) {
+    cat->drawText(renderer, "Warning: Lat/Lon mismatch!",
+                  fieldX + halfFieldW / 2, labelY + 2, red, FontStyle::Fast,
+                  true, false, true);
+  } else if (gridValid_ && !latLonManual_) {
+    cat->drawText(renderer, "Auto-calculated", fieldX + halfFieldW / 2,
+                  labelY + 2, gray, FontStyle::Fast, true, false, true);
+  }
+
   latRect_ = {fieldX, y, halfFieldW, labelH + fieldH};
   lonRect_ = {fieldX + halfFieldW + pad, y, halfFieldW, labelH + fieldH};
   y += labelH;
@@ -364,16 +382,7 @@ void SetupScreen::renderTabIdentity(SDL_Renderer *renderer, int, int pad,
                    halfFieldW, fieldH, FontStyle::SmallRegular, textPad,
                    activeField_ == 3, !lonInput_.getValue().empty(), orange,
                    gray, white, white, gray, "e.g. -82.64");
-  y = std::max(latY, lonY) + pad / 2;
-
-  if (mismatchWarning_) {
-    cat->drawText(renderer, "Warning: Lat/Lon outside grid square", fieldX, y,
-                  red, FontStyle::Fast);
-  } else if (gridValid_ && !latLonManual_) {
-    cat->drawText(renderer, "Auto-calculated from grid", fieldX, y, gray,
-                  FontStyle::Fast, false, false, true);
-  }
-  y += pad;
+  y = std::max(latY, lonY) + pad / 2 + pad;
 
   gpsToggleRect_ = {fieldX, y, 20, 20};
   SDL_SetRenderDrawColor(renderer, 50, 50, 60, 255);
@@ -514,6 +523,7 @@ void SetupScreen::renderTabAppearance(SDL_Renderer *renderer, int cx, int pad,
   SDL_Color orange = {255, 165, 0, 255};
   SDL_Color gray = {140, 140, 140, 255};
   SDL_Color cyan = {0, 200, 255, 255};
+  int halfW = fieldW / 2;
 
   // --- Appearance section ---
   cat->drawText(renderer, "--- Appearance ---", cx, y, cyan,
@@ -529,16 +539,20 @@ void SetupScreen::renderTabAppearance(SDL_Renderer *renderer, int cx, int pad,
                   FontStyle::Fast, true, false, true);
   };
 
-  // Row 1: Theme and Customize
-  cat->drawText(renderer, "Theme:", fieldX, y + 12, white,
+  // Row 1: Theme and Customize (Centered)
+  int wThemeLabel =
+      fontMgr_.getLogicalWidth("Theme:", cat->ptSize(FontStyle::SmallRegular));
+  int wRow1 = wThemeLabel + 10 + 80 + 15 + 85;
+  int xRow1 = cx - wRow1 / 2;
+  cat->drawText(renderer, "Theme:", xRow1, y + 12, white,
                 FontStyle::SmallRegular, false, false, true);
-  themeRect_ = {fieldX + fieldW - 80, y, 80, 24};
-  customizeBtnRect_ = {themeRect_.x - 90, y, 85, 24};
+  themeRect_ = {xRow1 + wThemeLabel + 10, y, 80, 24};
+  customizeBtnRect_ = {themeRect_.x + 95, y, 85, 24};
   drawBtn(themeRect_, theme_);
   drawBtn(customizeBtnRect_, "Customize");
   y += 24 + vSpace;
 
-  // Row 2: Night Lights & Metric Toggles
+  // Row 2: Toggles (Night Lights, Metric) - Centered
   auto drawToggle = [&](SDL_Rect &r, bool val, const char *lbl) {
     SDL_SetRenderDrawColor(renderer, 50, 50, 60, 255);
     SDL_RenderFillRect(renderer, &r);
@@ -553,62 +567,19 @@ void SetupScreen::renderTabAppearance(SDL_Renderer *renderer, int cx, int pad,
                   FontStyle::SmallRegular, false, false, true);
   };
 
-  int halfW = fieldW / 2;
-  nightLightsRect_ = {fieldX, y, 20, 20};
-  drawToggle(nightLightsRect_, mapNightLights_, "Night Lights");
+  int wNL = 25 + fontMgr_.getLogicalWidth("Night Lights",
+                                          cat->ptSize(FontStyle::SmallRegular));
+  int wMU = 25 + fontMgr_.getLogicalWidth("Metric Units",
+                                          cat->ptSize(FontStyle::SmallRegular));
+  int toggleGap = 30;
+  int wRow2 = wNL + toggleGap + wMU;
+  int xRow2 = cx - wRow2 / 2;
 
-  metricToggleRect_ = {fieldX + halfW, y, 20, 20};
+  nightLightsRect_ = {xRow2, y, 20, 20};
+  drawToggle(nightLightsRect_, mapNightLights_, "Night Lights");
+  metricToggleRect_ = {xRow2 + wNL + toggleGap, y, 20, 20};
   drawToggle(metricToggleRect_, useMetric_, "Metric Units");
   y += 20 + vSpace;
-
-  // Row 3: RSS Toggle, Borders, & Weather Overlay
-  rssToggleRect_ = {fieldX, y, 20, 20};
-  drawToggle(rssToggleRect_, rssEnabled_, "RSS");
-
-  bordersToggleRect_ = {fieldX + halfW - 100, y, 20, 20};
-  drawToggle(bordersToggleRect_, showBorders_, "Borders");
-
-  cat->drawText(renderer, "WX Overlay:", fieldX + halfW + 30, y + 10, white,
-                FontStyle::SmallRegular, false, false, true);
-  weatherOverlayRect_ = {fieldX + fieldW - 80, y, 80, 24};
-  std::string wStr = (weatherOverlay_ == WeatherOverlayType::Clouds) ? "Clouds"
-                     : (weatherOverlay_ == WeatherOverlayType::WxMb) ? "Press."
-                                                                     : "None";
-  drawBtn(weatherOverlayRect_, wStr);
-  y += 24 + vSpace;
-
-  // Row 4: Map Style & Projection
-  cat->drawText(renderer, "Map Style:", fieldX, y + 12, white,
-                FontStyle::SmallRegular, false, false, true);
-  mapStyleRect_ = {fieldX + halfW - 80, y, 80, 24};
-  std::string msLabel = "NASA";
-  if (mapStyle_ == "topo") msLabel = "Topo";
-  else if (mapStyle_ == "topo_bathy") msLabel = "Topo+B";
-  drawBtn(mapStyleRect_, msLabel);
-
-  cat->drawText(renderer, "Projection:", fieldX + halfW, y + 12, white,
-                FontStyle::SmallRegular, false, false, true);
-  projectionRect_ = {fieldX + fieldW - 80, y, 80, 24};
-  drawBtn(projectionRect_,
-          projection_ == "equirectangular" ? "Mercator" : "Azimuthal");
-  y += 24 + vSpace;
-
-  // Row 5: Rotation Interval
-  cat->drawText(renderer, "Pane Rotation (s):", fieldX, y + 12, white,
-                FontStyle::SmallRegular, false, false, true);
-  int rotBtnW = 60;
-  rotationToggleRect_ = {fieldX + fieldW - rotBtnW, y, rotBtnW, 24};
-  SDL_SetRenderDrawColor(renderer, 30, 30, 40, 255);
-  SDL_RenderFillRect(renderer, &rotationToggleRect_);
-  SDL_SetRenderDrawColor(renderer, activeField_ == 0 ? 255 : 80,
-                         activeField_ == 0 ? 165 : 80,
-                         activeField_ == 0 ? 0 : 80, 255);
-  SDL_RenderDrawRect(renderer, &rotationToggleRect_);
-  cat->drawText(renderer, std::to_string(rotationInterval_),
-                rotationToggleRect_.x + rotBtnW / 2,
-                rotationToggleRect_.y + rotationToggleRect_.h / 2, white,
-                FontStyle::SmallRegular, true, false, true);
-  y += 24 + vSpace;
 
   // --- Brightness section ---
   cat->drawText(renderer, "--- Brightness ---", cx, y, cyan,
@@ -879,7 +850,7 @@ void SetupScreen::renderTabWidgets(SDL_Renderer *renderer, int cx, int pad,
   }
   y += btnH + btnGap;
 
-  // Sync rotation checkbox
+  // Sync rotation checkbox and Interval
   syncRotationRect_ = {fieldX, y, 16, 16};
   SDL_SetRenderDrawColor(renderer, 50, 50, 60, 255);
   SDL_RenderFillRect(renderer, &syncRotationRect_);
@@ -892,6 +863,21 @@ void SetupScreen::renderTabWidgets(SDL_Renderer *renderer, int cx, int pad,
   }
   cat->drawText(renderer, "Sync pane rotation", fieldX + 22, y + 8, gray,
                 FontStyle::Fast, false, false, true);
+
+  cat->drawText(renderer, "Interval (s):", cx + 20, y + 8, gray,
+                FontStyle::Fast, false, false, true);
+  rotationToggleRect_ = {cx + 105, y, 40, 18};
+  SDL_SetRenderDrawColor(renderer, 30, 30, 40, 255);
+  SDL_RenderFillRect(renderer, &rotationToggleRect_);
+  SDL_SetRenderDrawColor(
+      renderer, (activeTab_ == Tab::Widgets && activeField_ == 0) ? 255 : 80,
+      (activeTab_ == Tab::Widgets && activeField_ == 0) ? 165 : 80,
+      (activeTab_ == Tab::Widgets && activeField_ == 0) ? 0 : 80, 255);
+  SDL_RenderDrawRect(renderer, &rotationToggleRect_);
+  cat->drawText(renderer, std::to_string(rotationInterval_),
+                rotationToggleRect_.x + rotationToggleRect_.w / 2,
+                rotationToggleRect_.y + rotationToggleRect_.h / 2, white,
+                FontStyle::Fast, true, false, true);
   y += 20;
 
   // --- Widget checklist (scrollable) ---
@@ -1217,9 +1203,9 @@ bool SetupScreen::onMouseDown(int mx, int my, Uint16 mod, int clicks) {
     if (hitField(hubPortRect_, 1, &hubPortInput_))
       return true;
   } else if (activeTab_ == Tab::Appearance) {
-    if (hitField(dimTimeRect_, 1, &dimTimeInput_))
+    if (hitField(dimTimeRect_, 0, &dimTimeInput_))
       return true;
-    if (hitField(brightTimeRect_, 2, &brightTimeInput_))
+    if (hitField(brightTimeRect_, 1, &brightTimeInput_))
       return true;
   } else if (activeTab_ == Tab::Widgets) {
     // 1. Pane Switching (4 top-bar panes, 1 row)
@@ -1265,7 +1251,16 @@ bool SetupScreen::onMouseDown(int mx, int my, Uint16 mod, int clicks) {
       }
     }
 
-    // 4. Side Panel Mode
+    // 4. Rotation Interval
+    if (mx >= rotationToggleRect_.x &&
+        mx < rotationToggleRect_.x + rotationToggleRect_.w &&
+        my >= rotationToggleRect_.y &&
+        my < rotationToggleRect_.y + rotationToggleRect_.h) {
+      activeField_ = 0; // Focus rotation interval input
+      return true;
+    }
+
+    // 5. Side Panel Mode
     static const WidgetType kMode5[] = {
         WidgetType::DE_INFO, WidgetType::DX_CLUSTER, WidgetType::ON_THE_AIR,
         WidgetType::LIVE_SPOTS};
@@ -1351,48 +1346,6 @@ bool SetupScreen::onMouseDown(int mx, int my, Uint16 mod, int clicks) {
       useMetric_ = !useMetric_;
       return true;
     }
-    if (mx >= rssToggleRect_.x && mx < rssToggleRect_.x + rssToggleRect_.w &&
-        my >= rssToggleRect_.y && my < rssToggleRect_.y + rssToggleRect_.h) {
-      rssEnabled_ = !rssEnabled_;
-      return true;
-    }
-    if (mx >= bordersToggleRect_.x &&
-        mx < bordersToggleRect_.x + bordersToggleRect_.w &&
-        my >= bordersToggleRect_.y &&
-        my < bordersToggleRect_.y + bordersToggleRect_.h) {
-      showBorders_ = !showBorders_;
-      return true;
-    }
-    if (mx >= weatherOverlayRect_.x &&
-        mx < weatherOverlayRect_.x + weatherOverlayRect_.w &&
-        my >= weatherOverlayRect_.y &&
-        my < weatherOverlayRect_.y + weatherOverlayRect_.h) {
-      if (weatherOverlay_ == WeatherOverlayType::None)
-        weatherOverlay_ = WeatherOverlayType::Clouds;
-      else if (weatherOverlay_ == WeatherOverlayType::Clouds)
-        weatherOverlay_ = WeatherOverlayType::WxMb;
-      else
-        weatherOverlay_ = WeatherOverlayType::None;
-      return true;
-    }
-    if (mx >= mapStyleRect_.x && mx < mapStyleRect_.x + mapStyleRect_.w &&
-        my >= mapStyleRect_.y && my < mapStyleRect_.y + mapStyleRect_.h) {
-      if (mapStyle_ == "nasa")
-        mapStyle_ = "topo";
-      else if (mapStyle_ == "topo")
-        mapStyle_ = "topo_bathy";
-      else
-        mapStyle_ = "nasa";
-      return true;
-    }
-    if (mx >= projectionRect_.x && mx < projectionRect_.x + projectionRect_.w &&
-        my >= projectionRect_.y && my < projectionRect_.y + projectionRect_.h) {
-      if (projection_ == "equirectangular")
-        projection_ = "azimuthal";
-      else
-        projection_ = "equirectangular";
-      return true;
-    }
     if (mx >= brightnessSliderRect_.x &&
         mx < brightnessSliderRect_.x + brightnessSliderRect_.w &&
         my >= brightnessSliderRect_.y &&
@@ -1406,13 +1359,6 @@ bool SetupScreen::onMouseDown(int mx, int my, Uint16 mod, int clicks) {
         my >= scheduleToggleRect_.y &&
         my < scheduleToggleRect_.y + scheduleToggleRect_.h) {
       brightnessMgr_.setScheduleEnabled(!brightnessMgr_.isScheduleEnabled());
-      return true;
-    }
-    if (mx >= rotationToggleRect_.x &&
-        mx < rotationToggleRect_.x + rotationToggleRect_.w &&
-        my >= rotationToggleRect_.y &&
-        my < rotationToggleRect_.y + rotationToggleRect_.h) {
-      activeField_ = 0; // Focus rotation interval input
       return true;
     }
   }
@@ -1497,8 +1443,8 @@ void SetupScreen::onMouseMove(int mx, int /*my*/) {
       r = *rects[activeField_];
   } else if (activeTab_ == Tab::Appearance) {
     const SDL_Rect *rects[] = {&dimTimeRect_, &brightTimeRect_};
-    if (activeField_ == 1 || activeField_ == 2)
-      r = *rects[activeField_ - 1];
+    if (activeField_ == 0 || activeField_ == 1)
+      r = *rects[activeField_];
   }
 
   if (r.w > 0) {
@@ -1515,11 +1461,13 @@ bool SetupScreen::onKeyDown(SDL_Keycode key, Uint16 mod) {
   } else if (activeTab_ == Tab::Spotting) {
     nFields = clusterWSJTX_ ? 4 : 3;
   } else if (activeTab_ == Tab::Appearance) {
-    nFields = 3; // 0=rotation interval, 1=dimTime, 2=brightTime
+    nFields = 2; // 0=dimTime, 1=brightTime
   } else if (activeTab_ == Tab::Services) {
     nFields = 4;
   } else if (activeTab_ == Tab::Rig) {
     nFields = 2;
+  } else if (activeTab_ == Tab::Widgets) {
+    nFields = 1; // 0=rotation interval
   } else if (activeTab_ == Tab::Watchlist) {
     nFields = 1;
   }
@@ -1561,7 +1509,7 @@ bool SetupScreen::onKeyDown(SDL_Keycode key, Uint16 mod) {
   case SDLK_DELETE: {
     bool isLatLon = (activeTab_ == Tab::Identity &&
                      (activeField_ == 2 || activeField_ == 3));
-    bool isRotInterval = (activeTab_ == Tab::Appearance && activeField_ == 0);
+    bool isRotInterval = (activeTab_ == Tab::Widgets && activeField_ == 0);
     if (isRotInterval) {
       if (key == SDLK_BACKSPACE)
         rotationInterval_ /= 10;
@@ -1606,7 +1554,7 @@ bool SetupScreen::onKeyDown(SDL_Keycode key, Uint16 mod) {
 }
 
 bool SetupScreen::onTextInput(const char *inputText) {
-  if (activeTab_ == Tab::Appearance) {
+  if (activeTab_ == Tab::Widgets) {
     if (activeField_ == 0) {
       // Rotation interval: numeric only
       if (inputText[0] >= '0' && inputText[0] <= '9') {
@@ -1616,7 +1564,10 @@ bool SetupScreen::onTextInput(const char *inputText) {
       }
       return true;
     }
-    // Fields 1 & 2: dimTime / brightTime (HH:MM) - auto-insert colon
+  }
+
+  if (activeTab_ == Tab::Appearance) {
+    // Fields 0 & 1: dimTime / brightTime (HH:MM) - auto-insert colon
     TextInput *ti = getActiveInput();
     if (ti && ti->getValue().size() == 2 && inputText[0] != ':') {
       ti->onTextInput(":");

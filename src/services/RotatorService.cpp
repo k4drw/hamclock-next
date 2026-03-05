@@ -242,9 +242,38 @@ void RotatorService::pollLoop() {
 
         // Only track if visible (elevation > 0)
         if (obs.elevation > 0) {
+          double azCmd = obs.azimuth;
+          double elCmd = obs.elevation;
+
+          // ---- Upover Mode -----------------------------------------------
+          // When a satellite passes near zenith (el would exceed 90°), a
+          // mechanical rotator cannot follow without wrapping az through
+          // north (a slow 360° slew).  The upover technique flips the dish
+          // through the zenith instead:
+          //   az = (az + 180) mod 360
+          //   el = 180 - el
+          // This keeps az movement to < 180° while the satellite transits.
+          // We arm the flip when we predict imminent zenith crossing and
+          // hold it until elevation decreases back below 80° (hysteresis).
+          if (elCmd > 85.0 && !flipActive_) {
+            // Enter flip: dish dips through zenith
+            flipActive_ = true;
+            LOG_I("Rotator", "Upover flip engaged at el={:.1f}", elCmd);
+          } else if (elCmd < 70.0 && flipActive_) {
+            // Hysteresis: exit flip once well past zenith
+            flipActive_ = false;
+            LOG_I("Rotator", "Upover flip released at el={:.1f}", elCmd);
+          }
+
+          if (flipActive_) {
+            azCmd = std::fmod(azCmd + 180.0, 360.0);
+            elCmd = 180.0 - elCmd; // Mirror through zenith
+          }
+          // ----------------------------------------------------------------
+
           RotatorData current = store_->get();
-          double azErr = std::abs(obs.azimuth - current.azimuth);
-          double elErr = std::abs(obs.elevation - current.elevation);
+          double azErr = std::abs(azCmd - current.azimuth);
+          double elErr = std::abs(elCmd - current.elevation);
 
           // Handle 360 wrap-around for azimuth error
           if (azErr > 180.0)
@@ -252,12 +281,14 @@ void RotatorService::pollLoop() {
 
           // Deadband: 2.0 degrees
           if (azErr > 2.0 || elErr > 2.0) {
-            if (setAzEl(obs.azimuth, obs.elevation)) {
-              // Update store moving state
+            if (setAzEl(azCmd, elCmd)) {
               current.moving = true;
               store_->set(current);
             }
           }
+        } else {
+          // Satellite below horizon — reset flip state for next pass
+          flipActive_ = false;
         }
       }
     }

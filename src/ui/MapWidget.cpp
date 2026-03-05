@@ -185,6 +185,8 @@ MapWidget::~MapWidget() {
   MemoryMonitor::getInstance().destroyTexture(propTexture_);
   MemoryMonitor::getInstance().destroyTexture(auroraTexture_);
   MemoryMonitor::getInstance().destroyTexture(tooltip_.cachedTexture);
+  if (wxFillTex_)
+    MemoryMonitor::getInstance().destroyTexture(wxFillTex_);
 }
 void MapWidget::recalcMapRect() {
   if (config_.projection == "azimuthal") {
@@ -1180,6 +1182,11 @@ void MapWidget::render(SDL_Renderer *renderer) {
       greatCircleDirty_ = true;
       satTrackDirty_ = true;
       asteroidTrackDirty_ = true;
+      // Clear WX GPU buffers — will be re-projected on next getSegments() call.
+      wxVerts_.clear();
+      wxIndices_.clear();
+      if (wxmb_)
+        wxmb_->invalidate();
     }
 
     if (config_.projection != "equirectangular") {
@@ -1317,6 +1324,7 @@ void MapWidget::render(SDL_Renderer *renderer) {
     renderCountryBorders(renderer);
 
   renderLegend(renderer);
+  renderWxMbLegend(renderer);
 
   renderTooltip(renderer);
 
@@ -2169,19 +2177,167 @@ void MapWidget::renderWxMbOverlay(SDL_Renderer *renderer) {
     return;
   if (!wxmb_)
     return;
-  SDL_Texture *tex = wxmb_->getTexture(renderer, mapRect_.w, mapRect_.h);
-  if (!tex)
-    return;
-  SDL_SetTextureBlendMode(tex, SDL_BLENDMODE_BLEND);
-  SDL_SetTextureAlphaMod(tex, 180);
-  SDL_RenderSetClipRect(renderer, &mapRect_);
-  if (config_.projection != "equirectangular" && !mapVerts_.empty()) {
-    // Warp WX texture to match map projection using map geometry (1024x512)
-    SDL_RenderGeometry(renderer, tex, mapVerts_.data(), (int)mapVerts_.size(),
-                       nightIndices_.data(), (int)nightIndices_.size());
-  } else {
-    SDL_RenderCopy(renderer, tex, nullptr, &mapRect_);
+
+  // Poll for new GFS data — rebuild GPU buffers when segments arrive.
+  {
+    std::vector<WxSegment> segs;
+    std::vector<WxQuiver> quivers;
+    SDL_Surface *fillSurface = nullptr;
+    if (wxmb_->getSegments(segs, quivers, fillSurface)) {
+      wxVerts_.clear();
+      wxIndices_.clear();
+
+      if (fillSurface) {
+        if (wxFillTex_) {
+          MemoryMonitor::getInstance().destroyTexture(wxFillTex_);
+          wxFillTex_ = nullptr;
+        }
+        wxFillTex_ = SDL_CreateTextureFromSurface(renderer, fillSurface);
+        if (wxFillTex_) {
+          SDL_SetTextureBlendMode(wxFillTex_, SDL_BLENDMODE_BLEND);
+          SDL_SetTextureAlphaMod(wxFillTex_, 200); // 80% opacity fill
+        }
+        SDL_FreeSurface(fillSurface);
+      }
+
+      SDL_Color mainColor = {220, 240, 255, 200}; // cool blue-white isobar
+      SDL_Color glowColor = {0, 30, 60, 120};     // subtle midnight-blue glow
+
+      // Half-map width used for antimeridian wrap guard (same as borders).
+      const float halfW = (float)mapRect_.w * 0.5f;
+
+      // --- Isobar contour segments -----------------------------------------
+      for (const auto &seg : segs) {
+        SDL_FPoint p1 = latLonToScreen(seg.lat1, seg.lon1);
+        SDL_FPoint p2 = latLonToScreen(seg.lat2, seg.lon2);
+
+        // Skip segments that jump across the antimeridian seam.
+        if (std::abs(p1.x - p2.x) > halfW)
+          continue;
+
+        float dx = p2.x - p1.x;
+        float dy = p2.y - p1.y;
+        float len = std::sqrt(dx * dx + dy * dy);
+        if (len < 0.1f)
+          continue;
+        dx /= len;
+        dy /= len;
+
+        // Layer 1: Dark glow (2.0f thick)
+        {
+          float t = 2.0f * 0.5f;
+          float nx = -dy * t, ny = dx * t;
+          int s = (int)wxVerts_.size();
+          wxVerts_.push_back({{p1.x + nx, p1.y + ny}, glowColor, {0, 0}});
+          wxVerts_.push_back({{p1.x - nx, p1.y - ny}, glowColor, {0, 1}});
+          wxVerts_.push_back({{p2.x + nx, p2.y + ny}, glowColor, {0, 0}});
+          wxVerts_.push_back({{p2.x - nx, p2.y - ny}, glowColor, {0, 1}});
+          wxIndices_.insert(wxIndices_.end(),
+                            {s, s + 1, s + 2, s + 2, s + 1, s + 3});
+        }
+        // Layer 2: Main isobar line (1.2f thick)
+        {
+          float t = 1.2f * 0.5f;
+          float nx = -dy * t, ny = dx * t;
+          int s = (int)wxVerts_.size();
+          wxVerts_.push_back({{p1.x + nx, p1.y + ny}, mainColor, {0, 0}});
+          wxVerts_.push_back({{p1.x - nx, p1.y - ny}, mainColor, {0, 1}});
+          wxVerts_.push_back({{p2.x + nx, p2.y + ny}, mainColor, {0, 0}});
+          wxVerts_.push_back({{p2.x - nx, p2.y - ny}, mainColor, {0, 1}});
+          wxIndices_.insert(wxIndices_.end(),
+                            {s, s + 1, s + 2, s + 2, s + 1, s + 3});
+        }
+      }
+
+      // --- Wind quiver arrows -----------------------------------------------
+      SDL_Color arrowColor = {180, 220, 255, 160};
+      for (const auto &q : quivers) {
+        float speed = std::sqrt(q.u * q.u + q.v * q.v);
+        if (speed < 0.5f)
+          continue;
+
+        SDL_FPoint origin = latLonToScreen(q.lat, q.lon);
+
+        // Arrow length scaled to speed (pixels), wind direction in screen
+        // space. latLonToScreen maps lon→x (east=right) and lat→y (north=up on
+        // screen), so meteorological convention: u=+east, v=+north → vy is
+        // negated.
+        float arrowLen = std::clamp(speed * 1.5f, 4.0f, 20.0f);
+        float angle =
+            std::atan2(-(q.v), q.u); // negate v because y increases down
+        SDL_FPoint tip = {origin.x + std::cos(angle) * arrowLen,
+                          origin.y + std::sin(angle) * arrowLen};
+
+        if (std::abs(origin.x - tip.x) > halfW)
+          continue;
+
+        float shaftdx = tip.x - origin.x;
+        float shaftdy = tip.y - origin.y;
+        float slen = std::sqrt(shaftdx * shaftdx + shaftdy * shaftdy);
+        if (slen < 0.5f)
+          continue;
+        float sdx = shaftdx / slen, sdy = shaftdy / slen;
+
+        // Shaft (1px)
+        {
+          float t = 0.6f;
+          float nx = -sdy * t, ny = sdx * t;
+          int s = (int)wxVerts_.size();
+          wxVerts_.push_back(
+              {{origin.x + nx, origin.y + ny}, arrowColor, {0, 0}});
+          wxVerts_.push_back(
+              {{origin.x - nx, origin.y - ny}, arrowColor, {0, 1}});
+          wxVerts_.push_back({{tip.x + nx, tip.y + ny}, arrowColor, {0, 0}});
+          wxVerts_.push_back({{tip.x - nx, tip.y - ny}, arrowColor, {0, 1}});
+          wxIndices_.insert(wxIndices_.end(),
+                            {s, s + 1, s + 2, s + 2, s + 1, s + 3});
+        }
+        // Arrowhead barbs
+        float headLen = std::max(3.0f, arrowLen * 0.4f);
+        for (int sign : {-1, 1}) {
+          float ha = angle + 3.14159f + sign * 0.45f;
+          SDL_FPoint barb = {tip.x + std::cos(ha) * headLen,
+                             tip.y + std::sin(ha) * headLen};
+          float bdx = barb.x - tip.x, bdy = barb.y - tip.y;
+          float bl = std::sqrt(bdx * bdx + bdy * bdy);
+          if (bl < 0.1f)
+            continue;
+          bdx /= bl;
+          bdy /= bl;
+          float t = 0.6f;
+          float nx = -bdy * t, ny = bdx * t;
+          int s = (int)wxVerts_.size();
+          wxVerts_.push_back({{tip.x + nx, tip.y + ny}, arrowColor, {0, 0}});
+          wxVerts_.push_back({{tip.x - nx, tip.y - ny}, arrowColor, {0, 1}});
+          wxVerts_.push_back({{barb.x + nx, barb.y + ny}, arrowColor, {0, 0}});
+          wxVerts_.push_back({{barb.x - nx, barb.y - ny}, arrowColor, {0, 1}});
+          wxIndices_.insert(wxIndices_.end(),
+                            {s, s + 1, s + 2, s + 2, s + 1, s + 3});
+        }
+      }
+    }
   }
+
+  SDL_RenderSetClipRect(renderer, &mapRect_);
+
+  // Render pressure fill layer underneath
+  if (wxFillTex_) {
+    if (config_.projection != "equirectangular" && !mapVerts_.empty()) {
+      SDL_RenderGeometry(renderer, wxFillTex_, mapVerts_.data(),
+                         (int)mapVerts_.size(), nightIndices_.data(),
+                         (int)nightIndices_.size());
+    } else {
+      SDL_RenderCopy(renderer, wxFillTex_, nullptr, &mapRect_);
+    }
+  }
+
+  // Render AA isobar lines and quivers on top
+  if (!wxVerts_.empty()) {
+    SDL_Texture *lineTex = texMgr_.get(LINE_AA_KEY);
+    SDL_RenderGeometry(renderer, lineTex, wxVerts_.data(), (int)wxVerts_.size(),
+                       wxIndices_.data(), (int)wxIndices_.size());
+  }
+
   SDL_RenderSetClipRect(renderer, nullptr);
 }
 
@@ -2468,7 +2624,7 @@ void MapWidget::renderLegend(SDL_Renderer *renderer) {
   int legendW = 120;
   int legendH = 12;
   int pad = 6;
-  int lx = x_ + width_ - legendW - pad - 4;
+  int lx = x_ + width_ - legendW - pad - 18;  // shifted left for text overhang
   int ly = y_ + height_ - legendH - pad - 22; // Above RSS button if active
 
   // Labels and Scale
@@ -2622,6 +2778,89 @@ void MapWidget::renderLegend(SDL_Renderer *renderer) {
   cat->drawText(renderer, labelMin, lx, ly + legendH + 8, txtCol,
                 FontStyle::Micro, false, false, true);
   cat->drawText(renderer, labelMax, lx + legendW, ly + legendH + 8, txtCol,
+                FontStyle::Micro, true, false, true);
+}
+
+void MapWidget::renderWxMbLegend(SDL_Renderer *renderer) {
+  if (config_.weatherOverlay != WeatherOverlayType::WxMb || !wxFillTex_)
+    return;
+
+  int legendW = 120;
+  int legendH = 12;
+  int pad = 6;
+  int lx = x_ + width_ - legendW - pad - 18;  // shifted left for text overhang
+  int ly = y_ + height_ - legendH - pad - 22; // Above RSS button if active
+
+  // If a propagation overlay legend is already rendered, move this one up
+  if (config_.propOverlay != PropOverlayType::None) {
+    ly -= (legendH + 26); // space for the other legend and its title/labels
+  }
+
+  auto *cat = fontMgr_.catalog();
+  SDL_Color txtCol = {220, 220, 220, 255};
+
+  // Draw Title
+  cat->drawText(renderer, "Pressure (hPa)", lx + legendW / 2, ly - 10, txtCol,
+                FontStyle::Micro, true, false, true);
+
+  // Draw Legend Strip (gradient)
+  SDL_Rect strip = {lx, ly, legendW, legendH};
+  SDL_SetRenderDrawColor(renderer, 40, 40, 40, 200);
+  SDL_RenderFillRect(renderer, &strip);
+  SDL_SetRenderDrawColor(renderer, 100, 100, 100, 255);
+  SDL_RenderDrawRect(renderer, &strip);
+
+  // Color stops match buildSegments:
+  struct Stop {
+    float hPa;
+    uint8_t r, g, b;
+  };
+  static const Stop kStops[] = {
+      {960.0f, 20, 40, 200},     {990.0f, 100, 160, 240},
+      {1013.25f, 240, 240, 248}, {1025.0f, 255, 160, 110},
+      {1040.0f, 195, 25, 25},
+  };
+  static constexpr int kNStops = 5;
+
+  auto pressureToColor = [&](float hpa) -> SDL_Color {
+    if (hpa <= kStops[0].hPa)
+      return {kStops[0].r, kStops[0].g, kStops[0].b, 255};
+    if (hpa >= kStops[kNStops - 1].hPa)
+      return {kStops[kNStops - 1].r, kStops[kNStops - 1].g,
+              kStops[kNStops - 1].b, 255};
+    for (int i = 0; i < kNStops - 1; ++i) {
+      if (hpa <= kStops[i + 1].hPa) {
+        float t = (hpa - kStops[i].hPa) / (kStops[i + 1].hPa - kStops[i].hPa);
+        auto lerp8 = [&](uint8_t a, uint8_t b) -> uint8_t {
+          return (uint8_t)(a + (b - a) * t);
+        };
+        return {lerp8(kStops[i].r, kStops[i + 1].r),
+                lerp8(kStops[i].g, kStops[i + 1].g),
+                lerp8(kStops[i].b, kStops[i + 1].b), 255};
+      }
+    }
+    return {240, 240, 248, 255};
+  };
+
+  // Draw 20 segments to approximate the color scale
+  float minHpa = 960.0f;
+  float maxHpa = 1040.0f;
+  int numSegs = 20;
+  for (int i = 0; i < numSegs; ++i) {
+    float t = (float)i / (float)(numSegs - 1);
+    float hpa = minHpa + t * (maxHpa - minHpa);
+    SDL_Color c = pressureToColor(hpa);
+
+    SDL_SetRenderDrawColor(renderer, c.r, c.g, c.b, 255);
+    SDL_Rect seg = {lx + i * legendW / numSegs, ly + 1, legendW / numSegs + 1,
+                    legendH - 2};
+    SDL_RenderFillRect(renderer, &seg);
+  }
+
+  // Draw Min/Max Labels
+  cat->drawText(renderer, "960", lx, ly + legendH + 8, txtCol, FontStyle::Micro,
+                false, false, true);
+  cat->drawText(renderer, "1040", lx + legendW, ly + legendH + 8, txtCol,
                 FontStyle::Micro, true, false, true);
 }
 

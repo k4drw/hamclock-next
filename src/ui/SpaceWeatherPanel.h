@@ -4,6 +4,7 @@
 #include "../core/Theme.h"
 #include "../core/XRayData.h"
 #include "FontManager.h"
+#include "TextureManager.h"
 #include "Widget.h"
 
 #include <SDL.h>
@@ -14,6 +15,7 @@
 class SpaceWeatherPanel : public Widget {
 public:
   SpaceWeatherPanel(int x, int y, int w, int h, FontManager &fontMgr,
+                    TextureManager &texMgr,
                     std::shared_ptr<SolarDataStore> store,
                     std::shared_ptr<XRayHistoryStore> xrayStore = nullptr);
   ~SpaceWeatherPanel() override { destroyCache(); }
@@ -36,6 +38,7 @@ private:
   static SDL_Color colorForNOAAScale(int scale, const ThemeColors &themes);
 
   FontManager &fontMgr_;
+  TextureManager &texMgr_;
   std::shared_ptr<SolarDataStore> store_;
   std::shared_ptr<XRayHistoryStore> xrayStore_;
   std::vector<XRayDataPoint> sparklineHistory_;

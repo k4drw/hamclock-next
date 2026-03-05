@@ -28,6 +28,8 @@ public:
 protected:
   SDL_Color getRowColor(int index,
                         const SDL_Color &defaultColor) const override;
+  void renderRowText(SDL_Renderer *renderer, int index, int rx, int ry, int rw,
+                     int rh, SDL_Color color) override;
 
 private:
   void rebuildRows();

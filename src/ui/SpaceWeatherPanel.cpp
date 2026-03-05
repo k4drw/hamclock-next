@@ -9,12 +9,12 @@
 #include <cstring>
 #include <vector>
 
-SpaceWeatherPanel::SpaceWeatherPanel(int x, int y, int w, int h,
-                                     FontManager &fontMgr,
-                                     std::shared_ptr<SolarDataStore> store,
-                                     std::shared_ptr<XRayHistoryStore> xrayStore)
-    : Widget(x, y, w, h), fontMgr_(fontMgr), store_(std::move(store)),
-      xrayStore_(std::move(xrayStore)) {
+SpaceWeatherPanel::SpaceWeatherPanel(
+    int x, int y, int w, int h, FontManager &fontMgr, TextureManager &texMgr,
+    std::shared_ptr<SolarDataStore> store,
+    std::shared_ptr<XRayHistoryStore> xrayStore)
+    : Widget(x, y, w, h), fontMgr_(fontMgr), texMgr_(texMgr),
+      store_(std::move(store)), xrayStore_(std::move(xrayStore)) {
   items_[0].label = "SFI";
   items_[1].label = "SN";
   items_[2].label = "A";
@@ -205,14 +205,15 @@ void SpaceWeatherPanel::render(SDL_Renderer *renderer) {
   int titleH = 20;
   bool isSmall = (width_ < 150);
   const char *titleText = isSmall ? "Space WX" : "Space Weather";
-  FontStyle titleStyle = isSmall ? FontStyle::CaptionBold : FontStyle::MicroBold;
-  fontMgr_.catalog()->drawText(renderer, titleText, x_ + 10, y_ + 5, themes.accent,
-                               titleStyle);
+  FontStyle titleStyle =
+      isSmall ? FontStyle::CaptionBold : FontStyle::MicroBold;
+  fontMgr_.catalog()->drawText(renderer, titleText, x_ + 10, y_ + 5,
+                               themes.accent, titleStyle);
 
   if (!dataValid_) {
     fontMgr_.catalog()->drawText(renderer, "Awaiting data...", x_ + 10,
-                      y_ + titleH + (height_ - titleH) / 2 - 8, themes.textDim,
-                      FontStyle::Micro);
+                                 y_ + titleH + (height_ - titleH) / 2 - 8,
+                                 themes.textDim, FontStyle::Micro);
     return;
   }
 
@@ -365,10 +366,17 @@ void SpaceWeatherPanel::render(SDL_Renderer *renderer) {
       slPts.push_back({static_cast<float>(timeToX(pt.timestamp)),
                        static_cast<float>(fluxToY(pt.flux))});
     }
-    if (slPts.size() >= 2)
-      RenderUtils::drawPolyline(renderer, slPts.data(),
-                                static_cast<int>(slPts.size()), 1.5f,
-                                themes.info);
+    if (slPts.size() >= 2) {
+      SDL_Texture *spLineTex = texMgr_.get("line_aa");
+      if (spLineTex)
+        RenderUtils::drawPolylineTextured(renderer, spLineTex, slPts.data(),
+                                          static_cast<int>(slPts.size()), 1.5f,
+                                          themes.info);
+      else
+        RenderUtils::drawPolyline(renderer, slPts.data(),
+                                  static_cast<int>(slPts.size()), 1.5f,
+                                  themes.info);
+    }
   }
 
   // Draw pagination bar (bottom) - 4 segments

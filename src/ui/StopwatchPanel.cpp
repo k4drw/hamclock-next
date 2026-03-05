@@ -7,7 +7,14 @@ StopwatchPanel::StopwatchPanel(int x, int y, int w, int h, FontManager &fontMgr)
     : Widget(x, y, w, h), fontMgr_(fontMgr) {}
 
 void StopwatchPanel::update() {
-  // Nothing to update periodically, time is calculated during render
+  // Nothing to update periodically; time is calculated during render
+}
+
+std::chrono::steady_clock::duration StopwatchPanel::elapsed() const {
+  auto e = accumulated_;
+  if (running_)
+    e += std::chrono::steady_clock::now() - startTime_;
+  return e;
 }
 
 void StopwatchPanel::render(SDL_Renderer *renderer) {
@@ -30,10 +37,10 @@ void StopwatchPanel::render(SDL_Renderer *renderer) {
                          themes.border.b, themes.border.a);
   SDL_RenderDrawRect(renderer, &rect);
 
-  // Unified Title Bar (Match standard font size/look)
+  // Title Bar
   int titleH = 20;
-  fontMgr_.catalog()->drawText(renderer, "Stopwatch", x_ + 10, y_ + 5, themes.accent,
-                               FontStyle::MicroBold);
+  fontMgr_.catalog()->drawText(renderer, "Stopwatch", x_ + 10, y_ + 5,
+                               themes.accent, FontStyle::MicroBold);
 
   // Separator line
   SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
@@ -41,16 +48,33 @@ void StopwatchPanel::render(SDL_Renderer *renderer) {
   SDL_RenderDrawLine(renderer, x_ + 5, y_ + titleH, x_ + width_ - 5,
                      y_ + titleH);
 
-  auto elapsed = accumulated_;
-  if (running_) {
-    elapsed += std::chrono::steady_clock::now() - startTime_;
+  auto elapsedDur = elapsed();
+  std::string timeStr = formatTime(elapsedDur);
+
+  // Button layout - 3 buttons
+  int btnH = 24;
+  int btnY = y_ + height_ - btnH - 6;
+  int btnW = (width_ - 8) / 3;
+  ssRect_ = {x_ + 4, btnY, btnW, btnH};
+  lapRect_ = {x_ + 4 + btnW + 2, btnY, btnW, btnH};
+  rRect_ = {x_ + 4 + btnW * 2 + 4, btnY, btnW, btnH};
+
+  // Available space for time + laps
+  int bodyH = btnY - y_ - titleH - 6;
+  int bodyY = y_ + titleH + 4;
+  int cx = x_ + width_ / 2;
+
+  // Lap table (if any laps recorded)
+  const int kMaxVisible = 5;
+  int lapTableH = 0;
+  int lapRowH = 13;
+  if (!laps_.empty()) {
+    lapTableH = std::min((int)laps_.size(), kMaxVisible) * lapRowH + 4;
   }
 
-  std::string timeStr = formatTime(elapsed);
-  int cx = x_ + width_ / 2;
-  int cy = y_ + titleH + (height_ - titleH) / 2 - 5;
-
-  // Render Time String with high quality
+  // Main time display
+  int timeAreaH = bodyH - lapTableH;
+  int cy = bodyY + timeAreaH / 2;
   int tw, th;
   SDL_Texture *tex =
       fontMgr_.renderText(renderer, timeStr, themes.text, 18, &tw, &th);
@@ -60,72 +84,88 @@ void StopwatchPanel::render(SDL_Renderer *renderer) {
     MemoryMonitor::getInstance().destroyTexture(tex);
   }
 
-  // Draw discrete buttons at the bottom (Premium style)
-  int btnW = 60; // Standardized button width
-  int btnH = 24; // Standardized button height
-  int btnY = y_ + height_ - btnH - 6;
+  // Lap table
+  if (!laps_.empty()) {
+    int lyBase = bodyY + timeAreaH + 2;
+    int start = std::max(0, (int)laps_.size() - kMaxVisible);
+    // Header divider
+    SDL_SetRenderDrawColor(renderer, 60, 60, 60, 255);
+    SDL_RenderDrawLine(renderer, x_ + 4, lyBase, x_ + width_ - 4, lyBase);
+    lyBase += 2;
 
-  SDL_Color white = themes.text;
+    for (int i = start; i < (int)laps_.size(); ++i) {
+      // Compute split (time since previous lap)
+      auto split = laps_[i];
+      if (i > 0)
+        split = laps_[i] - laps_[i - 1];
 
-  // Start/Stop
-  SDL_Rect ssRect = {cx - btnW - 10, btnY, btnW, btnH};
-  if (running_) {
-    SDL_SetRenderDrawColor(renderer, 60, 20, 20, 255); // Red-ish bg
-  } else {
-    SDL_SetRenderDrawColor(renderer, 20, 60, 20, 255); // Green-ish bg
+      char lapBuf[48];
+      std::snprintf(lapBuf, sizeof(lapBuf), "L%02d  %s  +%s", i + 1,
+                    formatTimeMini(laps_[i]).c_str(),
+                    formatTimeMini(split).c_str());
+
+      // Highlight most recent lap
+      SDL_Color lapColor = (i == (int)laps_.size() - 1)
+                               ? SDL_Color{200, 255, 200, 255}
+                               : themes.textDim;
+      fontMgr_.catalog()->drawText(renderer, lapBuf, x_ + 6,
+                                   lyBase + (i - start) * lapRowH + lapRowH / 2,
+                                   lapColor, FontStyle::Tiny, false, false,
+                                   true);
+    }
   }
-  SDL_RenderFillRect(renderer, &ssRect);
-  SDL_SetRenderDrawColor(renderer, running_ ? 150 : 50, running_ ? 50 : 150, 50,
-                         255);
-  SDL_RenderDrawRect(renderer, &ssRect);
 
-  tex = fontMgr_.renderText(renderer, running_ ? "Stop" : "Start", white, 10,
-                            &tw, &th);
-  if (tex) {
-    SDL_Rect dst = {ssRect.x + (btnW - tw) / 2, ssRect.y + (btnH - th) / 2, tw,
-                    th};
-    SDL_RenderCopy(renderer, tex, nullptr, &dst);
-    MemoryMonitor::getInstance().destroyTexture(tex);
-  }
+  // Render buttons
+  auto drawBtn = [&](SDL_Rect r, const char *label, SDL_Color bg,
+                     SDL_Color border) {
+    SDL_SetRenderDrawColor(renderer, bg.r, bg.g, bg.b, bg.a);
+    SDL_RenderFillRect(renderer, &r);
+    SDL_SetRenderDrawColor(renderer, border.r, border.g, border.b, border.a);
+    SDL_RenderDrawRect(renderer, &r);
+    int bw, bh;
+    SDL_Texture *t =
+        fontMgr_.renderText(renderer, label, themes.text, 9, &bw, &bh);
+    if (t) {
+      SDL_Rect dst = {r.x + (r.w - bw) / 2, r.y + (r.h - bh) / 2, bw, bh};
+      SDL_RenderCopy(renderer, t, nullptr, &dst);
+      MemoryMonitor::getInstance().destroyTexture(t);
+    }
+  };
 
-  // Reset
-  SDL_Rect rRect = {cx + 10, btnY, btnW, btnH};
-  SDL_SetRenderDrawColor(renderer, 30, 30, 40, 255);
-  SDL_RenderFillRect(renderer, &rRect);
-  SDL_SetRenderDrawColor(renderer, 80, 80, 100, 255);
-  SDL_RenderDrawRect(renderer, &rRect);
+  // Start/Stop button
+  drawBtn(ssRect_, running_ ? "Stop" : "Start",
+          running_ ? SDL_Color{60, 20, 20, 255} : SDL_Color{20, 60, 20, 255},
+          running_ ? SDL_Color{150, 50, 50, 255} : SDL_Color{50, 150, 50, 255});
 
-  tex = fontMgr_.renderText(renderer, "Reset", white, 10, &tw, &th);
-  if (tex) {
-    SDL_Rect dst = {rRect.x + (btnW - tw) / 2, rRect.y + (btnH - th) / 2, tw,
-                    th};
-    SDL_RenderCopy(renderer, tex, nullptr, &dst);
-    MemoryMonitor::getInstance().destroyTexture(tex);
-  }
+  // Lap button (enabled only while running)
+  drawBtn(lapRect_, "Lap",
+          running_ ? SDL_Color{30, 40, 60, 255} : SDL_Color{25, 25, 30, 255},
+          running_ ? SDL_Color{80, 112, 160, 255} : SDL_Color{50, 50, 60, 255});
+
+  // Reset button
+  drawBtn(rRect_, "Reset", SDL_Color{30, 30, 40, 255},
+          SDL_Color{80, 80, 100, 255});
 }
 
 bool StopwatchPanel::onMouseUp(int mx, int my, Uint16, int) {
-  if (showSetup_) {
+  if (showSetup_)
     return handleSetupClick(mx, my);
-  }
 
-  int cx = x_ + width_ / 2;
-  int btnW = 60;
-  int btnH = 24;
-  int btnY = y_ + height_ - btnH - 6;
-
-  // Check buttons first
-  if (my >= btnY && my < btnY + btnH) {
-    if (mx >= cx - btnW - 10 && mx < cx - 10) {
+  if (my >= ssRect_.y && my < ssRect_.y + ssRect_.h) {
+    if (mx >= ssRect_.x && mx < ssRect_.x + ssRect_.w) {
       performAction("Toggle");
       return true;
-    } else if (mx >= cx + 10 && mx < cx + 10 + btnW) {
+    }
+    if (running_ && mx >= lapRect_.x && mx < lapRect_.x + lapRect_.w) {
+      performAction("Lap");
+      return true;
+    }
+    if (mx >= rRect_.x && mx < rRect_.x + rRect_.w) {
       performAction("Reset");
       return true;
     }
   }
 
-  // Click is handled by PaneContainer if not on buttons
   return false;
 }
 
@@ -153,20 +193,17 @@ void StopwatchPanel::renderSetup(SDL_Renderer *renderer) {
   }
   y += th + 15;
 
-  t = fontMgr_.renderText(renderer, "No settings for Stopwatch yet.", white, 10,
-                          &tw, &th);
+  t = fontMgr_.renderText(renderer, "No additional settings.", white, 10, &tw,
+                          &th);
   if (t) {
     SDL_Rect tr = {cx - tw / 2, y, tw, th};
     SDL_RenderCopy(renderer, t, nullptr, &tr);
     MemoryMonitor::getInstance().destroyTexture(t);
   }
 
-  // Bottom buttons
-  int btnW = 80;
-  int btnH = 28;
-  int btnY = y_ + height_ - btnH - 6;
-
   // Done button
+  int btnW = 80, btnH = 28;
+  int btnY = y_ + height_ - btnH - 6;
   doneRect_ = {cx - btnW / 2, btnY, btnW, btnH};
   SDL_SetRenderDrawColor(renderer, themes.success.r, themes.success.g,
                          themes.success.b, 255);
@@ -201,9 +238,16 @@ bool StopwatchPanel::performAction(const std::string &action) {
       running_ = true;
     }
     return true;
+  } else if (action == "Lap") {
+    // Record current total elapsed time as a lap timestamp
+    if (running_) {
+      laps_.push_back(elapsed());
+    }
+    return true;
   } else if (action == "Reset") {
     running_ = false;
     accumulated_ = std::chrono::steady_clock::duration::zero();
+    laps_.clear();
     return true;
   }
   return false;
@@ -218,7 +262,6 @@ StopwatchPanel::formatTime(std::chrono::steady_clock::duration d) const {
   auto s = std::chrono::duration_cast<std::chrono::seconds>(d);
   d -= s;
   auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(d);
-
   char buf[32];
   if (h.count() > 0) {
     std::snprintf(buf, sizeof(buf), "%02d:%02d:%02d.%01d", (int)h.count(),
@@ -227,5 +270,18 @@ StopwatchPanel::formatTime(std::chrono::steady_clock::duration d) const {
     std::snprintf(buf, sizeof(buf), "%02d:%02d.%01d", (int)m.count(),
                   (int)s.count(), (int)(ms.count() / 100));
   }
+  return buf;
+}
+
+std::string
+StopwatchPanel::formatTimeMini(std::chrono::steady_clock::duration d) const {
+  auto m = std::chrono::duration_cast<std::chrono::minutes>(d);
+  d -= m;
+  auto s = std::chrono::duration_cast<std::chrono::seconds>(d);
+  d -= s;
+  auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(d);
+  char buf[16];
+  std::snprintf(buf, sizeof(buf), "%02d:%02d.%01d", (int)m.count(),
+                (int)s.count(), (int)(ms.count() / 100));
   return buf;
 }

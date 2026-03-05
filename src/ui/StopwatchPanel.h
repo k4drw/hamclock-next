@@ -3,6 +3,7 @@
 #include "FontManager.h"
 #include "Widget.h"
 #include <chrono>
+#include <vector>
 
 class StopwatchPanel : public Widget {
 public:
@@ -15,9 +16,16 @@ public:
 
   std::string getName() const override { return "Stopwatch"; }
   std::vector<std::string> getActions() const override {
-    return {"Toggle", "Reset"};
+    return {"Toggle", "Lap", "Reset"};
   }
   bool performAction(const std::string &action) override;
+
+  // Lap data access for REST API
+  std::chrono::steady_clock::duration elapsed() const;
+  bool isRunning() const { return running_; }
+  const std::vector<std::chrono::steady_clock::duration> &laps() const {
+    return laps_;
+  }
 
 private:
   FontManager &fontMgr_;
@@ -26,7 +34,16 @@ private:
   std::chrono::steady_clock::duration accumulated_ =
       std::chrono::steady_clock::duration::zero();
 
+  // Lap recording
+  std::vector<std::chrono::steady_clock::duration> laps_;
+
   std::string formatTime(std::chrono::steady_clock::duration d) const;
+  std::string formatTimeMini(std::chrono::steady_clock::duration d) const;
+
+  // Button rects (set during render for hit-testing)
+  SDL_Rect ssRect_ = {};
+  SDL_Rect lapRect_ = {};
+  SDL_Rect rRect_ = {};
 
   // Setup State
   bool showSetup_ = false;

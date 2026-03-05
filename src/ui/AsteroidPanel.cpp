@@ -37,6 +37,8 @@ AsteroidPanel::AsteroidPanel(int x, int y, int w, int h, FontManager &fontMgr,
 
 void AsteroidPanel::onResize(int x, int y, int w, int h) {
   ListPanel::onResize(x, y, w, h);
+  // Use Tiny font for more room in columns
+  rowFontSize_ = fontMgr_.catalog()->ptSize(FontStyle::Tiny);
 }
 
 void AsteroidPanel::update() {
@@ -65,8 +67,8 @@ void AsteroidPanel::update() {
       double obsLat = state_->deLocation.lat;
       double obsLon = state_->deLocation.lon;
       // Current JD
-      double nowJd = static_cast<double>(std::time(nullptr)) / 86400.0 +
-                     2440587.5;
+      double nowJd =
+          static_cast<double>(std::time(nullptr)) / 86400.0 + 2440587.5;
       // 24 points over ±12h centred on closest approach
       double jd0 = (ast.julianDate > 0) ? ast.julianDate : nowJd;
       constexpr int kSteps = 24;
@@ -78,8 +80,8 @@ void AsteroidPanel::update() {
         double subLat, subLon;
         if (AsteroidPropagator::subAsteroidPoint(elem, jd, subLat, subLon)) {
           double az, el;
-          AsteroidPropagator::computeAzEl(obsLat, obsLon, subLat, subLon,
-                                          az, el);
+          AsteroidPropagator::computeAzEl(obsLat, obsLon, subLat, subLon, az,
+                                          el);
           asteroidTrack_.push_back({az, el});
         }
       }
@@ -121,16 +123,16 @@ void AsteroidPanel::rebuildRows() {
     std::string name = ast.name;
     if (name.size() > 2 && name.front() == '(' && name.back() == ')')
       name = name.substr(1, name.size() - 2);
-    if (name.size() > 8)
-      name = name.substr(0, 8);
+    if (name.size() > 14)
+      name = name.substr(0, 14);
     // approachDate format: "YYYY-Mon-DD" (e.g. "2026-Feb-19")
     std::string monStr =
         ast.approachDate.size() >= 8 ? ast.approachDate.substr(5, 3) : "???";
     std::string day =
         ast.approachDate.size() >= 11 ? ast.approachDate.substr(9, 2) : "??";
-    char row[64];
-    std::snprintf(row, sizeof(row), "%-8s %s %s %s", name.c_str(),
-                  monStr.c_str(), day.c_str(), ast.closeApproachTime.c_str());
+    char row[128];
+    std::snprintf(row, sizeof(row), "%s|%s|%s|%s", name.c_str(), monStr.c_str(),
+                  day.c_str(), ast.closeApproachTime.c_str());
     return std::string(row);
   };
 
@@ -374,8 +376,9 @@ void AsteroidPanel::renderPolarPlot(SDL_Renderer *renderer, float cx, float cy,
       pts.push_back({cx + r * static_cast<float>(std::cos(theta)),
                      cy + r * static_cast<float>(std::sin(theta))});
     }
-    RenderUtils::drawPolyline(renderer, pts.data(), static_cast<int>(pts.size()),
-                              1.0f, ringColor, false);
+    RenderUtils::drawPolyline(renderer, pts.data(),
+                              static_cast<int>(pts.size()), 1.0f, ringColor,
+                              false);
   }
 
   // --- Radial lines (N/E/S/W) ---
@@ -394,8 +397,8 @@ void AsteroidPanel::renderPolarPlot(SDL_Renderer *renderer, float cx, float cy,
       double angle = i * 90.0 * kDeg2Rad;
       int lx = static_cast<int>(cx + labelDist * std::sin(angle)) - 3;
       int ly = static_cast<int>(cy - labelDist * std::cos(angle)) - 5;
-      fontMgr_.catalog()->drawText(renderer, kCompassLabels[i], lx, ly,
-                                   dimGray, FontStyle::Fast);
+      fontMgr_.catalog()->drawText(renderer, kCompassLabels[i], lx, ly, dimGray,
+                                   FontStyle::Fast);
     }
   }
 
@@ -417,13 +420,13 @@ void AsteroidPanel::renderPolarPlot(SDL_Renderer *renderer, float cx, float cy,
   }
   if (seg.size() >= 2)
     RenderUtils::drawPolyline(renderer, seg.data(),
-                              static_cast<int>(seg.size()), 2.0f,
-                              trackColor, false);
+                              static_cast<int>(seg.size()), 2.0f, trackColor,
+                              false);
 
   // --- Current position marker (if above horizon) ---
   if (asteroidAboveHorizon_) {
-    double r = static_cast<double>(radius) *
-               (90.0 - asteroidCurrentAzEl_.el) / 90.0;
+    double r =
+        static_cast<double>(radius) * (90.0 - asteroidCurrentAzEl_.el) / 90.0;
     float sx = cx + static_cast<float>(
                         r * std::sin(asteroidCurrentAzEl_.az * kDeg2Rad));
     float sy = cy - static_cast<float>(
@@ -444,5 +447,48 @@ SDL_Color AsteroidPanel::getRowColor(int index,
       lastData_.asteroids[astIdx].isHazardous)
     return themes.danger;
 
-  return themes.accent;
+  // Use the default (white) color for normal rows.
+  // Accent/highlight color is applied by ListPanel for the selected row.
+  return defaultColor;
+}
+
+void AsteroidPanel::renderRowText(SDL_Renderer *renderer, int index, int rx,
+                                  int ry, int rw, int rh, SDL_Color color) {
+  if (index < 0 || index >= (int)rows_.size())
+    return;
+  std::string text = rows_[index];
+
+  // Split by |
+  std::vector<std::string> cols;
+  size_t start = 0, end = 0;
+  while ((end = text.find('|', start)) != std::string::npos) {
+    cols.push_back(text.substr(start, end - start));
+    start = end + 1;
+  }
+  cols.push_back(text.substr(start));
+
+  if (cols.size() < 4) {
+    // Fallback if not a piped row (e.g. "No data available")
+    ListPanel::renderRowText(renderer, index, rx, ry, rw, rh, color);
+    return;
+  }
+
+  int pad = std::max(2, static_cast<int>(width_ * 0.03f));
+
+  // Column start X positions (percentages of rw)
+  // Name (48%), Month (20%), Day (14%), Time (18%)
+  float colX[] = {0.0f, 0.48f, 0.68f, 0.82f};
+
+  for (size_t i = 0; i < cols.size() && i < 4; ++i) {
+    int tw = 0, th = 0;
+    SDL_Texture *tex =
+        fontMgr_.renderText(renderer, cols[i], color, rowFontSize_, &tw, &th);
+    if (tex) {
+      int tx = rx + pad + static_cast<int>((rw - 2 * pad) * colX[i]);
+      int ty = ry + (rh - th) / 2;
+      SDL_Rect dst = {tx, ty, tw, th};
+      SDL_RenderCopy(renderer, tex, nullptr, &dst);
+      SDL_DestroyTexture(tex);
+    }
+  }
 }

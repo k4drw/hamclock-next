@@ -3,6 +3,7 @@
 #include "../core/OrbitPredictor.h"
 #include "../core/RotatorData.h"
 #include "FontManager.h"
+#include "TextureManager.h"
 #include "Widget.h"
 
 #include <memory>
@@ -12,6 +13,7 @@ struct SDL_Renderer;
 class GimbalPanel : public Widget {
 public:
   GimbalPanel(int x, int y, int w, int h, FontManager &fontMgr,
+              TextureManager &texMgr,
               std::shared_ptr<RotatorDataStore> rotatorStore = nullptr);
 
   void setPredictor(OrbitPredictor *pred) { predictor_ = pred; }
@@ -26,6 +28,7 @@ public:
 
 private:
   FontManager &fontMgr_;
+  TextureManager &texMgr_;
   OrbitPredictor *predictor_ = nullptr;
   std::shared_ptr<RotatorDataStore> rotatorStore_;
   double obsLat_ = 0, obsLon_ = 0;

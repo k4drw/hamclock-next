@@ -207,6 +207,10 @@ private:
   bool borderDirty_ = true;
   std::vector<SDL_Vertex> borderVerts_;
   std::vector<int> borderIndices_;
+  // WX/Pressure overlay GPU geometry (rebuilt when new GFS data arrives)
+  std::vector<SDL_Vertex> wxVerts_;
+  std::vector<int> wxIndices_;
+  SDL_Texture *wxFillTex_ = nullptr; // pressure fill layer (blue-white-red)
 
   // Buffers for batching spots (dynamic per frame)
   std::vector<SDL_Vertex> spotVerts_;
@@ -234,6 +238,7 @@ private:
   } tooltip_;
 
   void renderLegend(SDL_Renderer *renderer);
+  void renderWxMbLegend(SDL_Renderer *renderer);
   void renderTooltip(SDL_Renderer *renderer);
   void renderProjectionSelect(SDL_Renderer *renderer);
 
