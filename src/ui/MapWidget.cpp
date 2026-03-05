@@ -1291,7 +1291,14 @@ void MapWidget::render(SDL_Renderer *renderer) {
   renderPropagationOverlay(renderer);
   renderMufRtOverlay(renderer);
   renderNightOverlay(renderer);
+
+  // Render global references and boundaries
+  renderAuroraOverlay(renderer);
+  if (config_.showBorders)
+    renderCountryBorders(renderer);
   renderGridOverlay(renderer);
+
+  // Render paths and dynamic markers
   renderGreatCircle(renderer);
 
   renderMarker(renderer, state_->deLocation.lat, state_->deLocation.lon, 255,
@@ -1301,7 +1308,6 @@ void MapWidget::render(SDL_Renderer *renderer) {
                  255, 0);
   }
 
-  renderAuroraOverlay(renderer);
   renderSatellite(renderer);
   renderAsteroidOverlay(renderer);
   renderSpotOverlay(renderer);
@@ -1317,12 +1323,10 @@ void MapWidget::render(SDL_Renderer *renderer) {
     renderAzimuthalMask(renderer);
   }
 
+  // Render UI HUD elements and legends on top
   renderProjectionSelect(renderer);
   renderRssButton(renderer);
   renderOverlayInfo(renderer);
-  if (config_.showBorders)
-    renderCountryBorders(renderer);
-
   renderLegend(renderer);
   renderWxMbLegend(renderer);
 
