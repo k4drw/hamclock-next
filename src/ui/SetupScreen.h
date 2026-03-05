@@ -14,11 +14,13 @@
 #include <vector>
 
 class BrightnessManager;
+class DisplayPower;
 
 class SetupScreen : public Widget {
 public:
   SetupScreen(int x, int y, int w, int h, FontManager &fontMgr,
-              BrightnessManager &brightnessMgr);
+              BrightnessManager &brightnessMgr,
+              std::shared_ptr<DisplayPower> displayPower);
 
   void update() override;
   void render(SDL_Renderer *renderer) override;
@@ -76,6 +78,7 @@ private:
 
   FontManager &fontMgr_;
   BrightnessManager &brightnessMgr_;
+  std::shared_ptr<DisplayPower> displayPower_;
 
   // Appearance tab absorbs the old Display tab (brightness/schedule now live
   // there)
@@ -115,6 +118,7 @@ private:
   bool useMetric_ = true;
   bool rssEnabled_ = true;
   bool showBorders_ = false;
+  std::string displayPowerMethod_ = "auto";
   WeatherOverlayType weatherOverlay_ = WeatherOverlayType::None;
 
   // Services & Rig
@@ -177,8 +181,8 @@ private:
   SDL_Rect metricToggleRect_ = {0, 0, 0, 0};
   SDL_Rect rssToggleRect_ = {0, 0, 0, 0};
   SDL_Rect bordersToggleRect_ = {0, 0, 0, 0};
-  SDL_Rect weatherOverlayRect_ = {0, 0, 0, 0};
-  SDL_Rect mapStyleRect_ = {0, 0, 0, 0};
+  SDL_Rect powerMethodRect_ = {0, 0, 0, 0};
+  SDL_Rect weatherOverlayRect_ = {0, 0, 0, 0};  SDL_Rect mapStyleRect_ = {0, 0, 0, 0};
   SDL_Rect projectionRect_ = {0, 0, 0, 0};
   SDL_Rect rotationToggleRect_ = {0, 0, 0, 0};
   SDL_Rect okBtnRect_ = {0, 0, 0, 0};

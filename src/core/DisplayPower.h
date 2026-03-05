@@ -13,6 +13,8 @@ public:
     XSET_DPMS,  // xset dpms force off/on (X11 DPMS)
     TVSERVICE,  // tvservice -o/-p (legacy RPi)
     WLR_RANDR,  // wlr-randr --output ... --off/--on (Wayland)
+    DRM_DPMS,   // Direct DRM DPMS (KMSDRM)
+    CONSOLE,    // Linux VT Console blanking
     NONE
   };
 
@@ -24,9 +26,15 @@ public:
   bool getPower() const;
   const std::vector<Method> &getMethods() const { return methods_; }
   std::string getMethodName() const;
+  std::string getSelectedMethodName() const { return methodToString(selectedMethod_); }
+  void setMethodByName(const std::string &name) { selectedMethod_ = stringToMethod(name); }
+
+  static std::string methodToString(Method m);
+  static Method stringToMethod(const std::string &s);
 
 private:
   std::vector<Method> methods_;
+  Method selectedMethod_ = Method::NONE;
   std::string blPowerPath_;
   bool currentPower_ = true;
 
@@ -37,6 +45,8 @@ private:
   bool runXsetDpms(bool on);
   bool runTvservice(bool on);
   bool runWlrRandr(bool on);
+  bool runDrmDpms(bool on);
+  bool runConsoleBlank(bool on);
   static bool binaryExists(const char *name);
   std::string xDisplayEnv_;
   std::string wlDisplayEnv_;

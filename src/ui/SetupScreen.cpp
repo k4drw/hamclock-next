@@ -1,5 +1,6 @@
 #include "SetupScreen.h"
 #include "../core/Astronomy.h"
+#include "../core/DisplayPower.h"
 #include "../core/Logger.h"
 #include "../core/StringUtils.h"
 #include "../core/Theme.h"
@@ -12,8 +13,10 @@
 #include <cstring>
 
 SetupScreen::SetupScreen(int x, int y, int w, int h, FontManager &fontMgr,
-                         BrightnessManager &brightnessMgr)
-    : Widget(x, y, w, h), fontMgr_(fontMgr), brightnessMgr_(brightnessMgr) {
+                         BrightnessManager &brightnessMgr,
+                         std::shared_ptr<DisplayPower> displayPower)
+    : Widget(x, y, w, h), fontMgr_(fontMgr), brightnessMgr_(brightnessMgr),
+      displayPower_(std::move(displayPower)) {
   LOG_D("SetupScreen", "Constructor: x={}, y={}, w={}, h={}", x, y, w, h);
   themeCustomizer_ = std::make_unique<HamClock::ThemeCustomizer>(
       x, y, w, h, fontMgr, theme_, colorOverrides_);
@@ -631,6 +634,16 @@ void SetupScreen::renderTabAppearance(SDL_Renderer *renderer, int cx, int pad,
   } else {
     dimTimeRect_ = {0, 0, 0, 0};
     brightTimeRect_ = {0, 0, 0, 0};
+  }
+
+  // Row 5: Display Power Method
+  {
+    int wLabel = fontMgr_.getLogicalWidth("Display Power:", cat->ptSize(FontStyle::SmallRegular));
+    cat->drawText(renderer, "Display Power:", fieldX, y + 12, white,
+                  FontStyle::SmallRegular, false, false, true);
+    powerMethodRect_ = {fieldX + wLabel + 10, y, 160, 24};
+    drawBtn(powerMethodRect_, displayPowerMethod_);
+    y += 24 + vSpace;
   }
 }
 
@@ -1459,6 +1472,21 @@ bool SetupScreen::onMouseDown(int mx, int my, Uint16 mod, int clicks) {
       brightnessMgr_.setScheduleEnabled(!brightnessMgr_.isScheduleEnabled());
       return true;
     }
+    if (mx >= powerMethodRect_.x && mx < powerMethodRect_.x + powerMethodRect_.w &&
+        my >= powerMethodRect_.y && my < powerMethodRect_.y + powerMethodRect_.h) {
+      std::vector<DisplayPower::Method> methods = {DisplayPower::Method::NONE};
+      if (displayPower_) {
+        const auto &available = displayPower_->getMethods();
+        methods.insert(methods.end(), available.begin(), available.end());
+      }
+      
+      auto current = DisplayPower::stringToMethod(displayPowerMethod_);
+      auto it = std::find(methods.begin(), methods.end(), current);
+      size_t idx = (it == methods.end()) ? 0 : std::distance(methods.begin(), it);
+      idx = (idx + 1) % methods.size();
+      displayPowerMethod_ = DisplayPower::methodToString(methods[idx]);
+      return true;
+    }
   } else if (activeTab_ == Tab::Rig) {
     if (mx >= toggleRect_.x && mx < toggleRect_.x + toggleRect_.w &&
         my >= toggleRect_.y && my < toggleRect_.y + toggleRect_.h) {
@@ -1980,6 +2008,7 @@ void SetupScreen::setConfig(const AppConfig &cfg) {
   theme_ = cfg.theme;
   mapStyle_ = cfg.mapStyle;
   projection_ = cfg.projection;
+  displayPowerMethod_ = cfg.displayPowerMethod;
   mapNightLights_ = cfg.mapNightLights;
   useMetric_ = cfg.useMetric;
   callsignColor_ = cfg.callsignColor;
@@ -2062,6 +2091,7 @@ AppConfig SetupScreen::getConfig() const {
   cfg.theme = theme_;
   cfg.mapStyle = mapStyle_;
   cfg.projection = projection_;
+  cfg.displayPowerMethod = displayPowerMethod_;
   cfg.mapNightLights = mapNightLights_;
   cfg.useMetric = useMetric_;
   cfg.rssEnabled = rssEnabled_;

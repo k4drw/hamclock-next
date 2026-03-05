@@ -459,6 +459,18 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND (CMAKE_SYSTEM_PROCESSOR MATCHES "arm" 
     link_libraries(atomic)
 endif()
 
+# Find LibDRM (for DisplayPower KMS/DRM support)
+if(NOT EMSCRIPTEN AND NOT WIN32 AND NOT APPLE)
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(LIBDRM QUIET libdrm)
+    if(LIBDRM_FOUND)
+        message(STATUS "Found libdrm: ${LIBDRM_VERSION}")
+        add_compile_definitions(HAS_LIBDRM)
+    else()
+        message(WARNING "libdrm not found. DRM DPMS support will be disabled.")
+    endif()
+endif()
+
 
 # --- Application Target ---
 
@@ -658,6 +670,7 @@ else()
     target_include_directories(hamclock-next SYSTEM PRIVATE
         ${libpredict_BINARY_DIR}/include
         ${SDL2_INCLUDE_DIRS}
+        ${LIBDRM_INCLUDE_DIRS}
     )
 
     target_link_libraries(hamclock-next PRIVATE
@@ -674,6 +687,7 @@ else()
         httplib::httplib
         fmt::fmt
         spdlog::spdlog
+        ${LIBDRM_LIBRARIES}
     )
 
     if(WIN32)

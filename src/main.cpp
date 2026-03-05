@@ -417,6 +417,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void hamclock_after_idbfs() {
     ctx.netManager->setCorsProxyUrl(ctx.appCfg.corsProxyUrl);
     ctx.netManager->setHubConfig(ctx.appCfg.hubMode, ctx.appCfg.hubIp,
                                  ctx.appCfg.hubPort);
+    ctx.displayPower->setMethodByName(ctx.appCfg.displayPowerMethod);
     ctx.activeSetup = AppContext::SetupMode::None;
   } else {
     LOG_I("Main", "No saved config found — showing setup screen");
@@ -2078,7 +2079,7 @@ void DashboardContext::update(AppContext &ctx) {
       [[fallthrough]];
     case SDL_MOUSEBUTTONDOWN: {
       int smx = event.button.x, smy = event.button.y;
-      if (FIDELITY_MODE) {
+      if (FIDELITY_MODE && event.button.windowID != 0) {
         float pixX = event.button.x * static_cast<float>(ctx.globalDrawW) /
                      ctx.globalWinW;
         float pixY = event.button.y * static_cast<float>(ctx.globalDrawH) /
@@ -2132,7 +2133,7 @@ void DashboardContext::update(AppContext &ctx) {
     case SDL_MOUSEBUTTONUP:
       if (updateOverlay) {
         int smx = event.button.x, smy = event.button.y;
-        if (FIDELITY_MODE) {
+        if (FIDELITY_MODE && event.button.windowID != 0) {
           float pixX = event.button.x * static_cast<float>(ctx.globalDrawW) /
                        ctx.globalWinW;
           float pixY = event.button.y * static_cast<float>(ctx.globalDrawH) /
@@ -2425,7 +2426,7 @@ void DashboardContext::update(AppContext &ctx) {
       // MOUSEMOTION
       if (event.type == SDL_MOUSEMOTION) {
         int mx = event.motion.x, my = event.motion.y;
-        if (FIDELITY_MODE) {
+        if (FIDELITY_MODE && event.motion.windowID != 0) {
           float pixX = event.motion.x * static_cast<float>(ctx.globalDrawW) /
                        ctx.globalWinW;
           float pixY = event.motion.y * static_cast<float>(ctx.globalDrawH) /
@@ -2443,7 +2444,7 @@ void DashboardContext::update(AppContext &ctx) {
       else if (event.type == SDL_MOUSEBUTTONUP) {
         if (event.button.button == SDL_BUTTON_LEFT) {
           int mx = event.button.x, my = event.button.y;
-          if (FIDELITY_MODE) {
+          if (FIDELITY_MODE && event.button.windowID != 0) {
             float pixX = event.button.x * static_cast<float>(ctx.globalDrawW) /
                          ctx.globalWinW;
             float pixY = event.button.y * static_cast<float>(ctx.globalDrawH) /
@@ -2723,7 +2724,8 @@ void main_tick() {
       if (ctx.activeSetup == AppContext::SetupMode::Main) {
         auto s = std::make_unique<SetupScreen>(setupX, setupY, setupW, setupH,
                                                *ctx.setupFontMgr,
-                                               *ctx.brightnessMgr);
+                                               *ctx.brightnessMgr,
+                                               ctx.displayPower);
         s->setConfig(ctx.appCfg);
         if (ctx.startOnUpdateTab) {
           s->setStartTab(SetupScreen::Tab::Update);
@@ -2763,7 +2765,7 @@ void main_tick() {
           ctx.setupWidget->onTextInput(event.text.text);
         else if (event.type == SDL_MOUSEBUTTONDOWN) {
           int smx = event.button.x, smy = event.button.y;
-          if (FIDELITY_MODE) {
+          if (FIDELITY_MODE && event.button.windowID != 0) {
             float pixX = event.button.x * static_cast<float>(ctx.globalDrawW) /
                          ctx.globalWinW;
             float pixY = event.button.y * static_cast<float>(ctx.globalDrawH) /
@@ -2775,7 +2777,7 @@ void main_tick() {
                                        event.button.clicks);
         } else if (event.type == SDL_MOUSEBUTTONUP) {
           int smx = event.button.x, smy = event.button.y;
-          if (FIDELITY_MODE) {
+          if (FIDELITY_MODE && event.button.windowID != 0) {
             float pixX = event.button.x * static_cast<float>(ctx.globalDrawW) /
                          ctx.globalWinW;
             float pixY = event.button.y * static_cast<float>(ctx.globalDrawH) /
@@ -2787,7 +2789,7 @@ void main_tick() {
                                      event.button.clicks);
         } else if (event.type == SDL_MOUSEMOTION) {
           int smx = event.motion.x, smy = event.motion.y;
-          if (FIDELITY_MODE) {
+          if (FIDELITY_MODE && event.motion.windowID != 0) {
             float pixX = event.motion.x * static_cast<float>(ctx.globalDrawW) /
                          ctx.globalWinW;
             float pixY = event.motion.y * static_cast<float>(ctx.globalDrawH) /

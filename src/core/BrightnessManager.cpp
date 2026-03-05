@@ -6,6 +6,7 @@
 #include <fcntl.h>
 #include <fstream>
 #include <unistd.h>
+#include <glob.h>
 
 BrightnessManager::BrightnessManager() {}
 
@@ -42,7 +43,7 @@ bool BrightnessManager::init() {
 
 bool BrightnessManager::detectBrightnessPath() {
 #ifndef __EMSCRIPTEN__
-  // Common brightness control paths (RPi, x86 laptops, DSI displays)
+  // 1. Try hardcoded common paths first
   const char *paths[] = {"/sys/class/backlight/rpi_backlight/brightness",
                          "/sys/class/backlight/10-0045/brightness",
                          "/sys/class/backlight/6-0045/brightness",
@@ -53,14 +54,27 @@ bool BrightnessManager::detectBrightnessPath() {
   for (int i = 0; paths[i] != nullptr; i++) {
     if (access(paths[i], W_OK) == 0) {
       brightnessPath_ = paths[i];
-
-      // Construct max_brightness path
       std::string dir = brightnessPath_.substr(0, brightnessPath_.rfind('/'));
       maxBrightnessPath_ = dir + "/max_brightness";
-
       LOG_I("Brightness", "Detected control: {}", brightnessPath_);
       return true;
     }
+  }
+
+  // 2. Comprehensive glob search for any backlight control
+  glob_t g;
+  if (glob("/sys/class/backlight/*/brightness", 0, nullptr, &g) == 0) {
+    for (size_t i = 0; i < g.gl_pathc; i++) {
+      if (access(g.gl_pathv[i], W_OK) == 0) {
+        brightnessPath_ = g.gl_pathv[i];
+        std::string dir = brightnessPath_.substr(0, brightnessPath_.rfind('/'));
+        maxBrightnessPath_ = dir + "/max_brightness";
+        LOG_I("Brightness", "Detected control (via glob): {}", brightnessPath_);
+        globfree(&g);
+        return true;
+      }
+    }
+    globfree(&g);
   }
 #endif
 

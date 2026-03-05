@@ -217,6 +217,7 @@ bool ConfigManager::load(AppConfig &config) {
     config.showSatTrack = ap.value("show_sat_track", true);
     config.showBeacons = ap.value("show_beacons", true);
     config.showBorders = ap.value("show_borders", false);
+    config.displayPowerMethod = ap.value("display_power_method", "auto");
     config.qrzUsername = ap.value("qrz_username", "");
     config.qrzPassword = ap.value("qrz_password", "");
   }
@@ -573,6 +574,7 @@ bool ConfigManager::save(const AppConfig &config) {
   json["appearance"]["show_sat_track"] = config.showSatTrack;
   json["appearance"]["show_beacons"] = config.showBeacons;
   json["appearance"]["show_borders"] = config.showBorders;
+  json["appearance"]["display_power_method"] = config.displayPowerMethod;
   json["appearance"]["qrz_username"] = config.qrzUsername;
   json["appearance"]["qrz_password"] = config.qrzPassword;
 

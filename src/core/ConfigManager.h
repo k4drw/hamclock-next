@@ -66,6 +66,7 @@ struct AppConfig {
   bool showSatTrack = true; // Show satellite ground track line on world map
   bool showBeacons = true;  // Show NCDXF beacons on world map
   bool showBorders = false; // Show Natural Earth country borders
+  std::string displayPowerMethod = "auto"; // "auto", "vcgencmd", "bl_power", etc.
 
   // Pane widget selection (top bar panes 1–3)  // Pane widget selection
   // (rotation sets)

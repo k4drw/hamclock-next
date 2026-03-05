@@ -14,6 +14,7 @@
 ## Reference
 
 - [Setup & Configuration](Configuration)
+- [REST API](REST-API)
 - [Data Sources & Network](Data-Sources)
 - [Keyboard Shortcuts](Keyboard-Shortcuts)
 
