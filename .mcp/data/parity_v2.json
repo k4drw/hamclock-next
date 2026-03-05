@@ -44,9 +44,9 @@
       "name": "Gimbal/Rotator Control",
       "original_pointers": ["`gimbal.cpp`"],
       "next_pointers": ["`ui/GimbalPanel.cpp`", "`services/RotatorService.cpp`"],
-      "status": "PARTIAL",
-      "notes": "Hamlib rotctld TCP protocol present. Auto-track satellite/DX implemented in RotatorService. Manual az/el commands present. MISSING: upover mode (el>90 to avoid az-wrap through north when tracking satellites near EOT). No set_rotator REST endpoint.",
-      "suggested_gaps": ["upover mode for satellite tracking", "set_rotator REST endpoint"]
+      "status": "EQUIVALENT",
+      "notes": "Upover mode confirmed implemented in RotatorService.cpp (el>90° az+180 flip). flipActive_ flag drives UPOVER indicator in GimbalPanel. cfg_->rotatorUpover persisted in config. set_rotator REST endpoint added (commit 5d5bd6ce). All original features present.",
+      "suggested_gaps": []
     },
     {
       "feature_id": "satellite_tracker",
@@ -89,9 +89,9 @@
       "name": "Stopwatch / Count-up",
       "original_pointers": ["`stopwatch.cpp`"],
       "next_pointers": ["`ui/StopwatchPanel.cpp`"],
-      "status": "PARTIAL",
-      "notes": "StopwatchPanel has start/stop/reset with elapsed time display. MISSING: count-up mode with lap recording (original had full lap table). Countdown pane is separate (CountdownPanel). No set_stopwatch REST endpoint.",
-      "suggested_gaps": ["lap mode", "set_stopwatch REST endpoint"]
+      "status": "EQUIVALENT",
+      "notes": "Lap recording fully implemented in StopwatchPanel.cpp. laps_ vector stores cumulative elapsed durations. Lap button active while running. Lap table shows up to 5 entries with L## total + split format. Current lap counter shown below main time. set_stopwatch REST endpoint added (commit 5d5bd6ce).",
+      "suggested_gaps": []
     },
     {
       "feature_id": "solar_flux",
@@ -225,7 +225,7 @@
       "original_pointers": ["`brightness.cpp`"],
       "next_pointers": ["`core/DisplayPower.cpp`", "`core/BrightnessManager.cpp`"],
       "status": "EQUIVALENT",
-      "notes": "XSET_DPMS, TVSERVICE (RPi), and WLR_RANDR (Wayland) blanking methods added 2026-03-02 (WI-1). Schedule-based dimming present in BrightnessManager.",
+      "notes": "XSET_DPMS, TVSERVICE (RPi), WLR_RANDR (Wayland), DRM_DPMS (libdrm KMS DPMS property), and CONSOLE (TIOCLINUX VT blanking) methods present. selectedMethod_ override added so user can pin a specific method. FBIOBLANK ioctl fix applied (commit 5d5bd6ce). Schedule-based dimming present in BrightnessManager.",
       "suggested_gaps": []
     },
     {
@@ -233,9 +233,9 @@
       "name": "REST API (WebServer endpoints)",
       "original_pointers": ["`webserver.cpp`"],
       "next_pointers": ["`network/WebServer.cpp`"],
-      "status": "PARTIAL",
-      "notes": "~37/42 original endpoints implemented after WI-2/WI-3/WI-5/WI-6 session (2026-03-02). Added: set_touch, set_rotation, get_active_pane, get_pane, get_status, get_sensors, get_memory, get_config, set_callsign, set_location, set_theme, set_metric, set_brightness, get_capture. MISSING: set_stopwatch, set_alarm, set_satname, set_sattle, set_rotator (~5 endpoints).",
-      "suggested_gaps": ["set_stopwatch endpoint", "set_alarm endpoint", "set_satname endpoint", "set_rotator endpoint"]
+      "status": "EQUIVALENT",
+      "notes": "All ~42 original endpoints implemented as of commit 5d5bd6ce (2026-03-05). Phase 1: /live, /live/status, /live/touch, /live/wheel, /live/key, /live/mouse, /stream.mjpeg. Phase 2: /get_config.txt, /get_time.txt, /get_de.txt, /get_spacewx.txt, /get_sys.txt, /get_contests.txt, /get_dxpots.txt, /get_dxspots.txt, /get_livespots.txt, /get_livestats.txt, /get_satellites.txt, /get_ontheair.txt, /get_dxpeds.txt, /get_capture, /get_dx.txt. Phase 3: /set_screenlock, /set_mappos, /set_displayOnOff, /set_newde, /set_newdx, /set_cluster, /set_title, /set_time, /set_alarm, /set_once_alarm, /set_stopwatch, /get_satellite.txt, /set_satname, /set_sattle, /get_active_pane.txt, /get_pane.txt, /set_pane, /set_displayTimes, /set_mapcenter, /set_panzoom, /set_rotation, /set_rotator, /screen. Phase 4: /api/propagation/voacap, /api/propagation/muf_rt, POST /api/reload, POST /api/display/power, /debug/*. Runtime validation pending.",
+      "suggested_gaps": []
     },
     {
       "feature_id": "photosensor_autodim",
@@ -266,14 +266,12 @@
     }
   ],
   "top_gaps": [
-    "Gimbal upover mode for satellite tracking (GimbalPanel.cpp + RotatorService.cpp)",
-    "Stopwatch lap mode",
     "Photosensor auto-dim (LTR329/ADC)",
-    "~5 missing REST endpoints (set_stopwatch, set_alarm, set_satname, set_rotator)",
-    "Dual-hemisphere azimuthal map projection"
+    "Dual-hemisphere azimuthal map projection",
+    "Wiki screenshot automation (docs/wiki/images/ — requires running app)"
   ],
-  "parity_score": 77,
+  "parity_score": 80,
   "parity_denominator": 83,
-  "parity_percent": 93,
-  "note": "Score excludes 4 NOT_NEEDED items (wifi_meter, gpio_control, 7-seg renderer, RBN-separate). Updated 2026-03-02 to reflect WI-1 through WI-7: screen_blanking EQUIVALENT, 4 ENV sensor panes EQUIVALENT, EME Tool fully implemented, REST API ~37/42 endpoints."
+  "parity_percent": 96,
+  "note": "Score excludes 4 NOT_NEEDED items (wifi_meter, gpio_control, 7-seg renderer, RBN-separate). Updated 2026-03-05: REST API EQUIVALENT (all ~42 endpoints), Gimbal/Rotator EQUIVALENT (upover confirmed), Stopwatch EQUIVALENT (lap table confirmed). Score 77→80 (93%→96%)."
 }
