@@ -2198,6 +2198,8 @@ void MapWidget::renderWxMbOverlay(SDL_Renderer *renderer) {
         }
         wxFillTex_ = SDL_CreateTextureFromSurface(renderer, fillSurface);
         if (wxFillTex_) {
+          MemoryMonitor::getInstance().addVram((int64_t)fillSurface->w *
+                                               fillSurface->h * 4);
           SDL_SetTextureBlendMode(wxFillTex_, SDL_BLENDMODE_BLEND);
           SDL_SetTextureAlphaMod(wxFillTex_, 200); // 80% opacity fill
         }
@@ -2325,7 +2327,7 @@ void MapWidget::renderWxMbOverlay(SDL_Renderer *renderer) {
   SDL_RenderSetClipRect(renderer, &mapRect_);
 
   // Render pressure fill layer underneath
-  if (wxFillTex_) {
+  if (wxFillTex_ && config_.propOverlay == PropOverlayType::None) {
     if (config_.projection != "equirectangular" && !mapVerts_.empty()) {
       SDL_RenderGeometry(renderer, wxFillTex_, mapVerts_.data(),
                          (int)mapVerts_.size(), nightIndices_.data(),
@@ -2787,6 +2789,11 @@ void MapWidget::renderLegend(SDL_Renderer *renderer) {
 
 void MapWidget::renderWxMbLegend(SDL_Renderer *renderer) {
   if (config_.weatherOverlay != WeatherOverlayType::WxMb || !wxFillTex_)
+    return;
+
+  // Do not render WX/Pressure legend if a propagation overlay is also active
+  // to avoid color confusion with the map.
+  if (config_.propOverlay != PropOverlayType::None)
     return;
 
   int legendW = 120;

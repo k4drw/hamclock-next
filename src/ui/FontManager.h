@@ -120,8 +120,8 @@ public:
       int measuredW = getLogicalWidth(text, basePt, bold);
       int physicalWrapWidth =
           std::max(1, static_cast<int>(measuredW * renderScale_) + 4);
-      surface =
-          TTF_RenderUTF8_Blended_Wrapped(font, text.c_str(), color, physicalWrapWidth);
+      surface = TTF_RenderUTF8_Blended_Wrapped(font, text.c_str(), color,
+                                               physicalWrapWidth);
     }
 
     // Restore previous style
@@ -363,7 +363,8 @@ public:
       TTF_SetFontStyle(font, prevStyle);
     }
 
-    return static_cast<int>((fontHeight * std::max(1, lineCount)) / renderScale_);
+    return static_cast<int>((fontHeight * std::max(1, lineCount)) /
+                            renderScale_);
   }
 
   void clearCache() {
@@ -439,10 +440,22 @@ private:
   };
 
   void pruneCache() {
-    // Very simple: just clear everything if we hit the limit to keep it fast.
-    // Most UI text is stable, so this only happens if there's massive churn
-    // (like a log view).
-    clearCache();
+    // Evict the oldest 50% of text cache entries to prevent massive VRAM churn
+    if (textCache_.empty())
+      return;
+
+    std::vector<std::pair<TextCacheKey, CachedTexture>> entries(
+        textCache_.begin(), textCache_.end());
+
+    std::sort(entries.begin(), entries.end(), [](const auto &a, const auto &b) {
+      return a.second.lastUsed < b.second.lastUsed;
+    });
+
+    size_t evictCount = std::max((size_t)1, textCache_.size() / 2);
+    for (size_t i = 0; i < evictCount; ++i) {
+      MemoryMonitor::getInstance().destroyTexture(entries[i].second.texture);
+      textCache_.erase(entries[i].first);
+    }
   }
 
   void closeAll() {
