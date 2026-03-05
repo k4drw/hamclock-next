@@ -445,13 +445,14 @@ bool ConfigManager::load(AppConfig &config) {
   }
 
   // Rotator (Hamlib rotctld)
+  // Rotator
   if (json.contains("rotator")) {
-    auto &r = json["rotator"];
+    const auto &r = json["rotator"];
     config.rotatorHost = r.value("host", "");
     config.rotatorPort = r.value("port", 4533);
     config.rotatorAutoTrack = r.value("auto_track", false);
+    config.rotatorUpover = r.value("upover", false);
   }
-
   // Rig (Hamlib rigctld)
   // Rig
   if (json.contains("rig")) {
@@ -624,6 +625,7 @@ bool ConfigManager::save(const AppConfig &config) {
   json["rotator"]["host"] = config.rotatorHost;
   json["rotator"]["port"] = config.rotatorPort;
   json["rotator"]["auto_track"] = config.rotatorAutoTrack;
+  json["rotator"]["upover"] = config.rotatorUpover;
 
   json["rig"]["host"] = config.rigHost;
   json["rig"]["port"] = config.rigPort;
@@ -729,14 +731,35 @@ bool ConfigManager::save(const AppConfig &config) {
     json["presets"] = presetsArr;
   }
 
-  std::ofstream ofs(configPath_);
+  std::filesystem::path tmpPath = configPath_;
+  tmpPath.replace_extension(".json.tmp");
+
+  std::ofstream ofs(tmpPath);
   if (!ofs) {
     std::fprintf(stderr, "ConfigManager: cannot write %s\n",
-                 configPath_.string().c_str());
+                 tmpPath.string().c_str());
     return false;
   }
 
   ofs << json.dump(2) << "\n";
+  ofs.close();
+
+  if (!ofs.good()) {
+    std::fprintf(stderr, "ConfigManager: write failed for %s\n",
+                 tmpPath.string().c_str());
+    std::error_code ec;
+    std::filesystem::remove(tmpPath, ec);
+    return false;
+  }
+
+  // Atomic rename
+  std::filesystem::rename(tmpPath, configPath_, ec);
+  if (ec) {
+    std::fprintf(stderr, "ConfigManager: rename failed from %s to %s: %s\n",
+                 tmpPath.string().c_str(), configPath_.string().c_str(),
+                 ec.message().c_str());
+    return false;
+  }
 
 #ifdef __EMSCRIPTEN__
   // Flush MEMFS -> IndexedDB.  Retry once after 1 s on failure (handles

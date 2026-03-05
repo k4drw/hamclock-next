@@ -75,12 +75,6 @@ std::shared_ptr<const DXClusterData> DXClusterDataStore::snapshot() const {
   return data_;
 }
 
-void DXClusterDataStore::set(const DXClusterData &data) {
-  std::lock_guard<std::mutex> lock(mutex_);
-  data_ = std::make_shared<DXClusterData>(data);
-  // TODO: Full replace in DB? Usually we just add spots incrementally.
-}
-
 void DXClusterDataStore::addSpot(const DXClusterSpot &spot) {
   // Create a dithered copy of the spot
   DXClusterSpot s = spot;

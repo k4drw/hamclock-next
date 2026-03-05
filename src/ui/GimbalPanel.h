@@ -38,6 +38,7 @@ private:
   bool hasSat_ = false;
   bool hasRotator_ = false;
   bool rotatorConnected_ = false;
+  bool flipActive_ = false;
 
   // Satellite prediction (for comparison or auto-track)
   double satAz_ = 0, satEl_ = -90;

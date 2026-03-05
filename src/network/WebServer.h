@@ -27,6 +27,7 @@ class RotatorService;
 class PaneContainer;
 class WeatherStore;
 class BrightnessManager;
+class ADIFProvider;
 
 class WebServer {
 public:
@@ -65,6 +66,7 @@ public:
   void setBrightnessManager(std::shared_ptr<BrightnessManager> bm) {
     brightnessMgr_ = bm;
   }
+  void setADIFProvider(ADIFProvider *p) { adifProvider_ = p; }
 
 private:
   void run();
@@ -92,6 +94,7 @@ private:
   std::vector<std::unique_ptr<PaneContainer>> *panes_ = nullptr;
   std::shared_ptr<WeatherStore> weatherStore_;
   std::shared_ptr<BrightnessManager> brightnessMgr_;
+  ADIFProvider *adifProvider_ = nullptr;
   bool screenLocked_ = false;
   bool liveWebEnabled_ = false;
   int port_;

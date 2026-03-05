@@ -43,7 +43,6 @@ public:
   ~DXClusterDataStore();
 
   std::shared_ptr<const DXClusterData> snapshot() const;
-  void set(const DXClusterData &data);
   void addSpot(const DXClusterSpot &spot);
   void setConnected(bool connected, const std::string &status = "");
   void clear();

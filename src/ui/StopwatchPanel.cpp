@@ -74,7 +74,7 @@ void StopwatchPanel::render(SDL_Renderer *renderer) {
 
   // Main time display
   int timeAreaH = bodyH - lapTableH;
-  int cy = bodyY + timeAreaH / 2;
+  int cy = bodyY + timeAreaH / 3; // Shift up slightly to make room for current lap
   int tw, th;
   SDL_Texture *tex =
       fontMgr_.renderText(renderer, timeStr, themes.text, 18, &tw, &th);
@@ -82,6 +82,32 @@ void StopwatchPanel::render(SDL_Renderer *renderer) {
     SDL_Rect dst = {cx - tw / 2, cy - th / 2, tw, th};
     SDL_RenderCopy(renderer, tex, nullptr, &dst);
     MemoryMonitor::getInstance().destroyTexture(tex);
+  }
+
+  // Current Lap time (if laps exist)
+  if (running_ && !laps_.empty()) {
+    auto currentLapDur = elapsed() - laps_.back();
+    std::string lapStr = "Lap " + std::to_string(laps_.size() + 1) + ": " +
+                         formatTimeMini(currentLapDur);
+    int lw, lh;
+    SDL_Texture *ltex =
+        fontMgr_.renderText(renderer, lapStr, themes.textDim, 10, &lw, &lh);
+    if (ltex) {
+      SDL_Rect ldst = {cx - lw / 2, cy + th / 2 + 2, lw, lh};
+      SDL_RenderCopy(renderer, ltex, nullptr, &ldst);
+      MemoryMonitor::getInstance().destroyTexture(ltex);
+    }
+  } else if (running_) {
+    // First lap
+    std::string lapStr = "Lap 1: " + formatTimeMini(elapsedDur);
+    int lw, lh;
+    SDL_Texture *ltex =
+        fontMgr_.renderText(renderer, lapStr, themes.textDim, 10, &lw, &lh);
+    if (ltex) {
+      SDL_Rect ldst = {cx - lw / 2, cy + th / 2 + 2, lw, lh};
+      SDL_RenderCopy(renderer, ltex, nullptr, &ldst);
+      MemoryMonitor::getInstance().destroyTexture(ltex);
+    }
   }
 
   // Lap table
@@ -280,7 +306,7 @@ StopwatchPanel::formatTimeMini(std::chrono::steady_clock::duration d) const {
   auto s = std::chrono::duration_cast<std::chrono::seconds>(d);
   d -= s;
   auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(d);
-  char buf[16];
+  char buf[32];
   std::snprintf(buf, sizeof(buf), "%02d:%02d.%01d", (int)m.count(),
                 (int)s.count(), (int)(ms.count() / 100));
   return buf;

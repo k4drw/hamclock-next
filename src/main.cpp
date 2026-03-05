@@ -1029,6 +1029,10 @@ DashboardContext::DashboardContext(AppContext &ctx)
 
   adifProvider = std::make_unique<ADIFProvider>(adifStore, ctx.prefixMgr);
   adifProvider->fetch(ctx.cfgMgr.configDir() / "logs.adif");
+#ifndef __EMSCRIPTEN__
+  if (ctx.webServer)
+    ctx.webServer->setADIFProvider(adifProvider.get());
+#endif
 
   mufRtProvider = std::make_unique<MufRtProvider>(netManager);
   mufRtProvider->update();
@@ -1063,8 +1067,6 @@ DashboardContext::DashboardContext(AppContext &ctx)
 
   marineProvider =
       std::make_unique<MarineProvider>(netManager, ctx.marineStore);
-  // Default NOAA tide station (Lake Worth FL) + NDBC buoy 41114 (FL Atlantic).
-  // TODO: make configurable via settings.
   if (isMasterMode || isWidgetConfigured(WidgetType::MARINE))
     marineProvider->fetch(appCfg.marineStation, appCfg.marineBuoy);
 
@@ -1328,7 +1330,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
       break;
     case WidgetType::ASTEROID:
       widgetPool[type] = std::make_unique<AsteroidPanel>(
-          0, 0, 0, 0, fontMgr, *asteroidProvider, ctx.state, &appCfg,
+          0, 0, 0, 0, fontMgr, texMgr, *asteroidProvider, state, &appCfg,
           [&ctx]() { ctx.cfgMgr.save(ctx.appCfg); });
       break;
     case WidgetType::ALERTS:

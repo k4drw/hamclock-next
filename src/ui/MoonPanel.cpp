@@ -1,5 +1,6 @@
 #include "MoonPanel.h"
 #include "../core/Theme.h"
+#include "../core/WorkerService.h"
 #include "FontCatalog.h"
 #include "RenderUtils.h"
 #include <cmath>
@@ -12,6 +13,14 @@ MoonPanel::MoonPanel(int x, int y, int w, int h, FontManager &fontMgr,
                      std::shared_ptr<MoonStore> store)
     : Widget(x, y, w, h), fontMgr_(fontMgr), texMgr_(texMgr), net_(net),
       store_(std::move(store)) {}
+
+MoonPanel::~MoonPanel() {
+  std::lock_guard<std::mutex> lock(imageMutex_);
+  if (pendingSurface_) {
+    SDL_FreeSurface(pendingSurface_);
+    pendingSurface_ = nullptr;
+  }
+}
 
 void MoonPanel::update() {
   currentData_ = store_->get();
@@ -28,12 +37,19 @@ void MoonPanel::update() {
         url,
         [this](std::string body) {
           if (!body.empty()) {
-            // Mark image as ready for texture manager (deferred to render
-            // thread) Actually we can't call SDL from here, but
-            // TextureManager::loadFromMemory is usually called from render
-            // thread. We'll store the bytes and load it in render()
-            std::lock_guard<std::mutex> lock(imageMutex_);
-            pendingImageData_ = body;
+            WorkerService::getInstance().submitTask([this, body = std::move(body)]() {
+              SDL_Surface *surf = TextureManager::decodeToSurface(
+                  reinterpret_cast<const unsigned char *>(body.data()),
+                  static_cast<unsigned int>(body.size()), MOON_IMAGE_KEY);
+
+              if (surf) {
+                std::lock_guard<std::mutex> lock(imageMutex_);
+                if (pendingSurface_) {
+                  SDL_FreeSurface(pendingSurface_);
+                }
+                pendingSurface_ = surf;
+              }
+            });
           }
           imageLoading_ = false;
         },
@@ -69,12 +85,13 @@ void MoonPanel::render(SDL_Renderer *renderer) {
   if (!fontMgr_.ready())
     return;
 
-  // Process pending image
+  // Process pending image decoded in background
   {
     std::lock_guard<std::mutex> lock(imageMutex_);
-    if (!pendingImageData_.empty()) {
-      texMgr_.loadFromMemory(renderer, MOON_IMAGE_KEY, pendingImageData_);
-      pendingImageData_.clear();
+    if (pendingSurface_) {
+      texMgr_.loadFromSurface(renderer, MOON_IMAGE_KEY, pendingSurface_);
+      SDL_FreeSurface(pendingSurface_);
+      pendingSurface_ = nullptr;
     }
   }
 

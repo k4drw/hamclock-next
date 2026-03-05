@@ -100,6 +100,10 @@ TextInput *SetupScreen::getActiveInput() {
       return &rigHostInput_;
     case 1:
       return &rigPortInput_;
+    case 2:
+      return &rotatorHostInput_;
+    case 3:
+      return &rotatorPortInput_;
     }
   } else if (activeTab_ == Tab::Network) {
     switch (activeField_) {
@@ -203,7 +207,7 @@ void SetupScreen::render(SDL_Renderer *renderer) {
 
   // Appearance tab absorbs brightness/display settings — 9 tabs total
   const char *tabs[] = {"Identity", "Spotting",  "Appearance",
-                        "Rig",      "Services",  "Network",
+                        "Rig/Rot",  "Services",  "Network",
                         "Widgets",  "Watchlist", "Update"};
   int numTabs = 9;
   int tabW = fieldW / numTabs;
@@ -763,54 +767,123 @@ void SetupScreen::renderTabRig(SDL_Renderer *renderer, int cx, int pad,
                                int fieldW, int fieldH, int fieldX,
                                int textPad) {
   auto *cat = fontMgr_.catalog();
-  int y =
+  int yBase =
       (modalRect_.y + cat->ptSize(FontStyle::MediumBold) + 2 * pad + fieldH);
+  int y = yBase;
   int vSpace = pad / 2;
+  int colW = fieldW / 2 - pad;
+  int rightX = cx + pad / 2;
+
   SDL_Color white = {255, 255, 255, 255};
   SDL_Color orange = {255, 165, 0, 255};
   SDL_Color gray = {140, 140, 140, 255};
 
+  // --- Rig Section (Left Column) ---
   cat->drawText(renderer, "Rig / CAT Control:", fieldX, y, white,
                 FontStyle::SmallBold);
-  y += cat->ptSize(FontStyle::SmallBold) + pad;
+  y += cat->ptSize(FontStyle::SmallBold) + vSpace;
 
   int rigLabelH = cat->ptSize(FontStyle::SmallRegular) + 4;
-  cat->drawText(renderer, "rigctld Host (IP or Name):", fieldX, y, white,
+  cat->drawText(renderer, "rigctld Host:", fieldX, y, white,
                 FontStyle::SmallRegular);
-  rigHostRect_ = {fieldX, y, fieldW, rigLabelH + fieldH};
+  rigHostRect_ = {fieldX, y, colW, rigLabelH + fieldH};
   y += rigLabelH;
-  rigHostInput_.render(renderer, fontMgr_, fieldX, y, fieldW, fieldH,
-                       FontStyle::SmallRegular, textPad, activeField_ == 0,
-                       true, orange, gray, white, white, gray,
-                       "e.g. localhost");
+  rigHostInput_.render(renderer, fontMgr_, fieldX, y, colW, fieldH,
+                       FontStyle::SmallRegular, textPad,
+                       (activeTab_ == Tab::Rig && activeField_ == 0), true,
+                       orange, gray, white, white, gray, "localhost");
   y += fieldH + vSpace;
 
   cat->drawText(renderer, "rigctld Port:", fieldX, y, white,
                 FontStyle::SmallRegular);
-  rigPortRect_ = {fieldX, y, fieldW, rigLabelH + fieldH};
+  rigPortRect_ = {fieldX, y, colW, rigLabelH + fieldH};
   y += rigLabelH;
-  rigPortInput_.render(renderer, fontMgr_, fieldX, y, fieldW, fieldH,
-                       FontStyle::SmallRegular, textPad, activeField_ == 1,
-                       true, orange, gray, white, white, gray, "4532");
+  rigPortInput_.render(renderer, fontMgr_, fieldX, y, colW, fieldH,
+                       FontStyle::SmallRegular, textPad,
+                       (activeTab_ == Tab::Rig && activeField_ == 1), true,
+                       orange, gray, white, white, gray, "4532");
   y += fieldH + vSpace;
 
   // Auto-tune Toggle
-  toggleRect_ = {fieldX, y, 20, 20};
-  SDL_SetRenderDrawColor(renderer, 50, 50, 60, 255);
-  SDL_RenderFillRect(renderer, &toggleRect_);
-  SDL_SetRenderDrawColor(renderer, 100, 100, 120, 255);
-  SDL_RenderDrawRect(renderer, &toggleRect_);
-  if (rigAutoTune_) {
-    SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
-    SDL_Rect check = {fieldX + 4, y + 4, 12, 12};
-    SDL_RenderFillRect(renderer, &check);
+  {
+    SDL_Rect r = {fieldX, y, 20, 20};
+    toggleRect_ = r;
+    SDL_SetRenderDrawColor(renderer, 50, 50, 60, 255);
+    SDL_RenderFillRect(renderer, &r);
+    SDL_SetRenderDrawColor(renderer, 100, 100, 120, 255);
+    SDL_RenderDrawRect(renderer, &r);
+    if (rigAutoTune_) {
+      SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
+      SDL_Rect check = {r.x + 4, r.y + 4, 12, 12};
+      SDL_RenderFillRect(renderer, &check);
+    }
+    cat->drawText(renderer, "Auto-Tune on Spot click", fieldX + 30, y + 10,
+                  white, FontStyle::SmallRegular, false, false, true);
   }
-  cat->drawText(renderer, "Enable Auto-Tune on DX Spot click", fieldX + 30,
-                y + 10, white, FontStyle::SmallRegular, false, false, true);
-  y += 24 + pad;
 
-  cat->drawText(renderer, "Rig control requires 'rigctld' (Hamlib) running.",
-                fieldX, y, gray, FontStyle::Fast);
+  // --- Rotator Section (Right Column) ---
+  y = yBase;
+  cat->drawText(renderer, "Rotator Control:", rightX, y, white,
+                FontStyle::SmallBold);
+  y += cat->ptSize(FontStyle::SmallBold) + vSpace;
+
+  cat->drawText(renderer, "rotctld Host:", rightX, y, white,
+                FontStyle::SmallRegular);
+  rotatorHostRect_ = {rightX, y, colW, rigLabelH + fieldH};
+  y += rigLabelH;
+  rotatorHostInput_.render(renderer, fontMgr_, rightX, y, colW, fieldH,
+                           FontStyle::SmallRegular, textPad,
+                           (activeTab_ == Tab::Rig && activeField_ == 2), true,
+                           orange, gray, white, white, gray, "localhost");
+  y += fieldH + vSpace;
+
+  cat->drawText(renderer, "rotctld Port:", rightX, y, white,
+                FontStyle::SmallRegular);
+  rotatorPortRect_ = {rightX, y, colW, rigLabelH + fieldH};
+  y += rigLabelH;
+  rotatorPortInput_.render(renderer, fontMgr_, rightX, y, colW, fieldH,
+                           FontStyle::SmallRegular, textPad,
+                           (activeTab_ == Tab::Rig && activeField_ == 3), true,
+                           orange, gray, white, white, gray, "4533");
+  y += fieldH + vSpace;
+
+  // Auto-track and Upover Toggles
+  {
+    // Auto-track
+    SDL_Rect r1 = {rightX, y, 20, 20};
+    rotatorAutoTrackRect_ = r1;
+    SDL_SetRenderDrawColor(renderer, 50, 50, 60, 255);
+    SDL_RenderFillRect(renderer, &r1);
+    SDL_SetRenderDrawColor(renderer, 100, 100, 120, 255);
+    SDL_RenderDrawRect(renderer, &r1);
+    if (rotatorAutoTrack_) {
+      SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
+      SDL_Rect check = {r1.x + 4, r1.y + 4, 12, 12};
+      SDL_RenderFillRect(renderer, &check);
+    }
+    cat->drawText(renderer, "Auto-track Satellite", rightX + 30, y + 10, white,
+                  FontStyle::SmallRegular, false, false, true);
+    y += 24 + vSpace;
+
+    // Upover
+    SDL_Rect r2 = {rightX, y, 20, 20};
+    rotatorUpoverRect_ = r2;
+    SDL_SetRenderDrawColor(renderer, 50, 50, 60, 255);
+    SDL_RenderFillRect(renderer, &r2);
+    SDL_SetRenderDrawColor(renderer, 100, 100, 120, 255);
+    SDL_RenderDrawRect(renderer, &r2);
+    if (rotatorUpover_) {
+      SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
+      SDL_Rect check = {r2.x + 4, r2.y + 4, 12, 12};
+      SDL_RenderFillRect(renderer, &check);
+    }
+    cat->drawText(renderer, "Upover Mode (Az flip)", rightX + 30, y + 10, white,
+                  FontStyle::SmallRegular, false, false, true);
+  }
+
+  y = yBase + 210; // Bottom of tab area, adjusted for clarity
+  cat->drawText(renderer, "Requires 'rigctld'/'rotctld' (Hamlib) daemon.", cx,
+                y, gray, FontStyle::Fast, true);
 }
 
 void SetupScreen::renderTabWidgets(SDL_Renderer *renderer, int cx, int pad,
@@ -1188,6 +1261,31 @@ bool SetupScreen::onMouseDown(int mx, int my, Uint16 mod, int clicks) {
       return true;
     if (hitField(rigPortRect_, 1, &rigPortInput_))
       return true;
+    if (hitField(rotatorHostRect_, 2, &rotatorHostInput_))
+      return true;
+    if (hitField(rotatorPortRect_, 3, &rotatorPortInput_))
+      return true;
+
+    // Toggles
+    if (mx >= toggleRect_.x && mx < toggleRect_.x + toggleRect_.w &&
+        my >= toggleRect_.y && my < toggleRect_.y + toggleRect_.h) {
+      rigAutoTune_ = !rigAutoTune_;
+      return true;
+    }
+    if (mx >= rotatorAutoTrackRect_.x &&
+        mx < rotatorAutoTrackRect_.x + rotatorAutoTrackRect_.w &&
+        my >= rotatorAutoTrackRect_.y &&
+        my < rotatorAutoTrackRect_.y + rotatorAutoTrackRect_.h) {
+      rotatorAutoTrack_ = !rotatorAutoTrack_;
+      return true;
+    }
+    if (mx >= rotatorUpoverRect_.x &&
+        mx < rotatorUpoverRect_.x + rotatorUpoverRect_.w &&
+        my >= rotatorUpoverRect_.y &&
+        my < rotatorUpoverRect_.y + rotatorUpoverRect_.h) {
+      rotatorUpover_ = !rotatorUpover_;
+      return true;
+    }
   } else if (activeTab_ == Tab::Services) {
     if (hitField(qrzUsernameRect_, 0, &qrzUsernameInput_))
       return true;
@@ -1361,6 +1459,26 @@ bool SetupScreen::onMouseDown(int mx, int my, Uint16 mod, int clicks) {
       brightnessMgr_.setScheduleEnabled(!brightnessMgr_.isScheduleEnabled());
       return true;
     }
+  } else if (activeTab_ == Tab::Rig) {
+    if (mx >= toggleRect_.x && mx < toggleRect_.x + toggleRect_.w &&
+        my >= toggleRect_.y && my < toggleRect_.y + toggleRect_.h) {
+      rigAutoTune_ = !rigAutoTune_;
+      return true;
+    }
+    if (mx >= rotatorAutoTrackRect_.x &&
+        mx < rotatorAutoTrackRect_.x + rotatorAutoTrackRect_.w &&
+        my >= rotatorAutoTrackRect_.y &&
+        my < rotatorAutoTrackRect_.y + rotatorAutoTrackRect_.h) {
+      rotatorAutoTrack_ = !rotatorAutoTrack_;
+      return true;
+    }
+    if (mx >= rotatorUpoverRect_.x &&
+        mx < rotatorUpoverRect_.x + rotatorUpoverRect_.w &&
+        my >= rotatorUpoverRect_.y &&
+        my < rotatorUpoverRect_.y + rotatorUpoverRect_.h) {
+      rotatorUpover_ = !rotatorUpover_;
+      return true;
+    }
   }
 
   // 4. Footer Buttons
@@ -1428,8 +1546,9 @@ void SetupScreen::onMouseMove(int mx, int /*my*/) {
     if (activeField_ >= 0 && activeField_ < 4)
       r = *rects[activeField_];
   } else if (activeTab_ == Tab::Rig) {
-    const SDL_Rect *rects[] = {&rigHostRect_, &rigPortRect_};
-    if (activeField_ >= 0 && activeField_ < 2)
+    const SDL_Rect *rects[] = {&rigHostRect_, &rigPortRect_, &rotatorHostRect_,
+                               &rotatorPortRect_};
+    if (activeField_ >= 0 && activeField_ < 4)
       r = *rects[activeField_];
   } else if (activeTab_ == Tab::Services) {
     // Both Username and Password use full fieldW in render pass
@@ -1465,7 +1584,7 @@ bool SetupScreen::onKeyDown(SDL_Keycode key, Uint16 mod) {
   } else if (activeTab_ == Tab::Services) {
     nFields = 4;
   } else if (activeTab_ == Tab::Rig) {
-    nFields = 2;
+    nFields = 4;
   } else if (activeTab_ == Tab::Widgets) {
     nFields = 1; // 0=rotation interval
   } else if (activeTab_ == Tab::Watchlist) {
@@ -1893,6 +2012,11 @@ void SetupScreen::setConfig(const AppConfig &cfg) {
   rigPortInput_.setValue(std::to_string(cfg.rigPort));
   rigAutoTune_ = cfg.rigAutoTune;
 
+  rotatorHostInput_.setValue(cfg.rotatorHost);
+  rotatorPortInput_.setValue(std::to_string(cfg.rotatorPort));
+  rotatorAutoTrack_ = cfg.rotatorAutoTrack;
+  rotatorUpover_ = cfg.rotatorUpover;
+
   hubMode_ = cfg.hubMode;
   hubIpInput_.setValue(cfg.hubIp);
   hubPortInput_.setValue(std::to_string(cfg.hubPort));
@@ -1979,6 +2103,13 @@ AppConfig SetupScreen::getConfig() const {
   if (cfg.rigPort == 0)
     cfg.rigPort = 4532;
   cfg.rigAutoTune = rigAutoTune_;
+
+  cfg.rotatorHost = rotatorHostInput_.getValue();
+  cfg.rotatorPort = std::atoi(rotatorPortInput_.getValue().c_str());
+  if (cfg.rotatorPort == 0)
+    cfg.rotatorPort = 4533;
+  cfg.rotatorAutoTrack = rotatorAutoTrack_;
+  cfg.rotatorUpover = rotatorUpover_;
 
   cfg.hubMode = hubMode_;
   cfg.hubIp = hubIpInput_.getValue();

@@ -138,6 +138,11 @@ private:
   TextInput rigPortInput_;
   bool rigAutoTune_ = true;
 
+  TextInput rotatorHostInput_;
+  TextInput rotatorPortInput_;
+  bool rotatorAutoTrack_ = false;
+  bool rotatorUpover_ = false;
+
   std::vector<WidgetType> paneRotations_[6];
   bool syncRotation_ = false;
   SDL_Rect syncRotationRect_ = {0, 0, 0, 0};
@@ -200,6 +205,10 @@ private:
   SDL_Rect hubPortRect_ = {0, 0, 0, 0};
   SDL_Rect rigHostRect_ = {0, 0, 0, 0};
   SDL_Rect rigPortRect_ = {0, 0, 0, 0};
+  SDL_Rect rotatorHostRect_ = {0, 0, 0, 0};
+  SDL_Rect rotatorPortRect_ = {0, 0, 0, 0};
+  SDL_Rect rotatorAutoTrackRect_ = {0, 0, 0, 0};
+  SDL_Rect rotatorUpoverRect_ = {0, 0, 0, 0};
   std::map<std::string, SDL_Color> colorOverrides_;
 
   // Track dimensions to detect size changes

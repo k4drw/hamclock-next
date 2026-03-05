@@ -1,4 +1,5 @@
 #include "AsteroidPanel.h"
+#include "TextureManager.h"
 #include "../core/AsteroidPropagator.h"
 #include "../core/MemoryMonitor.h"
 #include "../core/Theme.h"
@@ -23,15 +24,15 @@ static const SDL_Color kPalette[] = {
 static constexpr int kPaletteSize = 6;
 
 AsteroidPanel::AsteroidPanel(int x, int y, int w, int h, FontManager &fontMgr,
-                             AsteroidProvider &provider,
+                             TextureManager &texMgr, AsteroidProvider &provider,
                              std::shared_ptr<HamClockState> state,
                              AppConfig *config, std::function<void()> onSave)
     : ListPanel(
           x, y, w, h, fontMgr,
           (config && !config->asteroidIcon.empty() ? "Asteroids" : "Asteroids"),
           {}),
-      provider_(provider), state_(std::move(state)), config_(config),
-      onSave_(std::move(onSave)) {
+      texMgr_(texMgr), provider_(provider), state_(std::move(state)),
+      config_(config), onSave_(std::move(onSave)) {
   onResize(x, y, w, h);
 }
 
@@ -404,6 +405,7 @@ void AsteroidPanel::renderPolarPlot(SDL_Renderer *renderer, float cx, float cy,
 
   // --- Asteroid track arc (above-horizon segments only, orange) ---
   SDL_Color trackColor = {255, 140, 0, 255};
+  SDL_Texture *lineAA = texMgr_.get("line_aa");
   std::vector<SDL_FPoint> seg;
   for (const auto &p : asteroidTrack_) {
     if (p.el > 0.0) {
@@ -411,17 +413,27 @@ void AsteroidPanel::renderPolarPlot(SDL_Renderer *renderer, float cx, float cy,
       seg.push_back({cx + static_cast<float>(r * std::sin(p.az * kDeg2Rad)),
                      cy - static_cast<float>(r * std::cos(p.az * kDeg2Rad))});
     } else {
-      if (seg.size() >= 2)
-        RenderUtils::drawPolyline(renderer, seg.data(),
-                                  static_cast<int>(seg.size()), 2.0f,
-                                  trackColor, false);
+      if (seg.size() >= 2) {
+        if (lineAA)
+          RenderUtils::drawPolylineTextured(renderer, lineAA, seg.data(),
+                                            (int)seg.size(), 2.0f, trackColor);
+        else
+          RenderUtils::drawPolyline(renderer, seg.data(),
+                                    static_cast<int>(seg.size()), 2.0f,
+                                    trackColor, false);
+      }
       seg.clear();
     }
   }
-  if (seg.size() >= 2)
-    RenderUtils::drawPolyline(renderer, seg.data(),
-                              static_cast<int>(seg.size()), 2.0f, trackColor,
-                              false);
+  if (seg.size() >= 2) {
+    if (lineAA)
+      RenderUtils::drawPolylineTextured(renderer, lineAA, seg.data(),
+                                        (int)seg.size(), 2.0f, trackColor);
+    else
+      RenderUtils::drawPolyline(renderer, seg.data(),
+                                static_cast<int>(seg.size()), 2.0f, trackColor,
+                                false);
+  }
 
   // --- Current position marker (if above horizon) ---
   if (asteroidAboveHorizon_) {

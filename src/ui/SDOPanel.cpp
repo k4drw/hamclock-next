@@ -3,6 +3,7 @@
 #include "../core/ConfigManager.h"
 #include "../core/Constants.h"
 #include "../core/Theme.h"
+#include "../core/WorkerService.h"
 #include "FontCatalog.h"
 #include "RenderUtils.h"
 #include <SDL.h>
@@ -25,6 +26,16 @@ SDOPanel::SDOPanel(int x, int y, int w, int h, FontManager &fontMgr,
   tempRotating_ = rotating_;
   tempPfss_ = showPfss_;
   tempMovie_ = movie_;
+
+  recalcMenuLayout();
+}
+
+SDOPanel::~SDOPanel() {
+  std::lock_guard<std::mutex> lock(*pendingMutex_);
+  if (*pendingSurface_) {
+    SDL_FreeSurface(*pendingSurface_);
+    *pendingSurface_ = nullptr;
+  }
 }
 
 void SDOPanel::update() {
@@ -35,18 +46,41 @@ void SDOPanel::update() {
   if (now - lastFetch_ > 60 * 60 * 1000 || lastFetch_ == 0) {
     lastFetch_ = now;
     auto mtx = pendingMutex_;
-    auto dat = pendingData_;
+    auto psurf = pendingSurface_;
     auto rdy = dataReady_;
     auto stm = pendingServerTime_;
     bool pfss = showPfss_;
-    provider_.fetch(
-        currentId_, pfss,
-        [mtx, dat, rdy, stm](const std::string &data, std::time_t serverTime) {
-          std::lock_guard<std::mutex> lock(*mtx);
-          *dat = data;
-          *stm = serverTime;
-          *rdy = true;
-        });
+    std::string cid = currentId_;
+
+    provider_.fetch(cid, pfss,
+                    [mtx, psurf, rdy, stm, cid](const std::string &data,
+                                                std::time_t serverTime) {
+                      WorkerService::getInstance().submitTask([mtx, psurf, rdy,
+                                                               stm, data, cid,
+                                                               serverTime]() {
+                        // Decode and tint in background
+                        SDL_Color tint = {255, 255, 255, 255};
+                        if (cid == "HMIIC") {
+                          tint = {255, 147, 41, 255};
+                        }
+
+                        SDL_Surface *surf = TextureManager::decodeToSurface(
+                            reinterpret_cast<const unsigned char *>(
+                                data.data()),
+                            static_cast<unsigned int>(data.size()),
+                            "sdo_latest", tint);
+
+                        if (surf) {
+                          std::lock_guard<std::mutex> lock(*mtx);
+                          if (*psurf) {
+                            SDL_FreeSurface(*psurf);
+                          }
+                          *psurf = surf;
+                          *stm = serverTime;
+                          *rdy = true;
+                        }
+                      });
+                    });
   }
 
   // Handle rotation (every 30 seconds if enabled)
@@ -68,19 +102,18 @@ void SDOPanel::update() {
 }
 
 void SDOPanel::render(SDL_Renderer *renderer) {
-  // 1. Check for new data
+  // 1. Check for new data from background decoder
   {
     std::lock_guard<std::mutex> lock(*pendingMutex_);
     if (*dataReady_) {
-      SDL_Color tint = {255, 255, 255, 255};
-      if (currentId_ == "HMIIC") {
-        tint = {255, 147, 41, 255}; // NASA SDO HMIIC Orange
+      if (*pendingSurface_) {
+        texMgr_.loadFromSurface(renderer, "sdo_latest", *pendingSurface_);
+        SDL_FreeSurface(*pendingSurface_);
+        *pendingSurface_ = nullptr;
+        imageServerTime_ = *pendingServerTime_;
+        imageReady_ = true;
       }
-      texMgr_.loadFromMemory(renderer, "sdo_latest", *pendingData_, tint);
-      imageServerTime_ = *pendingServerTime_;
       *dataReady_ = false;
-      pendingData_->clear();
-      imageReady_ = true;
     }
   }
 

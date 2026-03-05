@@ -274,19 +274,28 @@ PropEngine::generateGrid(const PropPathParams &params, const SolarData &sw,
       double midLonDeg = midLam * 180.0 / M_PI;
 
       // Interpolate iono
-      // TODO: optimize access to provider?
-      // Actually, we can create a temporary IonosondeData struct with 0s if
-      // provider is null
       InterpolatedIonosonde iono;
       if (ionoProvider) {
-        // This is the bottleneck! 217k calls.
-        // We MUST optimize this in Phase 3 or use a 10-degree step.
-        // For now, let's assume we do it every 5th pixel and lerp?
-        // Or just do physics math.
-        // Let's rely on the fact that interpolate() inside provider is fast
-        // enough for now (it sorts 50 stations). 50 * 217k = 10 million ops.
-        // Doable in < 1 sec on modern CPU.
-        iono = ionoProvider->interpolate(midLatDeg, midLonDeg);
+        // Optimized access using a simple local cache for the current row
+        // since midLat/midLon change relatively slowly.
+        static thread_local InterpolatedIonosonde rowCache[MAP_W / 4 + 1];
+        static thread_local int cacheY = -1;
+        static thread_local double cacheTxLat = -999;
+        static thread_local double cacheTxLon = -999;
+
+        int cacheIdx = x / 4;
+        if (y != cacheY || params.txLat != cacheTxLat ||
+            params.txLon != cacheTxLon || x % 4 == 0) {
+          iono = ionoProvider->interpolate(midLatDeg, midLonDeg);
+          if (x % 4 == 0) {
+            rowCache[cacheIdx] = iono;
+            cacheY = y;
+            cacheTxLat = params.txLat;
+            cacheTxLon = params.txLon;
+          }
+        } else {
+          iono = rowCache[cacheIdx];
+        }
       }
 
       if (outputType == 0) {

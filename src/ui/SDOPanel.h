@@ -13,6 +13,7 @@ class SDOPanel : public Widget {
 public:
   SDOPanel(int x, int y, int w, int h, FontManager &fontMgr,
            TextureManager &texMgr, SDOProvider &provider);
+  ~SDOPanel() override;
 
   void setObserver(double lat, double lon) {
     obsLat_ = lat;
@@ -83,6 +84,8 @@ private:
   // Thread-safe image delivery bridge (shared so lambda outlives panel)
   std::shared_ptr<std::mutex> pendingMutex_ = std::make_shared<std::mutex>();
   std::shared_ptr<std::string> pendingData_ = std::make_shared<std::string>();
+  std::shared_ptr<SDL_Surface *> pendingSurface_ =
+      std::make_shared<SDL_Surface *>(nullptr);
   std::shared_ptr<std::time_t> pendingServerTime_ =
       std::make_shared<std::time_t>(0);
   std::shared_ptr<bool> dataReady_ = std::make_shared<bool>(false);

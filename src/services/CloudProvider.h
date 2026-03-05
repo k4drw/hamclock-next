@@ -22,12 +22,12 @@ public:
 
 private:
   NetworkManager &netMgr_;
-  std::string jpgData_;
   bool hasData_ = false;
   uint32_t lastUpdateMs_ = 0;
   mutable std::mutex mutex_;
 
   SDL_Texture *texture_ = nullptr;
+  SDL_Surface *pendingSurface_ = nullptr;
   int texW_ = 0;
   int texH_ = 0;
   bool textureDirty_ = false;

@@ -121,6 +121,7 @@ struct AppConfig {
   std::string rotatorHost = "";  // Empty = disabled
   int rotatorPort = 4533;        // Default Hamlib rotctld port
   bool rotatorAutoTrack = false; // Auto-track satellite when enabled
+  bool rotatorUpover = false;    // Azimuth flip for zenith passes
 
   // Rig (Hamlib rigctld)
   std::string rigHost = ""; // Empty = disabled

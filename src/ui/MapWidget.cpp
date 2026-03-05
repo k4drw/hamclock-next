@@ -119,6 +119,12 @@ static void projectAzimuthal(double lat, double lon, double lat0, double lon0,
     ny = 0;
     return;
   }
+  if (c > M_PI - 1e-10) {
+    // Antipode - map to a point outside the unit circle so it's filtered or masked
+    nx = 2.0;
+    ny = 0.0;
+    return;
+  }
   double k = c / sin(c);
   nx = k * cos(phi) * sin(dlon) / M_PI;
   ny = k * (cos(phi0) * sin(phi) - sin(phi0) * cos(phi) * cos(dlon)) / M_PI;
@@ -223,8 +229,10 @@ SDL_FPoint MapWidget::latLonToScreen(double lat, double lon) const {
     double deLon = state_ ? state_->deLocation.lon : 0.0;
     double nx, ny;
     projectAzimuthal(lat, lon, deLat, deLon, nx, ny);
-    float px = static_cast<float>(mapRect_.x + (nx + 1.0) * 0.5 * mapRect_.w);
-    float py = static_cast<float>(mapRect_.y + (1.0 - ny) * 0.5 * mapRect_.h);
+
+    float scale = std::min(mapRect_.w, mapRect_.h);
+    float px = mapRect_.x + (mapRect_.w * 0.5f) + (float)nx * (scale * 0.5f);
+    float py = mapRect_.y + (mapRect_.h * 0.5f) - (float)ny * (scale * 0.5f);
     return {px, py};
   }
   if (config_.projection == "mercator") {
@@ -1208,15 +1216,19 @@ void MapWidget::render(SDL_Renderer *renderer) {
           // Screen-space grid for Azimuthal to avoid antipode singularities
           double deLat = state_ ? state_->deLocation.lat : 0.0;
           double deLon = state_ ? state_->deLocation.lon : 0.0;
+          float cx = mapRect_.x + mapRect_.w * 0.5f;
+          float cy = mapRect_.y + mapRect_.h * 0.5f;
+          float R = std::min(mapRect_.w, mapRect_.h) * 0.5f;
+
           for (int j = 0; j <= gridH; ++j) {
             float sy = mapRect_.y + (float)j * mapRect_.h / gridH;
             for (int i = 0; i <= gridW; ++i) {
               float sx = mapRect_.x + (float)i * mapRect_.w / gridW;
               int idx = j * (gridW + 1) + i;
+              double nx = (sx - cx) / R;
+              double ny = (cy - sy) / R;
               double lat, lon;
-              if (inverseAzimuthal((i * 2.0 / gridW - 1.0),
-                                   (1.0 - j * 2.0 / gridH), deLat, deLon, lat,
-                                   lon)) {
+              if (inverseAzimuthal(nx, ny, deLat, deLon, lat, lon)) {
                 float u = static_cast<float>((lon + 180.0) / 360.0);
                 float v = static_cast<float>((90.0 - lat) / 180.0);
                 mapVerts_[idx] = {{sx, sy}, {255, 255, 255, 255}, {u, v}};
@@ -3356,44 +3368,40 @@ void MapWidget::renderModal(SDL_Renderer *renderer) {
 }
 
 void MapWidget::renderAzimuthalMask(SDL_Renderer *renderer) {
-  // Clear areas outside the circular azimuthal projection within mapRect_
-  // but also handle the space between mapRect_ and x_,y_,w,h if any.
-
-  // The map is a circle inside mapRect_
-  int radius = mapRect_.w / 2 - 12;
-  int centerX = mapRect_.x + radius;
-
-  // We use 4 rectangles to mask the corners, but for a perfect circle
-  // we could use a custom mesh. Given the "Masking Overlay" recommendation,
-  // let's at least cover the outer rectangular areas that bleed.
-
-  // Actually, some overlays (like propagation) are drawn on the whole
-  // mapRect_. The simplest effective mask is to draw 4 large rects that cover
-  // everything EXCEPT the circle.
+  // Center is the center of the map area.
+  float cx = mapRect_.x + mapRect_.w * 0.5f;
+  float cy = mapRect_.y + mapRect_.h * 0.5f;
+  // Radius is half the height (max 165 for 330 height).
+  // We use a small 2px margin to keep the circle away from the edge.
+  float radius = std::min(mapRect_.w, mapRect_.h) * 0.5f - 2.0f;
 
   SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
-  SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255); // Background black
+  SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
 
-  // Mask the 4 corners of mapRect_ to crop content to the circle.
-  // All map content is already clipped to mapRect_ via SDL_RenderSetClipRect,
-  // so only the within-mapRect_ corners need masking.
   for (int j = 0; j < mapRect_.h; ++j) {
-    int dy = j - radius;
-    int dx = (int)std::sqrt(
-        std::max(0.0, (double)radius * radius - (double)dy * dy));
+    float sy = mapRect_.y + j;
+    float dy = std::abs(sy - cy);
 
-    // Left edge of circle at row j is centerX - dx
-    // Right edge of circle at row j is centerX + dx
+    if (dy >= radius) {
+      // Entire row is outside the circle vertically
+      SDL_Rect fullRow = {mapRect_.x, (int)sy, mapRect_.w, 1};
+      SDL_RenderFillRect(renderer, &fullRow);
+    } else {
+      float dx = std::sqrt(radius * radius - dy * dy);
 
-    SDL_Rect leftCrop = {mapRect_.x, mapRect_.y + j, centerX - dx - mapRect_.x,
-                         1};
-    if (leftCrop.w > 0)
-      SDL_RenderFillRect(renderer, &leftCrop);
+      // Left masking: from mapRect_.x up to cx - dx
+      int xMaskEnd = (int)(cx - dx);
+      SDL_Rect leftCrop = {mapRect_.x, (int)sy, xMaskEnd - mapRect_.x, 1};
+      if (leftCrop.w > 0)
+        SDL_RenderFillRect(renderer, &leftCrop);
 
-    SDL_Rect rightCrop = {centerX + dx, mapRect_.y + j,
-                          mapRect_.x + mapRect_.w - (centerX + dx), 1};
-    if (rightCrop.w > 0)
-      SDL_RenderFillRect(renderer, &rightCrop);
+      // Right masking: from cx + dx to mapRect_.x + mapRect_.w
+      int xMaskStart = (int)(cx + dx);
+      SDL_Rect rightCrop = {xMaskStart, (int)sy,
+                            (mapRect_.x + mapRect_.w) - xMaskStart, 1};
+      if (rightCrop.w > 0)
+        SDL_RenderFillRect(renderer, &rightCrop);
+    }
   }
 }
 

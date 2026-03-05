@@ -37,15 +37,18 @@ void GimbalPanel::update() {
     if (hasRotator_) {
       az_ = rotData.azimuth;
       el_ = rotData.elevation;
+      flipActive_ = rotData.flipActive;
     } else if (hasSat_) {
       // Fall back to satellite prediction
       az_ = satAz_;
       el_ = satEl_;
+      flipActive_ = false;
     }
   } else if (hasSat_) {
     // No rotator configured, use satellite prediction
     az_ = satAz_;
     el_ = satEl_;
+    flipActive_ = false;
   }
 }
 
@@ -65,6 +68,12 @@ void GimbalPanel::render(SDL_Renderer *renderer) {
   auto *cat = fontMgr_.catalog();
   cat->drawText(renderer, "Rotator", x_ + 10, y_ + 5, accent,
                 FontStyle::MicroBold);
+
+  if (flipActive_) {
+    int upW = fontMgr_.getLogicalWidth("UPOVER", cat->ptSize(FontStyle::MicroBold));
+    cat->drawText(renderer, "UPOVER", x_ + width_ - upW - 10, y_ + 5,
+                  {255, 128, 0, 255}, FontStyle::MicroBold);
+  }
 
   // Display status line (Rotator status or Sat name)
   int statusY = y_ + titleH + 5;

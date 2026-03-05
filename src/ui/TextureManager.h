@@ -83,6 +83,55 @@ public:
   SDL_Texture *loadFromMemory(SDL_Renderer *renderer, const std::string &key,
                               const unsigned char *data, unsigned int size,
                               SDL_Color tint = {255, 255, 255, 255}) {
+    // Determine max dimensions if not already known
+    updateMaxDimensions(renderer);
+
+    SDL_Surface *surface = decodeToSurface(data, size, key, tint, maxW_, maxH_);
+    if (!surface)
+      return nullptr;
+    SDL_Texture *texture = loadFromSurface(renderer, key, surface);
+    SDL_FreeSurface(surface);
+    return texture;
+  }
+
+  // Upload an existing surface to GPU, replacing any existing texture for this
+  // key. Note: The caller remains responsible for freeing the surface if
+  // desired.
+  SDL_Texture *loadFromSurface(SDL_Renderer *renderer, const std::string &key,
+                               SDL_Surface *surface) {
+    if (!surface)
+      return nullptr;
+
+    auto it = cache_.find(key);
+    if (it != cache_.end()) {
+      destroyTexture(it->second.texture);
+      lru_.erase(it->second.lruIt);
+      cache_.erase(it);
+    } else {
+      pruneIfNecessary();
+    }
+
+    SDL_Texture *texture = createTexture(renderer, surface, key);
+    if (!texture && lowMemCallback_) {
+      lowMemCallback_();
+      texture = createTexture(renderer, surface, key);
+    }
+
+    if (texture) {
+      SDL_SetTextureBlendMode(texture, SDL_BLENDMODE_BLEND);
+      insert(key, texture);
+    }
+    return texture;
+  }
+
+  // Thread-safe CPU-bound image decoding and pixel manipulation.
+  // Returns a new SDL_Surface that must be freed by the caller via
+  // SDL_FreeSurface.
+  static SDL_Surface *decodeToSurface(const unsigned char *data,
+                                      unsigned int size,
+                                      const std::string &key = "",
+                                      SDL_Color tint = {255, 255, 255, 255},
+                                      int maxW = 0, int maxH = 0) {
     SDL_RWops *rw = SDL_RWFromConstMem(data, static_cast<int>(size));
     if (!rw)
       return nullptr;
@@ -118,7 +167,7 @@ public:
           uint8_t r, g, b, a;
           SDL_GetRGBA(p, surface->format, &r, &g, &b, &a);
           uint8_t br = std::max({r, g, b});
-          
+
           if (key == "nasa_moon") {
             if (br < 20)
               br = 0;
@@ -135,76 +184,31 @@ public:
             // Remove black background by setting alpha based on brightness.
             // We use a small threshold to kill compression noise.
             uint8_t alpha = 255;
-            if (br < 15) alpha = 0;
-            else if (br < 40) alpha = (uint8_t)(((br - 15) / 25.0f) * 255);
-            
+            if (br < 15)
+              alpha = 0;
+            else if (br < 40)
+              alpha = (uint8_t)(((br - 15) / 25.0f) * 255);
+
             row[x] = SDL_MapRGBA(surface->format, r, g, b, alpha);
           }
         }
       }
     }
 
-    if (maxW_ == 0) {
-      SDL_RendererInfo info;
-      if (SDL_GetRendererInfo(renderer, &info) == 0) {
-        maxW_ = info.max_texture_width;
-        maxH_ = info.max_texture_height;
-#ifdef __EMSCRIPTEN__
-        maxW_ = std::min(maxW_, 1024);
-        maxH_ = std::min(maxH_, 1024);
-#elif (defined(__arm__) || defined(__aarch64__)) && defined(__linux__)
-        // RPi/Linux ARM only — keeps worst-case texture at 4 MB vs 16 MB.
-        // Intentionally excludes macOS ARM (Apple Silicon) which has ample
-        // VRAM.
-        maxW_ = std::min(maxW_, 1024);
-        maxH_ = std::min(maxH_, 1024);
-#endif
-      } else {
-        maxW_ = 2048;
-        maxH_ = 2048;
-      }
-    }
-
-    SDL_Surface *finalSurface = surface;
-    bool mustFreeFinal = false;
-    if (maxW_ > 0 && (surface->w > maxW_ || surface->h > maxH_)) {
-      float scale =
-          std::min((float)maxW_ / surface->w, (float)maxH_ / surface->h);
-      finalSurface = SDL_CreateRGBSurfaceWithFormat(
+    // Downscale if exceeds limits
+    if (maxW > 0 && (surface->w > maxW || surface->h > maxH)) {
+      float scale = std::min((float)maxW / surface->w, (float)maxH / surface->h);
+      SDL_Surface *finalSurface = SDL_CreateRGBSurfaceWithFormat(
           0, (int)(surface->w * scale), (int)(surface->h * scale), 32,
           surface->format->format);
       if (finalSurface) {
         SDL_BlitScaled(surface, nullptr, finalSurface, nullptr);
-        mustFreeFinal = true;
-      } else {
-        finalSurface = surface;
+        SDL_FreeSurface(surface);
+        surface = finalSurface;
       }
     }
 
-    auto it = cache_.find(key);
-    if (it != cache_.end()) {
-      destroyTexture(it->second.texture);
-      lru_.erase(it->second.lruIt);
-      cache_.erase(it);
-    } else {
-      pruneIfNecessary();
-    }
-
-    SDL_Texture *texture = createTexture(renderer, finalSurface, key);
-    if (!texture && lowMemCallback_) {
-      lowMemCallback_();
-      texture = createTexture(renderer, finalSurface, key);
-    }
-
-    if (mustFreeFinal)
-      SDL_FreeSurface(finalSurface);
-    SDL_FreeSurface(surface);
-
-    if (texture) {
-      SDL_SetTextureBlendMode(texture, SDL_BLENDMODE_BLEND);
-      insert(key, texture);
-    }
-    return texture;
+    return surface;
   }
 
   SDL_Texture *generateEarthFallback(SDL_Renderer *renderer,
@@ -218,15 +222,12 @@ public:
     SDL_SetRenderTarget(renderer, texture);
     SDL_SetRenderDrawColor(renderer, 10, 20, 60, 255);
     SDL_RenderClear(renderer);
-    SDL_SetRenderDrawColor(renderer, 40, 60, 100, 255);
-    for (int lon = -180; lon <= 180; lon += 30) {
-      int px = (int)((lon + 180.0) / 360.0 * width);
-      SDL_RenderDrawLine(renderer, px, 0, px, height);
-    }
-    for (int lat = -90; lat <= 90; lat += 30) {
-      int py = (int)((90.0 - lat) / 180.0 * height);
-      SDL_RenderDrawLine(renderer, 0, py, width, py);
-    }
+
+    // Basic map outline
+    SDL_SetRenderDrawColor(renderer, 50, 100, 200, 255);
+    SDL_RenderDrawLine(renderer, 0, height / 2, width, height / 2);
+    SDL_RenderDrawLine(renderer, width / 2, 0, width / 2, height);
+
     SDL_SetRenderTarget(renderer, nullptr);
     insert(key, texture);
     return texture;
@@ -356,6 +357,30 @@ public:
     maxCacheSize_ = size;
     pruneIfNecessary();
   }
+
+  void updateMaxDimensions(SDL_Renderer *renderer) {
+    if (maxW_ == 0) {
+      SDL_RendererInfo info;
+      if (SDL_GetRendererInfo(renderer, &info) == 0) {
+        maxW_ = info.max_texture_width;
+        maxH_ = info.max_texture_height;
+#ifdef __EMSCRIPTEN__
+        maxW_ = std::min(maxW_, 1024);
+        maxH_ = std::min(maxH_, 1024);
+#elif (defined(__arm__) || defined(__aarch64__)) && defined(__linux__)
+        // RPi/Linux ARM only — keeps worst-case texture at 4 MB vs 16 MB.
+        maxW_ = std::min(maxW_, 1024);
+        maxH_ = std::min(maxH_, 1024);
+#endif
+      } else {
+        maxW_ = 2048;
+        maxH_ = 2048;
+      }
+    }
+  }
+
+  int getMaxW() const { return maxW_; }
+  int getMaxH() const { return maxH_; }
 
 private:
   struct CacheEntry {

@@ -1,5 +1,7 @@
 #include "CloudProvider.h"
 #include "../core/Logger.h"
+#include "../core/WorkerService.h"
+#include "../ui/TextureManager.h"
 #include <SDL_image.h>
 #include <chrono>
 #include <ctime>
@@ -12,6 +14,10 @@ CloudProvider::~CloudProvider() {
   if (texture_) {
     SDL_DestroyTexture(texture_);
     texture_ = nullptr;
+  }
+  if (pendingSurface_) {
+    SDL_FreeSurface(pendingSurface_);
+    pendingSurface_ = nullptr;
   }
 }
 
@@ -46,20 +52,27 @@ void CloudProvider::update() {
           return;
         }
 
-        // Validate JPEG header (magic number)
-        if (data.size() < 4 || (uint8_t)data[0] != 0xFF ||
-            (uint8_t)data[1] != 0xD8) {
-          LOG_E("CloudProvider", "Invalid JPEG data received from {}", url);
-          return;
-        }
+        // Offload decoding to background thread
+        WorkerService::getInstance().submitTask([this, data = std::move(data)]() {
+          SDL_Surface *surf = TextureManager::decodeToSurface(
+              reinterpret_cast<const unsigned char *>(data.data()),
+              static_cast<unsigned int>(data.size()), "clouds");
 
-        std::lock_guard<std::mutex> lock(mutex_);
-        jpgData_ = std::move(data);
-        hasData_ = true;
-        textureDirty_ = true;
-        lastUpdateMs_ = SDL_GetTicks();
-        LOG_I("CloudProvider", "Received {} bytes of cloud data",
-              jpgData_.size());
+          if (surf) {
+            std::lock_guard<std::mutex> lock(mutex_);
+            if (pendingSurface_) {
+              SDL_FreeSurface(pendingSurface_);
+            }
+            pendingSurface_ = surf;
+            hasData_ = true;
+            textureDirty_ = true;
+            lastUpdateMs_ = SDL_GetTicks();
+            LOG_I("CloudProvider", "Decoded {}x{} cloud surface in background",
+                  surf->w, surf->h);
+          } else {
+            LOG_E("CloudProvider", "Failed to decode cloud JPEG in background");
+          }
+        });
       },
       3600); // Cache for 1 hour
 }
@@ -67,51 +80,31 @@ void CloudProvider::update() {
 bool CloudProvider::hasData() const { return hasData_; }
 
 const std::string &CloudProvider::getData() const {
-  std::lock_guard<std::mutex> lock(mutex_);
-  return jpgData_;
+  static std::string empty;
+  return empty; // jpgData_ removed to save RAM since we decode in background
 }
 
 SDL_Texture *CloudProvider::getTexture(SDL_Renderer *renderer, int w, int h) {
   std::lock_guard<std::mutex> lock(mutex_);
 
-  if (!hasData_ || jpgData_.empty()) {
-    return nullptr;
-  }
-
-  // If we have a texture and it's not dirty, return it.
-  // Note: we don't strictly enforce w/h match here because we might want to stretch it.
-  // But if we wanted to support resizing efficiently, we might re-create.
-  // For now, we just rely on SDL_RenderCopy to scale it.
-  if (texture_ && !textureDirty_) {
-    return texture_;
-  }
-
-  if (textureDirty_) {
+  // Check for new surface from background thread
+  if (pendingSurface_) {
     if (texture_) {
       SDL_DestroyTexture(texture_);
-      texture_ = nullptr;
     }
-
-    SDL_RWops *rw = SDL_RWFromConstMem(jpgData_.data(), (int)jpgData_.size());
-    if (rw) {
-      SDL_Surface *surf = IMG_Load_RW(rw, 1); // 1 = frees src
-      if (surf) {
-        texture_ = SDL_CreateTextureFromSurface(renderer, surf);
-        if (texture_) {
-          texW_ = surf->w;
-          texH_ = surf->h;
-          SDL_SetTextureBlendMode(texture_, SDL_BLENDMODE_BLEND);
-          LOG_D("CloudProvider", "Created cloud texture {}x{}", texW_, texH_);
-        } else {
-          LOG_E("CloudProvider", "Failed to create texture: {}",
-                SDL_GetError());
-        }
-        SDL_FreeSurface(surf);
-      } else {
-        LOG_E("CloudProvider", "Failed to load JPEG: {}", IMG_GetError());
-      }
+    texture_ = SDL_CreateTextureFromSurface(renderer, pendingSurface_);
+    if (texture_) {
+      texW_ = pendingSurface_->w;
+      texH_ = pendingSurface_->h;
+      SDL_SetTextureBlendMode(texture_, SDL_BLENDMODE_BLEND);
     }
+    SDL_FreeSurface(pendingSurface_);
+    pendingSurface_ = nullptr;
     textureDirty_ = false;
+  }
+
+  if (!texture_) {
+    return nullptr;
   }
 
   return texture_;

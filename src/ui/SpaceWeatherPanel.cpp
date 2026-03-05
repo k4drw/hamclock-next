@@ -407,6 +407,10 @@ void SpaceWeatherPanel::render(SDL_Renderer *renderer) {
     }
   }
 
+  if (tooltip_.visible) {
+    renderTooltip(renderer, fontMgr_);
+  }
+
   lastLabelFontSize_ = labelFontSize_;
   lastValueFontSize_ = valueFontSize_;
 }
@@ -417,6 +421,76 @@ void SpaceWeatherPanel::onResize(int x, int y, int w, int h) {
   labelFontSize_ = cat->ptSize(FontStyle::Fast);
   valueFontSize_ = cat->ptSize(FontStyle::SmallBold);
   destroyCache();
+}
+
+void SpaceWeatherPanel::onMouseMove(int mx, int my) {
+  bool isNarrow = (width_ < 110);
+  int numRows = isNarrow ? 4 : 2;
+  int titleH = 20;
+  bool showSparkline =
+      (!isNarrow && xrayStore_ && !sparklineHistory_.empty() && height_ >= 80);
+  int sparklineH = showSparkline ? 22 : 0;
+  int cellH = (height_ - titleH - sparklineH - 10) / numRows;
+
+  if (!showSparkline || sparklineHistory_.empty()) {
+    tooltip_.visible = false;
+    return;
+  }
+
+  // Sparkline area (must match render() logic)
+  const int pad = 4;
+  const int slX = x_ + pad;
+  const int slW = width_ - 2 * pad;
+  const int slY = y_ + titleH + numRows * cellH + 2;
+  const int slH = sparklineH - 4;
+
+  if (mx < slX || mx > slX + slW || my < slY || my > slY + slH) {
+    tooltip_.visible = false;
+    return;
+  }
+
+  // Find nearest data point based on X coordinate
+  auto now = std::chrono::system_clock::now();
+  auto tMin = now - std::chrono::hours(6);
+  double tSpan = std::chrono::duration<double>(now - tMin).count();
+
+  float bestDist = 99999.0f;
+  const XRayDataPoint *bestPoint = nullptr;
+
+  for (const auto &pt : sparklineHistory_) {
+    if (pt.timestamp < tMin)
+      continue;
+
+    double age = std::chrono::duration<double>(pt.timestamp - tMin).count();
+    int px = slX + static_cast<int>(age / tSpan * slW);
+    float dist = std::abs(static_cast<float>(mx - px));
+    if (dist < bestDist) {
+      bestDist = dist;
+      bestPoint = &pt;
+    }
+  }
+
+  if (bestPoint && bestDist < 10.0f) {
+    auto ageMins = std::chrono::duration_cast<std::chrono::minutes>(
+                       now - bestPoint->timestamp)
+                       .count();
+    char buf[64];
+    // Convert flux to Scientific notation
+    if (ageMins < 5) {
+      std::snprintf(buf, sizeof(buf), "%.1e W/m2 (Now)", bestPoint->flux);
+    } else {
+      std::snprintf(buf, sizeof(buf), "%.1e W/m2 (-%lldh %lldm)",
+                    bestPoint->flux, static_cast<long long>(ageMins / 60),
+                    static_cast<long long>(ageMins % 60));
+    }
+    tooltip_.text = buf;
+    tooltip_.x = mx;
+    tooltip_.y = my;
+    tooltip_.visible = true;
+    tooltip_.timestamp = SDL_GetTicks();
+  } else {
+    tooltip_.visible = false;
+  }
 }
 
 bool SpaceWeatherPanel::onMouseUp(int mx, int my, Uint16 mod, int clicks) {

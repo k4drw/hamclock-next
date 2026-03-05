@@ -255,14 +255,18 @@ void RotatorService::pollLoop() {
           // This keeps az movement to < 180° while the satellite transits.
           // We arm the flip when we predict imminent zenith crossing and
           // hold it until elevation decreases back below 80° (hysteresis).
-          if (elCmd > 85.0 && !flipActive_) {
-            // Enter flip: dish dips through zenith
-            flipActive_ = true;
-            LOG_I("Rotator", "Upover flip engaged at el={:.1f}", elCmd);
-          } else if (elCmd < 70.0 && flipActive_) {
-            // Hysteresis: exit flip once well past zenith
+          if (config_.rotatorUpover) {
+            if (elCmd > 85.0 && !flipActive_) {
+              // Enter flip: dish dips through zenith
+              flipActive_ = true;
+              LOG_I("Rotator", "Upover flip engaged at el={:.1f}", elCmd);
+            } else if (elCmd < 70.0 && flipActive_) {
+              // Hysteresis: exit flip once well past zenith
+              flipActive_ = false;
+              LOG_I("Rotator", "Upover flip released at el={:.1f}", elCmd);
+            }
+          } else {
             flipActive_ = false;
-            LOG_I("Rotator", "Upover flip released at el={:.1f}", elCmd);
           }
 
           if (flipActive_) {
@@ -272,6 +276,7 @@ void RotatorService::pollLoop() {
           // ----------------------------------------------------------------
 
           RotatorData current = store_->get();
+          current.flipActive = flipActive_;
           double azErr = std::abs(azCmd - current.azimuth);
           double elErr = std::abs(elCmd - current.elevation);
 

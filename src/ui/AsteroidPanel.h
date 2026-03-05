@@ -8,10 +8,13 @@
 #include <memory>
 #include <vector>
 
+class AsteroidProvider;
+class TextureManager;
+
 class AsteroidPanel : public ListPanel {
 public:
   AsteroidPanel(int x, int y, int w, int h, FontManager &fontMgr,
-                AsteroidProvider &provider,
+                TextureManager &texMgr, AsteroidProvider &provider,
                 std::shared_ptr<HamClockState> state = nullptr,
                 AppConfig *config = nullptr,
                 std::function<void()> onSave = nullptr);
@@ -37,6 +40,7 @@ private:
 
   struct AzElPoint { double az; double el; };
 
+  TextureManager &texMgr_;
   AsteroidProvider &provider_;
   AsteroidData lastData_;
   std::shared_ptr<HamClockState> state_;

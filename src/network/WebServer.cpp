@@ -34,6 +34,7 @@
 #include "../core/DXClusterData.h"
 #include "../core/LiveSpotData.h"
 #include "../core/SatelliteManager.h"
+#include "../services/ADIFProvider.h"
 #ifdef ENABLE_DEBUG_API
 #include "../core/UIRegistry.h"
 #endif
@@ -51,6 +52,24 @@
 #endif
 
 using namespace HamClock;
+
+static SDL_Color hexToColor(const std::string &hex) {
+  SDL_Color c = {255, 255, 255, 255};
+  if (hex.empty())
+    return c;
+  std::string s = hex;
+  if (s[0] == '#')
+    s = s.substr(1);
+  if (s.length() == 6) {
+    unsigned int r, g, b;
+    if (std::sscanf(s.c_str(), "%02x%02x%02x", &r, &g, &b) == 3) {
+      c.r = (uint8_t)r;
+      c.g = (uint8_t)g;
+      c.b = (uint8_t)b;
+    }
+  }
+  return c;
+}
 
 [[maybe_unused]] static std::string propOverlayToString(PropOverlayType t) {
   switch (t) {
@@ -503,6 +522,50 @@ loadConfig();
     if (cfgMgr_) cfgMgr_->save(*cfg_);
     if (reloadFlag_) reloadFlag_->store(true, std::memory_order_release);
     res.set_content("ok", "text/plain");
+  });
+
+  svr.Get("/set_rss", [this](const httplib::Request &req, httplib::Response &res) {
+    if (req.has_param("enabled")) {
+      cfg_->rssEnabled = req.get_param_value("enabled") == "1";
+      if (cfgMgr_) cfgMgr_->save(*cfg_);
+      if (reloadFlag_) reloadFlag_->store(true, std::memory_order_release);
+      res.set_content("ok", "text/plain");
+    } else {
+      res.status = 400;
+    }
+  });
+
+  svr.Get("/set_mapcolor", [this](const httplib::Request &req, httplib::Response &res) {
+    if (req.has_param("key") && req.has_param("color")) {
+      std::string key = req.get_param_value("key");
+      std::string color = req.get_param_value("color");
+      cfg_->colorOverrides[key] = hexToColor(color);
+      if (cfgMgr_) cfgMgr_->save(*cfg_);
+      if (reloadFlag_) reloadFlag_->store(true, std::memory_order_release);
+      res.set_content("ok", "text/plain");
+    } else {
+      res.status = 400;
+    }
+  });
+
+  svr.Post("/set_adif", [this](const httplib::Request &req, httplib::Response &res) {
+    if (req.has_file("adif")) {
+      const auto &file = req.get_file_value("adif");
+      std::filesystem::path path = cfgMgr_->configDir() / "upload.adi";
+      std::ofstream ofs(path, std::ios::binary);
+      if (ofs) {
+        ofs.write(file.content.data(), file.content.size());
+        ofs.close();
+        if (adifProvider_) {
+          adifProvider_->fetch(path);
+        }
+        res.set_content("ok", "text/plain");
+      } else {
+        res.status = 500;
+      }
+    } else {
+      res.status = 400;
+    }
   });
 
   svr.Get("/api/display/status", [this](const httplib::Request &, httplib::Response &res) {
