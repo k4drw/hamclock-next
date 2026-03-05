@@ -268,13 +268,27 @@ void SpaceWeatherPanel::render(SDL_Renderer *renderer) {
         MemoryMonitor::getInstance().destroyTexture(items_[itemIdx].valueTex);
       }
       int vSize = valueFontSize_;
-      // Special case: Wind text in Pane 4 (isSmall) might overflow
+      // Special case: Wind text in Pane 4 (isSmall) often needs shrinking
       if (isSmall && itemIdx == 4) {
         vSize = std::max(8, vSize - 2);
       }
+
+      // Initial render
       items_[itemIdx].valueTex = fontMgr_.renderText(
           renderer, items_[itemIdx].value, items_[itemIdx].valueColor, vSize,
           &items_[itemIdx].valueW, &items_[itemIdx].valueH, true);
+
+      // --- Shrink-to-fit logic ---
+      // If width exceeds cell (minus padding), re-render smaller
+      int maxW = cellW - 4;
+      while (items_[itemIdx].valueW > maxW && vSize > 8) {
+        MemoryMonitor::getInstance().destroyTexture(items_[itemIdx].valueTex);
+        vSize--;
+        items_[itemIdx].valueTex = fontMgr_.renderText(
+            renderer, items_[itemIdx].value, items_[itemIdx].valueColor, vSize,
+            &items_[itemIdx].valueW, &items_[itemIdx].valueH, true);
+      }
+
       items_[itemIdx].lastValue = items_[itemIdx].value;
       items_[itemIdx].lastValueColor = items_[itemIdx].valueColor;
     }

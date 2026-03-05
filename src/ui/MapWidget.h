@@ -139,6 +139,7 @@ private:
   void renderPropagationOverlay(SDL_Renderer *renderer);
   void updatePropagationOverlay();
   void renderAzimuthalMask(SDL_Renderer *renderer);
+  void renderCountryBorders(SDL_Renderer *renderer);
 
   TextureManager &texMgr_;
   FontManager &fontMgr_;
@@ -166,6 +167,7 @@ private:
   SDL_Rect mapRect_ = {};
   bool mapLoaded_ = false;
   int currentMonth_ = 0; // 1-12
+  std::string lastStyle_;
 
   std::mutex mapDataMutex_;
   std::string pendingMapData_;
@@ -202,6 +204,9 @@ private:
   std::vector<int> asteroidTrackIndices_;
   bool gridDirty_ = true;
   std::vector<SDL_Vertex> gridVerts_;
+  bool borderDirty_ = true;
+  std::vector<SDL_Vertex> borderVerts_;
+  std::vector<int> borderIndices_;
 
   // Buffers for batching spots (dynamic per frame)
   std::vector<SDL_Vertex> spotVerts_;

@@ -65,6 +65,7 @@ struct AppConfig {
   int mufRtOpacity = 40;    // percentage
   bool showSatTrack = true; // Show satellite ground track line on world map
   bool showBeacons = true;  // Show NCDXF beacons on world map
+  bool showBorders = false; // Show Natural Earth country borders
 
   // Pane widget selection (top bar panes 1–3)  // Pane widget selection
   // (rotation sets)
@@ -233,6 +234,15 @@ public:
   // Save config to disk. Creates directories if needed. Returns false on
   // failure.
   bool save(const AppConfig &config);
+
+  // Apply a preset to the given config
+  void applyPreset(AppConfig &config, int index);
+
+  // Save current config as a new preset
+  void savePreset(AppConfig &config, const std::string &name);
+
+  // Delete a preset
+  void deletePreset(AppConfig &config, int index);
 
   // Returns the resolved config file path (valid after init()).
   const std::filesystem::path &configPath() const { return configPath_; }

@@ -13,6 +13,7 @@
 #include "../core/PropEngine.h"
 #include "../core/StringUtils.h"
 #include "../core/WorkerService.h"
+#include "../core/WorldBorders.h"
 #include "../services/AsteroidProvider.h"
 #include "../services/BeaconProvider.h"
 #include "../services/CloudProvider.h"
@@ -423,8 +424,9 @@ void MapWidget::update() {
   std::tm *tm = std::localtime(&t);
   int month = tm->tm_mon + 1; // 1-12
 
-  if (month != currentMonth_) {
+  if (month != currentMonth_ || config_.mapStyle != lastStyle_) {
     currentMonth_ = month;
+    lastStyle_ = config_.mapStyle;
 
     char url[256];
     const std::string &style = config_.mapStyle;
@@ -443,10 +445,11 @@ void MapWidget::update() {
           "world.topo.2004%02d.3x5400x2700.jpg",
           kMonthNames[month - 1], month);
     } else {
-      if (style != "nasa") {
+      if (!style.empty() && style != "nasa") {
         LOG_W("MapWidget", "Unknown map style '{}', falling back to 'nasa'",
               style);
       }
+      // Note: BMNG-Base is the standard "Blue Marble" look.
       std::snprintf(
           url, sizeof(url),
           "https://assets.science.nasa.gov/content/dam/science/esd/eo/images/"
@@ -1169,6 +1172,16 @@ void MapWidget::render(SDL_Renderer *renderer) {
 
   SDL_Texture *mapTex = texMgr_.get(MAP_KEY);
   if (mapTex) {
+    bool projChanged = (lastProjection_ != config_.projection);
+    if (projChanged) {
+      lastProjection_ = config_.projection;
+      borderDirty_ = true;
+      gridDirty_ = true;
+      greatCircleDirty_ = true;
+      satTrackDirty_ = true;
+      asteroidTrackDirty_ = true;
+    }
+
     if (config_.projection != "equirectangular") {
       // Draw using mesh to support Robinson, Mercator, or Azimuthal warping
       // Low-memory mode: reduce mesh density on KMSDRM
@@ -1180,10 +1193,9 @@ void MapWidget::render(SDL_Renderer *renderer) {
       bool needsMeshUpdate =
           mapVerts_.empty() ||
           (mapVerts_.size() != (size_t)(gridW + 1) * (gridH + 1)) ||
-          (lastProjection_ != config_.projection);
+          projChanged;
 
       if (needsMeshUpdate) {
-        lastProjection_ = config_.projection;
         mapVerts_.resize((gridW + 1) * (gridH + 1));
         if (config_.projection == "azimuthal") {
           // Screen-space grid for Azimuthal to avoid antipode singularities
@@ -1301,6 +1313,9 @@ void MapWidget::render(SDL_Renderer *renderer) {
   renderProjectionSelect(renderer);
   renderRssButton(renderer);
   renderOverlayInfo(renderer);
+  if (config_.showBorders)
+    renderCountryBorders(renderer);
+
   renderLegend(renderer);
 
   renderTooltip(renderer);
@@ -2437,6 +2452,7 @@ void MapWidget::onResize(int x, int y, int w, int h) {
   }
   // Invalidate all cached geometry that depends on screen coordinates
   gridDirty_ = true;
+  borderDirty_ = true;
   greatCircleDirty_ = true;
   satTrackDirty_ = true;
   mapVerts_.clear(); // Also force map mesh regen
@@ -2878,13 +2894,14 @@ void MapWidget::renderAuroraOverlay(SDL_Renderer *renderer) {
   const int gridW = 360 / step;
   const int gridH = 180 / step;
 
-  bool needsUpdate = auroraVerts_.empty() || (lastAuroraProjection_ != config_.projection) || 
+  bool needsUpdate = auroraVerts_.empty() ||
+                     (lastAuroraProjection_ != config_.projection) ||
                      (data.lastUpdate > lastAuroraUpdateTime_);
 
   if (needsUpdate) {
     auroraVerts_.clear();
     auroraIndices_.clear();
-    
+
     for (int j = 0; j <= gridH; ++j) {
       double lat = 90.0 - j * step;
       // Grid row is 0..180 matching Lat -90..90
@@ -2894,21 +2911,24 @@ void MapWidget::renderAuroraOverlay(SDL_Renderer *renderer) {
       for (int i = 0; i <= gridW; ++i) {
         // worldLon is -180 to 180
         double worldLon = -180.0 + i * step;
-        
+
         // Map worldLon (-180..180) to data grid column (0..359)
         int dataCol = static_cast<int>(std::round(worldLon));
-        while (dataCol < 0) dataCol += 360;
-        while (dataCol >= 360) dataCol -= 360;
+        while (dataCol < 0)
+          dataCol += 360;
+        while (dataCol >= 360)
+          dataCol -= 360;
 
         uint8_t val = data.grid[dataRow * 360 + dataCol];
         SDL_FPoint pt = latLonToScreen(lat, worldLon);
-        
+
         SDL_Color color = {0, 255, 0, 0};
         if (val >= 5) {
           // Green with alpha based on probability
-          color.a = static_cast<uint8_t>(std::clamp(40 + (val * 160 / 100), 0, 200));
+          color.a =
+              static_cast<uint8_t>(std::clamp(40 + (val * 160 / 100), 0, 200));
         }
-        
+
         auroraVerts_.push_back({pt, color, {0, 0}});
       }
     }
@@ -2929,12 +2949,16 @@ void MapWidget::renderAuroraOverlay(SDL_Renderer *renderer) {
         // Check for date-line wrap in longitude
         float lon0 = -180.0f + i * step;
         float lon1 = -180.0f + (i + 1) * step;
-        if (std::abs(lon0 - lon1) > 180.0f) wrap = true;
+        if (std::abs(lon0 - lon1) > 180.0f)
+          wrap = true;
 
         // Also check screen-space jump for projections that warp significantly
-        if (!wrap && (config_.projection == "azimuthal" || config_.projection == "robinson")) {
-          float d1 = std::abs(auroraVerts_[p0].position.x - auroraVerts_[p1].position.x);
-          if (d1 > mapRect_.w / 2) wrap = true;
+        if (!wrap && (config_.projection == "azimuthal" ||
+                      config_.projection == "robinson")) {
+          float d1 = std::abs(auroraVerts_[p0].position.x -
+                              auroraVerts_[p1].position.x);
+          if (d1 > mapRect_.w * 0.5f)
+            wrap = true;
         }
 
         if (!wrap) {
@@ -2954,8 +2978,9 @@ void MapWidget::renderAuroraOverlay(SDL_Renderer *renderer) {
   if (!auroraVerts_.empty()) {
     texMgr_.generateWhiteTexture(renderer);
     SDL_Texture *whiteTex = texMgr_.get("white");
-    SDL_RenderGeometry(renderer, whiteTex, auroraVerts_.data(), (int)auroraVerts_.size(),
-                       auroraIndices_.data(), (int)auroraIndices_.size());
+    SDL_RenderGeometry(renderer, whiteTex, auroraVerts_.data(),
+                       (int)auroraVerts_.size(), auroraIndices_.data(),
+                       (int)auroraIndices_.size());
   }
 
   SDL_RenderSetClipRect(renderer, nullptr);
@@ -3119,5 +3144,94 @@ void MapWidget::renderAzimuthalMask(SDL_Renderer *renderer) {
                           mapRect_.x + mapRect_.w - (centerX + dx), 1};
     if (rightCrop.w > 0)
       SDL_RenderFillRect(renderer, &rightCrop);
+  }
+}
+
+void MapWidget::renderCountryBorders(SDL_Renderer *renderer) {
+  if (borderDirty_) {
+    borderVerts_.clear();
+    borderIndices_.clear();
+
+    SDL_Color mainColor = {200, 200, 200, 180}; // Crisp light grey
+    SDL_Color glowColor = {0, 0, 0, 100};       // Subtle dark glow/shadow
+
+    for (uint32_t i = 0; i < g_NumWorldBorders; ++i) {
+      const auto &line = g_WorldBorders[i];
+      if (line.numPts < 2)
+        continue;
+
+      std::vector<SDL_FPoint> pts;
+      pts.reserve(line.numPts);
+      for (uint16_t j = 0; j < line.numPts; ++j) {
+        double lat = line.pts[j].lat / 100.0;
+        double lon = line.pts[j].lon / 100.0;
+        pts.push_back(latLonToScreen(lat, lon));
+      }
+
+      for (size_t j = 0; j < pts.size() - 1; ++j) {
+        if (std::abs(pts[j].x - pts[j + 1].x) > mapRect_.w * 0.5f)
+          continue;
+
+        float x1 = pts[j].x, y1 = pts[j].y;
+        float x2 = pts[j + 1].x, y2 = pts[j + 1].y;
+        float dx = x2 - x1;
+        float dy = y2 - y1;
+        float len = std::sqrt(dx * dx + dy * dy);
+        if (len < 0.1f)
+          continue;
+        dx /= len;
+        dy /= len;
+
+        // Layer 1: Subtle Dark Glow (Thicker)
+        {
+          float thickness = 2.2f;
+          float nx = -dy * (thickness * 0.5f);
+          float ny = dx * (thickness * 0.5f);
+          int startIdx = (int)borderVerts_.size();
+
+          borderVerts_.push_back({{x1 + nx, y1 + ny}, glowColor, {0, 0}});
+          borderVerts_.push_back({{x1 - nx, y1 - ny}, glowColor, {0, 1}});
+          borderVerts_.push_back({{x2 + nx, y2 + ny}, glowColor, {0, 0}});
+          borderVerts_.push_back({{x2 - nx, y2 - ny}, glowColor, {0, 1}});
+
+          borderIndices_.push_back(startIdx + 0);
+          borderIndices_.push_back(startIdx + 1);
+          borderIndices_.push_back(startIdx + 2);
+          borderIndices_.push_back(startIdx + 2);
+          borderIndices_.push_back(startIdx + 1);
+          borderIndices_.push_back(startIdx + 3);
+        }
+
+        // Layer 2: Main Border Line (Thinner)
+        {
+          float thickness = 1.2f;
+          float nx = -dy * (thickness * 0.5f);
+          float ny = dx * (thickness * 0.5f);
+          int startIdx = (int)borderVerts_.size();
+
+          borderVerts_.push_back({{x1 + nx, y1 + ny}, mainColor, {0, 0}});
+          borderVerts_.push_back({{x1 - nx, y1 - ny}, mainColor, {0, 1}});
+          borderVerts_.push_back({{x2 + nx, y2 + ny}, mainColor, {0, 0}});
+          borderVerts_.push_back({{x2 - nx, y2 - ny}, mainColor, {0, 1}});
+
+          borderIndices_.push_back(startIdx + 0);
+          borderIndices_.push_back(startIdx + 1);
+          borderIndices_.push_back(startIdx + 2);
+          borderIndices_.push_back(startIdx + 2);
+          borderIndices_.push_back(startIdx + 1);
+          borderIndices_.push_back(startIdx + 3);
+        }
+      }
+    }
+    borderDirty_ = false;
+    LOG_D("MapWidget", "Country borders geometry cached ({} vertices)",
+          (int)borderVerts_.size());
+  }
+
+  if (!borderVerts_.empty()) {
+    SDL_Texture *lineTex = texMgr_.get(LINE_AA_KEY);
+    SDL_RenderGeometry(renderer, lineTex, borderVerts_.data(),
+                       (int)borderVerts_.size(), borderIndices_.data(),
+                       (int)borderIndices_.size());
   }
 }

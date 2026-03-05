@@ -87,8 +87,8 @@ void PresetsModal::render(SDL_Renderer *renderer) {
   // ── Title bar ────────────────────────────────────────────────────────────
   SDL_Rect titleBg = {dialogRect_.x, dialogRect_.y, kModalW, 30};
   fillRect(renderer, titleBg, {28, 35, 48, 255});
-  cat->drawText(renderer, "Presets", dialogRect_.x + 10, dialogRect_.y + 8,
-                white, FontStyle::UIBold);
+  cat->drawText(renderer, "Presets", dialogRect_.x + 10, dialogRect_.y + 15,
+                white, FontStyle::UIBold, false, false, true);
 
   // Scroll arrows (only useful if more than kVisibleRows presets)
   int total = cfg_ ? (int)cfg_->presets.size() : 0;

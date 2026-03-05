@@ -181,6 +181,7 @@ bool ConfigManager::load(AppConfig &config) {
     config.useMetric = ap.value("use_metric", true);
     config.projection = ap.value("projection", "equirectangular");
     config.mapStyle = ap.value("map_style", "nasa");
+    if (config.mapStyle.empty()) config.mapStyle = "nasa";
     config.showGrid = ap.value("show_grid", false);
     config.gridType = ap.value("grid_type", "latlon");
 
@@ -214,6 +215,8 @@ bool ConfigManager::load(AppConfig &config) {
     config.propPower = ap.value("prop_power", 100);
     config.mufRtOpacity = ap.value("muf_rt_opacity", 40);
     config.showSatTrack = ap.value("show_sat_track", true);
+    config.showBeacons = ap.value("show_beacons", true);
+    config.showBorders = ap.value("show_borders", false);
     config.qrzUsername = ap.value("qrz_username", "");
     config.qrzPassword = ap.value("qrz_password", "");
   }
@@ -567,6 +570,8 @@ bool ConfigManager::save(const AppConfig &config) {
       (config.propOverlay == PropOverlayType::Muf);
   json["appearance"]["muf_rt_opacity"] = config.mufRtOpacity;
   json["appearance"]["show_sat_track"] = config.showSatTrack;
+  json["appearance"]["show_beacons"] = config.showBeacons;
+  json["appearance"]["show_borders"] = config.showBorders;
   json["appearance"]["qrz_username"] = config.qrzUsername;
   json["appearance"]["qrz_password"] = config.qrzPassword;
 
@@ -757,4 +762,55 @@ bool ConfigManager::save(const AppConfig &config) {
 #endif
 
   return ofs.good();
+}
+
+void ConfigManager::applyPreset(AppConfig &config, int index) {
+  if (index < 0 || index >= (int)config.presets.size())
+    return;
+
+  const auto &p = config.presets[index];
+  config.pane1Rotation = p.pane1Rotation;
+  config.pane2Rotation = p.pane2Rotation;
+  config.pane3Rotation = p.pane3Rotation;
+  config.pane4Rotation = p.pane4Rotation;
+  config.pane5Rotation = p.pane5Rotation;
+  config.pane6Rotation = p.pane6Rotation;
+  config.rotationIntervalS = p.rotationIntervalS;
+  config.propOverlay = p.propOverlay;
+  config.weatherOverlay = p.weatherOverlay;
+  config.mapStyle = p.mapStyle;
+  config.mapNightLights = p.mapNightLights;
+  config.showGrid = p.showGrid;
+  config.gridType = p.gridType;
+  config.propBand = p.propBand;
+  config.propMode = p.propMode;
+  config.propPower = p.propPower;
+}
+
+void ConfigManager::savePreset(AppConfig &config, const std::string &name) {
+  ConfigPreset p;
+  p.name = name;
+  p.pane1Rotation = config.pane1Rotation;
+  p.pane2Rotation = config.pane2Rotation;
+  p.pane3Rotation = config.pane3Rotation;
+  p.pane4Rotation = config.pane4Rotation;
+  p.pane5Rotation = config.pane5Rotation;
+  p.pane6Rotation = config.pane6Rotation;
+  p.rotationIntervalS = config.rotationIntervalS;
+  p.propOverlay = config.propOverlay;
+  p.weatherOverlay = config.weatherOverlay;
+  p.mapStyle = config.mapStyle;
+  p.mapNightLights = config.mapNightLights;
+  p.showGrid = config.showGrid;
+  p.gridType = config.gridType;
+  p.propBand = config.propBand;
+  p.propMode = config.propMode;
+  p.propPower = config.propPower;
+  config.presets.push_back(std::move(p));
+}
+
+void ConfigManager::deletePreset(AppConfig &config, int index) {
+  if (index >= 0 && index < (int)config.presets.size()) {
+    config.presets.erase(config.presets.begin() + index);
+  }
 }

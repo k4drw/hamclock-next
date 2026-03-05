@@ -123,7 +123,7 @@ void WidgetSelector::render(SDL_Renderer *renderer) {
     cat->drawText(renderer, widgetTypeDisplayName(t),
                   itemRects_[i].x + itemRects_[i].w / 2,
                   itemRects_[i].y + itemRects_[i].h / 2, textColor,
-                  FontStyle::SmallRegular, true);
+                  FontStyle::SmallRegular, true, false, true);
 
     // Draw separator (if not last row)
     int numCols = 4;

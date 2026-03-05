@@ -103,6 +103,7 @@ void MeteorPanel::onMouseMove(int mx, int my) {
     tooltip_.x = mx;
     tooltip_.y = my;
     tooltip_.visible = true;
+    tooltip_.timestamp = SDL_GetTicks();
   } else {
     tooltip_.visible = false;
   }

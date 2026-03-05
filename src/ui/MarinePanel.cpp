@@ -289,7 +289,7 @@ void MarinePanel::renderMenu(SDL_Renderer *renderer,
     SDL_SetRenderDrawColor(renderer, 100, 100, 100, 255);
     SDL_RenderDrawRect(renderer, &r);
     cat->drawText(renderer, label, r.x + r.w / 2, r.y + r.h / 2, white,
-                  FontStyle::Micro, true);
+                  FontStyle::Micro, true, false, true);
   };
 
   int mx, my;

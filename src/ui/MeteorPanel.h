@@ -23,12 +23,6 @@ private:
   MeteorData data_;
   std::mutex mutex_;
 
-  struct {
-    bool visible = false;
-    std::string text;
-    int x, y;
-  } tooltip_;
-
   void drawGraph(SDL_Renderer *renderer, int x, int y, int w, int h, const float* values);
 };
 

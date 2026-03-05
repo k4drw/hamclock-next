@@ -53,8 +53,9 @@ void DXClusterSetup::render(SDL_Renderer *renderer) {
   int y = y_ + height_ / 10;
 
   // --- Title ---
-  cat->drawText(renderer, "DX Cluster Settings", cx, y, cyan,
-                FontStyle::MediumBold, true);
+  cat->drawText(renderer, "DX Cluster Settings", cx,
+                y + cat->ptSize(FontStyle::MediumBold) / 2, cyan,
+                FontStyle::MediumBold, true, false, true);
   y += cat->ptSize(FontStyle::MediumBold) + pad;
 
   // --- Host & Port ---

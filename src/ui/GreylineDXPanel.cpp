@@ -41,39 +41,58 @@ void GreylineDXPanel::render(SDL_Renderer *renderer) {
   if (!currentData_.valid || currentData_.activeEntities.empty()) {
     cat->drawText(renderer, "No entities in greyline", x_ + width_ / 2,
                   y_ + titleH + (height_ - titleH) / 2, themes.textDim,
-                  FontStyle::Micro, true);
+                  FontStyle::Micro, true, false, true);
     return;
   }
 
   int pad = 4;
   int curY = y_ + titleH + pad;
-  int rowH = (height_ - titleH - 2 * pad) / 6;
+  int rowH = (height_ - titleH - 2 * pad) / 7;
   if (rowH < 12) rowH = 12;
+
+  // Column offsets
+  int colPX = x_ + pad;
+  int colOX = x_ + 35;
+  int colNX = x_ + 75;
+
+  // Header
+  cat->drawText(renderer, "PFX", colPX, curY + rowH / 2, themes.textDim,
+                FontStyle::Tiny, false, false, true);
+  cat->drawText(renderer, "OFFSET", colOX, curY + rowH / 2, themes.textDim,
+                FontStyle::Tiny, false, false, true);
+  cat->drawText(renderer, "ENTITY", colNX, curY + rowH / 2, themes.textDim,
+                FontStyle::Tiny, false, false, true);
+  curY += rowH;
 
   int count = 0;
   for (const auto &entity : currentData_.activeEntities) {
     if (curY + rowH > y_ + height_ - pad)
       break;
 
-    char buf[64];
-    // Prefix: +Mins (or -Mins)
-    std::snprintf(buf, sizeof(buf), "%-4s %c%02.0f m",
-                  entity.prefix.empty() ? "??" : entity.prefix.c_str(),
+    std::string pfx = entity.prefix.empty() ? "??" : entity.prefix;
+    char oBuf[16];
+    std::snprintf(oBuf, sizeof(oBuf), "%c%02.0fm",
                   entity.minutesToPeak >= 0 ? '+' : '-',
                   std::abs(entity.minutesToPeak));
 
     SDL_Color valColor = entity.isSunrise ? themes.warning : themes.info;
-    
+
     // Draw row
-    cat->drawText(renderer, buf, x_ + pad, curY + rowH/2, themes.text, FontStyle::Fast, false, false);
-    
+    cat->drawText(renderer, pfx, colPX, curY + rowH / 2, themes.text,
+                  FontStyle::Fast, false, false, true);
+    cat->drawText(renderer, oBuf, colOX, curY + rowH / 2, themes.text,
+                  FontStyle::Fast, false, false, true);
+
     // Entity name (truncated if needed)
     std::string name = entity.name;
-    if (name.length() > 12) name = name.substr(0, 10) + "..";
-    cat->drawText(renderer, name, x_ + width_ - pad, curY + rowH/2, valColor, FontStyle::Micro, true, false);
+    if (name.length() > 14)
+      name = name.substr(0, 12) + "..";
+    cat->drawText(renderer, name, colNX, curY + rowH / 2, valColor,
+                  FontStyle::Micro, false, false, true);
 
     curY += rowH;
-    if (++count >= 8) break;
+    if (++count >= 6)
+      break;
   }
 }
 

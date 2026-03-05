@@ -114,6 +114,7 @@ private:
   std::string projection_ = "equirectangular";
   bool useMetric_ = true;
   bool rssEnabled_ = true;
+  bool showBorders_ = false;
   WeatherOverlayType weatherOverlay_ = WeatherOverlayType::None;
 
   // Services & Rig
@@ -170,6 +171,7 @@ private:
   SDL_Rect nightLightsRect_ = {0, 0, 0, 0};
   SDL_Rect metricToggleRect_ = {0, 0, 0, 0};
   SDL_Rect rssToggleRect_ = {0, 0, 0, 0};
+  SDL_Rect bordersToggleRect_ = {0, 0, 0, 0};
   SDL_Rect weatherOverlayRect_ = {0, 0, 0, 0};
   SDL_Rect mapStyleRect_ = {0, 0, 0, 0};
   SDL_Rect projectionRect_ = {0, 0, 0, 0};

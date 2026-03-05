@@ -1241,7 +1241,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
       break;
     case WidgetType::EME_TOOL:
       widgetPool[type] =
-          std::make_unique<EMEToolPanel>(0, 0, 0, 0, fontMgr, moonStore);
+          std::make_unique<EMEToolPanel>(0, 0, 0, 0, fontMgr, texMgr, moonStore);
       break;
     case WidgetType::SANTA_TRACKER:
       widgetPool[type] =
@@ -1868,6 +1868,16 @@ void DashboardContext::update(AppContext &ctx) {
 
     if (isMaster || isWidgetActive(WidgetType::MOON))
       moonProvider->update(appCfg.lat, appCfg.lon);
+
+    if (isWidgetActive(WidgetType::EME_TOOL)) {
+      auto it = widgetPool.find(WidgetType::EME_TOOL);
+      if (it != widgetPool.end()) {
+        auto *eme = static_cast<EMEToolPanel *>(it->second.get());
+        eme->setDeLocation(appCfg.lat, appCfg.lon);
+        eme->setDxLocation(ctx.state->dxLocation.lat,
+                           ctx.state->dxLocation.lon);
+      }
+    }
 
     if (isMaster || isWidgetActive(WidgetType::HISTORY_FLUX))
       historyProvider->fetchFlux();

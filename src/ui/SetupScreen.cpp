@@ -191,8 +191,9 @@ void SetupScreen::render(SDL_Renderer *renderer) {
 
   int y = modalRect_.y + pad;
 
-  cat->drawText(renderer, "HamClock-Next Setup", cx, y, cyan,
-                FontStyle::MediumBold, true);
+  cat->drawText(renderer, "HamClock-Next Setup", cx,
+                y + cat->ptSize(FontStyle::MediumBold) / 2, cyan,
+                FontStyle::MediumBold, true, false, true);
   y += cat->ptSize(FontStyle::MediumBold) +
        pad / 2; // tightened: was +pad, halved gap to tab bar
 
@@ -384,8 +385,8 @@ void SetupScreen::renderTabIdentity(SDL_Renderer *renderer, int, int pad,
     SDL_Rect check = {fieldX + 4, y + 4, 12, 12};
     SDL_RenderFillRect(renderer, &check);
   }
-  cat->drawText(renderer, "Synchronize with GPS (gpsd)", fieldX + 30, y + 2,
-                white, FontStyle::SmallRegular);
+  cat->drawText(renderer, "Synchronize with GPS (gpsd)", fieldX + 30, y + 10,
+                white, FontStyle::SmallRegular, false, false, true);
 }
 
 void SetupScreen::renderTabDXCluster(SDL_Renderer *renderer, int cx, int pad,
@@ -446,8 +447,8 @@ void SetupScreen::renderTabDXCluster(SDL_Renderer *renderer, int cx, int pad,
     SDL_Rect check = {fieldX + 4, y + 4, 12, 12};
     SDL_RenderFillRect(renderer, &check);
   }
-  cat->drawText(renderer, "Enable DX Cluster", fieldX + 30, y + 2, white,
-                FontStyle::SmallRegular);
+  cat->drawText(renderer, "Enable DX Cluster", fieldX + 30, y + 10, white,
+                FontStyle::SmallRegular, false, false, true);
   clusterToggleRect_ = enableToggle;
 
   y += 24;
@@ -462,8 +463,8 @@ void SetupScreen::renderTabDXCluster(SDL_Renderer *renderer, int cx, int pad,
     SDL_Rect check = {fieldX + 4, y + 4, 12, 12};
     SDL_RenderFillRect(renderer, &check);
   }
-  cat->drawText(renderer, "Use WSJT-X (UDP)", fieldX + 30, y + 2, white,
-                FontStyle::SmallRegular);
+  cat->drawText(renderer, "Use WSJT-X (UDP)", fieldX + 30, y + 10, white,
+                FontStyle::SmallRegular, false, false, true);
   toggleRect_ = toggle;
   if (clusterWSJTX_) {
     int wPortW = std::min(120, halfW);
@@ -494,7 +495,7 @@ void SetupScreen::renderTabDXCluster(SDL_Renderer *renderer, int cx, int pad,
     SDL_RenderFillRect(renderer, &check);
   }
   cat->drawText(renderer, "Enable RBN (feeds DX Cluster panel)", fieldX + 30,
-                y + 2, white, FontStyle::SmallRegular);
+                y + 10, white, FontStyle::SmallRegular, false, false, true);
   rbnToggleRect_ = rbnToggle;
   y += 24;
 }
@@ -560,11 +561,14 @@ void SetupScreen::renderTabAppearance(SDL_Renderer *renderer, int cx, int pad,
   drawToggle(metricToggleRect_, useMetric_, "Metric Units");
   y += 20 + vSpace;
 
-  // Row 3: RSS Toggle & Weather Overlay
+  // Row 3: RSS Toggle, Borders, & Weather Overlay
   rssToggleRect_ = {fieldX, y, 20, 20};
-  drawToggle(rssToggleRect_, rssEnabled_, "RSS Banner");
+  drawToggle(rssToggleRect_, rssEnabled_, "RSS");
 
-  cat->drawText(renderer, "WX Overlay:", fieldX + halfW, y + 10, white,
+  bordersToggleRect_ = {fieldX + halfW - 100, y, 20, 20};
+  drawToggle(bordersToggleRect_, showBorders_, "Borders");
+
+  cat->drawText(renderer, "WX Overlay:", fieldX + halfW + 30, y + 10, white,
                 FontStyle::SmallRegular, false, false, true);
   weatherOverlayRect_ = {fieldX + fieldW - 80, y, 80, 24};
   std::string wStr = (weatherOverlay_ == WeatherOverlayType::Clouds) ? "Clouds"
@@ -577,7 +581,10 @@ void SetupScreen::renderTabAppearance(SDL_Renderer *renderer, int cx, int pad,
   cat->drawText(renderer, "Map Style:", fieldX, y + 12, white,
                 FontStyle::SmallRegular, false, false, true);
   mapStyleRect_ = {fieldX + halfW - 80, y, 80, 24};
-  drawBtn(mapStyleRect_, mapStyle_);
+  std::string msLabel = "NASA";
+  if (mapStyle_ == "topo") msLabel = "Topo";
+  else if (mapStyle_ == "topo_bathy") msLabel = "Topo+B";
+  drawBtn(mapStyleRect_, msLabel);
 
   cat->drawText(renderer, "Projection:", fieldX + halfW, y + 12, white,
                 FontStyle::SmallRegular, false, false, true);
@@ -828,7 +835,7 @@ void SetupScreen::renderTabRig(SDL_Renderer *renderer, int cx, int pad,
     SDL_RenderFillRect(renderer, &check);
   }
   cat->drawText(renderer, "Enable Auto-Tune on DX Spot click", fieldX + 30,
-                y + 2, white, FontStyle::SmallRegular);
+                y + 10, white, FontStyle::SmallRegular, false, false, true);
   y += 24 + pad;
 
   cat->drawText(renderer, "Rig control requires 'rigctld' (Hamlib) running.",
@@ -883,8 +890,8 @@ void SetupScreen::renderTabWidgets(SDL_Renderer *renderer, int cx, int pad,
     SDL_Rect check = {syncRotationRect_.x + 3, syncRotationRect_.y + 3, 10, 10};
     SDL_RenderFillRect(renderer, &check);
   }
-  cat->drawText(renderer, "Sync pane rotation", fieldX + 22, y + 4, gray,
-                FontStyle::Fast);
+  cat->drawText(renderer, "Sync pane rotation", fieldX + 22, y + 8, gray,
+                FontStyle::Fast, false, false, true);
   y += 20;
 
   // --- Widget checklist (scrollable) ---
@@ -982,12 +989,12 @@ void SetupScreen::renderTabWidgets(SDL_Renderer *renderer, int cx, int pad,
           SDL_Rect check = {r.x + 3, r.y + 3, 10, 10};
           SDL_RenderFillRect(renderer, &check);
         }
-        cat->drawText(renderer, widgetTypeDisplayName(t), r.x + 22, r.y, white,
-                      FontStyle::Fast);
+        cat->drawText(renderer, widgetTypeDisplayName(t), r.x + 22, r.y + 8,
+                      white, FontStyle::Fast, false, false, true);
         widgetRects_.push_back({t, r});
       } else {
-        cat->drawText(renderer, widgetTypeDisplayName(t), r.x + 22, r.y,
-                      {60, 60, 70, 255}, FontStyle::Fast);
+        cat->drawText(renderer, widgetTypeDisplayName(t), r.x + 22, r.y + 8,
+                      {60, 60, 70, 255}, FontStyle::Fast, false, false, true);
       }
     }
   }
@@ -1045,8 +1052,9 @@ void SetupScreen::renderTabWidgets(SDL_Renderer *renderer, int cx, int pad,
       SDL_Rect inner = {rr.x + 3, rr.y + 3, 8, 8};
       SDL_RenderFillRect(renderer, &inner);
     }
-    cat->drawText(renderer, kSideLabels[i], rr.x + 22, rr.y,
-                  curMode == i ? white : gray, FontStyle::Fast);
+    cat->drawText(renderer, kSideLabels[i], rr.x + 22, rr.y + 7,
+                  curMode == i ? white : gray, FontStyle::Fast, false, false,
+                  true);
     y += rowH + 2;
   }
 }
@@ -1348,6 +1356,13 @@ bool SetupScreen::onMouseDown(int mx, int my, Uint16 mod, int clicks) {
       rssEnabled_ = !rssEnabled_;
       return true;
     }
+    if (mx >= bordersToggleRect_.x &&
+        mx < bordersToggleRect_.x + bordersToggleRect_.w &&
+        my >= bordersToggleRect_.y &&
+        my < bordersToggleRect_.y + bordersToggleRect_.h) {
+      showBorders_ = !showBorders_;
+      return true;
+    }
     if (mx >= weatherOverlayRect_.x &&
         mx < weatherOverlayRect_.x + weatherOverlayRect_.w &&
         my >= weatherOverlayRect_.y &&
@@ -1363,9 +1378,9 @@ bool SetupScreen::onMouseDown(int mx, int my, Uint16 mod, int clicks) {
     if (mx >= mapStyleRect_.x && mx < mapStyleRect_.x + mapStyleRect_.w &&
         my >= mapStyleRect_.y && my < mapStyleRect_.y + mapStyleRect_.h) {
       if (mapStyle_ == "nasa")
-        mapStyle_ = "terrain";
-      else if (mapStyle_ == "terrain")
-        mapStyle_ = "countries";
+        mapStyle_ = "topo";
+      else if (mapStyle_ == "topo")
+        mapStyle_ = "topo_bathy";
       else
         mapStyle_ = "nasa";
       return true;
@@ -1901,6 +1916,7 @@ void SetupScreen::setConfig(const AppConfig &cfg) {
   panelMode_ = cfg.panelMode;
   selectedSatellite_ = cfg.selectedSatellite;
   rssEnabled_ = cfg.rssEnabled;
+  showBorders_ = cfg.showBorders;
   weatherOverlay_ = cfg.weatherOverlay;
 
   qrzUsernameInput_.setValue(cfg.qrzUsername);
@@ -1974,6 +1990,7 @@ AppConfig SetupScreen::getConfig() const {
   cfg.mapNightLights = mapNightLights_;
   cfg.useMetric = useMetric_;
   cfg.rssEnabled = rssEnabled_;
+  cfg.showBorders = showBorders_;
   cfg.weatherOverlay = weatherOverlay_;
   cfg.callsignColor = callsignColor_;
   cfg.panelMode = panelMode_;
@@ -2024,11 +2041,22 @@ AppConfig SetupScreen::getConfig() const {
 }
 
 std::vector<std::string> SetupScreen::getActions() const {
-  return {"tab_identity",  "tab_dxcluster", "tab_appearance",
-          "tab_widgets",   "field_0",       "field_1",
-          "field_2",       "field_3",       "toggle_night_lights",
-          "toggle_metric", "toggle_rss",    "toggle_weather_overlay",
-          "done",          "cancel"};
+  return {"tab_identity",
+          "tab_dxcluster",
+          "tab_appearance",
+          "tab_widgets",
+          "field_0",
+          "field_1",
+          "field_2",
+          "field_3",
+          "toggle_night_lights",
+          "toggle_metric",
+          "toggle_rss",
+          "toggle_borders",
+          "toggle_weather_overlay",
+          "toggle_map_style",
+          "done",
+          "cancel"};
 }
 
 SDL_Rect SetupScreen::getActionRect(const std::string &action) const {
@@ -2075,8 +2103,12 @@ SDL_Rect SetupScreen::getActionRect(const std::string &action) const {
     return metricToggleRect_;
   if (action == "toggle_rss")
     return rssToggleRect_;
+  if (action == "toggle_borders")
+    return bordersToggleRect_;
   if (action == "toggle_weather_overlay")
     return weatherOverlayRect_;
+  if (action == "toggle_map_style")
+    return mapStyleRect_;
 
   if (action == "done") {
     return okBtnRect_;
