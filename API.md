@@ -16,8 +16,9 @@ A simplified live viewer.
 Provides a live MJPEG video stream of the HamClock display.
 - **Refresh Rate**: 1 FPS (default to conserve CPU)
 
-### `GET /live.jpg`
+### `GET /live.jpg` (or `/get_capture`)
 Returns the current screen as a JPEG image.
+- **Optional Parameter**: `seq=N`. If provided, wait until image sequence `N` is encoded. If omitted, defaults to `latestSeq`, ensuring a fresh frame.
 
 ### `GET /get_capture`
 Alias for `/live.jpg`.

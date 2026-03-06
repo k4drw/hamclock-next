@@ -1,6 +1,6 @@
 {
   "schema_version": "2.0",
-  "audit_date": "2026-03-02",
+  "audit_date": "2026-03-06",
   "audit_method": "ground-truth code review against hamclock-original/",
   "features": [
     {
@@ -274,11 +274,9 @@
       "suggested_gaps": []
     }
   ],
-  "top_gaps": [
-    "Wiki screenshot automation (docs/wiki/images/ — requires running app)"
-  ],
-  "parity_score": 81,
+  "top_gaps": [],
+  "parity_score": 82,
   "parity_denominator": 82,
-  "parity_percent": 99,
-  "note": "Score excludes 5 NOT_NEEDED items (wifi_meter, gpio_control, 7-seg renderer, RBN-separate, photosensor_autodim). Updated 2026-03-06: dual_hemisphere_projection EQUIVALENT (commit implementing dual azimuthal in MapWidget.cpp + MapViewMenu). Score 80→81 (98%→99%)."
+  "parity_percent": 100,
+  "note": "Score excludes 5 NOT_NEEDED items (wifi_meter, gpio_control, 7-seg renderer, RBN-separate, photosensor_autodim). Updated 2026-03-06: dual_hemisphere_projection implemented (81/82); wiki screenshot automation implemented via /get_capture seq fix (82/82). Parity is now 100%."
 }
