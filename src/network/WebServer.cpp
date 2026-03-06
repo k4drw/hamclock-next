@@ -1937,10 +1937,19 @@ void WebServer::run() {
       res.status = 503;
       return;
     }
+    
+    // Increment subscribers so FrameCapture::capture() actually runs on the main thread
+    frameCapture_->addSubscriber();
+    
     uint64_t afterSeq =
         static_cast<uint64_t>(StringUtils::safe_stoi(req.get_param_value("seq")));
     uint64_t outSeq = 0;
-    auto frame = frameCapture_->waitFrame(afterSeq, 200, outSeq);
+    
+    // Increased timeout to 1000ms to allow for RPi 3B scheduling and encoding
+    auto frame = frameCapture_->waitFrame(afterSeq, 1000, outSeq);
+    
+    frameCapture_->removeSubscriber();
+
     if (frame.empty()) {
       res.status = 503;
       return;
