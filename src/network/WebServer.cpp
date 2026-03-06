@@ -1420,6 +1420,8 @@ void WebServer::run() {
       cfg_->liveSpotsOfDe = req.get_param_value("live_spots_of_de") == "1";
     if (req.has_param("live_spots_use_call"))
       cfg_->liveSpotsUseCall = req.get_param_value("live_spots_use_call") == "1";
+    if (req.has_param("pskr_proxy_url"))
+      cfg_->pskrProxyUrl = req.get_param_value("pskr_proxy_url");
     if (req.has_param("brightness"))
       cfg_->brightness =
           StringUtils::safe_stoi(req.get_param_value("brightness"));

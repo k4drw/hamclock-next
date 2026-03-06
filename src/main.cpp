@@ -2911,19 +2911,37 @@ void main_tick() {
       ctx.netManager->setCorsProxyUrl(ctx.appCfg.corsProxyUrl);
       ctx.netManager->setHubConfig(ctx.appCfg.hubMode, ctx.appCfg.hubIp,
                                    ctx.appCfg.hubPort);
-      // Re-apply theme/metric to all live widgets without rebuilding dashboard
-      if (ctx.dashboard) {
-        for (auto const &[type, widget] : ctx.dashboard->widgetPool)
-          if (widget) {
-            widget->setTheme(ctx.appCfg.theme);
-            widget->setMetric(ctx.appCfg.useMetric);
-          }
-        ctx.dashboard->timePanel->setTheme(ctx.appCfg.theme);
-        ctx.dashboard->timePanel->setMetric(ctx.appCfg.useMetric);
-        ctx.dashboard->mapArea->setTheme(ctx.appCfg.theme);
-        ctx.dashboard->mapArea->setMetric(ctx.appCfg.useMetric);
-        ctx.dashboard->widgetSelector->setTheme(ctx.appCfg.theme);
+
+#ifndef __EMSCRIPTEN__
+      // Restart background services that hold persistent config state
+      if (ctx.dxcProvider) {
+        ctx.dxcProvider->stop();
+        if (ctx.isWidgetConfigured(WidgetType::DX_CLUSTER))
+          ctx.dxcProvider->start(ctx.appCfg);
       }
+      if (ctx.rbnProvider) {
+        ctx.rbnProvider->stop();
+        if (ctx.isWidgetConfigured(WidgetType::DX_CLUSTER) &&
+            ctx.appCfg.rbnEnabled)
+          ctx.rbnProvider->start(ctx.appCfg);
+      }
+      if (ctx.rigService) {
+        ctx.rigService->stop();
+        ctx.rigService->start();
+      }
+      if (ctx.rotatorService) {
+        ctx.rotatorService->stop();
+        ctx.rotatorService->start();
+      }
+#endif
+
+      // Rebuild dashboard to refresh all widgets with new config (host, port,
+      // overlays, etc.)
+      if (ctx.dashboard) {
+        ctx.dashboard.reset();
+        LOG_I("Main", "Dashboard rebuild triggered by remote config reload");
+      }
+
       LOG_I("Main", "Config reloaded from remote API: callsign={}",
             ctx.appCfg.callsign);
     }
