@@ -56,6 +56,7 @@ private:
   // Auto-tracking state
   mutable std::mutex trackMutex_;
   bool autoTracking_ = false;
+  bool flipActive_ = false; // Upover mode: active when el > 85° near zenith
   const Satellite *currentSat_ = nullptr;
   OrbitPredictor
       predictor_; // Legacy: keeping for now to avoid breaking existing code

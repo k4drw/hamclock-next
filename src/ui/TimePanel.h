@@ -1,12 +1,16 @@
 #pragma once
 
+#include "../core/ConfigManager.h"
 #include "../core/MemoryMonitor.h"
 #include "FontManager.h"
+#include "PresetsModal.h"
+#include "TextInput.h"
 #include "Widget.h"
 
 #include <SDL.h>
 #include <array>
 #include <functional>
+#include <memory>
 #include <string>
 
 class TextureManager;
@@ -47,8 +51,22 @@ public:
     MemoryMonitor::getInstance().destroyTexture(callTex_);
   }
 
+  // Preset modal interface — call once after timePanel is constructed.
+  void initPresets(AppConfig *cfg, std::function<void()> onApply);
+  bool isModalActive() const override;
+  void renderModal(SDL_Renderer *renderer) override;
+
   bool isSetupRequested() const { return setupRequested_; }
   void clearSetupRequest() { setupRequested_ = false; }
+
+  // Rotation transport controls
+  void setOnPauseRotation(std::function<void()> cb) {
+    onPauseRotation_ = std::move(cb);
+  }
+  void setOnNextRotation(std::function<void()> cb) {
+    onNextRotation_ = std::move(cb);
+  }
+  void setRotationPaused(bool paused) { rotationPaused_ = paused; }
 
   // Called whenever the update checker has new information.
   void setUpdateInfo(bool available, const std::string &latestVersion) {
@@ -79,8 +97,7 @@ private:
 
   // Editor state
   bool editing_ = false;
-  std::string editText_;
-  int cursorPos_ = 0;
+  TextInput editInput_;
   int selectedColorIdx_ = 2; // default to orange
 
   static constexpr int kNumColors = 12;
@@ -129,6 +146,11 @@ private:
   int lastDateFontSize_ = 0;
 
   ConfigChangedCb onConfigChanged_;
+  std::function<void()> onPauseRotation_;
+  std::function<void()> onNextRotation_;
+  bool rotationPaused_ = false;
+  SDL_Rect pauseRect_ = {};
+  SDL_Rect nextRect_ = {};
   bool setupRequested_ = false;
   bool updateAvailable_ = false;
   std::string latestVersion_;
@@ -136,6 +158,12 @@ private:
   SDL_Rect versionRect_ = {};
   int gearSize_ = 12;
   bool updateRequested_ = false;
+
+  // Presets
+  std::unique_ptr<PresetsModal> presetsModal_;
+  SDL_Rect presetsRect_ = {};
+  SDL_Texture *starTex_ = nullptr;
+  int starW_ = 0, starH_ = 0;
 
   // Info bar state (uptime, rotating center, version)
   std::string currentUptime_;

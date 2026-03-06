@@ -29,21 +29,23 @@ double RepeaterProvider::haversineKm(double lat1, double lon1, double lat2,
 
 void RepeaterProvider::fetch(double lat, double lon, const std::string &state,
                               bool force) {
-  // RepeaterBook public export API — no API key required.
-  // Limit to 150 km radius; filter by state when provided.
+  // RepeaterBook API. Use key if configured in AppConfig.
+  auto &cfg = ConfigManager::instance().getConfig();
+  std::string key = cfg.repeaterBookKey;
+
   char url[512];
   if (!state.empty()) {
     std::snprintf(
         url, sizeof(url),
         "https://www.repeaterbook.com/api/export.php?country=United%%20States"
-        "&state=%s&lat=%.4f&lng=%.4f&dist=93&Dunit=k&fmt=json",
-        state.c_str(), lat, lon);
+        "&state=%s&lat=%.4f&lng=%.4f&dist=93&Dunit=k&fmt=json%s%s",
+        state.c_str(), lat, lon, key.empty() ? "" : "&key=", key.c_str());
   } else {
     std::snprintf(
         url, sizeof(url),
         "https://www.repeaterbook.com/api/export.php?country=United%%20States"
-        "&lat=%.4f&lng=%.4f&dist=93&Dunit=k&fmt=json",
-        lat, lon);
+        "&lat=%.4f&lng=%.4f&dist=93&Dunit=k&fmt=json%s%s",
+        lat, lon, key.empty() ? "" : "&key=", key.c_str());
   }
 
   double deLat = lat;

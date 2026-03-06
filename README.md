@@ -1,46 +1,108 @@
-# HamClock-Next (v1.0B02)
+# HamClock-Next (v1.0B03)
 
-HamClock-Next is a modern, SDL2-based reconstruction of the classic HamClock. It focuses on visual fidelity, high-DPI support, and a smooth user experience while maintaining the essential functionality loved by amateur radio operators.
+> **HamClock-Next** is a modern, multi-platform rewrite of the original HamClock
+> by **Elwood Downey, WB0OEW** (SK 29 January 2026).
+>
+> Elwood built HamClock into one of the most beloved shack displays in amateur
+> radio — a real-time world clock, propagation tool, and DX dashboard all in one.
+> He maintained it for years with care and craftsmanship, and the ham community
+> is lesser for his passing. HamClock-Next carries his work forward with deep
+> respect, preserving every feature of the original while adding a modern
+> architecture and new capabilities for today's ham shacks.
+>
+> *This project is dedicated to his memory. 73, Elwood.*
 
-## [Feature Overview](feature_overview.md) — The Story, philosophy, and full feature list
+---
 
-> [!WARNING]
-> **BETA RELEASE NOTICE**: This is a Beta release (**v1.0B02**). While functional, it is still under active development and contains known bugs. Breaking changes and refinements are ongoing. Please report issues on GitHub.
+## Why a Complete Rewrite?
 
-## Key Accomplishments
+HamClock-Next did not start as a rewrite. It started as a refactor — and a
+frustrating one.
 
-### Visuals & Rendering
-- **High-Fidelity Rendering**: Implemented text super-sampling and logical scaling for crisp 4K/Retina display. Includes specialized compatibility paths for artifact-free rendering on Raspberry Pi (KMSDRM).
-- **Dynamic Seasonal Maps**: Automatically downloads high-resolution NASA Blue Marble backgrounds based on the current month.
-- **Night Lights & Shadows**: Integrated NASA Black Marble city lights with additive blending and persistent vertex-shaded terminator overlays.
-- **NASA Dial-a-Moon**: Real-time lunar phase imagery directly from NASA SVS, corrected for North-Up orientation.
-- **Zero-Asset Binary**: Essential assets (fonts, icons) are embedded directly into the executable, creating a self-contained single-file deployment.
-- **Graphics Smoothing**: Hardware-accelerated anti-aliasing (4x MSAA) and ribbon-path primitives for smooth great circles and satellite tracks.
-- **Advanced Caching**: Implemented a "lean" caching system using HTTP HEAD validation (`Last-Modified`/`ETag`) to save bandwidth.
+Elwood originally wrote HamClock for the **ESP8266** microcontroller. Over time
+he shimmed in Linux support around that embedded core. By version 4 he had
+formally dropped ESP8266 support, but the architectural fingerprint of
+single-file globals, Arduino-style execution flow, and tight coupling to his own
+propagation proxy remained woven throughout the codebase. It was never the kind
+of code you could fault — it was *brilliant* embedded engineering — but it was
+also not a foundation you could cleanly modernize.
 
-### Features
-- **Global Map**: Interactive map with day/night terminator, great circle paths, and real-time overlays.
-- **Live Spots**: Real-time band activity visualization using PSK Reporter data, with map plotting for selected bands.
-- **DX Cluster**: Integrated Telnet-based DX Cluster management with interactive spot lists, age tracking, and prefix-resolved map plotting.
-- **On-The-Air Widget**: Real-time monitoring of POTA, SOTA, and DXPedition activity with seamless JSON/HTML aggregation.
-- **Satellite Tracking**: Comprehensive satellite tracking with a high-fidelity polar plot, rise/set predictions, and map footprints.
-- **Space Weather**: Integrated Space Weather data visualization including:
-  - **Aurora Graph & Map**: 24-hour history graph and real-time forecast overlays.
-  - **DRAP Panel**: D-Region Absorption Prediction with color-coded severity indicators.
-  - **Propagation Model**: Solar flux, sunspot numbers, and band-specific condition estimates.
-- **Smart Setup**: Easy configuration of callsign and location via Maidenhead grid squares or direct map interaction (Shift-Click to set DE).
-- **RSS News Banner**: Smoothly scrolling news ticker aggregating multiple amateur radio news feeds.
-- **Stopwatch & Reminders**: High-precision count-up timer and automated license expiry tracking with custom user reminders.
+The decision to start clean was not made lightly, but it was the right call.
+A greenfield CMake + SDL2 + modern C++20 project with a proper layer separation
+(data stores, providers, UI widgets, network) turned out to move faster than
+the refactor had — and the result is something that can actually be maintained,
+extended, and ported without archaeology.
 
-### Customization & Themes
-HamClock-Next features a built-in theming system with three presets:
-1. **Default (Orange)**: The classic look with dark gray backgrounds and high-contrast orange text.
-2. **Modern Dark**: A cooler palette with slate blues and neutral grays.
-3. **Glass**: Semi-transparent panels with blur effects (requires a compositor on Linux).
+---
 
-You can switch themes via the **Setup Screen** (Appearance tab) or the remote web interface. A future update will enable custom JSON-based themes.
+## Project Philosophy — AI as Co-Developer
 
-For a detailed guide on how to navigate the new interface and use keyboard shortcuts, see **[USAGE.md](USAGE.md)**.
+HamClock-Next is, by deliberate design, a near-**100% AI-written codebase**.
+The implementation itself is written by AI assistants (Antigravity/Gemini 3.0 Flash, 
+Gemini CLI, and Claude Code) while humans serve as architects: defining the structure, 
+owning the design decisions, setting acceptance criteria, and reviewing every output.
+
+The result is a production-quality, modern C++ codebase that compiles clean, 
+passes valgrind, and runs stably on everything from a Raspberry Pi 3 to a browser tab.
+
+---
+
+## 100% Feature Parity with the Original HamClock
+
+HamClock-Next implements all **71 original features** across every category:
+
+| Category                | Features                                                                                                                                 |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| World Map & Projections | Azimuthal, Robinson, Mercator; day/night terminator; great-circle paths; Maidenhead/lat-lon grid overlays                                |
+| Map Markers             | City labels, DX Cluster spots, PSK Reporter spots, POTA/SOTA activator pins, ADIF QSO pins, satellite tracks                             |
+| Map Overlays            | VOACAP MUF, VOACAP Reliability, VOACAP TOA, KC2G real-time MUF, cloud cover, WX precipitation                                            |
+| Data Panels             | Solar/space weather, DX Cluster, Live Spots (PSK/WSPR/RBN), POTA/SOTA activity, satellite tracking, contest calendar, RSS feed, and more |
+| Core UI                 | Clock display, callsign, DE/DX info panels, bearing/distance, countdown timer, audio alarms                                              |
+| Hardware                | GPS/NMEA (gpsd), rotator control (rotctld), rig CAT control (rigctld), display brightness, display power management                      |
+| Utilities               | QRZ.com lookup, Maidenhead grid system, callsign prefix lookup, EME (moonbounce) tool, Santa Tracker                                     |
+
+---
+
+## 🆕 New Features Exclusive to HamClock-Next
+
+### 1. Multi-Display Hub Model
+One HamClock-Next instance runs as a **Master hub** and fetches all external data. All other instances on the same LAN run as **Clients** and pull data from the hub. Eliminates redundant API calls and ensures data consistency across every screen in a club station.
+
+### 2. Smart Network Caching
+Every external data fetch is cached both in memory and on disk with ETag / HTTP 304 support. Dramatically reduces bandwidth on slow or metered connections. Cache survives restarts — data is available immediately on next launch.
+
+### 3. Live Web Viewer & Remote Control
+- MJPEG live stream of the HamClock screen, viewable in any browser.
+- Full **mouse and keyboard passthrough** — click and type through the browser.
+- REST API with **30+ endpoints** for automation and home-automation integration.
+
+### 4. Advanced Weather & Environment
+- **7-day NWS forecast panel** — hourly and daily outlook for your grid square.
+- **NOAA severe weather alerts** — active watches, warnings, and advisories for your county.
+- **Hurricane / tropical cyclone tracker** — active storm list with track and intensity.
+- **Marine / tide panel** — NOAA tide predictions for nearby stations.
+
+### 5. Ham Radio Hardware Integration
+- **Hamlib rig control** — reads frequency and mode from your transceiver via `rigctld`.
+- **Hamlib rotator control** — displays azimuth/elevation; accepts bearing commands from the map.
+- **WSJT-X / JS8Call UDP** — captures QSO data live from digital mode software.
+
+### 6. Expanded Radio Activity & Logging
+- **ADIF log import** — plots confirmed QSOs as pins on the world map.
+- **DX watchlist** — monitor specific callsigns/prefixes with on-screen alerts.
+- **ONTA (On The Air) panel** — aggregated POTA/SOTA activations.
+
+### 7. Space & Celestial
+- **Asteroid Tracker** — next 5 close approaches from JPL SSD/CAD data.
+- **History Panel** — scrollable time-series graphs of solar flux (SFI), SSN, and Kp.
+- **Native VOACAP propagation engine** — MUF, reliability, and takeoff-angle heatmaps computed locally.
+
+### 8. Modern UI & Customization
+- **Dynamic Theme Engine** — Built-in color themes (Default, Dark, Glass) plus a powerful **Custom Theme** editor.
+- **Real-time UI Preview** — Changes in the Theme Customizer are reflected immediately.
+- **High-DPI Support** — Text super-sampling and logical scaling for crisp 4K/Retina displays.
+
+---
 
 ## Requirements & Dependencies
 
@@ -61,6 +123,8 @@ To compile HamClock-Next, you will need the following libraries and tools instal
 - **pkg-config**: Package configuration tool (for finding SDL2 extensions)
 
 *Note: `nlohmann_json`, `libpredict`, `cpp-httplib`, and `spdlog` are automatically fetched and built via CMake during the first compilation.*
+
+---
 
 ## Build Instructions
 
@@ -104,75 +168,17 @@ mkdir build
 cd build
 cmake ..
 cmake --build . -j1
-
-# For automated universal builds (recommended for releases):
-./scripts/build-linux-arm64-universal.sh   # Builds ARM64 DEBs (64-bit OS)
-./scripts/build-linux-armhf-universal.sh   # Builds ARMhf DEBs (32-bit OS)
-
-> [!IMPORTANT]
-> **Choose the correct architecture**: Your choice depends on your **Operating System architecture**, not just the hardware.
-> - **64-bit OS** (e.g., Raspberry Pi OS 64-bit, Armbian 64-bit): Use **arm64**.
-> - **32-bit OS** (e.g., Raspberry Pi OS 32-bit, Raspbian): Use **armhf**.
 ```
 
-**Build times:**
-- **Pi 3B (1GB)**: ~20-30 minutes (first build)
-- **Pi 4 (4GB)**: ~10-15 minutes
-- **Pi 5 (8GB)**: ~5-8 minutes
-
 ### Building on macOS
-
-HamClock-Next builds natively on macOS (Intel and Apple Silicon):
 
 ```bash
 # Install dependencies via Homebrew
 brew install cmake sdl2 sdl2_image sdl2_ttf curl
 
-# Clone the repository
-git clone https://github.com/k4drw/hamclock-next.git
-cd hamclock-next
-
 # Build .app bundle
 ./scripts/build-macos.sh
-
-# Optional: Developer ID sign (no notarization)
-MACOS_SIGN_MODE=developer-id \
-MACOS_CODESIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
-./scripts/build-macos.sh
-
-# Optional: Developer ID sign + notarize DMG using notarytool keychain profile
-MACOS_SIGN_MODE=developer-id \
-MACOS_CODESIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
-MACOS_NOTARIZE=1 \
-MACOS_NOTARY_KEYCHAIN_PROFILE="AC_NOTARY_PROFILE" \
-./scripts/build-macos.sh
-
-# The application bundle will be at:
-#   build-macos/hamclock-next.app
-#
-# Distribution packages:
-#   build-macos/hamclock-next-macos-arm64.dmg  (or x86_64)
-#   build-macos/hamclock-next-macos-arm64.zip
-
-# Signing behavior:
-#   - Default is ad-hoc signing (MACOS_SIGN_MODE=adhoc), which avoids
-#     broken-signature "app is damaged" issues on unsigned local artifacts.
-#   - For trusted distribution, use Developer ID signing and notarization.
-#   - Script env vars:
-#       MACOS_SIGN_MODE=adhoc|developer-id|auto
-#       MACOS_CODESIGN_IDENTITY="Developer ID Application: ..."
-#       MACOS_NOTARIZE=0|1
-#       MACOS_NOTARY_KEYCHAIN_PROFILE="..."
-#       # Or credential fallback for notarytool:
-#       MACOS_NOTARY_APPLE_ID / MACOS_NOTARY_TEAM_ID / MACOS_NOTARY_APP_PASSWORD
-#
-# To install: Open the DMG and drag HamClock-Next.app to Applications
-# Or: Unzip and copy hamclock-next.app to /Applications
 ```
-
-**Build times:**
-- **M1/M2/M3 Mac**: ~2-5 minutes (first build)
-- **Intel Mac**: ~5-10 minutes
 
 ### Building for Windows (x64 Cross-Compile)
 
@@ -184,58 +190,10 @@ bash scripts/build-win64.sh
 
 Produces `build-win64/hamclock-next.exe` and `build-win64/HamClock-Next-Setup.exe`.
 
-The installer (`HamClock-Next-Setup.exe`) sets up PATH and creates Start Menu shortcuts.
-
-**Speed up rebuilds with ccache:**
-```bash
-sudo apt-get install ccache
-cmake -DCMAKE_C_COMPILER_LAUNCHER=ccache \
-      -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
-      ..
-cmake --build . -j1
-```
-With ccache, incremental builds take only **30-60 seconds**!
-
-### Universal Linux Packages (Debian/Ubuntu/PiOS)
-
-We provide high-compatibility **Universal Binaries** built against a Debian Bullseye baseline (glibc 2.31). These are distributed in two distinct `.deb` variants:
-
-1. **`unified`**: The standard desktop package. Includes dependencies for X11, Wayland, and KMSDRM. Recommended for most users.
-2. **`fb0`**: A lean "kiosk" package. Only includes dependencies for direct framebuffer (KMSDRM) rendering. Ideal for headless Raspberry Pi Lite installs.
-
-> [!IMPORTANT]
-> **Architecture Selection**:
-> - If you are running a **64-bit OS** (check with `uname -m`, should return `aarch64`), you **MUST** use the `arm64` package.
-> - If you are running a **32-bit OS** (should return `armv7l`), use the `armhf` package.
-> - Using the wrong package will result in an "Exec format error".
-
-#### How to Install (.deb)
-
-Do **not** try to execute the `.deb` file directly (e.g., `chmod +x` followed by `./file.deb`). It is a package archive, not an executable binary. Install it using `apt` or `dpkg`:
-
-```bash
-# Recommended (automatically installs dependencies):
-sudo apt install ./hamclock-next_0.9.0B_unified_arm64.deb
-
-# OR using dpkg:
-sudo dpkg -i hamclock-next_0.9.0B_unified_arm64.deb
-```
-
-For detailed technical references and remote control info, see:
-- **[Feature Overview](feature_overview.md)** — The Story, philosophy, and full feature list
-- **[API.md](API.md)** — Remote control and debugging API reference
-- **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** — Solutions for common build and runtime issues
-- **[DATA_SOURCES.md](original-analysis/DATA_SOURCES.md)** — List of live data providers
-- **[USAGE.md](USAGE.md)** — Interface navigation and keyboard shortcuts
-
-**Note**: The web server live view is optimized for headless operation (1 FPS refresh) to reduce CPU usage (~50-60% vs ~100%). See **[API.md](API.md)** for customization options.
-
+---
 
 ## Raspberry Pi & Console Mode (No X11)
 
-If you are running on a headless or console-only system (like Pi-Star or Raspbian Lite) without X11/Wayland, you may need to use the software renderer.
-
-### Running on Framebuffer (/dev/fb0)
 If you encounter `SDL_Init failed: No available video device`, ensure your user is in the `video` and `render` groups:
 ```bash
 sudo usermod -aG video,render $USER
@@ -246,53 +204,36 @@ Then try:
 sudo SDL_VIDEODRIVER=kmsdrm ./hamclock-next --fullscreen --software
 ```
 
-### Preventing Screen Blanking
-In console mode (no X11), the Linux kernel defaults to blanking the screen after 10 minutes of inactivity. To prevent this for fixed-display kiosks:
-
-1. Edit `/boot/cmdline.txt` (or `/boot/firmware/cmdline.txt` on Bookworm):
-   ```bash
-   sudo nano /boot/cmdline.txt
-   ```
-2. Append `consoleblank=0` to the end of the line (all parameters must be on a single line).
-3. Save and reboot: `sudo reboot`
-
-HamClock-Next also attempts to disable this at runtime, but the kernel parameter is the most reliable method.
-
 ### Command Line Options
 - `-f, --fullscreen`: Launch in fullscreen mode.
 - `-s, --software`: Force software rendering (disables OpenGL/MSAA). Essential for environments without a functioning 3D setup or DRI access.
 - `--log-level <level>`: Set logging verbosity. Values: `debug`, `info`, `warn`, `error` (default: `warn`).
 - `-h, --help`: Show help message.
 
-## Data & Configuration Locations
+---
 
-HamClock-Next stores configuration (`config.json`), database (`hamclock.db`), and cached assets (maps, satellite data) in standard platform-specific locations:
+## Data & Configuration Locations
 
 - **Linux / Raspberry Pi**: `~/.local/share/HamClock/HamClock-Next/`
 - **Windows**: `%APPDATA%\HamClock\HamClock-Next\`
-- **macOS (Apple Silicon Only)**: `~/Library/Application Support/HamClock/HamClock-Next/`
+- **macOS**: `~/Library/Application Support/HamClock/HamClock-Next/`
 
-*Note: If you are upgrading from an older version, your previous configuration files at `~/.config/hamclock/` may need to be moved manually.*
+---
 
 ## Contributing & AI Assistance (MCP)
 
-HamClock-Next is designed for AI-assisted development using the **Model Context Protocol (MCP)**. We provide a specialized "HamClock Bridge" server that allows AI assistants (like Claude and Gemini) to:
-
--   **Compare Codebases**: Check feature parity between this project and the original HamClock.
--   **Trace Logic**: Find specific pointers to original implementation files.
--   **Automated Scaffolding**: Automatically generate C++ boilerplate for new panels and providers.
--   **Plan Work**: Generate implementation tickets with pre-analyzed technical context.
+HamClock-Next is designed for AI-assisted development using the **Model Context Protocol (MCP)**. We provide a specialized "HamClock Bridge" server that allows AI assistants (like Claude and Gemini) to compare codebases, trace logic, and automatically scaffold new widgets.
 
 To get started with AI-assisted contributions, see the **[MCP_GUIDE.md](MCP_GUIDE.md)** for setup and usage instructions.
 
-## Roadmap & Next Steps
-
-- ✅ **Phase 6: Hardware Control** (RigService CAT, RotatorService, CPUMonitor) — DONE
-- ✅ **Windows x64 cross-build** (dockcross) — DONE (02-17-2026)
-- ✅ **GPS/NMEA**: GPSProvider integrated; time/location sync supported. — DONE (02-17-2026)
-- ✅ **Local Data Hub (Phase 1)**: Master/Client hub mode — one instance serves its API cache to other clocks on the same LAN via `/api/hub/fetch`, reducing external rate-limit consumption. Configurable in Setup → Network tab. — DONE (02-24-2026)
-- [ ] **World Map Overlays** — CQ/ITU Zones, Prefix overlays
-- [ ] **Multi-Instance Sync (Phase 2+)** — Full bidirectional state sharing (spots, DX target, map position) between multiple clocks on the same network
-
 ---
-*Created by the HamClock-Next team.*
+
+## Get HamClock-Next
+
+Releases, installers, and WASM builds are available at:
+
+**https://github.com/k4drw/hamclock-next/releases**
+
+HamClock-Next is free and open source under the GPL license, in the spirit of the original work by Elwood Downey, WB0OEW.
+
+*73 de K4DRW*

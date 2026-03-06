@@ -21,7 +21,6 @@ public:
   nlohmann::json getDebugData() const override;
 
 private:
-  void renderTooltip(SDL_Renderer *renderer);
   FontManager &fontMgr_;
   TextureManager &texMgr_;
   std::shared_ptr<DstStore> store_;

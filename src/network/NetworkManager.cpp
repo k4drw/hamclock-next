@@ -92,7 +92,7 @@ std::string NetworkManager::fetchFromHubSync(const std::string &hubUrl) {
   if (!curl)
     return "";
   curl_easy_setopt(curl, CURLOPT_URL, hubUrl.c_str());
-  curl_easy_setopt(curl, CURLOPT_TIMEOUT, 2L);
+  curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10L);
   curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
   curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeCallback);
   curl_easy_setopt(curl, CURLOPT_WRITEDATA, &result);
@@ -141,10 +141,14 @@ void NetworkManager::fetchAsync(const std::string &url,
           std::string data;
           if (ifs) {
             std::string line;
-            for (int i = 0; i < 5; ++i)
-              std::getline(ifs, line);
-            data.assign((std::istreambuf_iterator<char>(ifs)),
-                        (std::istreambuf_iterator<char>()));
+            if (std::getline(ifs, line)) {
+              bool v11 = (line == "HamClockCache/1.1");
+              int skip = v11 ? 5 : 4;
+              for (int i = 0; i < skip; ++i)
+                std::getline(ifs, line);
+              data.assign((std::istreambuf_iterator<char>(ifs)),
+                          (std::istreambuf_iterator<char>()));
+            }
           }
           callback(data);
         }).detach();
@@ -218,10 +222,14 @@ void NetworkManager::fetchAsync(const std::string &url,
       std::string hubUrl = "http://" + hubIp_ + ":" + std::to_string(hubPort_) +
                            "/api/hub/fetch?url=" + encoded +
                            "&max_age=" + std::to_string(cacheAgeSeconds);
+      
+      LOG_D("NetworkManager", "Hub client: Proxying request for {} to Hub at {}", url, hubUrl);
+
       std::thread([this, hubUrl, url, callback = std::move(callback), hasCache,
                    cached]() mutable {
         std::string body = fetchFromHubSync(hubUrl);
         if (!body.empty()) {
+          LOG_D("NetworkManager", "Hub client: Received {} bytes from Hub for {}", body.size(), url);
           {
             std::lock_guard<std::mutex> lock(cacheMutex_);
             CacheEntry entry;
@@ -233,7 +241,7 @@ void NetworkManager::fetchAsync(const std::string &url,
           callback(std::move(body));
           return;
         }
-        LOG_D("NetworkManager", "Hub miss for {}, falling back to direct", url);
+        LOG_D("NetworkManager", "Hub client: Hub miss or error for {}, falling back to direct", url);
         fetchDirect(url, std::move(callback), hasCache, cached);
       }).detach();
       return;
@@ -245,6 +253,15 @@ void NetworkManager::fetchAsync(const std::string &url,
     fetchDirect(url, std::move(callback), hasCache, cached);
   }).detach();
 #endif
+}
+
+std::time_t NetworkManager::getCacheServerTime(const std::string &url) {
+  std::lock_guard<std::mutex> lock(cacheMutex_);
+  auto it = cache_.find(url);
+  if (it != cache_.end()) {
+    return it->second.serverTime;
+  }
+  return 0;
 }
 
 #ifndef __EMSCRIPTEN__
@@ -262,9 +279,24 @@ void NetworkManager::fetchDirect(const std::string &url,
   curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
   curl_easy_setopt(curl, CURLOPT_TIMEOUT, 15L);
   curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
-  curl_easy_setopt(curl, CURLOPT_USERAGENT, "HamClock-Next/1.0");
+  
+  if (url.find("pskreporter.info") != std::string::npos) {
+    curl_easy_setopt(curl, CURLOPT_USERAGENT, "HamClock/1.0");
+    curl_easy_setopt(curl, CURLOPT_REFERER, "https://pskreporter.info/pskmap.html");
+  } else {
+    curl_easy_setopt(curl, CURLOPT_USERAGENT, "HamClock-Next/1.0");
+  }
+
   curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, headerCallback);
   curl_easy_setopt(curl, CURLOPT_HEADERDATA, &headers);
+  curl_easy_setopt(curl, CURLOPT_FILETIME, 1L);
+
+  // Workaround for lmsal.com and pskreporter.info certificate issues
+  if (url.find("lmsal.com") != std::string::npos ||
+      url.find("pskreporter.info") != std::string::npos) {
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
+  }
 
 // On Linux with static mbedTLS, we often need to point CURL to the CA
 // bundle. However, for system libcurl (dynamic), this is usually automatic.
@@ -308,7 +340,9 @@ void NetworkManager::fetchDirect(const std::string &url,
   }
 
   long responseCode = 0;
+  long fileTime = -1;
   curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &responseCode);
+  curl_easy_getinfo(curl, CURLINFO_FILETIME, &fileTime);
   curl_easy_cleanup(curl);
 
   if (res != CURLE_OK) {
@@ -327,10 +361,14 @@ void NetworkManager::fetchDirect(const std::string &url,
       std::ifstream ifs(p, std::ios::binary);
       if (ifs) {
         std::string line;
-        for (int i = 0; i < 5; ++i)
-          std::getline(ifs, line);
-        retData.assign((std::istreambuf_iterator<char>(ifs)),
-                       (std::istreambuf_iterator<char>()));
+        if (std::getline(ifs, line)) {
+          bool v11 = (line == "HamClockCache/1.1");
+          int skip = v11 ? 5 : 4;
+          for (int i = 0; i < skip; ++i)
+            std::getline(ifs, line);
+          retData.assign((std::istreambuf_iterator<char>(ifs)),
+                         (std::istreambuf_iterator<char>()));
+        }
       }
     }
     {
@@ -353,6 +391,7 @@ void NetworkManager::fetchDirect(const std::string &url,
     std::time_t now = std::time(nullptr);
     CacheEntry entry;
     entry.timestamp = now;
+    entry.serverTime = (fileTime != -1) ? (std::time_t)fileTime : 0;
     if (headers.count("last-modified"))
       entry.lastModified = headers.at("last-modified");
     if (headers.count("etag"))
@@ -415,8 +454,9 @@ void NetworkManager::saveToDisk(const std::string &url, const CacheEntry &entry,
   std::ofstream ofs(p, std::ios::binary);
   if (ofs) {
     // Write a simple header
-    ofs << "HamClockCache/1.0\n";
+    ofs << "HamClockCache/1.1\n";
     ofs << entry.timestamp << "\n";
+    ofs << entry.serverTime << "\n";
     ofs << url << "\n";
     ofs << entry.lastModified << "\n";
     ofs << entry.etag << "\n";
@@ -434,13 +474,21 @@ void NetworkManager::loadCache() {
       if (ifs) {
         std::string line;
         if (std::getline(ifs, line)) {
-          if (line != "HamClockCache/1.0")
+          bool v11 = (line == "HamClockCache/1.1");
+          if (!v11 && line != "HamClockCache/1.0")
             continue; // Skip old/invalid
 
           try {
             if (!std::getline(ifs, line))
               continue;
             std::time_t ts = std::stoll(line);
+
+            std::time_t serverTs = 0;
+            if (v11) {
+              if (!std::getline(ifs, line))
+                continue;
+              serverTs = std::stoll(line);
+            }
 
             std::string url;
             if (!std::getline(ifs, url))
@@ -467,7 +515,7 @@ void NetworkManager::loadCache() {
             }
 
             std::lock_guard<std::mutex> lock(cacheMutex_);
-            cache_[url] = {std::move(data), ts, lm, etag};
+            cache_[url] = {std::move(data), ts, serverTs, lm, etag};
           } catch (const std::exception &ex) {
             LOG_W("NetworkManager", "Cache parse error for {}: {}",
                   entry.path().string(), ex.what());

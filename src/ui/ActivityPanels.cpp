@@ -455,8 +455,8 @@ void ONTAPanel::renderSetup(SDL_Renderer *renderer) {
     RenderUtils::drawRectOutline(renderer, (float)rect.x, (float)rect.y,
                                  (float)rect.w, (float)rect.h, themes.border);
 
-    cat->drawText(renderer, label, lx + 10, y + btnH / 2,
-                  selected ? themes.bg : white, FontStyle::Fast, false, false,
+    cat->drawText(renderer, label, rect.x + rect.w / 2, y + btnH / 2,
+                  selected ? themes.bg : white, FontStyle::Fast, true, false,
                   true);
     y += btnH + 2;
   };

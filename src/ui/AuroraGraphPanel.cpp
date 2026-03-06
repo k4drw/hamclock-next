@@ -143,19 +143,23 @@ void AuroraGraphPanel::render(SDL_Renderer *renderer) {
     y1 = std::max(graphY, std::min(graphY + graphH, y1));
     y2 = std::max(graphY, std::min(graphY + graphH, y2));
 
+    // Dim color for Kp-estimated (backfill) segments
+    SDL_Color segColor = (prev.isBackfill || curr.isBackfill)
+                             ? SDL_Color{0, 140, 80, 180}
+                             : SDL_Color{0, 255, 128, 255};
+
     SDL_Texture *lineAA = texMgr_.get("line_aa");
     if (lineAA) {
       RenderUtils::drawThickLineTextured(renderer, lineAA, (float)x1, (float)y1,
-                                         (float)x2, (float)y2, 2.0f,
-                                         {0, 255, 128, 255});
+                                         (float)x2, (float)y2, 2.0f, segColor);
     } else {
       RenderUtils::drawThickLine(renderer, (float)x1, (float)y1, (float)x2,
-                                 (float)y2, 2.0f, {0, 255, 128, 255});
+                                 (float)y2, 2.0f, segColor);
     }
   }
 
   if (tooltip_.visible) {
-    renderTooltip(renderer);
+    renderTooltip(renderer, fontMgr_);
   }
 }
 
@@ -211,12 +215,14 @@ void AuroraGraphPanel::onMouseMove(int mx, int my) {
                        now - bestPoint->timestamp)
                        .count();
     char buf[64];
+    const char *src = bestPoint->isBackfill ? " [Est.]" : "";
     if (ageMins < 30) {
-      std::snprintf(buf, sizeof(buf), "%.0f%% (Now)", bestPoint->percent);
+      std::snprintf(buf, sizeof(buf), "%.0f%% (Now)%s", bestPoint->percent,
+                    src);
     } else {
-      std::snprintf(buf, sizeof(buf), "%.0f%% (-%lldh %lldm)",
+      std::snprintf(buf, sizeof(buf), "%.0f%% (-%lldh %lldm)%s",
                     bestPoint->percent, static_cast<long long>(ageMins / 60),
-                    static_cast<long long>(ageMins % 60));
+                    static_cast<long long>(ageMins % 60), src);
     }
     tooltip_.text = buf;
     tooltip_.x = mx;
@@ -228,40 +234,3 @@ void AuroraGraphPanel::onMouseMove(int mx, int my) {
   }
 }
 
-void AuroraGraphPanel::renderTooltip(SDL_Renderer *renderer) {
-  if (tooltip_.text.empty())
-    return;
-
-  auto *cat = fontMgr_.catalog();
-  int tw, th;
-  cat->renderText(renderer, tooltip_.text, {255, 255, 255, 255},
-                  FontStyle::Micro, &tw, &th);
-
-  int padX = 8;
-  int padY = 4;
-  int boxW = tw + padX * 2;
-  int boxH = th + padY * 2;
-
-  int bx = tooltip_.x - boxW / 2;
-  int by = tooltip_.y - boxH - 12;
-
-  // Flip if too close to top
-  if (by < y_) {
-    by = tooltip_.y + 16;
-  }
-  // Clamp to widget bounds
-  if (bx < x_)
-    bx = x_;
-  if (bx + boxW > x_ + width_)
-    bx = x_ + width_ - boxW;
-
-  SDL_Rect box = {bx, by, boxW, boxH};
-  SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-  SDL_SetRenderDrawColor(renderer, 20, 20, 20, 200);
-  SDL_RenderFillRect(renderer, &box);
-  SDL_SetRenderDrawColor(renderer, 100, 100, 100, 255);
-  SDL_RenderDrawRect(renderer, &box);
-
-  cat->drawText(renderer, tooltip_.text, bx + padX, by + padY,
-                {255, 255, 255, 255}, FontStyle::Micro);
-}

@@ -18,6 +18,7 @@ void MapViewMenu::show(AppConfig &config, std::function<void()> onApply) {
   mapStyle_ = config.mapStyle;
   showGrid_ = config.showGrid;
   showBeacons_ = config.showBeacons;
+  showBorders_ = config.showBorders;
   gridType_ = config.gridType;
   propOverlay_ = config.propOverlay;
   weatherOverlay_ = config.weatherOverlay;
@@ -57,6 +58,7 @@ void MapViewMenu::show(AppConfig &config, std::function<void()> onApply) {
   weatherHeaderY_ = y;
 
   beaconsRec_ = {col2X + 10, y + 30, 20, 20};
+  bordersRec_ = {col2X + 110, y + 30, 20, 20};
 
   // Row 4 (VOACAP) - 3 columns
   y += 70;
@@ -104,7 +106,8 @@ void MapViewMenu::render(SDL_Renderer *renderer) {
 
   // Title
   cat->drawText(renderer, "Map View Options", menuRect_.x + menuRect_.w / 2,
-                menuRect_.y + 20, themes.text, FontStyle::SmallBold, true);
+                menuRect_.y + 15, themes.text, FontStyle::SmallBold, true,
+                false, true);
 
   // Projection Section
   cat->drawText(renderer, "Projection", projRec_.x, projHeaderY_, themes.text,
@@ -112,8 +115,12 @@ void MapViewMenu::render(SDL_Renderer *renderer) {
   std::string projLabel = "Equirectangular";
   if (projection_ == "robinson")
     projLabel = "Robinson";
+  else if (projection_ == "azimuthal")
+    projLabel = "Azimuthal";
   else if (projection_ == "mercator")
     projLabel = "Mercator";
+  else if (projection_ == "dual_azimuthal")
+    projLabel = "Dual Azimuthal";
   drawDropdown(renderer, projRec_, projLabel, openCombo_ == COMBO_PROJ);
 
   // Style Section
@@ -148,6 +155,10 @@ void MapViewMenu::render(SDL_Renderer *renderer) {
     propLabel = "TOA";
   else if (propOverlay_ == PropOverlayType::Heatmap)
     propLabel = "Heatmap";
+  else if (propOverlay_ == PropOverlayType::Drap)
+    propLabel = "DRAP";
+  else if (propOverlay_ == PropOverlayType::Aurora)
+    propLabel = "Aurora";
   drawDropdown(renderer, overlayRec_, propLabel, openCombo_ == COMBO_OVERLAY);
 
   // Weather Section
@@ -161,8 +172,10 @@ void MapViewMenu::render(SDL_Renderer *renderer) {
   drawDropdown(renderer, weatherRec_, weatherLabel,
                openCombo_ == COMBO_WEATHER);
 
-  // Beacons Toggle
-  renderRadioButton(renderer, beaconsRec_, showBeacons_, "NCDXF Beacons",
+  // Beacons & Borders Toggles
+  renderRadioButton(renderer, beaconsRec_, showBeacons_, "Beacons",
+                    themes.text);
+  renderRadioButton(renderer, bordersRec_, showBorders_, "Borders",
                     themes.text);
 
   // VOACAP Extras (Used for VOACAP, Reliability, and TOA)
@@ -206,18 +219,20 @@ void MapViewMenu::render(SDL_Renderer *renderer) {
   SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
 
   // Cancel button
-  SDL_SetRenderDrawColor(renderer, 80, 80, 90, 255);
+  SDL_SetRenderDrawColor(renderer, themes.danger.r, themes.danger.g,
+                         themes.danger.b, 255);
   SDL_RenderFillRect(renderer, &cancelRect_);
-  SDL_SetRenderDrawColor(renderer, 120, 120, 130, 255);
+  SDL_SetRenderDrawColor(renderer, 255, 255, 255, 100);
   SDL_RenderDrawRect(renderer, &cancelRect_);
   cat->drawText(renderer, "Cancel", cancelRect_.x + cancelRect_.w / 2,
                 cancelRect_.y + cancelRect_.h / 2, {255, 255, 255, 255},
                 FontStyle::UI, true, false, true);
 
   // Apply button
-  SDL_SetRenderDrawColor(renderer, 0, 100, 200, 255);
+  SDL_SetRenderDrawColor(renderer, themes.success.r, themes.success.g,
+                         themes.success.b, 255);
   SDL_RenderFillRect(renderer, &applyRect_);
-  SDL_SetRenderDrawColor(renderer, 100, 150, 255, 255);
+  SDL_SetRenderDrawColor(renderer, 255, 255, 255, 100);
   SDL_RenderDrawRect(renderer, &applyRect_);
   cat->drawText(renderer, "Apply", applyRect_.x + applyRect_.w / 2,
                 applyRect_.y + applyRect_.h / 2, {255, 255, 255, 255},
@@ -356,7 +371,11 @@ bool MapViewMenu::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
         else if (idx == 1)
           projection_ = "robinson";
         else if (idx == 2)
+          projection_ = "azimuthal";
+        else if (idx == 3)
           projection_ = "mercator";
+        else if (idx == 4)
+          projection_ = "dual_azimuthal";
       }))
     return true;
 
@@ -396,6 +415,10 @@ bool MapViewMenu::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
                   propOverlay_ = PropOverlayType::Toa;
                 else if (idx == 5)
                   propOverlay_ = PropOverlayType::Heatmap;
+                else if (idx == 6)
+                  propOverlay_ = PropOverlayType::Drap;
+                else if (idx == 7)
+                  propOverlay_ = PropOverlayType::Aurora;
               }))
             return true;
       
@@ -412,6 +435,11 @@ bool MapViewMenu::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
               if (mx >= beaconsRec_.x && mx < beaconsRec_.x + beaconsRec_.w &&
                   my >= beaconsRec_.y && my < beaconsRec_.y + beaconsRec_.h) {
                 showBeacons_ = !showBeacons_;
+                return true;
+              }
+              if (mx >= bordersRec_.x && mx < bordersRec_.x + bordersRec_.w &&
+                  my >= bordersRec_.y && my < bordersRec_.y + bordersRec_.h) {
+                showBorders_ = !showBorders_;
                 return true;
               }
           
@@ -454,6 +482,7 @@ bool MapViewMenu::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
     config_->mapStyle = mapStyle_;
           config_->showGrid = showGrid_;
           config_->showBeacons = showBeacons_;
+          config_->showBorders = showBorders_;
           config_->gridType = gridType_;          config_->propOverlay = propOverlay_;
           config_->weatherOverlay = weatherOverlay_;
           config_->propBand = propBand_;    config_->propMode = propMode_;
@@ -482,8 +511,28 @@ bool MapViewMenu::onKeyDown(SDL_Keycode key, Uint16) {
 }
 
 // Dummy helper just in case
-void MapViewMenu::renderRadioButton(SDL_Renderer *, const SDL_Rect &, bool,
-                                    const std::string &, const SDL_Color &) {}
+void MapViewMenu::renderRadioButton(SDL_Renderer *renderer, const SDL_Rect &rect,
+                                    bool selected, const std::string &label,
+                                    const SDL_Color &textColor) {
+  auto *cat = fontMgr_.catalog();
+
+  // Draw the outer square
+  SDL_SetRenderDrawColor(renderer, 60, 60, 70, 255);
+  SDL_RenderFillRect(renderer, &rect);
+  SDL_SetRenderDrawColor(renderer, 150, 150, 150, 255);
+  SDL_RenderDrawRect(renderer, &rect);
+
+  // If selected, draw the inner "checked" square
+  if (selected) {
+    SDL_Rect check = {rect.x + 4, rect.y + 4, rect.w - 8, rect.h - 8};
+    SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255); // Green check
+    SDL_RenderFillRect(renderer, &check);
+  }
+
+  // Draw the label
+  cat->drawText(renderer, label, rect.x + rect.w + 10, rect.y + rect.h / 2,
+                textColor, FontStyle::UI, false, false, true);
+}
 
 bool MapViewMenu::onMouseWheel(int scrollY) {
   if (!visible_ || openCombo_ == -1)

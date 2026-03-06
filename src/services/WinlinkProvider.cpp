@@ -29,17 +29,22 @@ double WinlinkProvider::haversineKm(double lat1, double lon1, double lat2,
 
 void WinlinkProvider::fetch(double lat, double lon, int radiusKm, bool force) {
   // Winlink API gateway listing endpoint.
-  // Fetch all gateways then filter by distance client-side.
-  static const char *kUrl =
-      "https://api.winlink.org/json/metadata?op=GatewayListing";
+  auto &cfg = ConfigManager::instance().getConfig();
+  std::string key = cfg.winlinkKey;
+
+  char url[512];
+  std::snprintf(url, sizeof(url),
+                "https://api.winlink.org/json/metadata?op=GatewayListing%s%s",
+                key.empty() ? "" : "&key=", key.c_str());
+
   (void)radiusKm; // filtering done client-side after fetch
-  const char *url = kUrl;
+  const char *resolvedUrl = url;
 
   double deLat = lat;
   double deLon = lon;
 
   net_.fetchAsync(
-      url,
+      resolvedUrl,
       [deLat, deLon, radiusKm](std::string body) {
         if (body.empty()) {
           // HTTP error — signal "fetched but unavailable" so panel shows a useful message.

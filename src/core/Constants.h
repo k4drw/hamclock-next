@@ -28,6 +28,13 @@ static constexpr int DEFAULT_FONT_SIZE = 24;
 
 // Custom SDL user event for blocking sleep
 static constexpr uint32_t SDL_USER_EVENT_BLOCK_SLEEP = 0x8001;
+// NTP sync request
+static constexpr uint32_t SDL_USER_EVENT_NTP_SYNC = 0x8002;
+// Stopwatch control events
+static constexpr uint32_t SDL_USER_EVENT_STOPWATCH_RUN = 0x8010;
+static constexpr uint32_t SDL_USER_EVENT_STOPWATCH_STOP = 0x8011;
+static constexpr uint32_t SDL_USER_EVENT_STOPWATCH_RESET = 0x8012;
+static constexpr uint32_t SDL_USER_EVENT_STOPWATCH_COUNTDOWN = 0x8013;
 
 // Base for custom application events, registered at runtime
 extern uint32_t AE_BASE_EVENT;
@@ -48,5 +55,7 @@ static constexpr uint32_t AE_REPEATER_DATA_READY = 13;
 static constexpr uint32_t AE_HURRICANE_DATA_READY = 14;
 static constexpr uint32_t AE_MARINE_DATA_READY = 15;
 static constexpr uint32_t AE_WINLINK_DATA_READY = 16;
+static constexpr uint32_t AE_TOUCH = 17; // REST /set_touch: data1=x, data2=y (logical)
+static constexpr uint32_t AE_WHEEL = 18; // REST /set_wheel: data1=deltaY (positive=up, negative=down)
 
 } // namespace HamClock

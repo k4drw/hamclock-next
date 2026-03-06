@@ -3,34 +3,7 @@
  */
 import { readdir, readFile, stat } from "fs/promises";
 import { join, relative, extname } from "path";
-
-export interface SymbolEntry {
-  name: string;
-  kind: "function" | "class" | "struct" | "enum" | "define" | "method";
-  line: number;
-  signature?: string;
-}
-
-export interface FileIndex {
-  path: string; // relative to repo root
-  size: number;
-  line_count: number;
-  symbols: SymbolEntry[];
-}
-
-export interface RepoIndex {
-  root: string;
-  label: string;
-  indexed_at: string;
-  files: FileIndex[];
-  stats: {
-    total_files: number;
-    cpp_files: number;
-    header_files: number;
-    total_lines: number;
-    total_symbols: number;
-  };
-}
+import { SymbolEntry, FileIndex, RepoIndex } from "./types.js";
 
 const CPP_EXTENSIONS = new Set([
   ".cpp",

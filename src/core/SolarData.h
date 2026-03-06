@@ -5,7 +5,7 @@
 
 struct SolarData {
   int sfi = 0;
-  int k_index = 0;
+  float k_index = 0.0f;
   int a_index = 0;
   int sunspot_number = 0;
   double solar_wind_speed = 0.0;

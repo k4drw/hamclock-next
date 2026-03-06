@@ -16,6 +16,7 @@ public:
   MoonPanel(int x, int y, int w, int h, FontManager &fontMgr,
             TextureManager &texMgr, NetworkManager &net,
             std::shared_ptr<MoonStore> store);
+  ~MoonPanel() override;
 
   void update() override;
   void render(SDL_Renderer *renderer) override;
@@ -31,7 +32,7 @@ private:
 
   std::string lastImageUrl_;
   bool imageLoading_ = false;
-  std::string pendingImageData_;
+  SDL_Surface *pendingSurface_ = nullptr;
   std::mutex imageMutex_;
 
   void drawMoon(SDL_Renderer *renderer, int cx, int cy, int r);

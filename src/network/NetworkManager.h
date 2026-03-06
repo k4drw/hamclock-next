@@ -36,6 +36,7 @@ private:
   struct CacheEntry {
     std::string data;
     std::time_t timestamp;
+    std::time_t serverTime = 0;
     std::string lastModified;
     std::string etag;
   };
@@ -58,4 +59,8 @@ private:
   void fetchDirect(const std::string &url,
                    std::function<void(std::string)> callback,
                    bool hasCache, const CacheEntry &cached);
+
+public:
+  // Get the server-reported last modified time for a cached URL
+  std::time_t getCacheServerTime(const std::string &url);
 };

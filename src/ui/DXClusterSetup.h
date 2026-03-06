@@ -2,9 +2,9 @@
 
 #include "../core/ConfigManager.h"
 #include "FontManager.h"
+#include "TextInput.h"
 #include "Widget.h"
 #include <SDL.h>
-#include <string>
 
 class DXClusterSetup : public Widget {
 public:
@@ -14,7 +14,9 @@ public:
   void render(SDL_Renderer *renderer) override;
   void onResize(int x, int y, int w, int h) override;
 
+  bool onMouseDown(int mx, int my, Uint16 mod, int clicks) override;
   bool onMouseUp(int mx, int my, Uint16 mod, int clicks) override;
+  void onMouseMove(int mx, int my) override;
   bool onKeyDown(SDL_Keycode key, Uint16 mod) override;
   bool onTextInput(const char *text) override;
 
@@ -25,18 +27,18 @@ public:
 
 private:
   void recalcLayout();
+  TextInput &activeInput();
 
   FontManager &fontMgr_;
 
   // Fields: 0=host, 1=port, 2=login
   static constexpr int kNumFields = 3;
   int activeField_ = 0;
-  std::string hostText_;
-  std::string portText_;
-  std::string loginText_;
+  TextInput hostInput_;
+  TextInput portInput_;
+  TextInput loginInput_;
   bool useWSJTX_ = false;
 
-  int cursorPos_ = 0;
   bool complete_ = false;
   bool saved_ = false;
 

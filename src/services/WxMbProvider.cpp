@@ -356,18 +356,17 @@ bool WxMbProvider::decodeGFS(const std::vector<uint8_t> &data,
 }
 
 // ---------------------------------------------------------------------------
-// Marching squares contour + wind quiver rendering
-// ---------------------------------------------------------------------------
-
-// Segment table: bit0=TL, bit1=TR, bit2=BR, bit3=BL
+// Marching squares — segment table
+// bit0=TL, bit1=TR, bit2=BR, bit3=BL
 // Edges: 0=top(TL-TR), 1=right(TR-BR), 2=bottom(BR-BL), 3=left(BL-TL)
+// ---------------------------------------------------------------------------
 static const int8_t MC_SEGS[16][2][2] = {
     {{-1, -1}, {-1, -1}}, // 0  all outside
     {{0, 3}, {-1, -1}},   // 1  TL
     {{0, 1}, {-1, -1}},   // 2  TR
     {{1, 3}, {-1, -1}},   // 3  TL+TR
     {{1, 2}, {-1, -1}},   // 4  BR
-    {{0, 3}, {1, 2}},     // 5  TL+BR (saddle: split variant)
+    {{0, 3}, {1, 2}},     // 5  TL+BR (saddle)
     {{0, 2}, {-1, -1}},   // 6  TR+BR
     {{2, 3}, {-1, -1}},   // 7  TL+TR+BR
     {{2, 3}, {-1, -1}},   // 8  BL
@@ -380,98 +379,22 @@ static const int8_t MC_SEGS[16][2][2] = {
     {{-1, -1}, {-1, -1}}, // 15 all inside
 };
 
-static void plotPixel(uint32_t *px, int pitch, int W, int H, int x, int y,
-                      uint32_t col, float alpha, SDL_PixelFormat *fmt) {
-  if ((unsigned)x < (unsigned)W && (unsigned)y < (unsigned)H) {
-    if (alpha <= 0.005f)
-      return;
-    uint32_t *p = &px[y * pitch + x];
-    if (alpha >= 0.995f) {
-      *p = col;
-    } else {
-      uint8_t rs, gs, bs, as;
-      SDL_GetRGBA(col, fmt, &rs, &gs, &bs, &as);
-      uint8_t rd, gd, bd, ad;
-      SDL_GetRGBA(*p, fmt, &rd, &gd, &bd, &ad);
+// ---------------------------------------------------------------------------
+// buildSegments — marching squares + quivers → lat/lon geometry
+// ---------------------------------------------------------------------------
 
-      uint32_t aSrc = (uint32_t)(alpha * (float)as);
-      if (aSrc == 0 && ad == 0)
-        return;
-
-      // Use uint32_t to prevent overflow during intermediate sums
-      uint32_t aOut32 = aSrc + (uint32_t)ad * (255 - aSrc) / 255;
-      if (aOut32 == 0)
-        return;
-
-      auto blend = [&](uint8_t src, uint8_t dst) -> uint8_t {
-        uint32_t s = (uint32_t)src * aSrc;
-        uint32_t d = (uint32_t)dst * ad * (255 - aSrc) / 255;
-        return (uint8_t)((s + d) / aOut32);
-      };
-
-      uint8_t rOut = blend(rs, rd);
-      uint8_t gOut = blend(gs, gd);
-      uint8_t bOut = blend(bs, bd);
-      uint8_t aOut = (uint8_t)std::min(aOut32, 255U);
-
-      *p = SDL_MapRGBA(fmt, rOut, gOut, bOut, aOut);
-    }
-  }
-}
-
-static void drawLine(uint32_t *px, int pitch, int W, int H, float x0, float y0,
-                     float x1, float y1, uint32_t col, SDL_PixelFormat *fmt) {
-  float dx = x1 - x0, dy = y1 - y0;
-  float len = std::sqrt(dx * dx + dy * dy);
-  if (len < 0.05f)
+void WxMbProvider::buildSegments(const GribField &prmsl, const GribField &ugrd,
+                                 const GribField &vgrd, float pMin, float pMax,
+                                 int W, int H, std::vector<WxSegment> &segs,
+                                 std::vector<WxQuiver> &quivers,
+                                 SDL_Surface *&fillSurface) {
+  segs.clear();
+  quivers.clear();
+  fillSurface = nullptr;
+  if (prmsl.values.empty())
     return;
 
-  // Use a thicker, more solid AA line
-  int minX = std::max(0, (int)std::floor(std::min(x0, x1)) - 1);
-  int maxX = std::min(W - 1, (int)std::ceil(std::max(x0, x1)) + 1);
-  int minY = std::max(0, (int)std::floor(std::min(y0, y1)) - 1);
-  int maxY = std::min(H - 1, (int)std::ceil(std::max(y0, y1)) + 1);
-
-  float invLen = 1.0f / len;
-  float ux = dx * invLen;
-  float uy = dy * invLen;
-
-  for (int iy = minY; iy <= maxY; ++iy) {
-    for (int ix = minX; ix <= maxX; ++ix) {
-      float tx = (float)ix - x0;
-      float ty = (float)iy - y0;
-      float proj = tx * ux + ty * uy;
-      float t = std::clamp(proj, 0.0f, len);
-      float qx = x0 + t * ux;
-      float qy = y0 + t * uy;
-      float d2 = ((float)ix - qx) * ((float)ix - qx) +
-                 ((float)iy - qy) * ((float)iy - qy);
-      if (d2 < 1.0f) {
-        float alpha = std::clamp(1.0f - std::sqrt(d2), 0.0f, 1.0f);
-        plotPixel(px, pitch, W, H, ix, iy, col, alpha, fmt);
-      }
-    }
-  }
-}
-
-SDL_Surface *WxMbProvider::renderToSurface(const GribField &prmsl,
-                                           const GribField &ugrd,
-                                           const GribField &vgrd, int W,
-                                           int H) {
-  SDL_Surface *surf =
-      SDL_CreateRGBSurfaceWithFormat(0, W, H, 32, SDL_PIXELFORMAT_RGBA8888);
-  if (!surf)
-    return nullptr;
-  SDL_FillRect(surf, nullptr, 0); // fully transparent
-
-  // Higher visibility colors
-  uint32_t contourCol = SDL_MapRGBA(surf->format, 255, 255, 255, 255);
-  uint32_t arrowCol = SDL_MapRGBA(surf->format, 255, 255, 255, 230);
-
-  uint32_t *pixels = static_cast<uint32_t *>(surf->pixels);
-  int pitch = surf->pitch / 4;
-
-  // Bicubic B-spline for maximum smoothness
+  // Bicubic B-spline sampler shared by both isobars and quivers.
   auto cubic = [](float v0, float v1, float v2, float v3, float x) {
     float a = -0.5f * v0 + 1.5f * v1 - 1.5f * v2 + 0.5f * v3;
     float b = v0 - 2.5f * v1 + 2.0f * v2 - 0.5f * v3;
@@ -483,6 +406,8 @@ SDL_Surface *WxMbProvider::renderToSurface(const GribField &prmsl,
   auto sampleField = [&](const GribField &f, float fx, float fy) -> float {
     if (f.values.empty())
       return 0.0f;
+    // GFS 0–360°E grid; equirectangular map shows -180°–+180°.
+    // Left pixel (fx=0) = -180° = 180°E = GFS col nx/2.
     float x_scaled = (fx / (float)W) * (float)f.nx + (float)f.nx / 2.0f;
     float y_scaled = (fy / (float)H) * (float)f.ny;
 
@@ -510,9 +435,20 @@ SDL_Surface *WxMbProvider::renderToSurface(const GribField &prmsl,
     return cubic(col[0], col[1], col[2], col[3], ty);
   };
 
-  // Marching squares: ultra-smooth via 1.2px sub-grid + bicubic
-  const float s = 2.0f;
-  for (float level = 960.0f; level <= 1040.0f; level += 4.0f) {
+  // Convert surface pixel → geographic coordinates.
+  auto toGeo = [&](float sx, float sy, float &lon, float &lat) {
+    lon = (sx / (float)W) * 360.0f - 180.0f;
+    lat = 90.0f - (sy / (float)H) * 180.0f;
+  };
+
+  // ---- Isobar contours (marching squares) ---------------------------------
+  float lo = std::floor(pMin / 4.0f) * 4.0f;
+  float hi = std::ceil(pMax / 4.0f) * 4.0f;
+  lo = std::max(lo, 880.0f);
+  hi = std::min(hi, 1080.0f);
+
+  const float s = 2.0f; // cell size (pixels in virtual 1024×512 space)
+  for (float level = lo; level <= hi; level += 4.0f) {
     for (float cy = 0; cy < (float)H - s; cy += s) {
       for (float cx = 0; cx < (float)W - s; cx += s) {
         float v0 = sampleField(prmsl, cx, cy);
@@ -525,7 +461,6 @@ SDL_Surface *WxMbProvider::renderToSurface(const GribField &prmsl,
         if (mask == 0 || mask == 15)
           continue;
 
-        // Compute edge crossing position
         auto interp = [](float va, float vb, float lev) -> float {
           float d = vb - va;
           return (std::abs(d) < 1e-4f) ? 0.5f
@@ -556,25 +491,26 @@ SDL_Surface *WxMbProvider::renderToSurface(const GribField &prmsl,
           }
         };
 
-        for (int mSegIdx = 0; mSegIdx < 2; ++mSegIdx) {
-          int ea = MC_SEGS[mask][mSegIdx][0];
-          int eb = MC_SEGS[mask][mSegIdx][1];
+        for (int si = 0; si < 2; ++si) {
+          int ea = MC_SEGS[mask][si][0];
+          int eb = MC_SEGS[mask][si][1];
           if (ea < 0)
             break;
           float ax, ay, bx, by;
           edgePt(ea, ax, ay);
           edgePt(eb, bx, by);
-          drawLine(pixels, pitch, W, H, ax, ay, bx, by, contourCol,
-                   surf->format);
+          WxSegment seg;
+          toGeo(ax, ay, seg.lon1, seg.lat1);
+          toGeo(bx, by, seg.lon2, seg.lat2);
+          segs.push_back(seg);
         }
       }
     }
   }
 
-  // Wind quivers
+  // ---- Wind quivers --------------------------------------------------------
   if (ugrd.nx > 0 && vgrd.nx > 0) {
     const int step = 25;
-
     for (int ay = step / 2; ay < H; ay += step) {
       for (int ax = step / 2; ax < W; ax += step) {
         float u = sampleField(ugrd, (float)ax, (float)ay);
@@ -582,26 +518,75 @@ SDL_Surface *WxMbProvider::renderToSurface(const GribField &prmsl,
         float speed = std::sqrt(u * u + v * v);
         if (speed < 0.5f)
           continue;
-
-        float len = std::clamp(speed * 1.5f, 4.0f, 20.0f);
-        float angle = std::atan2(-v, u);
-        float x1 = (float)ax + std::cos(angle) * len;
-        float y1 = (float)ay + std::sin(angle) * len;
-        drawLine(pixels, pitch, W, H, (float)ax, (float)ay, x1, y1, arrowCol,
-                 surf->format);
-
-        float headLen = std::max(4.0f, len * 0.4f);
-        for (int sign : {-1, 1}) {
-          float ha = angle + 3.14159f + sign * 0.5f;
-          float hx = x1 + std::cos(ha) * headLen;
-          float hy = y1 + std::sin(ha) * headLen;
-          drawLine(pixels, pitch, W, H, x1, y1, hx, hy, arrowCol, surf->format);
-        }
+        WxQuiver q;
+        toGeo((float)ax, (float)ay, q.lon, q.lat);
+        q.u = u;
+        q.v = v;
+        quivers.push_back(q);
       }
     }
   }
 
-  return surf;
+  LOG_I("WxMb", "buildSegments: {} isobar segs, {} quivers", (int)segs.size(),
+        (int)quivers.size());
+
+  // ---- Pressure fill raster (360x180, one pixel per degree) ---------------
+  // Map pressure → RGBA using a Zoom-Earth-style blue–white–red ramp.
+  // Color stops (hPa → RGBA):
+  //   ≤960: deep blue   (20, 40, 200, 170)
+  //   990   mid blue    (100, 160, 240, 150)
+  //   1013.25 standard  (240, 240, 248, 110)  near-white/neutral
+  //   1025  warm peach  (255, 160, 110, 150)
+  //   ≥1040 deep red    (195, 25, 25, 170)
+  struct Stop {
+    float hPa;
+    uint8_t r, g, b, a;
+  };
+  static const Stop kStops[] = {
+      {960.0f, 20, 40, 200, 170},     {990.0f, 100, 160, 240, 150},
+      {1013.25f, 240, 240, 248, 110}, {1025.0f, 255, 160, 110, 150},
+      {1040.0f, 195, 25, 25, 170},
+  };
+  static constexpr int kNStops = 5;
+
+  auto pressureToColor = [&](float hpa) -> SDL_Color {
+    if (hpa <= kStops[0].hPa)
+      return {kStops[0].r, kStops[0].g, kStops[0].b, kStops[0].a};
+    if (hpa >= kStops[kNStops - 1].hPa)
+      return {kStops[kNStops - 1].r, kStops[kNStops - 1].g,
+              kStops[kNStops - 1].b, kStops[kNStops - 1].a};
+    for (int i = 0; i < kNStops - 1; ++i) {
+      if (hpa <= kStops[i + 1].hPa) {
+        float t = (hpa - kStops[i].hPa) / (kStops[i + 1].hPa - kStops[i].hPa);
+        auto lerp8 = [&](uint8_t a, uint8_t b) -> uint8_t {
+          return (uint8_t)(a + (b - a) * t);
+        };
+        return {lerp8(kStops[i].r, kStops[i + 1].r),
+                lerp8(kStops[i].g, kStops[i + 1].g),
+                lerp8(kStops[i].b, kStops[i + 1].b),
+                lerp8(kStops[i].a, kStops[i + 1].a)};
+      }
+    }
+    return {240, 240, 248, 110};
+  };
+
+  constexpr int FW = 360, FH = 180;
+  SDL_Surface *fill =
+      SDL_CreateRGBSurfaceWithFormat(0, FW, FH, 32, SDL_PIXELFORMAT_RGBA8888);
+  if (fill) {
+    uint32_t *px = (uint32_t *)fill->pixels;
+    int pitch = fill->pitch / 4;
+    float scaleX = (float)W / FW;
+    float scaleY = (float)H / FH;
+    for (int iy = 0; iy < FH; ++iy) {
+      for (int ix = 0; ix < FW; ++ix) {
+        float p = sampleField(prmsl, ix * scaleX, iy * scaleY);
+        SDL_Color c = pressureToColor(p);
+        px[iy * pitch + ix] = SDL_MapRGBA(fill->format, c.r, c.g, c.b, c.a);
+      }
+    }
+    fillSurface = fill;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -609,7 +594,6 @@ SDL_Surface *WxMbProvider::renderToSurface(const GribField &prmsl,
 // ---------------------------------------------------------------------------
 
 std::string WxMbProvider::buildNomadsUrl() {
-  // Use UTC time 4 hours ago, rounded down to nearest 6h GFS cycle boundary.
   std::time_t t = std::time(nullptr) - 4 * 3600;
   struct tm gmt{};
 #ifdef _WIN32
@@ -618,7 +602,6 @@ std::string WxMbProvider::buildNomadsUrl() {
   gmtime_r(&t, &gmt);
 #endif
   int hh = (gmt.tm_hour / 6) * 6;
-
   char buf[512];
   std::snprintf(buf, sizeof(buf),
                 "https://nomads.ncep.noaa.gov/cgi-bin/filter_gfs_0p25.pl"
@@ -636,12 +619,9 @@ std::string WxMbProvider::buildNomadsUrl() {
 // ---------------------------------------------------------------------------
 
 WxMbProvider::WxMbProvider(NetworkManager &net) : net_(net) {}
-
 WxMbProvider::~WxMbProvider() {
-  if (pendingSurface_)
-    SDL_FreeSurface(pendingSurface_);
-  if (texture_)
-    SDL_DestroyTexture(texture_);
+  if (pendingFillSurface_)
+    SDL_FreeSurface(pendingFillSurface_);
 }
 
 void WxMbProvider::update() {
@@ -669,9 +649,7 @@ void WxMbProvider::update() {
 
               GribField prmsl, ugrd, vgrd;
               if (!decodeGFS(bytes, prmsl, ugrd, vgrd)) {
-                LOG_W(
-                    "WxMb",
-                    "GRIB2 decode failed — non-simple packing or parse error");
+                LOG_W("WxMb", "GRIB2 decode failed");
                 std::lock_guard<std::mutex> lk(mutex_);
                 fetchingUrl_ = "";
                 return;
@@ -700,56 +678,42 @@ void WxMbProvider::update() {
                     (int)prmsl.values.size(), pmn, pmx, (int)ugrd.values.size(),
                     umn, umx, (int)vgrd.values.size(), vmn, vmx);
 
-              SDL_Surface *surf = renderToSurface(prmsl, ugrd, vgrd, 1024, 512);
-              if (!surf) {
-                LOG_W("WxMb", "renderToSurface failed");
-                std::lock_guard<std::mutex> lk(mutex_);
-                fetchingUrl_ = "";
-                return;
-              }
+              std::vector<WxSegment> segs;
+              std::vector<WxQuiver> quivers;
+              SDL_Surface *fillSurf = nullptr;
+              buildSegments(prmsl, ugrd, vgrd, pmn, pmx, 1024, 512, segs,
+                            quivers, fillSurf);
 
               std::lock_guard<std::mutex> lk(mutex_);
-              if (pendingSurface_)
-                SDL_FreeSurface(pendingSurface_);
-              pendingSurface_ = surf;
-              dirty_ = true;
+              segments_ = std::move(segs);
+              quivers_ = std::move(quivers);
+              if (pendingFillSurface_)
+                SDL_FreeSurface(pendingFillSurface_);
+              pendingFillSurface_ = fillSurf;
+              segmentsDirty_ = true;
               hasData_ = true;
               lastUrl_ = url;
               fetchingUrl_ = "";
               lastUpdateMs_ = (uint64_t)SDL_GetTicks();
             });
       },
-      0); // TTL=0: WxMbProvider tracks cycle freshness via URL comparison
+      0);
 }
 
-SDL_Texture *WxMbProvider::getTexture(SDL_Renderer *renderer, int w, int h) {
+bool WxMbProvider::getSegments(std::vector<WxSegment> &segs,
+                               std::vector<WxQuiver> &quivers,
+                               SDL_Surface *&fillSurface) {
   std::lock_guard<std::mutex> lk(mutex_);
-
-  // Return cached texture if still valid and same size
-  if (!dirty_ && texture_ && texW_ == w && texH_ == h)
-    return texture_;
-
-  if (!pendingSurface_)
-    return texture_; // no new data yet
-
-  SDL_Surface *surf = pendingSurface_;
-  pendingSurface_ = nullptr;
-  dirty_ = false;
-
-  if (texture_) {
-    SDL_DestroyTexture(texture_);
-    texture_ = nullptr;
+  if (!segmentsDirty_) {
+    fillSurface = nullptr;
+    return false;
   }
-
-  texture_ = SDL_CreateTextureFromSurface(renderer, surf);
-  SDL_FreeSurface(surf);
-
-  if (texture_) {
-    SDL_SetTextureBlendMode(texture_, SDL_BLENDMODE_BLEND);
-    texW_ = w;
-    texH_ = h;
-  }
-  return texture_;
+  segs = segments_;
+  quivers = quivers_;
+  fillSurface = pendingFillSurface_; // transfer ownership to caller
+  pendingFillSurface_ = nullptr;
+  segmentsDirty_ = false;
+  return true;
 }
 
 bool WxMbProvider::hasData() const {

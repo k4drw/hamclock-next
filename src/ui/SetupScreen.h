@@ -4,6 +4,7 @@
 #include "../core/ConfigManager.h"
 #include "FontCatalog.h"
 #include "FontManager.h"
+#include "TextInput.h"
 #include "ThemeCustomizer.h"
 #include "Widget.h"
 
@@ -13,17 +14,21 @@
 #include <vector>
 
 class BrightnessManager;
+class DisplayPower;
 
 class SetupScreen : public Widget {
 public:
   SetupScreen(int x, int y, int w, int h, FontManager &fontMgr,
-              BrightnessManager &brightnessMgr);
+              BrightnessManager &brightnessMgr,
+              std::shared_ptr<DisplayPower> displayPower);
 
   void update() override;
   void render(SDL_Renderer *renderer) override;
   void onResize(int x, int y, int w, int h) override;
-  bool onMouseDown(int mx, int my, Uint16 mod) override;
+  bool onMouseDown(int mx, int my, Uint16 mod, int clicks) override;
   bool onMouseUp(int mx, int my, Uint16 mod, int clicks) override;
+  void onMouseMove(int mx, int my) override;
+  bool onMouseWheel(int scrollY) override;
   bool onKeyDown(SDL_Keycode key, Uint16 mod) override;
   bool onTextInput(const char *text) override;
   bool isModalActive() const override;
@@ -43,6 +48,7 @@ public:
     Services,
     Network,
     Widgets,
+    Watchlist,
     Update
   };
   void setStartTab(Tab tab) { activeTab_ = tab; }
@@ -50,10 +56,7 @@ public:
 private:
   void recalcLayout();
   void autoPopulateLatLon();
-  std::string *getActiveFieldText();
-  bool deleteSelection(std::string *text);
-  int calculateCursorPosFromClick(int clickX, int fieldStartX,
-                                  const std::string &text, FontStyle style);
+  TextInput *getActiveInput();
   void renderTabIdentity(SDL_Renderer *renderer, int cx, int pad, int fieldW,
                          int fieldH, int fieldX, int textPad);
   void renderTabDXCluster(SDL_Renderer *renderer, int cx, int pad, int fieldW,
@@ -70,26 +73,36 @@ private:
                         int fieldH, int fieldX, int textPad);
   void renderTabUpdate(SDL_Renderer *renderer, int cx, int pad, int fieldW,
                        int fieldH, int fieldX, int textPad);
+  void renderTabWatchlist(SDL_Renderer *renderer, int cx, int pad, int fieldW,
+                          int fieldH, int fieldX, int textPad);
 
   FontManager &fontMgr_;
   BrightnessManager &brightnessMgr_;
+  std::shared_ptr<DisplayPower> displayPower_;
 
   // Appearance tab absorbs the old Display tab (brightness/schedule now live
   // there)
   Tab activeTab_ = Tab::Identity;
   bool gpsEnabled_ = false;
-  std::string callsignText_;
-  std::string gridText_;
-  std::string latText_;
-  std::string lonText_;
+  TextInput callsignInput_;
+  TextInput gridInput_;
+  TextInput latInput_;
+  TextInput lonInput_;
   std::string frnText_;
-  std::string clusterHost_;
-  std::string clusterPort_;
-  std::string clusterLogin_;
+  TextInput clusterHostInput_;
+  TextInput clusterPortInput_;
+  TextInput clusterLoginInput_;
   bool clusterEnabled_ = true;
   bool clusterWSJTX_ = false;
-  std::string wsjtxPort_;
+  TextInput wsjtxPortInput_;
   SDL_Rect wsjtxPortRect_ = {0, 0, 0, 0};
+  SDL_Rect clusterHostRect_ = {0, 0, 0, 0};
+  SDL_Rect clusterPortRect_ = {0, 0, 0, 0};
+  SDL_Rect clusterLoginRect_ = {0, 0, 0, 0};
+  SDL_Rect callsignRect_ = {0, 0, 0, 0};
+  SDL_Rect gridRect_ = {0, 0, 0, 0};
+  SDL_Rect latRect_ = {0, 0, 0, 0};
+  SDL_Rect lonRect_ = {0, 0, 0, 0};
   bool rbnEnabled_ = false;
   bool pskOfDe_ = true;
   bool pskUseCall_ = true;
@@ -100,30 +113,58 @@ private:
   std::string panelMode_ = "dx";
   std::string selectedSatellite_;
   bool mapNightLights_ = true;
+  std::string mapStyle_ = "nasa";
+  std::string projection_ = "equirectangular";
   bool useMetric_ = true;
   bool rssEnabled_ = true;
+  bool showBorders_ = false;
+  std::string displayPowerMethod_ = "auto";
   WeatherOverlayType weatherOverlay_ = WeatherOverlayType::None;
 
   // Services & Rig
-  std::string qrzUsername_;
-  std::string qrzPassword_;
+  TextInput qrzUsernameInput_;
+  TextInput qrzPasswordInput_;
+  TextInput repeaterBookInput_;
+  TextInput winlinkInput_;
   std::string countdownLabel_;
   std::string countdownTime_; // YYYY-MM-DD HH:MM
-  std::string dimTime_;
-  std::string brightTime_;
+  TextInput dimTimeInput_;
+  TextInput brightTimeInput_;
 
+  SDL_Rect qrzUsernameRect_ = {0, 0, 0, 0};
+  SDL_Rect qrzPasswordRect_ = {0, 0, 0, 0};
+  SDL_Rect repeaterBookRect_ = {0, 0, 0, 0};
+  SDL_Rect winlinkRect_ = {0, 0, 0, 0};
   SDL_Rect brightTimeRect_ = {0, 0, 0, 0};
   SDL_Rect modalRect_ = {0, 0, 0, 0};
 
-  std::string rigHost_;
-  std::string rigPort_;
+  TextInput rigHostInput_;
+  TextInput rigPortInput_;
   bool rigAutoTune_ = true;
 
-  std::vector<WidgetType> paneRotations_[4];
+  TextInput rotatorHostInput_;
+  TextInput rotatorPortInput_;
+  bool rotatorAutoTrack_ = false;
+  bool rotatorUpover_ = false;
+
+  std::vector<WidgetType> paneRotations_[6];
+  bool syncRotation_ = false;
+  SDL_Rect syncRotationRect_ = {0, 0, 0, 0};
+
+  // Watchlist tab
+  std::vector<std::string> watchlistEntries_;
+  TextInput watchlistInputField_;
+  SDL_Rect watchlistInputRect_ = {0, 0, 0, 0};
+  SDL_Rect watchlistAddRect_ = {0, 0, 0, 0};
+  std::vector<SDL_Rect> watchlistDeleteRects_;
+  int watchlistScrollOffset_ = 0;
+  int widgetListScrollOffset_ = 0;
+  int widgetListStartY_ = 0;
+  int widgetListEndY_ = 0;
+  int widgetListMaxScroll_ = 0;
+  SDL_Rect sidePanelModeRects_[4] = {};
   int activePane_ = 0;
   int activeField_ = 0;
-  int cursorPos_ = 0;
-  int selectionAnchor_ = 0;
   bool complete_ = false;
   bool cancelled_ = false;
   bool latLonManual_ = false;
@@ -139,7 +180,11 @@ private:
   SDL_Rect nightLightsRect_ = {0, 0, 0, 0};
   SDL_Rect metricToggleRect_ = {0, 0, 0, 0};
   SDL_Rect rssToggleRect_ = {0, 0, 0, 0};
-  SDL_Rect weatherOverlayRect_ = {0, 0, 0, 0};
+  SDL_Rect bordersToggleRect_ = {0, 0, 0, 0};
+  SDL_Rect powerMethodRect_ = {0, 0, 0, 0};
+  SDL_Rect weatherOverlayRect_ = {0, 0, 0, 0};  SDL_Rect mapStyleRect_ = {0, 0, 0, 0};
+  SDL_Rect projectionRect_ = {0, 0, 0, 0};
+  SDL_Rect rotationToggleRect_ = {0, 0, 0, 0};
   SDL_Rect okBtnRect_ = {0, 0, 0, 0};
   SDL_Rect cancelBtnRect_ = {0, 0, 0, 0};
   SDL_Rect brightnessSliderRect_ = {0, 0, 0, 0};
@@ -157,11 +202,17 @@ private:
 
   // Network / Hub tab
   HubMode hubMode_ = HubMode::Off;
-  std::string hubIp_;
-  std::string hubPortStr_ = "8080";
+  TextInput hubIpInput_;
+  TextInput hubPortInput_;
   SDL_Rect hubModeRect_ = {0, 0, 0, 0};
   SDL_Rect hubIpRect_ = {0, 0, 0, 0};
   SDL_Rect hubPortRect_ = {0, 0, 0, 0};
+  SDL_Rect rigHostRect_ = {0, 0, 0, 0};
+  SDL_Rect rigPortRect_ = {0, 0, 0, 0};
+  SDL_Rect rotatorHostRect_ = {0, 0, 0, 0};
+  SDL_Rect rotatorPortRect_ = {0, 0, 0, 0};
+  SDL_Rect rotatorAutoTrackRect_ = {0, 0, 0, 0};
+  SDL_Rect rotatorUpoverRect_ = {0, 0, 0, 0};
   std::map<std::string, SDL_Color> colorOverrides_;
 
   // Track dimensions to detect size changes

@@ -5,12 +5,15 @@
 #include "TextureManager.h"
 #include "Widget.h"
 #include <SDL.h>
+#include <memory>
+#include <mutex>
 #include <string>
 
 class SDOPanel : public Widget {
 public:
   SDOPanel(int x, int y, int w, int h, FontManager &fontMgr,
            TextureManager &texMgr, SDOProvider &provider);
+  ~SDOPanel() override;
 
   void setObserver(double lat, double lon) {
     obsLat_ = lat;
@@ -36,6 +39,7 @@ private:
   void renderMenu(SDL_Renderer *renderer, const struct ThemeColors &themes);
   void renderOverlays(SDL_Renderer *renderer, const struct ThemeColors &themes);
   void recalcMenuLayout();
+  void saveSettings();
 
   FontManager &fontMgr_;
   TextureManager &texMgr_;
@@ -47,18 +51,18 @@ private:
     const char *id;
   };
 
-  static inline const Wavelength wavelengths_[] = {{"Composite", "211193171"},
-                                                   {"Magnetogram", "HMIB"},
-                                                   {"6173A", "HMIIC"},
-                                                   {"131A", "0131"},
-                                                   {"193A", "0193"},
-                                                   {"211A", "0211"},
-                                                   {"304A", "0304"}};
+  static inline const Wavelength wavelengths_[] = {
+      {"Composite", "211193171"}, {"Magnetogram", "HMIB"}, {"6173A", "HMIIC"},
+      {"131A", "0131"},           {"193A", "0193"},        {"211A", "0211"},
+      {"304A", "0304"},           {"1600A", "1600"},       {"1700A", "1700"}};
 
   std::string currentId_ = "0193";
   bool rotating_ = false;
+  bool showPfss_ = false;
+  bool movie_ = false;
   bool menuVisible_ = false;
   bool imageReady_ = false;
+  std::time_t imageServerTime_ = 0;
   uint32_t lastFetch_ = 0;
   uint32_t lastRotate_ = 0;
 
@@ -74,8 +78,17 @@ private:
   // Temp state
   std::string tempId_;
   bool tempRotating_ = false;
-  bool tempGrayline_ = false;
+  bool tempPfss_ = false;
   bool tempMovie_ = false;
+
+  // Thread-safe image delivery bridge (shared so lambda outlives panel)
+  std::shared_ptr<std::mutex> pendingMutex_ = std::make_shared<std::mutex>();
+  std::shared_ptr<std::string> pendingData_ = std::make_shared<std::string>();
+  std::shared_ptr<SDL_Surface *> pendingSurface_ =
+      std::make_shared<SDL_Surface *>(nullptr);
+  std::shared_ptr<std::time_t> pendingServerTime_ =
+      std::make_shared<std::time_t>(0);
+  std::shared_ptr<bool> dataReady_ = std::make_shared<bool>(false);
 
   // Scaling
   int overlayFontSize_ = 14;

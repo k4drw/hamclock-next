@@ -2,22 +2,28 @@
 
 #include "../core/SolarData.h"
 #include "../core/Theme.h"
+#include "../core/XRayData.h"
 #include "FontManager.h"
+#include "TextureManager.h"
 #include "Widget.h"
 
 #include <SDL.h>
 #include <memory>
 #include <string>
+#include <vector>
 
 class SpaceWeatherPanel : public Widget {
 public:
   SpaceWeatherPanel(int x, int y, int w, int h, FontManager &fontMgr,
-                    std::shared_ptr<SolarDataStore> store);
+                    TextureManager &texMgr,
+                    std::shared_ptr<SolarDataStore> store,
+                    std::shared_ptr<XRayHistoryStore> xrayStore = nullptr);
   ~SpaceWeatherPanel() override { destroyCache(); }
 
   void update() override;
   void render(SDL_Renderer *renderer) override;
   void onResize(int x, int y, int w, int h) override;
+  void onMouseMove(int mx, int my) override;
   bool onMouseUp(int mx, int my, Uint16 mod, int clicks) override;
 
   std::string getName() const override { return "SpaceWeather"; }
@@ -28,12 +34,15 @@ public:
 
 private:
   void destroyCache();
-  static SDL_Color colorForK(int k);
-  static SDL_Color colorForSFI(int sfi);
+  static SDL_Color colorForK(float k, const ThemeColors &themes);
+  static SDL_Color colorForSFI(int sfi, const ThemeColors &themes);
   static SDL_Color colorForNOAAScale(int scale, const ThemeColors &themes);
 
   FontManager &fontMgr_;
+  TextureManager &texMgr_;
   std::shared_ptr<SolarDataStore> store_;
+  std::shared_ptr<XRayHistoryStore> xrayStore_;
+  std::vector<XRayDataPoint> sparklineHistory_;
 
   static constexpr int kNumItems = 15;
   static constexpr int kItemsPerPage = 4;

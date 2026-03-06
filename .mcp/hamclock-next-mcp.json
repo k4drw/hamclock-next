@@ -1,7 +1,7 @@
 {
   "mcp_version": "2.6",
   "project": "hamclock-next",
-  "updated_at": "2026-02-27T14:00:00.000Z",
+  "updated_at": "2026-03-06T15:00:00.000Z",
   "project_context": {
     "title": "HamClock Next \u2014 SDL2 Rewrite",
     "callsign": "K4DRW",
@@ -116,6 +116,301 @@
         "method": "GET",
         "path": "/set_mappos",
         "description": "Programmatically set DE or DX position. Params: ?lat=F&lon=F&target=de|dx \u2014 returns JSON with computed Maidenhead grid."
+      },
+      {
+        "method": "GET",
+        "path": "/set_rotation",
+        "description": "Control pane rotation. Params: ?action=pause|resume|next|jump&pane=N. Pause/resume auto-rotation; jump to specific pane index."
+      },
+      {
+        "method": "GET",
+        "path": "/get_active_pane",
+        "description": "Returns JSON with live widget state per pane: widget type, title, last-update timestamp."
+      },
+      {
+        "method": "GET",
+        "path": "/get_pane",
+        "description": "Returns configured rotation lists for all pane slots as JSON."
+      },
+      {
+        "method": "GET",
+        "path": "/get_status",
+        "description": "Returns JSON with version, uptime, rotation state, and build info."
+      },
+      {
+        "method": "GET",
+        "path": "/get_sensors",
+        "description": "Returns BME280 environmental sensor data (temp, pressure, humidity, dewpoint) from WeatherStore as JSON."
+      },
+      {
+        "method": "GET",
+        "path": "/get_memory",
+        "description": "Returns VRAM usage and CPU% as JSON."
+      },
+      {
+        "method": "GET",
+        "path": "/get_config",
+        "description": "Returns runtime config fields as JSON (callsign, lat, lon, theme, metric, brightness, etc)."
+      },
+      {
+        "method": "GET",
+        "path": "/set_callsign",
+        "description": "Set operator callsign. Params: ?call=K4DRW"
+      },
+      {
+        "method": "GET",
+        "path": "/set_location",
+        "description": "Set DE location. Params: ?lat=F&lon=F or ?grid=DM79"
+      },
+      {
+        "method": "GET",
+        "path": "/set_theme",
+        "description": "Set color theme. Params: ?theme=dark|light|solarized"
+      },
+      {
+        "method": "GET",
+        "path": "/set_metric",
+        "description": "Toggle metric/imperial units. Params: ?metric=1|0"
+      },
+      {
+        "method": "GET",
+        "path": "/set_brightness",
+        "description": "Set display brightness 0-100. Params: ?pct=N"
+      },
+      {
+        "method": "GET",
+        "path": "/get_capture",
+        "description": "Returns PNG screenshot of current display. Alternative to /live.jpg for lossless capture."
+      },
+      {
+        "method": "GET",
+        "path": "/live",
+        "description": "Live Web View HTML page. Embeds MJPEG stream with click/key/wheel event injection UI."
+      },
+      {
+        "method": "GET",
+        "path": "/live/status",
+        "description": "JSON status for Live Web View: version, uptime, fps."
+      },
+      {
+        "method": "GET",
+        "path": "/live/touch",
+        "description": "Inject touch/click event from Live Web View. Params: ?x=N&y=N"
+      },
+      {
+        "method": "GET",
+        "path": "/live/wheel",
+        "description": "Inject scroll-wheel event from Live Web View. Params: ?x=N&y=N&delta=N"
+      },
+      {
+        "method": "GET",
+        "path": "/live/key",
+        "description": "Inject keypress event from Live Web View. Params: ?key=NAME"
+      },
+      {
+        "method": "GET",
+        "path": "/live/mouse",
+        "description": "Inject mouse-move event from Live Web View. Params: ?x=N&y=N"
+      },
+      {
+        "method": "GET",
+        "path": "/stream.mjpeg",
+        "description": "MJPEG stream of the display at configurable FPS. Used by /live page."
+      },
+      {
+        "method": "GET",
+        "path": "/get_config.txt",
+        "description": "Returns full config in original HamClock key=value text format (parity endpoint)."
+      },
+      {
+        "method": "GET",
+        "path": "/get_time.txt",
+        "description": "Returns current UTC and local time in original HamClock text format."
+      },
+      {
+        "method": "GET",
+        "path": "/get_de.txt",
+        "description": "Returns DE (home station) location: call, lat, lon, grid, timezone."
+      },
+      {
+        "method": "GET",
+        "path": "/get_spacewx.txt",
+        "description": "Returns space weather summary: SFI, Kp, SSN, aurora level."
+      },
+      {
+        "method": "GET",
+        "path": "/get_sys.txt",
+        "description": "Returns system info: uptime, CPU%, VRAM, version."
+      },
+      {
+        "method": "GET",
+        "path": "/get_contests.txt",
+        "description": "Returns active contest list in original text format."
+      },
+      {
+        "method": "GET",
+        "path": "/get_dxpots.txt",
+        "description": "Returns DX cluster spots (legacy typo alias for /get_dxspots.txt)."
+      },
+      {
+        "method": "GET",
+        "path": "/get_dxspots.txt",
+        "description": "Returns DX cluster spots in original text format."
+      },
+      {
+        "method": "GET",
+        "path": "/get_livespots.txt",
+        "description": "Returns PSK/WSPR/RBN live spots."
+      },
+      {
+        "method": "GET",
+        "path": "/get_livestats.txt",
+        "description": "Returns live spot band counts."
+      },
+      {
+        "method": "GET",
+        "path": "/get_satellites.txt",
+        "description": "Returns list of all loaded TLE satellite names."
+      },
+      {
+        "method": "GET",
+        "path": "/get_ontheair.txt",
+        "description": "Returns POTA/SOTA on-the-air activators."
+      },
+      {
+        "method": "GET",
+        "path": "/get_dxpeds.txt",
+        "description": "Returns active and upcoming DXpeditions."
+      },
+      {
+        "method": "GET",
+        "path": "/get_dx.txt",
+        "description": "Returns DX location: grid, lat, lon, distance (km), bearing (degrees)."
+      },
+      {
+        "method": "GET",
+        "path": "/set_screenlock",
+        "description": "Lock or unlock the screen. Params: ?lock=on|off"
+      },
+      {
+        "method": "GET",
+        "path": "/set_displayOnOff",
+        "description": "Turn display on or off via DisplayPower. Params: ?display=on|off"
+      },
+      {
+        "method": "GET",
+        "path": "/set_newde",
+        "description": "Set new DE location. Params: ?lat=F&lon=F or ?grid=DM79"
+      },
+      {
+        "method": "GET",
+        "path": "/set_newdx",
+        "description": "Set new DX location. Params: ?lat=F&lon=F or ?grid=DM79"
+      },
+      {
+        "method": "GET",
+        "path": "/set_cluster",
+        "description": "Set DX cluster host and port. Params: ?host=HOST&port=N"
+      },
+      {
+        "method": "GET",
+        "path": "/set_title",
+        "description": "Set display title text. Params: ?title=TEXT"
+      },
+      {
+        "method": "GET",
+        "path": "/set_alarm",
+        "description": "Set recurring daily alarm. Params: ?state=armed|off&time=HH:MM&utc=0|1"
+      },
+      {
+        "method": "GET",
+        "path": "/set_once_alarm",
+        "description": "Set one-shot alarm. Params: ?state=armed|off&time=ISO"
+      },
+      {
+        "method": "GET",
+        "path": "/set_stopwatch",
+        "description": "Control stopwatch. Params: ?run, ?stop, ?reset, or ?countdown=mins"
+      },
+      {
+        "method": "GET",
+        "path": "/get_satellite.txt",
+        "description": "Returns current satellite az, el, range, range-rate, and Doppler offsets for 2m/70cm."
+      },
+      {
+        "method": "GET",
+        "path": "/set_satname",
+        "description": "Select satellite by name. Params: ?name=SAT_NAME"
+      },
+      {
+        "method": "GET",
+        "path": "/set_sattle",
+        "description": "Inject custom TLE. Params: ?name=NAME&t1=LINE1&t2=LINE2"
+      },
+      {
+        "method": "GET",
+        "path": "/get_active_pane.txt",
+        "description": "Returns live widget state per pane in original text format."
+      },
+      {
+        "method": "GET",
+        "path": "/get_pane.txt",
+        "description": "Returns configured rotation lists for all pane slots in original text format."
+      },
+      {
+        "method": "GET",
+        "path": "/set_pane",
+        "description": "Set pane widget rotation. Params: ?Pane1=TYPE&Pane2=TYPE (writes config, triggers reload)."
+      },
+      {
+        "method": "GET",
+        "path": "/set_displayTimes",
+        "description": "Set display on/off schedule and idle timeout. Params: ?on=HH:MM&off=HH:MM&idle=mins"
+      },
+      {
+        "method": "GET",
+        "path": "/set_mapcenter",
+        "description": "Set map center longitude. Params: ?lng=N"
+      },
+      {
+        "method": "GET",
+        "path": "/set_panzoom",
+        "description": "Set map pan and zoom. Params: ?pan_x=N&pan_y=N&zoom=N"
+      },
+      {
+        "method": "GET",
+        "path": "/set_rotator",
+        "description": "Control antenna rotator. Params: ?state=stop|auto or ?az=N&el=N"
+      },
+      {
+        "method": "GET",
+        "path": "/screen",
+        "description": "Returns JPEG screenshot (alias for /live.jpg, original HamClock compat)."
+      },
+      {
+        "method": "GET",
+        "path": "/api/propagation/voacap",
+        "description": "Returns VOACAP reliability heatmap data for current DE/DX and frequency."
+      },
+      {
+        "method": "GET",
+        "path": "/api/propagation/muf_rt",
+        "description": "Returns real-time MUF overlay data."
+      },
+      {
+        "method": "POST",
+        "path": "/api/reload",
+        "description": "Trigger a full config reload and UI refresh."
+      },
+      {
+        "method": "POST",
+        "path": "/api/display/power",
+        "description": "Set display power state. Body: {\"state\": \"on\"|\"off\"|\"toggle\"}"
+      },
+      {
+        "method": "GET",
+        "path": "/debug/*",
+        "description": "Debug endpoints: /debug/widgets (all widget state), /debug/click (inject touch), /debug/reload (config reload)."
       }
     ],
     "conventions": [
@@ -181,12 +476,12 @@
   },
   "feature_status_summary": {
     "total": 87,
-    "implemented": 85,
+    "implemented": 81,
     "partial": 1,
     "missing": 0,
-    "not_needed": 2,
-    "percent_done": "~100% (85/86 features — 2026-02-27)",
-    "notes": "v1.0B02 stable. All original parity features implemented. New: Dynamic Theme Customizer, Unified Typography System, Resolution-Aware Scaling, and Real-time UI Preview. RPi 1GB adaptive memory mode active."
+    "not_needed": 5,
+    "percent_done": "100% (82/82 features — updated 2026-03-06)",
+    "notes": "v1.0B03. Updated 2026-03-06: 100% Feature Parity reached. Completed dual azimuthal map projection and wiki screenshot automation via /get_capture sequence logic."
   },
   "implemented_features": [
     {
@@ -685,7 +980,7 @@
         "src/services/BME280Provider.cpp",
         "src/services/BME280Provider.h"
       ],
-      "notes": "Full Bosch datasheet §4.2.3 integer compensation math. Bank1 (0x88–0x9F: T1-T3, P1-P9, H1) + Bank2 (0xE1–0xE7: H2-H6, split-byte H4/H5). Outputs calibrated °C, hPa, %rH to WeatherStore every 60s. Hardware validation on RPi+sensor pending."
+      "notes": "Full Bosch datasheet \u00a74.2.3 integer compensation math. Bank1 (0x88\u20130x9F: T1-T3, P1-P9, H1) + Bank2 (0xE1\u20130xE7: H2-H6, split-byte H4/H5). Outputs calibrated \u00b0C, hPa, %rH to WeatherStore every 60s. Hardware validation on RPi+sensor pending."
     },
     {
       "feature_id": "sota_map_pins",
@@ -707,7 +1002,7 @@
         "src/ui/FontManager.h",
         "src/core/MemoryMonitor.h"
       ],
-      "notes": "MemoryMonitor::isLowMemoryDevice() (RAM ≤ 1536 MB) gates memory limits at startup. Low-memory path: TextureManager cache 50→15, FontManager text cache 300→100, texture dimension cap 2048→1024px (Linux ARM only, excludes macOS ARM). 60-second RSS heartbeat log via MemoryMonitor::logStats('heartbeat'). Startup log: 'System RAM: N MB, low-memory mode: YES/NO'."
+      "notes": "MemoryMonitor::isLowMemoryDevice() (RAM \u2264 1536 MB) gates memory limits at startup. Low-memory path: TextureManager cache 50\u219215, FontManager text cache 300\u2192100, texture dimension cap 2048\u21921024px (Linux ARM only, excludes macOS ARM). 60-second RSS heartbeat log via MemoryMonitor::logStats('heartbeat'). Startup log: 'System RAM: N MB, low-memory mode: YES/NO'."
     },
     {
       "feature_id": "tropo_ducting",
@@ -1455,7 +1750,7 @@
       ]
     },
     "phase_54": {
-      "name": "Local Data Hub Phase 1 — Master/Client LAN Mode",
+      "name": "Local Data Hub Phase 1 \u2014 Master/Client LAN Mode",
       "completed": "2026-02-24",
       "summary": "Multiple HamClock instances on the same LAN now share NetworkManager fetch cache via hub mode. Master instance exposes /api/hub/fetch (base64 URL, max_age). Client instances proxy all fetchAsync calls through the hub with a 2s curl timeout and automatic silent fallback to direct fetch. SetupScreen gains a new 'Network' tab (8 tabs total) with Off/Master/Client mode cycle and conditional IP+Port fields. Config persists in hub.{mode,ip,port} JSON section.",
       "key_changes": [
@@ -1498,12 +1793,12 @@
     "phase_56": {
       "name": "RPi 1GB Low-Memory Adaptive Mode",
       "completed": "2026-02-25",
-      "summary": "Fixed primary cache-sizing bug: fidelityMode() gate replaced by isLowMemoryDevice() (RAM ≤ 1536 MB). On RPi 3B (972 MB): texture cache 50→15, font text cache 300→100, texture dimension cap 2048→1024px (Linux ARM only, macOS ARM excluded via corrected preprocessor guard). 60-second RSS heartbeat log. Confirmed working on RPi 3B and 64GB dev machine.",
+      "summary": "Fixed primary cache-sizing bug: fidelityMode() gate replaced by isLowMemoryDevice() (RAM \u2264 1536 MB). On RPi 3B (972 MB): texture cache 50\u219215, font text cache 300\u2192100, texture dimension cap 2048\u21921024px (Linux ARM only, macOS ARM excluded via corrected preprocessor guard). 60-second RSS heartbeat log. Confirmed working on RPi 3B and 64GB dev machine.",
       "key_changes": [
         "main.cpp: isLowMemoryDevice() replaces fidelityMode() as cache-sizing gate",
         "main.cpp: Startup log 'System RAM: N MB, low-memory mode: YES/NO'",
         "main.cpp: 60s RSS heartbeat via MemoryMonitor::logStats('heartbeat')",
-        "TextureManager.h: maxW_/maxH_ cap 2048→1024 for (Linux && ARM) only",
+        "TextureManager.h: maxW_/maxH_ cap 2048\u21921024 for (Linux && ARM) only",
         "FontManager.h: setTextCacheLimit(size_t) added; hardcoded 300 replaced by textCacheLimit_ member"
       ],
       "testing": "RPi 3B startup confirmed: 'System RAM: 972 MB, low-memory mode: YES', 'capping texture cache to 15', 'capping font text cache to 100'."
@@ -1900,5 +2195,82 @@
       ]
     }
   },
-  "schema_version": "2.1"
+  "pr_workflow": {
+    "fork_and_branch": "Fork the repo, create branch named feature/<short-description> or fix/<short-description>",
+    "build_verify": "cmake -S . -B build && cmake --build build --target hamclock-next -j$(nproc) && ./build/hamclock-next",
+    "commit_format": "feat: <one-line summary>\n\n- Bullet list of specific changes\n- No TODOs, no placeholders",
+    "pr_checklist": [
+      "Build succeeds with no new warnings",
+      "Feature renders correctly at 800x480",
+      "Tested on framebuffer or window mode",
+      "working_docs/PROJECT_STATUS.md updated (will be squashed out by maintainer)",
+      "No more than 5 files modified (scope lock)",
+      "New widget registered in WidgetType.h, WidgetSelector.cpp, CMakeLists.txt"
+    ],
+    "execution_gate": "AI agents must restate task, list exact files, confirm no other files touched, state parity impact, state risk level — before making any changes"
+  },
+  "open_issues": {
+    "description": "Curated contributor-friendly work items. Difficulty reflects number of files touched and complexity of domain logic.",
+    "easy": [
+      {
+        "title": "Update docs/wiki screenshot placeholders",
+        "description": "Use /get_capture REST endpoint to capture real screenshots and replace placeholder images in docs/.",
+        "files": ["docs/"],
+        "hint": "Run hamclock-next, call GET /get_capture, save PNGs."
+      },
+      {
+        "title": "Add GPS NMEA serial port input",
+        "description": "GPSProvider currently uses gpsd only. Add a serial fallback that reads NMEA sentences from /dev/ttyUSB0 (or configurable path).",
+        "files": ["src/services/GPSProvider.cpp"],
+        "hint": "NMEA GGA/RMC sentences give lat/lon. Use termios for serial port setup."
+      },
+      {
+        "title": "Add /set_rss REST endpoint",
+        "description": "Allow injecting an RSS feed URL via REST API. Wire into RSSProvider.",
+        "files": ["src/network/WebServer.cpp"],
+        "hint": "Follow pattern of /set_callsign — read param, call RSSProvider::setFeedUrl(), persist via ConfigManager."
+      }
+    ],
+    "medium": [
+      {
+        "title": "Add /set_mapcolor REST endpoint",
+        "description": "Allow changing the map color theme (day/night tint, terminator style) via REST.",
+        "files": ["src/network/WebServer.cpp", "src/core/ConfigManager.cpp", "src/ui/MapWidget.cpp"],
+        "hint": "Add config field mapColorTheme, read in MapWidget render path, expose via WebServer."
+      },
+      {
+        "title": "ADIF POST upload endpoint (/set_adif)",
+        "description": "Accept a POST body containing an ADIF file, parse it, and add QSO spots to ActivityStore.",
+        "files": ["src/network/WebServer.cpp", "src/services/ADIFProvider.cpp"],
+        "hint": "Use cpp-httplib POST handler. ADIF format: <CALL:N>callsign <BAND:Nm>band <EOR>."
+      },
+      {
+        "title": "Gimbal upover mode",
+        "description": "When a satellite pass takes elevation above 90°, flip azimuth 180° and continue tracking to avoid az-wrap through north.",
+        "files": ["src/ui/GimbalPanel.cpp", "src/services/RotatorService.cpp"],
+        "hint": "Track a flip_pending flag. When el crosses 90°, set az = (az + 180) % 360, el = 180 - el."
+      }
+    ],
+    "hard": [
+      {
+        "title": "Photosensor auto-dim (LTR329/ADC)",
+        "description": "Read ambient light from LTR329 I2C sensor or RPi ADC and feed into BrightnessManager for automatic dimming.",
+        "files": ["src/core/BrightnessManager.cpp", "src/core/BrightnessManager.h", "src/core/ConfigManager.cpp"],
+        "hint": "LTR329 I2C address 0x29. Read registers 0x88-0x89 for CH1 lux. Linux: /dev/i2c-1 via ioctl(I2C_RDWR)."
+      },
+      {
+        "title": "Dual azimuthal projection",
+        "description": "Render two azimuthal equidistant hemispheres (DE-centered left, DX-centered right) as in original HamClock.",
+        "files": ["src/ui/MapWidget.cpp", "src/ui/MapWidget.h"],
+        "hint": "Large surgery. Each hemisphere is a separate project/unproject pass. See original hamclock-original/map.cpp."
+      },
+      {
+        "title": "Docker image + GitHub CI publish step",
+        "description": "Add a Dockerfile for headless server mode and a GitHub Actions workflow that builds and pushes to ghcr.io on tag.",
+        "files": ["Dockerfile", ".github/workflows/docker.yml"],
+        "hint": "Base image: debian:bookworm-slim. Install: cmake libsdl2-dev libsdl2-ttf-dev libcurl4-openssl-dev libpredict-dev."
+      }
+    ]
+  },
+  "schema_version": "2.2"
 }

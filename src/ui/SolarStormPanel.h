@@ -23,15 +23,8 @@ private:
   SolarStormData data_;
   std::mutex mutex_;
 
-  struct {
-    bool visible = false;
-    std::string text;
-    int x, y;
-  } tooltip_;
-
   void drawSparkline(SDL_Renderer *renderer, int x, int y, int w, int h, const float* values);
   void drawBadge(SDL_Renderer *renderer, int x, int y, const std::string& label, SolarStormScale scale);
-  void renderTooltip(SDL_Renderer *renderer);
 };
 
 } // namespace HamClock

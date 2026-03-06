@@ -16,7 +16,7 @@ public:
 
   void update() override {}
   void render(SDL_Renderer *renderer) override;
-  bool onMouseDown(int mx, int my, Uint16 mod) override;
+  bool onMouseDown(int mx, int my, Uint16 mod, int clicks) override;
   bool onMouseUp(int mx, int my, Uint16 mod, int clicks) override;
   void onMouseMove(int mx, int my) override;
 

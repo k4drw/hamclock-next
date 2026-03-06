@@ -4,6 +4,7 @@
 #include "../services/CallbookProvider.h"
 #include "../services/FccProvider.h"
 #include "FontManager.h"
+#include "TextInput.h"
 #include "Widget.h"
 #include <atomic>
 #include <mutex>
@@ -45,7 +46,7 @@ private:
   bool showSetup_ = false;
   std::vector<ReminderEntry> pendingReminders_;
   int activeField_ = -1; // -1=none, 0..N-1=label, N..2N-1=date
-  int cursorPos_ = 0;
+  TextInput activeProxy_;   // proxy cursor/selection for the active field
   bool checking_ = false;
   bool fetching_ = false;
 
@@ -56,7 +57,6 @@ private:
   std::vector<HoverZone> hoverZones_;
 
   void onMouseMove(int mx, int my) override;
-  void renderTooltip(SDL_Renderer *renderer);
 
   // ── Notification state ────────────────────────────────────────────────────
   bool notificationActive_ = false;

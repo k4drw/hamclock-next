@@ -9,6 +9,7 @@ struct RotatorData {
   double elevation = 0.0; // Current elevation (-90 to 90 degrees)
   bool connected = false; // Connection status
   bool moving = false;    // Is rotator currently moving
+  bool flipActive = false; // Is "Upover" mode engaged
   std::chrono::system_clock::time_point lastUpdate;
   bool valid = false;
 };

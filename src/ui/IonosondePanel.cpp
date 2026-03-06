@@ -75,7 +75,7 @@ void IonosondePanel::render(SDL_Renderer *renderer) {
   drawGraph(renderer, x_ + pad, curY + 12, width_ - 2*pad, 35, d.stations);
 
   if (tooltip_.visible) {
-    renderTooltip(renderer);
+    renderTooltip(renderer, fontMgr_);
   }
 }
 
@@ -109,6 +109,7 @@ void IonosondePanel::onMouseMove(int mx, int my) {
     tooltip_.x = mx;
     tooltip_.y = my;
     tooltip_.visible = true;
+    tooltip_.timestamp = SDL_GetTicks();
   } else {
     tooltip_.visible = false;
   }
@@ -151,49 +152,5 @@ void IonosondePanel::drawGraph(SDL_Renderer *renderer, int x, int y, int w, int 
   }
 }
 
-void IonosondePanel::renderTooltip(SDL_Renderer *renderer) {
-  if (tooltip_.text.empty()) return;
-
-  auto *cat = fontMgr_.catalog();
-  
-  // Handle multiline text in tooltip
-  size_t newlinePos = tooltip_.text.find('\n');
-  std::string line1 = tooltip_.text.substr(0, newlinePos);
-  std::string line2 = (newlinePos != std::string::npos) ? tooltip_.text.substr(newlinePos + 1) : "";
-
-  int tw1, th1, tw2 = 0, th2 = 0;
-  cat->renderText(renderer, line1, {255, 255, 255, 255}, FontStyle::Micro, &tw1, &th1);
-  if (!line2.empty()) {
-    cat->renderText(renderer, line2, {200, 200, 200, 255}, FontStyle::Micro, &tw2, &th2);
-  }
-
-  int tw = std::max(tw1, tw2);
-  int th = th1 + (line2.empty() ? 0 : th2 + 2); // 2px spacing
-
-  int padX = 8;
-  int padY = 4;
-  int boxW = tw + padX * 2;
-  int boxH = th + padY * 2;
-
-  int bx = tooltip_.x - boxW / 2;
-  int by = tooltip_.y - boxH - 12;
-
-  // Clamp to widget bounds
-  if (bx < x_) bx = x_;
-  if (bx + boxW > x_ + width_) bx = x_ + width_ - boxW;
-  if (by < y_) by = tooltip_.y + 16;
-
-  SDL_Rect box = {bx, by, boxW, boxH};
-  SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-  SDL_SetRenderDrawColor(renderer, 20, 20, 20, 220);
-  SDL_RenderFillRect(renderer, &box);
-  SDL_SetRenderDrawColor(renderer, 100, 100, 100, 255);
-  SDL_RenderDrawRect(renderer, &box);
-
-  cat->drawText(renderer, line1, bx + padX, by + padY, {255, 255, 255, 255}, FontStyle::Micro);
-  if (!line2.empty()) {
-    cat->drawText(renderer, line2, bx + padX, by + padY + th1 + 2, {200, 200, 200, 255}, FontStyle::Micro);
-  }
-}
 
 } // namespace HamClock

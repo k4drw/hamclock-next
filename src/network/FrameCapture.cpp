@@ -1,4 +1,5 @@
 #include "FrameCapture.h"
+#include "../core/Constants.h"
 #include "../core/Logger.h"
 
 #include <SDL.h>
@@ -74,7 +75,7 @@ static SDL_RWops *makeGrowBufRW(GrowBuf *g) {
 
 // ---------------------------------------------------------------------------
 
-FrameCapture::FrameCapture() : running_(false) {}
+FrameCapture::FrameCapture() : maxFps_(10), running_(false) {}
 
 void FrameCapture::start() {
   if (running_)
@@ -100,20 +101,21 @@ void FrameCapture::capture(SDL_Renderer *renderer) {
   if (subscribers_ == 0 || busy_)
     return;
 
+  Uint32 now = SDL_GetTicks();
   if (maxFps_ > 0) {
     Uint32 minInterval = 1000u / static_cast<Uint32>(maxFps_);
-    Uint32 now = SDL_GetTicks();
     if (now - lastCaptureMs_ < minInterval)
       return;
-    lastCaptureMs_ = now;
   }
+  lastCaptureMs_ = now;
 
   int w, h;
   SDL_GetRendererOutputSize(renderer, &w, &h);
   if (w <= 0 || h <= 0)
     return;
 
-  // Use cached surface if dimensions match, otherwise recreate
+  // Use cached surface if dimensions match, otherwise recreate.
+  // We MUST match the actual renderer dimensions to avoid overflow in SDL_RenderReadPixels.
   if (!cachedSurface_ || cachedSurface_->w != w || cachedSurface_->h != h) {
     if (cachedSurface_)
       SDL_FreeSurface(cachedSurface_);

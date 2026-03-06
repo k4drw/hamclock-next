@@ -59,9 +59,9 @@ void AsteroidProvider::fetchInternal() {
 
   // Query: Max 5M km, starting now, sorted by date
   std::stringstream url;
-  url << API_BASE_URL << "?dist-max=5000000km&date-min=now&sort=date";
+  url << API_BASE_URL << "?dist-max=8000000km&date-min=now&sort=date";
 
-  LOG_I("AsteroidProvider", "Fetching key-less NEO data from JPL (max 5M km)");
+  LOG_I("AsteroidProvider", "Fetching key-less NEO data from JPL (max 8M km)");
 
   netMgr_.fetchAsync(url.str(), [this](std::string body) {
     if (body.empty()) {
@@ -198,9 +198,8 @@ void AsteroidProvider::fetchOrbitalElements(const std::string &des) {
       return; // already cached
   }
 
-  std::string url =
-      std::string("https://ssd-api.jpl.nasa.gov/sbdb.api?sstr=") +
-      urlEncode(des);
+  std::string url = std::string("https://ssd-api.jpl.nasa.gov/sbdb.api?sstr=") +
+                    urlEncode(des);
 
   LOG_I("AsteroidProvider", "Fetching orbital elements for '{}'", des);
 
@@ -222,7 +221,8 @@ void AsteroidProvider::processElementsResponse(const std::string &des,
 
     if (!j.contains("orbit") || !j["orbit"].contains("elements") ||
         !j["orbit"].contains("epoch")) {
-      LOG_E("AsteroidProvider", "SBDB response missing orbit data for '{}'", des);
+      LOG_E("AsteroidProvider", "SBDB response missing orbit data for '{}'",
+            des);
       return;
     }
 
@@ -248,8 +248,9 @@ void AsteroidProvider::processElementsResponse(const std::string &des,
 
     elem.valid = (elem.a > 0 && elem.epoch_jd > 0);
 
-    LOG_I("AsteroidProvider", "Got orbital elements for '{}': a={:.4f} e={:.4f}",
-          des, elem.a, elem.e);
+    LOG_I("AsteroidProvider",
+          "Got orbital elements for '{}': a={:.4f} e={:.4f}", des, elem.a,
+          elem.e);
   } catch (const std::exception &e) {
     LOG_E("AsteroidProvider", "SBDB parse error for '{}': {}", des, e.what());
     return;
@@ -261,8 +262,7 @@ void AsteroidProvider::processElementsResponse(const std::string &des,
   }
 
   // Notify map widget via SDL event
-  auto *payload =
-      new std::pair<std::string, OrbitalElements>(des, elem);
+  auto *payload = new std::pair<std::string, OrbitalElements>(des, elem);
   SDL_Event ev;
   SDL_zero(ev);
   ev.type = HamClock::AE_BASE_EVENT + HamClock::AE_ASTEROID_ELEMENTS_READY;
@@ -270,7 +270,8 @@ void AsteroidProvider::processElementsResponse(const std::string &des,
   SDL_PushEvent(&ev);
 }
 
-OrbitalElements AsteroidProvider::getOrbitalElements(const std::string &des) const {
+OrbitalElements
+AsteroidProvider::getOrbitalElements(const std::string &des) const {
   std::lock_guard<std::mutex> lock(mutex_);
   auto it = orbitalElementsCache_.find(des);
   if (it != orbitalElementsCache_.end())

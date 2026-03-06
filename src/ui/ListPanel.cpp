@@ -48,7 +48,6 @@ void ListPanel::render(SDL_Renderer *renderer) {
                                              // fill, keeping 'rect' for border
   SDL_RenderDrawRect(renderer, &rect);
 
-  int pad = std::max(2, static_cast<int>(width_ * 0.03f));
   bool titleFontChanged = (titleFontSize_ != lastTitleFontSize_);
   bool rowFontChanged = (rowFontSize_ != lastRowFontSize_);
 
@@ -58,9 +57,8 @@ void ListPanel::render(SDL_Renderer *renderer) {
       MemoryMonitor::getInstance().destroyTexture(titleTex_);
     }
     SDL_Color cyan = themes.accent;
-    titleTex_ = fontMgr_.catalog()->renderText(renderer, title_, cyan,
-                                               FontStyle::MicroBold, &titleW_,
-                                               &titleH_);
+    titleTex_ = fontMgr_.catalog()->renderText(
+        renderer, title_, cyan, FontStyle::MicroBold, &titleW_, &titleH_);
     lastTitleFontSize_ = fontMgr_.catalog()->ptSize(FontStyle::MicroBold);
   }
 
@@ -111,28 +109,36 @@ void ListPanel::render(SDL_Renderer *renderer) {
     RenderUtils::drawRect(renderer, x_ + 1, rowY, width_ - 2, rowH,
                           stripeColor);
 
-    // Render row text (cached). Subclasses can override row color via
-    // getRowColor.
+    // Render row text (via overridable method)
     SDL_Color thisRowColor = getRowColor(static_cast<int>(i), rowColor);
-    auto &rc = rowCache_[i];
-    bool colorChanged =
-        (rc.color.r != thisRowColor.r || rc.color.g != thisRowColor.g ||
-         rc.color.b != thisRowColor.b);
-    if (rows_[i] != rc.text || colorChanged) {
-      if (rc.tex) {
-        MemoryMonitor::getInstance().destroyTexture(rc.tex);
-        rc.tex = nullptr;
-      }
-      rc.tex = fontMgr_.renderText(renderer, rows_[i], thisRowColor,
-                                   rowFontSize_, &rc.w, &rc.h);
-      rc.text = rows_[i];
-      rc.color = thisRowColor;
-    }
+    renderRowText(renderer, static_cast<int>(i), x_ + 1, rowY, width_ - 2, rowH,
+                  thisRowColor);
+  }
+}
+
+void ListPanel::renderRowText(SDL_Renderer *renderer, int index, int rx, int ry,
+                              int rw, int rh, SDL_Color color) {
+  int pad = std::max(2, static_cast<int>(width_ * 0.03f));
+  auto &rc = rowCache_[index];
+  bool colorChanged =
+      (rc.color.r != color.r || rc.color.g != color.g || rc.color.b != color.b);
+
+  if (rows_[index] != rc.text || colorChanged) {
     if (rc.tex) {
-      int ty = rowY + (rowH - rc.h) / 2;
-      SDL_Rect dst = {x_ + pad, ty, rc.w, rc.h};
-      SDL_RenderCopy(renderer, rc.tex, nullptr, &dst);
+      MemoryMonitor::getInstance().destroyTexture(rc.tex);
+      rc.tex = nullptr;
     }
+    rc.tex = fontMgr_.renderText(renderer, rows_[index], color, rowFontSize_,
+                                 &rc.w, &rc.h);
+    rc.text = rows_[index];
+    rc.color = color;
+  }
+
+  if (rc.tex) {
+    int tx = rx + pad;
+    int ty = ry + (rh - rc.h) / 2;
+    SDL_Rect dst = {tx, ty, rc.w, rc.h};
+    SDL_RenderCopy(renderer, rc.tex, nullptr, &dst);
   }
 }
 

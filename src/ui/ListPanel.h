@@ -34,6 +34,11 @@ protected:
     return defaultColor;
   }
 
+  // Overridable row text rendering. Default implementation handles cached
+  // single-string rendering.
+  virtual void renderRowText(SDL_Renderer *renderer, int index, int rx, int ry,
+                             int rw, int rh, SDL_Color color);
+
   FontManager &fontMgr_;
   std::string title_;
   std::vector<std::string> rows_;

@@ -11,46 +11,63 @@ struct GribField {
   int nx = 0, ny = 0;
 };
 
+// ---- Output types for GPU rendering ----------------------------------------
+struct WxSegment {
+  float lon1, lat1;
+  float lon2, lat2;
+};
+
+struct WxQuiver {
+  float lon, lat;
+  float u, v;
+};
+// ---------------------------------------------------------------------------
+
 class WxMbProvider {
 public:
   explicit WxMbProvider(NetworkManager &net);
   ~WxMbProvider();
 
-  // Trigger fetch of current GFS cycle; no-op if cycle URL unchanged.
   void update();
 
-  // Returns cached SDL_Texture (RGBA, BLEND) scaled to (w, h), or nullptr.
-  // Must be called from the main/render thread.
-  SDL_Texture *getTexture(SDL_Renderer *renderer, int w, int h);
+  // Copy decoded segments, quivers, and optionally a pressure fill surface.
+  // fillSurface is non-null only when fresh GFS data arrived; caller owns it.
+  // Returns true when new data was available (caller should rebuild GPU
+  // buffers).
+  bool getSegments(std::vector<WxSegment> &segs, std::vector<WxQuiver> &quivers,
+                   SDL_Surface *&fillSurface);
+
+  // Force geometry rebuild on next getSegments() (e.g. projection change).
+  // Note: fillSurface will be nullptr on rebuild-only calls (no new GFS data).
+  void invalidate() {
+    std::lock_guard<std::mutex> lk(mutex_);
+    segmentsDirty_ = true;
+  }
 
   bool hasData() const;
   uint64_t getLastUpdateMs() const;
 
 private:
-  // Decode raw GRIB2 bytes into three fields (PRMSL hPa, UGRD m/s, VGRD m/s).
-  // Returns true only if all three fields decoded with simple packing.
   static bool decodeGFS(const std::vector<uint8_t> &data, GribField &prmsl,
                         GribField &ugrd, GribField &vgrd);
 
-  // Render pressure contours + wind quivers to a new RGBA SDL_Surface (w×h).
-  // Caller owns the returned surface.
-  static SDL_Surface *renderToSurface(const GribField &prmsl,
-                                      const GribField &ugrd,
-                                      const GribField &vgrd, int w, int h);
+  // Run marching squares + quivers → lat/lon geometry, and build fill surface.
+  static void buildSegments(const GribField &prmsl, const GribField &ugrd,
+                            const GribField &vgrd, float pMin, float pMax,
+                            int W, int H, std::vector<WxSegment> &segs,
+                            std::vector<WxQuiver> &quivers,
+                            SDL_Surface *&fillSurface);
 
-  // Build the NOAA NOMADS GFS filter URL for the current best cycle.
   static std::string buildNomadsUrl();
 
   NetworkManager &net_;
 
-  SDL_Surface *pendingSurface_ =
-      nullptr; // produced by WorkerService, consumed by getTexture()
-  SDL_Texture *texture_ = nullptr;
-  bool dirty_ = false;
+  std::vector<WxSegment> segments_;
+  std::vector<WxQuiver> quivers_;
+  SDL_Surface *pendingFillSurface_ = nullptr; // 360x180 RGBA pressure fill
+  bool segmentsDirty_ = false;
   bool hasData_ = false;
   uint64_t lastUpdateMs_ = 0;
-  int texW_ = 0;
-  int texH_ = 0;
   std::string lastUrl_;
   std::string fetchingUrl_;
 

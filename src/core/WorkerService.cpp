@@ -72,14 +72,20 @@ void WorkerService::stop() {
   {
     std::unique_lock<std::mutex> lock(queueMutex_);
     if (shouldStop_) {
-        return;
+      return;
     }
     shouldStop_ = true;
   }
+  LOG_I("WorkerService", "Stopping background threads...");
   condition_.notify_all();
-  for (std::thread &worker : workers_) {
-    if (worker.joinable()) {
-      worker.join();
+
+  for (size_t i = 0; i < workers_.size(); ++i) {
+    if (workers_[i].joinable()) {
+      LOG_D("WorkerService", "Joining worker thread {}...", i);
+      // We don't have a native std::thread join-with-timeout in C++17,
+      // but we've signaled shouldStop_ so it should return quickly.
+      workers_[i].join();
     }
   }
+  LOG_I("WorkerService", "All worker threads joined.");
 }

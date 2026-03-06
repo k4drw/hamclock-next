@@ -11,7 +11,12 @@ public:
   PaneContainer(int x, int y, int w, int h, WidgetType initialType,
                 FontManager &fontMgr);
 
-  void setRotation(const std::vector<WidgetType> &types, int intervalS);
+  void setRotation(const std::vector<WidgetType> &types, int intervalS,
+                   bool syncRotation = false);
+  void setPaused(bool paused);
+  bool isPaused() const;
+  void forceAdvance();
+  void jumpToType(WidgetType type);
   const std::vector<WidgetType> &getRotation() const { return rotation_; }
   WidgetType getActiveType() const { return currentType_; }
 
@@ -26,11 +31,13 @@ public:
   bool onMouseUp(int mx, int my, Uint16 mod, int clicks) override;
   bool onKeyDown(SDL_Keycode key, Uint16 mod) override;
   bool onTextInput(const char *text) override;
+  bool onMouseWheel(int scrollY) override;
 
   // Semantic Debug API
   std::string getName() const override {
     return "PaneContainer_" + std::to_string(paneIndex_);
   }
+  std::string getDisplayName() const override;
   std::vector<std::string> getActions() const override;
   SDL_Rect getActionRect(const std::string &action) const override;
   nlohmann::json getDebugData() const override;
@@ -70,6 +77,8 @@ private:
   size_t rotationIdx_ = 0;
   Uint32 lastRotateMs_ = 0;
   int intervalS_ = 30;
+  bool syncRotation_ = false;
+  bool paused_ = false;
   std::function<Widget *(WidgetType)> widgetFactory_;
 
   int paneIndex_ = 0;

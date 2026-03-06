@@ -88,7 +88,7 @@ void ContestPanel::render(SDL_Renderer *renderer) {
     std::string status = "";
 
     if (now >= c.startTime && now <= c.endTime) {
-      statusColor = {0, 255, 0, 255};
+      statusColor = themes.success;
       status = "NOW";
     } else {
       auto diff =
@@ -218,7 +218,7 @@ void ContestPanel::renderPopup(SDL_Renderer *renderer) {
     SDL_Color statusColor = themes.text;
     if (now >= c.startTime && now <= c.endTime) {
       status = "Status: Running Now";
-      statusColor = {0, 255, 0, 255};
+      statusColor = themes.success;
     } else if (c.startTime > now) {
       auto diff =
           std::chrono::duration_cast<std::chrono::hours>(c.startTime - now);

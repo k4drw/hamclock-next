@@ -34,6 +34,13 @@ private:
   void runUDP(int port);
 
   void processLine(const std::string &line);
+  void processWSJTX(const uint8_t *packet, size_t len);
+
+  // Connection rate limiting
+  bool checkConnectionRate();
+  void incrementConnectionAttempts();
+  int connectionAttempts_ = 0;
+  std::chrono::system_clock::time_point firstAttemptTime_;
 
   std::shared_ptr<DXClusterDataStore> store_;
   PrefixManager &pm_;

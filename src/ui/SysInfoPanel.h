@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../core/CPUMonitor.h"
+#include "../core/HamClockState.h"
 #include "FontManager.h"
 #include "Widget.h"
 
@@ -17,7 +18,9 @@ struct SDL_Renderer;
 class SysInfoPanel : public Widget {
 public:
   SysInfoPanel(int x, int y, int w, int h, FontManager &fontMgr,
-               std::shared_ptr<CPUMonitor> monitor, bool useMetric = true);
+               std::shared_ptr<CPUMonitor> monitor,
+               std::shared_ptr<HamClockState> state,
+               bool useMetric = true);
 
   void update() override;
   void render(SDL_Renderer *renderer) override;
@@ -30,6 +33,7 @@ public:
 private:
   FontManager &fontMgr_;
   std::shared_ptr<CPUMonitor> monitor_;
+  std::shared_ptr<HamClockState> state_;
   bool useMetric_;
 
   // Temperature

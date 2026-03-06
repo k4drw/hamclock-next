@@ -129,11 +129,18 @@ void LiveSpotProvider::fetchPSK() {
     param = config_.liveSpotsUseCall ? "receiverCallsign=" : "receiverLocator=";
   }
 
-  std::string url = fmt::format("https://retrieve.pskreporter.info/"
-                                "query?{}{}&flowStartSeconds={}&rronly=1",
-                                param, target, windowStart);
+  std::string baseUrl = "https://retrieve.pskreporter.info";
+  if (!config_.pskrProxyUrl.empty()) {
+    baseUrl = config_.pskrProxyUrl;
+    // Remove trailing slash if present
+    if (baseUrl.back() == '/')
+      baseUrl.pop_back();
+  }
 
-  LOG_I("LiveSpot", "Fetching PSK {}", url);
+  std::string url = fmt::format("{}/query?{}{}&flowStartSeconds={}&rronly=1",
+                                baseUrl, param, target, windowStart);
+
+  LOG_D("LiveSpot", "Fetching PSK {}", url);
   if (state_) {
     state_->services["LiveSpot"].lastError = "Fetching...";
   }
@@ -172,7 +179,7 @@ void LiveSpotProvider::fetchPSK() {
         data.valid = true;
         store->set(data);
       },
-      300); // 5 minute cache age
+      600); // 10 minute cache age
 }
 
 // Parse one field from a ClickHouse FORMAT CSV line.

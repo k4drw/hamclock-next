@@ -36,6 +36,7 @@ private:
   std::string mapStyle_;
   bool showGrid_;
   bool showBeacons_;
+  bool showBorders_;
   std::string gridType_;
   PropOverlayType propOverlay_;
   WeatherOverlayType weatherOverlay_;
@@ -45,12 +46,14 @@ private:
 
   // Combo options
   std::vector<std::string> projOpts_ = {"Equirectangular", "Robinson",
-                                        "Azimuthal", "Mercator"};
+                                        "Azimuthal", "Mercator",
+                                        "Dual Azimuthal"};
   std::vector<std::string> mapOpts_ = {"NASA Blue Marble", "Topo",
                                        "Topo + Bathy"};
   std::vector<std::string> gridOpts_ = {"Off", "Lat/Lon", "Maidenhead"};
   std::vector<std::string> overlayOpts_ = {"None", "MUF", "VOACAP",
-                                           "Reliability", "TOA", "Heatmap"};
+                                           "Reliability", "TOA", "Heatmap",
+                                           "DRAP", "Aurora"};
   std::vector<std::string> weatherOpts_ = {"None", "WX/Pressure", "Clouds"};
   std::vector<std::string> bandOpts_ = {"80m", "60m", "40m", "30m", "20m",
                                         "17m", "15m", "12m", "10m", "6m"};
@@ -61,7 +64,7 @@ private:
   // Rects for dropdown HEADERS
   SDL_Rect projRec_, styleRec_;
   SDL_Rect gridRec_, overlayRec_, weatherRec_;
-  SDL_Rect beaconsRec_;
+  SDL_Rect beaconsRec_, bordersRec_;
   SDL_Rect bandRec_, modeRec_, powerRec_; // VOACAP row
 
   enum {

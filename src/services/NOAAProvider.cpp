@@ -8,15 +8,19 @@
 #include "../core/WorkerService.h"
 #include <SDL_events.h>
 #include <chrono>
+#include <cmath>
 #include <cstdio>
+#include <memory>
 #include <nlohmann/json.hpp>
+#include <unordered_map>
 
 NOAAProvider::NOAAProvider(NetworkManager &net,
                            std::shared_ptr<SolarDataStore> store,
                            std::shared_ptr<AuroraHistoryStore> auroraStore,
+                           std::shared_ptr<XRayHistoryStore> xrayStore,
                            HamClockState *state)
     : net_(net), store_(std::move(store)), auroraStore_(std::move(auroraStore)),
-      state_(state) {}
+      xrayStore_(std::move(xrayStore)), state_(state) {}
 
 // Calculate R-scale (Radio Blackouts) from X-ray flux
 // R1: >= 1e-5, R2: >= 5e-5, R3: >= 1e-4, R4: >= 1e-3, R5: >= 2e-3
@@ -75,6 +79,9 @@ void NOAAProvider::fetch() {
   fetchMag();
   fetchDST();
   fetchAurora();
+  fetchAuroraMap();
+  if (auroraStore_ && auroraStore_->needsBackfill())
+    fetchAuroraHistory();
   fetchDRAP();
   fetchXRay();
   fetchProtonFlux();
@@ -106,7 +113,7 @@ void NOAAProvider::fetchKIndex() {
 
       auto *update = new SolarData();
       double kp = StringUtils::safe_stod(row[1].get<std::string>());
-      update->k_index = static_cast<int>(kp);
+      update->k_index = static_cast<float>(kp);
       update->a_index = StringUtils::safe_stoi(row[2].get<std::string>());
       update->noaa_g_scale = calculateGScale(update->k_index);
       update->last_updated = std::chrono::system_clock::now();
@@ -382,15 +389,212 @@ void NOAAProvider::fetchAurora() {
   });
 }
 
-void NOAAProvider::fetchDRAP() {
-  net_.fetchAsync(DRAP_URL, [](std::string body) {
+// Shared state for the two parallel solar-wind backfill fetches.
+// Lives until both callbacks have fired (held by shared_ptr in each lambda).
+struct SolarWindBackfill {
+  std::mutex mu;
+  int pending{2};
+  // keyed by unix timestamp rounded to the nearest minute
+  std::unordered_map<int64_t, std::pair<float, float>>
+      mag;                                  // t → (bz, bt_transverse)
+  std::unordered_map<int64_t, float> speed; // t → km/s
+  std::shared_ptr<AuroraHistoryStore> store;
+};
+
+// Parse NOAA "YYYY-MM-DD HH:MM:SS.sss" time-tag → unix seconds, rounded to
+// the nearest minute.  Returns -1 on failure.
+static int64_t parseNoaaMinute(const std::string &ts) {
+  int y = 0, mo = 0, d = 0, h = 0, mi = 0, s = 0;
+  if (sscanf(ts.c_str(), "%d-%d-%d %d:%d:%d", &y, &mo, &d, &h, &mi, &s) != 6)
+    return -1;
+  std::tm tm{};
+  tm.tm_year = y - 1900;
+  tm.tm_mon = mo - 1;
+  tm.tm_mday = d;
+  tm.tm_hour = h;
+  tm.tm_min = mi;
+  tm.tm_sec = s;
+  tm.tm_isdst = -1;
+  std::time_t t = Astronomy::portable_timegm(&tm);
+  if (t < 0)
+    return -1;
+  return (static_cast<int64_t>(t) / 60) * 60; // round to minute
+}
+
+static void computeAndMerge(std::shared_ptr<SolarWindBackfill> state) {
+  std::vector<AuroraDataPoint> points;
+  points.reserve(state->speed.size());
+
+  for (const auto &[t, v] : state->speed) {
+    auto it = state->mag.find(t);
+    if (it == state->mag.end())
+      continue;
+
+    float bz = it->second.first;
+    float bt = it->second.second; // sqrt(By² + Bz²)
+
+    if (bt < 0.5f || v < 50.0f)
+      continue; // skip bad/null data
+
+    // Newell coupling: dΦ/dt = V^(4/3) × Bt^(2/3) × sin^(8/3)(θ/2)
+    // sin²(θ/2) = (1 - Bz/Bt) / 2  (clock angle; 1 when Bz fully southward)
+    float sin2 = std::max(0.0f, (1.0f - bz / bt) * 0.5f);
+    float coupling = std::pow(v, 4.0f / 3.0f) * std::pow(bt, 2.0f / 3.0f) *
+                     std::pow(sin2, 4.0f / 3.0f);
+
+    // Scale to 0-100%: power-law, ~50 000 Wb/s ≈ extreme storm
+    float pct = std::min(100.0f, std::pow(coupling / 50000.0f, 0.4f) * 100.0f);
+
+    AuroraDataPoint dp;
+    dp.percent = pct;
+    dp.timestamp =
+        std::chrono::system_clock::from_time_t(static_cast<std::time_t>(t));
+    points.push_back(dp);
+  }
+
+  if (!points.empty()) {
+    state->store->mergePoints(std::move(points));
+    LOG_I("NOAAProvider", "Aurora backfill: {} solar-wind points merged",
+          points.size());
+  }
+}
+
+void NOAAProvider::fetchAuroraHistory() {
+  auto backfill = std::make_shared<SolarWindBackfill>();
+  backfill->store = auroraStore_;
+
+  // --- Fetch 1: solar-wind speed (plasma-7-day) ---
+  net_.fetchAsync(PLASMA_7D_URL, [backfill](std::string body) {
+    WorkerService::getInstance().submitTask([body, backfill]() {
+      try {
+        auto j = nlohmann::json::parse(body, nullptr, false);
+        if (!j.is_discarded() && j.is_array()) {
+          for (const auto &row : j) {
+            if (!row.is_array() || row.size() < 3)
+              continue;
+            if (!row[0].is_string() || row[2].is_null())
+              continue;
+            int64_t t = parseNoaaMinute(row[0].get<std::string>());
+            if (t < 0)
+              continue;
+            float v = static_cast<float>(
+                StringUtils::safe_stod(row[2].get<std::string>()));
+            if (v > 0)
+              backfill->speed[t] = v;
+          }
+        }
+      } catch (...) {
+      }
+      std::lock_guard<std::mutex> lk(backfill->mu);
+      if (--backfill->pending == 0)
+        computeAndMerge(backfill);
+    });
+  });
+
+  // --- Fetch 2: IMF Bz + By (mag-7-day) ---
+  net_.fetchAsync(MAG_7D_URL, [backfill](std::string body) {
+    WorkerService::getInstance().submitTask([body, backfill]() {
+      try {
+        auto j = nlohmann::json::parse(body, nullptr, false);
+        if (!j.is_discarded() && j.is_array()) {
+          for (const auto &row : j) {
+            // row: [time, bx, by, bz, lon, lat, bt]
+            if (!row.is_array() || row.size() < 7)
+              continue;
+            if (!row[0].is_string() || row[2].is_null() || row[3].is_null())
+              continue;
+            int64_t t = parseNoaaMinute(row[0].get<std::string>());
+            if (t < 0)
+              continue;
+            float by = static_cast<float>(
+                StringUtils::safe_stod(row[2].get<std::string>()));
+            float bz = static_cast<float>(
+                StringUtils::safe_stod(row[3].get<std::string>()));
+            float bt = std::sqrt(by * by + bz * bz); // transverse field
+            backfill->mag[t] = {bz, bt};
+          }
+        }
+      } catch (...) {
+      }
+      std::lock_guard<std::mutex> lk(backfill->mu);
+      if (--backfill->pending == 0)
+        computeAndMerge(backfill);
+    });
+  });
+}
+
+void NOAAProvider::fetchAuroraMap() {
+  auto auroraMapStore = auroraMapStore_;
+  net_.fetchAsync(AURORA_URL, [auroraMapStore](std::string body) {
     if (body.empty())
       return;
 
-    WorkerService::getInstance().submitTask([body]() {
+    WorkerService::getInstance().submitTask([body, auroraMapStore]() {
+      try {
+        if (!auroraMapStore)
+          return;
+
+        auto j = nlohmann::json::parse(body, nullptr, false);
+        if (j.is_discarded() || !j.contains("coordinates"))
+          return;
+
+        AuroraMapData data;
+        const auto &coords = j["coordinates"];
+        if (!coords.is_array())
+          return;
+
+        for (const auto &point : coords) {
+          if (point.is_array() && point.size() >= 3) {
+            // NOAA OVATION spec: [longitude, latitude, probability].
+            // Longitude: 0 to 360, Latitude: -90 to 90.
+            double d_lon = point[0].get<double>();
+            double d_lat = point[1].get<double>();
+            int val = point[2].get<int>();
+
+            int lon = static_cast<int>(std::round(d_lon));
+            int lat = static_cast<int>(std::round(d_lat));
+
+            // Normalize longitude to 0..359
+            while (lon < 0)
+              lon += 360;
+            while (lon >= 360)
+              lon -= 360;
+
+            if (lat >= -90 && lat <= 90) {
+              int row = lat + 90; // 0 to 180
+              data.grid[row * 360 + lon] =
+                  static_cast<uint8_t>(std::clamp(val, 0, 100));
+            }
+          }
+        }
+        data.valid = true;
+        data.lastUpdate = std::chrono::system_clock::now();
+        auroraMapStore->update(data);
+        LOG_I("NOAAProvider", "Aurora map grid updated ({} points).",
+              (int)coords.size());
+      } catch (const std::exception &e) {
+        LOG_E("NOAAProvider", "Aurora JSON error: {}", e.what());
+      }
+    });
+  });
+}
+
+void NOAAProvider::fetchDRAP() {
+  LOG_I("NOAAProvider", "DRAP fetch started (drapStore_={})",
+        drapStore_ ? "set" : "null");
+  auto drapStore = drapStore_;
+  net_.fetchAsync(DRAP_URL, [drapStore](std::string body) {
+    if (body.empty()) {
+      LOG_W("NOAAProvider", "DRAP fetch returned empty body");
+      return;
+    }
+
+    WorkerService::getInstance().submitTask([body, drapStore]() {
       try {
         float max_freq = 0;
         bool found_any = false;
+        DRAPGrid grid;
+        int maxCols = 0;
 
         std::stringstream ss(body);
         std::string line;
@@ -399,22 +603,44 @@ void NOAAProvider::fetchDRAP() {
             continue;
 
           size_t pipe_pos = line.find('|');
-          if (pipe_pos != std::string::npos) {
-            std::string freqs = line.substr(pipe_pos + 1);
-            std::stringstream ss_vals(freqs);
-            float val;
-            while (ss_vals >> val) {
-              if (val > max_freq)
-                max_freq = val;
-              found_any = true;
-            }
+          if (pipe_pos == std::string::npos)
+            continue;
+
+          std::string freqs = line.substr(pipe_pos + 1);
+          std::stringstream ss_vals(freqs);
+          float val;
+          int rowCols = 0;
+          while (ss_vals >> val) {
+            grid.cells.push_back(val);
+            if (val > max_freq)
+              max_freq = val;
+            found_any = true;
+            rowCols++;
+          }
+          if (rowCols > 0) {
+            grid.rows++;
+            if (rowCols > maxCols)
+              maxCols = rowCols;
           }
         }
 
         if (found_any) {
+          // Populate grid store for DRAP map overlay
+          if (drapStore) {
+            grid.cols = maxCols;
+            grid.valid = true;
+            grid.updated = std::chrono::system_clock::now();
+            drapStore->set(grid);
+            LOG_I("NOAAProvider",
+                  "DRAP grid stored: {}x{}, {} cells, max={:.1f} MHz",
+                  grid.rows, grid.cols, (int)grid.cells.size(), max_freq);
+          } else {
+            LOG_W("NOAAProvider",
+                  "DRAP grid parsed but drapStore is null (rows={} cols={})",
+                  grid.rows, maxCols);
+          }
+
           auto *update = new SolarData();
-          // Storing float frequency into int field (rounding) per existing
-          // pattern
           update->drap = static_cast<int>(std::round(max_freq));
           update->valid = true;
 
@@ -433,7 +659,8 @@ void NOAAProvider::fetchDRAP() {
 
 void NOAAProvider::fetchXRay() {
   auto state = state_;
-  net_.fetchAsync(XRAY_URL, [state](std::string body) {
+  auto xrayStore = xrayStore_;
+  net_.fetchAsync(XRAY_URL, [state, xrayStore](std::string body) {
     if (body.empty()) {
       if (state) {
         auto &s = state->services["NOAA:XRay"];
@@ -443,7 +670,7 @@ void NOAAProvider::fetchXRay() {
       return;
     }
 
-    WorkerService::getInstance().submitTask([body, state]() {
+    WorkerService::getInstance().submitTask([body, state, xrayStore]() {
       try {
         auto j = nlohmann::json::parse(body, nullptr, false);
         if (j.is_discarded() || !j.is_array() || j.empty()) {
@@ -454,21 +681,33 @@ void NOAAProvider::fetchXRay() {
           return;
         }
 
-        // Find the most recent 0.1-0.8nm band entry
-        // Iterate backwards to find the latest valid entry
+        // Collect all 0.1-0.8nm entries; also find the latest for SolarData
         double latest_flux = 0.0;
         bool found = false;
 
-        for (auto it = j.rbegin(); it != j.rend(); ++it) {
-          const auto &entry = *it;
-          if (entry.contains("energy") && entry.contains("flux")) {
-            std::string energy = entry["energy"].get<std::string>();
-            if (energy == "0.1-0.8nm") {
-              latest_flux = entry["flux"].get<double>();
-              found = true;
-              break;
+        for (const auto &entry : j) {
+          if (!entry.contains("energy") || !entry.contains("flux"))
+            continue;
+          if (entry["energy"].get<std::string>() != "0.1-0.8nm")
+            continue;
+
+          double flux = entry["flux"].get<double>();
+
+          // Push to history store with parsed timestamp
+          if (xrayStore && entry.contains("time_tag") &&
+              entry["time_tag"].is_string()) {
+            int64_t t = parseNoaaMinute(entry["time_tag"].get<std::string>());
+            if (t >= 0) {
+              XRayDataPoint pt;
+              pt.timestamp = std::chrono::system_clock::from_time_t(
+                  static_cast<std::time_t>(t));
+              pt.flux = flux;
+              xrayStore->push(pt);
             }
           }
+
+          latest_flux = flux; // last entry in array is the most recent
+          found = true;
         }
 
         if (found) {

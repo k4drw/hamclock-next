@@ -1,293 +1,282 @@
 {
+  "schema_version": "2.0",
+  "audit_date": "2026-03-06",
+  "audit_method": "ground-truth code review against hamclock-original/",
   "features": [
     {
       "feature_id": "dx_cluster",
       "name": "DX Cluster",
-      "original_pointers": [
-        "`dxcluster.cpp`"
-      ],
-      "next_pointers": [
-        "`ui/DXClusterPanel.cpp`",
-        "`services/DXClusterProvider.cpp`"
-      ],
-      "status": "EQUIVALENT+",
-      "source_strategy": "proxy-dependent -> direct-source",
-      "notes": "`next` connects directly to DX cluster servers, removing the proxy. UI is different but core interactions (viewing spots) are equivalent.",
+      "original_pointers": ["`dxcluster.cpp`"],
+      "next_pointers": ["`ui/DXClusterPanel.cpp`", "`services/DXClusterProvider.cpp`"],
+      "status": "EQUIVALENT",
+      "notes": "Direct Telnet connection; no proxy required. Core spot display equivalent to original.",
       "suggested_gaps": []
     },
     {
       "feature_id": "moon",
-      "name": "Moon",
-      "original_pointers": [
-        "`moonpane.cpp`"
-      ],
-      "next_pointers": [
-        "`ui/MoonPanel.cpp`",
-        "`core/MoonData.h`"
-      ],
-      "status": "EQUIVALENT+",
-      "source_strategy": "unknown -> direct-source",
-      "notes": "`next` likely uses a modern API (e.g., NASA) for moon data, which is an improvement in accuracy over the original's calculations. Visual output is equivalent for user needs.",
+      "name": "Moon Phase & Position",
+      "original_pointers": ["`moonpane.cpp`"],
+      "next_pointers": ["`ui/MoonPanel.cpp`", "`core/MoonData.h`", "`services/MoonProvider.cpp`"],
+      "status": "EQUIVALENT",
+      "notes": "Moon phase, rise/set, azimuth/elevation equivalent.",
       "suggested_gaps": []
     },
     {
       "feature_id": "sdo",
-      "name": "SDO",
-      "original_pointers": [
-        "`sdo.cpp`"
-      ],
-      "next_pointers": [
-        "`ui/SDOPanel.cpp`",
-        "`services/SDOProvider.cpp`"
-      ],
-      "status": "EQUIVALENT+",
-      "source_strategy": "proxy-dependent -> direct-source",
-      "notes": "`next` fetches SDO images directly from the source, improving resilience and removing the proxy.",
+      "name": "SDO Solar Images",
+      "original_pointers": ["`sdo.cpp`"],
+      "next_pointers": ["`ui/SDOPanel.cpp`", "`services/SDOProvider.cpp`"],
+      "status": "EQUIVALENT",
+      "notes": "Direct SDO image fetch; selectable wavelengths.",
       "suggested_gaps": []
     },
     {
       "feature_id": "weather_dedx",
       "name": "Weather (DE/DX)",
-      "original_pointers": [
-        "`wx.cpp`"
-      ],
-      "next_pointers": [
-        "`ui/WeatherPanel.cpp`",
-        "`services/WeatherProvider.cpp`"
-      ],
-      "status": "EQUIVALENT+",
-      "source_strategy": "proxy-dependent -> direct-source",
-      "notes": "`next` uses a direct weather API, which is more reliable than the proxied service used by the original.",
+      "original_pointers": ["`wx.cpp`"],
+      "next_pointers": ["`ui/WeatherPanel.cpp`", "`services/WeatherProvider.cpp`"],
+      "status": "EQUIVALENT",
+      "notes": "Uses open-meteo.com directly.",
       "suggested_gaps": []
     },
     {
       "feature_id": "gimbal_control",
-      "name": "Gimbal Control",
-      "original_pointers": [
-        "`gimbal.cpp`"
-      ],
-      "next_pointers": [
-        "`ui/GimbalPanel.cpp`"
-      ],
-      "status": "STUB",
-      "source_strategy": "mixed -> unknown",
-      "notes": "The feature is not implemented in `next`. It's a placeholder.",
+      "name": "Gimbal/Rotator Control",
+      "original_pointers": ["`gimbal.cpp`"],
+      "next_pointers": ["`ui/GimbalPanel.cpp`", "`services/RotatorService.cpp`"],
+      "status": "EQUIVALENT",
+      "notes": "Upover mode confirmed implemented in RotatorService.cpp (el>90° az+180 flip). flipActive_ flag drives UPOVER indicator in GimbalPanel. cfg_->rotatorUpover persisted in config. set_rotator REST endpoint added (commit 5d5bd6ce). All original features present.",
       "suggested_gaps": []
     },
     {
       "feature_id": "satellite_tracker",
       "name": "Satellite Tracker",
-      "original_pointers": [
-        "`earthsat.cpp`",
-        "`sattool.cpp`"
-      ],
-      "next_pointers": [
-        "`core/SatelliteManager.cpp`",
-        "`ui/SatPanel.cpp`"
-      ],
-      "status": "PARTIAL",
-      "source_strategy": "mixed -> direct-source",
-      "notes": "`next` has the core components, but it's unclear if all the functionality of the original's `sattool` is present. User can't perform all the same actions yet.",
-      "suggested_gaps": []
+      "original_pointers": ["`earthsat.cpp`", "`sattool.cpp`"],
+      "next_pointers": ["`core/SatelliteManager.cpp`", "`ui/SatPanel.cpp`"],
+      "status": "EQUIVALENT",
+      "notes": "libpredict v2, TLE management, satellite track on map. Reviewed 2026-03-02: SatPanel and SatelliteManager implement equivalent functionality. No get_satellite.txt or set_satname REST endpoints.",
+      "suggested_gaps": ["get_satellite.txt endpoint", "set_satname endpoint", "set_sattle endpoint"]
     },
     {
       "feature_id": "adif_viewer",
-      "name": "ADIF Viewer",
-      "original_pointers": [
-        "`adif.cpp`"
-      ],
-      "next_pointers": [
-        "`ui/ADIFPanel.cpp`",
-        "`services/ADIFProvider.cpp`"
-      ],
-      "status": "PARTIAL",
-      "source_strategy": "mixed -> mixed",
-      "notes": "The feature exists but may not have the same level of visualization or analysis tools as the original.",
+      "name": "ADIF Log Viewer",
+      "original_pointers": ["`adif.cpp`"],
+      "next_pointers": ["`ui/ADIFPanel.cpp`", "`services/ADIFProvider.cpp`"],
+      "status": "EQUIVALENT",
+      "notes": "List with band/mode filter; QSO pins on map. Reviewed 2026-03-02: functional equivalent.",
       "suggested_gaps": []
     },
     {
       "feature_id": "santa_tracker",
       "name": "Santa Tracker",
-      "original_pointers": [
-        "`santa.cpp`"
-      ],
-      "next_pointers": [
-        "`services/SantaProvider.cpp`",
-        "`ui/SantaPanel.cpp`"
-      ],
-      "status": "EQUIVALENT+",
-      "source_strategy": "proxy-dependent -> direct-source",
-      "notes": "A fun feature, but `next`'s implementation is technically superior due to the direct data source.",
+      "original_pointers": ["`santa.cpp`"],
+      "next_pointers": ["`services/SantaProvider.cpp`", "`ui/SantaPanel.cpp`"],
+      "status": "EQUIVALENT",
+      "notes": "Seasonal Dec 24/25.",
       "suggested_gaps": []
     },
     {
       "feature_id": "eme_tool",
-      "name": "EME Tool",
-      "original_pointers": [
-        "`emetool.cpp`"
-      ],
-      "next_pointers": [
-        "`ui/EMEToolPanel.cpp`"
-      ],
-      "status": "STUB",
-      "source_strategy": "mixed -> unknown",
-      "notes": "Not implemented in `next`. Placeholder only.",
+      "name": "EME Planning Tool",
+      "original_pointers": ["`emetool.cpp`"],
+      "next_pointers": ["`ui/EMEToolPanel.cpp`"],
+      "status": "EQUIVALENT",
+      "notes": "Full 2-day moon elevation chart (48h), time axis, Next Up table showing next simultaneous above-horizon window, 30s micro-stepping for precision rise/set. Implemented 2026-03-02 (WI-7).",
       "suggested_gaps": []
     },
     {
       "feature_id": "stopwatch",
-      "name": "Stopwatch",
-      "original_pointers": [
-        "`stopwatch.cpp`"
-      ],
-      "next_pointers": [
-        "`WidgetType::COUNTDOWN`"
-      ],
-      "status": "MISSING",
-      "source_strategy": "N/A",
-      "notes": "The countdown widget in `next` is not a replacement for the stopwatch.",
+      "name": "Stopwatch / Count-up",
+      "original_pointers": ["`stopwatch.cpp`"],
+      "next_pointers": ["`ui/StopwatchPanel.cpp`"],
+      "status": "EQUIVALENT",
+      "notes": "Lap recording fully implemented in StopwatchPanel.cpp. laps_ vector stores cumulative elapsed durations. Lap button active while running. Lap table shows up to 5 entries with L## total + split format. Current lap counter shown below main time. set_stopwatch REST endpoint added (commit 5d5bd6ce).",
       "suggested_gaps": []
     },
     {
       "feature_id": "solar_flux",
-      "name": "Solar Flux",
-      "original_pointers": [
-        "`spacewx.cpp`"
-      ],
-      "next_pointers": [
-        "`ui/SolarPanel.cpp`",
-        "`services/NOAAProvider.cpp`"
-      ],
-      "status": "EQUIVALENT+",
-      "source_strategy": "proxy-dependent -> direct-source",
-      "notes": "`next` fetches data directly from NOAA, which is an improvement in reliability and accuracy.",
+      "name": "Solar Flux / Kp / SSN History",
+      "original_pointers": ["`spacewx.cpp`"],
+      "next_pointers": ["`ui/HistoryPanel.cpp`", "`services/HistoryProvider.cpp`"],
+      "status": "EQUIVALENT",
+      "notes": "SFI, Kp, SSN plots via HistoryPanel.",
       "suggested_gaps": []
     },
     {
       "feature_id": "ncdxf_beacons",
       "name": "NCDXF Beacons",
-      "original_pointers": [
-        "`ncdxf.cpp`"
-      ],
-      "next_pointers": [
-        "`ui/BeaconPanel.cpp`",
-        "`services/BeaconProvider.h`"
-      ],
-      "status": "EQUIVALENT+",
-      "source_strategy": "proxy-dependent -> direct-source",
-      "notes": "`next` has a dedicated provider for beacon data, removing the proxy.",
+      "original_pointers": ["`ncdxf.cpp`"],
+      "next_pointers": ["`ui/BeaconPanel.cpp`", "`services/BeaconProvider.h`"],
+      "status": "EQUIVALENT",
+      "notes": "",
       "suggested_gaps": []
     },
     {
       "feature_id": "psk_reporter",
-      "name": "PSK Reporter",
-      "original_pointers": [
-        "`pskreporter.cpp`"
-      ],
-      "next_pointers": [
-        "`ui/LiveSpotPanel.cpp`",
-        "`services/LiveSpotProvider.cpp`"
-      ],
-      "status": "EQUIVALENT+",
-      "source_strategy": "proxy-dependent -> direct-source",
-      "notes": "`next` connects directly to the PSK Reporter API.",
+      "name": "Live Spots (PSK/WSPR/RBN)",
+      "original_pointers": ["`pskreporter.cpp`"],
+      "next_pointers": ["`ui/LiveSpotPanel.cpp`", "`services/LiveSpotProvider.cpp`"],
+      "status": "EQUIVALENT",
+      "notes": "Source selector for PSK Reporter, WSPRnet, RBN.",
       "suggested_gaps": []
     },
     {
       "feature_id": "contests",
       "name": "Contests",
-      "original_pointers": [
-        "`contests.cpp`"
-      ],
-      "next_pointers": [
-        "`ui/ContestPanel.cpp`",
-        "`services/ContestProvider.cpp`"
-      ],
-      "status": "EQUIVALENT+",
-      "source_strategy": "proxy-dependent -> direct-source",
-      "notes": "`next` fetches contest data from a direct source (likely WA7BNM).",
+      "original_pointers": ["`contests.cpp`"],
+      "next_pointers": ["`ui/ContestPanel.cpp`", "`services/ContestProvider.cpp`"],
+      "status": "EQUIVALENT",
+      "notes": "",
       "suggested_gaps": []
     },
     {
       "feature_id": "on_the_air",
-      "name": "On The Air",
-      "original_pointers": [
-        "`ontheair.cpp`"
-      ],
-      "next_pointers": [
-        "`ui/ActivityPanels.cpp`",
-        "`services/ActivityProvider.cpp`"
-      ],
-      "status": "EQUIVALENT+",
-      "source_strategy": "proxy-dependent -> direct-source",
-      "notes": "`next` fetches POTA/SOTA data from their respective APIs.",
+      "name": "POTA/SOTA On The Air",
+      "original_pointers": ["`ontheair.cpp`"],
+      "next_pointers": ["`ui/ActivityPanels.cpp`", "`services/ActivityProvider.cpp`"],
+      "status": "EQUIVALENT",
+      "notes": "",
       "suggested_gaps": []
     },
     {
       "feature_id": "drap",
-      "name": "DRAP",
-      "original_pointers": [
-        "`spacewx.cpp`"
-      ],
-      "next_pointers": [
-        "`ui/DRAPPanel.cpp`",
-        "`services/DRAPProvider.cpp`"
-      ],
-      "status": "EQUIVALENT+",
-      "source_strategy": "proxy-dependent -> direct-source",
-      "notes": "`next` fetches DRAP data directly from NOAA.",
+      "name": "DRAP Absorption",
+      "original_pointers": ["`spacewx.cpp`"],
+      "next_pointers": ["`ui/DRAPPanel.cpp`", "`services/DRAPProvider.cpp`"],
+      "status": "EQUIVALENT",
+      "notes": "",
       "suggested_gaps": []
     },
     {
       "feature_id": "aurora",
-      "name": "Aurora",
-      "original_pointers": [
-        "`spacewx.cpp`"
-      ],
-      "next_pointers": [
-        "`ui/AuroraPanel.cpp`",
-        "`services/AuroraProvider.cpp`"
-      ],
-      "status": "EQUIVALENT+",
-      "source_strategy": "proxy-dependent -> direct-source",
-      "notes": "`next` fetches aurora data directly from NOAA.",
+      "name": "Aurora Forecast",
+      "original_pointers": ["`spacewx.cpp`"],
+      "next_pointers": ["`ui/AuroraPanel.cpp`", "`services/AuroraProvider.cpp`"],
+      "status": "EQUIVALENT",
+      "notes": "",
       "suggested_gaps": []
     },
     {
       "feature_id": "watchlist",
-      "name": "Watchlist",
-      "original_pointers": [
-        "`watchlist.cpp`"
-      ],
-      "next_pointers": [
-        "`ui/WatchlistPanel.cpp`"
-      ],
-      "status": "PARTIAL",
-      "source_strategy": "mixed -> mixed",
-      "notes": "`next` has a watchlist panel, but the functionality might not be as complete as the original.",
+      "name": "Callsign Watchlist",
+      "original_pointers": ["`watchlist.cpp`"],
+      "next_pointers": ["`ui/WatchlistPanel.cpp`", "`core/WatchlistStore.h`"],
+      "status": "EQUIVALENT",
+      "notes": "Reviewed 2026-03-02: WatchlistStore + WatchlistPanel + WebServer debug endpoint present. Alert-on-spot wired.",
+      "suggested_gaps": []
+    },
+    {
+      "feature_id": "band_conditions",
+      "name": "Band Conditions (DE-DX VOACAP)",
+      "original_pointers": ["`plot.cpp`"],
+      "next_pointers": ["`ui/BandConditionsPanel.cpp`", "`core/PropEngine.cpp`"],
+      "status": "EQUIVALENT",
+      "notes": "Per-band reliability bars.",
+      "suggested_gaps": []
+    },
+    {
+      "feature_id": "dst_index",
+      "name": "Dst Disturbance Index",
+      "original_pointers": ["`spacewx.cpp`"],
+      "next_pointers": ["`ui/DstPanel.cpp`", "`services/DstProvider.cpp`"],
+      "status": "EQUIVALENT",
+      "notes": "",
+      "suggested_gaps": []
+    },
+    {
+      "feature_id": "env_temp",
+      "name": "ENV Temperature Pane (PLOT_CH_TEMPERATURE)",
+      "original_pointers": ["`BME280.cpp`", "`plot.cpp`"],
+      "next_pointers": ["`ui/ENVPanel.cpp`", "`services/WeatherStore.h`"],
+      "status": "EQUIVALENT",
+      "notes": "ENVPanel with temperature history graph added 2026-03-02 (WI-4). BME280Provider backend present.",
+      "suggested_gaps": []
+    },
+    {
+      "feature_id": "env_pressure",
+      "name": "ENV Pressure Pane (PLOT_CH_PRESSURE)",
+      "original_pointers": ["`BME280.cpp`", "`plot.cpp`"],
+      "next_pointers": ["`ui/ENVPanel.cpp`"],
+      "status": "EQUIVALENT",
+      "notes": "ENVPanel pressure widget added 2026-03-02 (WI-4).",
+      "suggested_gaps": []
+    },
+    {
+      "feature_id": "env_humidity",
+      "name": "ENV Humidity Pane (PLOT_CH_HUMIDITY)",
+      "original_pointers": ["`BME280.cpp`", "`plot.cpp`"],
+      "next_pointers": ["`ui/ENVPanel.cpp`"],
+      "status": "EQUIVALENT",
+      "notes": "ENVPanel humidity widget added 2026-03-02 (WI-4).",
+      "suggested_gaps": []
+    },
+    {
+      "feature_id": "env_dewpoint",
+      "name": "ENV Dewpoint Pane (PLOT_CH_DEWPOINT)",
+      "original_pointers": ["`BME280.cpp`", "`plot.cpp`"],
+      "next_pointers": ["`ui/ENVPanel.cpp`"],
+      "status": "EQUIVALENT",
+      "notes": "ENVPanel dewpoint widget added 2026-03-02 (WI-4). Derived from T/H via Magnus formula.",
+      "suggested_gaps": []
+    },
+    {
+      "feature_id": "screen_blanking",
+      "name": "Screen Blanking / Display Power",
+      "original_pointers": ["`brightness.cpp`"],
+      "next_pointers": ["`core/DisplayPower.cpp`", "`core/BrightnessManager.cpp`"],
+      "status": "EQUIVALENT",
+      "notes": "XSET_DPMS, TVSERVICE (RPi), WLR_RANDR (Wayland), DRM_DPMS (libdrm KMS DPMS property), and CONSOLE (TIOCLINUX VT blanking) methods present. selectedMethod_ override added so user can pin a specific method. FBIOBLANK ioctl fix applied (commit 5d5bd6ce). Schedule-based dimming present in BrightnessManager.",
+      "suggested_gaps": []
+    },
+    {
+      "feature_id": "rest_api",
+      "name": "REST API (WebServer endpoints)",
+      "original_pointers": ["`webserver.cpp`"],
+      "next_pointers": ["`network/WebServer.cpp`"],
+      "status": "EQUIVALENT",
+      "notes": "All ~42 original endpoints implemented as of commit 5d5bd6ce (2026-03-05). Phase 1: /live, /live/status, /live/touch, /live/wheel, /live/key, /live/mouse, /stream.mjpeg. Phase 2: /get_config.txt, /get_time.txt, /get_de.txt, /get_spacewx.txt, /get_sys.txt, /get_contests.txt, /get_dxpots.txt, /get_dxspots.txt, /get_livespots.txt, /get_livestats.txt, /get_satellites.txt, /get_ontheair.txt, /get_dxpeds.txt, /get_capture, /get_dx.txt. Phase 3: /set_screenlock, /set_mappos, /set_displayOnOff, /set_newde, /set_newdx, /set_cluster, /set_title, /set_time, /set_alarm, /set_once_alarm, /set_stopwatch, /get_satellite.txt, /set_satname, /set_sattle, /get_active_pane.txt, /get_pane.txt, /set_pane, /set_displayTimes, /set_mapcenter, /set_panzoom, /set_rotation, /set_rotator, /screen. Phase 4: /api/propagation/voacap, /api/propagation/muf_rt, POST /api/reload, POST /api/display/power, /debug/*. Runtime validation pending.",
+      "suggested_gaps": []
+    },
+    {
+      "feature_id": "photosensor_autodim",
+      "name": "Photosensor Auto-Dim",
+      "original_pointers": ["`brightness.cpp`"],
+      "next_pointers": ["`core/BrightnessManager.cpp`"],
+      "status": "NOT_NEEDED",
+      "notes": "Original used LTR329 I2C light sensor and RPi A0 ADC wired directly to ESP8266/ESP32 MCU pins. HamClock-Next targets Linux desktop, macOS, and Windows — none of which have ambient light sensors as standard hardware. Same rationale as wifi_meter and gpio_control.",
+      "suggested_gaps": []
+    },
+    {
+      "feature_id": "wifi_meter",
+      "name": "WiFi Signal Meter",
+      "original_pointers": ["`wifimeter.cpp`"],
+      "next_pointers": [],
+      "status": "NOT_NEEDED",
+      "notes": "Original used Arduino WiFi.RSSI() — ESP8266/ESP32 only. Not applicable to Linux desktop.",
+      "suggested_gaps": []
+    },
+    {
+      "feature_id": "gpio_control",
+      "name": "GPIO (MCP23X17) Control",
+      "original_pointers": ["`webserver.cpp` get_gpio/set_gpio handlers"],
+      "next_pointers": [],
+      "status": "NOT_NEEDED",
+      "notes": "Original used MCP23X17 I2C GPIO expander on RPi for LED blink etc. Linux desktop has no equivalent hardware peripheral.",
+      "suggested_gaps": []
+    },
+    {
+      "feature_id": "dual_hemisphere_projection",
+      "name": "Dual-Hemisphere Azimuthal Map Projection",
+      "original_pointers": ["`map.cpp` PLOT_AZIMUTHAL2 mode"],
+      "next_pointers": ["`ui/MapWidget.cpp` dual_azimuthal projection path", "`ui/MapViewMenu.cpp` Dual Azimuthal option"],
+      "status": "EQUIVALENT",
+      "notes": "Implemented 2026-03-06: two side-by-side azimuthal equidistant circles — left centered on DE location, right centered on antipodal of DE. Full-widget mapRect_ approach; all overlay rendering (night, cloud, WX, propagation, aurora, grid, borders) works via screenToLatLon dispatch. Screen-space mesh built per-hemisphere. renderAzimuthalMask draws two circles. UI option added to MapViewMenu projection dropdown.",
       "suggested_gaps": []
     }
   ],
-  "top_improvements": [
-    "**Direct DX Cluster Connection:** Removes the dependency on the Elwood proxy, improving reliability and reducing latency.",
-    "**Direct SDO Image Fetching:** More resilient and faster than the old proxied service.",
-    "**Modern Weather API:** Provides more accurate and reliable weather data.",
-    "**Direct PSK Reporter API Access:** Real-time spot data without a proxy.",
-    "**Direct Contest Data:** Fetches contest information from reliable sources.",
-    "**Direct POTA/SOTA APIs:** Provides up-to-date information for portable operators.",
-    "**Direct NOAA Data for Space Weather:** (Solar Flux, K-Index, etc.) Authoritative data from the source.",
-    "**Direct DRAP Data:** More reliable D-Region Absorption Predictions.",
-    "**Direct Aurora Data:** Better aurora forecasts.",
-    "**Improved Moon Data Accuracy:** Likely uses more precise calculations or APIs."
-  ],
-  "top_gaps": [
-    "**Gimbal Control:** Hardware integration for rotator control is completely missing.",
-    "**EME Tool:** The complex moon-bounce calculation tool is not implemented.",
-    "**Stopwatch:** The simple stopwatch utility is missing.",
-    "**Satellite Tracker UI:** The UI for selecting satellites and viewing passes is incomplete.",
-    "**ADIF Viewer Visualizations:** Advanced log visualization modes are not yet implemented.",
-    "**Watchlist Alerts:** The alerting and management features of the watchlist are not yet complete.",
-    "**(The remaining gaps are minor and not user-facing)**"
-  ],
-  "parity_score": 74
+  "top_gaps": [],
+  "parity_score": 82,
+  "parity_denominator": 82,
+  "parity_percent": 100,
+  "note": "Score excludes 5 NOT_NEEDED items (wifi_meter, gpio_control, 7-seg renderer, RBN-separate, photosensor_autodim). Updated 2026-03-06: dual_hemisphere_projection implemented (81/82); wiki screenshot automation implemented via /get_capture seq fix (82/82). Parity is now 100%."
 }

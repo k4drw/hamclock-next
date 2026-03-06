@@ -4,7 +4,9 @@
 #include "../core/ActivityData.h"
 #include "../core/AsteroidData.h"
 #include "../core/AuroraHistoryStore.h"
+#include "../core/AuroraMapData.h"
 #include "../core/ConfigManager.h"
+#include "../core/DRAPData.h"
 #include "../core/DXClusterData.h"
 #include "../core/HamClockState.h"
 #include "../core/LiveSpotData.h"
@@ -52,7 +54,8 @@ public:
   // Set the asteroid provider for ground track overlay (non-owning).
   void setAsteroidProvider(AsteroidProvider *p) { asteroidProvider_ = p; }
 
-  // Called when orbital elements are ready (from background thread via SDL event).
+  // Called when orbital elements are ready (from background thread via SDL
+  // event).
   void onAsteroidElementsReady(const std::string &des,
                                const OrbitalElements &elem);
 
@@ -67,6 +70,14 @@ public:
 
   void setAuroraStore(std::shared_ptr<AuroraHistoryStore> store) {
     auroraStore_ = std::move(store);
+  }
+
+  void setAuroraMapStore(std::shared_ptr<AuroraMapStore> store) {
+    auroraMapStore_ = std::move(store);
+  }
+
+  void setDrapStore(std::shared_ptr<DRAPDataStore> store) {
+    drapStore_ = std::move(store);
   }
 
   void setADIFStore(std::shared_ptr<ADIFStore> store) {
@@ -98,8 +109,9 @@ public:
   nlohmann::json getDebugData() const override;
 
   // Thread-safe method for receiving data from background threads
-  void onSatTrackReady(const std::vector<GroundTrackPoint>& track);
+  void onSatTrackReady(const std::vector<GroundTrackPoint> &track);
   void onPropDataReady(PropOverlayType type, const std::vector<float> &grid);
+
 private:
   SDL_FPoint latLonToScreen(double lat, double lon) const;
   bool screenToLatLon(int sx, int sy, double &lat, double &lon) const;
@@ -126,6 +138,8 @@ private:
   void renderWxMbOverlay(SDL_Renderer *renderer);
   void renderPropagationOverlay(SDL_Renderer *renderer);
   void updatePropagationOverlay();
+  void renderAzimuthalMask(SDL_Renderer *renderer);
+  void renderCountryBorders(SDL_Renderer *renderer);
 
   TextureManager &texMgr_;
   FontManager &fontMgr_;
@@ -134,6 +148,8 @@ private:
   std::shared_ptr<LiveSpotDataStore> spotStore_;
   std::shared_ptr<DXClusterDataStore> dxcStore_;
   std::shared_ptr<AuroraHistoryStore> auroraStore_;
+  std::shared_ptr<AuroraMapStore> auroraMapStore_;
+  std::shared_ptr<DRAPDataStore> drapStore_;
   std::shared_ptr<ADIFStore> adifStore_;
   std::shared_ptr<ActivityDataStore> activityStore_;
   MufRtProvider *mufrt_ = nullptr;
@@ -151,6 +167,7 @@ private:
   SDL_Rect mapRect_ = {};
   bool mapLoaded_ = false;
   int currentMonth_ = 0; // 1-12
+  std::string lastStyle_;
 
   std::mutex mapDataMutex_;
   std::string pendingMapData_;
@@ -170,6 +187,8 @@ private:
   std::vector<SDL_Vertex> propVerts_;
   std::vector<int> nightIndices_;
   std::vector<int> propIndices_;
+  std::vector<SDL_Vertex> auroraVerts_;
+  std::vector<int> auroraIndices_;
 
   // Caches for render-ready geometry to avoid per-frame recalculation
   bool greatCircleDirty_ = true;
@@ -185,6 +204,13 @@ private:
   std::vector<int> asteroidTrackIndices_;
   bool gridDirty_ = true;
   std::vector<SDL_Vertex> gridVerts_;
+  bool borderDirty_ = true;
+  std::vector<SDL_Vertex> borderVerts_;
+  std::vector<int> borderIndices_;
+  // WX/Pressure overlay GPU geometry (rebuilt when new GFS data arrives)
+  std::vector<SDL_Vertex> wxVerts_;
+  std::vector<int> wxIndices_;
+  SDL_Texture *wxFillTex_ = nullptr; // pressure fill layer (blue-white-red)
 
   // Buffers for batching spots (dynamic per frame)
   std::vector<SDL_Vertex> spotVerts_;
@@ -211,6 +237,8 @@ private:
     int cachedH = 0;
   } tooltip_;
 
+  void renderLegend(SDL_Renderer *renderer);
+  void renderWxMbLegend(SDL_Renderer *renderer);
   void renderTooltip(SDL_Renderer *renderer);
   void renderProjectionSelect(SDL_Renderer *renderer);
 
@@ -224,6 +252,9 @@ private:
   uint32_t lastMufUpdateMs_ = 0;
   uint64_t wxLastCheckMs_ = 0;
   uint32_t lastPropUpdateMs_ = 0;
+  std::chrono::system_clock::time_point lastAuroraUpdateTime_;
+  std::string lastAuroraProjection_;
+  SDL_Texture *auroraTexture_ = nullptr;
   PropOverlayType lastPropType_ = PropOverlayType::None;
   std::string lastBand_;
   std::string lastMode_;

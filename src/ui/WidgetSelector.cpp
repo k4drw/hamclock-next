@@ -12,7 +12,9 @@ void WidgetSelector::show(
     int paneIndex, const std::vector<WidgetType> &available,
     const std::vector<WidgetType> &currentSelection,
     const std::vector<WidgetType> &forbidden,
-    std::function<void(int, const std::vector<WidgetType> &)> onDone) {
+    std::function<void(int, const std::vector<WidgetType> &)> onDone,
+    bool singleSelect) {
+  singleSelect_ = singleSelect;
   paneIndex_ = paneIndex;
   available_ = available;
 
@@ -30,9 +32,9 @@ void WidgetSelector::show(
   focusedIdx_ = 0;
 
   // Center the menu
-  int numCols = 3; // Use 3 columns to handle more widgets
-  int itemH = 28;  // Shrink from 34
-  int baseW = 180; // Narrower columns for 3-column layout
+  int numCols = 4; // 4 columns to fit ~47 widgets without scrolling
+  int itemH = 28;
+  int baseW = 180; // 4 × 180 = 720px, fits in 800px logical width
   int menuW = baseW * numCols;
   int footerH = 50;
 
@@ -121,10 +123,10 @@ void WidgetSelector::render(SDL_Renderer *renderer) {
     cat->drawText(renderer, widgetTypeDisplayName(t),
                   itemRects_[i].x + itemRects_[i].w / 2,
                   itemRects_[i].y + itemRects_[i].h / 2, textColor,
-                  FontStyle::SmallRegular, true);
+                  FontStyle::SmallRegular, true, false, true);
 
     // Draw separator (if not last row)
-    int numCols = 3;
+    int numCols = 4;
     int row = static_cast<int>(i) / numCols;
     int numRows = (static_cast<int>(available_.size()) + numCols - 1) / numCols;
     if (row < numRows - 1) {
@@ -194,7 +196,9 @@ bool WidgetSelector::onMouseUp(int mx, int my, Uint16 /*mod*/, int clicks) {
                         selection_.end();
 
       // Update local selection for immediate UI feedback
-      if (isSelected) {
+      if (singleSelect_) {
+        selection_ = {t}; // radio: replace entire selection
+      } else if (isSelected) {
         if (selection_.size() > 1) {
           selection_.erase(std::remove(selection_.begin(), selection_.end(), t),
                            selection_.end());
@@ -231,7 +235,7 @@ bool WidgetSelector::onKeyDown(SDL_Keycode key, Uint16 /*mod*/) {
   }
 
   // Navigation
-  int numCols = 3;
+  int numCols = 4;
   if (key == SDLK_UP) {
     if (focusedIdx_ >= numCols)
       focusedIdx_ -= numCols;
@@ -267,13 +271,17 @@ bool WidgetSelector::onKeyDown(SDL_Keycode key, Uint16 /*mod*/) {
       bool isForbidden = std::find(forbidden_.begin(), forbidden_.end(), t) !=
                          forbidden_.end();
       if (!isForbidden) {
-        auto it = std::find(selection_.begin(), selection_.end(), t);
-        if (it != selection_.end()) {
-          if (selection_.size() > 1) {
-            selection_.erase(it);
-          }
+        if (singleSelect_) {
+          selection_ = {t};
         } else {
-          selection_.push_back(t);
+          auto it = std::find(selection_.begin(), selection_.end(), t);
+          if (it != selection_.end()) {
+            if (selection_.size() > 1) {
+              selection_.erase(it);
+            }
+          } else {
+            selection_.push_back(t);
+          }
         }
       }
     }

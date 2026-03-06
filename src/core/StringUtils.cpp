@@ -60,4 +60,12 @@ int safe_stoi(const std::string &s) {
   return 0;
 }
 
+std::string trim(const std::string &s) {
+  auto start = s.find_first_not_of(" \t\n\r");
+  if (start == std::string::npos)
+    return "";
+  auto end = s.find_last_not_of(" \t\n\r");
+  return s.substr(start, end - start + 1);
+}
+
 } // namespace StringUtils

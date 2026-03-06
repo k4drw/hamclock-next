@@ -28,6 +28,7 @@ private:
   Callback callback_;
   mutable std::mutex mutex_;
   TropoData data_;
+  static constexpr uint32_t kFetchIntervalMs = 3'600'000; // 1 hour
   uint32_t lastFetch_ = 0;
 };
 

@@ -1,7 +1,9 @@
 #include "SDOPanel.h"
 #include "../core/Astronomy.h"
+#include "../core/ConfigManager.h"
 #include "../core/Constants.h"
 #include "../core/Theme.h"
+#include "../core/WorkerService.h"
 #include "FontCatalog.h"
 #include "RenderUtils.h"
 #include <SDL.h>
@@ -10,15 +12,30 @@
 #include <mutex>
 #include <nlohmann/json.hpp>
 
-static std::mutex sdoMutex;
-static std::string sdoPendingData;
-static bool sdoDataReady = false;
-
 SDOPanel::SDOPanel(int x, int y, int w, int h, FontManager &fontMgr,
                    TextureManager &texMgr, SDOProvider &provider)
     : Widget(x, y, w, h), fontMgr_(fontMgr), texMgr_(texMgr),
       provider_(provider) {
+  const auto &config = ConfigManager::instance().getConfig();
+  currentId_ = config.sdoWavelength;
+  rotating_ = config.sdoRotating;
+  showPfss_ = config.sdoPfss;
+  movie_ = config.sdoShowMovie;
+
   tempId_ = currentId_;
+  tempRotating_ = rotating_;
+  tempPfss_ = showPfss_;
+  tempMovie_ = movie_;
+
+  recalcMenuLayout();
+}
+
+SDOPanel::~SDOPanel() {
+  std::lock_guard<std::mutex> lock(*pendingMutex_);
+  if (*pendingSurface_) {
+    SDL_FreeSurface(*pendingSurface_);
+    *pendingSurface_ = nullptr;
+  }
 }
 
 void SDOPanel::update() {
@@ -28,11 +45,42 @@ void SDOPanel::update() {
   // Hourly fetch or on ID change
   if (now - lastFetch_ > 60 * 60 * 1000 || lastFetch_ == 0) {
     lastFetch_ = now;
-    provider_.fetch(currentId_, [](const std::string &data) {
-      std::lock_guard<std::mutex> lock(sdoMutex);
-      sdoPendingData = data;
-      sdoDataReady = true;
-    });
+    auto mtx = pendingMutex_;
+    auto psurf = pendingSurface_;
+    auto rdy = dataReady_;
+    auto stm = pendingServerTime_;
+    bool pfss = showPfss_;
+    std::string cid = currentId_;
+
+    provider_.fetch(cid, pfss,
+                    [mtx, psurf, rdy, stm, cid](const std::string &data,
+                                                std::time_t serverTime) {
+                      WorkerService::getInstance().submitTask([mtx, psurf, rdy,
+                                                               stm, data, cid,
+                                                               serverTime]() {
+                        // Decode and tint in background
+                        SDL_Color tint = {255, 255, 255, 255};
+                        if (cid == "HMIIC") {
+                          tint = {255, 147, 41, 255};
+                        }
+
+                        SDL_Surface *surf = TextureManager::decodeToSurface(
+                            reinterpret_cast<const unsigned char *>(
+                                data.data()),
+                            static_cast<unsigned int>(data.size()),
+                            "sdo_latest", tint);
+
+                        if (surf) {
+                          std::lock_guard<std::mutex> lock(*mtx);
+                          if (*psurf) {
+                            SDL_FreeSurface(*psurf);
+                          }
+                          *psurf = surf;
+                          *stm = serverTime;
+                          *rdy = true;
+                        }
+                      });
+                    });
   }
 
   // Handle rotation (every 30 seconds if enabled)
@@ -40,9 +88,10 @@ void SDOPanel::update() {
     lastRotate_ = now;
     // Advance to next wavelength
     int idx = 0;
-    for (int i = 0; i < 7; ++i) {
+    int nWl = sizeof(wavelengths_) / sizeof(wavelengths_[0]);
+    for (int i = 0; i < nWl; ++i) {
       if (wavelengths_[i].id == currentId_) {
-        idx = (i + 1) % 7;
+        idx = (i + 1) % nWl;
         break;
       }
     }
@@ -53,14 +102,18 @@ void SDOPanel::update() {
 }
 
 void SDOPanel::render(SDL_Renderer *renderer) {
-  // 1. Check for new data
+  // 1. Check for new data from background decoder
   {
-    std::lock_guard<std::mutex> lock(sdoMutex);
-    if (sdoDataReady) {
-      texMgr_.loadFromMemory(renderer, "sdo_latest", sdoPendingData);
-      sdoDataReady = false;
-      sdoPendingData.clear();
-      imageReady_ = true;
+    std::lock_guard<std::mutex> lock(*pendingMutex_);
+    if (*dataReady_) {
+      if (*pendingSurface_) {
+        texMgr_.loadFromSurface(renderer, "sdo_latest", *pendingSurface_);
+        SDL_FreeSurface(*pendingSurface_);
+        *pendingSurface_ = nullptr;
+        imageServerTime_ = *pendingServerTime_;
+        imageReady_ = true;
+      }
+      *dataReady_ = false;
     }
   }
 
@@ -155,6 +208,18 @@ void SDOPanel::renderOverlays(SDL_Renderer *renderer,
   int vW = fontMgr_.getLogicalWidth(buf, cat->ptSize(FontStyle::Micro));
   cat->drawText(renderer, buf, x_ + width_ - vW - 4,
                 y_ + height_ - overlayFontSize_ - 4, HUD, FontStyle::Micro);
+
+  // Stale check (AIA: 1h, HMI: 24h as they update less frequently)
+  if (imageServerTime_ > 0) {
+    std::time_t nowT = std::time(nullptr);
+    std::time_t threshold = 86400;
+    if (nowT - imageServerTime_ > threshold) {
+      // Draw "NOT CURRENT" in red
+      SDL_Color staleColor = {255, 50, 50, 255};
+      cat->drawText(renderer, "NOT CURRENT", x_ + width_ / 2, y_ + height_ / 2,
+                    staleColor, FontStyle::SmallBold, true);
+    }
+  }
 }
 
 void SDOPanel::renderMenu(SDL_Renderer *renderer, const ThemeColors &themes) {
@@ -166,7 +231,7 @@ void SDOPanel::renderMenu(SDL_Renderer *renderer, const ThemeColors &themes) {
   SDL_RenderDrawRect(renderer, &menuRect_);
 
   // Icon and Title
-  SDL_Rect iconRect = {menuRect_.x + 10, menuRect_.y + 5, 24, 24};
+  SDL_Rect iconRect = {menuRect_.x + 10, menuRect_.y + 8, 12, 12};
   SDL_Color gearColor = {140, 140, 140, 255};
   SDL_Color bgColor = {20, 20, 20, 255};
   RenderUtils::drawGear(renderer, iconRect.x + iconRect.w / 2.0f,
@@ -177,7 +242,8 @@ void SDOPanel::renderMenu(SDL_Renderer *renderer, const ThemeColors &themes) {
                 menuRect_.y + 5, themes.textDim, FontStyle::SmallRegular, true);
 
   // Radio Buttons (Highlight instead of boxes)
-  for (int i = 0; i < 7; ++i) {
+  int nWl = sizeof(wavelengths_) / sizeof(wavelengths_[0]);
+  for (int i = 0; i < nWl; ++i) {
     bool selected = (tempId_ == wavelengths_[i].id && !tempRotating_);
     SDL_Rect r = radioRects_[i];
 
@@ -201,19 +267,15 @@ void SDOPanel::renderMenu(SDL_Renderer *renderer, const ThemeColors &themes) {
   cat->drawText(renderer, "Auto-Rotate", rotIdx.x + 10, rotIdx.y + 4,
                 tempRotating_ ? themes.text : themes.textDim, FontStyle::UI);
 
-  // Checkboxes (Simplified)
-  auto drawToggle = [&](SDL_Rect r, bool val, const char *lbl) {
-    if (val) {
-      SDL_SetRenderDrawColor(renderer, themes.accent.r, themes.accent.g,
-                             themes.accent.b, 80);
-      SDL_RenderFillRect(renderer, &r);
-    }
-    cat->drawText(renderer, lbl, r.x + 10, r.y + 4,
-                  val ? themes.text : themes.textDim, FontStyle::UI);
-  };
-
-  drawToggle(graylineRect_, tempGrayline_, "Grayline Tool");
-  drawToggle(movieRect_, tempMovie_, "Show Movie");
+  // PFSS Magnetic Lines
+  SDL_Rect pfssR = graylineRect_;
+  if (tempPfss_) {
+    SDL_SetRenderDrawColor(renderer, themes.accent.r, themes.accent.g,
+                           themes.accent.b, 80);
+    SDL_RenderFillRect(renderer, &pfssR);
+  }
+  cat->drawText(renderer, "Magnetic Lines (PFSS)", pfssR.x + 10, pfssR.y + 4,
+                tempPfss_ ? themes.text : themes.textDim, FontStyle::UI);
 
   // Done / Cancel
   auto drawBtn = [&](const SDL_Rect &r, const char *label, SDL_Color bg) {
@@ -248,16 +310,17 @@ void SDOPanel::onResize(int x, int y, int w, int h) {
 void SDOPanel::recalcMenuLayout() {
   // Global centered popup (relative to 800x480 space)
   int mW = 280;
-  int mH = 400;
+  int mH = 430;
   menuRect_ = {(HamClock::LOGICAL_WIDTH - mW) / 2,
                (HamClock::LOGICAL_HEIGHT - mH) / 2, mW, mH};
 
   int curY = menuRect_.y + 25;
-  itemH_ = 28;
+  itemH_ = 25;
 
+  int nWl = sizeof(wavelengths_) / sizeof(wavelengths_[0]);
   radioRects_.clear();
-  radioRects_.reserve(7);
-  for (int i = 0; i < 7; ++i) {
+  radioRects_.reserve(nWl);
+  for (int i = 0; i < nWl; ++i) {
     radioRects_.push_back({menuRect_.x + 10, curY, mW - 20, itemH_});
     curY += itemH_;
   }
@@ -266,8 +329,6 @@ void SDOPanel::recalcMenuLayout() {
   curY += itemH_ + 5;
 
   graylineRect_ = {menuRect_.x + 10, curY, mW - 20, itemH_};
-  curY += itemH_;
-  movieRect_ = {menuRect_.x + 10, curY, mW - 20, itemH_};
 
   int btnW = 100;
   int btnH = 34;
@@ -286,6 +347,7 @@ bool SDOPanel::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
         my < okRect_.y + okRect_.h) {
       currentId_ = tempId_;
       rotating_ = tempRotating_;
+      saveSettings();
       menuVisible_ = false;
       lastFetch_ = 0; // Trigger reload
       return true;
@@ -298,7 +360,8 @@ bool SDOPanel::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
     }
 
     // 2. Handle menu items
-    for (int i = 0; i < 7; ++i) {
+    int nWl = sizeof(wavelengths_) / sizeof(wavelengths_[0]);
+    for (int i = 0; i < nWl; ++i) {
       if (mx >= radioRects_[i].x && mx < radioRects_[i].x + radioRects_[i].w &&
           my >= radioRects_[i].y && my < radioRects_[i].y + radioRects_[i].h) {
         tempId_ = wavelengths_[i].id;
@@ -315,13 +378,7 @@ bool SDOPanel::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
 
     if (mx >= graylineRect_.x && mx < graylineRect_.x + graylineRect_.w &&
         my >= graylineRect_.y && my < graylineRect_.y + graylineRect_.h) {
-      tempGrayline_ = !tempGrayline_;
-      return true;
-    }
-
-    if (mx >= movieRect_.x && mx < movieRect_.x + movieRect_.w &&
-        my >= movieRect_.y && my < movieRect_.y + movieRect_.h) {
-      tempMovie_ = !tempMovie_;
+      tempPfss_ = !tempPfss_;
       return true;
     }
 
@@ -346,6 +403,7 @@ bool SDOPanel::onKeyDown(SDL_Keycode key, Uint16 /*mod*/) {
     if (key == SDLK_RETURN || key == SDLK_KP_ENTER) {
       currentId_ = tempId_;
       rotating_ = tempRotating_;
+      saveSettings();
       menuVisible_ = false;
       lastFetch_ = 0;
       return true;
@@ -357,6 +415,17 @@ bool SDOPanel::onKeyDown(SDL_Keycode key, Uint16 /*mod*/) {
     return true; // Eat all keys when modal
   }
   return false;
+}
+
+void SDOPanel::saveSettings() {
+  showPfss_ = tempPfss_;
+  movie_ = tempMovie_;
+  auto &config = ConfigManager::instance().getConfig();
+  config.sdoWavelength = currentId_;
+  config.sdoRotating = rotating_;
+  config.sdoPfss = showPfss_;
+  config.sdoShowMovie = movie_;
+  ConfigManager::instance().save(config);
 }
 
 std::vector<std::string> SDOPanel::getActions() const {
@@ -384,6 +453,9 @@ nlohmann::json SDOPanel::getDebugData() const {
   data["current_id"] = currentId_;
   data["rotating"] = rotating_;
   data["image_ready"] = imageReady_;
+  data["image_server_time"] = imageServerTime_;
+  data["image_age_seconds"] =
+      (imageServerTime_ > 0) ? (std::time(nullptr) - imageServerTime_) : -1;
 
   // Available wavelengths
   nlohmann::json wavelengths = nlohmann::json::array();

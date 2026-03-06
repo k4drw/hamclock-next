@@ -7,8 +7,13 @@
 #ifdef __linux__
 #include <fcntl.h>
 #include <linux/fb.h>
+#include <linux/tiocl.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
+#ifdef HAS_LIBDRM
+#include <xf86drm.h>
+#include <xf86drmMode.h>
+#endif
 #endif
 
 #ifdef _WIN32
@@ -46,7 +51,59 @@ void DisplayPower::init() {
           "Detected screen control: Framebuffer blanking (visual only)");
   }
 
-  // 4. Always add SOFTWARE blanking as a robust fallback
+  // 4. X11 DPMS via xset (works when KMS is active, $DISPLAY is set)
+  {
+    const char *disp = std::getenv("DISPLAY");
+    if (disp && disp[0] && binaryExists("xset")) {
+      xDisplayEnv_ = disp;
+      methods_.push_back(Method::XSET_DPMS);
+      LOG_I("Display", "Detected screen control: xset dpms (X11)");
+    }
+  }
+
+  // 5. tvservice (legacy RPi firmware stack)
+  if (binaryExists("tvservice")) {
+    methods_.push_back(Method::TVSERVICE);
+    LOG_I("Display", "Detected screen control: tvservice (legacy RPi)");
+  }
+
+  // 6. wlr-randr (Wayland compositors: sway, labwc, etc.)
+  {
+    const char *wdisp = std::getenv("WAYLAND_DISPLAY");
+    if (wdisp && wdisp[0] && binaryExists("wlr-randr")) {
+      wlDisplayEnv_ = wdisp;
+      // Detect first output name for --off/--on
+      FILE *fp = popen("wlr-randr 2>/dev/null | head -1", "r");
+      if (fp) {
+        char buf[128] = {};
+        if (fgets(buf, sizeof(buf), fp)) {
+          // Output line format: "HDMI-A-1 ..."
+          char *sp = std::strchr(buf, ' ');
+          if (sp) *sp = '\0';
+          wlrRandrOutput_ = buf;
+        }
+        pclose(fp);
+      }
+      if (!wlrRandrOutput_.empty()) {
+        methods_.push_back(Method::WLR_RANDR);
+        LOG_I("Display", "Detected screen control: wlr-randr ({})", wlrRandrOutput_);
+      }
+    }
+  }
+
+  // 7. DRM DPMS (Direct KMS/DRM control)
+  if (access("/dev/dri/card0", W_OK) == 0) {
+    methods_.push_back(Method::DRM_DPMS);
+    LOG_I("Display", "Detected screen control: Direct DRM DPMS");
+  }
+
+  // 8. VT Console blanking
+  if (access("/dev/tty1", W_OK) == 0 || access("/dev/tty0", W_OK) == 0) {
+    methods_.push_back(Method::CONSOLE);
+    LOG_I("Display", "Detected screen control: Console VT blanking");
+  }
+
+  // 9. Always add SOFTWARE blanking as a robust fallback
   methods_.push_back(Method::SOFTWARE);
   LOG_I("Display", "Detected screen control: Software blanking");
 #else
@@ -61,30 +118,43 @@ bool DisplayPower::setPower(bool on) {
   (void)on;
   success = false;
 #else
-  for (auto method : methods_) {
-    bool m_success = false;
-    switch (method) {
+  auto attempt = [&](Method m) -> bool {
+    switch (m) {
     case Method::VCGENCMD:
-      m_success = runVcgencmd(on);
-      break;
+      return runVcgencmd(on);
     case Method::BL_POWER:
-      m_success = writeSysfs(blPowerPath_, on ? "0" : "1");
-      break;
+      return writeSysfs(blPowerPath_, on ? "0" : "1");
     case Method::FRAMEBUFFER:
-      m_success = blankFramebuffer(!on);
-      break;
+      return blankFramebuffer(!on);
     case Method::SOFTWARE:
-      // Software power state is always "successful" from DisplayPower's
-      // perspective. The application (main.cpp) will check getPower() to
-      // perform actual blanking.
-      m_success = true;
-      break;
+      return true;
+    case Method::XSET_DPMS:
+      return runXsetDpms(on);
+    case Method::TVSERVICE:
+      return runTvservice(on);
+    case Method::WLR_RANDR:
+      return runWlrRandr(on);
+    case Method::DRM_DPMS:
+#ifdef HAS_LIBDRM
+      return runDrmDpms(on);
+#else
+      return false;
+#endif
+    case Method::CONSOLE:
+      return runConsoleBlank(on);
     case Method::NONE:
-      m_success = false;
-      break;
+      return false;
     }
-    if (m_success)
-      success = true; // At least one method "worked"
+    return false;
+  };
+
+  if (selectedMethod_ != Method::NONE) {
+    success = attempt(selectedMethod_);
+  } else {
+    for (auto method : methods_) {
+      if (attempt(method))
+        success = true;
+    }
   }
 #endif
 #else
@@ -124,6 +194,21 @@ std::string DisplayPower::getMethodName() const {
       break;
     case Method::SOFTWARE:
       name += "software";
+      break;
+    case Method::XSET_DPMS:
+      name += "xset dpms";
+      break;
+    case Method::TVSERVICE:
+      name += "tvservice";
+      break;
+    case Method::WLR_RANDR:
+      name += "wlr-randr";
+      break;
+    case Method::DRM_DPMS:
+      name += "drm dpms";
+      break;
+    case Method::CONSOLE:
+      name += "console";
       break;
     case Method::NONE:
       name += "none";
@@ -201,27 +286,16 @@ bool DisplayPower::blankFramebuffer(bool blank) {
   if (fd < 0)
     return false;
 
-  struct fb_var_screeninfo vinfo;
-  if (ioctl(fd, FBIOGET_VSCREENINFO, &vinfo) < 0) {
+  int level = blank ? FB_BLANK_POWERDOWN : FB_BLANK_UNBLANK;
+  if (ioctl(fd, FBIOBLANK, level) < 0) {
     close(fd);
     return false;
   }
 
-  size_t size = vinfo.xres * vinfo.yres * (vinfo.bits_per_pixel / 8);
-  if (size == 0) {
-    close(fd);
-    return false;
-  }
-
-  // In a real implementation this might interfere with SDL.
-  // For now we'll just log that we would blank it.
-  // We can't easily "unblank" the FB once we zero it if SDL is still wanting to
-  // render to it. But on RPi, vcgencmd or bl_power usually work.
   close(fd);
-
-  // If we're using FB blanking as fallback, it's mostly a dummy for now.
   return true;
 #else
+  (void)blank;
   return false;
 #endif
 #else
@@ -229,3 +303,191 @@ bool DisplayPower::blankFramebuffer(bool blank) {
   return false;
 #endif
 }
+
+bool DisplayPower::binaryExists(const char *name) {
+#if !defined(__EMSCRIPTEN__) && !defined(_WIN32)
+  std::string cmd = std::string("which ") + name + " > /dev/null 2>&1";
+  return std::system(cmd.c_str()) == 0;
+#else
+  (void)name;
+  return false;
+#endif
+}
+
+bool DisplayPower::runXsetDpms(bool on) {
+#if !defined(__EMSCRIPTEN__) && !defined(_WIN32)
+  std::string cmd;
+  if (!xDisplayEnv_.empty())
+    cmd = "DISPLAY=" + xDisplayEnv_ + " ";
+  cmd += on ? "xset dpms force on > /dev/null 2>&1"
+             : "xset dpms force off > /dev/null 2>&1";
+  return std::system(cmd.c_str()) == 0;
+#else
+  (void)on;
+  return false;
+#endif
+}
+
+bool DisplayPower::runTvservice(bool on) {
+#if !defined(__EMSCRIPTEN__) && !defined(_WIN32)
+  std::string cmd = on ? "tvservice -p > /dev/null 2>&1"
+                       : "tvservice -o > /dev/null 2>&1";
+  return std::system(cmd.c_str()) == 0;
+#else
+  (void)on;
+  return false;
+#endif
+}
+
+bool DisplayPower::runWlrRandr(bool on) {
+#if !defined(__EMSCRIPTEN__) && !defined(_WIN32)
+  if (wlrRandrOutput_.empty())
+    return false;
+  std::string cmd;
+  if (!wlDisplayEnv_.empty())
+    cmd = "WAYLAND_DISPLAY=" + wlDisplayEnv_ + " ";
+  cmd += "wlr-randr --output " + wlrRandrOutput_ +
+         (on ? " --on" : " --off") + " > /dev/null 2>&1";
+  return std::system(cmd.c_str()) == 0;
+#else
+  (void)on;
+  return false;
+#endif
+}
+
+bool DisplayPower::runDrmDpms(bool on) {
+#if defined(__linux__) && !defined(__EMSCRIPTEN__)
+  int fd = open("/dev/dri/card0", O_RDWR | O_CLOEXEC);
+  if (fd < 0) {
+    LOG_E("DisplayPower", "Failed to open /dev/dri/card0: %s", std::strerror(errno));
+    return false;
+  }
+
+  drmModeRes *res = drmModeGetResources(fd);
+  if (!res) {
+    LOG_E("DisplayPower", "drmModeGetResources failed");
+    close(fd);
+    return false;
+  }
+
+  bool anySuccess = false;
+  uint32_t dpmsValue = on ? 0 : 3; // 0=ON, 3=OFF
+
+  for (int i = 0; i < res->count_connectors; i++) {
+    drmModeConnector *conn = drmModeGetConnector(fd, res->connectors[i]);
+    if (conn) {
+      if (conn->connection == DRM_MODE_CONNECTED) {
+        uint32_t propId = 0;
+        for (int j = 0; j < conn->count_props; j++) {
+          drmModePropertyRes *prop = drmModeGetProperty(fd, conn->props[j]);
+          if (prop) {
+            if (std::strcmp(prop->name, "DPMS") == 0) {
+              propId = prop->prop_id;
+            }
+            drmModeFreeProperty(prop);
+            if (propId != 0)
+              break;
+          }
+        }
+
+        if (propId) {
+          if (drmModeConnectorSetProperty(fd, conn->connector_id, propId,
+                                          dpmsValue) == 0) {
+            anySuccess = true;
+          } else {
+            LOG_E("DisplayPower", "Failed to set DPMS on connector %u: %s",
+                  conn->connector_id, std::strerror(errno));
+          }
+        }
+      }
+      drmModeFreeConnector(conn);
+    }
+  }
+
+  drmModeFreeResources(res);
+  close(fd);
+  return anySuccess;
+#else
+  (void)on;
+  return false;
+#endif
+}
+
+bool DisplayPower::runConsoleBlank(bool on) {
+#if defined(__linux__) && !defined(__EMSCRIPTEN__)
+  // Attempt to blank via VT ioctl on /dev/tty1
+  int fd = open("/dev/tty1", O_RDWR);
+  if (fd < 0) {
+    fd = open("/dev/tty0", O_RDWR);
+  }
+  if (fd < 0) {
+    LOG_E("DisplayPower", "Failed to open /dev/tty1 or /dev/tty0 for blanking");
+    return false;
+  }
+
+  // TIOCL_BLANKSCREEN/TIOCL_UNBLANKSCREEN
+  char arg = on ? TIOCL_UNBLANKSCREEN : TIOCL_BLANKSCREEN;
+  if (ioctl(fd, TIOCLINUX, &arg) < 0) {
+    LOG_E("DisplayPower", "Console blanking ioctl failed: %s",
+          std::strerror(errno));
+    close(fd);
+    return false;
+  }
+
+  close(fd);
+  return true;
+#else
+  (void)on;
+  return false;
+#endif
+}
+
+std::string DisplayPower::methodToString(Method m) {
+  switch (m) {
+  case Method::VCGENCMD:
+    return "vcgencmd";
+  case Method::BL_POWER:
+    return "sysfs bl_power";
+  case Method::FRAMEBUFFER:
+    return "framebuffer blank";
+  case Method::SOFTWARE:
+    return "software";
+  case Method::XSET_DPMS:
+    return "xset dpms";
+  case Method::TVSERVICE:
+    return "tvservice";
+  case Method::WLR_RANDR:
+    return "wlr-randr";
+  case Method::DRM_DPMS:
+    return "drm dpms";
+  case Method::CONSOLE:
+    return "console";
+  case Method::NONE:
+    return "auto";
+  }
+  return "auto";
+}
+
+DisplayPower::Method DisplayPower::stringToMethod(const std::string &s) {
+  if (s == "vcgencmd")
+    return Method::VCGENCMD;
+  if (s == "sysfs bl_power")
+    return Method::BL_POWER;
+  if (s == "framebuffer blank")
+    return Method::FRAMEBUFFER;
+  if (s == "software")
+    return Method::SOFTWARE;
+  if (s == "xset dpms")
+    return Method::XSET_DPMS;
+  if (s == "tvservice")
+    return Method::TVSERVICE;
+  if (s == "wlr-randr")
+    return Method::WLR_RANDR;
+  if (s == "drm dpms")
+    return Method::DRM_DPMS;
+  if (s == "console")
+    return Method::CONSOLE;
+  return Method::NONE;
+}
+
+

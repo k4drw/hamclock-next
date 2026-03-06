@@ -2,6 +2,7 @@
 
 #include "../core/SatelliteManager.h"
 #include "FontManager.h"
+#include "TextInput.h"
 #include "Widget.h"
 #include <string>
 
@@ -19,7 +20,7 @@ public:
     Widget::onResize(x, y, w, h);
     calculateLayout();
   }
-  bool onMouseDown(int mx, int my, Uint16 mod) override;
+  bool onMouseDown(int mx, int my, Uint16 mod, int clicks) override;
   bool onMouseUp(int mx, int my, Uint16 mod, int clicks) override;
   bool onTextInput(const char *text) override;
   bool onKeyDown(SDL_Keycode key, Uint16 mod) override;
@@ -39,9 +40,8 @@ private:
 
   enum class InputMode { None, SCC, TLE };
   InputMode inputMode_ = InputMode::None;
-  std::string sccInput_;
+  TextInput sccInput_;
   std::string tleInput_;
-  int cursor_ = 0;
 
   SDL_Rect rectOk_;
   SDL_Rect rectCancel_;

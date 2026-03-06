@@ -11,6 +11,40 @@
 #include <emscripten.h>
 #endif
 
+static std::string propOverlayToStr(PropOverlayType t) {
+  switch (t) {
+  case PropOverlayType::Muf:         return "muf";
+  case PropOverlayType::Voacap:      return "voacap";
+  case PropOverlayType::Reliability: return "reliability";
+  case PropOverlayType::Toa:         return "toa";
+  case PropOverlayType::Heatmap:     return "heatmap";
+  case PropOverlayType::Drap:        return "drap";
+  default:                           return "none";
+  }
+}
+
+static PropOverlayType propOverlayFromStr(const std::string &s) {
+  if (s == "muf")         return PropOverlayType::Muf;
+  if (s == "voacap")      return PropOverlayType::Voacap;
+  if (s == "reliability") return PropOverlayType::Reliability;
+  if (s == "toa")         return PropOverlayType::Toa;
+  if (s == "heatmap")     return PropOverlayType::Heatmap;
+  if (s == "drap")        return PropOverlayType::Drap;
+  return PropOverlayType::None;
+}
+
+static std::string weatherOverlayToStr(WeatherOverlayType t) {
+  if (t == WeatherOverlayType::Clouds) return "clouds";
+  if (t == WeatherOverlayType::WxMb)   return "wxmb";
+  return "none";
+}
+
+static WeatherOverlayType weatherOverlayFromStr(const std::string &s) {
+  if (s == "clouds") return WeatherOverlayType::Clouds;
+  if (s == "wxmb")   return WeatherOverlayType::WxMb;
+  return WeatherOverlayType::None;
+}
+
 static std::string colorToHex(SDL_Color c) {
   char buf[8];
   std::snprintf(buf, sizeof(buf), "#%02X%02X%02X", c.r, c.g, c.b);
@@ -147,6 +181,7 @@ bool ConfigManager::load(AppConfig &config) {
     config.useMetric = ap.value("use_metric", true);
     config.projection = ap.value("projection", "equirectangular");
     config.mapStyle = ap.value("map_style", "nasa");
+    if (config.mapStyle.empty()) config.mapStyle = "nasa";
     config.showGrid = ap.value("show_grid", false);
     config.gridType = ap.value("grid_type", "latlon");
 
@@ -180,6 +215,9 @@ bool ConfigManager::load(AppConfig &config) {
     config.propPower = ap.value("prop_power", 100);
     config.mufRtOpacity = ap.value("muf_rt_opacity", 40);
     config.showSatTrack = ap.value("show_sat_track", true);
+    config.showBeacons = ap.value("show_beacons", true);
+    config.showBorders = ap.value("show_borders", false);
+    config.displayPowerMethod = ap.value("display_power_method", "auto");
     config.qrzUsername = ap.value("qrz_username", "");
     config.qrzPassword = ap.value("qrz_password", "");
   }
@@ -284,7 +322,8 @@ bool ConfigManager::load(AppConfig &config) {
     auto &pa = json["panes"];
     auto loadRotation = [&](const std::string &key,
                             const std::string &legacyKey,
-                            std::vector<WidgetType> &vec, WidgetType fallback) {
+                            std::vector<WidgetType> &vec, WidgetType fallback,
+                            bool allowEmpty = false) {
       if (pa.contains(key) && pa[key].is_array()) {
         vec.clear();
         for (auto &item : pa[key]) {
@@ -296,7 +335,7 @@ bool ConfigManager::load(AppConfig &config) {
       } else if (pa.contains(legacyKey)) {
         vec = {widgetTypeFromString(pa.value(legacyKey, ""), fallback)};
       }
-      if (vec.empty())
+      if (vec.empty() && !allowEmpty)
         vec = {fallback};
     };
 
@@ -308,7 +347,18 @@ bool ConfigManager::load(AppConfig &config) {
                  WidgetType::LIVE_SPOTS);
     loadRotation("pane4_rotation", "pane4_widget", config.pane4Rotation,
                  WidgetType::BAND_CONDITIONS);
+    loadRotation("pane5_rotation", "pane5_widget", config.pane5Rotation,
+                 WidgetType::DE_INFO);
+    loadRotation("pane6_rotation", "pane6_widget", config.pane6Rotation,
+                 WidgetType::DX_INFO, /*allowEmpty=*/true);
     config.rotationIntervalS = pa.value("rotation_interval_s", 30);
+    config.syncRotation = pa.value("sync_rotation", false);
+    if (pa.contains("watchlist") && pa["watchlist"].is_array()) {
+      for (const auto &e : pa["watchlist"]) {
+        if (e.is_string())
+          config.watchlist.push_back(e.get<std::string>());
+      }
+    }
   }
 
   // Panel state
@@ -370,6 +420,23 @@ bool ConfigManager::load(AppConfig &config) {
       config.liveSpotsBands = psk.value("bands_mask", 0xFFF);
     }
   }
+
+  // SDO Settings
+  if (json.contains("sdo")) {
+    auto &s = json["sdo"];
+    config.sdoWavelength = s.value("wavelength", "0193");
+    config.sdoRotating = s.value("rotating", false);
+    config.sdoPfss = s.value("pfss", s.value("grayline", false));
+    config.sdoShowMovie = s.value("show_movie", false);
+  }
+
+  // Marine
+  if (json.contains("marine")) {
+    auto &m = json["marine"];
+    config.marineStation = m.value("station", "8722670");
+    config.marineBuoy = m.value("buoy", "41114");
+  }
+
   // Power
   if (json.contains("power")) {
     auto &p = json["power"];
@@ -379,19 +446,71 @@ bool ConfigManager::load(AppConfig &config) {
   }
 
   // Rotator (Hamlib rotctld)
+  // Rotator
   if (json.contains("rotator")) {
-    auto &r = json["rotator"];
+    const auto &r = json["rotator"];
     config.rotatorHost = r.value("host", "");
     config.rotatorPort = r.value("port", 4533);
     config.rotatorAutoTrack = r.value("auto_track", false);
+    config.rotatorUpover = r.value("upover", false);
   }
-
   // Rig (Hamlib rigctld)
+  // Rig
   if (json.contains("rig")) {
     auto &r = json["rig"];
     config.rigHost = r.value("host", "");
     config.rigPort = r.value("port", 4532);
     config.rigAutoTune = r.value("auto_tune", true);
+  }
+
+  // API Keys
+  if (json.contains("api_keys")) {
+    auto &k = json["api_keys"];
+    config.repeaterBookKey = k.value("repeaterbook", "");
+    config.winlinkKey = k.value("winlink", "");
+  }
+  // Presets
+  if (json.contains("presets") && json["presets"].is_array()) {
+    config.presets.clear();
+    for (auto &jp : json["presets"]) {
+      ConfigPreset p;
+      p.name = jp.value("name", "");
+      if (jp.contains("pane1_rotation") && jp["pane1_rotation"].is_array())
+        for (auto &e : jp["pane1_rotation"])
+          if (e.is_string())
+            p.pane1Rotation.push_back(widgetTypeFromString(e.get<std::string>(), WidgetType::SOLAR));
+      if (jp.contains("pane2_rotation") && jp["pane2_rotation"].is_array())
+        for (auto &e : jp["pane2_rotation"])
+          if (e.is_string())
+            p.pane2Rotation.push_back(widgetTypeFromString(e.get<std::string>(), WidgetType::DX_CLUSTER));
+      if (jp.contains("pane3_rotation") && jp["pane3_rotation"].is_array())
+        for (auto &e : jp["pane3_rotation"])
+          if (e.is_string())
+            p.pane3Rotation.push_back(widgetTypeFromString(e.get<std::string>(), WidgetType::LIVE_SPOTS));
+      if (jp.contains("pane4_rotation") && jp["pane4_rotation"].is_array())
+        for (auto &e : jp["pane4_rotation"])
+          if (e.is_string())
+            p.pane4Rotation.push_back(widgetTypeFromString(e.get<std::string>(), WidgetType::BAND_CONDITIONS));
+      if (jp.contains("pane5_rotation") && jp["pane5_rotation"].is_array())
+        for (auto &e : jp["pane5_rotation"])
+          if (e.is_string())
+            p.pane5Rotation.push_back(widgetTypeFromString(e.get<std::string>(), WidgetType::DE_INFO));
+      if (jp.contains("pane6_rotation") && jp["pane6_rotation"].is_array())
+        for (auto &e : jp["pane6_rotation"])
+          if (e.is_string())
+            p.pane6Rotation.push_back(widgetTypeFromString(e.get<std::string>(), WidgetType::DX_INFO));
+      p.rotationIntervalS = jp.value("rotation_interval_s", 30);
+      p.propOverlay  = propOverlayFromStr(jp.value("prop_overlay", "none"));
+      p.weatherOverlay = weatherOverlayFromStr(jp.value("weather_overlay", "none"));
+      p.mapStyle     = jp.value("map_style", "nasa");
+      p.mapNightLights = jp.value("map_night_lights", true);
+      p.showGrid     = jp.value("show_grid", false);
+      p.gridType     = jp.value("grid_type", "latlon");
+      p.propBand     = jp.value("prop_band", "20m");
+      p.propMode     = jp.value("prop_mode", "SSB");
+      p.propPower    = jp.value("prop_power", 100);
+      config.presets.push_back(std::move(p));
+    }
   }
 
   // Sync internal state
@@ -453,6 +572,9 @@ bool ConfigManager::save(const AppConfig &config) {
       (config.propOverlay == PropOverlayType::Muf);
   json["appearance"]["muf_rt_opacity"] = config.mufRtOpacity;
   json["appearance"]["show_sat_track"] = config.showSatTrack;
+  json["appearance"]["show_beacons"] = config.showBeacons;
+  json["appearance"]["show_borders"] = config.showBorders;
+  json["appearance"]["display_power_method"] = config.displayPowerMethod;
   json["appearance"]["qrz_username"] = config.qrzUsername;
   json["appearance"]["qrz_password"] = config.qrzPassword;
 
@@ -494,13 +616,25 @@ bool ConfigManager::save(const AppConfig &config) {
   json["hub"]["ip"] = config.hubIp;
   json["hub"]["port"] = config.hubPort;
 
+  json["sdo"]["wavelength"] = config.sdoWavelength;
+  json["sdo"]["rotating"] = config.sdoRotating;
+  json["sdo"]["pfss"] = config.sdoPfss;
+  json["sdo"]["show_movie"] = config.sdoShowMovie;
+
+  json["marine"]["station"] = config.marineStation;
+  json["marine"]["buoy"] = config.marineBuoy;
+
   json["rotator"]["host"] = config.rotatorHost;
   json["rotator"]["port"] = config.rotatorPort;
   json["rotator"]["auto_track"] = config.rotatorAutoTrack;
+  json["rotator"]["upover"] = config.rotatorUpover;
 
   json["rig"]["host"] = config.rigHost;
   json["rig"]["port"] = config.rigPort;
   json["rig"]["auto_tune"] = config.rigAutoTune;
+
+  json["api_keys"]["repeaterbook"] = config.repeaterBookKey;
+  json["api_keys"]["winlink"] = config.winlinkKey;
 
   auto saveRotation = [&](const std::string &key,
                           const std::vector<WidgetType> &vec) {
@@ -515,7 +649,16 @@ bool ConfigManager::save(const AppConfig &config) {
   saveRotation("pane2_rotation", config.pane2Rotation);
   saveRotation("pane3_rotation", config.pane3Rotation);
   saveRotation("pane4_rotation", config.pane4Rotation);
+  saveRotation("pane5_rotation", config.pane5Rotation);
+  saveRotation("pane6_rotation", config.pane6Rotation);
   json["panes"]["rotation_interval_s"] = config.rotationIntervalS;
+  json["panes"]["sync_rotation"] = config.syncRotation;
+  {
+    auto wl = nlohmann::json::array();
+    for (const auto &c : config.watchlist)
+      wl.push_back(c);
+    json["panes"]["watchlist"] = wl;
+  }
 
   json["panel"]["mode"] = config.panelMode;
   json["panel"]["satellite"] = config.selectedSatellite;
@@ -558,14 +701,67 @@ bool ConfigManager::save(const AppConfig &config) {
     }
   }
 
-  std::ofstream ofs(configPath_);
+  // Presets
+  {
+    auto savePresetRotation = [](const std::vector<WidgetType> &vec) {
+      auto arr = nlohmann::json::array();
+      for (auto t : vec) arr.push_back(widgetTypeToString(t));
+      return arr;
+    };
+    auto presetsArr = nlohmann::json::array();
+    for (const auto &p : config.presets) {
+      nlohmann::json jp;
+      jp["name"]               = p.name;
+      jp["pane1_rotation"]     = savePresetRotation(p.pane1Rotation);
+      jp["pane2_rotation"]     = savePresetRotation(p.pane2Rotation);
+      jp["pane3_rotation"]     = savePresetRotation(p.pane3Rotation);
+      jp["pane4_rotation"]     = savePresetRotation(p.pane4Rotation);
+      jp["pane5_rotation"]     = savePresetRotation(p.pane5Rotation);
+      jp["pane6_rotation"]     = savePresetRotation(p.pane6Rotation);
+      jp["rotation_interval_s"] = p.rotationIntervalS;
+      jp["prop_overlay"]       = propOverlayToStr(p.propOverlay);
+      jp["weather_overlay"]    = weatherOverlayToStr(p.weatherOverlay);
+      jp["map_style"]          = p.mapStyle;
+      jp["map_night_lights"]   = p.mapNightLights;
+      jp["show_grid"]          = p.showGrid;
+      jp["grid_type"]          = p.gridType;
+      jp["prop_band"]          = p.propBand;
+      jp["prop_mode"]          = p.propMode;
+      jp["prop_power"]         = p.propPower;
+      presetsArr.push_back(jp);
+    }
+    json["presets"] = presetsArr;
+  }
+
+  std::filesystem::path tmpPath = configPath_;
+  tmpPath.replace_extension(".json.tmp");
+
+  std::ofstream ofs(tmpPath);
   if (!ofs) {
     std::fprintf(stderr, "ConfigManager: cannot write %s\n",
-                 configPath_.string().c_str());
+                 tmpPath.string().c_str());
     return false;
   }
 
   ofs << json.dump(2) << "\n";
+  ofs.close();
+
+  if (!ofs.good()) {
+    std::fprintf(stderr, "ConfigManager: write failed for %s\n",
+                 tmpPath.string().c_str());
+    std::error_code ec;
+    std::filesystem::remove(tmpPath, ec);
+    return false;
+  }
+
+  // Atomic rename
+  std::filesystem::rename(tmpPath, configPath_, ec);
+  if (ec) {
+    std::fprintf(stderr, "ConfigManager: rename failed from %s to %s: %s\n",
+                 tmpPath.string().c_str(), configPath_.string().c_str(),
+                 ec.message().c_str());
+    return false;
+  }
 
 #ifdef __EMSCRIPTEN__
   // Flush MEMFS -> IndexedDB.  Retry once after 1 s on failure (handles
@@ -591,4 +787,55 @@ bool ConfigManager::save(const AppConfig &config) {
 #endif
 
   return ofs.good();
+}
+
+void ConfigManager::applyPreset(AppConfig &config, int index) {
+  if (index < 0 || index >= (int)config.presets.size())
+    return;
+
+  const auto &p = config.presets[index];
+  config.pane1Rotation = p.pane1Rotation;
+  config.pane2Rotation = p.pane2Rotation;
+  config.pane3Rotation = p.pane3Rotation;
+  config.pane4Rotation = p.pane4Rotation;
+  config.pane5Rotation = p.pane5Rotation;
+  config.pane6Rotation = p.pane6Rotation;
+  config.rotationIntervalS = p.rotationIntervalS;
+  config.propOverlay = p.propOverlay;
+  config.weatherOverlay = p.weatherOverlay;
+  config.mapStyle = p.mapStyle;
+  config.mapNightLights = p.mapNightLights;
+  config.showGrid = p.showGrid;
+  config.gridType = p.gridType;
+  config.propBand = p.propBand;
+  config.propMode = p.propMode;
+  config.propPower = p.propPower;
+}
+
+void ConfigManager::savePreset(AppConfig &config, const std::string &name) {
+  ConfigPreset p;
+  p.name = name;
+  p.pane1Rotation = config.pane1Rotation;
+  p.pane2Rotation = config.pane2Rotation;
+  p.pane3Rotation = config.pane3Rotation;
+  p.pane4Rotation = config.pane4Rotation;
+  p.pane5Rotation = config.pane5Rotation;
+  p.pane6Rotation = config.pane6Rotation;
+  p.rotationIntervalS = config.rotationIntervalS;
+  p.propOverlay = config.propOverlay;
+  p.weatherOverlay = config.weatherOverlay;
+  p.mapStyle = config.mapStyle;
+  p.mapNightLights = config.mapNightLights;
+  p.showGrid = config.showGrid;
+  p.gridType = config.gridType;
+  p.propBand = config.propBand;
+  p.propMode = config.propMode;
+  p.propPower = config.propPower;
+  config.presets.push_back(std::move(p));
+}
+
+void ConfigManager::deletePreset(AppConfig &config, int index) {
+  if (index >= 0 && index < (int)config.presets.size()) {
+    config.presets.erase(config.presets.begin() + index);
+  }
 }

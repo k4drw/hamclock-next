@@ -108,9 +108,9 @@ void HistoryPanel::render(SDL_Renderer *renderer) {
       if (kpNow >= 0.0f) {
         char kpBuf[8];
         std::snprintf(kpBuf, sizeof(kpBuf), "%.1f", kpNow);
-        SDL_Color kpCol = (kpNow >= 5.0f)   ? SDL_Color{255, 0, 0, 255}
-                          : (kpNow >= 4.0f) ? SDL_Color{255, 255, 0, 255}
-                                            : SDL_Color{0, 255, 0, 255};
+        SDL_Color kpCol = (kpNow >= 5.0f)   ? themes.danger
+                          : (kpNow >= 4.0f) ? themes.warning
+                                            : themes.success;
         cat->drawText(renderer, kpBuf, graphX + graphW / 2, graphY + 15, kpCol,
                       FontStyle::MediumBold, true, false, true);
       }
@@ -134,11 +134,19 @@ void HistoryPanel::render(SDL_Renderer *renderer) {
                                 {255, 255, 0, 255});
     }
 
-    // Show current value inside graph area (right edge, top of graph)
-    char buf[16];
-    std::snprintf(buf, sizeof(buf), "%.0f", currentSeries_.points.back().value);
-    cat->drawText(renderer, buf, graphX + graphW - 20, graphY + 10,
-                  {255, 255, 255, 255}, FontStyle::Fast, true);
+    // Current value as large overlay (matching Kp style)
+    {
+      float valNow = currentSeries_.points.back().value;
+      char buf[16];
+      if (seriesName_ == "flux") {
+        std::snprintf(buf, sizeof(buf), "%.1f", valNow);
+      } else {
+        std::snprintf(buf, sizeof(buf), "%.0f", valNow);
+      }
+      cat->drawText(renderer, buf, graphX + graphW / 2, graphY + 15,
+                    {255, 255, 255, 255}, FontStyle::MediumBold, true, false,
+                    true);
+    }
   }
 
   // X-axis time labels at 4 evenly-spaced positions
@@ -171,7 +179,7 @@ void HistoryPanel::render(SDL_Renderer *renderer) {
   }
 
   if (tooltip_.visible) {
-    renderTooltip(renderer);
+    renderTooltip(renderer, fontMgr_);
   }
 }
 
@@ -251,37 +259,3 @@ void HistoryPanel::onMouseMove(int mx, int my) {
   }
 }
 
-void HistoryPanel::renderTooltip(SDL_Renderer *renderer) {
-  if (tooltip_.text.empty())
-    return;
-
-  auto *cat = fontMgr_.catalog();
-  int tw, th;
-  cat->renderText(renderer, tooltip_.text, {255, 255, 255, 255},
-                  FontStyle::Micro, &tw, &th);
-
-  int padX = 8;
-  int padY = 4;
-  int boxW = tw + padX * 2;
-  int boxH = th + padY * 2;
-
-  int bx = tooltip_.x - boxW / 2;
-  int by = tooltip_.y - boxH - 12;
-
-  if (by < y_)
-    by = tooltip_.y + 16;
-  if (bx < x_)
-    bx = x_;
-  if (bx + boxW > x_ + width_)
-    bx = x_ + width_ - boxW;
-
-  SDL_Rect box = {bx, by, boxW, boxH};
-  SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-  SDL_SetRenderDrawColor(renderer, 20, 20, 20, 200);
-  SDL_RenderFillRect(renderer, &box);
-  SDL_SetRenderDrawColor(renderer, 100, 100, 100, 255);
-  SDL_RenderDrawRect(renderer, &box);
-
-  cat->drawText(renderer, tooltip_.text, bx + padX, by + padY,
-                {255, 255, 255, 255}, FontStyle::Micro);
-}

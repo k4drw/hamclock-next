@@ -49,6 +49,7 @@ void SatelliteSetup::setActive(bool active) {
   if (active_) {
     inputMode_ = InputMode::None;
     sccInput_.clear();
+    sccInput_.setActive(false);
     tleInput_.clear();
     SDL_StartTextInput();
   } else {
@@ -81,23 +82,15 @@ void SatelliteSetup::render(SDL_Renderer *renderer) {
   // SCC Input
   cat->drawText(renderer, "NORAD ID (SCC):", rectSccInput_.x,
                 rectSccInput_.y - 18, themes.text, FontStyle::Fast);
-  SDL_SetRenderDrawColor(renderer, themes.rowStripe1.r, themes.rowStripe1.g,
-                         themes.rowStripe1.b, 255);
-  SDL_RenderFillRect(renderer, &rectSccInput_);
-
-  if (inputMode_ == InputMode::SCC) {
-    SDL_SetRenderDrawColor(renderer, themes.accent.r, themes.accent.g,
-                           themes.accent.b, 255);
-  } else {
-    SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
-                           themes.border.b, 100);
-  }
-  SDL_RenderDrawRect(renderer, &rectSccInput_);
-
-  std::string sccDisp = sccInput_.empty() ? "Click to type ID..." : sccInput_;
-  SDL_Color sccColor = sccInput_.empty() ? themes.textDim : themes.text;
-  cat->drawText(renderer, sccDisp.c_str(), rectSccInput_.x + 8,
-                rectSccInput_.y + 5, sccColor, FontStyle::Fast);
+  sccInput_.render(renderer, fontMgr_,
+                   rectSccInput_.x, rectSccInput_.y,
+                   rectSccInput_.w, rectSccInput_.h,
+                   FontStyle::Fast, 8,
+                   inputMode_ == InputMode::SCC, true,
+                   themes.accent,
+                   {themes.border.r, themes.border.g, themes.border.b, 100},
+                   themes.text, themes.text, themes.textDim,
+                   "Click to type ID...");
 
   // TLE Input
   cat->drawText(renderer, "TLE (3 lines):", rectTleInput_.x,
@@ -172,7 +165,7 @@ void SatelliteSetup::render(SDL_Renderer *renderer) {
   }
 }
 
-bool SatelliteSetup::onMouseDown(int mx, int my, Uint16 mod) {
+bool SatelliteSetup::onMouseDown(int mx, int my, Uint16 mod, int clicks) {
   if (!active_)
     return false;
 
@@ -181,11 +174,20 @@ bool SatelliteSetup::onMouseDown(int mx, int my, Uint16 mod) {
   };
 
   if (pointInRect(mx, my, rectSccInput_)) {
+    int oldMode = (int)inputMode_;
     inputMode_ = InputMode::SCC;
+    sccInput_.setActive(true);
+    if (oldMode == (int)InputMode::SCC || clicks == 2)
+      sccInput_.onMouseDown(mx, my, clicks, fontMgr_, rectSccInput_.x,
+                            rectSccInput_.y, rectSccInput_.w, rectSccInput_.h,
+                            FontStyle::SmallRegular, 7);
+    else
+      sccInput_.setCursorToEnd();
     return true;
   }
   if (pointInRect(mx, my, rectTleInput_)) {
     inputMode_ = InputMode::TLE;
+    sccInput_.setActive(false);
     return true;
   }
 
@@ -231,7 +233,7 @@ bool SatelliteSetup::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
   };
 
   if (pointInRect(mx, my, rectOk_)) {
-    if (!sccInput_.empty())
+    if (!sccInput_.getValue().empty())
       addSatelliteBySCC();
     if (!tleInput_.empty())
       addSatelliteByTLE();
@@ -258,8 +260,10 @@ bool SatelliteSetup::onTextInput(const char *text) {
 
   if (inputMode_ == InputMode::SCC) {
     for (size_t i = 0; i < strlen(text); ++i) {
-      if (isdigit(text[i]))
-        sccInput_ += text[i];
+      if (isdigit(text[i])) {
+        char buf[2] = {text[i], '\0'};
+        sccInput_.onTextInput(buf);
+      }
     }
     return true;
   }
@@ -275,33 +279,9 @@ bool SatelliteSetup::onKeyDown(SDL_Keycode key, Uint16 mod) {
   if (!active_)
     return false;
 
-  if (key == SDLK_BACKSPACE) {
-    if (inputMode_ == InputMode::SCC && !sccInput_.empty())
-      sccInput_.pop_back();
-    else if (inputMode_ == InputMode::TLE && !tleInput_.empty())
-      tleInput_.pop_back();
-    return true;
-  }
-
-  if (key == SDLK_v && (mod & KMOD_CTRL)) {
-    char *text = SDL_GetClipboardText();
-    if (text) {
-      if (inputMode_ == InputMode::SCC) {
-        for (size_t i = 0; i < strlen(text); ++i) {
-          if (isdigit(text[i]))
-            sccInput_ += text[i];
-        }
-      } else if (inputMode_ == InputMode::TLE) {
-        tleInput_ = text;
-      }
-      SDL_free(text);
-    }
-    return true;
-  }
-
   if (key == SDLK_ESCAPE || key == SDLK_RETURN || key == SDLK_KP_ENTER) {
     if (key == SDLK_RETURN || key == SDLK_KP_ENTER) {
-      if (!sccInput_.empty())
+      if (!sccInput_.getValue().empty())
         addSatelliteBySCC();
       if (!tleInput_.empty())
         addSatelliteByTLE();
@@ -310,11 +290,43 @@ bool SatelliteSetup::onKeyDown(SDL_Keycode key, Uint16 mod) {
     return true;
   }
 
+  if (inputMode_ == InputMode::SCC) {
+    if (key == SDLK_v && (mod & KMOD_CTRL)) {
+      char *cbText = SDL_GetClipboardText();
+      if (cbText) {
+        sccInput_.clear();
+        for (size_t i = 0; i < strlen(cbText); ++i) {
+          if (isdigit(cbText[i])) {
+            char buf[2] = {cbText[i], '\0'};
+            sccInput_.onTextInput(buf);
+          }
+        }
+        SDL_free(cbText);
+      }
+      return true;
+    }
+    sccInput_.onKeyDown(key, mod);
+    return true;
+  }
+
+  if (inputMode_ == InputMode::TLE) {
+    if (key == SDLK_BACKSPACE && !tleInput_.empty())
+      tleInput_.pop_back();
+    else if (key == SDLK_v && (mod & KMOD_CTRL)) {
+      char *cbText = SDL_GetClipboardText();
+      if (cbText) {
+        tleInput_ = cbText;
+        SDL_free(cbText);
+      }
+    }
+    return true;
+  }
+
   return true;
 }
 
 void SatelliteSetup::addSatelliteBySCC() {
-  int id = std::atoi(sccInput_.c_str());
+  int id = std::atoi(sccInput_.getValue().c_str());
   if (id > 0) {
     satMgr_.addCustomSCC(id);
   }

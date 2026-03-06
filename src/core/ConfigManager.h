@@ -10,7 +10,7 @@
 #include <SDL.h>
 
 enum class LiveSpotSource { PSK, RBN, WSPR };
-enum class PropOverlayType { None, Muf, Voacap, Reliability, Toa, Heatmap };
+enum class PropOverlayType { None, Muf, Voacap, Reliability, Toa, Heatmap, Drap, Aurora };
 enum class WeatherOverlayType { None, Clouds, WxMb };
 enum class HubMode { Off, Master, Client };
 
@@ -19,6 +19,26 @@ struct ReminderEntry {
   std::string date; // YYYY-MM-DD
   bool active = true;
   std::string acknowledgedDate; // If == date, notification has been dismissed
+};
+
+struct ConfigPreset {
+  std::string name;
+  std::vector<WidgetType> pane1Rotation;
+  std::vector<WidgetType> pane2Rotation;
+  std::vector<WidgetType> pane3Rotation;
+  std::vector<WidgetType> pane4Rotation;
+  std::vector<WidgetType> pane5Rotation;
+  std::vector<WidgetType> pane6Rotation;
+  int rotationIntervalS = 30;
+  PropOverlayType propOverlay = PropOverlayType::None;
+  WeatherOverlayType weatherOverlay = WeatherOverlayType::None;
+  std::string mapStyle = "nasa";
+  bool mapNightLights = true;
+  bool showGrid = false;
+  std::string gridType = "latlon";
+  std::string propBand = "20m";
+  std::string propMode = "SSB";
+  int propPower = 100;
 };
 
 struct AppConfig {
@@ -45,6 +65,8 @@ struct AppConfig {
   int mufRtOpacity = 40;    // percentage
   bool showSatTrack = true; // Show satellite ground track line on world map
   bool showBeacons = true;  // Show NCDXF beacons on world map
+  bool showBorders = false; // Show Natural Earth country borders
+  std::string displayPowerMethod = "auto"; // "auto", "vcgencmd", "bl_power", etc.
 
   // Pane widget selection (top bar panes 1–3)  // Pane widget selection
   // (rotation sets)
@@ -52,7 +74,11 @@ struct AppConfig {
   std::vector<WidgetType> pane2Rotation = {WidgetType::DX_CLUSTER};
   std::vector<WidgetType> pane3Rotation = {WidgetType::LIVE_SPOTS};
   std::vector<WidgetType> pane4Rotation = {WidgetType::BAND_CONDITIONS};
+  std::vector<WidgetType> pane5Rotation = {WidgetType::DE_INFO};
+  std::vector<WidgetType> pane6Rotation = {WidgetType::DX_INFO};
   int rotationIntervalS = 30;
+  bool syncRotation = false; // true = all panes advance on the same wall-clock tick
+  std::vector<std::string> watchlist; // persisted callsign watchlist
 
   // Panel state
   std::string panelMode = "dx";  // "dx" or "sat"
@@ -74,6 +100,7 @@ struct AppConfig {
   bool liveSpotsUseCall = true; // true if filter by callsign, false if by grid
   int liveSpotsMaxAge = 30;     // minutes
   uint32_t liveSpotsBands = 0xFFF; // Bitmask of selected bands (lower 12 bits)
+  std::string pskrProxyUrl;        // Custom PSK Reporter proxy URL
   bool rbnEnabled =
       false; // Kept for backward compat in logic, but mostly internal now
   std::string rbnHost = "telnet.reversebeacon.net";
@@ -81,8 +108,13 @@ struct AppConfig {
 
   // SDO Widget settings
   std::string sdoWavelength = "0193";
-  bool sdoGrayline = false;
+  bool sdoRotating = false;
+  bool sdoPfss = false;
   bool sdoShowMovie = false;
+
+  // Marine Widget settings
+  std::string marineStation = "8722670"; // NOAA Tide station (Lake Worth FL)
+  std::string marineBuoy = "41114";       // NDBC Buoy ID (FL Atlantic)
 
   // Power / Screen
   bool preventSleep = true; // true to call SDL_DisableScreenSaver()
@@ -91,6 +123,7 @@ struct AppConfig {
   std::string rotatorHost = "";  // Empty = disabled
   int rotatorPort = 4533;        // Default Hamlib rotctld port
   bool rotatorAutoTrack = false; // Auto-track satellite when enabled
+  bool rotatorUpover = false;    // Azimuth flip for zenith passes
 
   // Rig (Hamlib rigctld)
   std::string rigHost = ""; // Empty = disabled
@@ -100,6 +133,20 @@ struct AppConfig {
   // QRZ
   std::string qrzUsername;
   std::string qrzPassword;
+
+  // Additional Services
+  std::string repeaterBookKey;
+  std::string winlinkKey;
+
+  // Daily alarm
+  bool alarmArmed = false;
+  int alarmTimeHH = 7;
+  int alarmTimeMM = 0;
+  bool alarmUtc = true;
+
+  // One-time alarm (ISO8601 date-time string, UTC)
+  bool onceAlarmArmed = false;
+  std::string onceAlarmTime; // e.g. "2026-03-15T14:00"
 
   // Countdown
   std::string countdownLabel;
@@ -113,13 +160,20 @@ struct AppConfig {
   int64_t callsignExpiryLastCheck = 0; // epoch seconds; 0 = never checked
   std::vector<ReminderEntry> reminders;
 
-  // Brightness
+  // Brightness / display schedule
   int brightness = 100;
   bool brightnessSchedule = false;
   int dimHour = 22;
   int dimMinute = 0;
   int brightHour = 6;
   int brightMinute = 0;
+  int idleMinutes = 0; // 0 = no idle blanking
+
+  // Map view
+  double mapCenterLon = 0.0;
+  int mapPanX = 0;
+  int mapPanY = 0;
+  double mapZoom = 1.0;
 
   // RSS
   bool rssEnabled = true; // Show RSS news banner
@@ -152,6 +206,9 @@ struct AppConfig {
   std::string corsProxyUrl = "";
 #endif
   std::map<std::string, SDL_Color> colorOverrides;
+
+  // Presets
+  std::vector<ConfigPreset> presets;
 };
 
 class ConfigManager {
@@ -180,6 +237,15 @@ public:
   // Save config to disk. Creates directories if needed. Returns false on
   // failure.
   bool save(const AppConfig &config);
+
+  // Apply a preset to the given config
+  void applyPreset(AppConfig &config, int index);
+
+  // Save current config as a new preset
+  void savePreset(AppConfig &config, const std::string &name);
+
+  // Delete a preset
+  void deletePreset(AppConfig &config, int index);
 
   // Returns the resolved config file path (valid after init()).
   const std::filesystem::path &configPath() const { return configPath_; }

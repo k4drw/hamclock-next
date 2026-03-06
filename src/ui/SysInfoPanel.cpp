@@ -100,9 +100,11 @@ std::string SysInfoPanel::getLocalIP() {
 // Constructor
 // ---------------------------------------------------------------------------
 SysInfoPanel::SysInfoPanel(int x, int y, int w, int h, FontManager &fontMgr,
-                           std::shared_ptr<CPUMonitor> monitor, bool useMetric)
+                           std::shared_ptr<CPUMonitor> monitor,
+                           std::shared_ptr<HamClockState> state,
+                           bool useMetric)
     : Widget(x, y, w, h), fontMgr_(fontMgr), monitor_(std::move(monitor)),
-      useMetric_(useMetric) {}
+      state_(std::move(state)), useMetric_(useMetric) {}
 
 // ---------------------------------------------------------------------------
 // update()
@@ -290,6 +292,28 @@ void SysInfoPanel::render(SDL_Renderer *renderer) {
   // Row 5: IP
   cat->drawText(renderer, cachedIP_.c_str(), cx, curY, themes.textDim,
                 FontStyle::Micro, true);
+  curY += cat->ptSize(FontStyle::Micro) + 4;
+
+  // Row 6+: Provider errors (show up to 3 failing services)
+  if (state_) {
+    int shown = 0;
+    for (const auto &kv : state_->services) {
+      if (curY + cat->ptSize(FontStyle::Micro) > y_ + height_ - 2)
+        break;
+      if (shown >= 3)
+        break;
+      const auto &svc = kv.second;
+      if (!svc.ok && !svc.lastError.empty()) {
+        char buf[64];
+        std::snprintf(buf, sizeof(buf), "%s: %s", kv.first.c_str(),
+                      svc.lastError.c_str());
+        cat->drawText(renderer, buf, cx, curY, themes.danger,
+                      FontStyle::Caption, true);
+        curY += cat->ptSize(FontStyle::Caption) + 3;
+        ++shown;
+      }
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------

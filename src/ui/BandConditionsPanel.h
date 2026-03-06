@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../core/BandConditionsData.h"
+#include "../core/Theme.h"
 #include "FontManager.h"
 #include "Widget.h"
 #include <SDL.h>
@@ -27,7 +28,7 @@ private:
   BandConditionsData currentData_;
   bool dataValid_ = false;
 
-  SDL_Color colorForCondition(BandCondition cond);
+  SDL_Color colorForCondition(BandCondition cond, const ThemeColors &themes);
   const char *stringForCondition(BandCondition cond, bool shortForm = false) const;
 
   int labelFontSize_ = 12;

@@ -2,6 +2,7 @@
 
 #include "../core/ConfigManager.h"
 #include "FontManager.h"
+#include "TextInput.h"
 #include "Widget.h"
 #include <chrono>
 #include <string>
@@ -25,7 +26,6 @@ private:
   void renderEditOverlay(SDL_Renderer *renderer);
 
   void onMouseMove(int mx, int my) override;
-  void renderTooltip(SDL_Renderer *renderer);
 
   FontManager &fontMgr_;
   AppConfig &config_;
@@ -35,8 +35,7 @@ private:
   // Editor state
   bool editing_ = false;
   bool editingTime_ = false; // true if editing time, false if editing label
-  std::string editText_;
-  int cursorPos_ = 0;
+  TextInput editInput_;
   bool alarmTriggered_ = false;
 
   // Temp storage for Multi-field editing

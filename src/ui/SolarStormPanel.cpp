@@ -82,7 +82,7 @@ void SolarStormPanel::render(SDL_Renderer *renderer) {
                 d.fluxHistory);
 
   if (tooltip_.visible) {
-    renderTooltip(renderer);
+    renderTooltip(renderer, fontMgr_);
   }
 }
 
@@ -115,6 +115,7 @@ void SolarStormPanel::onMouseMove(int mx, int my) {
     tooltip_.x = mx;
     tooltip_.y = my;
     tooltip_.visible = true;
+    tooltip_.timestamp = SDL_GetTicks();
   } else {
     tooltip_.visible = false;
   }
@@ -185,39 +186,5 @@ void SolarStormPanel::drawSparkline(SDL_Renderer *renderer, int x, int y, int w,
   }
 }
 
-void SolarStormPanel::renderTooltip(SDL_Renderer *renderer) {
-  if (tooltip_.text.empty())
-    return;
-
-  auto *cat = fontMgr_.catalog();
-  int tw, th;
-  cat->renderText(renderer, tooltip_.text, {255, 255, 255, 255},
-                  FontStyle::Micro, &tw, &th);
-
-  int padX = 8;
-  int padY = 4;
-  int boxW = tw + padX * 2;
-  int boxH = th + padY * 2;
-
-  int bx = tooltip_.x - boxW / 2;
-  int by = tooltip_.y - boxH - 12;
-
-  if (bx < x_)
-    bx = x_;
-  if (bx + boxW > x_ + width_)
-    bx = x_ + width_ - boxW;
-  if (by < y_)
-    by = tooltip_.y + 16;
-
-  SDL_Rect box = {bx, by, boxW, boxH};
-  SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-  SDL_SetRenderDrawColor(renderer, 20, 20, 20, 220);
-  SDL_RenderFillRect(renderer, &box);
-  SDL_SetRenderDrawColor(renderer, 100, 100, 100, 255);
-  SDL_RenderDrawRect(renderer, &box);
-
-  cat->drawText(renderer, tooltip_.text, bx + padX, by + padY,
-                {255, 255, 255, 255}, FontStyle::Micro);
-}
 
 } // namespace HamClock

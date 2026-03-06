@@ -498,7 +498,8 @@ bool ReminderPanel::handleSetupClick(int mx, int my) {
     if (pendingReminders_.size() < 5) {
       pendingReminders_.push_back({"", "", true, ""});
       activeField_ = (int)pendingReminders_.size() - 1;
-      cursorPos_ = 0;
+      activeProxy_.clear();
+      activeProxy_.setActive(true);
     }
     return true;
   }
@@ -529,13 +530,17 @@ bool ReminderPanel::handleSetupClick(int mx, int my) {
     int halfW = (fieldW - 30) / 2;
     if (mx >= x_ + 5 && mx < x_ + 5 + halfW && my >= fy && my < fy + fieldH) {
       activeField_ = (int)i;
-      cursorPos_ = (int)pendingReminders_[i].label.size();
+      activeProxy_.setValue(pendingReminders_[i].label);
+      activeProxy_.setCursorToEnd();
+      activeProxy_.setActive(true);
       return true;
     }
     if (mx >= x_ + 10 + halfW && mx < x_ + 10 + 2 * halfW && my >= fy &&
         my < fy + fieldH) {
       activeField_ = (int)(i + pendingReminders_.size());
-      cursorPos_ = (int)pendingReminders_[i].date.size();
+      activeProxy_.setValue(pendingReminders_[i].date);
+      activeProxy_.setCursorToEnd();
+      activeProxy_.setActive(true);
       return true;
     }
     fy += fieldH + 5;
@@ -546,32 +551,48 @@ bool ReminderPanel::handleSetupClick(int mx, int my) {
 
 // ─── keyboard ────────────────────────────────────────────────────────────────
 
-bool ReminderPanel::onKeyDown(SDL_Keycode key, Uint16 /*mod*/) {
+static std::string *getReminderField(std::vector<ReminderEntry> &entries,
+                                     int activeField) {
+  if (activeField < 0 || entries.empty())
+    return nullptr;
+  size_t idx = (size_t)activeField;
+  if (idx >= entries.size()) {
+    idx -= entries.size();
+    if (idx < entries.size())
+      return &entries[idx].date;
+  } else {
+    return &entries[idx].label;
+  }
+  return nullptr;
+}
+
+bool ReminderPanel::onKeyDown(SDL_Keycode key, Uint16 mod) {
   if (!showSetup_ || activeField_ == -1)
     return false;
 
-  std::string *text = nullptr;
-  size_t idx = (size_t)activeField_;
-  if (idx >= pendingReminders_.size()) {
-    idx -= pendingReminders_.size();
-    text = &pendingReminders_[idx].date;
-  } else {
-    text = &pendingReminders_[idx].label;
+  if (key == SDLK_TAB && !pendingReminders_.empty()) {
+    // Sync proxy back before switching
+    if (std::string *f = getReminderField(pendingReminders_, activeField_))
+      *f = activeProxy_.getValue();
+    activeField_ = (activeField_ + 1) % (int)(pendingReminders_.size() * 2);
+    if (std::string *f = getReminderField(pendingReminders_, activeField_)) {
+      activeProxy_.setValue(*f);
+      activeProxy_.setCursorToEnd();
+    }
+    return true;
+  }
+  if (key == SDLK_RETURN || key == SDLK_ESCAPE) {
+    if (std::string *f = getReminderField(pendingReminders_, activeField_))
+      *f = activeProxy_.getValue();
+    activeField_ = -1;
+    activeProxy_.clear();
+    return true;
   }
 
-  if (key == SDLK_BACKSPACE && !text->empty() && cursorPos_ > 0) {
-    text->erase(cursorPos_ - 1, 1);
-    cursorPos_--;
-    return true;
-  }
-  if (key == SDLK_TAB && !pendingReminders_.empty()) {
-    activeField_ = (activeField_ + 1) % (int)(pendingReminders_.size() * 2);
-    return true;
-  }
-  if (key == SDLK_RETURN) {
-    activeField_ = -1;
-    return true;
-  }
+  activeProxy_.onKeyDown(key, mod);
+  // Sync proxy value back to the reminder entry immediately
+  if (std::string *f = getReminderField(pendingReminders_, activeField_))
+    *f = activeProxy_.getValue();
   return true;
 }
 
@@ -579,17 +600,10 @@ bool ReminderPanel::onTextInput(const char *inputText) {
   if (!showSetup_ || activeField_ == -1)
     return false;
 
-  std::string *text = nullptr;
-  size_t idx = (size_t)activeField_;
-  if (idx >= pendingReminders_.size()) {
-    idx -= pendingReminders_.size();
-    text = &pendingReminders_[idx].date;
-  } else {
-    text = &pendingReminders_[idx].label;
-  }
-
-  text->insert(cursorPos_, inputText);
-  cursorPos_ += (int)strlen(inputText);
+  activeProxy_.onTextInput(inputText);
+  // Sync proxy value back to the reminder entry
+  if (std::string *f = getReminderField(pendingReminders_, activeField_))
+    *f = activeProxy_.getValue();
   return true;
 }
 
@@ -742,7 +756,7 @@ void ReminderPanel::renderReminderList(SDL_Renderer *renderer) {
   }
 
   if (tooltip_.visible) {
-    renderTooltip(renderer);
+    renderTooltip(renderer, fontMgr_);
   }
 }
 
@@ -763,38 +777,3 @@ void ReminderPanel::onMouseMove(int mx, int my) {
   }
 }
 
-void ReminderPanel::renderTooltip(SDL_Renderer *renderer) {
-  if (tooltip_.text.empty())
-    return;
-
-  auto *cat = fontMgr_.catalog();
-  int tw, th;
-  cat->renderText(renderer, tooltip_.text, {255, 255, 255, 255},
-                  FontStyle::Micro, &tw, &th);
-
-  int padX = 8;
-  int padY = 4;
-  int boxW = tw + padX * 2;
-  int boxH = th + padY * 2;
-
-  int bx = tooltip_.x - boxW / 2;
-  int by = tooltip_.y - boxH - 12;
-
-  if (by < y_) {
-    by = tooltip_.y + 16;
-  }
-  if (bx < x_)
-    bx = x_;
-  if (bx + boxW > x_ + width_)
-    bx = x_ + width_ - boxW;
-
-  SDL_Rect box = {bx, by, boxW, boxH};
-  SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-  SDL_SetRenderDrawColor(renderer, 20, 20, 20, 200);
-  SDL_RenderFillRect(renderer, &box);
-  SDL_SetRenderDrawColor(renderer, 100, 100, 100, 255);
-  SDL_RenderDrawRect(renderer, &box);
-
-  cat->drawText(renderer, tooltip_.text, bx + padX, by + padY,
-                {255, 255, 255, 255}, FontStyle::Micro);
-}

@@ -459,6 +459,18 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND (CMAKE_SYSTEM_PROCESSOR MATCHES "arm" 
     link_libraries(atomic)
 endif()
 
+# Find LibDRM (for DisplayPower KMS/DRM support)
+if(NOT EMSCRIPTEN AND NOT WIN32 AND NOT APPLE)
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(LIBDRM QUIET libdrm)
+    if(LIBDRM_FOUND)
+        message(STATUS "Found libdrm: ${LIBDRM_VERSION}")
+        add_compile_definitions(HAS_LIBDRM)
+    else()
+        message(WARNING "libdrm not found. DRM DPMS support will be disabled.")
+    endif()
+endif()
+
 
 # --- Application Target ---
 
@@ -529,6 +541,7 @@ set(HAMCLOCK_SOURCES
     src/services/HurricaneProvider.cpp
     src/services/MarineProvider.cpp
     src/services/WinlinkProvider.cpp
+    src/services/GreylineDXProvider.cpp
     src/ui/ActivityPanels.cpp
     src/ui/ADIFPanel.cpp
     src/ui/AlertsPanel.cpp
@@ -538,6 +551,7 @@ set(HAMCLOCK_SOURCES
     src/ui/MarinePanel.cpp
     src/ui/RepeaterPanel.cpp
     src/ui/WinlinkPanel.cpp
+    src/ui/GreylineDXPanel.cpp
     src/ui/AuroraPanel.cpp
     src/ui/AuroraGraphPanel.cpp
     src/ui/DXClusterPanel.cpp
@@ -550,11 +564,13 @@ set(HAMCLOCK_SOURCES
     src/ui/DRAPPanel.cpp
     src/ui/GimbalPanel.cpp
     src/ui/GreylineModal.cpp
+    src/ui/PresetsModal.cpp
     src/ui/HistoryPanel.cpp
     src/ui/MoonPanel.cpp
     src/ui/SDOPanel.cpp
     src/ui/WeatherPanel.cpp
     src/ui/ClockAuxPanel.cpp
+    src/ui/ENVPanel.cpp
     src/ui/DXPanel.cpp
     src/ui/DXSatPane.cpp
     src/ui/ListPanel.cpp
@@ -570,6 +586,7 @@ set(HAMCLOCK_SOURCES
     src/ui/SatelliteSetup.cpp
     src/ui/SatPanel.cpp
     src/ui/SetupScreen.cpp
+    src/ui/TextInput.cpp
     src/ui/SpaceWeatherPanel.cpp
     src/ui/ThemeCustomizer.cpp
     src/ui/TimePanel.cpp
@@ -653,6 +670,7 @@ else()
     target_include_directories(hamclock-next SYSTEM PRIVATE
         ${libpredict_BINARY_DIR}/include
         ${SDL2_INCLUDE_DIRS}
+        ${LIBDRM_INCLUDE_DIRS}
     )
 
     target_link_libraries(hamclock-next PRIVATE
@@ -669,6 +687,7 @@ else()
         httplib::httplib
         fmt::fmt
         spdlog::spdlog
+        ${LIBDRM_LIBRARIES}
     )
 
     if(WIN32)

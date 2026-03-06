@@ -1,5 +1,6 @@
 #include "GimbalPanel.h"
 #include "FontCatalog.h"
+#include "RenderUtils.h"
 #include <cmath>
 #include <cstdio>
 
@@ -8,8 +9,9 @@
 #endif
 
 GimbalPanel::GimbalPanel(int x, int y, int w, int h, FontManager &fontMgr,
+                         TextureManager &texMgr,
                          std::shared_ptr<RotatorDataStore> rotatorStore)
-    : Widget(x, y, w, h), fontMgr_(fontMgr),
+    : Widget(x, y, w, h), fontMgr_(fontMgr), texMgr_(texMgr),
       rotatorStore_(std::move(rotatorStore)) {}
 
 void GimbalPanel::update() {
@@ -35,15 +37,18 @@ void GimbalPanel::update() {
     if (hasRotator_) {
       az_ = rotData.azimuth;
       el_ = rotData.elevation;
+      flipActive_ = rotData.flipActive;
     } else if (hasSat_) {
       // Fall back to satellite prediction
       az_ = satAz_;
       el_ = satEl_;
+      flipActive_ = false;
     }
   } else if (hasSat_) {
     // No rotator configured, use satellite prediction
     az_ = satAz_;
     el_ = satEl_;
+    flipActive_ = false;
   }
 }
 
@@ -63,6 +68,12 @@ void GimbalPanel::render(SDL_Renderer *renderer) {
   auto *cat = fontMgr_.catalog();
   cat->drawText(renderer, "Rotator", x_ + 10, y_ + 5, accent,
                 FontStyle::MicroBold);
+
+  if (flipActive_) {
+    int upW = fontMgr_.getLogicalWidth("UPOVER", cat->ptSize(FontStyle::MicroBold));
+    cat->drawText(renderer, "UPOVER", x_ + width_ - upW - 10, y_ + 5,
+                  {255, 128, 0, 255}, FontStyle::MicroBold);
+  }
 
   // Display status line (Rotator status or Sat name)
   int statusY = y_ + titleH + 5;
@@ -128,30 +139,47 @@ void GimbalPanel::render(SDL_Renderer *renderer) {
   int centerY = y_ + height_ - 50;
   int radius = 35;
 
-  // Outer circle (simple octagonal approximation)
-  SDL_SetRenderDrawColor(renderer, 60, 60, 60, 255);
-  for (int i = 0; i < 8; ++i) {
-    double a1 = i * (45.0 * M_PI / 180.0);
-    double a2 = (i + 1) * (45.0 * M_PI / 180.0);
-    SDL_RenderDrawLine(renderer, centerX + radius * std::cos(a1),
-                       centerY + radius * std::sin(a1),
-                       centerX + radius * std::cos(a2),
-                       centerY + radius * std::sin(a2));
+  // Outer circle (AA octagon approximation)
+  SDL_Texture *lineTex = texMgr_.get("line_aa");
+  {
+    static const int kSegs = 48;
+    SDL_FPoint pts[kSegs + 1];
+    for (int i = 0; i <= kSegs; ++i) {
+      double a = i * 2.0 * M_PI / kSegs;
+      pts[i] = {(float)(centerX + radius * std::cos(a)),
+                (float)(centerY + radius * std::sin(a))};
+    }
+    if (lineTex)
+      RenderUtils::drawPolylineTextured(renderer, lineTex, pts, kSegs + 1, 1.2f,
+                                        {60, 60, 60, 255}, false);
   }
 
   // Crosshair
-  SDL_SetRenderDrawColor(renderer, 50, 50, 50, 255);
-  SDL_RenderDrawLine(renderer, centerX - radius, centerY, centerX + radius,
-                     centerY);
-  SDL_RenderDrawLine(renderer, centerX, centerY - radius, centerX,
-                     centerY + radius);
+  {
+    SDL_FPoint hLine[] = {{(float)(centerX - radius), (float)centerY},
+                          {(float)(centerX + radius), (float)centerY}};
+    SDL_FPoint vLine[] = {{(float)centerX, (float)(centerY - radius)},
+                          {(float)centerX, (float)(centerY + radius)}};
+    if (lineTex) {
+      RenderUtils::drawPolylineTextured(renderer, lineTex, hLine, 2, 1.0f,
+                                        {50, 50, 50, 200});
+      RenderUtils::drawPolylineTextured(renderer, lineTex, vLine, 2, 1.0f,
+                                        {50, 50, 50, 200});
+    }
+  }
 
   // Azimuth indicator (North is 0, which is up/-Y in screen space)
   double azRad = (az_ - 90.0) * M_PI / 180.0;
   int tipX = centerX + static_cast<int>(std::cos(azRad) * radius);
   int tipY = centerY + static_cast<int>(std::sin(azRad) * radius);
-  SDL_SetRenderDrawColor(renderer, 255, 128, 0, 255);
-  SDL_RenderDrawLine(renderer, centerX, centerY, tipX, tipY);
+  // Azimuth indicator needle (AA, bright orange)
+  {
+    SDL_FPoint needle[] = {{(float)centerX, (float)centerY},
+                           {(float)tipX, (float)tipY}};
+    if (lineTex)
+      RenderUtils::drawPolylineTextured(renderer, lineTex, needle, 2, 2.0f,
+                                        {255, 128, 0, 255});
+  }
 
   // Add a small arrow head
   // SDL_RenderFillRect(renderer, ...); // skip for simplicity
@@ -173,10 +201,15 @@ void GimbalPanel::render(SDL_Renderer *renderer) {
     SDL_SetRenderDrawColor(renderer, 0, 255, 255, 255);
     SDL_RenderFillRect(renderer, &barFill);
 
-    // Horizontal tick for 0 degrees
-    SDL_SetRenderDrawColor(renderer, 100, 100, 100, 255);
-    SDL_RenderDrawLine(renderer, barX - 2, barY + barH / 2, barX + barW + 2,
-                       barY + barH / 2);
+    // Horizontal tick for 0 degrees (AA)
+    {
+      SDL_FPoint tick[] = {
+          {(float)barX - 2.0f, (float)barY + (float)barH * 0.5f},
+          {(float)barX + (float)barW + 2.0f, (float)barY + (float)barH * 0.5f}};
+      if (lineTex)
+        RenderUtils::drawPolylineTextured(renderer, lineTex, tick, 2, 1.0f,
+                                          {100, 100, 100, 200});
+    }
   }
 }
 

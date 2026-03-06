@@ -98,3 +98,20 @@ int PrefixManager::getITUZone(int dxcc) {
   const DXCCEntity *entity = findDXCCEntity(dxcc);
   return entity ? entity->ituZone : -1;
 }
+
+std::string PrefixManager::getPrefix(int dxcc) {
+  // Linear scan of g_PrefixData for the first short prefix matching this DXCC.
+  // This is only called when populating the Greyline list, so it's not super hot path.
+  for (size_t i = 0; i < g_PrefixDataSize; ++i) {
+    if (g_PrefixData[i].dxcc == dxcc) {
+      std::string p = g_PrefixData[i].prefix;
+      // Skip internal helper prefixes starting with '*' or '='
+      if (p.empty() || p[0] == '*' || p[0] == '=')
+        continue;
+      // Prefer shorter prefixes (typically the primary ones)
+      if (p.length() <= 3)
+        return p;
+    }
+  }
+  return "";
+}
