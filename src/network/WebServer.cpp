@@ -2255,6 +2255,46 @@ void WebServer::run() {
     res.set_content(oss.str(), "text/plain");
   });
 
+  // Surgical map configuration endpoints (no full dashboard reset)
+  svr.Get("/set_projection", [this](const httplib::Request &req,
+                                    httplib::Response &res) {
+    if (req.has_param("type")) {
+      cfg_->projection = req.get_param_value("type");
+      if (cfgMgr_)
+        cfgMgr_->save(*cfg_);
+      if (mapReloadFlag_)
+        mapReloadFlag_->store(true, std::memory_order_release);
+      res.set_content("ok", "text/plain");
+    } else
+      res.status = 400;
+  });
+
+  svr.Get("/set_prop_overlay", [this](const httplib::Request &req,
+                                      httplib::Response &res) {
+    if (req.has_param("type")) {
+      cfg_->propOverlay = propOverlayFromString(req.get_param_value("type"));
+      if (cfgMgr_)
+        cfgMgr_->save(*cfg_);
+      if (mapReloadFlag_)
+        mapReloadFlag_->store(true, std::memory_order_release);
+      res.set_content("ok", "text/plain");
+    } else
+      res.status = 400;
+  });
+
+  svr.Get("/set_wx_overlay", [this](const httplib::Request &req,
+                                    httplib::Response &res) {
+    if (req.has_param("type")) {
+      cfg_->weatherOverlay = wxOverlayFromString(req.get_param_value("type"));
+      if (cfgMgr_)
+        cfgMgr_->save(*cfg_);
+      if (mapReloadFlag_)
+        mapReloadFlag_->store(true, std::memory_order_release);
+      res.set_content("ok", "text/plain");
+    } else
+      res.status = 400;
+  });
+
   svr.Get("/set_pane", [this](const httplib::Request &req,
                               httplib::Response &res) {
     int idx = StringUtils::safe_stoi(req.get_param_value("pane")) - 1;

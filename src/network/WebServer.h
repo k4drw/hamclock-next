@@ -67,6 +67,7 @@ public:
     brightnessMgr_ = bm;
   }
   void setADIFProvider(ADIFProvider *p) { adifProvider_ = p; }
+  void setMapReloadFlag(std::atomic<bool> *flag) { mapReloadFlag_ = flag; }
 
 private:
   void run();
@@ -83,6 +84,7 @@ private:
   std::shared_ptr<CPUMonitor> cpu_;
   std::shared_ptr<DisplayPower> displayPower_;
   std::atomic<bool> *reloadFlag_; // points to AppContext::configReloadRequested
+  std::atomic<bool> *mapReloadFlag_ = nullptr;
   FrameCapture *frameCapture_ = nullptr;
   NetworkManager *netMgr_ = nullptr;
   ActivityDataStore *activityStore_ = nullptr;

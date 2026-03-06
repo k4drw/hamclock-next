@@ -246,6 +246,7 @@ struct AppContext {
   // it, then re-applies the in-memory config to live state (callsign, proxy,
   // themes, etc.) without tearing down the dashboard.
   std::atomic<bool> configReloadRequested{false};
+  std::atomic<bool> mapUpdateRequested{false};
   // Rotation control commands written by WebServer thread, consumed on main
   // thread. rotationCmd: 0=none, 1=pause, 2=resume, 3=next, 4=jump-to-widget
   // rotationCmdPane: -1=all panes, 0-5=specific pane
@@ -352,7 +353,7 @@ struct DashboardContext {
   bool rssDataDirty = false;
 
   DashboardContext(AppContext &ctx);
-  ~DashboardContext() = default;
+  ~DashboardContext();
 
   void applySidePanelMode(WidgetType chosen, AppContext &ctx);
   void update(AppContext &ctx);
@@ -770,6 +771,7 @@ int main(int argc, char *argv[]) {
   ctx.webServer->setActivityStore(ctx.activityStore.get());
   ctx.webServer->setRotationControl(&ctx.rotationCmd, &ctx.rotationCmdPane,
                                     &ctx.rotationCmdWidget);
+  ctx.webServer->setMapReloadFlag(&ctx.mapUpdateRequested);
   ctx.webServer->start();
 
   ctx.gpsProvider = std::make_unique<GPSProvider>(ctx.state.get(), ctx.appCfg);
@@ -1747,6 +1749,19 @@ DashboardContext::DashboardContext(AppContext &ctx)
                      ctx.layLogicalOffY);
   rssBanner->onResize(139 + ctx.layLogicalOffX, 412 + ctx.layLogicalOffY, 660,
                       68);
+}
+
+DashboardContext::~DashboardContext() {
+#ifndef __EMSCRIPTEN__
+  if (dxcProvider)
+    dxcProvider->stop();
+  if (rbnProvider)
+    rbnProvider->stop();
+  if (rigService)
+    rigService->stop();
+  if (rotatorService)
+    rotatorService->stop();
+#endif
 }
 
 void DashboardContext::applySidePanelMode(WidgetType chosen, AppContext &ctx) {
@@ -2912,66 +2927,25 @@ void main_tick() {
       ctx.netManager->setHubConfig(ctx.appCfg.hubMode, ctx.appCfg.hubIp,
                                    ctx.appCfg.hubPort);
 
-#ifndef __EMSCRIPTEN__
-      if (ctx.dashboard) {
-        // Use a local isWidgetConfigured check matching the one in main()
-        auto isWidgetConfigured = [&](WidgetType type) -> bool {
-          if (type == WidgetType::AURORA_GRAPH)
-            return true;
-          for (auto t : ctx.appCfg.pane1Rotation)
-            if (t == type)
-              return true;
-          for (auto t : ctx.appCfg.pane2Rotation)
-            if (t == type)
-              return true;
-          for (auto t : ctx.appCfg.pane3Rotation)
-            if (t == type)
-              return true;
-          for (auto t : ctx.appCfg.pane4Rotation)
-            if (t == type)
-              return true;
-          for (auto t : ctx.appCfg.pane5Rotation)
-            if (t == type)
-              return true;
-          for (auto t : ctx.appCfg.pane6Rotation)
-            if (t == type)
-              return true;
-          return false;
-        };
-        const bool isMasterMode = (ctx.appCfg.hubMode == HubMode::Master);
-
-        // Restart background services that hold persistent config state
-        if (ctx.dashboard->dxcProvider) {
-          ctx.dashboard->dxcProvider->stop();
-          if (isMasterMode || isWidgetConfigured(WidgetType::DX_CLUSTER))
-            ctx.dashboard->dxcProvider->start(ctx.appCfg);
-        }
-        if (ctx.dashboard->rbnProvider) {
-          ctx.dashboard->rbnProvider->stop();
-          if ((isMasterMode || isWidgetConfigured(WidgetType::DX_CLUSTER)) &&
-              ctx.appCfg.rbnEnabled)
-            ctx.dashboard->rbnProvider->start(ctx.appCfg);
-        }
-        if (ctx.dashboard->rigService) {
-          ctx.dashboard->rigService->stop();
-          ctx.dashboard->rigService->start();
-        }
-        if (ctx.dashboard->rotatorService) {
-          ctx.dashboard->rotatorService->stop();
-          ctx.dashboard->rotatorService->start();
-        }
-      }
-#endif
+      LOG_I("Main", "Config reloaded from remote API: callsign={}",
+            ctx.appCfg.callsign);
 
       // Rebuild dashboard to refresh all widgets with new config (host, port,
-      // overlays, etc.)
+      // overlays, theme, metric, etc.)
       if (ctx.dashboard) {
         ctx.dashboard.reset();
         LOG_I("Main", "Dashboard rebuild triggered by remote config reload");
+        return; // Exit tick early; dashboard will be re-created on next frame
       }
+    }
 
-      LOG_I("Main", "Config reloaded from remote API: callsign={}",
-            ctx.appCfg.callsign);
+    // Surgical map updates (no full reset)
+    if (ctx.mapUpdateRequested.exchange(false, std::memory_order_acq_rel)) {
+      if (ctx.dashboard && ctx.dashboard->mapArea) {
+        // MapWidget detects config changes in its own update() call, 
+        // we just need to ensure we don't trigger a full reload.
+        LOG_I("Main", "Lightweight map update triggered");
+      }
     }
 
     // Process rotation control commands from REST API (WebServer thread).
