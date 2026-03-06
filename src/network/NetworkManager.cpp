@@ -92,7 +92,7 @@ std::string NetworkManager::fetchFromHubSync(const std::string &hubUrl) {
   if (!curl)
     return "";
   curl_easy_setopt(curl, CURLOPT_URL, hubUrl.c_str());
-  curl_easy_setopt(curl, CURLOPT_TIMEOUT, 2L);
+  curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10L);
   curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
   curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeCallback);
   curl_easy_setopt(curl, CURLOPT_WRITEDATA, &result);

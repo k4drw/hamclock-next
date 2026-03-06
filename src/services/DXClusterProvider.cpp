@@ -154,8 +154,7 @@ void DXClusterProvider::runTelnet(const std::string &host, int port,
     s.lastError = "Connecting...";
   }
 
-  // Note: Removed incrementConnectionAttempts() from here. 
-  // Per Elwood, we only count LOST connections that were once established.
+  incrementConnectionAttempts();
 
   int sock = socket(AF_INET, SOCK_STREAM, 0);
   if (sock < 0) {
@@ -275,7 +274,6 @@ void DXClusterProvider::runTelnet(const std::string &host, int port,
       ssize_t n = recv(sock, tmp, sizeof(tmp) - 1, 0);
       if (n <= 0) {
         LOG_W("DXCluster", "Connection lost");
-        incrementConnectionAttempts();
         if (state_) {
           state_->services["DXCluster"].ok = false;
           state_->services["DXCluster"].lastError = "Connection lost";
@@ -351,7 +349,6 @@ void DXClusterProvider::runTelnet(const std::string &host, int port,
     if (now - lastHeartbeat > std::chrono::seconds(60)) {
       if (send(sock, "\r\n", 2, 0) < 0) {
         LOG_W("DXCluster", "Heartbeat failed, closing connection");
-        incrementConnectionAttempts();
         break;
       }
       lastHeartbeat = now;
