@@ -30,6 +30,7 @@ open-hamclock-backend
 .claude
 AI_RULES.md
 CLAUDE.md
+GEMINI.md
 
 # Docker
 docker-build/

@@ -46,7 +46,8 @@ private:
 
   // Combo options
   std::vector<std::string> projOpts_ = {"Equirectangular", "Robinson",
-                                        "Azimuthal", "Mercator"};
+                                        "Azimuthal", "Mercator",
+                                        "Dual Azimuthal"};
   std::vector<std::string> mapOpts_ = {"NASA Blue Marble", "Topo",
                                        "Topo + Bathy"};
   std::vector<std::string> gridOpts_ = {"Off", "Lat/Lon", "Maidenhead"};

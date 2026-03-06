@@ -120,7 +120,8 @@ static void projectAzimuthal(double lat, double lon, double lat0, double lon0,
     return;
   }
   if (c > M_PI - 1e-10) {
-    // Antipode - map to a point outside the unit circle so it's filtered or masked
+    // Antipode - map to a point outside the unit circle so it's filtered or
+    // masked
     nx = 2.0;
     ny = 0.0;
     return;
@@ -202,6 +203,12 @@ void MapWidget::recalcMapRect() {
     mapRect_.h = side;
     mapRect_.x = x_ + (width_ - side) / 2;
     mapRect_.y = y_ + (height_ - side) / 2;
+  } else if (config_.projection == "dual_azimuthal") {
+    // Two side-by-side circles — use full widget area so overlay code works
+    mapRect_.x = x_;
+    mapRect_.y = y_;
+    mapRect_.w = width_;
+    mapRect_.h = height_;
   } else {
     int mapW = width_;
     int mapH = mapW / 2;
@@ -233,6 +240,20 @@ SDL_FPoint MapWidget::latLonToScreen(double lat, double lon) const {
     float scale = std::min(mapRect_.w, mapRect_.h);
     float px = mapRect_.x + (mapRect_.w * 0.5f) + (float)nx * (scale * 0.5f);
     float py = mapRect_.y + (mapRect_.h * 0.5f) - (float)ny * (scale * 0.5f);
+    return {px, py};
+  }
+  if (config_.projection == "dual_azimuthal") {
+    double deLat = state_ ? state_->deLocation.lat : 0.0;
+    double deLon = state_ ? state_->deLocation.lon : 0.0;
+    int halfW = mapRect_.w / 2;
+    float R = std::min(halfW, mapRect_.h) * 0.5f;
+    // Left hemisphere: DE-centered
+    float cx = mapRect_.x + halfW * 0.5f;
+    float cy = mapRect_.y + mapRect_.h * 0.5f;
+    double nx, ny;
+    projectAzimuthal(lat, lon, deLat, deLon, nx, ny);
+    float px = cx + (float)nx * R;
+    float py = cy - (float)ny * R;
     return {px, py};
   }
   if (config_.projection == "mercator") {
@@ -275,6 +296,30 @@ bool MapWidget::screenToLatLon(int sx, int sy, double &lat, double &lon) const {
     double deLat = state_ ? state_->deLocation.lat : 0.0;
     double deLon = state_ ? state_->deLocation.lon : 0.0;
     return inverseAzimuthal(nx, ny, deLat, deLon, lat, lon);
+  }
+  if (config_.projection == "dual_azimuthal") {
+    double deLat = state_ ? state_->deLocation.lat : 0.0;
+    double deLon = state_ ? state_->deLocation.lon : 0.0;
+    int halfW = mapRect_.w / 2;
+    float R = std::min(halfW, mapRect_.h) * 0.5f;
+    bool rightHalf = (sx >= mapRect_.x + halfW);
+    float cx, cy;
+    double centerLat, centerLon;
+    if (!rightHalf) {
+      cx = mapRect_.x + halfW * 0.5f;
+      cy = mapRect_.y + mapRect_.h * 0.5f;
+      centerLat = deLat;
+      centerLon = deLon;
+    } else {
+      cx = mapRect_.x + halfW + halfW * 0.5f;
+      cy = mapRect_.y + mapRect_.h * 0.5f;
+      // Antipodal center
+      centerLat = -deLat;
+      centerLon = deLon + (deLon >= 0.0 ? -180.0 : 180.0);
+    }
+    double nx = (sx - cx) / R;
+    double ny = (cy - sy) / R;
+    return inverseAzimuthal(nx, ny, centerLat, centerLon, lat, lon);
   }
   if (config_.projection == "mercator") {
     double nx = static_cast<double>(sx - mapRect_.x) / mapRect_.w;
@@ -396,8 +441,7 @@ void MapWidget::update() {
   }
 
   // Propagation Overlay updates (every 15 mins or on change)
-  if (config_.propOverlay != PropOverlayType::None &&
-      config_.propOverlay != PropOverlayType::Muf) {
+  if (config_.propOverlay != PropOverlayType::None) {
     bool changed = (lastPropType_ != config_.propOverlay) ||
                    (lastBand_ != config_.propBand) ||
                    (lastMode_ != config_.propMode) ||
@@ -888,7 +932,8 @@ void MapWidget::renderNightOverlay(SDL_Renderer *renderer) {
 
   // Low-memory mode: reduce mesh density on KMSDRM to minimize GPU allocations
   // For azimuthal, we use higher density for smoother circular edges.
-  const bool isAz = config_.projection == "azimuthal";
+  const bool isAz = (config_.projection == "azimuthal" ||
+                     config_.projection == "dual_azimuthal");
   const int gridW =
       useCompatibilityRenderPath_ ? (isAz ? 96 : 48) : (isAz ? 192 : 96);
   const int gridH =
@@ -1200,7 +1245,8 @@ void MapWidget::render(SDL_Renderer *renderer) {
     if (config_.projection != "equirectangular") {
       // Draw using mesh to support Robinson, Mercator, or Azimuthal warping
       // Low-memory mode: reduce mesh density on KMSDRM
-      const bool isAz = config_.projection == "azimuthal";
+      const bool isAz = (config_.projection == "azimuthal" ||
+                         config_.projection == "dual_azimuthal");
       const int gridW =
           useCompatibilityRenderPath_ ? (isAz ? 96 : 48) : (isAz ? 192 : 96);
       const int gridH =
@@ -1237,6 +1283,43 @@ void MapWidget::render(SDL_Renderer *renderer) {
               }
             }
           }
+        } else if (config_.projection == "dual_azimuthal") {
+          // Screen-space grid for dual azimuthal (two hemispheres)
+          double deLat = state_ ? state_->deLocation.lat : 0.0;
+          double deLon = state_ ? state_->deLocation.lon : 0.0;
+          double antiLat = -deLat;
+          double antiLon = deLon + (deLon >= 0.0 ? -180.0 : 180.0);
+          int halfW = mapRect_.w / 2;
+          float R = std::min(halfW, mapRect_.h) * 0.5f;
+          float cxL = mapRect_.x + halfW * 0.5f;
+          float cxR = mapRect_.x + halfW + halfW * 0.5f;
+          float cy = mapRect_.y + mapRect_.h * 0.5f;
+
+          for (int j = 0; j <= gridH; ++j) {
+            float sy = mapRect_.y + (float)j * mapRect_.h / gridH;
+            for (int i = 0; i <= gridW; ++i) {
+              float sx = mapRect_.x + (float)i * mapRect_.w / gridW;
+              int idx = j * (gridW + 1) + i;
+              double lat, lon;
+              bool valid;
+              if (sx < mapRect_.x + halfW) {
+                double nx = (sx - cxL) / R;
+                double ny = (cy - sy) / R;
+                valid = inverseAzimuthal(nx, ny, deLat, deLon, lat, lon);
+              } else {
+                double nx = (sx - cxR) / R;
+                double ny = (cy - sy) / R;
+                valid = inverseAzimuthal(nx, ny, antiLat, antiLon, lat, lon);
+              }
+              if (valid) {
+                float u = static_cast<float>((lon + 180.0) / 360.0);
+                float v = static_cast<float>((90.0 - lat) / 180.0);
+                mapVerts_[idx] = {{sx, sy}, {255, 255, 255, 255}, {u, v}};
+              } else {
+                mapVerts_[idx] = {{sx, sy}, {0, 0, 0, 0}, {0, 0}};
+              }
+            }
+          }
         } else {
           // Standard equirectangular-to-warped mesh
           for (int j = 0; j <= gridH; ++j) {
@@ -1265,7 +1348,8 @@ void MapWidget::render(SDL_Renderer *renderer) {
 
               // Check for texture wrapping (crossing date line)
               bool wrap = false;
-              if (config_.projection == "azimuthal") {
+              if (config_.projection == "azimuthal" ||
+                  config_.projection == "dual_azimuthal") {
                 float u0 = mapVerts_[p0].tex_coord.x;
                 float u1 = mapVerts_[p1].tex_coord.x;
                 float u2 = mapVerts_[p2].tex_coord.x;
@@ -1331,7 +1415,8 @@ void MapWidget::render(SDL_Renderer *renderer) {
   renderMarker(renderer, sunLat_, sunLon_, 255, 255, 0, MarkerShape::Circle,
                true);
 
-  if (config_.projection == "azimuthal") {
+  if (config_.projection == "azimuthal" ||
+      config_.projection == "dual_azimuthal") {
     renderAzimuthalMask(renderer);
   }
 
@@ -2078,7 +2163,8 @@ void MapWidget::renderPropagationOverlay(SDL_Renderer *renderer) {
   SDL_RenderSetClipRect(renderer, &mapRect_);
 
   // Geometry buffer management
-  const bool isAz = config_.projection == "azimuthal";
+  const bool isAz = (config_.projection == "azimuthal" ||
+                     config_.projection == "dual_azimuthal");
   const int gridW =
       useCompatibilityRenderPath_ ? (isAz ? 96 : 48) : (isAz ? 192 : 96);
   const int gridH =
@@ -2097,16 +2183,38 @@ void MapWidget::renderPropagationOverlay(SDL_Renderer *renderer) {
   if (projChanged || rectChanged ||
       propVerts_.size() != (size_t)((gridW + 1) * (gridH + 1))) {
     propVerts_.resize((gridW + 1) * (gridH + 1));
-    for (int j = 0; j <= gridH; ++j) {
-      for (int i = 0; i <= gridW; ++i) {
-        double lat = 90.0 - (double)j * 180.0 / gridH;
-        double lon = -180.0 + (double)i * 360.0 / gridW;
-        SDL_FPoint pt = latLonToScreen(lat, lon);
-        int idx = j * (gridW + 1) + i;
-        propVerts_[idx].position = {pt.x, pt.y};
-        propVerts_[idx].color = {255, 255, 255,
-                                 190}; // Slightly muted for geometry paths
-        propVerts_[idx].tex_coord = {(float)i / gridW, (float)j / gridH};
+    if (config_.projection == "dual_azimuthal") {
+      // Screen-space build — same approach as main map mesh for dual azimuthal
+      for (int j = 0; j <= gridH; ++j) {
+        float sy = mapRect_.y + (float)j * mapRect_.h / gridH;
+        for (int i = 0; i <= gridW; ++i) {
+          float sx = mapRect_.x + (float)i * mapRect_.w / gridW;
+          int idx = j * (gridW + 1) + i;
+          double lat, lon;
+          if (screenToLatLon((int)sx, (int)sy, lat, lon)) {
+            float u = static_cast<float>((lon + 180.0) / 360.0);
+            float v = static_cast<float>((90.0 - lat) / 180.0);
+            propVerts_[idx].position = {sx, sy};
+            propVerts_[idx].color = {255, 255, 255, 190};
+            propVerts_[idx].tex_coord = {u, v};
+          } else {
+            propVerts_[idx].position = {sx, sy};
+            propVerts_[idx].color = {0, 0, 0, 0};
+            propVerts_[idx].tex_coord = {0, 0};
+          }
+        }
+      }
+    } else {
+      for (int j = 0; j <= gridH; ++j) {
+        for (int i = 0; i <= gridW; ++i) {
+          double lat = 90.0 - (double)j * 180.0 / gridH;
+          double lon = -180.0 + (double)i * 360.0 / gridW;
+          SDL_FPoint pt = latLonToScreen(lat, lon);
+          int idx = j * (gridW + 1) + i;
+          propVerts_[idx].position = {pt.x, pt.y};
+          propVerts_[idx].color = {255, 255, 255, 190};
+          propVerts_[idx].tex_coord = {(float)i / gridW, (float)j / gridH};
+        }
       }
     }
     lastPropProj = config_.projection;
@@ -2126,7 +2234,8 @@ void MapWidget::renderPropagationOverlay(SDL_Renderer *renderer) {
 
         // Check for texture wrapping (crossing date line)
         bool wrap = false;
-        if (config_.projection == "azimuthal") {
+        if (config_.projection == "azimuthal" ||
+            config_.projection == "dual_azimuthal") {
           float u0 = propVerts_[p0].tex_coord.x;
           float u1 = propVerts_[p1].tex_coord.x;
           float u2 = propVerts_[p2].tex_coord.x;
@@ -2149,8 +2258,8 @@ void MapWidget::renderPropagationOverlay(SDL_Renderer *renderer) {
     }
   }
 
-  if (config_.projection == "robinson" || config_.projection == "azimuthal") {
-    // Note: for azimuthal, screenToLatLon handles the projection warping
+  if (config_.projection == "robinson" || config_.projection == "azimuthal" ||
+      config_.projection == "dual_azimuthal") {
     SDL_RenderGeometry(renderer, propTexture_, propVerts_.data(),
                        (int)propVerts_.size(), propIndices_.data(),
                        (int)propIndices_.size());
@@ -2221,16 +2330,40 @@ void MapWidget::renderWxMbOverlay(SDL_Renderer *renderer) {
       SDL_Color mainColor = {220, 240, 255, 200}; // cool blue-white isobar
       SDL_Color glowColor = {0, 30, 60, 120};     // subtle midnight-blue glow
 
-      // Half-map width used for antimeridian wrap guard (same as borders).
-      const float halfW = (float)mapRect_.w * 0.5f;
+      int numPasses = (config_.projection == "dual_azimuthal") ? 2 : 1;
+      double wxDeLat = state_ ? state_->deLocation.lat : 0.0;
+      double wxDeLon = state_ ? state_->deLocation.lon : 0.0;
+      double wxAntiLat = -wxDeLat;
+      double wxAntiLon = wxDeLon + (wxDeLon >= 0.0 ? -180.0 : 180.0);
+      int wxHalfW = mapRect_.w / 2;
+      float wxHemisR = std::min(wxHalfW, mapRect_.h) * 0.5f;
+
+      auto wxProjectPt = [&](double lat, double lon, int pass) -> SDL_FPoint {
+        if (config_.projection == "dual_azimuthal") {
+          double cLat = (pass == 0) ? wxDeLat : wxAntiLat;
+          double cLon = (pass == 0) ? wxDeLon : wxAntiLon;
+          float cx = (pass == 0) ? (mapRect_.x + wxHalfW * 0.5f)
+                                 : (mapRect_.x + wxHalfW + wxHalfW * 0.5f);
+          float cy = mapRect_.y + mapRect_.h * 0.5f;
+          double nx, ny;
+          projectAzimuthal(lat, lon, cLat, cLon, nx, ny);
+          return {cx + (float)nx * wxHemisR, cy - (float)ny * wxHemisR};
+        }
+        return latLonToScreen(lat, lon);
+      };
+
+      for (int pass = 0; pass < numPasses; ++pass) {
+      float jumpThresh = (config_.projection == "dual_azimuthal")
+                             ? wxHemisR * 2.0f
+                             : (float)mapRect_.w * 0.5f;
 
       // --- Isobar contour segments -----------------------------------------
       for (const auto &seg : segs) {
-        SDL_FPoint p1 = latLonToScreen(seg.lat1, seg.lon1);
-        SDL_FPoint p2 = latLonToScreen(seg.lat2, seg.lon2);
+        SDL_FPoint p1 = wxProjectPt(seg.lat1, seg.lon1, pass);
+        SDL_FPoint p2 = wxProjectPt(seg.lat2, seg.lon2, pass);
 
-        // Skip segments that jump across the antimeridian seam.
-        if (std::abs(p1.x - p2.x) > halfW)
+        // Skip segments that jump across the antimeridian seam or hemisphere edge.
+        if (std::abs(p1.x - p2.x) > jumpThresh)
           continue;
 
         float dx = p2.x - p1.x;
@@ -2274,19 +2407,15 @@ void MapWidget::renderWxMbOverlay(SDL_Renderer *renderer) {
         if (speed < 0.5f)
           continue;
 
-        SDL_FPoint origin = latLonToScreen(q.lat, q.lon);
+        SDL_FPoint origin = wxProjectPt(q.lat, q.lon, pass);
 
-        // Arrow length scaled to speed (pixels), wind direction in screen
-        // space. latLonToScreen maps lon→x (east=right) and lat→y (north=up on
-        // screen), so meteorological convention: u=+east, v=+north → vy is
-        // negated.
         float arrowLen = std::clamp(speed * 1.5f, 4.0f, 20.0f);
         float angle =
             std::atan2(-(q.v), q.u); // negate v because y increases down
         SDL_FPoint tip = {origin.x + std::cos(angle) * arrowLen,
                           origin.y + std::sin(angle) * arrowLen};
 
-        if (std::abs(origin.x - tip.x) > halfW)
+        if (std::abs(origin.x - tip.x) > jumpThresh)
           continue;
 
         float shaftdx = tip.x - origin.x;
@@ -2333,6 +2462,7 @@ void MapWidget::renderWxMbOverlay(SDL_Renderer *renderer) {
                             {s, s + 1, s + 2, s + 2, s + 1, s + 3});
         }
       }
+      } // end pass loop
     }
   }
 
@@ -3069,14 +3199,17 @@ void MapWidget::renderGridOverlay(SDL_Renderer *renderer) {
         double dlon = std::abs(path[i].lon - path[i - 1].lon);
         bool jump = (dlon > 180.0);
 
-        if (!jump && config_.projection == "azimuthal") {
+        if (!jump && (config_.projection == "azimuthal" ||
+                      config_.projection == "dual_azimuthal")) {
           // Also check for huge screen jumps (e.g. crossing the disk edge)
           SDL_FPoint p1 = latLonToScreen(path[i - 1].lat, path[i - 1].lon);
           SDL_FPoint p2 = latLonToScreen(path[i].lat, path[i].lon);
           float dx = p2.x - p1.x;
           float dy = p2.y - p1.y;
-          if (std::sqrt(dx * dx + dy * dy) >
-              std::min(mapRect_.w, mapRect_.h) * 0.5f) {
+          float jumpThresh = (config_.projection == "dual_azimuthal")
+                                 ? std::min(mapRect_.w / 2, mapRect_.h) * 0.5f
+                                 : std::min(mapRect_.w, mapRect_.h) * 0.5f;
+          if (std::sqrt(dx * dx + dy * dy) > jumpThresh) {
             jump = true;
           }
         }
@@ -3216,6 +3349,7 @@ void MapWidget::renderAuroraOverlay(SDL_Renderer *renderer) {
 
         // Also check screen-space jump for projections that warp significantly
         if (!wrap && (config_.projection == "azimuthal" ||
+                      config_.projection == "dual_azimuthal" ||
                       config_.projection == "robinson")) {
           float d1 = std::abs(auroraVerts_[p0].position.x -
                               auroraVerts_[p1].position.x);
@@ -3368,15 +3502,57 @@ void MapWidget::renderModal(SDL_Renderer *renderer) {
 }
 
 void MapWidget::renderAzimuthalMask(SDL_Renderer *renderer) {
-  // Center is the center of the map area.
-  float cx = mapRect_.x + mapRect_.w * 0.5f;
-  float cy = mapRect_.y + mapRect_.h * 0.5f;
-  // Radius is half the height (max 165 for 330 height).
-  // We use a small 2px margin to keep the circle away from the edge.
-  float radius = std::min(mapRect_.w, mapRect_.h) * 0.5f - 2.0f;
-
   SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
   SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+
+  if (config_.projection == "dual_azimuthal") {
+    // Two side-by-side circles
+    int halfW = mapRect_.w / 2;
+    float R = std::min(halfW, mapRect_.h) * 0.5f - 6.0f;
+    float cxL = mapRect_.x + halfW * 0.5f;
+    float cxR = mapRect_.x + halfW + halfW * 0.5f;
+    float cy = mapRect_.y + mapRect_.h * 0.5f;
+
+    for (int j = 0; j < mapRect_.h; ++j) {
+      float sy = mapRect_.y + j;
+      float dy = std::abs(sy - cy);
+
+      if (dy >= R) {
+        // Entire row outside both circles
+        SDL_Rect fullRow = {mapRect_.x, (int)sy, mapRect_.w, 1};
+        SDL_RenderFillRect(renderer, &fullRow);
+      } else {
+        float dx = std::sqrt(R * R - dy * dy);
+
+        // Left of left circle
+        int xL0 = (int)(cxL - dx);
+        SDL_Rect rL0 = {mapRect_.x, (int)sy, xL0 - mapRect_.x, 1};
+        if (rL0.w > 0)
+          SDL_RenderFillRect(renderer, &rL0);
+
+        // Gap between circles
+        int xL1 = (int)(cxL + dx);
+        int xR0 = (int)(cxR - dx);
+        if (xR0 > xL1) {
+          SDL_Rect rGap = {xL1, (int)sy, xR0 - xL1, 1};
+          SDL_RenderFillRect(renderer, &rGap);
+        }
+
+        // Right of right circle
+        int xR1 = (int)(cxR + dx);
+        int mapRight = mapRect_.x + mapRect_.w;
+        SDL_Rect rR1 = {xR1, (int)sy, mapRight - xR1, 1};
+        if (rR1.w > 0)
+          SDL_RenderFillRect(renderer, &rR1);
+      }
+    }
+    return;
+  }
+
+  // Single azimuthal circle
+  float cx = mapRect_.x + mapRect_.w * 0.5f;
+  float cy = mapRect_.y + mapRect_.h * 0.5f;
+  float radius = std::min(mapRect_.w, mapRect_.h) * 0.5f - 5.0f;
 
   for (int j = 0; j < mapRect_.h; ++j) {
     float sy = mapRect_.y + j;
@@ -3413,74 +3589,103 @@ void MapWidget::renderCountryBorders(SDL_Renderer *renderer) {
     SDL_Color mainColor = {200, 200, 200, 180}; // Crisp light grey
     SDL_Color glowColor = {0, 0, 0, 100};       // Subtle dark glow/shadow
 
-    for (uint32_t i = 0; i < g_NumWorldBorders; ++i) {
-      const auto &line = g_WorldBorders[i];
-      if (line.numPts < 2)
-        continue;
+    // For dual_azimuthal: build geometry for both hemispheres
+    int numPasses = (config_.projection == "dual_azimuthal") ? 2 : 1;
+    double deLat = state_ ? state_->deLocation.lat : 0.0;
+    double deLon = state_ ? state_->deLocation.lon : 0.0;
+    double antiLat = -deLat;
+    double antiLon = deLon + (deLon >= 0.0 ? -180.0 : 180.0);
+    int halfW = mapRect_.w / 2;
+    float hemisR = std::min(halfW, mapRect_.h) * 0.5f;
 
-      std::vector<SDL_FPoint> pts;
-      pts.reserve(line.numPts);
-      for (uint16_t j = 0; j < line.numPts; ++j) {
-        double lat = line.pts[j].lat / 100.0;
-        double lon = line.pts[j].lon / 100.0;
-        pts.push_back(latLonToScreen(lat, lon));
-      }
+    for (int pass = 0; pass < numPasses; ++pass) {
+      // Project a lat/lon to screen for this pass
+      auto projectPt = [&](double lat, double lon) -> SDL_FPoint {
+        if (config_.projection == "dual_azimuthal") {
+          double cLat = (pass == 0) ? deLat : antiLat;
+          double cLon = (pass == 0) ? deLon : antiLon;
+          float cx = (pass == 0) ? (mapRect_.x + halfW * 0.5f)
+                                 : (mapRect_.x + halfW + halfW * 0.5f);
+          float cy = mapRect_.y + mapRect_.h * 0.5f;
+          double nx, ny;
+          projectAzimuthal(lat, lon, cLat, cLon, nx, ny);
+          return {cx + (float)nx * hemisR, cy - (float)ny * hemisR};
+        }
+        return latLonToScreen(lat, lon);
+      };
+      float jumpThresh = (config_.projection == "dual_azimuthal")
+                             ? hemisR * 2.0f
+                             : mapRect_.w * 0.5f;
 
-      for (size_t j = 0; j < pts.size() - 1; ++j) {
-        if (std::abs(pts[j].x - pts[j + 1].x) > mapRect_.w * 0.5f)
+      for (uint32_t i = 0; i < g_NumWorldBorders; ++i) {
+        const auto &line = g_WorldBorders[i];
+        if (line.numPts < 2)
           continue;
 
-        float x1 = pts[j].x, y1 = pts[j].y;
-        float x2 = pts[j + 1].x, y2 = pts[j + 1].y;
-        float dx = x2 - x1;
-        float dy = y2 - y1;
-        float len = std::sqrt(dx * dx + dy * dy);
-        if (len < 0.1f)
-          continue;
-        dx /= len;
-        dy /= len;
-
-        // Layer 1: Subtle Dark Glow (Thicker)
-        {
-          float thickness = 2.2f;
-          float nx = -dy * (thickness * 0.5f);
-          float ny = dx * (thickness * 0.5f);
-          int startIdx = (int)borderVerts_.size();
-
-          borderVerts_.push_back({{x1 + nx, y1 + ny}, glowColor, {0, 0}});
-          borderVerts_.push_back({{x1 - nx, y1 - ny}, glowColor, {0, 1}});
-          borderVerts_.push_back({{x2 + nx, y2 + ny}, glowColor, {0, 0}});
-          borderVerts_.push_back({{x2 - nx, y2 - ny}, glowColor, {0, 1}});
-
-          borderIndices_.push_back(startIdx + 0);
-          borderIndices_.push_back(startIdx + 1);
-          borderIndices_.push_back(startIdx + 2);
-          borderIndices_.push_back(startIdx + 2);
-          borderIndices_.push_back(startIdx + 1);
-          borderIndices_.push_back(startIdx + 3);
+        std::vector<SDL_FPoint> pts;
+        pts.reserve(line.numPts);
+        for (uint16_t j = 0; j < line.numPts; ++j) {
+          double lat = line.pts[j].lat / 100.0;
+          double lon = line.pts[j].lon / 100.0;
+          pts.push_back(projectPt(lat, lon));
         }
 
-        // Layer 2: Main Border Line (Thinner)
-        {
-          float thickness = 1.2f;
-          float nx = -dy * (thickness * 0.5f);
-          float ny = dx * (thickness * 0.5f);
-          int startIdx = (int)borderVerts_.size();
+        for (size_t j = 0; j < pts.size() - 1; ++j) {
+          if (std::abs(pts[j].x - pts[j + 1].x) > jumpThresh)
+            continue;
 
-          borderVerts_.push_back({{x1 + nx, y1 + ny}, mainColor, {0, 0}});
-          borderVerts_.push_back({{x1 - nx, y1 - ny}, mainColor, {0, 1}});
-          borderVerts_.push_back({{x2 + nx, y2 + ny}, mainColor, {0, 0}});
-          borderVerts_.push_back({{x2 - nx, y2 - ny}, mainColor, {0, 1}});
+          float x1 = pts[j].x, y1 = pts[j].y;
+          float x2 = pts[j + 1].x, y2 = pts[j + 1].y;
+          float dx = x2 - x1;
+          float dy = y2 - y1;
+          float len = std::sqrt(dx * dx + dy * dy);
+          if (len < 0.1f)
+            continue;
+          dx /= len;
+          dy /= len;
 
-          borderIndices_.push_back(startIdx + 0);
-          borderIndices_.push_back(startIdx + 1);
-          borderIndices_.push_back(startIdx + 2);
-          borderIndices_.push_back(startIdx + 2);
-          borderIndices_.push_back(startIdx + 1);
-          borderIndices_.push_back(startIdx + 3);
+          // Layer 1: Subtle Dark Glow (Thicker)
+          {
+            float thickness = 2.2f;
+            float nx = -dy * (thickness * 0.5f);
+            float ny = dx * (thickness * 0.5f);
+            int startIdx = (int)borderVerts_.size();
+
+            borderVerts_.push_back({{x1 + nx, y1 + ny}, glowColor, {0, 0}});
+            borderVerts_.push_back({{x1 - nx, y1 - ny}, glowColor, {0, 1}});
+            borderVerts_.push_back({{x2 + nx, y2 + ny}, glowColor, {0, 0}});
+            borderVerts_.push_back({{x2 - nx, y2 - ny}, glowColor, {0, 1}});
+
+            borderIndices_.push_back(startIdx + 0);
+            borderIndices_.push_back(startIdx + 1);
+            borderIndices_.push_back(startIdx + 2);
+            borderIndices_.push_back(startIdx + 2);
+            borderIndices_.push_back(startIdx + 1);
+            borderIndices_.push_back(startIdx + 3);
+          }
+
+          // Layer 2: Main Border Line (Thinner)
+          {
+            float thickness = 1.2f;
+            float nx = -dy * (thickness * 0.5f);
+            float ny = dx * (thickness * 0.5f);
+            int startIdx = (int)borderVerts_.size();
+
+            borderVerts_.push_back({{x1 + nx, y1 + ny}, mainColor, {0, 0}});
+            borderVerts_.push_back({{x1 - nx, y1 - ny}, mainColor, {0, 1}});
+            borderVerts_.push_back({{x2 + nx, y2 + ny}, mainColor, {0, 0}});
+            borderVerts_.push_back({{x2 - nx, y2 - ny}, mainColor, {0, 1}});
+
+            borderIndices_.push_back(startIdx + 0);
+            borderIndices_.push_back(startIdx + 1);
+            borderIndices_.push_back(startIdx + 2);
+            borderIndices_.push_back(startIdx + 2);
+            borderIndices_.push_back(startIdx + 1);
+            borderIndices_.push_back(startIdx + 3);
+          }
         }
       }
-    }
+    } // end pass loop
     borderDirty_ = false;
     LOG_D("MapWidget", "Country borders geometry cached ({} vertices)",
           (int)borderVerts_.size());

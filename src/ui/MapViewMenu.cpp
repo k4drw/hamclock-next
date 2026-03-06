@@ -119,6 +119,8 @@ void MapViewMenu::render(SDL_Renderer *renderer) {
     projLabel = "Azimuthal";
   else if (projection_ == "mercator")
     projLabel = "Mercator";
+  else if (projection_ == "dual_azimuthal")
+    projLabel = "Dual Azimuthal";
   drawDropdown(renderer, projRec_, projLabel, openCombo_ == COMBO_PROJ);
 
   // Style Section
@@ -372,6 +374,8 @@ bool MapViewMenu::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
           projection_ = "azimuthal";
         else if (idx == 3)
           projection_ = "mercator";
+        else if (idx == 4)
+          projection_ = "dual_azimuthal";
       }))
     return true;
 
