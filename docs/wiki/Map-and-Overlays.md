@@ -18,8 +18,7 @@ The default projection. Shows the full world with longitude and latitude as stra
 
 Centered on your DE location. Shows true bearing and distance in all directions as straight lines from your QTH. Useful for antenna pointing.
 
-![Azimuthal projection](images/map-azimuthal.png)
-<!-- TODO: screenshot needed -->
+![Azimuthal projection](images/map-azimuthal.jpg)
 
 ### Dual-Hemisphere Azimuthal *(planned)*
 
@@ -75,8 +74,7 @@ Select the active overlay and configure band/mode/power from the Configuration s
 | **Heatmap**         | Live spot density heat map from PSK Reporter data                                                                          |
 | **DRAP**            | D-Region Absorption Prediction (also available as a widget)                                                                |
 
-![MUF propagation overlay](images/map-prop-muf.png)
-<!-- TODO: screenshot needed -->
+![MUF propagation overlay](images/map-prop-muf.jpg)
 
 ![VOACAP overlay](images/map-prop-voacap.png)
 <!-- TODO: screenshot needed -->
@@ -104,8 +102,7 @@ Weather overlays can be displayed independently of propagation overlays.
 | **Clouds** | Global cloud cover from satellite imagery |
 | **WxMb**   | Surface pressure / weather map contours   |
 
-![Cloud cover overlay](images/map-weather-clouds.png)
-<!-- TODO: screenshot needed -->
+![Cloud cover overlay](images/map-weather-clouds.jpg)
 
 ---
 

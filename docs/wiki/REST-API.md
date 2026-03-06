@@ -7,7 +7,9 @@ These endpoints provide access to the user interface remotely.
 - `GET /` : Returns the Live Web Control UI HTML.
 - `GET /live` : Returns the interactive live-view HTML page (requires `--live-web`).
 - `GET /stream.mjpeg` : Continuous motion JPEG stream of the screen.
-- `GET /live.jpg` (or `/get_capture`) : Returns a single JPEG snapshot of the current screen.
+- `GET /live.jpg` (or `/get_capture`) : Returns a single JPEG snapshot.
+  - Optional query parameter `seq={number}`: If provided, the server waits until the specified sequence number is reached before returning the frame. This ensures you get a *new* frame rather than a cached one.
+  - If `seq` is omitted, the server automatically waits for the next captured frame (latest sequence + 1).
 - `GET /live/touch?x={x}&y={y}&w={w}&h={h}&button={btn}` : Synthesizes a mouse click on the screen.
 - `GET /live/key?k={key}` : Synthesizes a keyboard key press.
 - `GET /live/mouse?x={x}&y={y}` : Synthesizes a mouse movement.
@@ -42,8 +44,9 @@ Controls the assignment and visualization of widgets in panes.
 - `GET /api/panes/pause_all?paused={0|1}` : Pauses or resumes all panes.
 - `GET /api/panes/toggle?pane={0-5}&widget={id}` : Toggles a specific widget in or out of a pane's rotation list.
 - `GET /set_pane?Pane1={widget1},...` : Set a rotation list of widgets per pane.
-- `GET /get_pane.txt` : Get the assigned widgets for each pane.
-- `GET /get_active_pane.txt` : Get the currently executing widget in each pane.
+- `GET /get_pane.txt` : Plaintext status of assigned widgets for each pane.
+- `GET /get_active_pane.txt` : Returns the currently visible widget name for each pane.
+  - **Note**: This returns dynamic names. For example, if Pane 6 is in Satellite mode, it returns `Satellite` instead of `DX Info`.
 - `GET /set_displayTimes?on={HH:MM}&off={HH:MM}&idle={mins}` : Schedule display wake/sleep times.
 - `GET /set_mapcenter?lng={X}` : Changes the center longitude point of the map.
 - `GET /set_panzoom?pan_x={X}&pan_y={Y}&zoom={Z}` : Sets map zoom level.

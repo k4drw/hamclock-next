@@ -36,6 +36,10 @@ If `lat`/`lon` are omitted, they are derived from the center of your grid square
 | `theme`          | string | `"default"`         | UI color theme                                              |
 | `useMetric`      | bool   | `true`              | Use metric units for weather and distance                   |
 | `callsignColor`  | color  | orange              | Display color for your callsign                             |
+| `showBorders`    | bool   | `false`             | Show country borders on map                                 |
+| `mapCenterLon`   | number | `0.0`               | Center longitude of the map view                            |
+| `mapZoom`        | number | `1.0`               | Map zoom level (1.0 = full world)                           |
+| `displayPowerMethod` | string | `"auto"`        | Method to control display (`auto`, `vcgencmd`, `bl_power`) |
 
 ---
 
@@ -155,6 +159,20 @@ If `lat`/`lon` are omitted, they are derived from the center of your grid square
 | `dimMinute`          | integer | `0`     | Minute to dim                        |
 | `brightHour`         | integer | `6`     | Hour (local) to restore brightness   |
 | `brightMinute`       | integer | `0`     | Minute to restore                    |
+| `idleMinutes`         | integer | `0`     | Minutes of inactivity before screen blank (0=disabled) |
+
+---
+
+## Alarms
+
+| Field                | Type    | Default | Description                                 |
+| -------------------- | ------- | ------- | ------------------------------------------- |
+| `alarmArmed`         | bool    | `false` | Enable daily alarm                          |
+| `alarmTimeHH`        | integer | `7`     | Alarm hour (0-23)                           |
+| `alarmTimeMM`        | integer | `0`     | Alarm minute                                |
+| `alarmUtc`           | bool    | `true`  | Alarm time is in UTC (vs local)             |
+| `onceAlarmArmed`     | bool    | `false` | Enable one-time alarm                       |
+| `onceAlarmTime`      | string  | `""`    | One-time alarm date (ISO: YYYY-MM-DDTHH:MM) |
 
 ---
 
@@ -212,5 +230,7 @@ If `lat`/`lon` are omitted, they are derived from the center of your grid square
 | `gpsEnabled`     | bool   | `false` | Use GPS for location                                        |
 | `rssEnabled`     | bool   | `true`  | Enable RSS ticker (if present)                              |
 | `asteroidIcon`   | string | `"☄"`   | Icon character shown in the Asteroid widget                 |
+| `asteroidColor`  | color  | orange  | Display color for the asteroid icon                         |
 | `colorOverrides` | object | `{}`    | Per-element color overrides (advanced)                      |
 | `skippedVersion` | string | `""`    | Version string to suppress update nag                       |
+| `rotatorUpover`  | bool   | `false` | Enable "up and over" flip logic for zenith passes           |

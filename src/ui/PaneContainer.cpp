@@ -255,6 +255,13 @@ bool PaneContainer::onTextInput(const char *text) {
   return false;
 }
 
+bool PaneContainer::onMouseWheel(int scrollY) {
+  if (activeWidget_) {
+    return activeWidget_->onMouseWheel(scrollY);
+  }
+  return false;
+}
+
 std::vector<std::string> PaneContainer::getActions() const {
   std::vector<std::string> actions = {"change_rotation", "tap", "rotate"};
   if (activeWidget_) {
@@ -263,6 +270,15 @@ std::vector<std::string> PaneContainer::getActions() const {
     }
   }
   return actions;
+}
+
+std::string PaneContainer::getDisplayName() const {
+  if (activeWidget_) {
+    std::string name = activeWidget_->getDisplayName();
+    if (!name.empty())
+      return name;
+  }
+  return widgetTypeDisplayName(currentType_);
 }
 
 SDL_Rect PaneContainer::getActionRect(const std::string &action) const {

@@ -47,14 +47,14 @@ Click the indicator arrows (if present) to manually advance or retreat through t
 
 ## The Six Panes
 
-| Pane   | Default Widget  | Position             |
-| ------ | --------------- | -------------------- |
-| Pane 1 | Solar           | Top row, left        |
-| Pane 2 | DX Cluster      | Top row, center      |
-| Pane 3 | Live Spots      | Bottom row, left     |
-| Pane 4 | Band Conditions | Right column, upper  |
-| Pane 5 | DE Info         | Right column, middle |
-| Pane 6 | DX Info         | Bottom / side panel  |
+| Pane   | Default Widget  | Position                 |
+| ------ | --------------- | ------------------------ |
+| Pane 1 | Solar           | Top bar, 1st slot        |
+| Pane 2 | DX Cluster      | Top bar, 2nd slot        |
+| Pane 3 | Live Spots      | Top bar, 3rd slot        |
+| Pane 4 | Band Conditions | Top bar, 4th slot (62px) |
+| Pane 5 | DE Info         | Left side, top           |
+| Pane 6 | DX Info         | Left side, bottom        |
 
 ---
 

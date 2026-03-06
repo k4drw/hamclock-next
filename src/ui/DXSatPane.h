@@ -92,6 +92,7 @@ public:
   }
 
   std::string getName() const override { return "DXSatPane"; }
+  std::string getDisplayName() const override;
   std::vector<std::string> getActions() const override;
   SDL_Rect getActionRect(const std::string &action) const override;
   nlohmann::json getDebugData() const override;

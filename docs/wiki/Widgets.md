@@ -10,17 +10,18 @@ To add a widget to a pane, click the **top strip** of the pane to open the widge
 
 ## Dashboard Rotation Gallery
 
-Since HamClock-Next allows multiple widgets per pane, the following snapshots show various dashboard configurations as the panes rotate. Use this gallery to see all 44+ widgets in action.
+Since HamClock-Next allows multiple widgets per pane, the following snapshots show various dashboard configurations as the panes rotate. Use this gallery to see all **56+** widgets in action.
 
-|               Snapshot 1               |               Snapshot 2               |
-| :------------------------------------: | :------------------------------------: |
-|  ![Rotation 0](images/rotation_0.png)  |  ![Rotation 1](images/rotation_1.png)  |
-|  ![Rotation 2](images/rotation_2.png)  |  ![Rotation 3](images/rotation_3.png)  |
-|  ![Rotation 4](images/rotation_4.png)  |  ![Rotation 5](images/rotation_5.png)  |
-|  ![Rotation 6](images/rotation_6.png)  |  ![Rotation 7](images/rotation_7.png)  |
-|  ![Rotation 8](images/rotation_8.png)  |  ![Rotation 9](images/rotation_9.png)  |
-| ![Rotation 10](images/rotation_10.png) | ![Rotation 11](images/rotation_11.png) |
-| ![Rotation 12](images/rotation_12.png) | ![Rotation 13](images/rotation_13.png) |
+|  ![Rotation 0](images/rotation_0.jpg)  |  ![Rotation 1](images/rotation_1.jpg)  |
+|  ![Rotation 2](images/rotation_2.jpg)  |  ![Rotation 3](images/rotation_3.jpg)  |
+|  ![Rotation 4](images/rotation_4.jpg)  |  ![Rotation 5](images/rotation_5.jpg)  |
+|  ![Rotation 6](images/rotation_6.jpg)  |  ![Rotation 7](images/rotation_7.jpg)  |
+|  ![Rotation 8](images/rotation_8.jpg)  |  ![Rotation 9](images/rotation_9.jpg)  |
+| ![Rotation 10](images/rotation_10.jpg) | ![Rotation 11](images/rotation_11.jpg) |
+| ![Rotation 12](images/rotation_12.jpg) | ![Rotation 13](images/rotation_13.jpg) |
+| ![Rotation 14](images/rotation_14.jpg) | ![Rotation 15](images/rotation_15.jpg) |
+| ![Rotation 16](images/rotation_16.jpg) | ![Rotation 17](images/rotation_17.jpg) |
+| ![Rotation 18](images/rotation_18.jpg) | ![Rotation 19](images/rotation_19.jpg) |
 
 
 ---

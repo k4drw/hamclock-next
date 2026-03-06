@@ -470,6 +470,12 @@ void DXSatPane::renderMenu(SDL_Renderer *renderer) {
   SDL_RenderSetClipRect(renderer, nullptr);
 }
 
+std::string DXSatPane::getDisplayName() const {
+  if (mode_ == Mode::SAT)
+    return "Satellite";
+  return "";
+}
+
 std::vector<std::string> DXSatPane::getActions() const {
   if (menuState_ == MenuState::Closed) {
     if (mode_ == Mode::SAT) {

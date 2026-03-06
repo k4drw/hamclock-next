@@ -1941,8 +1941,16 @@ void WebServer::run() {
     // Increment subscribers so FrameCapture::capture() actually runs on the main thread
     frameCapture_->addSubscriber();
     
-    uint64_t afterSeq =
-        static_cast<uint64_t>(StringUtils::safe_stoi(req.get_param_value("seq")));
+    std::string seqParam = req.get_param_value("seq");
+    uint64_t afterSeq = 0;
+    if (seqParam.empty()) {
+      // If no seq is provided, wait for the NEXT frame after the current one.
+      // This ensures we don't get a stale cached frame from when nobody was
+      // watching.
+      afterSeq = frameCapture_->latestSeq();
+    } else {
+      afterSeq = static_cast<uint64_t>(StringUtils::safe_stoi(seqParam));
+    }
     uint64_t outSeq = 0;
     
     // Increased timeout to 1000ms to allow for RPi 3B scheduling and encoding
@@ -2244,8 +2252,8 @@ void WebServer::run() {
     }
     std::ostringstream oss;
     for (size_t i = 0; i < panes_->size(); ++i)
-      oss << "Pane" << (i + 1) << "  "
-          << widgetTypeDisplayName((*panes_)[i]->getActiveType()) << "\n";
+      oss << "Pane" << (i + 1) << "  " << (*panes_)[i]->getDisplayName()
+          << "\n";
     res.set_content(oss.str(), "text/plain");
   });
 
@@ -2258,7 +2266,7 @@ void WebServer::run() {
     }
     auto &pane = (*panes_)[idx];
     std::ostringstream oss;
-    oss << "Active  " << widgetTypeDisplayName(pane->getActiveType()) << "\n";
+    oss << "Active  " << pane->getDisplayName() << "\n";
     for (auto t : pane->getRotation())
       oss << "Widget  " << widgetTypeDisplayName(t) << "\n";
     res.set_content(oss.str(), "text/plain");

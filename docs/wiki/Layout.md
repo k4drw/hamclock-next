@@ -9,21 +9,24 @@ HamClock-Next divides the screen into a fixed set of regions. Understanding the 
 
 ## Regions at a Glance
 
+HamClock-Next uses a **Top Bar** and a **Left Side Panel** to maximize map area.
+
 ```
-+------------------+------------------+------------------+
-|  Time Panel      |   Pane 1         |   Pane 2         |
-|  (fixed)         |   (rotatable)    |   (rotatable)    |
-+------------------+------------------+------------------+
-|                                     |   Pane 4         |
-|         MAP                         |   (rotatable)    |
-|         (center)                    +------------------+
-|                                     |   Pane 5         |
-|                                     |   (rotatable)    |
-+------------------+------------------+------------------+
-|  Pane 3          |   Pane 6 (or side panel)            |
-|  (rotatable)     |                                     |
-+------------------+-------------------------------------+
++----------+----------+----------+----------+-------+
+| Time     | Pane 1   | Pane 2   | Pane 3   | Pane4 |
+| Panel    | (rot)    | (rot)    | (rot)    | (stat)|
++----------+----------+----------+----------+-------+
+| Pane 5   |                                        |
+| (rot)    |                                        |
++----------+             MAP AREA                   |
+| Pane 6   |             (center)                   |
+| (rot)    |                                        |
++----------+                                        |
+| RSS Ticker (optional)                             |
++---------------------------------------------------+
 ```
+
+> **Note on Pane 4**: This is a narrow status pane (62px) typically used for the NCDXF Beacon widget or system status.
 
 > Layout proportions vary by screen resolution and panel mode. The exact arrangement is determined at startup based on the window dimensions.
 
@@ -78,9 +81,7 @@ See [Map & Overlays](Map-and-Overlays) for details.
 
 ---
 
-## Side Panel Mode
-
-In **side panel mode**, the right column (Panes 4 and 5) is replaced by a tall panel showing either:
+In **side panel mode**, the left column (Panes 5 and 6) is replaced by a tall panel showing either:
 
 - **DX Info** — information about your current DX entity target
 - **Satellite** — ground track and pass information for a tracked satellite
