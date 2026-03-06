@@ -67,7 +67,9 @@ DXClusterProvider::DXClusterProvider(std::shared_ptr<DXClusterDataStore> store,
                                      std::shared_ptr<WatchlistHitStore> hits,
                                      HamClockState *state)
     : store_(store), pm_(pm), watchlist_(watchlist), hits_(hits),
-      state_(state) {}
+      state_(state) {
+  firstAttemptTime_ = std::chrono::system_clock::now();
+}
 
 DXClusterProvider::~DXClusterProvider() { stop(); }
 
@@ -97,17 +99,50 @@ void DXClusterProvider::run() {
     if (config_.dxClusterUseWSJTX) {
       runUDP(config_.wsjtxPort);
     } else {
-      runTelnet(config_.dxClusterHost, config_.dxClusterPort,
-                config_.dxClusterLogin);
+      // Check for excessive lost connection rate (10 per hour as per Elwood)
+      if (checkConnectionRate()) {
+        runTelnet(config_.dxClusterHost, config_.dxClusterPort,
+                  config_.dxClusterLogin);
+      } else {
+        LOG_W("DXCluster", "Connection rate limit reached (10/hr)");
+        if (state_) {
+          state_->services["DXCluster"].ok = false;
+          state_->services["DXCluster"].lastError = "Rate limit reached (10/hr)";
+        }
+        store_->setConnected(false, "Rate limit reached (10/hr)");
+      }
     }
 
     if (stopClicked_)
       break;
 
     // Retry delay
-    store_->setConnected(false, "Disconnected, retrying in 10s...");
     std::this_thread::sleep_for(std::chrono::seconds(10));
   }
+}
+
+bool DXClusterProvider::checkConnectionRate() {
+  auto now = std::chrono::system_clock::now();
+  if (connectionAttempts_ == 0) {
+    firstAttemptTime_ = now;
+    return true;
+  }
+
+  auto elapsed = std::chrono::duration_cast<std::chrono::hours>(now - firstAttemptTime_);
+  if (elapsed >= std::chrono::hours(1)) {
+    // Reset after an hour
+    connectionAttempts_ = 0;
+    firstAttemptTime_ = now;
+    return true;
+  }
+
+  // Original HamClock: MAX_LCN = 10
+  return connectionAttempts_ < 10;
+}
+
+void DXClusterProvider::incrementConnectionAttempts() {
+  connectionAttempts_++;
+  LOG_I("DXCluster", "Connection attempts in current window: {}", connectionAttempts_);
 }
 
 void DXClusterProvider::runTelnet(const std::string &host, int port,
@@ -119,6 +154,8 @@ void DXClusterProvider::runTelnet(const std::string &host, int port,
     s.lastError = "Connecting...";
   }
 
+  incrementConnectionAttempts();
+
   int sock = socket(AF_INET, SOCK_STREAM, 0);
   if (sock < 0) {
     LOG_E("DXCluster", "Failed to create socket");
@@ -127,7 +164,7 @@ void DXClusterProvider::runTelnet(const std::string &host, int port,
     return;
   }
 
-  // Resolve hostname using getaddrinfo (thread-safe, IPv4/IPv6 capable)
+  // Resolve hostname
   struct addrinfo hints{};
   hints.ai_family = AF_INET;
   hints.ai_socktype = SOCK_STREAM;
@@ -145,20 +182,59 @@ void DXClusterProvider::runTelnet(const std::string &host, int port,
   server_addr.sin_port = htons(port);
   freeaddrinfo(res);
 
-  if (connect(sock, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
-    LOG_E("DXCluster", "Connect to {} failed: {}", host, std::strerror(errno));
-    if (state_)
-      state_->services["DXCluster"].lastError = "Connect failed";
-    close(sock);
-    return;
-  }
-
+  // Set non-blocking for connect timeout
 #ifdef _WIN32
   unsigned long mode = 1;
   ioctlsocket(sock, FIONBIO, &mode);
 #else
   fcntl(sock, F_SETFL, O_NONBLOCK);
 #endif
+
+  int ret = connect(sock, (struct sockaddr *)&server_addr, sizeof(server_addr));
+  if (ret < 0) {
+#ifdef _WIN32
+    if (WSAGetLastError() != WSAEWOULDBLOCK) {
+#else
+    if (errno != EINPROGRESS) {
+#endif
+      LOG_E("DXCluster", "Connect to {} failed: {}", host, std::strerror(errno));
+      if (state_)
+        state_->services["DXCluster"].lastError = "Connect failed";
+      close(sock);
+      return;
+    }
+
+    // Wait for connect completion (10s timeout)
+#ifdef _WIN32
+    WSAPOLLFD pfd{};
+    pfd.fd = sock;
+    pfd.events = POLLOUT;
+    ret = WSAPoll(&pfd, 1, 10000);
+#else
+    struct pollfd pfd{};
+    pfd.fd = sock;
+    pfd.events = POLLOUT;
+    ret = poll(&pfd, 1, 10000); // 10s timeout
+#endif
+    if (ret <= 0) {
+      LOG_E("DXCluster", "Connect to {} timed out after 10s", host);
+      if (state_)
+        state_->services["DXCluster"].lastError = "Connect timeout";
+      close(sock);
+      return;
+    }
+
+    // Check socket error status
+    int error = 0;
+    socklen_t len = sizeof(error);
+    if (getsockopt(sock, SOL_SOCKET, SO_ERROR, (char *)&error, &len) < 0 || error != 0) {
+      LOG_E("DXCluster", "Connect to {} failed: {}", host, std::strerror(error));
+      if (state_)
+        state_->services["DXCluster"].lastError = "Connect error";
+      close(sock);
+      return;
+    }
+  }
 
   LOG_I("DXCluster", "Connected to {}", host);
   if (state_)
@@ -170,18 +246,12 @@ void DXClusterProvider::runTelnet(const std::string &host, int port,
   bool initialRequestSent = false;
   auto lastHeartbeat = std::chrono::system_clock::now();
 
-  // Following original HamClock logic: send login immediately as prompts may
-  // not have newlines
-  if (!login.empty()) {
+  // Elwood's 500ms delay (DXCMSG_DT) to let the server breathe
+  std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
+  if (!login.empty() && !stopClicked_) {
     std::string cmd = login + "\r\n";
-    ssize_t sent = send(sock, cmd.c_str(), cmd.length(), 0);
-    if (sent < 0) {
-      LOG_E("DXCluster", "send login failed: {}", strerror(errno));
-      close(sock);
-      return;
-    }
-    // Note: Don't set loggedIn = true yet, we want to see if we get a "Welcome"
-    // or prompt
+    send(sock, cmd.c_str(), cmd.length(), 0);
   }
 
   while (!stopClicked_) {
@@ -189,17 +259,17 @@ void DXClusterProvider::runTelnet(const std::string &host, int port,
     WSAPOLLFD pfd{};
     pfd.fd = sock;
     pfd.events = POLLIN;
-    int ret = WSAPoll(&pfd, 1, 500);
+    int poll_ret = WSAPoll(&pfd, 1, 500);
 #else
     struct pollfd pfd{};
     pfd.fd = sock;
     pfd.events = POLLIN;
-    int ret = poll(&pfd, 1, 500); // 500ms timeout
+    int poll_ret = poll(&pfd, 1, 500); // 500ms timeout
 #endif
-    if (ret < 0)
+    if (poll_ret < 0)
       break;
 
-    if (ret > 0) {
+    if (poll_ret > 0) {
       char tmp[1024];
       ssize_t n = recv(sock, tmp, sizeof(tmp) - 1, 0);
       if (n <= 0) {
@@ -233,6 +303,8 @@ void DXClusterProvider::runTelnet(const std::string &host, int port,
                   std::string::npos) { // Spot line also means we are in
             if (!loggedIn) {
               loggedIn = true;
+              // Reset connection attempt count on successful login
+              connectionAttempts_ = 0;
               if (state_) {
                 auto &s = state_->services["DXCluster"];
                 s.ok = true;
@@ -242,16 +314,12 @@ void DXClusterProvider::runTelnet(const std::string &host, int port,
             }
             if (!initialRequestSent) {
               const char *req = "sh/dx 30\r\n";
-              ssize_t sent2 = send(sock, req, std::strlen(req), 0);
-              if (sent2 < 0)
-                LOG_E("DXCluster", "send sh/dx failed: {}", strerror(errno));
+              send(sock, req, std::strlen(req), 0);
               initialRequestSent = true;
             }
           }
 
           if (!loggedIn) {
-            // Still check for login prompt just in case we didn't send it or it
-            // asked again
             if (line.find("login:") != std::string::npos ||
                 line.find("callsign:") != std::string::npos ||
                 line.find("Please enter your call:") != std::string::npos) {
@@ -262,26 +330,27 @@ void DXClusterProvider::runTelnet(const std::string &host, int port,
         }
       }
 
-      // Check for prompt without newline at the end of buffer
+      // Prompt without newline logic
       if (!loggedIn && !buffer.empty()) {
         if (buffer.find("login:") != std::string::npos ||
             buffer.find("callsign:") != std::string::npos ||
             buffer.find("Please enter your call:") != std::string::npos) {
           std::string cmd = login + "\r\n";
           send(sock, cmd.c_str(), cmd.length(), 0);
-          buffer.clear(); // Clear so we don't repeat
+          buffer.clear();
         }
       }
 
-      // If still buffer too long without newline, clear it
       if (buffer.length() > 4096)
         buffer.clear();
     }
 
-    // Heartbeat
     auto now = std::chrono::system_clock::now();
     if (now - lastHeartbeat > std::chrono::seconds(60)) {
-      send(sock, "\r\n", 2, 0);
+      if (send(sock, "\r\n", 2, 0) < 0) {
+        LOG_W("DXCluster", "Heartbeat failed, closing connection");
+        break;
+      }
       lastHeartbeat = now;
     }
   }
