@@ -116,8 +116,8 @@ void DXClusterProvider::run() {
     if (stopClicked_)
       break;
 
-    // Retry delay
-    std::this_thread::sleep_for(std::chrono::seconds(10));
+    // Retry delay (increased to 60s to avoid hammering and IP bans)
+    std::this_thread::sleep_for(std::chrono::seconds(60));
   }
 }
 
@@ -128,21 +128,21 @@ bool DXClusterProvider::checkConnectionRate() {
     return true;
   }
 
-  auto elapsed = std::chrono::duration_cast<std::chrono::hours>(now - firstAttemptTime_);
-  if (elapsed >= std::chrono::hours(1)) {
+  auto elapsed = std::chrono::duration_cast<std::chrono::minutes>(now - firstAttemptTime_);
+  if (elapsed >= std::chrono::minutes(60)) {
     // Reset after an hour
     connectionAttempts_ = 0;
     firstAttemptTime_ = now;
     return true;
   }
 
-  // Original HamClock: MAX_LCN = 10
+  // Original HamClock: MAX_LCN = 10 lost connections per hour
   return connectionAttempts_ < 10;
 }
 
 void DXClusterProvider::incrementConnectionAttempts() {
   connectionAttempts_++;
-  LOG_I("DXCluster", "Connection attempts in current window: {}", connectionAttempts_);
+  LOG_W("DXCluster", "Lost connection count: {}/10 in current hour", connectionAttempts_);
 }
 
 void DXClusterProvider::runTelnet(const std::string &host, int port,
@@ -154,7 +154,8 @@ void DXClusterProvider::runTelnet(const std::string &host, int port,
     s.lastError = "Connecting...";
   }
 
-  incrementConnectionAttempts();
+  // Note: Removed incrementConnectionAttempts() from here. 
+  // Per Elwood, we only count LOST connections that were once established.
 
   int sock = socket(AF_INET, SOCK_STREAM, 0);
   if (sock < 0) {
@@ -274,6 +275,7 @@ void DXClusterProvider::runTelnet(const std::string &host, int port,
       ssize_t n = recv(sock, tmp, sizeof(tmp) - 1, 0);
       if (n <= 0) {
         LOG_W("DXCluster", "Connection lost");
+        incrementConnectionAttempts();
         if (state_) {
           state_->services["DXCluster"].ok = false;
           state_->services["DXCluster"].lastError = "Connection lost";
@@ -349,6 +351,7 @@ void DXClusterProvider::runTelnet(const std::string &host, int port,
     if (now - lastHeartbeat > std::chrono::seconds(60)) {
       if (send(sock, "\r\n", 2, 0) < 0) {
         LOG_W("DXCluster", "Heartbeat failed, closing connection");
+        incrementConnectionAttempts();
         break;
       }
       lastHeartbeat = now;
