@@ -5,8 +5,10 @@
 #include <ctime>
 #include <fcntl.h>
 #include <fstream>
-#include <unistd.h>
+#ifdef __linux__
 #include <glob.h>
+#include <unistd.h>
+#endif
 
 BrightnessManager::BrightnessManager() {}
 
@@ -43,6 +45,7 @@ bool BrightnessManager::init() {
 
 bool BrightnessManager::detectBrightnessPath() {
 #ifndef __EMSCRIPTEN__
+#ifdef __linux__
   // 1. Try hardcoded common paths first
   const char *paths[] = {"/sys/class/backlight/rpi_backlight/brightness",
                          "/sys/class/backlight/10-0045/brightness",
@@ -76,7 +79,8 @@ bool BrightnessManager::detectBrightnessPath() {
     }
     globfree(&g);
   }
-#endif
+#endif // __linux__
+#endif // !__EMSCRIPTEN__
 
   return false;
 }

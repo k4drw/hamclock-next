@@ -2906,6 +2906,7 @@ void main_tick() {
     // Dashboard
     if (!ctx.dashboard) {
       ctx.dashboard = std::make_unique<DashboardContext>(ctx);
+#ifndef __EMSCRIPTEN__
       if (ctx.webServer) {
         ctx.webServer->setSatelliteManager(ctx.dashboard->satMgr.get());
         ctx.webServer->setRotatorService(ctx.dashboard->rotatorService.get());
@@ -2913,6 +2914,7 @@ void main_tick() {
         ctx.webServer->setWeatherStore(ctx.deWeatherStore);
         ctx.webServer->setBrightnessManager(ctx.brightnessMgr);
       }
+#endif
     }
 
     // Apply any config changes injected by the WebServer API (RPi/framebuffer
