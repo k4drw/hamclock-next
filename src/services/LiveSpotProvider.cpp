@@ -129,9 +129,16 @@ void LiveSpotProvider::fetchPSK() {
     param = config_.liveSpotsUseCall ? "receiverCallsign=" : "receiverLocator=";
   }
 
-  std::string url = fmt::format("https://retrieve.pskreporter.info/"
-                                "query?{}{}&flowStartSeconds={}&rronly=1",
-                                param, target, windowStart);
+  std::string baseUrl = "https://retrieve.pskreporter.info";
+  if (!config_.pskrProxyUrl.empty()) {
+    baseUrl = config_.pskrProxyUrl;
+    // Remove trailing slash if present
+    if (baseUrl.back() == '/')
+      baseUrl.pop_back();
+  }
+
+  std::string url = fmt::format("{}/query?{}{}&flowStartSeconds={}&rronly=1",
+                                baseUrl, param, target, windowStart);
 
   LOG_D("LiveSpot", "Fetching PSK {}", url);
   if (state_) {

@@ -100,6 +100,7 @@ struct AppConfig {
   bool liveSpotsUseCall = true; // true if filter by callsign, false if by grid
   int liveSpotsMaxAge = 30;     // minutes
   uint32_t liveSpotsBands = 0xFFF; // Bitmask of selected bands (lower 12 bits)
+  std::string pskrProxyUrl;        // Custom PSK Reporter proxy URL
   bool rbnEnabled =
       false; // Kept for backward compat in logic, but mostly internal now
   std::string rbnHost = "telnet.reversebeacon.net";

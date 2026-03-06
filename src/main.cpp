@@ -2913,25 +2913,53 @@ void main_tick() {
                                    ctx.appCfg.hubPort);
 
 #ifndef __EMSCRIPTEN__
-      // Restart background services that hold persistent config state
-      if (ctx.dxcProvider) {
-        ctx.dxcProvider->stop();
-        if (ctx.isWidgetConfigured(WidgetType::DX_CLUSTER))
-          ctx.dxcProvider->start(ctx.appCfg);
-      }
-      if (ctx.rbnProvider) {
-        ctx.rbnProvider->stop();
-        if (ctx.isWidgetConfigured(WidgetType::DX_CLUSTER) &&
-            ctx.appCfg.rbnEnabled)
-          ctx.rbnProvider->start(ctx.appCfg);
-      }
-      if (ctx.rigService) {
-        ctx.rigService->stop();
-        ctx.rigService->start();
-      }
-      if (ctx.rotatorService) {
-        ctx.rotatorService->stop();
-        ctx.rotatorService->start();
+      if (ctx.dashboard) {
+        // Use a local isWidgetConfigured check matching the one in main()
+        auto isWidgetConfigured = [&](WidgetType type) -> bool {
+          if (type == WidgetType::AURORA_GRAPH)
+            return true;
+          for (auto t : ctx.appCfg.pane1Rotation)
+            if (t == type)
+              return true;
+          for (auto t : ctx.appCfg.pane2Rotation)
+            if (t == type)
+              return true;
+          for (auto t : ctx.appCfg.pane3Rotation)
+            if (t == type)
+              return true;
+          for (auto t : ctx.appCfg.pane4Rotation)
+            if (t == type)
+              return true;
+          for (auto t : ctx.appCfg.pane5Rotation)
+            if (t == type)
+              return true;
+          for (auto t : ctx.appCfg.pane6Rotation)
+            if (t == type)
+              return true;
+          return false;
+        };
+        const bool isMasterMode = (ctx.appCfg.hubMode == HubMode::Master);
+
+        // Restart background services that hold persistent config state
+        if (ctx.dashboard->dxcProvider) {
+          ctx.dashboard->dxcProvider->stop();
+          if (isMasterMode || isWidgetConfigured(WidgetType::DX_CLUSTER))
+            ctx.dashboard->dxcProvider->start(ctx.appCfg);
+        }
+        if (ctx.dashboard->rbnProvider) {
+          ctx.dashboard->rbnProvider->stop();
+          if ((isMasterMode || isWidgetConfigured(WidgetType::DX_CLUSTER)) &&
+              ctx.appCfg.rbnEnabled)
+            ctx.dashboard->rbnProvider->start(ctx.appCfg);
+        }
+        if (ctx.dashboard->rigService) {
+          ctx.dashboard->rigService->stop();
+          ctx.dashboard->rigService->start();
+        }
+        if (ctx.dashboard->rotatorService) {
+          ctx.dashboard->rotatorService->stop();
+          ctx.dashboard->rotatorService->start();
+        }
       }
 #endif
 
