@@ -478,10 +478,10 @@
     "total": 87,
     "implemented": 80,
     "partial": 1,
-    "missing": 2,
-    "not_needed": 4,
-    "percent_done": "~96% (80/83 features \u2014 updated 2026-03-05)",
-    "notes": "v1.0B03. Updated 2026-03-05: REST API EQUIVALENT (all ~42 endpoints wired, commit 5d5bd6ce), Gimbal/Rotator EQUIVALENT (upover mode + set_rotator confirmed), Stopwatch EQUIVALENT (lap table + set_stopwatch confirmed). screen_blanking updated with DRM_DPMS + CONSOLE methods. Remaining gaps: photosensor auto-dim (hardware decision pending), dual-hemisphere azimuthal projection (deferred), wiki screenshot automation (requires running app)."
+    "missing": 1,
+    "not_needed": 5,
+    "percent_done": "~98% (80/82 features \u2014 updated 2026-03-05)",
+    "notes": "v1.0B03. Updated 2026-03-05: photosensor_autodim reclassified NOT_NEEDED (ESP8266/ESP32 MCU-wired hardware, not applicable to Linux desktop targets — same rationale as wifi_meter/gpio_control). Remaining gaps: dual-hemisphere azimuthal projection (deferred), wiki screenshot automation (requires running app)."
   },
   "implemented_features": [
     {

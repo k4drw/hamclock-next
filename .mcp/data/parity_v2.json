@@ -242,9 +242,9 @@
       "name": "Photosensor Auto-Dim",
       "original_pointers": ["`brightness.cpp`"],
       "next_pointers": ["`core/BrightnessManager.cpp`"],
-      "status": "MISSING",
-      "notes": "Original supported LTR329 I2C light sensor and RPi A0 ADC for automatic brightness. BrightnessManager has schedule-based dimming and sysfs backlight but no photosensor input.",
-      "suggested_gaps": ["LTR329/ADC photosensor auto-dim"]
+      "status": "NOT_NEEDED",
+      "notes": "Original used LTR329 I2C light sensor and RPi A0 ADC wired directly to ESP8266/ESP32 MCU pins. HamClock-Next targets Linux desktop, macOS, and Windows — none of which have ambient light sensors as standard hardware. Same rationale as wifi_meter and gpio_control.",
+      "suggested_gaps": []
     },
     {
       "feature_id": "wifi_meter",
@@ -266,12 +266,11 @@
     }
   ],
   "top_gaps": [
-    "Photosensor auto-dim (LTR329/ADC)",
     "Dual-hemisphere azimuthal map projection",
     "Wiki screenshot automation (docs/wiki/images/ — requires running app)"
   ],
   "parity_score": 80,
-  "parity_denominator": 83,
-  "parity_percent": 96,
-  "note": "Score excludes 4 NOT_NEEDED items (wifi_meter, gpio_control, 7-seg renderer, RBN-separate). Updated 2026-03-05: REST API EQUIVALENT (all ~42 endpoints), Gimbal/Rotator EQUIVALENT (upover confirmed), Stopwatch EQUIVALENT (lap table confirmed). Score 77→80 (93%→96%)."
+  "parity_denominator": 82,
+  "parity_percent": 98,
+  "note": "Score excludes 5 NOT_NEEDED items (wifi_meter, gpio_control, 7-seg renderer, RBN-separate, photosensor_autodim). photosensor_autodim reclassified NOT_NEEDED 2026-03-05: original used ESP8266/ESP32 MCU-wired I2C/ADC hardware not present on Linux desktop targets. Updated 2026-03-05: REST API EQUIVALENT, Gimbal/Rotator EQUIVALENT, Stopwatch EQUIVALENT. Score 77→80 (93%→96%); denominator 83→82 (98%)."
 }
