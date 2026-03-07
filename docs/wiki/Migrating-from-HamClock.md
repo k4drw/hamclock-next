@@ -10,7 +10,7 @@ This page is for users of **Elwood Downey's original HamClock** (WB0OEW) who are
 
 Elwood created HamClock and maintained it for many years as a labor of love for the amateur radio community. HamClock-Next is a community continuation of his work, carrying forward his vision while modernizing the platform. His name and callsign are honored in this project.
 
-73 de WB0OEW
+73 de K4DRW
 
 ---
 
@@ -60,16 +60,16 @@ You can edit it with any text editor, copy it between machines, and version-cont
 
 ### New Widgets Not in Original HamClock
 
-| Widget | Description |
-|--------|-------------|
-| **Asteroid** | Next 5 close Earth approaches (JPL data) |
-| **Ionosonde** | Live ionospheric sounding data |
-| **Lightning** | Real-time lightning strike activity |
-| **Meteor** | Meteor scatter activity and upcoming showers |
-| **Tropo** | Tropospheric ducting forecast |
-| **Presets** | Save/recall complete dashboard configurations |
-| **Sys Info** | System CPU, memory, network, uptime |
-| **Solar Storm** | Geomagnetic storm watch/warning/alert |
+| Widget          | Description                                   |
+| --------------- | --------------------------------------------- |
+| **Asteroid**    | Next 5 close Earth approaches (JPL data)      |
+| **Ionosonde**   | Live ionospheric sounding data                |
+| **Lightning**   | Real-time lightning strike activity           |
+| **Meteor**      | Meteor scatter activity and upcoming showers  |
+| **Tropo**       | Tropospheric ducting forecast                 |
+| **Presets**     | Save/recall complete dashboard configurations |
+| **Sys Info**    | System CPU, memory, network, uptime           |
+| **Solar Storm** | Geomagnetic storm watch/warning/alert         |
 
 ---
 
@@ -95,16 +95,16 @@ The original On The Air widget showed all POTA and SOTA activations together wit
 
 ## Feature Mapping: Original → Next
 
-| Original HamClock Feature | HamClock-Next Equivalent |
-|--------------------------|--------------------------|
+| Original HamClock Feature                | HamClock-Next Equivalent                                                |
+| ---------------------------------------- | ----------------------------------------------------------------------- |
 | Multiple widgets per pane, auto-rotation | Same, plus: manual cycling arrows, configurable interval, sync rotation |
-| Fixed rotation interval | User-configurable rotation interval (default 30 s) |
-| No manual pane advance | Left/right arrows advance pane immediately, reset timer |
-| Binary/EEPROM config | JSON configuration file |
-| X11 / framebuffer rendering | SDL2 (native + WASM browser) |
-| Live Spots band filter in config menu | Band filter toggled by clicking bands directly in the widget |
-| K key highlight | K key highlight (same, improved coverage) |
-| No presets | Presets modal (★ button) — widget + map groups |
+| Fixed rotation interval                  | User-configurable rotation interval (default 30 s)                      |
+| No manual pane advance                   | Left/right arrows advance pane immediately, reset timer                 |
+| Binary/EEPROM config                     | JSON configuration file                                                 |
+| X11 / framebuffer rendering              | SDL2 (native + WASM browser)                                            |
+| Live Spots band filter in config menu    | Band filter toggled by clicking bands directly in the widget            |
+| K key highlight                          | K key highlight (same, improved coverage)                               |
+| No presets                               | Presets modal (★ button) — widget + map groups                          |
 
 ---
 

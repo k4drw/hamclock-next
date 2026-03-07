@@ -38,4 +38,4 @@ It is a community continuation of the original HamClock created by Elwood Downey
 
 HamClock-Next carries forward the work of **Elwood Downey, WB0OEW**, the original author of HamClock, who became a Silent Key on 29 January 2026. His tireless contribution to the amateur radio community lives on in every running instance.
 
-73 de WB0OEW
+73 de K4DRW

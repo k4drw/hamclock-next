@@ -1,6 +1,6 @@
 # HamClock-Next REST API
 
-HamClock-Next provides a comprehensive REST API over HTTP for querying status, fetching current data, and remote-controlling the application. The API runs on the same port as the Live Web Interface (default: `8081`).
+HamClock-Next provides a comprehensive REST API over HTTP for querying status, fetching current data, and remote-controlling the application. The API runs on the same port as the Live Web Interface (default: `8081`). There are **79 registered endpoints** across 7 functional groups.
 
 ## 1. Live Web & Streaming Endpoints
 These endpoints provide access to the user interface remotely.
@@ -83,6 +83,7 @@ Query internally gathered telemetry and spot data quickly.
 - `GET /get_satellites.txt` : Retrieves an array of all available satellite TLE objects.
 - `GET /get_ontheair.txt` : Gets spots of active POTA/SOTA on-the-air activity.
 - `GET /get_dxpeds.txt` : Details listed upcoming DX Peditions.
+- `GET /get_de.txt` : Returns current DE (home station) details: callsign, grid, lat/lon, bearing, and DXCC info.
 - `GET /get_dx.txt` : Retrieves coordinate vectors between User DE and target DX location.
 
 ## 6. Propagation API

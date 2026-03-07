@@ -1,7 +1,7 @@
 {
-  "mcp_version": "2.6",
+  "mcp_version": "2.7",
   "project": "hamclock-next",
-  "updated_at": "2026-03-06T15:00:00.000Z",
+  "updated_at": "2026-03-07T15:00:00.000Z",
   "project_context": {
     "title": "HamClock Next \u2014 SDL2 Rewrite",
     "callsign": "K4DRW",
@@ -475,15 +475,26 @@
     ]
   },
   "feature_status_summary": {
-    "total": 87,
-    "implemented": 81,
+    "total": 88,
+    "implemented": 82,
     "partial": 1,
     "missing": 0,
     "not_needed": 5,
-    "percent_done": "100% (82/82 features — updated 2026-03-06)",
-    "notes": "v1.0B03. Updated 2026-03-06: 100% Feature Parity reached. Completed dual azimuthal map projection and wiki screenshot automation via /get_capture sequence logic."
+    "percent_done": "100% (82/82 parity features — updated 2026-03-07)",
+    "notes": "v1.0B04. Updated 2026-03-07: B04 polish — AuroraGraphPanel getName/onResize, GreylineDXPanel scroll, ReminderPanel onResize, Aux Clock timezone cycling (click-to-cycle presets: UTC/EST/CST/MST/PST/CET/JST/AEST), widget count corrected to 45, REST-API route count corrected to 79, wiki/docs completions."
   },
   "implemented_features": [
+    {
+      "feature_id": "aux_clock_timezone",
+      "name": "Aux Clock Timezone Cycling",
+      "next_files": [
+        "src/ui/ClockAuxPanel.cpp",
+        "src/ui/ClockAuxPanel.h",
+        "src/core/ConfigManager.h",
+        "src/core/ConfigManager.cpp"
+      ],
+      "notes": "Click the Aux Clock widget to cycle through preset timezones: UTC, EST(-5), CST(-6), MST(-7), PST(-8), CET(+1), JST(+9), AEST(+10). Config keys: auxClockTzOffset (int), auxClockTzLabel (string). API: /set_config?aux_tz_offset=N&aux_tz_label=LABEL."
+    },
     {
       "feature_id": "radio_control",
       "name": "Radio CAT Control",

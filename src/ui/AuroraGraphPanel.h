@@ -17,7 +17,9 @@ public:
 
   void update() override;
   void render(SDL_Renderer *renderer) override;
+  void onResize(int x, int y, int w, int h) override;
   void onMouseMove(int mx, int my) override;
+  std::string getName() const override { return "Aurora Graph"; }
 
 private:
   FontManager &fontMgr_;

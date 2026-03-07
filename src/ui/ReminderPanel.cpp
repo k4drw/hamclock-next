@@ -456,6 +456,13 @@ void ReminderPanel::renderSetup(SDL_Renderer *renderer) {
 
 // ─── mouse ───────────────────────────────────────────────────────────────────
 
+void ReminderPanel::onResize(int x, int y, int w, int h) {
+  Widget::onResize(x, y, w, h);
+  // Button rects are recomputed each render() call — clear hover zones
+  // so stale click targets from old geometry are not retained.
+  hoverZones_.clear();
+}
+
 bool ReminderPanel::onMouseUp(int mx, int my, Uint16, int) {
   // Notification modal consumes all clicks (full-screen)
   if (notificationActive_)

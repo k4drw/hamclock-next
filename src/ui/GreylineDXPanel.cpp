@@ -1,6 +1,7 @@
 #include "GreylineDXPanel.h"
 #include "../core/Theme.h"
 #include "FontCatalog.h"
+#include <algorithm>
 #include <cstdio>
 
 GreylineDXPanel::GreylineDXPanel(int x, int y, int w, int h,
@@ -50,6 +51,11 @@ void GreylineDXPanel::render(SDL_Renderer *renderer) {
   int rowH = (height_ - titleH - 2 * pad) / 7;
   if (rowH < 12) rowH = 12;
 
+  int maxRows = std::max(1, (height_ - titleH - 2 * pad) / rowH - 1); // -1 for header
+  maxScroll_ = std::max(0, (int)currentData_.activeEntities.size() - maxRows);
+  scrollOffset_ = std::min(scrollOffset_, maxScroll_);
+  int startIdx = std::max(0, scrollOffset_);
+
   // Column offsets
   int colPX = x_ + pad;
   int colOX = x_ + 35;
@@ -64,8 +70,8 @@ void GreylineDXPanel::render(SDL_Renderer *renderer) {
                 FontStyle::Tiny, false, false, true);
   curY += rowH;
 
-  int count = 0;
-  for (const auto &entity : currentData_.activeEntities) {
+  for (int ei = startIdx; ei < (int)currentData_.activeEntities.size(); ++ei) {
+    const auto &entity = currentData_.activeEntities[ei];
     if (curY + rowH > y_ + height_ - pad)
       break;
 
@@ -91,9 +97,12 @@ void GreylineDXPanel::render(SDL_Renderer *renderer) {
                   FontStyle::Micro, false, false, true);
 
     curY += rowH;
-    if (++count >= 6)
-      break;
   }
+}
+
+bool GreylineDXPanel::onMouseWheel(int scrollY) {
+  scrollOffset_ = std::clamp(scrollOffset_ - scrollY, 0, maxScroll_);
+  return true;
 }
 
 void GreylineDXPanel::onResize(int x, int y, int w, int h) {

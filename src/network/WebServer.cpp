@@ -1485,6 +1485,12 @@ void WebServer::run() {
     if (req.has_param("pane5"))
       parsePane(req.get_param_value("pane5"), cfg_->pane6Rotation);
 
+    if (req.has_param("aux_tz_offset"))
+      cfg_->auxClockTzOffset =
+          StringUtils::safe_stoi(req.get_param_value("aux_tz_offset"));
+    if (req.has_param("aux_tz_label"))
+      cfg_->auxClockTzLabel = req.get_param_value("aux_tz_label");
+
     if (cfgMgr_)
       cfgMgr_->save(*cfg_);
     if (reloadFlag_)

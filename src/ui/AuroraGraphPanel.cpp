@@ -165,6 +165,10 @@ void AuroraGraphPanel::render(SDL_Renderer *renderer) {
   }
 }
 
+void AuroraGraphPanel::onResize(int x, int y, int w, int h) {
+  Widget::onResize(x, y, w, h);
+}
+
 void AuroraGraphPanel::onMouseMove(int mx, int my) {
   if (!store_ || !store_->hasData()) {
     tooltip_.visible = false;

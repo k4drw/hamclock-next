@@ -188,6 +188,10 @@ struct AppConfig {
   // Security
   bool gpsEnabled = false;
 
+  // Aux Clock timezone
+  int auxClockTzOffset = 0;           // Hours from UTC (-12 to +14)
+  std::string auxClockTzLabel = "UTC"; // Display label
+
   // Update
   std::string skippedVersion;
 

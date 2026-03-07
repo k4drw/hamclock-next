@@ -1386,6 +1386,41 @@ bool SetupScreen::onMouseDown(int mx, int my, Uint16 mod, int clicks) {
         return true;
       }
     }
+  } else if (activeTab_ == Tab::Watchlist) {
+    // Input field focus
+    if (hitField(watchlistInputRect_, 0, &watchlistInputField_))
+      return true;
+
+    // Add button
+    if (watchlistAddRect_.w > 0 &&
+        mx >= watchlistAddRect_.x && mx < watchlistAddRect_.x + watchlistAddRect_.w &&
+        my >= watchlistAddRect_.y && my < watchlistAddRect_.y + watchlistAddRect_.h) {
+      std::string call = watchlistInputField_.getValue();
+      if (!call.empty()) {
+        std::transform(call.begin(), call.end(), call.begin(), ::toupper);
+        if (std::find(watchlistEntries_.begin(), watchlistEntries_.end(), call) ==
+            watchlistEntries_.end()) {
+          watchlistEntries_.push_back(call);
+        }
+        watchlistInputField_.clear();
+      }
+      return true;
+    }
+
+    // Delete buttons
+    for (int i = 0; i < (int)watchlistDeleteRects_.size(); ++i) {
+      const SDL_Rect &dr = watchlistDeleteRects_[i];
+      if (mx >= dr.x && mx < dr.x + dr.w && my >= dr.y && my < dr.y + dr.h) {
+        int realIdx = watchlistScrollOffset_ + i;
+        if (realIdx >= 0 && realIdx < (int)watchlistEntries_.size()) {
+          watchlistEntries_.erase(watchlistEntries_.begin() + realIdx);
+          if (watchlistScrollOffset_ > 0 &&
+              watchlistScrollOffset_ >= (int)watchlistEntries_.size())
+            --watchlistScrollOffset_;
+        }
+        return true;
+      }
+    }
   }
 
   // 3. Toggles and Buttons (Non-text fields)

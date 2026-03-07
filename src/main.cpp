@@ -1276,7 +1276,8 @@ DashboardContext::DashboardContext(AppContext &ctx)
           0, 0, 0, 0, fontMgr, texMgr, netManager, moonStore);
       break;
     case WidgetType::CLOCK_AUX:
-      widgetPool[type] = std::make_unique<ClockAuxPanel>(0, 0, 0, 0, fontMgr);
+      widgetPool[type] = std::make_unique<ClockAuxPanel>(0, 0, 0, 0, fontMgr,
+                                                         appCfg, ctx.cfgMgr);
       break;
     case WidgetType::HISTORY_FLUX:
       widgetPool[type] = std::make_unique<HistoryPanel>(
