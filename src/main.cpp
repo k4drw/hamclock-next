@@ -2574,7 +2574,18 @@ void DashboardContext::update(AppContext &ctx) {
 
   // 60-second RSS/VRAM heartbeat — helps diagnose memory growth on RPi
   if (now - lastMemLogMs > 60000) {
-    MemoryMonitor::getInstance().logStats("heartbeat");
+    auto &mm = MemoryMonitor::getInstance();
+    mm.logStats("heartbeat");
+    if (mm.isLowMemoryDevice()) {
+      size_t rss = mm.getRSS();
+      const size_t kFlushThresholdBytes = 650ULL * 1024 * 1024;
+      if (rss > kFlushThresholdBytes) {
+        LOG_W("Main", "RSS {:.1f} MB exceeds threshold on low-mem device — flushing caches",
+              rss / 1024.0 / 1024.0);
+        texMgr.clearCache();
+        texMgr.setMaxCacheSize(10);
+      }
+    }
     lastMemLogMs = now;
   }
 

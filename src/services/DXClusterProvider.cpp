@@ -9,6 +9,8 @@
 #include "../core/HamClockState.h"
 #include "../core/Logger.h"
 #include "../core/PrefixManager.h"
+#include <httplib.h>
+#include <nlohmann/json.hpp>
 #ifdef _WIN32
 #include <winsock2.h>
 #include <ws2tcpip.h>
@@ -95,6 +97,10 @@ void DXClusterProvider::stop() {
 }
 
 void DXClusterProvider::run() {
+  if (config_.hubMode == HubMode::Client && !config_.hubIp.empty()) {
+    runHubClient();
+    return;
+  }
   while (!stopClicked_) {
     if (config_.dxClusterUseWSJTX) {
       runUDP(config_.wsjtxPort);
@@ -118,6 +124,48 @@ void DXClusterProvider::run() {
 
     // Retry delay (increased to 60s to avoid hammering and IP bans)
     std::this_thread::sleep_for(std::chrono::seconds(60));
+  }
+}
+
+void DXClusterProvider::runHubClient() {
+  while (!stopClicked_) {
+    httplib::Client cli(config_.hubIp, config_.hubPort);
+    cli.set_connection_timeout(5);
+    auto resp = cli.Get("/api/hub/dxcluster");
+    if (resp && resp->status == 200) {
+      try {
+        auto arr = nlohmann::json::parse(resp->body);
+        std::vector<DXClusterSpot> spots;
+        for (const auto &j : arr) {
+          DXClusterSpot s;
+          s.txCall  = j.value("txCall", "");
+          s.txGrid  = j.value("txGrid", "");
+          s.rxCall  = j.value("rxCall", "");
+          s.rxGrid  = j.value("rxGrid", "");
+          s.mode    = j.value("mode", "");
+          s.freqKhz = j.value("freqKhz", 0.0);
+          s.snr     = j.value("snr", 0.0);
+          s.txLat   = j.value("txLat", 0.0);
+          s.txLon   = j.value("txLon", 0.0);
+          s.rxLat   = j.value("rxLat", 0.0);
+          s.rxLon   = j.value("rxLon", 0.0);
+          s.txDxcc  = j.value("txDxcc", 0);
+          s.rxDxcc  = j.value("rxDxcc", 0);
+          int64_t ts = j.value("spottedAt", (int64_t)0);
+          s.spottedAt = std::chrono::system_clock::time_point(
+                            std::chrono::seconds(ts));
+          spots.push_back(s);
+        }
+        if (store_) store_->setSpots(spots);
+        if (store_) store_->setConnected(true, "Hub client");
+      } catch (...) {
+        if (store_) store_->setConnected(false, "Hub parse error");
+      }
+    } else {
+      if (store_) store_->setConnected(false, "Hub unreachable");
+    }
+    for (int i = 0; i < 300 && !stopClicked_; ++i)
+      std::this_thread::sleep_for(std::chrono::milliseconds(100));
   }
 }
 

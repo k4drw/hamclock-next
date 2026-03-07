@@ -47,6 +47,8 @@ public:
   void setConnected(bool connected, const std::string &status = "");
   void clear();
 
+  void setSpots(const std::vector<DXClusterSpot> &spots);
+
   void selectSpot(const DXClusterSpot &spot);
   void clearSelection();
 

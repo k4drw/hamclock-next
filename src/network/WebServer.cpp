@@ -1591,6 +1591,34 @@ void WebServer::run() {
     res.set_content(body, "application/octet-stream");
   });
 
+  svr.Get("/api/hub/dxcluster", [this](const httplib::Request &,
+                                       httplib::Response &res) {
+    if (!cfg_ || cfg_->hubMode != HubMode::Master || !dxc_) {
+      res.status = 403;
+      return;
+    }
+    auto snap = dxc_->snapshot();
+    auto now = std::chrono::system_clock::now();
+    nlohmann::json arr = nlohmann::json::array();
+    for (const auto &s : snap->spots) {
+      auto age = std::chrono::duration_cast<std::chrono::minutes>(
+                     now - s.spottedAt).count();
+      if (age >= 60) continue;
+      nlohmann::json j;
+      j["txCall"]    = s.txCall;   j["txGrid"]  = s.txGrid;
+      j["rxCall"]    = s.rxCall;   j["rxGrid"]  = s.rxGrid;
+      j["mode"]      = s.mode;     j["freqKhz"] = s.freqKhz;
+      j["snr"]       = s.snr;
+      j["txLat"]     = s.txLat;   j["txLon"]   = s.txLon;
+      j["rxLat"]     = s.rxLat;   j["rxLon"]   = s.rxLon;
+      j["txDxcc"]    = s.txDxcc;  j["rxDxcc"]  = s.rxDxcc;
+      j["spottedAt"] = std::chrono::duration_cast<std::chrono::seconds>(
+                           s.spottedAt.time_since_epoch()).count();
+      arr.push_back(j);
+    }
+    res.set_content(arr.dump(), "application/json");
+  });
+
   // ============================================================
   // Phase 1 — Live Web View
   // ============================================================

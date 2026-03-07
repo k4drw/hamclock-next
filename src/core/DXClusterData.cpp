@@ -175,6 +175,14 @@ void DXClusterDataStore::pruneOldSpots() {
   DatabaseManager::instance().exec(sql);
 }
 
+void DXClusterDataStore::setSpots(const std::vector<DXClusterSpot> &spots) {
+  std::lock_guard<std::mutex> lk(mutex_);
+  auto newData = std::make_shared<DXClusterData>(*data_);
+  newData->spots = spots;
+  newData->lastUpdate = std::chrono::system_clock::now();
+  data_ = newData;
+}
+
 void DXClusterDataStore::selectSpot(const DXClusterSpot &spot) {
   std::lock_guard<std::mutex> lock(mutex_);
   auto newData = std::make_shared<DXClusterData>(*data_);
