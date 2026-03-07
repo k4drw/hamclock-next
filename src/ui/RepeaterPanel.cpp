@@ -58,6 +58,8 @@ void RepeaterPanel::render(SDL_Renderer *renderer) {
   // Each row: freq | callsign | distance (km or mi)
   int rowH = rowFontSize_ + subFontSize_ + 4;
   int maxRows = (height_ - (curY - y_) - pad) / rowH;
+  maxScroll_ = std::max(0, (int)currentData_.repeaters.size() - maxRows);
+  scrollOffset_ = std::min(scrollOffset_, maxScroll_);
   int startIdx = std::max(0, scrollOffset_);
   int endIdx = std::min((int)currentData_.repeaters.size(), startIdx + maxRows);
 
@@ -123,6 +125,6 @@ void RepeaterPanel::onResize(int x, int y, int w, int h) {
 }
 
 bool RepeaterPanel::onMouseWheel(int scrollY) {
-  scrollOffset_ = std::max(0, scrollOffset_ - scrollY);
+  scrollOffset_ = std::clamp(scrollOffset_ - scrollY, 0, maxScroll_);
   return true;
 }

@@ -8,29 +8,35 @@ The large center area of HamClock-Next displays an interactive world map with co
 
 ## Map Projections
 
-HamClock-Next supports two map projections, selectable from the Setup or map controls:
+HamClock-Next supports five map projections, selectable from the Setup or map controls:
 
-### Mercator (Equirectangular)
+### Equirectangular
 
 The default projection. Shows the full world with longitude and latitude as straight lines. Easy to read and works well for most purposes.
 
-### Azimuthal (Great Circle)
+### Robinson
 
-Centered on your DE location. Shows true bearing and distance in all directions as straight lines from your QTH. Useful for antenna pointing.
+A compromise projection that balances distortion of area, shape, distance, and direction. Gives a visually pleasing view of the whole world.
+
+### Azimuthal (Great Circle) *(new in HamClock-Next)*
+
+Centered on your DE location. Shows true bearing and distance in all directions as straight lines from your QTH. Useful for antenna pointing. The original HamClock only offered the dual-hemisphere variant; this single-circle view is a HamClock-Next addition.
 
 ![Azimuthal projection](images/map-azimuthal.jpg)
 
-### Dual-Hemisphere Azimuthal *(planned)*
+### Mercator
 
-The original HamClock displayed a **dual-hemisphere** azimuthal equidistant projection: two side-by-side circles, the left centered on DE and the right centered on the antipodal point. Together they show the complete globe — every location on Earth appears in one of the two circles with no clipping. Great-circle paths remain straight within each hemisphere.
+A cylindrical projection that preserves angles and shapes locally. Useful for navigation but significantly distorts area near the poles.
 
-HamClock-Next currently implements only the single DE-centered azimuthal circle. The dual-hemisphere variant is a tracked parity gap and is planned for a future release.
+### Dual Azimuthal
+
+Displays two side-by-side azimuthal equidistant circles: the left centered on DE and the right centered on the antipodal point. Together they show the complete globe — every location on Earth appears in one of the two circles with no clipping. Great-circle paths remain straight within each hemisphere.
 
 ---
 
 ## Map Styles
 
-The base map tile style can be changed in [Setup & Configuration](Configuration):
+The base map tile style can be changed in [Setup & Configuration](Configuration.md):
 
 | Style       | Description                                   |
 | ----------- | --------------------------------------------- |
@@ -81,7 +87,7 @@ Select the active overlay and configure band/mode/power from the Configuration s
 
 ### Propagation Settings
 
-Configure these fields in [Setup & Configuration](Configuration):
+Configure these fields in [Setup & Configuration](Configuration.md):
 
 | Field          | Description                                       |
 | -------------- | ------------------------------------------------- |

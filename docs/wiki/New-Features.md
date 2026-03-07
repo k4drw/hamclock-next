@@ -111,6 +111,7 @@ All overlays are configurable by **band**, **mode**, and **power** (watts).
 ## Map Enhancements
 
 - **Robinson projection** — an additional map projection option alongside Mercator (equirectangular) and Azimuthal
+- **Single Azimuthal projection** — DE-centered azimuthal equidistant circle; the original HamClock only offered the dual-hemisphere variant
 - **POTA activator map pins** — lime-green pins on the map for active POTA activations (requires On The Air widget in a pane)
 - **ADIF QSO map pins** — plots your logged QSOs from an ADIF file on the map (requires ADIF widget)
 - **Satellite ground track** — the selected satellite's orbital path is drawn as an arc on the map (`showSatTrack`)

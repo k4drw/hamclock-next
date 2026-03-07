@@ -27,6 +27,7 @@ private:
   std::shared_ptr<HurricaneStore> store_;
   HurricaneData currentData_;
   int scrollOffset_ = 0;
+  int maxScroll_ = 0;
 
   int titleFontSize_ = 12;
   int nameFontSize_ = 14;

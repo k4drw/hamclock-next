@@ -26,6 +26,7 @@ private:
   ForecastData currentData_;
   bool useMetricTemp_ = false; // NWS data is Fahrenheit; convert if metric
   int scrollOffset_ = 0;
+  int maxScroll_ = 0;
 
   int titleFontSize_ = 12;
   int nameFontSize_ = 12;

@@ -122,7 +122,7 @@ If you find a feature gap, please open an issue on the project repository.
 
 ## Migration Steps
 
-1. Install and build HamClock-Next (see [Getting Started](Getting-Started))
+1. Install and build HamClock-Next (see [Getting Started](Getting-Started.md))
 2. On first launch, enter your callsign, grid, and location in the Setup screen
 3. Open each pane's widget picker (click top strip of pane) and add your preferred widgets
 4. Configure DX cluster in Setup → DX Cluster tab

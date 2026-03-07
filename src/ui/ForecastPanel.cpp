@@ -54,6 +54,8 @@ void ForecastPanel::render(SDL_Renderer *renderer) {
   // Each row: period name + temp + short forecast
   int rowH = nameFontSize_ + detailFontSize_ + 4;
   int maxRows = (height_ - (curY - y_) - pad) / rowH;
+  maxScroll_ = std::max(0, (int)currentData_.periods.size() - maxRows);
+  scrollOffset_ = std::min(scrollOffset_, maxScroll_);
   int startIdx = std::max(0, scrollOffset_);
   int endIdx = std::min((int)currentData_.periods.size(), startIdx + maxRows);
 
@@ -127,6 +129,6 @@ void ForecastPanel::onResize(int x, int y, int w, int h) {
 }
 
 bool ForecastPanel::onMouseWheel(int scrollY) {
-  scrollOffset_ = std::max(0, scrollOffset_ - scrollY);
+  scrollOffset_ = std::clamp(scrollOffset_ - scrollY, 0, maxScroll_);
   return true;
 }

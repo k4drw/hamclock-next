@@ -960,7 +960,10 @@ void WebServer::run() {
           const list = document.getElementById(`pane${i}-list`);
           list.innerHTML = '';
           const activeRot = c.panes ? (c.panes[i] ? c.panes[i].rotation : []) : [];
-          availableWidgets.forEach(w => {
+          const SIDE_PANEL_WIDGETS = ['de_info', 'dx_cluster', 'on_the_air', 'live_spots'];
+          const pool = (i >= 4) ? availableWidgets.filter(w => SIDE_PANEL_WIDGETS.includes(w.id))
+                                 : availableWidgets;
+          pool.forEach(w => {
             const div = document.createElement('div');
             div.className = 'widget-item' + (activeRot.includes(w.display) ? ' active' : '');
             div.textContent = w.display;
@@ -1080,7 +1083,8 @@ void WebServer::run() {
                 WidgetType::ALERTS,       WidgetType::FORECAST,
                 WidgetType::HURRICANE,    WidgetType::MARINE,
                 WidgetType::GREYLINE_DX,  WidgetType::METEOR,
-                WidgetType::IONOSONDE,    WidgetType::SOLAR_STORM};
+                WidgetType::IONOSONDE,    WidgetType::SOLAR_STORM,
+                WidgetType::DE_INFO,      WidgetType::DX_INFO};
             for (auto t : all) {
               nlohmann::json w;
               w["id"] = widgetTypeToString(t);
@@ -1603,8 +1607,11 @@ void WebServer::run() {
     int outW = LOGICAL_WIDTH, outH = LOGICAL_HEIGHT;
     if (renderer_)
       SDL_GetRendererOutputSize(renderer_, &outW, &outH);
-    int lx = (outW > 0) ? (x * LOGICAL_WIDTH / outW) : x;
-    int ly = (outH > 0) ? (y * LOGICAL_HEIGHT / outH) : y;
+    float layScale = std::min(
+        static_cast<float>(outW) / LOGICAL_WIDTH,
+        static_cast<float>(outH) / LOGICAL_HEIGHT);
+    int lx = (layScale > 0.0f) ? static_cast<int>(x / layScale) : x;
+    int ly = (layScale > 0.0f) ? static_cast<int>(y / layScale) : y;
     SDL_Event e{};
     e.type = AE_BASE_EVENT + AE_TOUCH;
     e.user.data1 = reinterpret_cast<void *>(static_cast<intptr_t>(lx));

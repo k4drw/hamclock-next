@@ -21,16 +21,16 @@ It is a community continuation of the original HamClock created by Elwood Downey
 
 ## Quick Links
 
-- [Getting Started](Getting-Started) — build, install, first launch
-- [Screen Layout](Layout) — what each region of the screen does
-- [Widgets Reference](Widgets) — all 44 widgets described
-- [Map & Overlays](Map-and-Overlays) — map projections and overlay layers
-- [Pane Customization](Pane-Customization) — configure pane widget rotations
-- [Configuration Presets](Presets) — save and recall configurations
-- [Setup & Configuration](Configuration) — all settings fields
-- [Data Sources & Network](Data-Sources) — what HamClock-Next fetches and from where
-- [Keyboard Shortcuts](Keyboard-Shortcuts) — K, Ctrl+Q, and in-dialog shortcuts
-- [Migrating from Original HamClock](Migrating-from-HamClock) — what changed
+- [Getting Started](Getting-Started.md) — build, install, first launch
+- [Screen Layout](Layout.md) — what each region of the screen does
+- [Widgets Reference](Widgets.md) — all 44 widgets described
+- [Map & Overlays](Map-and-Overlays.md) — map projections and overlay layers
+- [Pane Customization](Pane-Customization.md) — configure pane widget rotations
+- [Configuration Presets](Presets.md) — save and recall configurations
+- [Setup & Configuration](Configuration.md) — all settings fields
+- [Data Sources & Network](Data-Sources.md) — what HamClock-Next fetches and from where
+- [Keyboard Shortcuts](Keyboard-Shortcuts.md) — K, Ctrl+Q, and in-dialog shortcuts
+- [Migrating from Original HamClock](Migrating-from-HamClock.md) — what changed
 
 ---
 

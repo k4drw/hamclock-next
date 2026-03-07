@@ -1,23 +1,23 @@
 ## HamClock-Next
 
-- [Home](Home)
-- [Getting Started](Getting-Started)
+- [Home](Home.md)
+- [Getting Started](Getting-Started.md)
 
 ## Using HamClock-Next
 
-- [Screen Layout](Layout)
-- [Widgets Reference](Widgets)
-- [Map & Overlays](Map-and-Overlays)
-- [Pane Customization](Pane-Customization)
-- [Configuration Presets](Presets)
+- [Screen Layout](Layout.md)
+- [Widgets Reference](Widgets.md)
+- [Map & Overlays](Map-and-Overlays.md)
+- [Pane Customization](Pane-Customization.md)
+- [Configuration Presets](Presets.md)
 
 ## Reference
 
-- [Setup & Configuration](Configuration)
-- [REST API](REST-API)
-- [Data Sources & Network](Data-Sources)
-- [Keyboard Shortcuts](Keyboard-Shortcuts)
+- [Setup & Configuration](Configuration.md)
+- [REST API](REST-API.md)
+- [Data Sources & Network](Data-Sources.md)
+- [Keyboard Shortcuts](Keyboard-Shortcuts.md)
 
 ## Migration
 
-- [Migrating from Original HamClock](Migrating-from-HamClock)
+- [Migrating from Original HamClock](Migrating-from-HamClock.md)

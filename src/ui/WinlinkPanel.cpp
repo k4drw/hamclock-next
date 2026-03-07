@@ -53,6 +53,8 @@ void WinlinkPanel::render(SDL_Renderer *renderer) {
   // Each row: callsign | distance | freq | modes
   int rowH = rowFontSize_ + subFontSize_ + 4;
   int maxRows = (height_ - (curY - y_) - pad) / rowH;
+  maxScroll_ = std::max(0, (int)currentData_.gateways.size() - maxRows);
+  scrollOffset_ = std::min(scrollOffset_, maxScroll_);
   int startIdx = std::max(0, scrollOffset_);
   int endIdx = std::min((int)currentData_.gateways.size(), startIdx + maxRows);
 
@@ -116,6 +118,6 @@ void WinlinkPanel::onResize(int x, int y, int w, int h) {
 }
 
 bool WinlinkPanel::onMouseWheel(int scrollY) {
-  scrollOffset_ = std::max(0, scrollOffset_ - scrollY);
+  scrollOffset_ = std::clamp(scrollOffset_ - scrollY, 0, maxScroll_);
   return true;
 }

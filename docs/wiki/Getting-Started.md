@@ -96,4 +96,4 @@ Once the dashboard is running:
 4. **Click the top strip of any pane** — opens the widget picker so you can choose what that pane displays.
 5. **Press K** — highlights every interactive region on screen with cyan boxes and tooltips.
 
-See [Screen Layout](Layout) for a detailed annotated diagram.
+See [Screen Layout](Layout.md) for a detailed annotated diagram.

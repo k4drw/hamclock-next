@@ -63,6 +63,8 @@ void AlertsPanel::render(SDL_Renderer *renderer) {
   const auto &alerts = currentData_.alerts;
   int rowH = rowFontSize_ + 6;
   int maxRows = (height_ - (curY - y_) - pad) / rowH;
+  maxScroll_ = std::max(0, (int)alerts.size() - maxRows);
+  scrollOffset_ = std::min(scrollOffset_, maxScroll_);
   int startIdx = std::max(0, scrollOffset_);
   int endIdx = std::min((int)alerts.size(), startIdx + maxRows);
 
@@ -102,6 +104,6 @@ void AlertsPanel::onResize(int x, int y, int w, int h) {
 }
 
 bool AlertsPanel::onMouseWheel(int scrollY) {
-  scrollOffset_ = std::max(0, scrollOffset_ - scrollY);
+  scrollOffset_ = std::clamp(scrollOffset_ - scrollY, 0, maxScroll_);
   return true;
 }

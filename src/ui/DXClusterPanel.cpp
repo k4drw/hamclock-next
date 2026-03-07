@@ -125,6 +125,8 @@ void DXClusterPanel::render(SDL_Renderer *renderer) {
   int remaining = (y_ + height_) - curY;
   int rowH = std::max(rowFontSize_ + 4,
                       remaining / static_cast<int>(visibleSpots_.size()));
+  contentY_ = curY;
+  rowH_ = rowH;
 
   // Column layout: Freq (Right-aligned) | Call (Left) | Age (Right-anchored)
   // Use worst-case sample strings to anchor fixed column boundaries
@@ -264,22 +266,13 @@ bool DXClusterPanel::onMouseWheel(int scrollY) {
 }
 
 bool DXClusterPanel::onMouseUp(int mx, int my, Uint16 /*mod*/, int clicks) {
-  // Top 10% is the PaneContainer widget-selection zone — match its threshold
-  // exactly so that clicking the title area opens the widget selector, while
-  // clicking anywhere in the content area is absorbed by this widget.
-  if (my < y_ + height_ / 10)
+  // Use cached geometry from render() so click rows match visual rows exactly.
+  // Return false for clicks above content area — PaneContainer handles those
+  // (widget selector fires if click is in top 10% of the pane).
+  if (my < contentY_)
     return false;
 
-  // Check if we clicked on a row
-  int rowH = 14;
-  auto font = fontMgr_.getFont(rowFontSize_);
-  if (font)
-    rowH = TTF_FontLineSkip(font);
-
-  int pad = std::max(2, static_cast<int>(width_ * 0.03f));
-  int curY = y_ + pad + rowFontSize_ + pad; // content start (below title)
-
-  int clickedRow = (my - curY) / rowH;
+  int clickedRow = (my - contentY_) / std::max(1, rowH_);
 
   auto data = store_->snapshot();
   auto spots = data->spots;

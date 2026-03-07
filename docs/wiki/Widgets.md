@@ -10,7 +10,7 @@ To add a widget to a pane, click the **top strip** of the pane to open the widge
 
 ## Dashboard Rotation Gallery
 
-Since HamClock-Next allows multiple widgets per pane, the following snapshots show various dashboard configurations as the panes rotate. Use this gallery to see all **56+** widgets in action.
+Since HamClock-Next allows multiple widgets per pane, the following snapshots show various dashboard configurations as the panes rotate. Use this gallery to see all **44** widgets in action.
 
 |  ![Rotation 0](images/rotation_0.jpg)  |  ![Rotation 1](images/rotation_1.jpg)  |
 |  ![Rotation 2](images/rotation_2.jpg)  |  ![Rotation 3](images/rotation_3.jpg)  |

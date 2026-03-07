@@ -150,8 +150,10 @@ void AuroraGraphPanel::render(SDL_Renderer *renderer) {
 
     SDL_Texture *lineAA = texMgr_.get("line_aa");
     if (lineAA) {
-      RenderUtils::drawThickLineTextured(renderer, lineAA, (float)x1, (float)y1,
-                                         (float)x2, (float)y2, 2.0f, segColor);
+      std::vector<SDL_FPoint> segment = {{(float)x1, (float)y1},
+                                         {(float)x2, (float)y2}};
+      RenderUtils::drawPolylineTextured(renderer, lineAA, segment.data(),
+                                        segment.size(), 2.0f, segColor);
     } else {
       RenderUtils::drawThickLine(renderer, (float)x1, (float)y1, (float)x2,
                                  (float)y2, 2.0f, segColor);
@@ -169,11 +171,11 @@ void AuroraGraphPanel::onMouseMove(int mx, int my) {
     return;
   }
 
-  // Graph area (must match render() logic)
+  // Graph area (must match render() logic EXACTLY)
   int graphX = x_ + 30;
-  int graphY = y_ + height_ / 2;
+  int graphY = y_ + 20 + 10; // titleH (20) + padding (10)
   int graphW = width_ - 40;
-  int graphH = height_ / 2 - 30;
+  int graphH = height_ - 20 - 40; // width_ - titleH - 40
 
   if (mx < graphX || mx > graphX + graphW || my < graphY ||
       my > graphY + graphH) {

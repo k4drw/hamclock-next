@@ -2091,7 +2091,7 @@ void DashboardContext::update(AppContext &ctx) {
     case SDL_FINGERDOWN:
       if (appCfg.preventSleep)
         preventRPiSleep(true, ctx.displayPower.get());
-      [[fallthrough]];
+      break;
     case SDL_MOUSEBUTTONDOWN: {
       int smx = event.button.x, smy = event.button.y;
       if (FIDELITY_MODE && event.button.windowID != 0) {
@@ -2483,9 +2483,13 @@ void DashboardContext::update(AppContext &ctx) {
         if (event.wheel.direction == SDL_MOUSEWHEEL_FLIPPED)
           scrollY = -scrollY;
 #endif
-        for (auto *w : eventWidgets)
-          if (w->onMouseWheel(scrollY))
-            break;
+        if (ctx.dashboard->mapArea->isModalActive()) {
+          ctx.dashboard->mapArea->onMouseWheel(scrollY);
+        } else {
+          for (auto *w : eventWidgets)
+            if (w->onMouseWheel(scrollY))
+              break;
+        }
       }
     }
   }

@@ -79,6 +79,8 @@ private:
   SDL_Rect autoPopRect_ = {0, 0, 0, 0};
   SDL_Rect footerRect_ = {0, 0, 0, 0};
   std::vector<SDL_Rect> deleteRects_;
+  std::vector<SDL_Rect> labelRects_;
+  std::vector<SDL_Rect> dateRects_;
 
   // ── Private helpers ───────────────────────────────────────────────────────
   void renderReminderList(SDL_Renderer *renderer);

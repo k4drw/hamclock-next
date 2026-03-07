@@ -345,6 +345,8 @@ void ReminderPanel::renderSetup(SDL_Renderer *renderer) {
   int textPad = 4;
 
   deleteRects_.clear();
+  labelRects_.clear();
+  dateRects_.clear();
 
   SDL_Texture *tex = nullptr;
   for (size_t i = 0; i < pendingReminders_.size(); ++i) {
@@ -358,6 +360,7 @@ void ReminderPanel::renderSetup(SDL_Renderer *renderer) {
     SDL_SetRenderDrawColor(renderer, (activeField_ == (int)i) ? 255 : 100, 150,
                            0, 255);
     SDL_RenderDrawRect(renderer, &lRect);
+    labelRects_.push_back(lRect);
     cat->drawText(renderer, pendingReminders_[i].label, lRect.x + textPad,
                   lRect.y + 2, white, FontStyle::Caption);
 
@@ -370,6 +373,7 @@ void ReminderPanel::renderSetup(SDL_Renderer *renderer) {
         (activeField_ == (int)(i + pendingReminders_.size())) ? 255 : 100, 150,
         0, 255);
     SDL_RenderDrawRect(renderer, &dRect);
+    dateRects_.push_back(dRect);
     cat->drawText(renderer, pendingReminders_[i].date, dRect.x + textPad,
                   dRect.y + 2, white, FontStyle::Caption);
 
@@ -520,30 +524,25 @@ bool ReminderPanel::handleSetupClick(int mx, int my) {
   }
 
   // Field click — detect label/date fields
-  if (pendingReminders_.empty())
-    return true;
-
-  int fy = y_ + 10 + 20; // approx first row Y (title ~28px)
-  int fieldW = width_ - 20;
-  int fieldH = 18;
-  for (size_t i = 0; i < pendingReminders_.size(); ++i) {
-    int halfW = (fieldW - 30) / 2;
-    if (mx >= x_ + 5 && mx < x_ + 5 + halfW && my >= fy && my < fy + fieldH) {
+  for (size_t i = 0; i < labelRects_.size(); ++i) {
+    const auto &r = labelRects_[i];
+    if (mx >= r.x && mx < r.x + r.w && my >= r.y && my < r.y + r.h) {
       activeField_ = (int)i;
       activeProxy_.setValue(pendingReminders_[i].label);
       activeProxy_.setCursorToEnd();
       activeProxy_.setActive(true);
       return true;
     }
-    if (mx >= x_ + 10 + halfW && mx < x_ + 10 + 2 * halfW && my >= fy &&
-        my < fy + fieldH) {
+  }
+  for (size_t i = 0; i < dateRects_.size(); ++i) {
+    const auto &r = dateRects_[i];
+    if (mx >= r.x && mx < r.x + r.w && my >= r.y && my < r.y + r.h) {
       activeField_ = (int)(i + pendingReminders_.size());
       activeProxy_.setValue(pendingReminders_[i].date);
       activeProxy_.setCursorToEnd();
       activeProxy_.setActive(true);
       return true;
     }
-    fy += fieldH + 5;
   }
 
   return true;

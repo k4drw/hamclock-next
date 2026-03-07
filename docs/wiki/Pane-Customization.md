@@ -26,7 +26,7 @@ Each pane has a rotation list — an ordered sequence of widgets it cycles throu
 
 The `rotationIntervalS` setting (default: 30 seconds) controls how long each widget is shown before advancing. This interval applies to all panes.
 
-Configure the interval in [Setup & Configuration](Configuration).
+Configure the interval in [Setup & Configuration](Configuration.md).
 
 ### Sync Rotation
 
@@ -75,7 +75,7 @@ Set `panelMode` in Configuration to switch modes. In side panel mode, Pane 5 is 
 
 Pane rotation lists are stored in the configuration file as arrays of widget type names. You can edit them directly or use Presets to save and restore complete configurations.
 
-See [Configuration Presets](Presets) for saving named configurations.
+See [Configuration Presets](Presets.md) for saving named configurations.
 
 The relevant configuration fields are:
 
