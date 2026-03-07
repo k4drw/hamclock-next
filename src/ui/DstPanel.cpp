@@ -105,6 +105,10 @@ void DstPanel::render(SDL_Renderer *renderer) {
   }
 }
 
+void DstPanel::onResize(int x, int y, int w, int h) {
+  Widget::onResize(x, y, w, h);
+}
+
 void DstPanel::onMouseMove(int mx, int my) {
   if (!currentData_.valid || currentData_.points.empty()) {
     tooltip_.visible = false;

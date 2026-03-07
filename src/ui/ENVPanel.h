@@ -15,6 +15,7 @@ public:
   ENVPanel(int x, int y, int w, int h, FontManager &fontMgr,
            std::shared_ptr<WeatherStore> store, WidgetType mode);
 
+  std::string getName() const override { return "Environment"; }
   void update() override;
   void render(SDL_Renderer *renderer) override;
   void onResize(int x, int y, int w, int h) override;

@@ -157,6 +157,8 @@ private:
   SDL_Rect watchlistInputRect_ = {0, 0, 0, 0};
   SDL_Rect watchlistAddRect_ = {0, 0, 0, 0};
   std::vector<SDL_Rect> watchlistDeleteRects_;
+  SDL_Rect watchlistScrollUpRect_ = {0, 0, 0, 0};
+  SDL_Rect watchlistScrollDownRect_ = {0, 0, 0, 0};
   int watchlistScrollOffset_ = 0;
   int widgetListScrollOffset_ = 0;
   int widgetListStartY_ = 0;

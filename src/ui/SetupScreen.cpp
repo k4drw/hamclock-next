@@ -1421,6 +1421,27 @@ bool SetupScreen::onMouseDown(int mx, int my, Uint16 mod, int clicks) {
         return true;
       }
     }
+
+    // Scroll arrows
+    if (watchlistScrollUpRect_.w > 0 &&
+        mx >= watchlistScrollUpRect_.x &&
+        mx < watchlistScrollUpRect_.x + watchlistScrollUpRect_.w &&
+        my >= watchlistScrollUpRect_.y &&
+        my < watchlistScrollUpRect_.y + watchlistScrollUpRect_.h) {
+      if (watchlistScrollOffset_ > 0)
+        --watchlistScrollOffset_;
+      return true;
+    }
+    if (watchlistScrollDownRect_.w > 0 &&
+        mx >= watchlistScrollDownRect_.x &&
+        mx < watchlistScrollDownRect_.x + watchlistScrollDownRect_.w &&
+        my >= watchlistScrollDownRect_.y &&
+        my < watchlistScrollDownRect_.y + watchlistScrollDownRect_.h) {
+      int maxVisible = 8; // matches renderTabWatchlist
+      if (watchlistScrollOffset_ + maxVisible < (int)watchlistEntries_.size())
+        ++watchlistScrollOffset_;
+      return true;
+    }
   }
 
   // 3. Toggles and Buttons (Non-text fields)
@@ -1936,10 +1957,13 @@ void SetupScreen::renderTabWatchlist(SDL_Renderer *renderer, int /*cx*/,
   }
 
   // Scroll arrows (shown when list is longer than maxVisible)
+  watchlistScrollUpRect_ = {0, 0, 0, 0};
+  watchlistScrollDownRect_ = {0, 0, 0, 0};
   if ((int)watchlistEntries_.size() > maxVisible) {
     SDL_Color arrowCol = {180, 180, 180, 255};
     if (watchlistScrollOffset_ > 0) {
       SDL_Rect upR = {fieldX, y, 40, fieldH};
+      watchlistScrollUpRect_ = upR;
       SDL_SetRenderDrawColor(renderer, 40, 40, 50, 255);
       SDL_RenderFillRect(renderer, &upR);
       SDL_SetRenderDrawColor(renderer, 80, 80, 100, 255);
@@ -1949,6 +1973,7 @@ void SetupScreen::renderTabWatchlist(SDL_Renderer *renderer, int /*cx*/,
     }
     if (watchlistScrollOffset_ + maxVisible < (int)watchlistEntries_.size()) {
       SDL_Rect downR = {fieldX + 44, y, 40, fieldH};
+      watchlistScrollDownRect_ = downR;
       SDL_SetRenderDrawColor(renderer, 40, 40, 50, 255);
       SDL_RenderFillRect(renderer, &downR);
       SDL_SetRenderDrawColor(renderer, 80, 80, 100, 255);

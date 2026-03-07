@@ -79,6 +79,10 @@ void IonosondePanel::render(SDL_Renderer *renderer) {
   }
 }
 
+void IonosondePanel::onResize(int x, int y, int w, int h) {
+  Widget::onResize(x, y, w, h);
+}
+
 void IonosondePanel::onMouseMove(int mx, int my) {
   std::lock_guard<std::mutex> lock(mutex_);
   if (!data_.valid || data_.stations.empty()) {

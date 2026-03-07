@@ -22,6 +22,7 @@ public:
     obsLon_ = lon;
   }
 
+  std::string getName() const override { return "Gimbal"; }
   void update() override;
   void render(SDL_Renderer *renderer) override;
   void onResize(int x, int y, int w, int h) override;

@@ -10,6 +10,14 @@ void StopwatchPanel::update() {
   // Nothing to update periodically; time is calculated during render
 }
 
+void StopwatchPanel::onResize(int x, int y, int w, int h) {
+  Widget::onResize(x, y, w, h);
+  ssRect_ = {};
+  lapRect_ = {};
+  rRect_ = {};
+  doneRect_ = {};
+}
+
 std::chrono::steady_clock::duration StopwatchPanel::elapsed() const {
   auto e = accumulated_;
   if (running_)

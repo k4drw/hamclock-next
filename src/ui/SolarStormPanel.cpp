@@ -86,6 +86,10 @@ void SolarStormPanel::render(SDL_Renderer *renderer) {
   }
 }
 
+void SolarStormPanel::onResize(int x, int y, int w, int h) {
+  Widget::onResize(x, y, w, h);
+}
+
 void SolarStormPanel::onMouseMove(int mx, int my) {
   std::lock_guard<std::mutex> lock(mutex_);
   if (!data_.valid) {

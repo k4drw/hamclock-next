@@ -481,7 +481,7 @@
     "missing": 0,
     "not_needed": 5,
     "percent_done": "100% (82/82 parity features — updated 2026-03-07)",
-    "notes": "v1.0B04. Updated 2026-03-07: B04 polish — AuroraGraphPanel getName/onResize, GreylineDXPanel scroll, ReminderPanel onResize, Aux Clock timezone cycling (click-to-cycle presets: UTC/EST/CST/MST/PST/CET/JST/AEST), widget count corrected to 45, REST-API route count corrected to 79, wiki/docs completions."
+    "notes": "v1.0B04. Updated 2026-03-07: B04 polish — AuroraGraphPanel getName/onResize, GreylineDXPanel scroll, ReminderPanel onResize, Aux Clock timezone — modal popup with Local+DST preset and full tz list, widget count corrected to 45, REST-API route count corrected to 79, wiki/docs completions."
   },
   "implemented_features": [
     {

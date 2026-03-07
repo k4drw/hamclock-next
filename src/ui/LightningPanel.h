@@ -11,6 +11,7 @@ class LightningPanel : public Widget {
 public:
   LightningPanel(int x, int y, int w, int h, FontManager &fontMgr);
 
+  std::string getName() const override { return "Lightning"; }
   void updateData(const LightningData &data);
   void update() override {}
   void render(SDL_Renderer *renderer) override;

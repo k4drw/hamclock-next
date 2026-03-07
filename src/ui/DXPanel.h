@@ -18,6 +18,7 @@ public:
           std::shared_ptr<WeatherStore> weatherStore);
   ~DXPanel() override { destroyCache(); }
 
+  std::string getName() const override { return "DX Cluster"; }
   void update() override;
   void render(SDL_Renderer *renderer) override;
   void onResize(int x, int y, int w, int h) override;

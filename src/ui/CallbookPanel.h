@@ -12,6 +12,7 @@ public:
   CallbookPanel(int x, int y, int w, int h, FontManager &fontMgr,
                 std::shared_ptr<CallbookStore> store);
 
+  std::string getName() const override { return "Callbook"; }
   void update() override;
   void render(SDL_Renderer *renderer) override;
   void onResize(int x, int y, int w, int h) override;

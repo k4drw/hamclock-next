@@ -12,9 +12,11 @@ class IonosondePanel : public Widget {
 public:
   IonosondePanel(int x, int y, int w, int h, FontManager &fontMgr, TextureManager &texMgr);
 
+  std::string getName() const override { return "Ionosonde"; }
   void updateData(const IonosondeData &data);
   void update() override {}
   void render(SDL_Renderer *renderer) override;
+  void onResize(int x, int y, int w, int h) override;
   void onMouseMove(int mx, int my) override;
 
 private:

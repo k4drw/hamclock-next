@@ -27,6 +27,10 @@ SDL_Color TropoPanel::getLevelColor(TropoLevel l) {
   return {255, 255, 255, 255};
 }
 
+void TropoPanel::onResize(int x, int y, int w, int h) {
+  Widget::onResize(x, y, w, h);
+}
+
 void TropoPanel::render(SDL_Renderer *renderer) {
   if (!fontMgr_.ready()) return;
 

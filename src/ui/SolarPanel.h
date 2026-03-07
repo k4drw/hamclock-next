@@ -18,6 +18,7 @@ public:
 
   ~SolarPanel() override { destroyCache(); }
 
+  std::string getName() const override { return "Solar"; }
   void update() override;
   void render(SDL_Renderer *renderer) override;
   void onResize(int x, int y, int w, int h) override;

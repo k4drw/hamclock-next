@@ -12,6 +12,7 @@ public:
   SantaPanel(int x, int y, int w, int h, FontManager &fontMgr,
              std::shared_ptr<SantaStore> store);
 
+  std::string getName() const override { return "Santa"; }
   void update() override;
   void render(SDL_Renderer *renderer) override;
 

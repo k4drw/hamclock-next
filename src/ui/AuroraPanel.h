@@ -12,8 +12,10 @@ public:
   AuroraPanel(int x, int y, int w, int h, FontManager &fontMgr,
               TextureManager &texMgr, AuroraProvider &provider);
 
+  std::string getName() const override { return "Aurora"; }
   void update() override;
   void render(SDL_Renderer *renderer) override;
+  void onResize(int x, int y, int w, int h) override;
 
 private:
   FontManager &fontMgr_;

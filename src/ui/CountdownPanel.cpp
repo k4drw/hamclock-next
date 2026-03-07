@@ -351,6 +351,10 @@ void CountdownPanel::renderEditOverlay(SDL_Renderer *renderer) {
   SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
 }
 
+void CountdownPanel::onResize(int x, int y, int w, int h) {
+  Widget::onResize(x, y, w, h);
+}
+
 void CountdownPanel::onMouseMove(int mx, int my) {
   tooltip_.visible = false;
   if (editing_)

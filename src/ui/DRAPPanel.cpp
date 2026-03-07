@@ -96,3 +96,7 @@ void DRAPPanel::render(SDL_Renderer *renderer) {
   cat->drawText(renderer, "Max Frequency", x_ + width_ / 2, y_ + height_ - 20,
                 themes.textDim, FontStyle::Micro, true);
 }
+
+void DRAPPanel::onResize(int x, int y, int w, int h) {
+  Widget::onResize(x, y, w, h);
+}
