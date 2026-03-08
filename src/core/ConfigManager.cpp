@@ -176,6 +176,10 @@ bool ConfigManager::load(AppConfig &config) {
     if (!hexColor.empty()) {
       config.callsignColor = hexToColor(hexColor, config.callsignColor);
     }
+    std::string hexBgColor = ap.value("callsign_bg_color", "");
+    if (!hexBgColor.empty()) {
+      config.callsignBgColor = hexToColor(hexBgColor, {0, 0, 0, 0});
+    }
     config.theme = ap.value("theme", "default");
     config.mapNightLights = ap.value("map_night_lights", true);
     config.useMetric = ap.value("use_metric", true);
@@ -549,6 +553,8 @@ bool ConfigManager::save(const AppConfig &config) {
   json["identity"]["lon"] = config.lon;
 
   json["appearance"]["callsign_color"] = colorToHex(config.callsignColor);
+  if (config.callsignBgColor.a > 0)
+    json["appearance"]["callsign_bg_color"] = colorToHex(config.callsignBgColor);
   json["appearance"]["theme"] = config.theme;
   json["appearance"]["map_night_lights"] = config.mapNightLights;
   json["appearance"]["use_metric"] = config.useMetric;

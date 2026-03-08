@@ -49,7 +49,8 @@ struct AppConfig {
   double lon = 0.0;
 
   // Appearance
-  SDL_Color callsignColor = {255, 165, 0, 255}; // default orange
+  SDL_Color callsignColor = {255, 165, 0, 255};   // default orange
+  SDL_Color callsignBgColor = {0, 0, 0, 0};       // default transparent (no bg)
   std::string theme = "default";
   bool mapNightLights = true;
   bool useMetric = true;

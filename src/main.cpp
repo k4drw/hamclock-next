@@ -535,6 +535,8 @@ int main(int argc, char *argv[]) {
     ctx.activeSetup = AppContext::SetupMode::Main;
   } else if (!ctx.cfgMgr.load(ctx.appCfg)) {
     ctx.activeSetup = AppContext::SetupMode::Main;
+  } else {
+    ctx.displayPower->setMethodByName(ctx.appCfg.displayPowerMethod);
   }
 #endif
 
@@ -789,7 +791,7 @@ int main(int argc, char *argv[]) {
   emscripten_set_main_loop(main_tick, 10, 1);
 #else
   while (ctx.appRunning) {
-    static constexpr Uint32 kTargetFrameMs = 100; // ~10 FPS
+    static constexpr Uint32 kTargetFrameMs = 20; // 50fps event loop; render throttled internally
     static Uint32 s_lastFrameMs = 0;
     main_tick();
     Uint32 elapsed = SDL_GetTicks() - s_lastFrameMs;
@@ -1135,10 +1137,12 @@ DashboardContext::DashboardContext(AppContext &ctx)
   timePanel =
       std::make_unique<TimePanel>(0, 0, 0, 0, fontMgr, texMgr, appCfg.callsign);
   timePanel->setCallColor(appCfg.callsignColor);
+  timePanel->setCallBgColor(appCfg.callsignBgColor);
   timePanel->setOnConfigChanged(
-      [&ctx](const std::string &call, SDL_Color color) {
+      [&ctx](const std::string &call, SDL_Color fgColor, SDL_Color bgColor) {
         ctx.appCfg.callsign = call;
-        ctx.appCfg.callsignColor = color;
+        ctx.appCfg.callsignColor = fgColor;
+        ctx.appCfg.callsignBgColor = bgColor;
         ctx.cfgMgr.save(ctx.appCfg);
       });
 
@@ -2398,11 +2402,19 @@ void DashboardContext::update(AppContext &ctx) {
             ctx.setupWidget->onMouseDown(mx, my, 0, 1);
             ctx.setupWidget->onMouseUp(mx, my, 0, 1);
           } else {
-            // Check Map Modal first (MapViewMenu) via mapArea
-            if (ctx.dashboard->mapArea->isModalActive()) {
-              ctx.dashboard->mapArea->onMouseUp(mx, my, 0, 1);
+            // Scan all eventWidgets for an active modal/config, mirroring
+            // the SDL_MOUSEBUTTONUP focusedWidget logic so every modal
+            // (not just mapArea's MapViewMenu) receives web touch events.
+            Widget *focused = nullptr;
+            for (auto *w : ctx.dashboard->eventWidgets) {
+              if (w->isModalActive() || w->isConfiguring()) {
+                focused = w;
+                break;
+              }
+            }
+            if (focused) {
+              focused->onMouseUp(mx, my, 0, 1);
             } else {
-              // Dashboard widgets (normal mode)
               for (auto *w : ctx.dashboard->eventWidgets)
                 if (w->onMouseUp(mx, my, 0, 1))
                   break;
@@ -2417,11 +2429,17 @@ void DashboardContext::update(AppContext &ctx) {
               ctx.setupWidget) {
             ctx.setupWidget->onMouseWheel(dy);
           } else {
-            // Check Map Modal first (MapViewMenu) via mapArea
-            if (ctx.dashboard->mapArea->isModalActive()) {
-              ctx.dashboard->mapArea->onMouseWheel(dy);
+            // Same fix: scan all eventWidgets for active modal/config.
+            Widget *focused = nullptr;
+            for (auto *w : ctx.dashboard->eventWidgets) {
+              if (w->isModalActive() || w->isConfiguring()) {
+                focused = w;
+                break;
+              }
+            }
+            if (focused) {
+              focused->onMouseWheel(dy);
             } else {
-              // Dashboard widgets (e.g. scrollable top bar panes)
               for (auto *w : ctx.dashboard->eventWidgets)
                 if (w->onMouseWheel(dy))
                   break;
@@ -2607,7 +2625,8 @@ void DashboardContext::render(AppContext &ctx) {
   }
 
   if (!ctx.displayPower->getPower()) {
-    return; // Stay black
+    SDL_RenderPresent(ctx.renderer); // Push black frame to framebuffer
+    return;
   }
 
   Widget *activeModal = nullptr;
@@ -2848,6 +2867,21 @@ void main_tick() {
           }
           ctx.setupWidget->onResize(ctx.layLogicalOffX, ctx.layLogicalOffY,
                                     LOGICAL_WIDTH, LOGICAL_HEIGHT);
+        } else if (event.type >= AE_BASE_EVENT) {
+          switch (event.type - AE_BASE_EVENT) {
+            case AE_TOUCH: {
+              int mx = static_cast<int>(reinterpret_cast<intptr_t>(event.user.data1));
+              int my = static_cast<int>(reinterpret_cast<intptr_t>(event.user.data2));
+              ctx.setupWidget->onMouseDown(mx, my, 0, 1);
+              ctx.setupWidget->onMouseUp(mx, my, 0, 1);
+              break;
+            }
+            case AE_WHEEL: {
+              int dy = static_cast<int>(reinterpret_cast<intptr_t>(event.user.data1));
+              ctx.setupWidget->onMouseWheel(dy);
+              break;
+            }
+          }
         }
       }
     }
@@ -2989,8 +3023,28 @@ void main_tick() {
       }
     }
 
+    // Always call update() — this processes SDL events and keeps interaction
+    // responsive. Only render() is throttled.
     ctx.dashboard->update(ctx);
+
+#ifndef __EMSCRIPTEN__
+    // Render at 2fps at idle; boost to 20fps for 2s after any mouse/touch input.
+    static Uint32 s_lastRenderMs = 0;
+    static constexpr Uint32 kIdleIntervalMs = 500;  // 2fps
+    static constexpr Uint32 kActiveIntervalMs = 50; // 20fps during interaction
+    static constexpr Uint32 kMouseWindowMs = 2000;  // stay fast 2s after input
+    const Uint32 renderNow = SDL_GetTicks();
+    const bool mouseActive =
+        (renderNow - ctx.dashboard->lastMouseMotionMs < kMouseWindowMs);
+    const Uint32 renderInterval =
+        mouseActive ? kActiveIntervalMs : kIdleIntervalMs;
+    if (renderNow - s_lastRenderMs >= renderInterval) {
+      s_lastRenderMs = renderNow;
+      ctx.dashboard->render(ctx);
+    }
+#else
     ctx.dashboard->render(ctx);
+#endif
 
     if (!ctx.appRunning) {
 #ifdef __EMSCRIPTEN__

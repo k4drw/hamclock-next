@@ -164,10 +164,30 @@ void FrameCapture::workerLoop() {
       SDL_RWops *rw = makeGrowBufRW(&gb);
       if (rw) {
         if (IMG_SaveJPG_RW(surf, rw, 0, quality) == 0) {
-          std::lock_guard<std::mutex> lock(mutex_);
-          jpegData_ = std::move(gb.data);
-          ++seq_;
-          cv_.notify_all();
+          std::vector<uint8_t> baseCopy;
+          {
+            std::lock_guard<std::mutex> lock(mutex_);
+            jpegData_ = std::move(gb.data);
+            ++seq_;
+            cv_.notify_all();
+            // Throttle base buffer to ~1 FPS for vector-overlay clients.
+            // requestBaseCapture() bypasses the throttle for one frame so
+            // user interactions (touch/key/wheel) produce immediate feedback.
+            if (baseSubscribers_ > 0) {
+              Uint32 now = SDL_GetTicks();
+              bool force = baseForceCaptureRequested_.exchange(false);
+              if (force || now - lastBaseCaptureMs_ >= 1000) {
+                lastBaseCaptureMs_ = now;
+                baseCopy = jpegData_;
+              }
+            }
+          }
+          if (!baseCopy.empty()) {
+            std::lock_guard<std::mutex> baseLock(baseMutex_);
+            baseJpegData_ = std::move(baseCopy);
+            ++baseSeq_;
+            baseCv_.notify_all();
+          }
         } else {
           LOG_W("FrameCapture", "JPEG encode failed: {}", IMG_GetError());
         }
@@ -187,6 +207,19 @@ std::vector<uint8_t> FrameCapture::waitFrame(uint64_t afterSeq, int timeoutMs,
   outSeq = seq_;
   if (ready && !jpegData_.empty())
     return jpegData_; // copy under lock
+  return {};
+}
+
+std::vector<uint8_t> FrameCapture::waitBaseFrame(uint64_t afterSeq,
+                                                  int timeoutMs,
+                                                  uint64_t &outSeq) const {
+  std::unique_lock<std::mutex> lock(baseMutex_);
+  bool ready =
+      baseCv_.wait_for(lock, std::chrono::milliseconds(timeoutMs),
+                       [this, afterSeq] { return baseSeq_ > afterSeq; });
+  outSeq = baseSeq_;
+  if (ready && !baseJpegData_.empty())
+    return baseJpegData_; // copy under lock
   return {};
 }
 

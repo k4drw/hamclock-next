@@ -194,6 +194,14 @@ void TimePanel::render(SDL_Renderer *renderer) {
   int dateRowH = y_ + height_ - dateBaseY;
 
   // --- Callsign (large, user-selected color, centered) ---
+  if (callBgColor_.a > 0) {
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+    SDL_Rect bgRect = {x_ + 1, callBaseY + 1, width_ - 2, callRowH - 2};
+    SDL_SetRenderDrawColor(renderer, callBgColor_.r, callBgColor_.g,
+                           callBgColor_.b, callBgColor_.a);
+    SDL_RenderFillRect(renderer, &bgRect);
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+  }
   if (callFontSize_ != lastCallFontSize_ || !callTex_) {
     MemoryMonitor::getInstance().destroyTexture(callTex_);
     callTex_ = fontMgr_.renderText(renderer, callsign_, callColor_,
@@ -398,10 +406,22 @@ void TimePanel::onResize(int x, int y, int w, int h) {
 
 void TimePanel::startEditing() {
   editing_ = true;
+  editingBgColor_ = false; // always start in FG mode
   editInput_.setValue(callsign_);
   editInput_.setMaxLength(20);
   editInput_.setCursorToEnd();
   editInput_.setActive(true);
+  // Sync selectedBgColorIdx_ from current callBgColor_
+  selectedBgColorIdx_ = -1;
+  if (callBgColor_.a > 0) {
+    for (int i = 0; i < kNumColors; ++i) {
+      if (kPalette[i].r == callBgColor_.r && kPalette[i].g == callBgColor_.g &&
+          kPalette[i].b == callBgColor_.b) {
+        selectedBgColorIdx_ = i;
+        break;
+      }
+    }
+  }
   SDL_StartTextInput();
 }
 
@@ -409,13 +429,15 @@ void TimePanel::stopEditing(bool apply) {
   if (apply && !editInput_.getValue().empty()) {
     callsign_ = editInput_.getValue();
     callColor_ = kPalette[selectedColorIdx_];
+    callBgColor_ = (selectedBgColorIdx_ >= 0) ? kPalette[selectedBgColorIdx_]
+                                               : SDL_Color{0, 0, 0, 0};
     // Force callsign texture rebuild
     if (callTex_) {
       MemoryMonitor::getInstance().destroyTexture(callTex_);
     }
     // Persist change
     if (onConfigChanged_) {
-      onConfigChanged_(callsign_, callColor_);
+      onConfigChanged_(callsign_, callColor_, callBgColor_);
     }
   }
   editing_ = false;
@@ -471,20 +493,36 @@ bool TimePanel::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
   }
 
   if (editing_) {
-    // Check if clicking a color swatch
     int pad = std::max(4, static_cast<int>(width_ * 0.03f));
     int editorFontSize = std::clamp(static_cast<int>(height_ * 0.18f), 12, 36);
     int textFieldH = editorFontSize + 12;
-
-    // Layout: text field at top, then color palette below
     int fieldY = y_ + pad;
-    int paletteY = fieldY + textFieldH + pad;
+    int tabRowH = 14;
+    int tabY = fieldY + textFieldH + 4;
+    int fieldW = width_ - 2 * pad;
+    int tabW = (fieldW - 4) / 2;
 
+    // Check FG tab click
+    if (mx >= x_ + pad && mx < x_ + pad + tabW && my >= tabY &&
+        my < tabY + tabRowH) {
+      editingBgColor_ = false;
+      return true;
+    }
+    // Check BG tab click
+    if (mx >= x_ + pad + tabW + 4 && mx < x_ + pad + tabW + 4 + tabW &&
+        my >= tabY && my < tabY + tabRowH) {
+      editingBgColor_ = true;
+      return true;
+    }
+
+    // Check palette swatches
+    int paletteY = tabY + tabRowH + 4;
     int swatchSize = std::clamp(static_cast<int>(width_ * 0.08f), 16, 32);
     int gap = std::max(2, swatchSize / 6);
     int cols = 6;
+    int numCells = editingBgColor_ ? kNumColors + 1 : kNumColors;
 
-    for (int i = 0; i < kNumColors; ++i) {
+    for (int i = 0; i < numCells; ++i) {
       int col = i % cols;
       int row = i / cols;
       int sx = x_ + pad + col * (swatchSize + gap);
@@ -492,12 +530,16 @@ bool TimePanel::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
 
       if (mx >= sx && mx < sx + swatchSize && my >= sy &&
           my < sy + swatchSize) {
-        selectedColorIdx_ = i;
+        if (editingBgColor_) {
+          selectedBgColorIdx_ = (i == 0) ? -1 : i - 1;
+        } else {
+          selectedColorIdx_ = i;
+        }
         return true;
       }
     }
 
-    // Click outside the overlay area → apply and close
+    // Click outside overlay → apply and close
     stopEditing(true);
     return true;
   }
@@ -591,13 +633,15 @@ void TimePanel::renderEditOverlay(SDL_Renderer *renderer) {
                   FontStyle::MediumBold);
   }
 
-  // Cursor: measure text up to cursorPos to find x offset
+  // Cursor: measure text up to cursorPos to find x offset.
+  // Must pass bold=true — MediumBold is wider than plain, causing cursor
+  // to appear mid-character if bold is omitted.
   int cursorX = textX;
   int cp = editInput_.getCursorPos();
   if (cp > 0) {
     std::string beforeCursor = editStr.substr(0, cp);
     int tw = fontMgr_.getLogicalWidth(beforeCursor,
-                                      cat->ptSize(FontStyle::MediumBold));
+                                      cat->ptSize(FontStyle::MediumBold), true);
     cursorX = textX + tw;
   }
 
@@ -609,35 +653,112 @@ void TimePanel::renderEditOverlay(SDL_Renderer *renderer) {
                        fieldY + textFieldH - 3);
   }
 
+  // --- FG / BG mode tabs ---
+  int tabRowH = 14;
+  int tabY = fieldY + textFieldH + 4;
+  int fieldW = width_ - 2 * pad;
+  int tabW = (fieldW - 4) / 2;
+  SDL_Rect fgTab = {x_ + pad, tabY, tabW, tabRowH};
+  SDL_Rect bgTab = {x_ + pad + tabW + 4, tabY, tabW, tabRowH};
+
+  // FG tab: filled with current fg color
+  {
+    SDL_Color fc = kPalette[selectedColorIdx_];
+    SDL_SetRenderDrawColor(renderer, fc.r / 3, fc.g / 3, fc.b / 3, 255);
+    SDL_RenderFillRect(renderer, &fgTab);
+    SDL_SetRenderDrawColor(renderer, fc.r, fc.g, fc.b, 255);
+    SDL_RenderDrawRect(renderer, &fgTab);
+    if (!editingBgColor_) {
+      SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+      SDL_Rect outline = {fgTab.x - 1, fgTab.y - 1, fgTab.w + 2, fgTab.h + 2};
+      SDL_RenderDrawRect(renderer, &outline);
+    }
+    SDL_Color lbl = {220, 220, 220, 255};
+    cat->drawText(renderer, "TEXT", fgTab.x + fgTab.w / 2,
+                  fgTab.y + fgTab.h / 2, lbl, FontStyle::Tiny, true, false,
+                  true);
+  }
+
+  // BG tab: filled with current bg color (or dark gray if none)
+  {
+    if (selectedBgColorIdx_ >= 0) {
+      SDL_Color bc = kPalette[selectedBgColorIdx_];
+      SDL_SetRenderDrawColor(renderer, bc.r / 3, bc.g / 3, bc.b / 3, 255);
+      SDL_RenderFillRect(renderer, &bgTab);
+      SDL_SetRenderDrawColor(renderer, bc.r, bc.g, bc.b, 255);
+      SDL_RenderDrawRect(renderer, &bgTab);
+    } else {
+      SDL_SetRenderDrawColor(renderer, 35, 35, 35, 255);
+      SDL_RenderFillRect(renderer, &bgTab);
+      SDL_SetRenderDrawColor(renderer, 90, 90, 90, 255);
+      SDL_RenderDrawRect(renderer, &bgTab);
+      // X mark for "none"
+      SDL_SetRenderDrawColor(renderer, 120, 120, 120, 255);
+      SDL_RenderDrawLine(renderer, bgTab.x + 3, bgTab.y + 3,
+                         bgTab.x + bgTab.w - 4, bgTab.y + bgTab.h - 4);
+      SDL_RenderDrawLine(renderer, bgTab.x + bgTab.w - 4, bgTab.y + 3,
+                         bgTab.x + 3, bgTab.y + bgTab.h - 4);
+    }
+    if (editingBgColor_) {
+      SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+      SDL_Rect outline = {bgTab.x - 1, bgTab.y - 1, bgTab.w + 2, bgTab.h + 2};
+      SDL_RenderDrawRect(renderer, &outline);
+    }
+    SDL_Color lbl = {220, 220, 220, 255};
+    cat->drawText(renderer, "BG", bgTab.x + bgTab.w / 2,
+                  bgTab.y + bgTab.h / 2, lbl, FontStyle::Tiny, true, false,
+                  true);
+  }
+
   // --- Color palette ---
-  int paletteY = fieldY + textFieldH + pad;
+  int paletteY = tabY + tabRowH + 4;
   int swatchSize = std::clamp(static_cast<int>(width_ * 0.08f), 16, 32);
   int gap = std::max(2, swatchSize / 6);
   int cols = 6;
 
-  for (int i = 0; i < kNumColors; ++i) {
+  // In BG mode: first cell is "none/clear" (dark with X), then palette colors.
+  // In FG mode: all 12 palette colors.
+  int numCells = editingBgColor_ ? kNumColors + 1 : kNumColors;
+  for (int i = 0; i < numCells; ++i) {
     int col = i % cols;
     int row = i / cols;
     int sx = x_ + pad + col * (swatchSize + gap);
     int sy = paletteY + row * (swatchSize + gap);
-
-    SDL_Color c = kPalette[i];
-    SDL_SetRenderDrawColor(renderer, c.r, c.g, c.b, 255);
     SDL_Rect swatch = {sx, sy, swatchSize, swatchSize};
-    SDL_RenderFillRect(renderer, &swatch);
 
-    // Highlight selected swatch with white border
-    if (i == selectedColorIdx_) {
-      SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
-      SDL_Rect outline = {sx - 1, sy - 1, swatchSize + 2, swatchSize + 2};
-      SDL_RenderDrawRect(renderer, &outline);
+    if (editingBgColor_ && i == 0) {
+      // "None" cell
+      SDL_SetRenderDrawColor(renderer, 35, 35, 35, 255);
+      SDL_RenderFillRect(renderer, &swatch);
+      SDL_SetRenderDrawColor(renderer, 90, 90, 90, 255);
+      SDL_RenderDrawLine(renderer, sx + 3, sy + 3, sx + swatchSize - 4,
+                         sy + swatchSize - 4);
+      SDL_RenderDrawLine(renderer, sx + swatchSize - 4, sy + 3, sx + 3,
+                         sy + swatchSize - 4);
+      if (selectedBgColorIdx_ == -1) {
+        SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+        SDL_Rect outline = {sx - 1, sy - 1, swatchSize + 2, swatchSize + 2};
+        SDL_RenderDrawRect(renderer, &outline);
+      }
+    } else {
+      int palIdx = editingBgColor_ ? i - 1 : i;
+      SDL_Color c = kPalette[palIdx];
+      SDL_SetRenderDrawColor(renderer, c.r, c.g, c.b, 255);
+      SDL_RenderFillRect(renderer, &swatch);
+
+      bool selected = editingBgColor_ ? (palIdx == selectedBgColorIdx_)
+                                      : (palIdx == selectedColorIdx_);
+      if (selected) {
+        SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+        SDL_Rect outline = {sx - 1, sy - 1, swatchSize + 2, swatchSize + 2};
+        SDL_RenderDrawRect(renderer, &outline);
+      }
     }
   }
 
   // --- Hint text ---
-  int hintY =
-      paletteY + ((kNumColors + cols - 1) / cols) * (swatchSize + gap) + pad;
-  if (hintY + 14 < y_ + height_) {
+  int hintY = paletteY + ((numCells + cols - 1) / cols) * (swatchSize + gap) + 2;
+  if (hintY + 11 < y_ + height_) {
     SDL_Color gray = {140, 140, 140, 255};
     cat->drawText(renderer, "Enter=Done  Esc=Cancel", x_ + pad, hintY, gray,
                   FontStyle::Caption);

@@ -9,6 +9,13 @@
 #include "../core/SolarData.h"
 #include "../core/StringUtils.h"
 #include "../core/WatchlistStore.h"
+// Cap the httplib thread pool to 2 (default is max(8, hw_concurrency-1)).
+// On RPi3B (4 cores) the default spawns 8 idle worker threads that
+// continuously wake the scheduler, adding ~14% system CPU at idle.
+// 2 threads is sufficient: one for the JPEG SSE stream, one for API calls.
+#ifndef CPPHTTPLIB_THREAD_POOL_COUNT
+#define CPPHTTPLIB_THREAD_POOL_COUNT 2
+#endif
 #include <httplib.h>
 #include <nlohmann/json.hpp>
 
@@ -1651,6 +1658,8 @@ void WebServer::run() {
     e.user.data1 = reinterpret_cast<void *>(static_cast<intptr_t>(lx));
     e.user.data2 = reinterpret_cast<void *>(static_cast<intptr_t>(ly));
     SDL_PushEvent(&e);
+    if (frameCapture_)
+      frameCapture_->requestBaseCapture();
     res.set_content("ok", "text/plain");
   });
 
@@ -1665,6 +1674,8 @@ void WebServer::run() {
     e.type = SDL_MOUSEWHEEL;
     e.wheel.y = y;
     SDL_PushEvent(&e);
+    if (frameCapture_)
+      frameCapture_->requestBaseCapture();
     res.set_content("ok", "text/plain");
   });
 
@@ -1688,6 +1699,8 @@ void WebServer::run() {
     up.type = SDL_KEYUP;
     SDL_PushEvent(&down);
     SDL_PushEvent(&up);
+    if (frameCapture_)
+      frameCapture_->requestBaseCapture();
     res.set_content("ok", "text/plain");
   });
 
@@ -1712,6 +1725,116 @@ void WebServer::run() {
     res.set_content("ok", "text/plain");
   });
 
+  // ----------------------------------------------------------------
+  // /api/live/vectors — spot + projection data for canvas overlay
+  // ----------------------------------------------------------------
+  svr.Get("/api/live/vectors", [this](const httplib::Request &,
+                                      httplib::Response &res) {
+    if (!cfg_ || !state_) {
+      res.status = 503;
+      return;
+    }
+    nlohmann::json j;
+    j["projection"] = cfg_->projection;
+    j["deLat"] = state_->deLocation.lat;
+    j["deLon"] = state_->deLocation.lon;
+    j["dxLat"] = state_->dxLocation.lat;
+    j["dxLon"] = state_->dxLocation.lon;
+    // Logical dimensions so the browser can compute the pixel scale factor.
+    j["logicalW"] = 800;
+    j["logicalH"] = 480;
+
+    // Compute mapRect in logical 800×480 coordinates.
+    // Map widget is at {139,149,660,330} per LayoutManager::kMain.
+    {
+      constexpr int wx = 139, wy = 149, ww = 660, wh = 330;
+      int mx, my, mw, mh;
+      const std::string &proj = cfg_->projection;
+      if (proj == "azimuthal") {
+        int side = std::min(ww, wh);
+        mx = wx + (ww - side) / 2;
+        my = wy + (wh - side) / 2;
+        mw = side;
+        mh = side;
+      } else if (proj == "dual_azimuthal") {
+        mx = wx;
+        my = wy;
+        mw = ww;
+        mh = wh;
+      } else {
+        // equirectangular / robinson / mercator — 2:1 aspect
+        int mapW = ww, mapH = ww / 2;
+        if (mapH > wh) {
+          mapH = wh;
+          mapW = mapH * 2;
+        }
+        mx = wx + (ww - mapW) / 2;
+        my = wy + (wh - mapH) / 2;
+        mw = mapW;
+        mh = mapH;
+      }
+      j["mapRect"] = {{"x", mx}, {"y", my}, {"w", mw}, {"h", mh}};
+    }
+
+    // DX cluster spots (< 60 min old)
+    nlohmann::json dxArr = nlohmann::json::array();
+    if (dxc_) {
+      auto snap = dxc_->snapshot();
+      auto now = std::chrono::system_clock::now();
+      for (const auto &s : snap->spots) {
+        auto age = std::chrono::duration_cast<std::chrono::minutes>(
+                       now - s.spottedAt)
+                       .count();
+        if (age >= 60)
+          continue;
+        nlohmann::json sj;
+        sj["txCall"] = s.txCall;
+        sj["txLat"] = s.txLat;
+        sj["txLon"] = s.txLon;
+        sj["rxCall"] = s.rxCall;
+        sj["rxLat"] = s.rxLat;
+        sj["rxLon"] = s.rxLon;
+        sj["mode"] = s.mode;
+        sj["freqKhz"] = s.freqKhz;
+        sj["spottedAt"] =
+            std::chrono::duration_cast<std::chrono::seconds>(
+                s.spottedAt.time_since_epoch())
+                .count();
+        dxArr.push_back(sj);
+      }
+    }
+    j["dxSpots"] = dxArr;
+
+    // Live spots — convert Maidenhead receiver grid to lat/lon centre
+    nlohmann::json liveArr = nlohmann::json::array();
+    if (spots_) {
+      auto snap = spots_->snapshot();
+      for (const auto &s : snap->spots) {
+        const std::string &g = s.receiverGrid;
+        if (g.size() < 4)
+          continue;
+        char f0 = std::toupper((unsigned char)g[0]);
+        char f1 = std::toupper((unsigned char)g[1]);
+        char f2 = g[2];
+        char f3 = g[3];
+        if (f0 < 'A' || f0 > 'R' || f1 < 'A' || f1 > 'R' ||
+            f2 < '0' || f2 > '9' || f3 < '0' || f3 > '9')
+          continue;
+        double rxLon = (f0 - 'A') * 20.0 - 180.0 + (f2 - '0') * 2.0 + 1.0;
+        double rxLat = (f1 - 'A') * 10.0 - 90.0 + (f3 - '0') * 1.0 + 0.5;
+        nlohmann::json sj;
+        sj["rxLat"] = rxLat;
+        sj["rxLon"] = rxLon;
+        sj["freqKhz"] = s.freqKhz;
+        liveArr.push_back(sj);
+      }
+    }
+    j["liveSpots"] = liveArr;
+
+    res.set_header("Access-Control-Allow-Origin", "*");
+    res.set_content(j.dump(), "application/json");
+  });
+
   svr.Get("/live", [](const httplib::Request &, httplib::Response &res) {
     static const std::string html = R"HTML(<!DOCTYPE html>
 <html lang="en">
@@ -1721,14 +1844,33 @@ void WebServer::run() {
   <style>
     body { background: #000; margin: 0; display: flex; flex-direction: column; align-items: center; }
     #info { color: #0f0; font-family: monospace; font-size: 12px; padding: 4px; }
+    #feed-wrap { position: relative; display: inline-block; max-width: 100vw; line-height: 0; }
     #feed { max-width: 100%; display: block; cursor: crosshair; }
+    #vcv { position: absolute; top: 0; left: 0; pointer-events: none; }
   </style>
 </head>
 <body>
   <div id="info">Click map to interact &bull; Scroll to zoom &bull; <a href="/" style="color:#0f0">Config</a></div>
-  <img id="feed" src="/stream.mjpeg">
+  <div id="feed-wrap">
+    <img id="feed" src="/stream.mjpeg">
+    <canvas id="vcv"></canvas>
+  </div>
   <script>
     const img = document.getElementById('feed');
+    const canvas = document.getElementById('vcv');
+    const ctx2d = canvas.getContext('2d');
+    const VM = new URLSearchParams(window.location.search).get('vectors') === '1';
+    if (VM) img.src = '/stream.mjpeg?vectors=1';
+
+    function syncCanvas() {
+      canvas.width = img.naturalWidth || 800;
+      canvas.height = img.naturalHeight || 480;
+      canvas.style.width = img.clientWidth + 'px';
+      canvas.style.height = img.clientHeight + 'px';
+    }
+    img.addEventListener('load', () => { syncCanvas(); if (VM && lastData) drawSpots(lastData); });
+    window.addEventListener('resize', () => { syncCanvas(); if (VM && lastData) drawSpots(lastData); });
+
     img.addEventListener('click', e => {
       const r = img.getBoundingClientRect();
       const x = Math.round((e.clientX - r.left) * img.naturalWidth / r.width);
@@ -1749,45 +1891,215 @@ void WebServer::run() {
       const y = Math.round((e.clientY - r.top) * img.naturalHeight / r.height);
       fetch('/live/mouse?x=' + x + '&y=' + y);
     });
+
+    // ---- Vector overlay (active when ?vectors=1) ----
+    var lastData = null;
+    if (VM) {
+      // Robinson projection coefficients (19 entries, 0-90° in 5° steps)
+      const ROB = [
+        [1.0000,0.0000],[0.9986,0.0620],[0.9954,0.1240],[0.9900,0.1860],
+        [0.9822,0.2480],[0.9730,0.3100],[0.9600,0.3720],[0.9427,0.4340],
+        [0.9216,0.4958],[0.8962,0.5571],[0.8679,0.6176],[0.8350,0.6769],
+        [0.7986,0.7346],[0.7597,0.7903],[0.7186,0.8435],[0.6732,0.8936],
+        [0.6213,0.9394],[0.5722,0.9761],[0.5322,1.0000]
+      ];
+      function projRobinson(lat, lon, mr) {
+        const a=Math.abs(lat), i=Math.min(Math.floor(a/5),17), f=a/5-i;
+        const xc=ROB[i][0]+f*(ROB[i+1][0]-ROB[i][0]);
+        const yc=ROB[i][1]+f*(ROB[i+1][1]-ROB[i][1]);
+        const rnx=(lon/180)*xc, rny=lat<0?-yc:yc;
+        return {x:mr.x+(rnx+1)*0.5*mr.w, y:mr.y+(1-rny)*0.5*mr.h};
+      }
+      function projEquirect(lat, lon, mr) {
+        return {x:mr.x+(lon+180)/360*mr.w, y:mr.y+(90-lat)/180*mr.h};
+      }
+      function azNxy(lat, lon, lat0, lon0) {
+        const D=Math.PI/180;
+        const phi=lat*D, phi0=lat0*D, dl=(lon-lon0)*D;
+        const cc=Math.max(-1,Math.min(1,Math.sin(phi0)*Math.sin(phi)+Math.cos(phi0)*Math.cos(phi)*Math.cos(dl)));
+        const c=Math.acos(cc);
+        if(c<1e-10) return {nx:0,ny:0};
+        if(c>Math.PI-1e-10) return null;
+        const k=c/Math.sin(c);
+        return {nx:k*Math.cos(phi)*Math.sin(dl)/Math.PI,
+                ny:k*(Math.cos(phi0)*Math.sin(phi)-Math.sin(phi0)*Math.cos(phi)*Math.cos(dl))/Math.PI};
+      }
+      function projAzimuthal(lat, lon, deLat, deLon, mr) {
+        const p=azNxy(lat,lon,deLat,deLon); if(!p) return null;
+        const sc=Math.min(mr.w,mr.h);
+        return {x:mr.x+mr.w*0.5+p.nx*sc*0.5, y:mr.y+mr.h*0.5-p.ny*sc*0.5};
+      }
+      function projDualAz(lat, lon, deLat, deLon, mr) {
+        const hw=mr.w/2, R=Math.min(hw,mr.h)*0.5;
+        const cx=mr.x+hw*0.5, cy=mr.y+mr.h*0.5;
+        const p=azNxy(lat,lon,deLat,deLon); if(!p) return null;
+        return {x:cx+p.nx*R, y:cy-p.ny*R};
+      }
+      function projMercator(lat, lon, mr) {
+        const mL=85.05112878, D=Math.PI/180;
+        const cl=Math.max(-mL,Math.min(mL,lat));
+        const mY=Math.log(Math.tan(Math.PI/4+cl*D/2));
+        const mmY=Math.log(Math.tan(Math.PI/4+mL*D/2));
+        return {x:mr.x+(lon+180)/360*mr.w, y:mr.y+(0.5-0.5*mY/mmY)*mr.h};
+      }
+      function project(lat, lon, proj, deLat, deLon, mr) {
+        switch(proj) {
+          case 'robinson':      return projRobinson(lat,lon,mr);
+          case 'azimuthal':     return projAzimuthal(lat,lon,deLat,deLon,mr);
+          case 'dual_azimuthal':return projDualAz(lat,lon,deLat,deLon,mr);
+          case 'mercator':      return projMercator(lat,lon,mr);
+          default:              return projEquirect(lat,lon,mr);
+        }
+      }
+
+      const BC = {
+        '160m':'#FF4444','80m':'#FF8800','60m':'#FFAA00','40m':'#FFFF00',
+        '30m':'#88FF00','20m':'#00FF00','17m':'#00FFAA','15m':'#00FFFF',
+        '12m':'#00AAFF','10m':'#0044FF','6m':'#8800FF','2m':'#FF00FF'
+      };
+      function freqBand(f) {
+        if(f>=1800&&f<=2000)   return '160m';
+        if(f>=3500&&f<=4000)   return '80m';
+        if(f>=5330&&f<=5410)   return '60m';
+        if(f>=7000&&f<=7300)   return '40m';
+        if(f>=10100&&f<=10150) return '30m';
+        if(f>=14000&&f<=14350) return '20m';
+        if(f>=18068&&f<=18168) return '17m';
+        if(f>=21000&&f<=21450) return '15m';
+        if(f>=24890&&f<=24990) return '12m';
+        if(f>=28000&&f<=29700) return '10m';
+        if(f>=50000&&f<=54000) return '6m';
+        if(f>=144000&&f<=148000) return '2m';
+        return null;
+      }
+
+      function scaledMr(mr, d) {
+        // Scale mapRect from logical coords to canvas pixel coords
+        const sx = canvas.width / d.logicalW;
+        const sy = canvas.height / d.logicalH;
+        return {x:mr.x*sx, y:mr.y*sy, w:mr.w*sx, h:mr.h*sy};
+      }
+
+      function drawSpots(d) {
+        lastData = d;
+        ctx2d.clearRect(0, 0, canvas.width, canvas.height);
+        const mr = scaledMr(d.mapRect, d);
+        const proj = d.projection, deLat = d.deLat, deLon = d.deLon;
+
+        // Live spots — small semi-transparent dots at receiver grid centre
+        for (const s of d.liveSpots) {
+          if (s.rxLat == null) continue;
+          const pt = project(s.rxLat, s.rxLon, proj, deLat, deLon, mr);
+          if (!pt) continue;
+          const band = freqBand(s.freqKhz);
+          const col = (band && BC[band]) ? BC[band] : '#aaaaaa';
+          ctx2d.beginPath();
+          ctx2d.arc(pt.x, pt.y, 2, 0, 2*Math.PI);
+          ctx2d.fillStyle = col + '80';
+          ctx2d.fill();
+        }
+
+        // DX cluster spots — labelled dots
+        for (const s of d.dxSpots) {
+          if (!s.txLat && !s.txLon) continue;
+          const pt = project(s.txLat, s.txLon, proj, deLat, deLon, mr);
+          if (!pt) continue;
+          const band = freqBand(s.freqKhz);
+          const col = (band && BC[band]) ? BC[band] : '#ffffff';
+          ctx2d.beginPath();
+          ctx2d.arc(pt.x, pt.y, 4, 0, 2*Math.PI);
+          ctx2d.fillStyle = col;
+          ctx2d.fill();
+          ctx2d.font = '9px monospace';
+          ctx2d.fillStyle = col;
+          ctx2d.fillText(s.txCall, pt.x + 6, pt.y + 3);
+        }
+      }
+
+      function pollVectors() {
+        fetch('/api/live/vectors')
+          .then(r => r.json())
+          .then(d => { syncCanvas(); drawSpots(d); })
+          .catch(e => console.warn('vectors poll:', e));
+      }
+      pollVectors();
+      setInterval(pollVectors, 15000);
+    }
   </script>
 </body>
 </html>)HTML";
     res.set_content(html, "text/html");
   });
 
-  svr.Get("/stream.mjpeg", [this](const httplib::Request &,
+  svr.Get("/stream.mjpeg", [this](const httplib::Request &req,
                                   httplib::Response &res) {
     if (!frameCapture_ || !liveWebEnabled_) {
       res.status = 503;
       return;
     }
-    frameCapture_->addSubscriber();
-    uint64_t seq = 0;
-    res.set_content_provider(
-        "multipart/x-mixed-replace;boundary=hamclock",
-        [this, seq](size_t /*offset*/,
-                    httplib::DataSink &sink) mutable -> bool {
-          if (!sink.is_writable())
-            return false;
-          uint64_t outSeq = 0;
-          auto frame = frameCapture_->waitFrame(seq, 5000, outSeq);
-          if (frame.empty())
-            return sink.is_writable();
-          seq = outSeq;
-          std::string hdr =
-              "--hamclock\r\nContent-Type: image/jpeg\r\nContent-Length: " +
-              std::to_string(frame.size()) + "\r\n\r\n";
-          if (!sink.write(hdr.data(), hdr.size()))
-            return false;
-          if (!sink.write(reinterpret_cast<const char *>(frame.data()),
-                          frame.size()))
-            return false;
-          return sink.write("\r\n", 2);
-        },
-        [this](bool) {
-          if (frameCapture_)
-            frameCapture_->removeSubscriber();
-        });
+    bool vectorsMode =
+        req.has_param("vectors") && req.get_param_value("vectors") == "1";
+    if (vectorsMode) {
+      // Base-layer stream: same frame content but throttled to ~1 FPS.
+      // Full spot suppression from the MJPEG base is deferred (requires
+      // MapWidget render-loop refactoring); spots are also drawn by the
+      // browser canvas overlay.
+      frameCapture_->addBaseSubscriber();
+      uint64_t seq = 0;
+      res.set_content_provider(
+          "multipart/x-mixed-replace;boundary=hamclock",
+          [this, seq](size_t /*offset*/,
+                      httplib::DataSink &sink) mutable -> bool {
+            if (!sink.is_writable())
+              return false;
+            uint64_t outSeq = 0;
+            auto frame = frameCapture_->waitBaseFrame(seq, 10000, outSeq);
+            if (frame.empty())
+              return sink.is_writable();
+            seq = outSeq;
+            std::string hdr =
+                "--hamclock\r\nContent-Type: image/jpeg\r\nContent-Length: " +
+                std::to_string(frame.size()) + "\r\n\r\n";
+            if (!sink.write(hdr.data(), hdr.size()))
+              return false;
+            if (!sink.write(reinterpret_cast<const char *>(frame.data()),
+                            frame.size()))
+              return false;
+            return sink.write("\r\n", 2);
+          },
+          [this](bool) {
+            if (frameCapture_)
+              frameCapture_->removeBaseSubscriber();
+          });
+    } else {
+      frameCapture_->addSubscriber();
+      uint64_t seq = 0;
+      res.set_content_provider(
+          "multipart/x-mixed-replace;boundary=hamclock",
+          [this, seq](size_t /*offset*/,
+                      httplib::DataSink &sink) mutable -> bool {
+            if (!sink.is_writable())
+              return false;
+            uint64_t outSeq = 0;
+            auto frame = frameCapture_->waitFrame(seq, 5000, outSeq);
+            if (frame.empty())
+              return sink.is_writable();
+            seq = outSeq;
+            std::string hdr =
+                "--hamclock\r\nContent-Type: image/jpeg\r\nContent-Length: " +
+                std::to_string(frame.size()) + "\r\n\r\n";
+            if (!sink.write(hdr.data(), hdr.size()))
+              return false;
+            if (!sink.write(reinterpret_cast<const char *>(frame.data()),
+                            frame.size()))
+              return false;
+            return sink.write("\r\n", 2);
+          },
+          [this](bool) {
+            if (frameCapture_)
+              frameCapture_->removeSubscriber();
+          });
+    }
   });
 
   // ============================================================

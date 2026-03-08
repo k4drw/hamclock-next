@@ -37,13 +37,32 @@ public:
   // Cap capture rate. 0 = no cap (default).
   void setMaxFps(int fps);
 
-  // Connection tracking
+  // Connection tracking (full-rate MJPEG)
   void addSubscriber() { subscribers_++; }
   void removeSubscriber() {
     if (subscribers_ > 0)
       subscribers_--;
   }
   bool hasSubscribers() const { return subscribers_ > 0; }
+
+  // Base-layer tracking (1 FPS, for vector-overlay clients).
+  // The base buffer receives the same encoded frame as the normal buffer
+  // but is throttled to ~1 FPS.  Spot suppression from the MJPEG base
+  // layer is deferred (requires MapWidget render-loop refactoring).
+  void addBaseSubscriber() { baseSubscribers_++; }
+  void removeBaseSubscriber() {
+    if (baseSubscribers_ > 0)
+      baseSubscribers_--;
+  }
+  bool hasBaseSubscribers() const { return baseSubscribers_ > 0; }
+
+  // Call from any thread to bypass the 1 FPS throttle for one frame.
+  // Use after user interactions so the browser sees updated UI immediately.
+  void requestBaseCapture() { baseForceCaptureRequested_ = true; }
+
+  // Block until a base frame with seq > afterSeq is available.
+  std::vector<uint8_t> waitBaseFrame(uint64_t afterSeq, int timeoutMs,
+                                     uint64_t &outSeq) const;
 
   int quality = 70; // JPEG quality 1-100
 
@@ -57,6 +76,15 @@ private:
   int maxFps_ = 0;
   uint32_t lastCaptureMs_ = 0;
   std::atomic<int> subscribers_{0};
+
+  // Base-layer buffer (1 FPS throttle)
+  mutable std::mutex baseMutex_;
+  mutable std::condition_variable baseCv_;
+  std::vector<uint8_t> baseJpegData_;
+  uint64_t baseSeq_{0};
+  uint32_t lastBaseCaptureMs_{0};
+  std::atomic<int> baseSubscribers_{0};
+  std::atomic<bool> baseForceCaptureRequested_{false};
 
   // Async encoding
   std::thread worker_;

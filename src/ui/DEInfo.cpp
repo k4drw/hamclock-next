@@ -19,17 +19,24 @@ void DEInfo::update() {
   lineText_[0] = "DE:";
   lineText_[1] = callsign_;
 
-  // Local time from longitude
+  // Local time from OS timezone (honours DST and timezone boundaries)
   auto now = std::chrono::system_clock::now();
   std::time_t t = std::chrono::system_clock::to_time_t(now);
-  std::tm utc{};
-  Astronomy::portable_gmtime(&t, &utc);
-  int utcOffset = static_cast<int>(lon_ / 15.0);
-  int localHour = (utc.tm_hour + utcOffset + 24) % 24;
+  std::tm local{};
+  Astronomy::portable_localtime(&t, &local);
+#if defined(_WIN32)
+  long tzSecs = 0;
+  _get_timezone(&tzSecs);
+  int utcOffset = -static_cast<int>(tzSecs) / 3600;
+  if (local.tm_isdst > 0)
+    utcOffset += 1;
+#else
+  int utcOffset = static_cast<int>(local.tm_gmtoff / 3600);
+#endif
 
   char buf[64];
-  std::snprintf(buf, sizeof(buf), "%02d:%02d UTC%+d", localHour, utc.tm_min,
-                utcOffset);
+  std::snprintf(buf, sizeof(buf), "%02d:%02d UTC%+d", local.tm_hour,
+                local.tm_min, utcOffset);
   lineText_[2] = buf;
 
   std::snprintf(buf, sizeof(buf), "%s %.1f%c %.1f%c", grid_.c_str(),

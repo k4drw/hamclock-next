@@ -395,7 +395,7 @@ bool DisplayPower::runDrmDpms(bool on) {
                                           dpmsValue) == 0) {
             anySuccess = true;
           } else {
-            LOG_E("DisplayPower", "Failed to set DPMS on connector %u: %s",
+            LOG_E("DisplayPower", "Failed to set DPMS on connector {}: {}",
                   conn->connector_id, std::strerror(errno));
           }
         }
