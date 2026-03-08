@@ -362,6 +362,10 @@ bool LiveSpotPanel::onMouseUp(int mx, int my, Uint16 /*mod*/, int clicks) {
   if (mx < x_ || mx >= x_ + width_ || my < y_ || my >= y_ + height_)
     return false;
 
+  // Top 10% -> widget selection (let PaneContainer handle it)
+  if (my < y_ + height_ / 10)
+    return false;
+
   if (showSetup_) {
     return handleSetupClick(mx, my);
   }

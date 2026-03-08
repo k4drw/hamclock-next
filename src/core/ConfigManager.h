@@ -10,7 +10,16 @@
 #include <SDL.h>
 
 enum class LiveSpotSource { PSK, RBN, WSPR };
-enum class PropOverlayType { None, Muf, Voacap, Reliability, Toa, Heatmap, Drap, Aurora };
+enum class PropOverlayType {
+  None,
+  Muf,
+  Voacap,
+  Reliability,
+  Toa,
+  Heatmap,
+  Drap,
+  Aurora
+};
 enum class WeatherOverlayType { None, Clouds, WxMb };
 enum class HubMode { Off, Master, Client };
 
@@ -49,8 +58,8 @@ struct AppConfig {
   double lon = 0.0;
 
   // Appearance
-  SDL_Color callsignColor = {255, 165, 0, 255};   // default orange
-  SDL_Color callsignBgColor = {0, 0, 0, 0};       // default transparent (no bg)
+  SDL_Color callsignColor = {255, 165, 0, 255}; // default orange
+  SDL_Color callsignBgColor = {0, 0, 0, 0};     // default transparent (no bg)
   std::string theme = "default";
   bool mapNightLights = true;
   bool useMetric = true;
@@ -67,7 +76,8 @@ struct AppConfig {
   bool showSatTrack = true; // Show satellite ground track line on world map
   bool showBeacons = true;  // Show NCDXF beacons on world map
   bool showBorders = false; // Show Natural Earth country borders
-  std::string displayPowerMethod = "auto"; // "auto", "vcgencmd", "bl_power", etc.
+  std::string displayPowerMethod =
+      "auto"; // "auto", "vcgencmd", "bl_power", etc.
 
   // Pane widget selection (top bar panes 1–3)  // Pane widget selection
   // (rotation sets)
@@ -78,7 +88,8 @@ struct AppConfig {
   std::vector<WidgetType> pane5Rotation = {WidgetType::DE_INFO};
   std::vector<WidgetType> pane6Rotation = {WidgetType::DX_INFO};
   int rotationIntervalS = 30;
-  bool syncRotation = false; // true = all panes advance on the same wall-clock tick
+  bool syncRotation =
+      false; // true = all panes advance on the same wall-clock tick
   std::vector<std::string> watchlist; // persisted callsign watchlist
 
   // Panel state
@@ -115,7 +126,7 @@ struct AppConfig {
 
   // Marine Widget settings
   std::string marineStation = "8722670"; // NOAA Tide station (Lake Worth FL)
-  std::string marineBuoy = "41114";       // NDBC Buoy ID (FL Atlantic)
+  std::string marineBuoy = "41114";      // NDBC Buoy ID (FL Atlantic)
 
   // Power / Screen
   bool preventSleep = true; // true to call SDL_DisableScreenSaver()
@@ -190,8 +201,9 @@ struct AppConfig {
   bool gpsEnabled = false;
 
   // Aux Clock timezone
-  int auxClockTzOffset = 0;           // Hours from UTC (-12 to +14)
+  int auxClockTzOffset = 0;            // Hours from UTC (-12 to +14)
   std::string auxClockTzLabel = "UTC"; // Display label
+  int auxClockStarMode = 1;
 
   // Update
   std::string skippedVersion;

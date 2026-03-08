@@ -10,16 +10,17 @@ AlertsPanel::AlertsPanel(int x, int y, int w, int h, FontManager &fontMgr,
 
 void AlertsPanel::update() { currentData_ = store_->get(); }
 
-SDL_Color AlertsPanel::severityColor(const std::string &severity) {
+SDL_Color AlertsPanel::severityColor(const std::string &severity) const {
+  ThemeColors themes = getThemeColors(this->theme_);
   if (severity == "Extreme")
-    return {255, 50, 50, 255};
+    return themes.danger;
   if (severity == "Severe")
-    return {255, 140, 0, 255};
+    return {255, 140, 0, 255}; // High orange fallback
   if (severity == "Moderate")
-    return {255, 220, 0, 255};
+    return themes.warning;
   if (severity == "Minor")
-    return {180, 220, 180, 255};
-  return {200, 200, 200, 255};
+    return themes.success;
+  return themes.textDim;
 }
 
 void AlertsPanel::render(SDL_Renderer *renderer) {

@@ -29,15 +29,7 @@ void LocalPanel::update() {
   // Use OS local time so DST and timezone boundaries are honoured.
   std::tm local{};
   Astronomy::portable_localtime(&t, &local);
-#if defined(_WIN32)
-  long tzSecs = 0;
-  _get_timezone(&tzSecs);
-  double utcOffsetHours = -static_cast<double>(tzSecs) / 3600.0;
-  if (local.tm_isdst > 0)
-    utcOffsetHours += 1.0;
-#else
-  double utcOffsetHours = local.tm_gmtoff / 3600.0;
-#endif
+  double utcOffsetHours = Astronomy::portable_utcoffset(&t, &local) / 3600.0;
 
   lineText_[0] = "DE:";
 

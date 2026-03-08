@@ -360,6 +360,7 @@ bool AsteroidPanel::onMouseUp(int mx, int my, Uint16 /*mod*/, int clicks) {
 
 void AsteroidPanel::renderPolarPlot(SDL_Renderer *renderer, float cx, float cy,
                                     int radius) {
+  ThemeColors themes = getThemeColors(theme_);
   static constexpr double kPi = 3.14159265358979323846;
   static constexpr double kDeg2Rad = kPi / 180.0;
   static const char *kCompassLabels[4] = {"N", "E", "S", "W"};
@@ -392,7 +393,7 @@ void AsteroidPanel::renderPolarPlot(SDL_Renderer *renderer, float cx, float cy,
 
   // --- Compass labels ---
   if (fontMgr_.catalog()) {
-    SDL_Color dimGray = {120, 120, 120, 255};
+    SDL_Color dimGray = themes.textDim;
     int labelDist = radius + 4;
     for (int i = 0; i < 4; ++i) {
       double angle = i * 90.0 * kDeg2Rad;

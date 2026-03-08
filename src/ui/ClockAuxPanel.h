@@ -33,31 +33,36 @@ private:
   int timeFontSize_ = 18;
   int infoFontSize_ = 12;
 
-  struct TzPreset { int offset; const char *label; };
+  struct TzPreset {
+    int offset;
+    const char *label;
+  };
   static const TzPreset kPresets[];
   static const int kPresetCount;
 
   // Current applied preset index (-1 = custom)
   int tzPresetIndex_ = 0;
+
+  int sdLineY_ = 0;
   void syncFromConfig();
 
   // Popup menu state
   bool menuVisible_ = false;
-  bool customSelected_ = false;  // Custom row is selected in the menu
-  int  tempPresetIdx_ = 0;       // Selected preset row while menu is open
-  bool offsetActive_ = true;     // Which custom text field has focus
+  bool customSelected_ = false; // Custom row is selected in the menu
+  int tempPresetIdx_ = 0;       // Selected preset row while menu is open
+  bool offsetActive_ = true;    // Which custom text field has focus
 
   TextInput customOffsetInput_;
   TextInput customLabelInput_;
 
   // Layout rects (computed in recalcMenuLayout)
   static constexpr int kTotalRows = 10; // kPresetCount(9) + 1 Custom
-  SDL_Rect menuRect_        = {};
+  SDL_Rect menuRect_ = {};
   SDL_Rect rowRects_[kTotalRows] = {};
   SDL_Rect customOffsetRect_ = {};
-  SDL_Rect customLabelRect_  = {};
-  SDL_Rect doneRect_         = {};
-  SDL_Rect cancelRect_       = {};
+  SDL_Rect customLabelRect_ = {};
+  SDL_Rect doneRect_ = {};
+  SDL_Rect cancelRect_ = {};
 
   void recalcMenuLayout();
   void renderMenu(SDL_Renderer *renderer);

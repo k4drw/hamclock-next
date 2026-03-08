@@ -59,7 +59,7 @@ SDL_Color SpaceWeatherPanel::colorForNOAAScale(int scale,
   if (scale == 2)
     return themes.warning; // Moderate — yellow
   if (scale == 3)
-    return {255, 140, 0, 255}; // Strong — orange (no theme token)
+    return themes.warning; // Strong — yellow (fallback to theme warning)
   return themes.danger;        // Severe/Extreme — red
 }
 
@@ -77,6 +77,7 @@ void SpaceWeatherPanel::destroyCache() {
 }
 
 void SpaceWeatherPanel::update() {
+  ThemeColors themes = getThemeColors(theme_);
   if (xrayStore_)
     sparklineHistory_ = xrayStore_->getHistory();
 
@@ -92,7 +93,7 @@ void SpaceWeatherPanel::update() {
 
   std::snprintf(buf, sizeof(buf), "%d", data.sunspot_number);
   items_[1].value = buf;
-  items_[1].valueColor = {0, 255, 128, 255};
+  items_[1].valueColor = themes.success;
 
   std::snprintf(buf, sizeof(buf), "%d", data.a_index);
   items_[2].value = buf;
@@ -108,9 +109,8 @@ void SpaceWeatherPanel::update() {
   std::snprintf(buf, sizeof(buf), "%.0f %s", windSpd,
                 useMetric_ ? "km/s" : "mph");
   items_[4].value = buf;
-  items_[4].valueColor = {255, 128, 0, 255};
+  items_[4].valueColor = themes.warning;
 
-  ThemeColors themes = getThemeColors(theme_);
   items_[0].valueColor = colorForSFI(data.sfi, themes);
   items_[3].valueColor = colorForK(data.k_index, themes);
 
@@ -389,9 +389,11 @@ void SpaceWeatherPanel::render(SDL_Renderer *renderer) {
   for (int i = 0; i < 4; ++i) {
     SDL_Rect seg = {x_ + segPad + i * segW, barY, segW - 1, barH};
     if (i == currentPage_) {
-      SDL_SetRenderDrawColor(renderer, 0, 200, 255, 255); // Cyan highlight
+      SDL_SetRenderDrawColor(renderer, themes.accent.r, themes.accent.g,
+                             themes.accent.b, themes.accent.a);
     } else {
-      SDL_SetRenderDrawColor(renderer, 60, 60, 60, 255); // Muted gray
+      SDL_SetRenderDrawColor(renderer, themes.textDim.r, themes.textDim.g,
+                             themes.textDim.b, themes.textDim.a);
     }
     SDL_RenderFillRect(renderer, &seg);
   }

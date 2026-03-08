@@ -260,8 +260,9 @@ bool ConfigManager::load(AppConfig &config) {
 
   // Aux Clock
   if (json.contains("aux_clock")) {
-    config.auxClockTzOffset = json["aux_clock"].value("tz_offset", 0);
-    config.auxClockTzLabel  = json["aux_clock"].value("tz_label", std::string("UTC"));
+    config.auxClockTzOffset  = json["aux_clock"].value("tz_offset", 0);
+    config.auxClockTzLabel   = json["aux_clock"].value("tz_label", std::string("UTC"));
+    config.auxClockStarMode  = json["aux_clock"].value("star_mode", 1);
   }
 
   // RSS
@@ -699,8 +700,9 @@ bool ConfigManager::save(const AppConfig &config) {
   json["live_spots"]["rbn_host"] = config.rbnHost;
   json["live_spots"]["rbn_port"] = config.rbnPort;
 
-  json["aux_clock"]["tz_offset"] = config.auxClockTzOffset;
-  json["aux_clock"]["tz_label"]  = config.auxClockTzLabel;
+  json["aux_clock"]["tz_offset"]  = config.auxClockTzOffset;
+  json["aux_clock"]["tz_label"]   = config.auxClockTzLabel;
+  json["aux_clock"]["star_mode"]  = config.auxClockStarMode;
 
   json["rss"]["enabled"] = config.rssEnabled;
   json["activity"]["onta_filter"] = config.ontaFilter;

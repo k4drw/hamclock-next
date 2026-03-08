@@ -72,6 +72,6 @@ private:
   struct AlertBadge {
     bool active = false;
     std::string text; // e.g. "G3!" or "R4!"
-    SDL_Color color = {255, 50, 50, 255};
+    SDL_Color color = {255, 255, 255, 255};
   } alertBadge_;
 };

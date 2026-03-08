@@ -75,7 +75,11 @@
       "If a provider's API may be unavailable or require auth, add a `bool fetched` flag to the data struct (default false). The provider pushes event on completion with `fetched=true, valid=false` on error \u2014 panel shows meaningful status (e.g. 'API key required') rather than indefinite 'Loading...' state.",
       "Widget::onMouseDown(int mx, int my, Uint16 mod) added for advanced interactivity (Phase 60).",
       "Widget::onMouseUp now takes `int clicks` as 4th parameter (Uint16 mod, int clicks). Update all Widget subclasses when overriding.",
-      "UI Engineering Standard for Graphs (Phase 62): Use 'line_aa' anti-aliased texture via RenderUtils::drawPolylineTextured for smooth plots. Implement onMouseMove hover tooltips to show precise data values."
+      "UI Engineering Standards (v1.0):",
+      "- COLORS: Never hardcode `SDL_Color{r,g,b,a}`. Always use `getThemeColors(theme_)` to obtain `ThemeColors` tokens (success, danger, warning, accent, text, textDim).",
+      "- GRAPHS: Plots must use anti-aliased textures. Use `RenderUtils::drawPolylineTextured` with the 'line_aa' texture. Avoid raw `SDL_RenderDrawLine` for data plots.",
+      "- TOOLTIPS: All interactive graphs must implement `onMouseMove` tooltips. Use the base `renderTooltip` (standardized in Widget.h) to ensure consistent theme-adaptive appearance.",
+      "- FONTS: Use the `FontCatalog` (via `cat->drawText`) with `FontStyle` tokens. Avoid raw `TTF_Font` manipulation in panels."
     ]
   },
   "api_reference": {

@@ -41,7 +41,7 @@ void AuroraGraphPanel::render(SDL_Renderer *renderer) {
 
   if (!store_ || !store_->hasData()) {
     cat->drawText(renderer, "Loading Aurora...", x_ + width_ / 2,
-                  y_ + titleH + (height_ - titleH) / 2, {150, 150, 150, 255},
+                  y_ + titleH + (height_ - titleH) / 2, themes.textDim,
                   FontStyle::Fast, true);
     return;
   }
@@ -55,7 +55,7 @@ void AuroraGraphPanel::render(SDL_Renderer *renderer) {
   std::snprintf(valueText, sizeof(valueText), "%.0f%%", currentPercent);
 
   cat->drawText(renderer, valueText, x_ + width_ - 35, y_ + 5,
-                {200, 200, 200, 255}, FontStyle::SmallBold, true);
+                themes.text, FontStyle::SmallBold, true);
 
   // Graph area - significantly expanded
   int graphX = x_ + 30;
@@ -80,23 +80,23 @@ void AuroraGraphPanel::render(SDL_Renderer *renderer) {
     // Y-axis labels
     char label[8];
     std::snprintf(label, sizeof(label), "%d", pct);
-    cat->drawText(renderer, label, graphX - 20, gy, {0, 255, 128, 255},
+    cat->drawText(renderer, label, graphX - 20, gy, themes.accent,
                   FontStyle::Tiny, false, false, true);
   }
 
   // X-axis labels
-  cat->drawText(renderer, "-25", graphX, graphY + graphH + 10,
-                {0, 255, 128, 255}, FontStyle::Tiny, false, false, true);
+  cat->drawText(renderer, "-25", graphX, graphY + graphH + 10, themes.accent,
+                FontStyle::Tiny, false, false, true);
   cat->drawText(renderer, "Hours", graphX + graphW / 2, graphY + graphH + 10,
-                {0, 255, 128, 255}, FontStyle::Tiny, true, false, true);
+                themes.accent, FontStyle::Tiny, true, false, true);
   cat->drawText(renderer, "0", graphX + graphW - 10, graphY + graphH + 10,
-                {0, 255, 128, 255}, FontStyle::Tiny, false, false, true);
+                themes.accent, FontStyle::Tiny, false, false, true);
 
   // Plot data
   if (history.size() < 2) {
     cat->drawText(renderer, "Collecting history...", x_ + width_ / 2,
-                  y_ + (graphY + graphH / 2), {100, 100, 100, 255},
-                  FontStyle::Micro, true);
+                  y_ + (graphY + graphH / 2), themes.textDim, FontStyle::Micro,
+                  true);
     return;
   }
 

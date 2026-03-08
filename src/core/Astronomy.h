@@ -68,6 +68,19 @@ public:
 #endif
   }
 
+  // Portable UTC offset in seconds (positive = east of GMT)
+  static long portable_utcoffset(const std::time_t *t, struct tm *local) {
+#if defined(_WIN32)
+    struct tm gmt;
+    portable_gmtime(t, &gmt);
+    gmt.tm_isdst = -1;
+    std::time_t t_gmt_as_local = std::mktime(&gmt);
+    return static_cast<long>(*t - t_gmt_as_local);
+#else
+    return local->tm_gmtoff;
+#endif
+  }
+
   // Calculate the sub-solar point for a given UTC time.
   static SubSolarPoint sunPosition(std::chrono::system_clock::time_point tp) {
     std::time_t t = std::chrono::system_clock::to_time_t(tp);

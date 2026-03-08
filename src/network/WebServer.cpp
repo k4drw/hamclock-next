@@ -2321,6 +2321,92 @@ void WebServer::run() {
         "image/jpeg");
   });
 
+  // /live.jpg — legacy alias for /get_capture; used by original HamClock
+  // clients and by the MCP verification tool.
+  svr.Get("/live.jpg", [this](const httplib::Request &req,
+                               httplib::Response &res) {
+    if (!frameCapture_) {
+      res.status = 503;
+      return;
+    }
+    frameCapture_->addSubscriber();
+    std::string seqParam = req.get_param_value("seq");
+    uint64_t afterSeq = seqParam.empty()
+                            ? frameCapture_->latestSeq()
+                            : static_cast<uint64_t>(StringUtils::safe_stoi(seqParam));
+    uint64_t outSeq = 0;
+    auto frame = frameCapture_->waitFrame(afterSeq, 1000, outSeq);
+    frameCapture_->removeSubscriber();
+    if (frame.empty()) {
+      res.status = 503;
+      return;
+    }
+    res.set_header("X-Frame-Seq", std::to_string(outSeq));
+    res.set_content(
+        std::string(reinterpret_cast<const char *>(frame.data()), frame.size()),
+        "image/jpeg");
+  });
+
+  // /set_touch?x=N&y=N — legacy alias for /live/touch; injects a tap event
+  // at logical (x,y) coordinates.  Does not require liveWebEnabled_.
+  svr.Get("/set_touch", [this](const httplib::Request &req,
+                                httplib::Response &res) {
+    int x = StringUtils::safe_stoi(req.get_param_value("x"));
+    int y = StringUtils::safe_stoi(req.get_param_value("y"));
+    int outW = LOGICAL_WIDTH, outH = LOGICAL_HEIGHT;
+    if (renderer_)
+      SDL_GetRendererOutputSize(renderer_, &outW, &outH);
+    float layScale = std::min(static_cast<float>(outW) / LOGICAL_WIDTH,
+                              static_cast<float>(outH) / LOGICAL_HEIGHT);
+    int lx = (layScale > 0.0f) ? static_cast<int>(x / layScale) : x;
+    int ly = (layScale > 0.0f) ? static_cast<int>(y / layScale) : y;
+    SDL_Event e{};
+    e.type = AE_BASE_EVENT + AE_TOUCH;
+    e.user.data1 = reinterpret_cast<void *>(static_cast<intptr_t>(lx));
+    e.user.data2 = reinterpret_cast<void *>(static_cast<intptr_t>(ly));
+    SDL_PushEvent(&e);
+    if (frameCapture_)
+      frameCapture_->requestBaseCapture();
+    res.set_content("ok", "text/plain");
+  });
+
+  // /set_char?val=N — legacy endpoint; injects a keystroke for ASCII code N.
+  // Printable characters (32–126) push an SDL_TEXTINPUT event so text fields
+  // receive them; control codes (Backspace=8, Tab=9, Enter=13, Esc=27) push
+  // SDL_KEYDOWN/KEYUP.
+  svr.Get("/set_char", [this](const httplib::Request &req,
+                               httplib::Response &res) {
+    int val = StringUtils::safe_stoi(req.get_param_value("val"));
+    if (val >= 32 && val <= 126) {
+      SDL_Event te{};
+      te.type = SDL_TEXTINPUT;
+      te.text.text[0] = static_cast<char>(val);
+      te.text.text[1] = '\0';
+      SDL_PushEvent(&te);
+    } else {
+      SDL_Scancode sc = SDL_SCANCODE_UNKNOWN;
+      switch (val) {
+        case 8:  sc = SDL_SCANCODE_BACKSPACE; break;
+        case 9:  sc = SDL_SCANCODE_TAB;       break;
+        case 13: sc = SDL_SCANCODE_RETURN;    break;
+        case 27: sc = SDL_SCANCODE_ESCAPE;    break;
+        default: break;
+      }
+      if (sc != SDL_SCANCODE_UNKNOWN) {
+        SDL_Event down{}, up{};
+        down.type = SDL_KEYDOWN;
+        down.key.keysym.scancode = sc;
+        up = down;
+        up.type = SDL_KEYUP;
+        SDL_PushEvent(&down);
+        SDL_PushEvent(&up);
+      }
+    }
+    if (frameCapture_)
+      frameCapture_->requestBaseCapture();
+    res.set_content("ok", "text/plain");
+  });
+
   svr.Get("/get_dx.txt", [this](const httplib::Request &,
                                 httplib::Response &res) {
     if (!state_->dxActive) {

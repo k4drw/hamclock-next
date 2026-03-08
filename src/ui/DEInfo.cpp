@@ -24,15 +24,7 @@ void DEInfo::update() {
   std::time_t t = std::chrono::system_clock::to_time_t(now);
   std::tm local{};
   Astronomy::portable_localtime(&t, &local);
-#if defined(_WIN32)
-  long tzSecs = 0;
-  _get_timezone(&tzSecs);
-  int utcOffset = -static_cast<int>(tzSecs) / 3600;
-  if (local.tm_isdst > 0)
-    utcOffset += 1;
-#else
-  int utcOffset = static_cast<int>(local.tm_gmtoff / 3600);
-#endif
+  int utcOffset = static_cast<int>(Astronomy::portable_utcoffset(&t, &local) / 3600);
 
   char buf[64];
   std::snprintf(buf, sizeof(buf), "%02d:%02d UTC%+d", local.tm_hour,

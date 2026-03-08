@@ -171,6 +171,10 @@ bool MarinePanel::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
 
   // Open menu on click
   if (mx >= x_ && mx < x_ + width_ && my >= y_ && my < y_ + height_) {
+    // Top 10% -> widget selection (let PaneContainer handle it)
+    if (my < y_ + height_ / 10)
+      return false;
+
     auto &cfg = ConfigManager::instance().getConfig();
     stationInput_.setValue(cfg.marineStation);
     buoyInput_.setValue(cfg.marineBuoy);

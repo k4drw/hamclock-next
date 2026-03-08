@@ -21,7 +21,7 @@ public:
   std::string getName() const override { return "WeatherAlerts"; }
 
 private:
-  static SDL_Color severityColor(const std::string &severity);
+  SDL_Color severityColor(const std::string &severity) const;
 
   FontManager &fontMgr_;
   std::shared_ptr<AlertsStore> store_;
