@@ -4,21 +4,7 @@
 #include "StringUtils.h"
 #include <algorithm>
 #include <chrono>
-#include <sstream>
-
-namespace {
-std::string sqlEscape(const std::string &s) {
-  std::string out;
-  out.reserve(s.size());
-  for (char c : s) {
-    if (c == '\'')
-      out += "''";
-    else
-      out += c;
-  }
-  return out;
-}
-} // namespace
+#include <sqlite3.h>
 
 DXClusterDataStore::DXClusterDataStore()
     : data_(std::make_shared<DXClusterData>()) {
@@ -128,17 +114,26 @@ void DXClusterDataStore::addSpot(const DXClusterSpot &spot) {
                    s.spottedAt.time_since_epoch())
                    .count();
 
-  std::stringstream ss;
-  ss << "INSERT OR IGNORE INTO dx_spots (tx_call, tx_grid, rx_call, rx_grid, "
-        "mode, "
-        "freq_khz, snr, tx_lat, tx_lon, rx_lat, rx_lon, spotted_at) VALUES ('"
-     << sqlEscape(s.txCall) << "', '" << sqlEscape(s.txGrid) << "', '"
-     << sqlEscape(s.rxCall) << "', '" << sqlEscape(s.rxGrid) << "', '"
-     << sqlEscape(s.mode) << "', " << s.freqKhz << ", " << s.snr << ", "
-     << s.txLat << ", " << s.txLon << ", " << s.rxLat << ", " << s.rxLon << ", "
-     << ts << ")";
+  static const char *kInsertSql =
+      "INSERT OR IGNORE INTO dx_spots "
+      "(tx_call, tx_grid, rx_call, rx_grid, mode, "
+      "freq_khz, snr, tx_lat, tx_lon, rx_lat, rx_lon, spotted_at) "
+      "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)";
 
-  db.exec(ss.str());
+  db.execPrepared(kInsertSql, [&s, ts](sqlite3_stmt *stmt) {
+    sqlite3_bind_text(stmt, 1, s.txCall.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 2, s.txGrid.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 3, s.rxCall.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 4, s.rxGrid.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 5, s.mode.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_double(stmt, 6, s.freqKhz);
+    sqlite3_bind_double(stmt, 7, s.snr);
+    sqlite3_bind_double(stmt, 8, s.txLat);
+    sqlite3_bind_double(stmt, 9, s.txLon);
+    sqlite3_bind_double(stmt, 10, s.rxLat);
+    sqlite3_bind_double(stmt, 11, s.rxLon);
+    sqlite3_bind_int64(stmt, 12, ts);
+  });
 
   pruneOldSpots(); // This now only prunes the DB
 }
