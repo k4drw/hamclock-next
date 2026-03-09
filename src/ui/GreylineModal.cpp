@@ -83,7 +83,7 @@ void GreylineModal::render(SDL_Renderer *renderer) {
   // Done Button
   SDL_SetRenderDrawColor(renderer, themes.success.r, themes.success.g, themes.success.b, 255);
   SDL_RenderFillRect(renderer, &okRect_);
-  SDL_SetRenderDrawColor(renderer, 255, 255, 255, 150);
+  SDL_SetRenderDrawColor(renderer, themes.text.r, themes.text.g, themes.text.b, 150);
   SDL_RenderDrawRect(renderer, &okRect_);
   cat->drawText(renderer, "Done", okRect_.x + okRect_.w / 2, okRect_.y + okRect_.h / 2,
                 {255, 255, 255, 255}, FontStyle::UIBold, true, false, true);

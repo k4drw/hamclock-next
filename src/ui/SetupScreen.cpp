@@ -391,13 +391,14 @@ void SetupScreen::renderTabIdentity(SDL_Renderer *renderer, int cx, int pad,
                    gray, white, white, gray, "e.g. -82.64");
   y = std::max(latY, lonY) + pad / 2 + pad;
 
+  ThemeColors themes = getThemeColors(theme_, &colorOverrides_);
   gpsToggleRect_ = {fieldX, y, 20, 20};
-  SDL_SetRenderDrawColor(renderer, 50, 50, 60, 255);
+  SDL_SetRenderDrawColor(renderer, themes.rowStripe1.r, themes.rowStripe1.g, themes.rowStripe1.b, 255);
   SDL_RenderFillRect(renderer, &gpsToggleRect_);
-  SDL_SetRenderDrawColor(renderer, 100, 100, 120, 255);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
   SDL_RenderDrawRect(renderer, &gpsToggleRect_);
   if (gpsEnabled_) {
-    SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
+    SDL_SetRenderDrawColor(renderer, themes.success.r, themes.success.g, themes.success.b, 255);
     SDL_Rect check = {fieldX + 4, y + 4, 12, 12};
     SDL_RenderFillRect(renderer, &check);
   }
@@ -452,14 +453,15 @@ void SetupScreen::renderTabDXCluster(SDL_Renderer *renderer, int cx, int pad,
   clusterLoginRect_ = {fieldX, y, fieldW, fieldH};
   y += fieldH + vSpace;
 
+  ThemeColors themes = getThemeColors(theme_, &colorOverrides_);
   // Toggles row 1
   SDL_Rect enableToggle = {fieldX, y, 20, 20};
-  SDL_SetRenderDrawColor(renderer, 50, 50, 60, 255);
+  SDL_SetRenderDrawColor(renderer, themes.rowStripe1.r, themes.rowStripe1.g, themes.rowStripe1.b, 255);
   SDL_RenderFillRect(renderer, &enableToggle);
-  SDL_SetRenderDrawColor(renderer, 100, 100, 120, 255);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
   SDL_RenderDrawRect(renderer, &enableToggle);
   if (clusterEnabled_) {
-    SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
+    SDL_SetRenderDrawColor(renderer, themes.success.r, themes.success.g, themes.success.b, 255);
     SDL_Rect check = {fieldX + 4, y + 4, 12, 12};
     SDL_RenderFillRect(renderer, &check);
   }
@@ -470,12 +472,12 @@ void SetupScreen::renderTabDXCluster(SDL_Renderer *renderer, int cx, int pad,
   y += 24;
 
   SDL_Rect toggle = {fieldX, y, 20, 20};
-  SDL_SetRenderDrawColor(renderer, 50, 50, 60, 255);
+  SDL_SetRenderDrawColor(renderer, themes.rowStripe1.r, themes.rowStripe1.g, themes.rowStripe1.b, 255);
   SDL_RenderFillRect(renderer, &toggle);
-  SDL_SetRenderDrawColor(renderer, 100, 100, 120, 255);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
   SDL_RenderDrawRect(renderer, &toggle);
   if (clusterWSJTX_) {
-    SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
+    SDL_SetRenderDrawColor(renderer, themes.success.r, themes.success.g, themes.success.b, 255);
     SDL_Rect check = {fieldX + 4, y + 4, 12, 12};
     SDL_RenderFillRect(renderer, &check);
   }
@@ -501,12 +503,12 @@ void SetupScreen::renderTabDXCluster(SDL_Renderer *renderer, int cx, int pad,
   y += cat->ptSize(FontStyle::SmallBold) + vSpace;
 
   SDL_Rect rbnToggle = {fieldX, y, 20, 20};
-  SDL_SetRenderDrawColor(renderer, 50, 50, 60, 255);
+  SDL_SetRenderDrawColor(renderer, themes.rowStripe1.r, themes.rowStripe1.g, themes.rowStripe1.b, 255);
   SDL_RenderFillRect(renderer, &rbnToggle);
-  SDL_SetRenderDrawColor(renderer, 100, 100, 120, 255);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
   SDL_RenderDrawRect(renderer, &rbnToggle);
   if (rbnEnabled_) {
-    SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
+    SDL_SetRenderDrawColor(renderer, themes.success.r, themes.success.g, themes.success.b, 255);
     SDL_Rect check = {fieldX + 4, y + 4, 12, 12};
     SDL_RenderFillRect(renderer, &check);
   }
@@ -531,6 +533,7 @@ void SetupScreen::renderTabAppearance(SDL_Renderer *renderer, int cx, int pad,
   SDL_Color gray = {140, 140, 140, 255};
   SDL_Color cyan = {0, 200, 255, 255};
   int halfW = fieldW / 2;
+  ThemeColors themes = getThemeColors(theme_, &colorOverrides_);
 
   // --- Appearance section ---
   cat->drawText(renderer, "--- Appearance ---", cx, y, cyan,
@@ -538,11 +541,11 @@ void SetupScreen::renderTabAppearance(SDL_Renderer *renderer, int cx, int pad,
   y += cat->ptSize(FontStyle::SmallBold) + vSpace;
 
   auto drawBtn = [&](const SDL_Rect &r, const std::string &txt) {
-    SDL_SetRenderDrawColor(renderer, 40, 40, 50, 255);
+    SDL_SetRenderDrawColor(renderer, themes.rowStripe1.r, themes.rowStripe1.g, themes.rowStripe1.b, 255);
     SDL_RenderFillRect(renderer, &r);
-    SDL_SetRenderDrawColor(renderer, 100, 100, 120, 255);
+    SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
     SDL_RenderDrawRect(renderer, &r);
-    cat->drawText(renderer, txt, r.x + r.w / 2, r.y + r.h / 2, white,
+    cat->drawText(renderer, txt, r.x + r.w / 2, r.y + r.h / 2, themes.text,
                   FontStyle::Fast, true, false, true);
   };
 
@@ -561,16 +564,16 @@ void SetupScreen::renderTabAppearance(SDL_Renderer *renderer, int cx, int pad,
 
   // Row 2: Toggles (Night Lights, Metric) - Centered
   auto drawToggle = [&](SDL_Rect &r, bool val, const char *lbl) {
-    SDL_SetRenderDrawColor(renderer, 50, 50, 60, 255);
+    SDL_SetRenderDrawColor(renderer, themes.rowStripe1.r, themes.rowStripe1.g, themes.rowStripe1.b, 255);
     SDL_RenderFillRect(renderer, &r);
-    SDL_SetRenderDrawColor(renderer, 100, 100, 120, 255);
+    SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
     SDL_RenderDrawRect(renderer, &r);
     if (val) {
-      SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
+      SDL_SetRenderDrawColor(renderer, themes.success.r, themes.success.g, themes.success.b, 255);
       SDL_Rect check = {r.x + 4, r.y + 4, 12, 12};
       SDL_RenderFillRect(renderer, &check);
     }
-    cat->drawText(renderer, lbl, r.x + 25, r.y + r.h / 2, white,
+    cat->drawText(renderer, lbl, r.x + 25, r.y + r.h / 2, themes.text,
                   FontStyle::SmallRegular, false, false, true);
   };
 
@@ -594,14 +597,14 @@ void SetupScreen::renderTabAppearance(SDL_Renderer *renderer, int cx, int pad,
   y += cat->ptSize(FontStyle::SmallBold) + vSpace;
 
   brightnessSliderRect_ = {fieldX, y, fieldW, fieldH};
-  SDL_SetRenderDrawColor(renderer, 30, 30, 40, 255);
+  SDL_SetRenderDrawColor(renderer, themes.rowStripe1.r, themes.rowStripe1.g, themes.rowStripe1.b, 255);
   SDL_RenderFillRect(renderer, &brightnessSliderRect_);
   int brightness = brightnessMgr_.getBrightness();
   int brightW = (fieldW * brightness) / 100;
   SDL_Rect brightRect = {fieldX, y, brightW, fieldH};
-  SDL_SetRenderDrawColor(renderer, 80, 80, 180, 255);
+  SDL_SetRenderDrawColor(renderer, themes.accent.r, themes.accent.g, themes.accent.b, 255);
   SDL_RenderFillRect(renderer, &brightRect);
-  SDL_SetRenderDrawColor(renderer, 150, 150, 220, 255);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
   SDL_RenderDrawRect(renderer, &brightnessSliderRect_);
   std::string brightText = std::to_string(brightness) + "%";
   cat->drawText(renderer, brightText, fieldX + fieldW / 2, y + fieldH / 2,
@@ -727,12 +730,13 @@ void SetupScreen::renderTabNetwork(SDL_Renderer *renderer, int /*cx*/, int pad,
                                                           : "Off";
   int btnW = 80;
   hubModeRect_ = {fieldX + fieldW - btnW, y, btnW, fieldH};
+  ThemeColors themes = getThemeColors(theme_, &colorOverrides_);
   cat->drawText(renderer, "Mode:", fieldX,
                 y + (fieldH - cat->ptSize(FontStyle::SmallRegular)) / 2, white,
                 FontStyle::SmallRegular);
-  SDL_SetRenderDrawColor(renderer, 40, 40, 60, 255);
+  SDL_SetRenderDrawColor(renderer, themes.rowStripe1.r, themes.rowStripe1.g, themes.rowStripe1.b, 255);
   SDL_RenderFillRect(renderer, &hubModeRect_);
-  SDL_SetRenderDrawColor(renderer, orange.r, orange.g, orange.b, 255);
+  SDL_SetRenderDrawColor(renderer, themes.accent.r, themes.accent.g, themes.accent.b, 255);
   SDL_RenderDrawRect(renderer, &hubModeRect_);
   cat->drawText(renderer, modeLabel, hubModeRect_.x + hubModeRect_.w / 2,
                 hubModeRect_.y + hubModeRect_.h / 2, orange,

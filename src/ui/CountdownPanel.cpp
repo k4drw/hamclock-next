@@ -257,10 +257,10 @@ bool CountdownPanel::onTextInput(const char *text) {
 void CountdownPanel::renderEditOverlay(SDL_Renderer *renderer) {
   ThemeColors themes = getThemeColors(theme_);
   SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-  SDL_SetRenderDrawColor(renderer, 0, 0, 0, 240);
+  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, 240);
   SDL_Rect overlay = {x_, y_, width_, height_};
   SDL_RenderFillRect(renderer, &overlay);
-  SDL_SetRenderDrawColor(renderer, 100, 100, 100, 255);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
   SDL_RenderDrawRect(renderer, &overlay);
 
   SDL_Color cyan = themes.accent;
@@ -275,12 +275,12 @@ void CountdownPanel::renderEditOverlay(SDL_Renderer *renderer) {
   cat->drawText(renderer, "Label:", x_ + pad, startY - 12, cyan,
                 FontStyle::Caption);
   SDL_Rect labelBox = {x_ + pad, startY, width_ - 2 * pad, boxH};
-  SDL_SetRenderDrawColor(renderer, 40, 40, 40, 255);
+  SDL_SetRenderDrawColor(renderer, themes.rowStripe1.r, themes.rowStripe1.g, themes.rowStripe1.b, themes.rowStripe1.a);
   SDL_RenderFillRect(renderer, &labelBox);
   if (!editingTime_)
-    SDL_SetRenderDrawColor(renderer, 0, 200, 0, 255);
+    SDL_SetRenderDrawColor(renderer, themes.accent.r, themes.accent.g, themes.accent.b, themes.accent.a);
   else
-    SDL_SetRenderDrawColor(renderer, 100, 100, 100, 255);
+    SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, themes.border.a);
   SDL_RenderDrawRect(renderer, &labelBox);
 
   const std::string &editVal = editInput_.getValue();
@@ -301,12 +301,12 @@ void CountdownPanel::renderEditOverlay(SDL_Renderer *renderer) {
   cat->drawText(renderer, "Time (YYYY-MM-DD HH:MM):", x_ + pad, timeY - 12, cyan,
                 FontStyle::Caption);
   SDL_Rect timeBox = {x_ + pad, timeY, width_ - 2 * pad, boxH};
-  SDL_SetRenderDrawColor(renderer, 40, 40, 40, 255);
+  SDL_SetRenderDrawColor(renderer, themes.rowStripe1.r, themes.rowStripe1.g, themes.rowStripe1.b, themes.rowStripe1.a);
   SDL_RenderFillRect(renderer, &timeBox);
   if (editingTime_)
-    SDL_SetRenderDrawColor(renderer, 0, 200, 0, 255);
+    SDL_SetRenderDrawColor(renderer, themes.accent.r, themes.accent.g, themes.accent.b, themes.accent.a);
   else
-    SDL_SetRenderDrawColor(renderer, 100, 100, 100, 255);
+    SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, themes.border.a);
   SDL_RenderDrawRect(renderer, &timeBox);
 
   std::string timeStr = editingTime_ ? editVal : tempTime_;

@@ -87,20 +87,20 @@ void EMEToolPanel::render(SDL_Renderer *renderer) {
   chartRect_ = {chartX, chartY, chartW, chartH};
 
   // Chart background
-  SDL_SetRenderDrawColor(renderer, 10, 15, 10, 255);
+  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, themes.bg.a);
   SDL_RenderFillRect(renderer, &chartRect_);
-  SDL_SetRenderDrawColor(renderer, 40, 60, 40, 255);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, themes.border.a);
   SDL_RenderDrawRect(renderer, &chartRect_);
 
   // Horizon line (0 deg) at midpoint of elevation range [-90..+90]
   int horizY = chartY + chartH / 2;
-  SDL_SetRenderDrawColor(renderer, 80, 80, 80, 255);
+  SDL_SetRenderDrawColor(renderer, themes.textDim.r, themes.textDim.g, themes.textDim.b, themes.textDim.a);
   SDL_RenderDrawLine(renderer, chartX, horizY, chartX + chartW, horizY);
 
   // Draw hour labels every 6 hours (every 12 points)
   for (int i = 0; i <= kPoints; i += 12) {
     int px = chartX + (i * chartW) / kPoints;
-    SDL_SetRenderDrawColor(renderer, 50, 60, 50, 255);
+    SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, themes.border.a);
     SDL_RenderDrawLine(renderer, px, chartY, px, chartY + chartH);
     char hlabel[8];
     std::snprintf(hlabel, sizeof(hlabel), "%dh", i / 2);
@@ -132,12 +132,12 @@ void EMEToolPanel::render(SDL_Renderer *renderer) {
   // Draw DE curve (green)
   RenderUtils::drawPolylineTextured(renderer, lineTex, dePoints.data(),
                                     (int)dePoints.size(), 2.0f,
-                                    {0, 220, 80, 255});
+                                    themes.success);
 
   // Draw DX curve (blue)
   RenderUtils::drawPolylineTextured(renderer, lineTex, dxPoints.data(),
                                     (int)dxPoints.size(), 2.0f,
-                                    {80, 160, 255, 255});
+                                    themes.accent);
 
   // Mark current time (vertical red tick at x=0)
   SDL_SetRenderDrawColor(renderer, 255, 60, 60, 255);
@@ -182,16 +182,16 @@ void EMEToolPanel::render(SDL_Renderer *renderer) {
   int centerX = x_ + width_ / 2;
 
   // Legend
-  SDL_SetRenderDrawColor(renderer, 0, 220, 80, 255);
+  SDL_SetRenderDrawColor(renderer, themes.success.r, themes.success.g, themes.success.b, themes.success.a);
   SDL_Rect deBox = {x_ + 4, infoY + 4, 10, 8};
   SDL_RenderFillRect(renderer, &deBox);
-  cat->drawText(renderer, "DE", x_ + 18, infoY + 8, {0, 220, 80, 255},
+  cat->drawText(renderer, "DE", x_ + 18, infoY + 8, themes.success,
                 FontStyle::Caption, false, false, true);
 
-  SDL_SetRenderDrawColor(renderer, 80, 160, 255, 255);
+  SDL_SetRenderDrawColor(renderer, themes.accent.r, themes.accent.g, themes.accent.b, themes.accent.a);
   SDL_Rect dxBox = {x_ + 44, infoY + 4, 10, 8};
   SDL_RenderFillRect(renderer, &dxBox);
-  cat->drawText(renderer, "DX", x_ + 58, infoY + 8, {80, 160, 255, 255},
+  cat->drawText(renderer, "DX", x_ + 58, infoY + 8, themes.accent,
                 FontStyle::Caption, false, false, true);
 
   // Next mutual window

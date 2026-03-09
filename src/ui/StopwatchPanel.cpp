@@ -123,7 +123,7 @@ void StopwatchPanel::render(SDL_Renderer *renderer) {
     int lyBase = bodyY + timeAreaH + 2;
     int start = std::max(0, (int)laps_.size() - kMaxVisible);
     // Header divider
-    SDL_SetRenderDrawColor(renderer, 60, 60, 60, 255);
+    SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
     SDL_RenderDrawLine(renderer, x_ + 4, lyBase, x_ + width_ - 4, lyBase);
     lyBase += 2;
 
@@ -168,17 +168,16 @@ void StopwatchPanel::render(SDL_Renderer *renderer) {
 
   // Start/Stop button
   drawBtn(ssRect_, running_ ? "Stop" : "Start",
-          running_ ? SDL_Color{60, 20, 20, 255} : SDL_Color{20, 60, 20, 255},
-          running_ ? SDL_Color{150, 50, 50, 255} : SDL_Color{50, 150, 50, 255});
+          running_ ? themes.danger : themes.success,
+          themes.border);
 
   // Lap button (enabled only while running)
   drawBtn(lapRect_, "Lap",
-          running_ ? SDL_Color{30, 40, 60, 255} : SDL_Color{25, 25, 30, 255},
-          running_ ? SDL_Color{80, 112, 160, 255} : SDL_Color{50, 50, 60, 255});
+          running_ ? themes.rowStripe1 : themes.bg,
+          themes.border);
 
   // Reset button
-  drawBtn(rRect_, "Reset", SDL_Color{30, 30, 40, 255},
-          SDL_Color{80, 80, 100, 255});
+  drawBtn(rRect_, "Reset", themes.rowStripe2, themes.border);
 }
 
 bool StopwatchPanel::onMouseUp(int mx, int my, Uint16, int) {

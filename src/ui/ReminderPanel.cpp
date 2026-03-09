@@ -197,15 +197,17 @@ void ReminderPanel::renderModal(SDL_Renderer *renderer) {
   int dx = (winW - dW) / 2;
   int dy = (winH - dH) / 2;
 
+  ThemeColors themes = getThemeColors(theme_);
+
   // Box background + border
-  SDL_SetRenderDrawColor(renderer, 20, 20, 35, 255);
+  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, 255);
   SDL_Rect box = {dx, dy, dW, dH};
   SDL_RenderFillRect(renderer, &box);
-  SDL_SetRenderDrawColor(renderer, 0, 180, 255, 255);
+  SDL_SetRenderDrawColor(renderer, themes.accent.r, themes.accent.g, themes.accent.b, 255);
   SDL_RenderDrawRect(renderer, &box);
 
   // Title bar strip
-  SDL_SetRenderDrawColor(renderer, 0, 60, 100, 255);
+  SDL_SetRenderDrawColor(renderer, themes.rowStripe2.r, themes.rowStripe2.g, themes.rowStripe2.b, 255);
   SDL_Rect titleBar = {dx, dy, dW, 22};
   SDL_RenderFillRect(renderer, &titleBar);
   SDL_Color white = {255, 255, 255, 255};
@@ -244,9 +246,9 @@ void ReminderPanel::renderModal(SDL_Renderer *renderer) {
 
   // Snooze
   notifySnoozeRect_ = {bx, btnY, btnW, btnH};
-  SDL_SetRenderDrawColor(renderer, 20, 40, 80, 255);
+  SDL_SetRenderDrawColor(renderer, themes.rowStripe1.r, themes.rowStripe1.g, themes.rowStripe1.b, 255);
   SDL_RenderFillRect(renderer, &notifySnoozeRect_);
-  SDL_SetRenderDrawColor(renderer, 60, 120, 200, 255);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
   SDL_RenderDrawRect(renderer, &notifySnoozeRect_);
   cat->drawText(renderer, "Snooze 1h", bx + btnW / 2, btnY + btnH / 2, white,
                 FontStyle::Caption, true);
@@ -254,9 +256,9 @@ void ReminderPanel::renderModal(SDL_Renderer *renderer) {
   // Acknowledge
   int ax = bx + btnW + gap;
   notifyAckRect_ = {ax, btnY, btnW, btnH};
-  SDL_SetRenderDrawColor(renderer, 20, 60, 20, 255);
+  SDL_SetRenderDrawColor(renderer, themes.success.r, themes.success.g, themes.success.b, 255);
   SDL_RenderFillRect(renderer, &notifyAckRect_);
-  SDL_SetRenderDrawColor(renderer, 50, 160, 50, 255);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
   SDL_RenderDrawRect(renderer, &notifyAckRect_);
   cat->drawText(renderer, "Acknowledge", ax + btnW / 2, btnY + btnH / 2, white,
                 FontStyle::Caption, true);

@@ -898,7 +898,11 @@ void MapWidget::renderGreatCircle(SDL_Renderer *renderer) {
         if (std::fabs(lon0 - lon1) > 180.0) {
           double lon1_adj = (lon1 < 0) ? lon1 + 360.0 : lon1 - 360.0;
           double borderLon = (lon1 < 0) ? 180.0 : -180.0;
-          double f = (borderLon - lon0) / (lon1_adj - lon0);
+          double dLon = lon1_adj - lon0;
+          double f = 0.5;
+          if (std::fabs(dLon) > 1e-6) {
+            f = (borderLon - lon0) / dLon;
+          }
           double borderLat =
               path[i - 1].lat + f * (path[i].lat - path[i - 1].lat);
 
