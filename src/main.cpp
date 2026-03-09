@@ -2638,8 +2638,9 @@ void DashboardContext::render(AppContext &ctx) {
   }
 
   if (!ctx.displayPower->getPower()) {
-    SDL_RenderPresent(ctx.renderer); // Push black frame to framebuffer
-    return;
+    if (ctx.displayPower->consumeBlackFrame())
+      SDL_RenderPresent(ctx.renderer); // one black frame to clear the display
+    return; // subsequent ticks: don't present — let KMSDRM pipeline go idle
   }
 
   Widget *activeModal = nullptr;

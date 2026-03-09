@@ -24,6 +24,9 @@ public:
   void init(); // Detect available method
   bool setPower(bool on);
   bool getPower() const;
+  // Render loop calls this: returns true once after power-off to push one
+  // black frame, then false so SDL_RenderPresent stops and KMS goes idle.
+  bool consumeBlackFrame();
   const std::vector<Method> &getMethods() const { return methods_; }
   std::string getMethodName() const;
   std::string getSelectedMethodName() const { return methodToString(selectedMethod_); }
@@ -37,6 +40,7 @@ private:
   Method selectedMethod_ = Method::NONE;
   std::string blPowerPath_;
   bool currentPower_ = true;
+  bool needsBlackFrame_ = false;
 
   std::string findBacklightPowerPath();
   bool writeSysfs(const std::string &path, const std::string &value);

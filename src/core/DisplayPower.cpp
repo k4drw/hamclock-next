@@ -81,14 +81,16 @@ void DisplayPower::init() {
         if (fgets(buf, sizeof(buf), fp)) {
           // Output line format: "HDMI-A-1 ..."
           char *sp = std::strchr(buf, ' ');
-          if (sp) *sp = '\0';
+          if (sp)
+            *sp = '\0';
           wlrRandrOutput_ = buf;
         }
         pclose(fp);
       }
       if (!wlrRandrOutput_.empty()) {
         methods_.push_back(Method::WLR_RANDR);
-        LOG_I("Display", "Detected screen control: wlr-randr ({})", wlrRandrOutput_);
+        LOG_I("Display", "Detected screen control: wlr-randr ({})",
+              wlrRandrOutput_);
       }
     }
   }
@@ -160,9 +162,10 @@ bool DisplayPower::setPower(bool on) {
 
   if (success) {
     currentPower_ = on;
+    if (!on)
+      needsBlackFrame_ = true;
     LOG_I("Display", "Screen power set to {}", on ? "ON" : "OFF");
   } else {
-    // Only log error on desktop
 #ifndef __EMSCRIPTEN__
     LOG_E("Display", "Failed to set screen power to {}", on ? "ON" : "OFF");
 #endif
@@ -171,6 +174,14 @@ bool DisplayPower::setPower(bool on) {
 }
 
 bool DisplayPower::getPower() const { return currentPower_; }
+
+bool DisplayPower::consumeBlackFrame() {
+  if (needsBlackFrame_) {
+    needsBlackFrame_ = false;
+    return true;
+  }
+  return false;
+}
 
 std::string DisplayPower::getMethodName() const {
 #if defined(__EMSCRIPTEN__)
@@ -266,7 +277,6 @@ bool DisplayPower::blankFramebuffer(bool blank) {
     return false;
 
   if (blank) {
-    ioctl(fd, FBIOBLANK, FB_BLANK_NORMAL); // best-effort prepare; ignore rc
     if (ioctl(fd, FBIOBLANK, FB_BLANK_POWERDOWN) < 0) {
       close(fd);
       return false;
@@ -302,7 +312,7 @@ bool DisplayPower::runXsetDpms(bool on) {
   if (!xDisplayEnv_.empty())
     cmd = "DISPLAY=" + xDisplayEnv_ + " ";
   cmd += on ? "xset dpms force on > /dev/null 2>&1"
-             : "xset dpms force off > /dev/null 2>&1";
+            : "xset dpms force off > /dev/null 2>&1";
   return std::system(cmd.c_str()) == 0;
 #else
   (void)on;
@@ -312,8 +322,8 @@ bool DisplayPower::runXsetDpms(bool on) {
 
 bool DisplayPower::runTvservice(bool on) {
 #if !defined(__EMSCRIPTEN__) && !defined(_WIN32)
-  std::string cmd = on ? "tvservice -p > /dev/null 2>&1"
-                       : "tvservice -o > /dev/null 2>&1";
+  std::string cmd =
+      on ? "tvservice -p > /dev/null 2>&1" : "tvservice -o > /dev/null 2>&1";
   return std::system(cmd.c_str()) == 0;
 #else
   (void)on;
@@ -328,8 +338,8 @@ bool DisplayPower::runWlrRandr(bool on) {
   std::string cmd;
   if (!wlDisplayEnv_.empty())
     cmd = "WAYLAND_DISPLAY=" + wlDisplayEnv_ + " ";
-  cmd += "wlr-randr --output " + wlrRandrOutput_ +
-         (on ? " --on" : " --off") + " > /dev/null 2>&1";
+  cmd += "wlr-randr --output " + wlrRandrOutput_ + (on ? " --on" : " --off") +
+         " > /dev/null 2>&1";
   return std::system(cmd.c_str()) == 0;
 #else
   (void)on;
@@ -341,7 +351,8 @@ bool DisplayPower::runDrmDpms(bool on) {
 #if defined(__linux__) && !defined(__EMSCRIPTEN__)
   int fd = open("/dev/dri/card0", O_RDWR | O_CLOEXEC);
   if (fd < 0) {
-    LOG_E("DisplayPower", "Failed to open /dev/dri/card0: %s", std::strerror(errno));
+    LOG_E("DisplayPower", "Failed to open /dev/dri/card0: %s",
+          std::strerror(errno));
     return false;
   }
 
@@ -471,5 +482,3 @@ DisplayPower::Method DisplayPower::stringToMethod(const std::string &s) {
     return Method::CONSOLE;
   return Method::NONE;
 }
-
-
