@@ -1,7 +1,7 @@
 {
   "mcp_version": "2.7",
   "project": "hamclock-next",
-  "updated_at": "2026-03-07T15:00:00.000Z",
+  "updated_at": "2026-03-09T00:00:00.000Z",
   "project_context": {
     "title": "HamClock Next \u2014 SDL2 Rewrite",
     "callsign": "K4DRW",
@@ -485,7 +485,7 @@
     "missing": 0,
     "not_needed": 5,
     "percent_done": "100% (82/82 parity features — updated 2026-03-07)",
-    "notes": "v1.0B04. Updated 2026-03-07: B04 polish — AuroraGraphPanel getName/onResize, GreylineDXPanel scroll, ReminderPanel onResize, Aux Clock timezone — modal popup with Local+DST preset and full tz list, widget count corrected to 45, REST-API route count corrected to 79, wiki/docs completions."
+    "notes": "v1.0B04. Updated 2026-03-09: post-B04 bug fixes — RigService sscanf width guard, RotatorService null store_ guard, OrbitPredictor overflow cap, hardcoded color constants replaced with ThemeColors (11 files), MapWidget antimeridian div-by-zero at 5 edge sites, DXClusterData INSERT → prepared statements, DatabaseManager execPrepared() added, SECURITY.md added. DisplayPower KMSDRM one-shot-black-frame architecture verified on RPi3B."
   },
   "implemented_features": [
     {
@@ -1864,6 +1864,27 @@
         "Event System: Enhanced SetupScreen event loop to support MouseDown/MouseMotion/MouseWheel for complex sub-modals.",
         "Automatic Reminders: Restored FRN parsing in CallbookProvider and automatic background sync."
       ]
+    },
+    "post_b04_fixes": {
+      "name": "Post-B04 Security & Stability Fixes",
+      "completed": "2026-03-09",
+      "summary": "Series of targeted security and stability fixes applied after the v1.0B04 release candidate. All fixes are surgical and do not affect parity status. Verified on RPi3B KMSDRM backend.",
+      "key_changes": [
+        "src/services/RigService.cpp:506 — sscanf %s → %31s width guard (buffer overflow prevention)",
+        "src/services/RotatorService.cpp:120,149,225,278 — null store_ guard added before all store_ dereferences",
+        "src/core/OrbitPredictor.cpp:142 — integer overflow cap: minutes * 60 capped to prevent wrap",
+        "src/ui/ (11 files) — hardcoded SDL_Color{r,g,b,a} constants replaced with getThemeColors() ThemeColors tokens",
+        "src/ui/MapWidget.cpp — antimeridian div-by-zero guard at 5 additional edge sites",
+        "src/core/DXClusterData.cpp — INSERT statement replaced with sqlite3 prepared statement (sqlite3_bind_*)",
+        "src/network/DatabaseManager.h/.cpp — execPrepared() method added for parameterized query support",
+        "SECURITY.md — added vulnerability reporting policy and REST/SQL architecture security notes",
+        "src/main.cpp ~line 2638 — DisplayPower one-shot-black-frame pattern (see platform_specific.raspberry_pi.kmsdrm_backend.display_power_architecture)"
+      ],
+      "security_fixes_resolved": [
+        "DXClusterData SQL injection risk — RESOLVED via prepared statements",
+        "RigService sscanf stack buffer overflow — RESOLVED via %31s width guard",
+        "RotatorService null pointer dereference — RESOLVED via null store_ guards"
+      ]
     }
   },
   "platform_specific": {
@@ -1888,8 +1909,15 @@
           "Colorful noise on night side (Phase 31)"
         ]
       },
+      "display_power_architecture": {
+        "description": "DisplayPower — KMSDRM + SDL2 Blanking Architecture (RPi3B verified 2026-03-09)",
+        "root_cause": "On RPi3B with KMSDRM, SDL2 owns the display pipeline. While SDL2 is actively calling SDL_RenderPresent(), no external blanking command (fbdev FBIOBLANK, vcgencmd display_power) can cut the HDMI signal — they blank visually but the monitor never enters power-saving mode and shows no HDMI input label on wake.",
+        "solution": "One-shot black frame pattern: (1) setPower(false) sets needsBlackFrame_=true, (2) consumeBlackFrame() returns true once (next render tick), (3) render loop: if consumeBlackFrame() → SDL_RenderPresent() once to clear screen, (4) subsequent ticks: getPower()==false → return without SDL_RenderPresent, (5) with no new frames, KMSDRM DPMS idle timer can engage → true power-off.",
+        "files": ["src/core/DisplayPower.h", "src/core/DisplayPower.cpp", "src/main.cpp ~line 2638"],
+        "verified": "RPi3B KMSDRM backend, 2026-03-09"
+      },
       "hardware_features": {
-        "display_power": "vcgencmd display_power (HDMI) or sysfs bl_power (DSI)",
+        "display_power": "vcgencmd display_power (HDMI) or sysfs bl_power (DSI). See display_power_architecture for KMSDRM-specific blanking.",
         "cpu_temperature": "/sys/class/thermal/thermal_zone0/temp",
         "brightness_control": "sysfs backlight control via BrightnessManager",
         "i2c_sensors": "BME280: full Bosch compensation math implemented (BME280Provider). Hardware validation on RPi+sensor pending."
@@ -2226,6 +2254,38 @@
   },
   "open_issues": {
     "description": "Curated contributor-friendly work items. Difficulty reflects number of files touched and complexity of domain logic.",
+    "recently_resolved": [
+      {
+        "title": "DXClusterData SQL injection (prepared statements)",
+        "status": "RESOLVED 2026-03-09",
+        "files": ["src/core/DXClusterData.cpp", "src/network/DatabaseManager.h", "src/network/DatabaseManager.cpp"],
+        "fix": "INSERT replaced with sqlite3_bind_* prepared statements; execPrepared() added to DatabaseManager."
+      },
+      {
+        "title": "RigService sscanf buffer overflow (%s width guard)",
+        "status": "RESOLVED 2026-03-09",
+        "files": ["src/services/RigService.cpp"],
+        "fix": "sscanf %s → %31s at line 506."
+      },
+      {
+        "title": "RotatorService null store_ pointer dereference",
+        "status": "RESOLVED 2026-03-09",
+        "files": ["src/services/RotatorService.cpp"],
+        "fix": "Null guard added before store_ dereferences at lines 120, 149, 225, 278."
+      },
+      {
+        "title": "MapWidget antimeridian div-by-zero at edge sites",
+        "status": "RESOLVED 2026-03-09",
+        "files": ["src/ui/MapWidget.cpp"],
+        "fix": "Guard added at 5 additional antimeridian edge sites."
+      },
+      {
+        "title": "Hardcoded SDL_Color constants in UI panels",
+        "status": "RESOLVED 2026-03-09",
+        "files": ["src/ui/ (11 files)"],
+        "fix": "All hardcoded SDL_Color{r,g,b,a} replaced with getThemeColors() ThemeColors tokens per UI Engineering Standards."
+      }
+    ],
     "easy": [
       {
         "title": "Update docs/wiki screenshot placeholders",

@@ -18,9 +18,25 @@ It allows an AI assistant to:
 
 ---
 
-## 🛠️ Setup (For Contributors)
+## Quick Start (Claude Code)
 
-To use the MCP server in your local development environment with an MCP-capable AI assistant:
+A `.mcp.json` file in the project root enables automatic MCP loading.
+When you open this project in Claude Code, it will offer to enable the
+`hamclock-bridge` MCP server automatically.
+
+**Prerequisite — build the server once:**
+```
+cd .mcp && npm install && npm run build
+```
+
+After that, Claude Code loads the MCP context automatically on project open.
+No manual configuration required.
+
+---
+
+## 🛠️ Setup (For Other Assistants)
+
+To use the MCP server with a non-Claude Code AI assistant:
 
 ### 1. Build the MCP Server
 Ensure you have Node.js installed, then:
