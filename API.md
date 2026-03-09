@@ -69,11 +69,20 @@ Returns the complete `AppConfig` as a JSON object.
 
 ## 3. Command & Control
 
+### `GET /set_config?key=value`
+Programmatically set a configuration field (e.g. `call=K4DRW`, `theme=dark`, `metric=1`).
+
+### `GET /set_rss?url=...`
+Sets the RSS news feed URL.
+
+### `GET /set_mapcolor?theme=...`
+Changes the map background theme.
+
 ### `GET /set_callsign?call=S`
-Sets the station callsign.
+(Legacy Alias) Sets the station callsign.
 
 ### `GET /set_location?lat=F&lon=F` or `?grid=S`
-Sets the DE (station) location.
+(Legacy Alias) Sets the DE (station) location.
 
 ### `GET /set_newdx?lat=F&lon=F` or `?grid=S`
 Sets the DX (target) location.

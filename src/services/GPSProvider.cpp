@@ -85,7 +85,16 @@ void GPSProvider::run() {
 
     // Request JSON updates
     const char *watch_cmd = "?WATCH={\"enable\":true,\"json\":true};\r\n";
-    send(sock, watch_cmd, std::strlen(watch_cmd), 0);
+    if (send(sock, watch_cmd, std::strlen(watch_cmd), 0) < 0) {
+      LOG_E("GPS", "Failed to send WATCH command to gpsd");
+#ifdef _WIN32
+      closesocket(sock);
+#else
+      close(sock);
+#endif
+      std::this_thread::sleep_for(std::chrono::seconds(10));
+      continue;
+    }
 
     // ... (rest of the run implementation)
     std::string buffer;

@@ -80,8 +80,11 @@ static std::string getTagContent(const std::string &line,
   size_t valueStart = close + 1;
   if (valueStart + len > line.length()) {
     LOG_W("ADIFProvider", "Tag {} length exceeds line boundary", tag);
-    return line.substr(valueStart); // Return what's available
+    len = line.length() - valueStart;
   }
+
+  if (len > 1024)
+    len = 1024; // Safety limit for any single tag content
 
   return line.substr(valueStart, len);
 }
@@ -242,18 +245,18 @@ void ADIFProvider::processFile(const std::filesystem::path &path) {
 
         // Store full QSO record (keep most recent 100)
         QSORecord qso;
-        qso.callsign = call;
-        qso.date = qsoDate;
-        qso.time = timeOn;
-        qso.band = useBand;
-        qso.mode = mode;
-        qso.freq = freq;
-        qso.rstSent = rstSent;
-        qso.rstRcvd = rstRcvd;
-        qso.name = name;
-        qso.qth = qth;
-        qso.gridsquare = gridsquare;
-        qso.comment = comment;
+        qso.callsign = call.length() > 16 ? call.substr(0, 16) : call;
+        qso.date = qsoDate.length() > 16 ? qsoDate.substr(0, 16) : qsoDate;
+        qso.time = timeOn.length() > 16 ? timeOn.substr(0, 16) : timeOn;
+        qso.band = useBand.length() > 8 ? useBand.substr(0, 8) : useBand;
+        qso.mode = mode.length() > 16 ? mode.substr(0, 16) : mode;
+        qso.freq = freq.length() > 16 ? freq.substr(0, 16) : freq;
+        qso.rstSent = rstSent.length() > 8 ? rstSent.substr(0, 8) : rstSent;
+        qso.rstRcvd = rstRcvd.length() > 8 ? rstRcvd.substr(0, 8) : rstRcvd;
+        qso.name = name.length() > 32 ? name.substr(0, 32) : name;
+        qso.qth = qth.length() > 32 ? qth.substr(0, 32) : qth;
+        qso.gridsquare = gridsquare.length() > 16 ? gridsquare.substr(0, 16) : gridsquare;
+        qso.comment = comment.length() > 64 ? comment.substr(0, 64) : comment;
 
         // Resolve location
         if (!latStr.empty() && !lonStr.empty()) {

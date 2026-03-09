@@ -54,40 +54,36 @@ Once active, the following tools become available to your AI assistant:
 ### 📊 Parity & Progress
 - **`parity_summary`**: View the overall progress of the `next` codebase vs `original`.
 - **`parity_list`**: Search for features by status (`MISSING`, `PARTIAL`, `IMPLEMENTED`).
-- **`parity_feature`**: Get JSON metadata for a specific feature, including technical debt notes.
+- **`parity_feature`**: Get JSON metadata for a specific feature.
 - **`parity_verify_feature`**: Ping a running hamclock-next instance to see if a feature's API is live.
+- **`parity_sync`**: Update `parity_v2.json` from a Markdown report.
+- **`parity_create_ticket`**: Generates a detailed implementation plan for a single feature.
+- **`parity_create_batch_tickets`**: Generates task lists for multiple features.
 
 ### 🔍 Codebase Intelligence
-- **`project_context`**: Get project context and architectural knowledge. Available sections:
-  - `project_context` - Origin story, tech stack, philosophy
-  - `source_layout` - Directory structure, naming conventions
-  - `original_vs_next` - Key architectural differences
-  - `widget_scaffolding` - How to add new widgets
-  - `api_reference` - WebServer endpoint summary
-  - `contribution_guide` - Code style, AI assistant tips
-  - `feature_status_summary` - Progress overview
-  - **`decisions`** ⭐ - Architectural decision records with rationale (9 entries covering SDL2, libpredict, libcurl, layout system, etc.)
-  - **`gotchas`** ⭐ - Debugging knowledge: non-obvious behaviors, footguns, initialization order issues (10 entries with severity ratings)
-  - **`api_examples`** ⭐ - Working curl commands for all 22 WebServer endpoints organized by category
+- **`project_context`**: Get project context and architectural knowledge (decisions, gotchas, api_examples, etc.).
 - **`repo_map <original|next>`**: Generates a high-level summary of the entire repository structure.
-- **`find_symbols`**: Regex search for functions/classes. Essential for finding *where* a feature was implemented in the original.
+- **`find_symbols`**: Regex search for functions/classes.
 - **`find_files`**: Glob-based file discovery.
+- **`reindex_repo`**: Force a re-index of the repository metadata.
 
-### 📚 Knowledge Resources
-These are also available as standalone MCP resources (use `ReadMcpResourceTool`):
-- **`hamclock://project/decisions`**: Why key architectural choices were made (alternatives considered, tradeoffs, files affected)
-- **`hamclock://project/gotchas`**: Hard-won debugging knowledge (symptom, cause, fix for each gotcha)
-- **`hamclock://project/api-examples`**: Copy-paste curl examples for every WebServer endpoint (core, input injection, config, debug API)
+### 🏥 Diagnostics & Memory
+- **`diagnose_memory`**: Query FPS, texture allocation health, and memory errors from a running instance.
+- **`analyze_texture_cache`**: Check for texture churn and leak patterns.
+- **`memory_stress_test`**: Monitor FPS stability over time to detect performance degradation.
 
-### 📝 Task Management
-- **`parity_create_ticket`**: Generates a detailed implementation plan for a single feature.
-- **`parity_create_batch_tickets`**: Generates task lists for an entire category or priority block.
+### 📡 Propagation (VOACAP)
+- **`voacap_overlay_schema`**: Get the canonical request/response schema for VOACAP overlays.
+- **`get_voacap_overlay`**: Request a VOACAP propagation map overlay (reliability, MUF, TOA).
+- **`check_propagation_backend`**: Verify connectivity to the propagation calculation engine.
+- **`propagation_parity_gaps`**: List all propagation-related gaps and implementation priorities.
 
-### ⚡ Automation & Scaffolding
-- **`get_scaffolding_template`**: **The most powerful tool for contributors.** Give it a PascalCase name (e.g., `SolarPanel`), and it returns complete, ready-to-save C++ boilerplate for:
-    - [Name]Data.h (Model)
-    - [Name]Provider.cpp/h (Service/Network)
-    - [Name]Panel.cpp/h (UI/Widget)
+### 📚 Knowledge & Contribution
+- **`contributor_start`**: Onboarding for a new contributor (onboarding, tech stack, rules).
+- **`open_issues`**: List curated, difficulty-ranked work items.
+- **`new_feature_checklist`**: Registration checklist for adding a new widget or endpoint.
+- **`get_scaffolding_template`**: Returns ready-to-save C++ boilerplate for new panels and providers.
+- **`scaffold_feature`**: Automatically generates the boilerplate files in the workspace.
 
 ---
 

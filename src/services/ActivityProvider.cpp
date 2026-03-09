@@ -76,7 +76,9 @@ void ActivityProvider::fetchDXPeds() {
             if (end == std::string::npos) return "";
           }
           searchPos = end;
-          return html.substr(start, end - start);
+          std::string content = html.substr(start, end - start);
+          if (content.length() > 256) content.resize(256); // Safety clip
+          return content;
         };
 
         size_t rowPos = pos;
@@ -97,8 +99,8 @@ void ActivityProvider::fetchDXPeds() {
 
         if (!call.empty() && !d1.empty()) {
           DXPedition de;
-          de.call = call;
-          de.location = loc;
+          de.call = call.length() > 16 ? call.substr(0, 16) : call;
+          de.location = loc.length() > 32 ? loc.substr(0, 32) : loc;
 
           auto parseAdxoDate = [](const std::string &s, int &year, char *mon,
                                   int &day) -> bool {
@@ -182,9 +184,12 @@ void ActivityProvider::fetchPOTA() {
         for (const auto &spot : j) {
           ONTASpot os;
           os.program = "POTA";
-          os.call = spot.value("activator", "");
-          os.ref = spot.value("reference", "");
-          os.mode = spot.value("mode", "");
+          std::string call = spot.value("activator", "");
+          os.call = call.length() > 16 ? call.substr(0, 16) : call;
+          std::string ref = spot.value("reference", "");
+          os.ref = ref.length() > 24 ? ref.substr(0, 24) : ref;
+          std::string mode = spot.value("mode", "");
+          os.mode = mode.length() > 16 ? mode.substr(0, 16) : mode;
           std::string freq = spot.value("frequency", "0");
           os.freqKhz = StringUtils::safe_stod(freq) * 1000.0;
           os.spottedAt = std::chrono::system_clock::now();
@@ -262,10 +267,13 @@ void ActivityProvider::fetchSOTA() {
         for (const auto &spot : j) {
           ONTASpot os;
           os.program = "SOTA";
-          os.call = spot.value("activatorCallsign", "");
-          os.ref = spot.value("associationCode", "") + "/" +
-                   spot.value("summitCode", "");
-          os.mode = spot.value("mode", "");
+          std::string call = spot.value("activatorCallsign", "");
+          os.call = call.length() > 16 ? call.substr(0, 16) : call;
+          std::string ref = spot.value("associationCode", "") + "/" +
+                            spot.value("summitCode", "");
+          os.ref = ref.length() > 24 ? ref.substr(0, 24) : ref;
+          std::string mode = spot.value("mode", "");
+          os.mode = mode.length() > 16 ? mode.substr(0, 16) : mode;
           std::string freq = spot.value("frequency", "0");
           os.freqKhz = StringUtils::safe_stod(freq) *
                        1000.0; // SOTA MHz to kHz? Check API

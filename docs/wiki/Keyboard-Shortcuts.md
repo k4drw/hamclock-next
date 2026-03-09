@@ -8,8 +8,10 @@ HamClock-Next uses minimal keyboard shortcuts at the global level. Most interact
 
 | Key | Action |
 |-----|--------|
-| `K` | Toggle **highlight mode** — draws cyan bounding boxes around all interactive regions, each labeled with a tooltip |
-| `Ctrl+Q` | Quit HamClock-Next (native builds) |
+| `K` | Toggle **highlight mode** — draws cyan bounding boxes around all interactive regions. |
+| `O` | Toggle **debug overlay** — shows real-time FPS, CPU, and network statistics. |
+| `F11` | Toggle **fullscreen mode**. |
+| `Ctrl+Q` | Quit HamClock-Next (native builds). |
 
 Closing the window (SDL_QUIT / OS close button) also exits cleanly.
 

@@ -2063,8 +2063,21 @@ void DashboardContext::update(AppContext &ctx) {
         if (event.key.keysym.sym == SDLK_k) {
           ctx.showActionHighlights = !ctx.showActionHighlights;
           consumed = true;
+        } else if (event.key.keysym.sym == SDLK_o && ctx.dashboard) {
+          ctx.dashboard->debugOverlay.toggle();
+          consumed = true;
+        } else if (event.key.keysym.sym == SDLK_F11) {
+
+          Uint32 flags = SDL_GetWindowFlags(ctx.window);
+          if (flags & SDL_WINDOW_FULLSCREEN_DESKTOP)
+            SDL_SetWindowFullscreen(ctx.window, 0);
+          else
+            SDL_SetWindowFullscreen(ctx.window, SDL_WINDOW_FULLSCREEN_DESKTOP);
+          consumed = true;
         }
+
         if (!consumed) {
+
           for (auto *w : eventWidgets) {
             if (w->onKeyDown(event.key.keysym.sym, event.key.keysym.mod)) {
               consumed = true;

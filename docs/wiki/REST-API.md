@@ -20,13 +20,21 @@ These endpoints provide access to the user interface remotely.
 These endpoints handle reading and writing application settings.
 - `GET /api/config` : Returns core configuration data in JSON format.
 - `GET /set_config?...` : Updates configuration parameters (e.g., `call`, `grid`, `lat`, `lon`, `theme`, `map_style`, `prop_overlay`, `wx_overlay`).
+- `GET /set_rss?url={url}` : Sets the RSS news feed URL.
+- `GET /set_mapcolor?theme={name}` : Changes the map background theme.
+- `GET /set_projection?type={mercator|azimuthal}` : Changes the map projection.
+- `GET /set_prop_overlay?type={none|muf|drap|aurora|...}` : Sets the map propagation overlay.
+- `GET /set_wx_overlay?type={none|temp|rain|wind}` : Sets the map weather overlay.
+- `GET /api/hub/fetch?url={B64_URL}&max_age={SEC}` : Proxies a fetch through the Master's cache (Master mode only).
+- `GET /api/hub/dxcluster` : Returns recent spots from the Master's DX Cluster store.
+- `POST /set_adif` : Uploads an ADIF log file body to the ADIFProvider.
 - `GET /api/display/status` : Returns display uptime and power status.
 - `POST /api/display/power` : Sets display power on/off (requires JSON body `{"state": "on"}`).
 - `GET /set_displayOnOff?on|off` : Sets the display screen to turn on or off.
 - `GET /set_screenlock?lock=on|off` : Enables or disables the screen touch lock.
-- `GET /set_callsign?call={callsign}` : Updates the operator callsign.
-- `GET /set_location?lat={lat}&lon={lon}` : Updates the local DE location.
-- `GET /set_theme?theme={dark|light|glass|default}` : Changes the UI theme live.
+- `GET /set_callsign?call={callsign}` : *Legacy Alias*: Updates the operator callsign (use `/set_config?call=...`).
+- `GET /set_location?lat={lat}&lon={lon}` : *Legacy Alias*: Updates the local DE location (use `/set_config?lat=...`).
+- `GET /set_theme?theme={dark|light|glass|default}` : *Legacy Alias*: Changes the UI theme (use `/set_config?theme=...`).
 - `GET /set_metric?units={metric|imperial}` : Changes the unit measurement system.
 - `GET /set_brightness?pct={0-100}` : Sets the display brightness level.
 - `GET /set_newde?lat={lat}&lon={lon}` : Updates the origin DE location.

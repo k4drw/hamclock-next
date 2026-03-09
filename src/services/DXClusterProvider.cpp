@@ -299,7 +299,11 @@ void DXClusterProvider::runTelnet(const std::string &host, int port,
 
   if (!login.empty() && !stopClicked_) {
     std::string cmd = login + "\r\n";
-    send(sock, cmd.c_str(), cmd.length(), 0);
+    if (send(sock, cmd.c_str(), cmd.length(), 0) < 0) {
+      LOG_W("DXCluster", "Failed to send login");
+      close(sock);
+      return;
+    }
   }
 
   while (!stopClicked_) {
@@ -362,7 +366,10 @@ void DXClusterProvider::runTelnet(const std::string &host, int port,
             }
             if (!initialRequestSent) {
               const char *req = "sh/dx 30\r\n";
-              send(sock, req, std::strlen(req), 0);
+              if (send(sock, req, std::strlen(req), 0) < 0) {
+                LOG_W("DXCluster", "Failed to send initial request");
+                break;
+              }
               initialRequestSent = true;
             }
           }
@@ -372,7 +379,10 @@ void DXClusterProvider::runTelnet(const std::string &host, int port,
                 line.find("callsign:") != std::string::npos ||
                 line.find("Please enter your call:") != std::string::npos) {
               std::string cmd = login + "\r\n";
-              send(sock, cmd.c_str(), cmd.length(), 0);
+              if (send(sock, cmd.c_str(), cmd.length(), 0) < 0) {
+                LOG_W("DXCluster", "Failed to send callsign");
+                break;
+              }
             }
           }
         }
@@ -384,7 +394,10 @@ void DXClusterProvider::runTelnet(const std::string &host, int port,
             buffer.find("callsign:") != std::string::npos ||
             buffer.find("Please enter your call:") != std::string::npos) {
           std::string cmd = login + "\r\n";
-          send(sock, cmd.c_str(), cmd.length(), 0);
+          if (send(sock, cmd.c_str(), cmd.length(), 0) < 0) {
+            LOG_W("DXCluster", "Failed to send callsign for prompt");
+            break;
+          }
           buffer.clear();
         }
       }
