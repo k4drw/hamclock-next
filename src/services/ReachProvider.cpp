@@ -20,7 +20,11 @@ void ReachProvider::fetch(const std::string& band, const std::string& mode) {
 void ReachProvider::fetchPSK(const std::string& band, const std::string& mode) {
     // PSK Reporter API: Query for signals heard BY our callsign (or heard US if configured)
     // For "Reach Heatmap", we usually want to see who heard US (transmitter reach).
-    std::string call = state_->deCallsign;
+    std::string call;
+    {
+        std::lock_guard<std::mutex> lk(state_->locationMutex);
+        call = state_->deCallsign;
+    }
     if (call.empty()) call = "NOCALL";
 
     // Example URL: https://pskreporter.info/query?senderCallsign=K1ABC&flowctrl=1

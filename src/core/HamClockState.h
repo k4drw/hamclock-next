@@ -4,6 +4,7 @@
 
 #include <chrono>
 #include <map>
+#include <mutex>
 #include <string>
 
 struct ServiceStatus {
@@ -38,4 +39,16 @@ struct HamClockState {
 
   // Asteroid selection — "" means none selected
   std::string selectedAsteroidName;
+
+  // Synchronization
+  // locationMutex: protects deLocation/deGrid/deCallsign/dxLocation/dxGrid/
+  //   dxActive/dxCallsign/mapDx*/fps.  Held by the main thread for the
+  //   duration of each update()+render() call; acquired briefly by the
+  //   WebServer thread for reads/writes and by worker threads that read
+  //   location fields.
+  mutable std::mutex locationMutex;
+  // servicesMutex: protects the services map.  Acquired by each service
+  //   provider thread on every status write, and by the render/web threads
+  //   when iterating the map.
+  mutable std::mutex servicesMutex;
 };

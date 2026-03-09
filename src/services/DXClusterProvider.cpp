@@ -112,6 +112,7 @@ void DXClusterProvider::run() {
       } else {
         LOG_W("DXCluster", "Connection rate limit reached (10/hr)");
         if (state_) {
+          std::lock_guard<std::mutex> lk(state_->servicesMutex);
           state_->services["DXCluster"].ok = false;
           state_->services["DXCluster"].lastError = "Rate limit reached (10/hr)";
         }
@@ -197,6 +198,7 @@ void DXClusterProvider::runTelnet(const std::string &host, int port,
                                   const std::string &login) {
   LOG_I("DXCluster", "Connecting to {}:{}", host, port);
   if (state_) {
+    std::lock_guard<std::mutex> lk(state_->servicesMutex);
     auto &s = state_->services["DXCluster"];
     s.ok = false;
     s.lastError = "Connecting...";
@@ -207,8 +209,10 @@ void DXClusterProvider::runTelnet(const std::string &host, int port,
   int sock = socket(AF_INET, SOCK_STREAM, 0);
   if (sock < 0) {
     LOG_E("DXCluster", "Failed to create socket");
-    if (state_)
+    if (state_) {
+      std::lock_guard<std::mutex> lk(state_->servicesMutex);
       state_->services["DXCluster"].lastError = "Socket error";
+    }
     return;
   }
 
@@ -220,8 +224,10 @@ void DXClusterProvider::runTelnet(const std::string &host, int port,
   std::string portStr = std::to_string(port);
   if (getaddrinfo(host.c_str(), portStr.c_str(), &hints, &res) != 0 || !res) {
     LOG_E("DXCluster", "Could not resolve {}", host);
-    if (state_)
+    if (state_) {
+      std::lock_guard<std::mutex> lk(state_->servicesMutex);
       state_->services["DXCluster"].lastError = "DNS failed";
+    }
     close(sock);
     return;
   }
@@ -246,8 +252,10 @@ void DXClusterProvider::runTelnet(const std::string &host, int port,
     if (errno != EINPROGRESS) {
 #endif
       LOG_E("DXCluster", "Connect to {} failed: {}", host, std::strerror(errno));
-      if (state_)
+      if (state_) {
+        std::lock_guard<std::mutex> lk(state_->servicesMutex);
         state_->services["DXCluster"].lastError = "Connect failed";
+      }
       close(sock);
       return;
     }
@@ -266,8 +274,10 @@ void DXClusterProvider::runTelnet(const std::string &host, int port,
 #endif
     if (ret <= 0) {
       LOG_E("DXCluster", "Connect to {} timed out after 10s", host);
-      if (state_)
+      if (state_) {
+        std::lock_guard<std::mutex> lk(state_->servicesMutex);
         state_->services["DXCluster"].lastError = "Connect timeout";
+      }
       close(sock);
       return;
     }
@@ -277,16 +287,20 @@ void DXClusterProvider::runTelnet(const std::string &host, int port,
     socklen_t len = sizeof(error);
     if (getsockopt(sock, SOL_SOCKET, SO_ERROR, (char *)&error, &len) < 0 || error != 0) {
       LOG_E("DXCluster", "Connect to {} failed: {}", host, std::strerror(error));
-      if (state_)
+      if (state_) {
+        std::lock_guard<std::mutex> lk(state_->servicesMutex);
         state_->services["DXCluster"].lastError = "Connect error";
+      }
       close(sock);
       return;
     }
   }
 
   LOG_I("DXCluster", "Connected to {}", host);
-  if (state_)
+  if (state_) {
+    std::lock_guard<std::mutex> lk(state_->servicesMutex);
     state_->services["DXCluster"].lastError = "Connected";
+  }
   store_->setConnected(true, "Connected to " + host);
 
   std::string buffer;
@@ -327,6 +341,7 @@ void DXClusterProvider::runTelnet(const std::string &host, int port,
       if (n <= 0) {
         LOG_W("DXCluster", "Connection lost");
         if (state_) {
+          std::lock_guard<std::mutex> lk(state_->servicesMutex);
           state_->services["DXCluster"].ok = false;
           state_->services["DXCluster"].lastError = "Connection lost";
         }
@@ -358,6 +373,7 @@ void DXClusterProvider::runTelnet(const std::string &host, int port,
               // Reset connection attempt count on successful login
               connectionAttempts_ = 0;
               if (state_) {
+                std::lock_guard<std::mutex> lk(state_->servicesMutex);
                 auto &s = state_->services["DXCluster"];
                 s.ok = true;
                 s.lastSuccess = std::chrono::system_clock::now();

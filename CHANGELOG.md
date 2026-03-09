@@ -29,6 +29,21 @@ Planned stable release following B04 validation.
 - Widget count in Widgets.md and gallery caption: 44 → 45
 - REST-API.md intro now states 79 endpoints
 
+### Fixed (post-B04 pre-release fixes — 2026-03-09)
+- **RigService.cpp** — `sscanf` format `%s` on `modeStr[32]` replaced with `%31s` to prevent buffer overflow on malformed CAT responses
+- **RotatorService.cpp** — Added `if (!store_)` null-pointer guards at four `store_->get()` call sites (lines 120, 149, 225, 278) matching the existing guard at line 64; affected paths: `setPosition()`, `stopRotator()`, `pollLoop()` disconnect, auto-tracking loop
+- **OrbitPredictor.cpp** — Added cap on `minutes` before `* 60` multiplication to prevent int32 overflow on pathological inputs
+- **MapWidget.cpp** — Added epsilon guard (`fabs(dLon) > 1e-6`) at antimeridian path-crossing calculation in 6 locations (sat track, asteroid track, `renderGreatCircle` duplicate sites, and 3 path-rendering functions) to prevent div-by-zero when a point lies exactly on ±180°
+- **UI theme colors** — Replaced hardcoded RGB values with `themes.*` tokens across 11 files: `TropoPanel.cpp`, `GreylineModal.cpp`, `ContestPanel.cpp`, `PresetsModal.cpp`, `StopwatchPanel.cpp`, `IonosondePanel.cpp`, `CountdownPanel.cpp`, `EMEToolPanel.cpp`, `ReminderPanel.cpp`, `SetupScreen.cpp` (ensures consistent Light/Dark/Glass appearance)
+- **Framebuffer blanking** — `blankFramebuffer()` now sends `FB_BLANK_NORMAL` before `FB_BLANK_POWERDOWN` so display power actually cuts; `#ifdef` guards normalized across `BME280Provider.cpp` and `FccProvider.cpp`
+- **REST-API.md** — Removed 10 stale endpoints not registered in WebServer.cpp; added `/set_mappos`; updated endpoint count to ~80
+- **API.md** — Removed unregistered `/set_theme` entry; corrected legacy compatibility note
+- **README.md** — Feature count 71 → 82; endpoint count "30+" → 79
+- **feature_overview.md** — Feature count 71 → 82; endpoint count corrected; C++ standard clarified to "C++20 (C++17 for WASM)"
+- **docs/wiki/Getting-Started.md** — CMake minimum version 3.16 → 3.18
+- **docs/wiki/Home.md** — Widget count 44 → 45 (two occurrences)
+- **CONTRIBUTING.md** — Broken link `docs/wiki/Building.md` → `docs/wiki/Getting-Started.md`
+
 ---
 
 ## [v1.0B03] — 2026-03-06

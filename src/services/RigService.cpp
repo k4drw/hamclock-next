@@ -182,6 +182,7 @@ void RigService::commandWorker() {
     store_->setConnected(true);
 
     if (state_) {
+      std::lock_guard<std::mutex> lk(state_->servicesMutex);
       state_->services["Rig"].ok = true;
       state_->services["Rig"].lastError = "";
     }
@@ -191,6 +192,7 @@ void RigService::commandWorker() {
     store_->setConnected(false);
 
     if (state_) {
+      std::lock_guard<std::mutex> lk(state_->servicesMutex);
       state_->services["Rig"].ok = false;
       state_->services["Rig"].lastError = "Connection failed";
     }
@@ -228,6 +230,7 @@ void RigService::commandWorker() {
         store_->setConnected(true);
 
         if (state_) {
+          std::lock_guard<std::mutex> lk(state_->servicesMutex);
           state_->services["Rig"].ok = true;
           state_->services["Rig"].lastError = "";
         }
@@ -246,6 +249,7 @@ void RigService::commandWorker() {
       if (success) {
         store_->setFrequency(cmd.freqHz);
         if (state_) {
+          std::lock_guard<std::mutex> lk(state_->servicesMutex);
           state_->services["Rig"].lastSuccess =
               std::chrono::system_clock::now();
         }
@@ -289,6 +293,7 @@ void RigService::commandWorker() {
       store_->setConnected(false);
 
       if (state_) {
+        std::lock_guard<std::mutex> lk(state_->servicesMutex);
         state_->services["Rig"].ok = false;
         state_->services["Rig"].lastError = "Command execution failed";
       }

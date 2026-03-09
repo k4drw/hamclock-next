@@ -179,12 +179,14 @@ void RotatorService::pollLoop() {
         connected_ = true;
 
         if (state_) {
+          std::lock_guard<std::mutex> lk(state_->servicesMutex);
           state_->services["Rotator"].ok = true;
           state_->services["Rotator"].lastError = "";
         }
       } else {
         // Connection failed, retry after delay
         if (state_) {
+          std::lock_guard<std::mutex> lk(state_->servicesMutex);
           state_->services["Rotator"].ok = false;
           state_->services["Rotator"].lastError = "Connection failed";
         }
@@ -207,6 +209,7 @@ void RotatorService::pollLoop() {
       store_->set(data);
 
       if (state_) {
+        std::lock_guard<std::mutex> lk(state_->servicesMutex);
         state_->services["Rotator"].ok = true;
         state_->services["Rotator"].lastSuccess =
             std::chrono::system_clock::now();
@@ -219,6 +222,7 @@ void RotatorService::pollLoop() {
       connected_ = false;
 
       if (state_) {
+        std::lock_guard<std::mutex> lk(state_->servicesMutex);
         state_->services["Rotator"].ok = false;
         state_->services["Rotator"].lastError = "Position query failed";
       }

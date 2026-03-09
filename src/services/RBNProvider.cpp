@@ -63,6 +63,7 @@ void RBNProvider::runTelnet(const std::string &host, int port,
                              const std::string &login) {
   LOG_I("RBN", "Connecting to {}:{}", host, port);
   if (state_) {
+    std::lock_guard<std::mutex> lk(state_->servicesMutex);
     auto &s = state_->services["RBN"];
     s.ok = false;
     s.lastError = "Connecting...";
@@ -71,16 +72,20 @@ void RBNProvider::runTelnet(const std::string &host, int port,
   int sock = socket(AF_INET, SOCK_STREAM, 0);
   if (sock < 0) {
     LOG_E("RBN", "Failed to create socket");
-    if (state_)
+    if (state_) {
+      std::lock_guard<std::mutex> lk(state_->servicesMutex);
       state_->services["RBN"].lastError = "Socket error";
+    }
     return;
   }
 
   struct hostent *he = gethostbyname(host.c_str());
   if (!he) {
     LOG_E("RBN", "Could not resolve {}", host);
-    if (state_)
+    if (state_) {
+      std::lock_guard<std::mutex> lk(state_->servicesMutex);
       state_->services["RBN"].lastError = "DNS failed";
+    }
 #ifdef _WIN32
     closesocket(sock);
 #else
@@ -100,8 +105,10 @@ void RBNProvider::runTelnet(const std::string &host, int port,
 #else
     LOG_E("RBN", "Connect to {} failed: {}", host, std::strerror(errno));
 #endif
-    if (state_)
+    if (state_) {
+      std::lock_guard<std::mutex> lk(state_->servicesMutex);
       state_->services["RBN"].lastError = "Connect failed";
+    }
 #ifdef _WIN32
     closesocket(sock);
 #else
@@ -119,6 +126,7 @@ void RBNProvider::runTelnet(const std::string &host, int port,
 
   LOG_I("RBN", "Connected to {}", host);
   if (state_) {
+    std::lock_guard<std::mutex> lk(state_->servicesMutex);
     state_->services["RBN"].lastError = "Connected";
   }
 
@@ -153,6 +161,7 @@ void RBNProvider::runTelnet(const std::string &host, int port,
       if (n <= 0) {
         LOG_W("RBN", "Connection lost");
         if (state_) {
+          std::lock_guard<std::mutex> lk(state_->servicesMutex);
           state_->services["RBN"].ok = false;
           state_->services["RBN"].lastError = "Connection lost";
         }
@@ -178,6 +187,7 @@ void RBNProvider::runTelnet(const std::string &host, int port,
                 line.find("DX de ") != std::string::npos) {
               loggedIn = true;
               if (state_) {
+                std::lock_guard<std::mutex> lk(state_->servicesMutex);
                 auto &s = state_->services["RBN"];
                 s.ok = true;
                 s.lastSuccess = std::chrono::system_clock::now();

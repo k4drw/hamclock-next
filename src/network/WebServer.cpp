@@ -1559,7 +1559,9 @@ void WebServer::run() {
   svr.Get("/api/display/status", [this](const httplib::Request &,
                                         httplib::Response &res) {
     nlohmann::json j;
-    j["fps"] = state_ ? std::to_string(state_->fps).substr(0, 4) : "0";
+    float fps = 0.0f;
+    if (state_) { std::lock_guard<std::mutex> lk(state_->locationMutex); fps = state_->fps; }
+    j["fps"] = std::to_string(fps).substr(0, 4);
     j["uptime"] =
         std::to_string(std::chrono::duration_cast<std::chrono::seconds>(
                            std::chrono::system_clock::now() - startTime_)
@@ -1736,10 +1738,13 @@ void WebServer::run() {
     }
     nlohmann::json j;
     j["projection"] = cfg_->projection;
-    j["deLat"] = state_->deLocation.lat;
-    j["deLon"] = state_->deLocation.lon;
-    j["dxLat"] = state_->dxLocation.lat;
-    j["dxLon"] = state_->dxLocation.lon;
+    {
+      std::lock_guard<std::mutex> lk(state_->locationMutex);
+      j["deLat"] = state_->deLocation.lat;
+      j["deLon"] = state_->deLocation.lon;
+      j["dxLat"] = state_->dxLocation.lat;
+      j["dxLon"] = state_->dxLocation.lon;
+    }
     // Logical dimensions so the browser can compute the pixel scale factor.
     j["logicalW"] = 800;
     j["logicalH"] = 480;
@@ -2135,10 +2140,13 @@ void WebServer::run() {
   svr.Get("/get_de.txt", [this](const httplib::Request &,
                                 httplib::Response &res) {
     std::ostringstream oss;
-    oss << "DE_Callsign  " << state_->deCallsign << "\n";
-    oss << "DE_Grid      " << state_->deGrid << "\n";
-    oss << "DE_Lat       " << state_->deLocation.lat << "\n";
-    oss << "DE_Lon       " << state_->deLocation.lon << "\n";
+    {
+      std::lock_guard<std::mutex> lk(state_->locationMutex);
+      oss << "DE_Callsign  " << state_->deCallsign << "\n";
+      oss << "DE_Grid      " << state_->deGrid << "\n";
+      oss << "DE_Lat       " << state_->deLocation.lat << "\n";
+      oss << "DE_Lon       " << state_->deLocation.lon << "\n";
+    }
     res.set_content(oss.str(), "text/plain");
   });
 
@@ -2174,8 +2182,10 @@ void WebServer::run() {
                      std::chrono::system_clock::now() - startTime_)
                      .count();
     oss << "Uptime_s    " << upSec << "\n";
-    if (state_)
+    if (state_) {
+      std::lock_guard<std::mutex> lk(state_->locationMutex);
       oss << "FPS         " << state_->fps << "\n";
+    }
     res.set_content(oss.str(), "text/plain");
   });
 
@@ -2409,18 +2419,26 @@ void WebServer::run() {
 
   svr.Get("/get_dx.txt", [this](const httplib::Request &,
                                 httplib::Response &res) {
-    if (!state_->dxActive) {
+    bool dxActive;
+    std::string dxGrid;
+    LatLon deLoc, dxLoc;
+    {
+      std::lock_guard<std::mutex> lk(state_->locationMutex);
+      dxActive = state_->dxActive;
+      dxGrid = state_->dxGrid;
+      deLoc = state_->deLocation;
+      dxLoc = state_->dxLocation;
+    }
+    if (!dxActive) {
       res.set_content("DX not set\n", "text/plain");
       return;
     }
     std::ostringstream oss;
-    oss << "DX_Grid      " << state_->dxGrid << "\n";
-    oss << "DX_Lat       " << state_->dxLocation.lat << "\n";
-    oss << "DX_Lon       " << state_->dxLocation.lon << "\n";
-    double distKm =
-        Astronomy::calculateDistance(state_->deLocation, state_->dxLocation);
-    double bearing =
-        Astronomy::calculateBearing(state_->deLocation, state_->dxLocation);
+    oss << "DX_Grid      " << dxGrid << "\n";
+    oss << "DX_Lat       " << dxLoc.lat << "\n";
+    oss << "DX_Lon       " << dxLoc.lon << "\n";
+    double distKm = Astronomy::calculateDistance(deLoc, dxLoc);
+    double bearing = Astronomy::calculateBearing(deLoc, dxLoc);
     oss << "DX_Dist_km   " << static_cast<int>(distKm) << "\n";
     oss << "DX_Bearing   " << static_cast<int>(bearing) << "\n";
     res.set_content(oss.str(), "text/plain");
@@ -2442,13 +2460,16 @@ void WebServer::run() {
     double lon = StringUtils::safe_stod(req.get_param_value("lon"));
     std::string target = req.get_param_value("target");
     std::string grid = Astronomy::latLonToGrid(lat, lon);
-    if (target == "dx") {
-      state_->dxLocation = {lat, lon};
-      state_->dxGrid = grid;
-      state_->dxActive = true;
-    } else {
-      state_->deLocation = {lat, lon};
-      state_->deGrid = grid;
+    {
+      std::lock_guard<std::mutex> lk(state_->locationMutex);
+      if (target == "dx") {
+        state_->dxLocation = {lat, lon};
+        state_->dxGrid = grid;
+        state_->dxActive = true;
+      } else {
+        state_->deLocation = {lat, lon};
+        state_->deGrid = grid;
+      }
     }
     res.set_content("ok", "text/plain");
   });
@@ -2478,11 +2499,14 @@ void WebServer::run() {
       lat = StringUtils::safe_stod(req.get_param_value("lat"));
       lon = StringUtils::safe_stod(req.get_param_value("lon"));
     }
-    state_->deLocation = {lat, lon};
-    state_->deGrid = Astronomy::latLonToGrid(lat, lon);
-    cfg_->lat = lat;
-    cfg_->lon = lon;
-    cfg_->grid = state_->deGrid;
+    {
+      std::lock_guard<std::mutex> lk(state_->locationMutex);
+      state_->deLocation = {lat, lon};
+      state_->deGrid = Astronomy::latLonToGrid(lat, lon);
+      cfg_->lat = lat;
+      cfg_->lon = lon;
+      cfg_->grid = state_->deGrid;
+    }
     if (cfgMgr_)
       cfgMgr_->save(*cfg_);
     res.set_content("ok", "text/plain");
@@ -2500,9 +2524,12 @@ void WebServer::run() {
       lat = StringUtils::safe_stod(req.get_param_value("lat"));
       lon = StringUtils::safe_stod(req.get_param_value("lon"));
     }
-    state_->dxLocation = {lat, lon};
-    state_->dxGrid = Astronomy::latLonToGrid(lat, lon);
-    state_->dxActive = true;
+    {
+      std::lock_guard<std::mutex> lk(state_->locationMutex);
+      state_->dxLocation = {lat, lon};
+      state_->dxGrid = Astronomy::latLonToGrid(lat, lon);
+      state_->dxActive = true;
+    }
     res.set_content("ok", "text/plain");
   });
 
@@ -2638,7 +2665,9 @@ void WebServer::run() {
     const SatelliteTLE *tle = satMgr_->findByName(name);
     if (tle) {
       Satellite sat(*tle);
-      sat.setObserver(state_->deLocation.lat, state_->deLocation.lon);
+      double deLat, deLon;
+      { std::lock_guard<std::mutex> lk(state_->locationMutex); deLat = state_->deLocation.lat; deLon = state_->deLocation.lon; }
+      sat.setObserver(deLat, deLon);
       SatObservation obs = sat.predict();
       oss << "Az         " << static_cast<int>(obs.azimuth) << "\n";
       oss << "El         " << static_cast<int>(obs.elevation) << "\n";
@@ -2940,7 +2969,7 @@ void WebServer::run() {
   svr.Get("/debug/performance", [this](const httplib::Request &,
                                        httplib::Response &res) {
     nlohmann::json j;
-    j["fps"] = state_ ? state_->fps : 0.0f;
+    { float _fps = 0.0f; if (state_) { std::lock_guard<std::mutex> lk(state_->locationMutex); _fps = state_->fps; } j["fps"] = _fps; }
     j["running_since"] =
         std::chrono::duration_cast<std::chrono::seconds>(
             std::chrono::system_clock::now() - startTime_)
@@ -2955,6 +2984,7 @@ void WebServer::run() {
                                   httplib::Response &res) {
     nlohmann::json j;
     if (state_) {
+      std::lock_guard<std::mutex> lk(state_->servicesMutex);
       for (const auto &[name, st] : state_->services) {
         nlohmann::json sj;
         sj["ok"] = st.ok;

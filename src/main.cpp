@@ -2980,6 +2980,13 @@ void main_tick() {
 #endif
     }
 
+    // Hold locationMutex for the entire update+render window so the WebServer
+    // thread cannot tear location/fps string fields mid-frame.  The lock is
+    // released at the end of this else-block (or at any early return) via RAII.
+    // Typical hold time: ~1–20 ms per tick; WebServer gets the lock in the
+    // SDL_Delay gap between ticks.
+    std::lock_guard<std::mutex> locLk(ctx.state->locationMutex);
+
     // Apply any config changes injected by the WebServer API (RPi/framebuffer
     // remote-control scenario).  The WebServer thread writes to ctx.appCfg
     // under the config mutex and then sets this flag; we re-apply live state
