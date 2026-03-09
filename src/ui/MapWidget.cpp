@@ -1580,7 +1580,8 @@ void MapWidget::renderSatGroundTrack(SDL_Renderer *renderer) {
         if (std::fabs(lon0 - lon1) > 180.0) {
           double lon1_adj = (lon1 < 0) ? lon1 + 360.0 : lon1 - 360.0;
           double borderLon = (lon1 < 0) ? 180.0 : -180.0;
-          double f = (borderLon - lon0) / (lon1_adj - lon0);
+          double dLon = lon1_adj - lon0;
+          double f = (std::fabs(dLon) > 1e-6) ? (borderLon - lon0) / dLon : 0.5;
           double borderLat =
               cachedSatTrack_[i - 1].lat +
               f * (cachedSatTrack_[i].lat - cachedSatTrack_[i - 1].lat);
@@ -1675,7 +1676,8 @@ void MapWidget::renderAsteroidOverlay(SDL_Renderer *renderer) {
           if (std::fabs(lon0 - lon1) > 180.0) {
             double lon1_adj = (lon1 < 0) ? lon1 + 360.0 : lon1 - 360.0;
             double borderLon = (lon1 < 0) ? 180.0 : -180.0;
-            double f = (borderLon - lon0) / (lon1_adj - lon0);
+            double dLon = lon1_adj - lon0;
+            double f = (std::fabs(dLon) > 1e-6) ? (borderLon - lon0) / dLon : 0.5;
             double borderLat = cachedAsteroidTrack_[i - 1].lat +
                                f * (cachedAsteroidTrack_[i].lat -
                                     cachedAsteroidTrack_[i - 1].lat);
@@ -1832,7 +1834,8 @@ void MapWidget::renderSpotOverlay(SDL_Renderer *renderer) {
       if (std::fabs(lon0 - lon1) > 180.0) {
         double lon1_adj = (lon1 < 0) ? lon1 + 360.0 : lon1 - 360.0;
         double borderLon = (lon1 < 0) ? 180.0 : -180.0;
-        double f = (borderLon - lon0) / (lon1_adj - lon0);
+        double dLon = lon1_adj - lon0;
+        double f = (std::fabs(dLon) > 1e-6) ? (borderLon - lon0) / dLon : 0.5;
         double borderLat =
             path[i - 1].lat + f * (path[i].lat - path[i - 1].lat);
 
@@ -1931,7 +1934,8 @@ void MapWidget::renderDXClusterSpots(SDL_Renderer *renderer) {
           if (std::fabs(lon0 - lon1) > 180.0) {
             double lon1_adj = (lon1 < 0) ? lon1 + 360.0 : lon1 - 360.0;
             double borderLon = (lon1 < 0) ? 180.0 : -180.0;
-            double f = (borderLon - lon0) / (lon1_adj - lon0);
+            double dLon = lon1_adj - lon0;
+            double f = (std::fabs(dLon) > 1e-6) ? (borderLon - lon0) / dLon : 0.5;
             double borderLat =
                 path[i - 1].lat + f * (path[i].lat - path[i - 1].lat);
 
@@ -2068,7 +2072,8 @@ void MapWidget::renderONTASpots(SDL_Renderer *renderer) {
       if (std::fabs(lon0 - lon1) > 180.0) {
         double lon1_adj = (lon1 < 0) ? lon1 + 360.0 : lon1 - 360.0;
         double borderLon = (lon1 < 0) ? 180.0 : -180.0;
-        double f = (borderLon - lon0) / (lon1_adj - lon0);
+        double dLon = lon1_adj - lon0;
+        double f = (std::fabs(dLon) > 1e-6) ? (borderLon - lon0) / dLon : 0.5;
         double borderLat =
             path[i - 1].lat + f * (path[i].lat - path[i - 1].lat);
 

@@ -103,9 +103,6 @@ Returns JSON with current power state and control method.
 ### `GET /set_brightness?n=N`
 Sets screen brightness (0-100).
 
-### `GET /set_theme?name=S`
-Changes the UI theme (default, dark, glass).
-
 ---
 
 ## 4. Pane & Rotation Control
@@ -163,4 +160,4 @@ Injects manual solar data (for testing).
 
 ## Legacy Compatibility
 
-HamClock-Next maintains 100% compatibility with all `GET /set_...` and `GET /get_...` endpoints from the original HamClock. Hardware controllers like the **Quadra** or **MegaClock** will work without modification.
+HamClock-Next maintains compatibility with the majority of `GET /set_...` and `GET /get_...` endpoints from the original HamClock. Hardware controllers like the **Quadra** or **MegaClock** should work without modification for most control operations. Note: `/restart`, `/reboot`, `/get_sensors.txt`, and `/get_memory.txt` are not currently registered.
