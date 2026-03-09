@@ -504,7 +504,7 @@ bool RigService::executeGetMode(std::string &mode, int &passbandHz) {
 
   // Parse response: "MODE\nPASSBAND\n"
   char modeStr[32];
-  if (std::sscanf(response.c_str(), "%s\n%d", modeStr, &passbandHz) == 2) {
+  if (std::sscanf(response.c_str(), "%31s\n%d", modeStr, &passbandHz) == 2) {
     mode = modeStr;
     LOG_I("Rig", "Mode read: {} ({}Hz)", mode, passbandHz);
     return true;

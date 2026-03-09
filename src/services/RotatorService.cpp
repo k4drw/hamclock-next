@@ -117,6 +117,7 @@ bool RotatorService::setPosition(double azimuth, double elevation) {
           elevation);
 
     // Update moving flag in store
+    if (!store_) return false;
     RotatorData data = store_->get();
     data.moving = true;
     store_->set(data);
@@ -146,6 +147,7 @@ bool RotatorService::stopRotator() {
     LOG_I("Rotator", "Stop command sent");
 
     // Update moving flag
+    if (!store_) return success;
     RotatorData data = store_->get();
     data.moving = false;
     store_->set(data);
@@ -222,6 +224,7 @@ void RotatorService::pollLoop() {
       }
 
       // Mark data as invalid
+      if (!store_) { std::this_thread::sleep_for(5s); continue; }
       RotatorData data = store_->get();
       data.connected = false;
       data.valid = false;
@@ -275,6 +278,7 @@ void RotatorService::pollLoop() {
           }
           // ----------------------------------------------------------------
 
+          if (!store_) continue;
           RotatorData current = store_->get();
           current.flipActive = flipActive_;
           double azErr = std::abs(azCmd - current.azimuth);

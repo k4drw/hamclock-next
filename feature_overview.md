@@ -34,7 +34,7 @@ The root cause wasn't any single piece of code; it was that the whole structure
 was load-bearing in ways that only revealed themselves mid-refactor.
 
 The decision to start clean was not made lightly, but it was the right call.
-A greenfield CMake + SDL2 + modern C++17 project with a proper layer separation
+A greenfield CMake + SDL2 + modern C++20 project (C++17 for WASM) with a proper layer separation
 (data stores, providers, UI widgets, network) turned out to move faster than
 the refactor had — and the result is something that can actually be maintained,
 extended, and ported without archaeology.
@@ -108,7 +108,7 @@ code they ship.
 
 ## 100% Feature Parity with the Original HamClock
 
-HamClock-Next implements all **71 original features** across every category:
+HamClock-Next implements all **82 original features** across every category:
 
 | Category                | Features                                                                                                                                 |
 | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
@@ -150,7 +150,7 @@ Every external data fetch is cached both in memory and on disk.
 - MJPEG live stream of the HamClock screen, viewable in any browser on your LAN
 - Full **mouse and keyboard passthrough** — click and type through the browser as if you were at the display
 - `--web-only` / headless mode — run on a server with no physical display; access everything via browser
-- REST API with 30+ endpoints for automation, scripting, and integration with home-automation systems
+- REST API with 79 endpoints for automation, scripting, and integration with home-automation systems
 
 ### 4. Advanced Weather & Environment
 
@@ -218,7 +218,7 @@ Every external data fetch is cached both in memory and on disk.
 
 ## REST API & Automation
 
-The embedded web server (default port 8080) exposes **30+ endpoints**:
+The embedded web server (default port 8080) exposes **79 endpoints**:
 
 - `GET /` — live MJPEG browser viewer with mouse/keyboard passthrough
 - `GET /live.jpg` — current screen as a JPEG snapshot

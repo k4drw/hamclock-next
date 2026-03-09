@@ -8,7 +8,7 @@ This page covers building HamClock-Next from source, running it for the first ti
 
 | Platform | Requirements |
 |----------|-------------|
-| Linux (native) | CMake ≥ 3.16, SDL2, SDL2_ttf, SDL2_image, libcurl, gcc/clang |
+| Linux (native) | CMake ≥ 3.18, SDL2, SDL2_ttf, SDL2_image, libcurl, gcc/clang |
 | macOS | Same as Linux; use Homebrew for SDL2 packages |
 | Windows (cross-build) | Docker + dockcross/windows-static-x64 |
 | Browser (WASM) | Docker + Emscripten image (via build script) |

@@ -21,7 +21,7 @@ cmake --build build --target hamclock-next
 ./scripts/build-win64.sh
 ```
 
-Full build instructions: see [Build Guide](docs/wiki/Building.md).
+Full build instructions: see [Getting Started](docs/wiki/Getting-Started.md).
 
 ---
 

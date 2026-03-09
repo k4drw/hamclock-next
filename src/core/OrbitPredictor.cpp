@@ -139,6 +139,7 @@ std::vector<GroundTrackPoint> OrbitPredictor::groundTrack(std::time_t startUtc,
   if (!elements_)
     return track;
 
+  if (minutes > 35791394) minutes = 35791394; // cap before * 60 to prevent int32 overflow
   int totalSec = minutes * 60;
   int numPoints = totalSec / stepSec + 1;
   track.reserve(numPoints);
