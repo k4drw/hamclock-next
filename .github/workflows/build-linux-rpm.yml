@@ -38,3 +38,32 @@ jobs:
           files: |
             build-rpm/RPMS/**/*.rpm
             build-rpm/SRPMS/**/*.rpm
+
+  build-rpm-suse:
+    name: OpenSUSE Tumbleweed RPM (x86_64)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Build OpenSUSE RPM
+        run: |
+          chmod +x scripts/build-rpm-suse.sh
+          ./scripts/build-rpm-suse.sh
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: hamclock-opensuse-rpm
+          path: |
+            build-rpm-suse/RPMS/**/*.rpm
+            build-rpm-suse/SRPMS/**/*.rpm
+
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            build-rpm-suse/RPMS/**/*.rpm
+            build-rpm-suse/SRPMS/**/*.rpm

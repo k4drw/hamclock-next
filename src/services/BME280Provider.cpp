@@ -4,7 +4,7 @@
 #include <cmath>
 #include <cstring>
 
-#ifdef __linux__
+#if defined(__linux__) && !defined(__EMSCRIPTEN__)
 #include <fcntl.h>
 #include <linux/i2c-dev.h>
 #include <sys/ioctl.h>
@@ -28,7 +28,7 @@ void BME280Provider::stop() {
   if (thread_.joinable())
     thread_.join();
   if (fd_ >= 0) {
-#ifdef __linux__
+#if defined(__linux__) && !defined(__EMSCRIPTEN__)
     close(fd_);
 #endif
     fd_ = -1;
@@ -60,7 +60,7 @@ void BME280Provider::worker() {
 }
 
 bool BME280Provider::initI2C() {
-#ifdef __linux__
+#if defined(__linux__) && !defined(__EMSCRIPTEN__)
   const char *dev = "/dev/i2c-1";
   fd_ = open(dev, O_RDWR);
   if (fd_ < 0) {
@@ -114,7 +114,7 @@ bool BME280Provider::initI2C() {
 }
 
 bool BME280Provider::readCalibration() {
-#ifdef __linux__
+#if defined(__linux__) && !defined(__EMSCRIPTEN__)
   // Bank 1: 0x88..0x9F (24 bytes) — T1-T3, P1-P9
   uint8_t reg1 = 0x88;
   if (write(fd_, &reg1, 1) != 1) return false;
@@ -159,7 +159,7 @@ bool BME280Provider::readCalibration() {
 }
 
 bool BME280Provider::readSensor() {
-#ifdef __linux__
+#if defined(__linux__) && !defined(__EMSCRIPTEN__)
   if (fd_ < 0) return false;
 
   // Read registers 0xF7 to 0xFE (8 bytes)

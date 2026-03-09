@@ -13,7 +13,10 @@
 BrightnessManager::BrightnessManager() {}
 
 bool BrightnessManager::init() {
-#ifndef __EMSCRIPTEN__
+#if defined(__EMSCRIPTEN__)
+  available_ = false;
+  return false;
+#else
   if (!detectBrightnessPath()) {
     LOG_W("Brightness", "No brightness control found");
     available_ = false;
@@ -37,15 +40,13 @@ bool BrightnessManager::init() {
     available_ = true;
     return true;
   }
-#endif
-
   available_ = false;
   return false;
+#endif
 }
 
 bool BrightnessManager::detectBrightnessPath() {
-#ifndef __EMSCRIPTEN__
-#ifdef __linux__
+#if defined(__linux__) && !defined(__EMSCRIPTEN__)
   // 1. Try hardcoded common paths first
   const char *paths[] = {"/sys/class/backlight/rpi_backlight/brightness",
                          "/sys/class/backlight/10-0045/brightness",
@@ -79,14 +80,13 @@ bool BrightnessManager::detectBrightnessPath() {
     }
     globfree(&g);
   }
-#endif // __linux__
-#endif // !__EMSCRIPTEN__
+#endif
 
   return false;
 }
 
 bool BrightnessManager::setBrightness(int percent) {
-#ifndef __EMSCRIPTEN__
+#if !defined(__EMSCRIPTEN__)
   if (!available_) {
     return false;
   }
@@ -105,6 +105,8 @@ bool BrightnessManager::setBrightness(int percent) {
     LOG_I("Brightness", "Set to {}% ({})", percent, value);
     return true;
   }
+#else
+  (void)percent;
 #endif
 
   return false;
@@ -123,23 +125,29 @@ int BrightnessManager::getBrightness() const {
 }
 
 void BrightnessManager::setDimTime(int hour, int minute) {
-#ifndef __EMSCRIPTEN__
+#if !defined(__EMSCRIPTEN__)
   dimHour_ = hour;
   dimMinute_ = minute;
   LOG_I("Brightness", "Dim time set to {:02d}:{:02d}", hour, minute);
+#else
+  (void)hour;
+  (void)minute;
 #endif
 }
 
 void BrightnessManager::setBrightTime(int hour, int minute) {
-#ifndef __EMSCRIPTEN__
+#if !defined(__EMSCRIPTEN__)
   brightHour_ = hour;
   brightMinute_ = minute;
   LOG_I("Brightness", "Bright time set to {:02d}:{:02d}", hour, minute);
+#else
+  (void)hour;
+  (void)minute;
 #endif
 }
 
 void BrightnessManager::update() {
-#ifndef __EMSCRIPTEN__
+#if !defined(__EMSCRIPTEN__)
   if (!available_ || !scheduleEnabled_) {
     return;
   }
@@ -183,7 +191,7 @@ bool BrightnessManager::shouldBeDimmed() const {
 }
 
 bool BrightnessManager::writeBrightness(int value) {
-#ifndef __EMSCRIPTEN__
+#if !defined(__EMSCRIPTEN__)
   std::ofstream file(brightnessPath_);
   if (!file.is_open()) {
     LOG_E("Brightness", "Failed to open {} for writing", brightnessPath_);
@@ -200,12 +208,13 @@ bool BrightnessManager::writeBrightness(int value) {
 
   return true;
 #else
+  (void)value;
   return false;
 #endif
 }
 
 int BrightnessManager::readBrightness() const {
-#ifndef __EMSCRIPTEN__
+#if !defined(__EMSCRIPTEN__)
   std::ifstream file(brightnessPath_);
   if (!file.is_open()) {
     LOG_E("Brightness", "Failed to open {} for reading", brightnessPath_);

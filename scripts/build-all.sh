@@ -36,6 +36,7 @@ fi
 run_build "Windows x64" "scripts/build-win64.sh" || FAILED_BUILDS+=("Windows x64")
 run_build "Linux x64 DEB" "scripts/build-linux-x64-deb.sh" || FAILED_BUILDS+=("Linux x64")
 run_build "Fedora RPM" "scripts/build-rpm-fedora.sh" || FAILED_BUILDS+=("Fedora RPM")
+run_build "OpenSUSE RPM" "scripts/build-rpm-suse.sh" || FAILED_BUILDS+=("OpenSUSE RPM")
 
 # 2. ARM Universal Builds
 run_build "Linux ARM64 Universal" "scripts/build-linux-arm64-universal.sh" || FAILED_BUILDS+=("ARM64")

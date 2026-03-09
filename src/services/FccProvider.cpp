@@ -1,7 +1,7 @@
 #include "FccProvider.h"
 #include "../core/Logger.h"
 
-#ifndef __EMSCRIPTEN__
+#if !defined(__EMSCRIPTEN__)
 #include <curl/curl.h>
 #include <filesystem>
 #endif
@@ -11,7 +11,7 @@
 
 // ─── internal helpers ────────────────────────────────────────────────────────
 
-#ifndef __EMSCRIPTEN__
+#if !defined(__EMSCRIPTEN__)
 static size_t fccWriteCallback(void *contents, size_t size, size_t nmemb,
                                void *userp) {
   static_cast<std::string *>(userp)->append(static_cast<char *>(contents),
@@ -142,7 +142,7 @@ static std::vector<FccLicense> fetchFrnSync(const std::string &frn) {
   // In-memory cookie jar (empty string enables it without writing a file)
   curl_easy_setopt(curl, CURLOPT_COOKIEFILE, "");
 
-#ifdef __linux__
+#if defined(__linux__)
   if (std::filesystem::exists("/etc/ssl/certs/ca-certificates.crt"))
     curl_easy_setopt(curl, CURLOPT_CAINFO,
                      "/etc/ssl/certs/ca-certificates.crt");
@@ -212,7 +212,7 @@ void FccProvider::lookupFrn(const std::string &frn, ResultCb onDone) {
     return;
   }
 
-#ifdef __EMSCRIPTEN__
+#if defined(__EMSCRIPTEN__)
   // FCC ULS requires cookies + POST — not feasible from a WASM/CORS context.
   LOG_W("FccProvider", "FCC ULS lookup not supported on WASM");
   onDone({});
