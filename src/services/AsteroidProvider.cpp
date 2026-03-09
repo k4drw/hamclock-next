@@ -63,15 +63,19 @@ void AsteroidProvider::fetchInternal() {
 
   LOG_I("AsteroidProvider", "Fetching key-less NEO data from JPL (max 8M km)");
 
-  netMgr_.fetchAsync(url.str(), [this](std::string body) {
+  std::weak_ptr<AsteroidProvider> self = shared_from_this();
+  netMgr_.fetchAsync(url.str(), [self](std::string body) {
+    auto p = self.lock();
+    if (!p)
+      return;
     if (body.empty()) {
       LOG_E("AsteroidProvider", "Empty response from JPL API");
-      isFetching_ = false;
+      p->isFetching_ = false;
       return;
     }
-    processResponse(body);
-    isFetching_ = false;
-    lastUpdate_ = std::chrono::system_clock::now();
+    p->processResponse(body);
+    p->isFetching_ = false;
+    p->lastUpdate_ = std::chrono::system_clock::now();
   });
 }
 
@@ -203,12 +207,16 @@ void AsteroidProvider::fetchOrbitalElements(const std::string &des) {
 
   LOG_I("AsteroidProvider", "Fetching orbital elements for '{}'", des);
 
-  netMgr_.fetchAsync(url, [this, des](std::string body) {
+  std::weak_ptr<AsteroidProvider> self = shared_from_this();
+  netMgr_.fetchAsync(url, [self, des](std::string body) {
+    auto p = self.lock();
+    if (!p)
+      return;
     if (body.empty()) {
       LOG_E("AsteroidProvider", "Empty SBDB response for '{}'", des);
       return;
     }
-    processElementsResponse(des, body);
+    p->processElementsResponse(des, body);
   });
 #endif
 }

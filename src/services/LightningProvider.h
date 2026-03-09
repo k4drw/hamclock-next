@@ -9,7 +9,7 @@
 
 namespace HamClock {
 
-class LightningProvider {
+class LightningProvider : public std::enable_shared_from_this<LightningProvider> {
 public:
   using Callback = std::function<void(const LightningData&)>;
 

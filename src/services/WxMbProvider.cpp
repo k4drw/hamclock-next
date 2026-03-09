@@ -634,24 +634,29 @@ void WxMbProvider::update() {
   }
 
   LOG_I("WxMb", "Fetching GFS WX subset: {}", url);
+  std::weak_ptr<WxMbProvider> self = shared_from_this();
   net_.fetchAsync(
       url,
-      [this, url](std::string rawData) {
+      [self, url](std::string rawData) {
+        auto p = self.lock();
+        if (!p) return;
         if (rawData.empty()) {
           LOG_W("WxMb", "GFS GRIB2 fetch returned empty response");
-          std::lock_guard<std::mutex> lk(mutex_);
-          fetchingUrl_ = "";
+          std::lock_guard<std::mutex> lk(p->mutex_);
+          p->fetchingUrl_ = "";
           return;
         }
         WorkerService::getInstance().submitTask(
-            [this, url, rawData = std::move(rawData)]() {
+            [self, url, rawData = std::move(rawData)]() {
+              auto p2 = self.lock();
+              if (!p2) return;
               std::vector<uint8_t> bytes(rawData.begin(), rawData.end());
 
               GribField prmsl, ugrd, vgrd;
               if (!decodeGFS(bytes, prmsl, ugrd, vgrd)) {
                 LOG_W("WxMb", "GRIB2 decode failed");
-                std::lock_guard<std::mutex> lk(mutex_);
-                fetchingUrl_ = "";
+                std::lock_guard<std::mutex> lk(p2->mutex_);
+                p2->fetchingUrl_ = "";
                 return;
               }
 
@@ -684,17 +689,17 @@ void WxMbProvider::update() {
               buildSegments(prmsl, ugrd, vgrd, pmn, pmx, 1024, 512, segs,
                             quivers, fillSurf);
 
-              std::lock_guard<std::mutex> lk(mutex_);
-              segments_ = std::move(segs);
-              quivers_ = std::move(quivers);
-              if (pendingFillSurface_)
-                SDL_FreeSurface(pendingFillSurface_);
-              pendingFillSurface_ = fillSurf;
-              segmentsDirty_ = true;
-              hasData_ = true;
-              lastUrl_ = url;
-              fetchingUrl_ = "";
-              lastUpdateMs_ = (uint64_t)SDL_GetTicks();
+              std::lock_guard<std::mutex> lk(p2->mutex_);
+              p2->segments_ = std::move(segs);
+              p2->quivers_ = std::move(quivers);
+              if (p2->pendingFillSurface_)
+                SDL_FreeSurface(p2->pendingFillSurface_);
+              p2->pendingFillSurface_ = fillSurf;
+              p2->segmentsDirty_ = true;
+              p2->hasData_ = true;
+              p2->lastUrl_ = url;
+              p2->fetchingUrl_ = "";
+              p2->lastUpdateMs_ = (uint64_t)SDL_GetTicks();
             });
       },
       0);

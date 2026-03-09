@@ -10,7 +10,7 @@
 
 namespace HamClock {
 
-class ReachProvider {
+class ReachProvider : public std::enable_shared_from_this<ReachProvider> {
 public:
     using Callback = std::function<void(const ReachData&)>;
 

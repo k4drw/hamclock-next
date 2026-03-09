@@ -5,7 +5,9 @@
 #include <string>
 #include <ctime>
 
-class SDOProvider {
+#include <memory>
+
+class SDOProvider : public std::enable_shared_from_this<SDOProvider> {
 public:
   using DataCb = std::function<void(const std::string &data, std::time_t serverTime)>;
 

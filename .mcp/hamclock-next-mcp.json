@@ -72,6 +72,7 @@
       "SDL coordinates: (0,0) is top-left. x_/y_ is the panel's top-left corner.",
       "All render() calls happen on the main thread. Providers run on a background thread. Use a mutex or std::atomic if sharing state.",
       "The WebServer debug endpoint /debug/widgets calls getDebugData() on all registered panels \u2014 always implement it.",
+      "If a provider uses NetworkManager::fetchAsync, it MUST inherit from std::enable_shared_from_this and capture a weak_ptr in the lambda to prevent use-after-free crashes during configuration reloads.",
       "If a provider's API may be unavailable or require auth, add a `bool fetched` flag to the data struct (default false). The provider pushes event on completion with `fetched=true, valid=false` on error \u2014 panel shows meaningful status (e.g. 'API key required') rather than indefinite 'Loading...' state.",
       "Widget::onMouseDown(int mx, int my, Uint16 mod) added for advanced interactivity (Phase 60).",
       "Widget::onMouseUp now takes `int clicks` as 4th parameter (Uint16 mod, int clicks). Update all Widget subclasses when overriding.",

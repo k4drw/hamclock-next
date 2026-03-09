@@ -5,7 +5,9 @@
 #include <mutex>
 #include <string>
 
-class CloudProvider {
+#include <memory>
+
+class CloudProvider : public std::enable_shared_from_this<CloudProvider> {
 public:
   CloudProvider(NetworkManager &netMgr);
   ~CloudProvider();

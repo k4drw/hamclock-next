@@ -177,7 +177,7 @@ MapWidget::MapWidget(int x, int y, int w, int h, TextureManager &texMgr,
   }
 
   // Initialize WxMbProvider
-  wxmb_ = std::make_unique<WxMbProvider>(netMgr_);
+  wxmb_ = std::make_shared<WxMbProvider>(netMgr_);
 
   // Initialize MapViewMenu
   mapViewMenu_ = std::make_unique<MapViewMenu>(fontMgr);
@@ -1024,7 +1024,7 @@ void MapWidget::renderNightOverlay(SDL_Renderer *renderer) {
 
         // Check for texture wrapping (crossing date line) in Azimuthal
         bool wrap = false;
-        if (config_.projection == "azimuthal") {
+        if (config_.projection == "azimuthal" || config_.projection == "dual_azimuthal") {
           float u0 = lightVerts_[p0].tex_coord.x;
           float u1 = lightVerts_[p1].tex_coord.x;
           float u2 = lightVerts_[p2].tex_coord.x;

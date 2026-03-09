@@ -14,7 +14,11 @@ DstProvider::DstProvider(NetworkManager &net, std::shared_ptr<DstStore> store)
 void DstProvider::fetch() {
   const char *url = "https://services.swpc.noaa.gov/products/kyoto-dst.json";
 
-  net_.fetchAsync(url, [this](std::string body) {
+  std::weak_ptr<DstProvider> self = shared_from_this();
+  net_.fetchAsync(url, [self](std::string body) {
+    auto p = self.lock();
+    if (!p)
+      return;
     if (body.empty())
       return;
 
@@ -70,7 +74,7 @@ void DstProvider::fetch() {
                   });
         data.current_val = data.points.back().value;
         data.valid = true;
-        store_->set(data);
+        p->store_->set(data);
       }
     } catch (...) {
     }

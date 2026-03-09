@@ -50,6 +50,7 @@
 #include "services/MufRtProvider.h"
 #include "services/NOAAProvider.h"
 #include "services/RBNProvider.h"
+#include "services/QRZProvider.h"
 #include "services/RSSProvider.h"
 #include "services/ReachProvider.h"
 #include "services/RepeaterProvider.h"
@@ -284,32 +285,34 @@ struct DashboardContext {
   std::unique_ptr<HistoryProvider> historyProvider;
   std::unique_ptr<WeatherProvider> deWeatherProvider;
   std::unique_ptr<WeatherProvider> dxWeatherProvider;
-  std::unique_ptr<SDOProvider> sdoProvider;
+  std::shared_ptr<SDOProvider> sdoProvider;
   std::unique_ptr<DRAPProvider> drapProvider;
   std::shared_ptr<AuroraProvider> auroraProvider;
   std::shared_ptr<CallbookProvider> callbookProvider;
   FccProvider fccProvider;
-  std::unique_ptr<DstProvider> dstProvider;
+  std::shared_ptr<DstProvider> dstProvider;
   std::unique_ptr<ADIFProvider> adifProvider;
-  std::unique_ptr<MufRtProvider> mufRtProvider;
-  std::unique_ptr<CloudProvider> cloudProvider;
-  std::unique_ptr<IonosondeProvider> ionosondeProvider;
-  std::unique_ptr<ReachProvider> reachProvider;
+  std::shared_ptr<MufRtProvider> mufRtProvider;
+  std::shared_ptr<CloudProvider> cloudProvider;
+  std::shared_ptr<IonosondeProvider> ionosondeProvider;
+  std::shared_ptr<ReachProvider> reachProvider;
   std::unique_ptr<SantaProvider> santaProvider;
   std::unique_ptr<TropoProvider> tropoProvider;
-  std::unique_ptr<LightningProvider> lightningProvider;
+  std::shared_ptr<LightningProvider> lightningProvider;
   std::unique_ptr<MeteorProvider> meteorProvider;
-  std::unique_ptr<SolarStormProvider> solarStormProvider;
+  std::shared_ptr<SolarStormProvider> solarStormProvider;
   std::unique_ptr<SatelliteManager> satMgr;
-  std::unique_ptr<AsteroidProvider> asteroidProvider;
+  std::shared_ptr<AsteroidProvider> asteroidProvider;
   std::unique_ptr<BeaconProvider> beaconProvider;
   std::unique_ptr<AlertsProvider> alertsProvider;
-  std::unique_ptr<ForecastProvider> forecastProvider;
+  std::shared_ptr<ForecastProvider> forecastProvider;
   std::unique_ptr<RepeaterProvider> repeaterProvider;
   std::unique_ptr<HurricaneProvider> hurricaneProvider;
   std::unique_ptr<MarineProvider> marineProvider;
   std::unique_ptr<WinlinkProvider> winlinkProvider;
   std::unique_ptr<GreylineDXProvider> greylineDXProvider;
+  std::shared_ptr<WxMbProvider> wxMbProvider;
+  std::shared_ptr<QRZProvider> qrzProvider;
 
   // Services
 #ifndef __EMSCRIPTEN__
@@ -1020,7 +1023,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
       std::make_unique<WeatherProvider>(netManager, dxWeatherStore, 1);
   dxWeatherProvider->fetch(state->dxLocation.lat, state->dxLocation.lon);
 
-  sdoProvider = std::make_unique<SDOProvider>(netManager);
+  sdoProvider = std::make_shared<SDOProvider>(netManager);
   drapProvider = std::make_unique<DRAPProvider>(netManager, ctx.drapDataStore);
   auroraProvider = std::make_shared<AuroraProvider>(netManager);
 
@@ -1028,7 +1031,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
       std::make_shared<CallbookProvider>(netManager, callbookStore);
   callbookProvider->lookup("K1ABC");
 
-  dstProvider = std::make_unique<DstProvider>(netManager, dstStore);
+  dstProvider = std::make_shared<DstProvider>(netManager, dstStore);
   if (isMasterMode || isWidgetConfigured(WidgetType::DST_INDEX))
     dstProvider->fetch();
 
@@ -1039,13 +1042,14 @@ DashboardContext::DashboardContext(AppContext &ctx)
     ctx.webServer->setADIFProvider(adifProvider.get());
 #endif
 
-  mufRtProvider = std::make_unique<MufRtProvider>(netManager);
+  mufRtProvider = std::make_shared<MufRtProvider>(netManager);
   mufRtProvider->update();
 
-  cloudProvider = std::make_unique<CloudProvider>(netManager);
+  cloudProvider = std::make_shared<CloudProvider>(netManager);
   cloudProvider->update();
 
-  asteroidProvider = std::make_unique<AsteroidProvider>(netManager);
+
+  asteroidProvider = std::make_shared<AsteroidProvider>(netManager);
   asteroidProvider->update();
 
   beaconProvider = std::make_unique<BeaconProvider>();
@@ -1056,7 +1060,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
     alertsProvider->fetch(appCfg.lat, appCfg.lon);
 
   forecastProvider =
-      std::make_unique<ForecastProvider>(netManager, ctx.forecastStore);
+      std::make_shared<ForecastProvider>(netManager, ctx.forecastStore);
   if (isMasterMode || isWidgetConfigured(WidgetType::FORECAST))
     forecastProvider->fetch(appCfg.lat, appCfg.lon);
 
@@ -1095,7 +1099,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
     }
   });
 
-  lightningProvider = std::make_unique<LightningProvider>(netManager);
+  lightningProvider = std::make_shared<LightningProvider>(netManager);
   lightningProvider->setCallback([this](const LightningData &d) {
     if (widgetPool.count(WidgetType::LIGHTNING)) {
       static_cast<LightningPanel *>(widgetPool[WidgetType::LIGHTNING].get())
@@ -1111,7 +1115,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
     }
   });
 
-  solarStormProvider = std::make_unique<SolarStormProvider>(netManager);
+  solarStormProvider = std::make_shared<SolarStormProvider>(netManager);
   solarStormProvider->setCallback([this](const SolarStormData &d) {
     if (widgetPool.count(WidgetType::SOLAR_STORM)) {
       static_cast<SolarStormPanel *>(widgetPool[WidgetType::SOLAR_STORM].get())
@@ -1119,7 +1123,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
     }
   });
 
-  ionosondeProvider = std::make_unique<IonosondeProvider>(netManager);
+  ionosondeProvider = std::make_shared<IonosondeProvider>(netManager);
   ionosondeProvider->setCallback([this](const IonosondeData &d) {
     if (widgetPool.count(WidgetType::IONOSONDE)) {
       static_cast<IonosondePanel *>(widgetPool[WidgetType::IONOSONDE].get())
@@ -1127,7 +1131,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
     }
   });
 
-  reachProvider = std::make_unique<ReachProvider>(netManager, state);
+  reachProvider = std::make_shared<ReachProvider>(netManager, state);
   reachProvider->setCallback([this](const ReachData &d) {
     if (mapArea) {
       mapArea->onPropDataReady(PropOverlayType::Heatmap, d.grid);
@@ -1631,6 +1635,12 @@ DashboardContext::DashboardContext(AppContext &ctx)
 
   mapArea = std::make_unique<MapWidget>(0, 0, 0, 0, texMgr, fontMgr, netManager,
                                         state, appCfg);
+  // Share ownership of WxMbProvider so its async callbacks are safe if
+  // dashboard resets.
+  wxMbProvider = mapArea->getWxMbProvider();
+
+  qrzProvider = std::make_shared<QRZProvider>(netManager);
+  qrzProvider->setCredentials(appCfg.qrzUsername, appCfg.qrzPassword);
   mapArea->setOnConfigChanged([&ctx] { ctx.cfgMgr.save(ctx.appCfg); });
   mapArea->setSpotStore(spotStore);
   mapArea->setDXClusterStore(dxcStore);

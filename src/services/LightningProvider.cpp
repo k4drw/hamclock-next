@@ -19,9 +19,13 @@ void LightningProvider::fetch(double lat, double lon, bool force) {
   LOG_I("LightningProvider", "Fetching lightning data (4-tile scan)...");
 
   // 1. Fetch RainViewer for specific strike clusters (Primary)
+  std::weak_ptr<LightningProvider> self = shared_from_this();
   net_.fetchAsync(
       "https://api.rainviewer.com/public/weather-maps.json",
-      [this, lat, lon](std::string response) {
+      [self, lat, lon](std::string response) {
+        auto p = self.lock();
+        if (!p)
+          return;
         if (response.empty()) {
           LOG_W("LightningProvider", "Metadata response empty");
           return;
@@ -33,8 +37,8 @@ void LightningProvider::fetch(double lat, double lon, bool force) {
             int ts = latest["time"].get<int>();
             std::string tsStr = std::to_string(ts);
 
-            if (tsStr != lastTimestamp_) {
-              lastTimestamp_ = tsStr;
+            if (tsStr != p->lastTimestamp_) {
+              p->lastTimestamp_ = tsStr;
               LOG_I("LightningProvider", "Found new lightning data (ts: {})", ts);
               
               int cx = static_cast<int>((lon + 180.0) / 360.0 * 32.0);
@@ -46,18 +50,21 @@ void LightningProvider::fetch(double lat, double lon, bool force) {
                   std::snprintf(url, sizeof(url), "https://nowcast.rainviewer.com/v2/lightning/%d/256/5/%d/%d/1/1_1.json", ts, cx+dx, cy+dy);
                   LOG_D("LightningProvider", "Requesting tile: {}", url);
                   // Timestamped tiles are immutable, so 1 hour cache is safe
-                  net_.fetchAsync(url, [this, lat, lon](std::string strikeData) {
-                    LOG_D("LightningProvider", "Received tile ({} bytes)", strikeData.size());
-                    processStrikes(strikeData, lat, lon);
+                  p->net_.fetchAsync(url, [self, lat, lon](std::string strikeData) {
+                    auto p2 = self.lock();
+                    if (p2) {
+                      LOG_D("LightningProvider", "Received tile ({} bytes)", strikeData.size());
+                      p2->processStrikes(strikeData, lat, lon);
+                    }
                   }, 3600);
                 }
               }
             }
           } else {
             LOG_I("LightningProvider", "No lightning activity found in RainViewer feed");
-            std::lock_guard<std::mutex> lock(mutex_);
-            data_.valid = true;
-            if (callback_) callback_(data_);
+            std::lock_guard<std::mutex> lock(p->mutex_);
+            p->data_.valid = true;
+            if (p->callback_) p->callback_(p->data_);
           }
         } catch (const std::exception &e) {
           LOG_E("LightningProvider", "Metadata parse error: {}", e.what());
@@ -67,7 +74,10 @@ void LightningProvider::fetch(double lat, double lon, bool force) {
   // Secondary broad check: Open-Meteo
   char meteoUrl[256];
   std::snprintf(meteoUrl, sizeof(meteoUrl), "https://api.open-meteo.com/v1/forecast?latitude=%.4f&longitude=%.4f&current=weather_code", lat, lon);
-  net_.fetchAsync(meteoUrl, [this](std::string response) {
+  net_.fetchAsync(meteoUrl, [self](std::string response) {
+    auto p = self.lock();
+    if (!p)
+      return;
     if (response.empty()) {
         LOG_W("LightningProvider", "Open-Meteo response empty");
         return;
@@ -76,14 +86,14 @@ void LightningProvider::fetch(double lat, double lon, bool force) {
       auto j = nlohmann::json::parse(response);
       int code = j["current"]["weather_code"].get<int>();
       LOG_I("LightningProvider", "Open-Meteo weather code: {}", code);
-      std::lock_guard<std::mutex> lock(mutex_);
+      std::lock_guard<std::mutex> lock(p->mutex_);
       bool stormy = (code == 95 || code == 96 || code == 99);
-      if (stormy && !data_.safetyAlert) {
+      if (stormy && !p->data_.safetyAlert) {
         LOG_I("LightningProvider", "Broad thunderstorm alert active based on WMO code {}", code);
-        data_.safetyAlert = true;
+        p->data_.safetyAlert = true;
       }
-      data_.valid = true;
-      if (callback_) callback_(data_);
+      p->data_.valid = true;
+      if (p->callback_) p->callback_(p->data_);
     } catch (const std::exception &e) {
         LOG_E("LightningProvider", "Open-Meteo parse error: {}", e.what());
     }

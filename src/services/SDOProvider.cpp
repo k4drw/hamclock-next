@@ -67,28 +67,35 @@ void SDOProvider::fetch(const std::string &wavelength, bool pfss, DataCb cb) {
   std::string sol24Url(sol24);
 
   // Start Fetch Chain: LMSAL -> NASA -> sol24
+  std::weak_ptr<SDOProvider> self = shared_from_this();
   net_.fetchAsync(
       primaryUrl,
-      [this, cb, primaryUrl, nasaUrl, sol24Url](std::string body) {
+      [self, cb, primaryUrl, nasaUrl, sol24Url](std::string body) {
+        auto p = self.lock();
+        if (!p) return;
         if (!body.empty()) {
-          cb(body, net_.getCacheServerTime(primaryUrl));
+          cb(body, p->net_.getCacheServerTime(primaryUrl));
           return;
         }
 
         // LMSAL failed — try NASA
-        net_.fetchAsync(
+        p->net_.fetchAsync(
             nasaUrl,
-            [this, cb, nasaUrl, sol24Url](std::string body2) {
+            [self, cb, nasaUrl, sol24Url](std::string body2) {
+              auto p2 = self.lock();
+              if (!p2) return;
               if (!body2.empty()) {
-                cb(body2, net_.getCacheServerTime(nasaUrl));
+                cb(body2, p2->net_.getCacheServerTime(nasaUrl));
                 return;
               }
               // NASA failed — try sol24.net
-              net_.fetchAsync(
+              p2->net_.fetchAsync(
                   sol24Url,
-                  [this, cb, sol24Url](std::string body3) {
+                  [self, cb, sol24Url](std::string body3) {
+                    auto p3 = self.lock();
+                    if (!p3) return;
                     if (!body3.empty()) {
-                      cb(body3, net_.getCacheServerTime(sol24Url));
+                      cb(body3, p3->net_.getCacheServerTime(sol24Url));
                     }
                   },
                   3600, false);

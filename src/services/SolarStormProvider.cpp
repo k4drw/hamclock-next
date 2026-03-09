@@ -34,18 +34,22 @@ void SolarStormProvider::update() {
 
 void SolarStormProvider::fetchXrayFlux() {
   const char *url = "https://services.swpc.noaa.gov/json/goes/primary/xrays-1-day.json";
-  netMgr_.fetchAsync(url, [this](std::string body) {
-    if (!body.empty()) {
-      processXrayFlux(body);
+  std::weak_ptr<SolarStormProvider> self = shared_from_this();
+  netMgr_.fetchAsync(url, [self](std::string body) {
+    auto p = self.lock();
+    if (p && !body.empty()) {
+      p->processXrayFlux(body);
     }
   });
 }
 
 void SolarStormProvider::fetchAlerts() {
   const char *url = "https://services.swpc.noaa.gov/products/alerts.json";
-  netMgr_.fetchAsync(url, [this](std::string body) {
-    if (!body.empty()) {
-      processAlerts(body);
+  std::weak_ptr<SolarStormProvider> self = shared_from_this();
+  netMgr_.fetchAsync(url, [self](std::string body) {
+    auto p = self.lock();
+    if (p && !body.empty()) {
+      p->processAlerts(body);
     }
   });
 }

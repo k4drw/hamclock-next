@@ -44,29 +44,34 @@ void CloudProvider::update() {
   std::string url = oss.str();
   LOG_I("CloudProvider", "Fetching clouds from {}", url);
 
+  std::weak_ptr<CloudProvider> self = shared_from_this();
   netMgr_.fetchAsync(
       url,
-      [this, url](std::string data) {
+      [self, url](std::string data) {
+        auto p = self.lock();
+        if (!p) return;
         if (data.empty()) {
           LOG_E("CloudProvider", "Fetch failed or empty for {}", url);
           return;
         }
 
         // Offload decoding to background thread
-        WorkerService::getInstance().submitTask([this, data = std::move(data)]() {
+        WorkerService::getInstance().submitTask([self, data = std::move(data)]() {
+          auto p2 = self.lock();
+          if (!p2) return;
           SDL_Surface *surf = TextureManager::decodeToSurface(
               reinterpret_cast<const unsigned char *>(data.data()),
               static_cast<unsigned int>(data.size()), "clouds");
 
           if (surf) {
-            std::lock_guard<std::mutex> lock(mutex_);
-            if (pendingSurface_) {
-              SDL_FreeSurface(pendingSurface_);
+            std::lock_guard<std::mutex> lock(p2->mutex_);
+            if (p2->pendingSurface_) {
+              SDL_FreeSurface(p2->pendingSurface_);
             }
-            pendingSurface_ = surf;
-            hasData_ = true;
-            textureDirty_ = true;
-            lastUpdateMs_ = SDL_GetTicks();
+            p2->pendingSurface_ = surf;
+            p2->hasData_ = true;
+            p2->textureDirty_ = true;
+            p2->lastUpdateMs_ = SDL_GetTicks();
             LOG_I("CloudProvider", "Decoded {}x{} cloud surface in background",
                   surf->w, surf->h);
           } else {

@@ -35,11 +35,15 @@ void ReachProvider::fetchPSK(const std::string& band, const std::string& mode) {
 
     LOG_I("ReachProvider", "Fetching PSK reach for {}: {}", call, url);
 
-    net_.fetchAsync(url, [this, band, mode](std::string body) {
-        if (!body.empty()) {
-            processPSK(body, band, mode);
-        } else {
-            LOG_E("ReachProvider", "PSK fetch failed or empty");
+    std::weak_ptr<ReachProvider> self = shared_from_this();
+    net_.fetchAsync(url, [self, band, mode](std::string body) {
+        auto p = self.lock();
+        if (p) {
+            if (!body.empty()) {
+                p->processPSK(body, band, mode);
+            } else {
+                LOG_E("ReachProvider", "PSK fetch failed or empty");
+            }
         }
     }, 300); // Cache for 5 mins
 }
