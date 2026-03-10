@@ -128,6 +128,15 @@
 #include "ui/GreylineDXPanel.h"
 #include <SDL.h>
 #include <SDL_image.h>
+#include <SDL_syswm.h>
+// SDL_syswm.h pulls in X11 headers on Linux which define None, Success, etc.
+// Undefine them before any other headers that use those identifiers as names.
+#ifdef None
+#undef None
+#endif
+#ifdef Success
+#undef Success
+#endif
 #include <SDL_ttf.h>
 #ifndef __EMSCRIPTEN__
 #include <curl/curl.h>
@@ -465,9 +474,6 @@ int main(int argc, char *argv[]) {
   Log::init(ctx.cfgMgr.configDir().string()); // stderr only until IDBFS ready
 #endif
 
-  ctx.displayPower = std::make_shared<DisplayPower>();
-  ctx.displayPower->init();
-
   // Parse command-line
   bool forceFullscreen = false;
   bool forceSoftware = false;
@@ -526,6 +532,8 @@ int main(int argc, char *argv[]) {
     Log::setLevel(spdlog::level::warn);
   }
 
+  ctx.displayPower = std::make_shared<DisplayPower>();
+
   LOG_INFO("Starting HamClock-Next {}...", HAMCLOCK_VERSION);
 
 #ifdef __EMSCRIPTEN__
@@ -562,6 +570,7 @@ int main(int argc, char *argv[]) {
   }
 #endif
 
+  SDL_SetHint(SDL_HINT_APP_NAME, "HamClock-Next");
   if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_EVENTS) != 0) {
     LOG_ERROR("SDL_Init failed: {}", SDL_GetError());
     return EXIT_FAILURE;
@@ -635,6 +644,17 @@ int main(int argc, char *argv[]) {
     LOG_ERROR("SDL_CreateWindow failed: {}", SDL_GetError());
     return EXIT_FAILURE;
   }
+
+#if defined(__linux__) && !defined(__EMSCRIPTEN__)
+  {
+    SDL_SysWMinfo wmInfo;
+    SDL_VERSION(&wmInfo.version);
+    if (SDL_GetWindowWMInfo(ctx.window, &wmInfo) &&
+        wmInfo.subsystem == SDL_SYSWM_KMSDRM) {
+      ctx.displayPower->setDrmFd(wmInfo.info.kmsdrm.drm_fd);
+    }
+  }
+#endif
 
 #ifdef __EMSCRIPTEN__
   // Resize the SDL window (and its backing canvas) whenever the browser
@@ -3009,6 +3029,7 @@ void main_tick() {
       ctx.netManager->setCorsProxyUrl(ctx.appCfg.corsProxyUrl);
       ctx.netManager->setHubConfig(ctx.appCfg.hubMode, ctx.appCfg.hubIp,
                                    ctx.appCfg.hubPort);
+      ctx.displayPower->setMethodByName(ctx.appCfg.displayPowerMethod);
 
       LOG_I("Main", "Config reloaded from remote API: callsign={}",
             ctx.appCfg.callsign);

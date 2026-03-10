@@ -361,6 +361,10 @@ void WebServer::run() {
       <div id="app-msg"></div>
     </div>
     <div class="card">
+      <label>Display Power Method</label>
+      <select id="display-power-method" style="margin-bottom:10px">
+        <option value="auto">Auto-detect</option>
+      </select>
       <label>Display Power</label>
       <div style="display:flex; gap:10px">
         <button onclick="setPower('on')">ON</button>
@@ -542,15 +546,23 @@ void WebServer::run() {
         </div>
       </div>
       
-      <div class="section-hdr" style="margin-top:16px">Side Panels</div>
-      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px">
-        <div>
-          <label>Pane 5 (Top Right)</label>
-          <div id="pane4-list" class="widget-list"></div>
-        </div>
-        <div>
-          <label>Pane 6 (Bottom Right)</label>
-          <div id="pane5-list" class="widget-list"></div>
+      <div class="section-hdr" style="margin-top:16px">Side Panels (Panes 5 & 6)</div>
+      <label>Mode</label>
+      <select id="side-panel-mode" onchange="toggleSidePanelSettings()">
+        <option value="de_info">DE Info + DX/Sat (2 panes, original)</option>
+        <option value="dx_cluster">DX Cluster (full height)</option>
+        <option value="on_the_air">On The Air (full height)</option>
+        <option value="live_spots">Live Spots (full height)</option>
+      </select>
+      <div id="dx-sat-settings" style="display:none; margin-top:10px; padding:10px; background:#222; border:1px solid var(--dim)">
+        <label>Pane 6 Target</label>
+        <select id="panel-mode" onchange="toggleSatSelect()">
+          <option value="dx">DX Info</option>
+          <option value="sat">Satellite Tracking</option>
+        </select>
+        <div id="sat-select-container" style="display:none; margin-top:10px;">
+          <label>Tracking Satellite</label>
+          <select id="selected-satellite"></select>
         </div>
       </div>
       
@@ -643,6 +655,21 @@ void WebServer::run() {
         document.getElementById('weather-overlay').value = c.weatherOverlay || 'none';
         document.getElementById('night-lights').checked = !!c.mapNightLights;
         document.getElementById('use-metric').checked = !!c.useMetric;
+        
+        const dpmSelect = document.getElementById('display-power-method');
+        dpmSelect.innerHTML = '<option value="auto">Auto-detect</option>';
+        if (c.displayPowerMethods) {
+          c.displayPowerMethods.forEach(m => {
+            if (m !== 'auto' && m !== 'none') {
+              const opt = document.createElement('option');
+              opt.value = m;
+              opt.textContent = m;
+              dpmSelect.appendChild(opt);
+            }
+          });
+        }
+        dpmSelect.value = c.displayPowerMethod || 'auto';
+
         const r2 = await fetch('/api/display/status');
         const j = await r2.json();
         document.getElementById('pwr-msg').textContent = 'State: ' + j.power + ' (' + j.method + ')';
@@ -658,9 +685,11 @@ void WebServer::run() {
       const wxOverlay = document.getElementById('weather-overlay').value;
       const nl = document.getElementById('night-lights').checked ? '1' : '0';
       const mu = document.getElementById('use-metric').checked ? '1' : '0';
+      const dpm = document.getElementById('display-power-method').value;
       const params = new URLSearchParams({
         theme, map_style: mapStyle, projection, show_borders: showBorders,
-        prop_overlay: propOverlay, wx_overlay: wxOverlay, night_lights: nl, use_metric: mu
+        prop_overlay: propOverlay, wx_overlay: wxOverlay, night_lights: nl, use_metric: mu,
+        display_power_method: dpm
       });
       try {
         const r = await fetch('/set_config?' + params);
@@ -953,24 +982,40 @@ void WebServer::run() {
     }
 
     let availableWidgets = [];
+    let availableSatellites = [];
     async function loadWidgets() {
       try {
         const r1 = await fetch('/api/widgets/available');
         availableWidgets = await r1.json();
+        availableWidgets.sort((a, b) => a.display.localeCompare(b.display));
         const r2 = await fetch('/api/config');
         const c = await r2.json();
-        
+        const r3 = await fetch('/api/satellites');
+        availableSatellites = await r3.json();
+
+        // Populate satellites
+        const satSel = document.getElementById('selected-satellite');
+        satSel.innerHTML = '';
+        availableSatellites.forEach(s => {
+          const opt = document.createElement('option');
+          opt.value = s;
+          opt.textContent = s;
+          satSel.appendChild(opt);
+        });
+
         document.getElementById('rot-interval').value = c.rotationInterval || 30;
         document.getElementById('sync-rot').checked = !!c.syncRotation;
-        
-        for (let i = 0; i < 6; i++) {
+
+        // Pane 4 (index 3) is a small pane restricted to 4 widget types
+        const pane4Allowed = new Set(['NCDXF', 'Solar', 'DX Weather', 'DE Weather']);
+
+        // Build Pane 1-4 lists
+        for (let i = 0; i < 4; i++) {
           const list = document.getElementById(`pane${i}-list`);
           list.innerHTML = '';
           const activeRot = c.panes ? (c.panes[i] ? c.panes[i].rotation : []) : [];
-          const SIDE_PANEL_WIDGETS = ['de_info', 'dx_cluster', 'on_the_air', 'live_spots'];
-          const pool = (i >= 4) ? availableWidgets.filter(w => SIDE_PANEL_WIDGETS.includes(w.id))
-                                 : availableWidgets;
-          pool.forEach(w => {
+          const widgets = (i === 3) ? availableWidgets.filter(w => pane4Allowed.has(w.display)) : availableWidgets;
+          widgets.forEach(w => {
             const div = document.createElement('div');
             div.className = 'widget-item' + (activeRot.includes(w.display) ? ' active' : '');
             div.textContent = w.display;
@@ -981,23 +1026,60 @@ void WebServer::run() {
             list.appendChild(div);
           });
         }
+
+        // Parse Pane 5/6 config to set "Side Panel Mode"
+        const p4 = (c.panes && c.panes[4] && c.panes[4].rotation.length > 0) ? c.panes[4].rotation[0] : 'DE Info';
+        let spMode = 'de_info';
+        if (p4 === 'DX Cluster') spMode = 'dx_cluster';
+        else if (p4 === 'On The Air') spMode = 'on_the_air';
+        else if (p4 === 'Live Spots') spMode = 'live_spots';
+        document.getElementById('side-panel-mode').value = spMode;
+
+        document.getElementById('panel-mode').value = c.panelMode || 'dx';
+        document.getElementById('selected-satellite').value = c.selectedSatellite || '';
+
+        toggleSidePanelSettings();
+
       } catch(e) {}
+    }
+
+    function toggleSidePanelSettings() {
+      const mode = document.getElementById('side-panel-mode').value;
+      const dxSatDiv = document.getElementById('dx-sat-settings');
+      dxSatDiv.style.display = (mode === 'de_info') ? 'block' : 'none';
+      toggleSatSelect();
+    }
+
+    function toggleSatSelect() {
+      const pm = document.getElementById('panel-mode').value;
+      document.getElementById('sat-select-container').style.display = (pm === 'sat') ? 'block' : 'none';
     }
 
     async function saveWidgets() {
       const panes = [];
-      for (let i = 0; i < 6; i++) {
+      for (let i = 0; i < 4; i++) {
         const active = [];
         document.querySelectorAll(`#pane${i}-list .widget-item.active`).forEach(el => {
           active.push(el.dataset.id);
         });
         panes.push(active.join(','));
       }
+
+      // Encode side panel mode back to panes 4 & 5
+      const spMode = document.getElementById('side-panel-mode').value;
+      panes[4] = spMode;
+      panes[5] = (spMode === 'de_info') ? 'dx_info' : '';
+
+      const pm = document.getElementById('panel-mode').value;
+      const sat = document.getElementById('selected-satellite').value;
+
       const params = new URLSearchParams({
         rotation_interval: document.getElementById('rot-interval').value,
         sync_rotation: document.getElementById('sync-rot').checked ? '1' : '0',
-        pane0: panes[0], pane1: panes[1], pane2: panes[2],
-        pane3: panes[3], pane4: panes[4], pane5: panes[5]
+        pane0: panes[0], pane1: panes[1], pane2: panes[2], pane3: panes[3],
+        side_panel_mode: spMode,
+        panel_mode: pm,
+        selected_satellite: sat
       });
       try {
         const r = await fetch('/set_config?' + params);
@@ -1321,6 +1403,16 @@ void WebServer::run() {
     addPane(cfg_->pane5Rotation);
     addPane(cfg_->pane6Rotation);
     j["panes"] = panes;
+    j["panelMode"] = cfg_->panelMode;
+    j["selectedSatellite"] = cfg_->selectedSatellite;
+    j["displayPowerMethod"] = cfg_->displayPowerMethod;
+    if (displayPower_) {
+      nlohmann::json dpm = nlohmann::json::array();
+      for (const auto &m : displayPower_->getMethods()) {
+        dpm.push_back(DisplayPower::methodToString(m));
+      }
+      j["displayPowerMethods"] = dpm;
+    }
 
     res.set_content(j.dump(2), "application/json");
   });
@@ -1498,11 +1590,47 @@ void WebServer::run() {
     if (req.has_param("aux_tz_label"))
       cfg_->auxClockTzLabel = req.get_param_value("aux_tz_label");
 
+    if (req.has_param("side_panel_mode")) {
+      std::string m = req.get_param_value("side_panel_mode");
+      if (m == "dx_cluster") {
+        cfg_->pane5Rotation = {WidgetType::DX_CLUSTER};
+        cfg_->pane6Rotation = {};
+      } else if (m == "on_the_air") {
+        cfg_->pane5Rotation = {WidgetType::ON_THE_AIR};
+        cfg_->pane6Rotation = {};
+      } else if (m == "live_spots") {
+        cfg_->pane5Rotation = {WidgetType::LIVE_SPOTS};
+        cfg_->pane6Rotation = {};
+      } else {
+        cfg_->pane5Rotation = {WidgetType::DE_INFO};
+        cfg_->pane6Rotation = {WidgetType::DX_INFO};
+      }
+    }
+    if (req.has_param("panel_mode"))
+      cfg_->panelMode = req.get_param_value("panel_mode");
+    if (req.has_param("selected_satellite"))
+      cfg_->selectedSatellite = req.get_param_value("selected_satellite");
+    if (req.has_param("display_power_method"))
+      cfg_->displayPowerMethod = req.get_param_value("display_power_method");
+
     if (cfgMgr_)
       cfgMgr_->save(*cfg_);
     if (reloadFlag_)
       reloadFlag_->store(true, std::memory_order_release);
     res.set_content("ok", "text/plain");
+  });
+
+  svr.Get("/api/satellites", [this](const httplib::Request &, httplib::Response &res) {
+    nlohmann::json j = nlohmann::json::array();
+    if (satMgr_) {
+      for (const auto &s : satMgr_->getSatellites()) {
+        j.push_back(s.name);
+      }
+      for (const auto &s : satMgr_->getCustomSatellites()) {
+        j.push_back(s.name);
+      }
+    }
+    res.set_content(j.dump(), "application/json");
   });
 
   svr.Get("/set_rss",

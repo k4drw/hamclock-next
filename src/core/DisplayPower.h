@@ -31,6 +31,8 @@ public:
   std::string getMethodName() const;
   std::string getSelectedMethodName() const { return methodToString(selectedMethod_); }
   void setMethodByName(const std::string &name) { selectedMethod_ = stringToMethod(name); }
+  void excludeMethod(Method m);
+  void setDrmFd(int fd);
 
   static std::string methodToString(Method m);
   static Method stringToMethod(const std::string &s);
@@ -41,6 +43,7 @@ private:
   std::string blPowerPath_;
   bool currentPower_ = true;
   bool needsBlackFrame_ = false;
+  int drmFd_ = -1;
 
   std::string findBacklightPowerPath();
   bool writeSysfs(const std::string &path, const std::string &value);
