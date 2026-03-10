@@ -71,3 +71,7 @@ void AuroraPanel::render(SDL_Renderer *renderer) {
                 north_ ? "Aurora Forecast (N)" : "Aurora Forecast (S)", x_ + 10,
                 y_ + 5, themes.accent, FontStyle::MicroBold);
 }
+
+void AuroraPanel::onResize(int x, int y, int w, int h) {
+  Widget::onResize(x, y, w, h);
+}

@@ -11,9 +11,11 @@ class TropoPanel : public Widget {
 public:
   TropoPanel(int x, int y, int w, int h, FontManager &fontMgr);
 
+  std::string getName() const override { return "Tropo"; }
   void updateData(const TropoData &data);
   void update() override {}
   void render(SDL_Renderer *renderer) override;
+  void onResize(int x, int y, int w, int h) override;
 
 private:
   FontManager &fontMgr_;

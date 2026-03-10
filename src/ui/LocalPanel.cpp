@@ -25,23 +25,19 @@ void LocalPanel::destroyCache() {
 void LocalPanel::update() {
   auto now = std::chrono::system_clock::now();
   std::time_t t = std::chrono::system_clock::to_time_t(now);
-  std::tm utc{};
-  Astronomy::portable_gmtime(&t, &utc);
 
-  // Crude local time offset from longitude (truncate toward zero)
-  double lon = state_->deLocation.lon;
-  int utcOffset = static_cast<int>(lon / 15.0);
-
-  int localHour = (utc.tm_hour + utcOffset + 24) % 24;
-  int localMin = utc.tm_min;
+  // Use OS local time so DST and timezone boundaries are honoured.
+  std::tm local{};
+  Astronomy::portable_localtime(&t, &local);
+  double utcOffsetHours = Astronomy::portable_utcoffset(&t, &local) / 3600.0;
 
   lineText_[0] = "DE:";
 
   char buf[64];
-  std::snprintf(buf, sizeof(buf), "%02d:%02d", localHour, localMin);
+  std::snprintf(buf, sizeof(buf), "%02d:%02d", local.tm_hour, local.tm_min);
   lineText_[1] = buf;
 
-  std::snprintf(buf, sizeof(buf), "%02d", utc.tm_sec);
+  std::snprintf(buf, sizeof(buf), "%02d", local.tm_sec);
   currentSec_ = buf;
 
   static constexpr const char *kDays[] = {"Sun", "Mon", "Tue", "Wed",
@@ -49,19 +45,18 @@ void LocalPanel::update() {
   static constexpr const char *kMonths[] = {"Jan", "Feb", "Mar", "Apr",
                                             "May", "Jun", "Jul", "Aug",
                                             "Sep", "Oct", "Nov", "Dec"};
-  std::snprintf(buf, sizeof(buf), "%s, %d %s %04d", kDays[utc.tm_wday],
-                utc.tm_mday, kMonths[utc.tm_mon], 1900 + utc.tm_year);
+  std::snprintf(buf, sizeof(buf), "%s, %d %s %04d", kDays[local.tm_wday],
+                local.tm_mday, kMonths[local.tm_mon], 1900 + local.tm_year);
   lineText_[2] = buf;
 
-  // Sunrise / Sunset
-  int doy = utc.tm_yday + 1;
+  // Sunrise / Sunset (sun times are in UTC decimal hours; convert to local)
+  int doy = local.tm_yday + 1;
   SunTimes st = Astronomy::calculateSunTimes(state_->deLocation.lat,
                                              state_->deLocation.lon, doy);
 
   if (st.hasRise && st.hasSet) {
-    // Convert UTC sun times to local
-    double localRise = st.sunrise + utcOffset;
-    double localSet = st.sunset + utcOffset;
+    double localRise = st.sunrise + utcOffsetHours;
+    double localSet = st.sunset + utcOffsetHours;
     auto norm24 = [](double &h) {
       while (h < 0.0)
         h += 24.0;

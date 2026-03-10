@@ -75,6 +75,32 @@ bool DatabaseManager::exec(const std::string &sql) {
   return true;
 }
 
+bool DatabaseManager::execPrepared(const std::string &sql,
+                                   std::function<void(sqlite3_stmt *)> binder) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  if (!db_)
+    return false;
+
+  sqlite3_stmt *stmt = nullptr;
+  if (sqlite3_prepare_v2(db_, sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
+    LOG_E("DatabaseManager", "Prepare failed: {}\nSQL: {}", sqlite3_errmsg(db_),
+          sql);
+    return false;
+  }
+
+  binder(stmt);
+
+  int rc = sqlite3_step(stmt);
+  sqlite3_finalize(stmt);
+
+  if (rc != SQLITE_DONE && rc != SQLITE_ROW) {
+    LOG_E("DatabaseManager", "execPrepared step failed: {}",
+          sqlite3_errmsg(db_));
+    return false;
+  }
+  return true;
+}
+
 bool DatabaseManager::query(const std::string &sql, QueryCallback callback) {
   std::lock_guard<std::mutex> lock(mutex_);
   if (!db_)

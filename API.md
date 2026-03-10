@@ -69,11 +69,20 @@ Returns the complete `AppConfig` as a JSON object.
 
 ## 3. Command & Control
 
+### `GET /set_config?key=value`
+Programmatically set a configuration field (e.g. `call=K4DRW`, `theme=dark`, `metric=1`).
+
+### `GET /set_rss?url=...`
+Sets the RSS news feed URL.
+
+### `GET /set_mapcolor?theme=...`
+Changes the map background theme.
+
 ### `GET /set_callsign?call=S`
-Sets the station callsign.
+(Legacy Alias) Sets the station callsign.
 
 ### `GET /set_location?lat=F&lon=F` or `?grid=S`
-Sets the DE (station) location.
+(Legacy Alias) Sets the DE (station) location.
 
 ### `GET /set_newdx?lat=F&lon=F` or `?grid=S`
 Sets the DX (target) location.
@@ -93,9 +102,6 @@ Returns JSON with current power state and control method.
 
 ### `GET /set_brightness?n=N`
 Sets screen brightness (0-100).
-
-### `GET /set_theme?name=S`
-Changes the UI theme (default, dark, glass).
 
 ---
 
@@ -154,4 +160,4 @@ Injects manual solar data (for testing).
 
 ## Legacy Compatibility
 
-HamClock-Next maintains 100% compatibility with all `GET /set_...` and `GET /get_...` endpoints from the original HamClock. Hardware controllers like the **Quadra** or **MegaClock** will work without modification.
+HamClock-Next maintains compatibility with the majority of `GET /set_...` and `GET /get_...` endpoints from the original HamClock. Hardware controllers like the **Quadra** or **MegaClock** should work without modification for most control operations. Note: `/restart`, `/reboot`, `/get_sensors.txt`, and `/get_memory.txt` are not currently registered.

@@ -12,9 +12,11 @@ class SolarStormPanel : public Widget {
 public:
   SolarStormPanel(int x, int y, int w, int h, FontManager &fontMgr, TextureManager &texMgr);
 
+  std::string getName() const override { return "Solar Storm"; }
   void updateData(const SolarStormData &data);
   void update() override {}
   void render(SDL_Renderer *renderer) override;
+  void onResize(int x, int y, int w, int h) override;
   void onMouseMove(int mx, int my) override;
 
 private:

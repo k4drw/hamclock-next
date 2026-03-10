@@ -197,15 +197,17 @@ void ReminderPanel::renderModal(SDL_Renderer *renderer) {
   int dx = (winW - dW) / 2;
   int dy = (winH - dH) / 2;
 
+  ThemeColors themes = getThemeColors(theme_);
+
   // Box background + border
-  SDL_SetRenderDrawColor(renderer, 20, 20, 35, 255);
+  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, 255);
   SDL_Rect box = {dx, dy, dW, dH};
   SDL_RenderFillRect(renderer, &box);
-  SDL_SetRenderDrawColor(renderer, 0, 180, 255, 255);
+  SDL_SetRenderDrawColor(renderer, themes.accent.r, themes.accent.g, themes.accent.b, 255);
   SDL_RenderDrawRect(renderer, &box);
 
   // Title bar strip
-  SDL_SetRenderDrawColor(renderer, 0, 60, 100, 255);
+  SDL_SetRenderDrawColor(renderer, themes.rowStripe2.r, themes.rowStripe2.g, themes.rowStripe2.b, 255);
   SDL_Rect titleBar = {dx, dy, dW, 22};
   SDL_RenderFillRect(renderer, &titleBar);
   SDL_Color white = {255, 255, 255, 255};
@@ -244,9 +246,9 @@ void ReminderPanel::renderModal(SDL_Renderer *renderer) {
 
   // Snooze
   notifySnoozeRect_ = {bx, btnY, btnW, btnH};
-  SDL_SetRenderDrawColor(renderer, 20, 40, 80, 255);
+  SDL_SetRenderDrawColor(renderer, themes.rowStripe1.r, themes.rowStripe1.g, themes.rowStripe1.b, 255);
   SDL_RenderFillRect(renderer, &notifySnoozeRect_);
-  SDL_SetRenderDrawColor(renderer, 60, 120, 200, 255);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
   SDL_RenderDrawRect(renderer, &notifySnoozeRect_);
   cat->drawText(renderer, "Snooze 1h", bx + btnW / 2, btnY + btnH / 2, white,
                 FontStyle::Caption, true);
@@ -254,9 +256,9 @@ void ReminderPanel::renderModal(SDL_Renderer *renderer) {
   // Acknowledge
   int ax = bx + btnW + gap;
   notifyAckRect_ = {ax, btnY, btnW, btnH};
-  SDL_SetRenderDrawColor(renderer, 20, 60, 20, 255);
+  SDL_SetRenderDrawColor(renderer, themes.success.r, themes.success.g, themes.success.b, 255);
   SDL_RenderFillRect(renderer, &notifyAckRect_);
-  SDL_SetRenderDrawColor(renderer, 50, 160, 50, 255);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
   SDL_RenderDrawRect(renderer, &notifyAckRect_);
   cat->drawText(renderer, "Acknowledge", ax + btnW / 2, btnY + btnH / 2, white,
                 FontStyle::Caption, true);
@@ -345,6 +347,8 @@ void ReminderPanel::renderSetup(SDL_Renderer *renderer) {
   int textPad = 4;
 
   deleteRects_.clear();
+  labelRects_.clear();
+  dateRects_.clear();
 
   SDL_Texture *tex = nullptr;
   for (size_t i = 0; i < pendingReminders_.size(); ++i) {
@@ -358,6 +362,7 @@ void ReminderPanel::renderSetup(SDL_Renderer *renderer) {
     SDL_SetRenderDrawColor(renderer, (activeField_ == (int)i) ? 255 : 100, 150,
                            0, 255);
     SDL_RenderDrawRect(renderer, &lRect);
+    labelRects_.push_back(lRect);
     cat->drawText(renderer, pendingReminders_[i].label, lRect.x + textPad,
                   lRect.y + 2, white, FontStyle::Caption);
 
@@ -370,6 +375,7 @@ void ReminderPanel::renderSetup(SDL_Renderer *renderer) {
         (activeField_ == (int)(i + pendingReminders_.size())) ? 255 : 100, 150,
         0, 255);
     SDL_RenderDrawRect(renderer, &dRect);
+    dateRects_.push_back(dRect);
     cat->drawText(renderer, pendingReminders_[i].date, dRect.x + textPad,
                   dRect.y + 2, white, FontStyle::Caption);
 
@@ -452,6 +458,13 @@ void ReminderPanel::renderSetup(SDL_Renderer *renderer) {
 
 // ─── mouse ───────────────────────────────────────────────────────────────────
 
+void ReminderPanel::onResize(int x, int y, int w, int h) {
+  Widget::onResize(x, y, w, h);
+  // Button rects are recomputed each render() call — clear hover zones
+  // so stale click targets from old geometry are not retained.
+  hoverZones_.clear();
+}
+
 bool ReminderPanel::onMouseUp(int mx, int my, Uint16, int) {
   // Notification modal consumes all clicks (full-screen)
   if (notificationActive_)
@@ -520,30 +533,25 @@ bool ReminderPanel::handleSetupClick(int mx, int my) {
   }
 
   // Field click — detect label/date fields
-  if (pendingReminders_.empty())
-    return true;
-
-  int fy = y_ + 10 + 20; // approx first row Y (title ~28px)
-  int fieldW = width_ - 20;
-  int fieldH = 18;
-  for (size_t i = 0; i < pendingReminders_.size(); ++i) {
-    int halfW = (fieldW - 30) / 2;
-    if (mx >= x_ + 5 && mx < x_ + 5 + halfW && my >= fy && my < fy + fieldH) {
+  for (size_t i = 0; i < labelRects_.size(); ++i) {
+    const auto &r = labelRects_[i];
+    if (mx >= r.x && mx < r.x + r.w && my >= r.y && my < r.y + r.h) {
       activeField_ = (int)i;
       activeProxy_.setValue(pendingReminders_[i].label);
       activeProxy_.setCursorToEnd();
       activeProxy_.setActive(true);
       return true;
     }
-    if (mx >= x_ + 10 + halfW && mx < x_ + 10 + 2 * halfW && my >= fy &&
-        my < fy + fieldH) {
+  }
+  for (size_t i = 0; i < dateRects_.size(); ++i) {
+    const auto &r = dateRects_[i];
+    if (mx >= r.x && mx < r.x + r.w && my >= r.y && my < r.y + r.h) {
       activeField_ = (int)(i + pendingReminders_.size());
       activeProxy_.setValue(pendingReminders_[i].date);
       activeProxy_.setCursorToEnd();
       activeProxy_.setActive(true);
       return true;
     }
-    fy += fieldH + 5;
   }
 
   return true;

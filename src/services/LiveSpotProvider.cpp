@@ -142,6 +142,7 @@ void LiveSpotProvider::fetchPSK() {
 
   LOG_D("LiveSpot", "Fetching PSK {}", url);
   if (state_) {
+    std::lock_guard<std::mutex> lk(state_->servicesMutex);
     state_->services["LiveSpot"].lastError = "Fetching...";
   }
 
@@ -161,6 +162,7 @@ void LiveSpotProvider::fetchPSK() {
         if (!body.empty()) {
           parsePSKReporter(body, data, ofDe);
           if (state) {
+            std::lock_guard<std::mutex> lk(state->servicesMutex);
             auto &s = state->services["LiveSpot"];
             s.ok = true;
             s.lastSuccess = std::chrono::system_clock::now();
@@ -169,6 +171,7 @@ void LiveSpotProvider::fetchPSK() {
         } else {
           LOG_W("LiveSpot", "Empty response from PSK Reporter");
           if (state) {
+            std::lock_guard<std::mutex> lk(state->servicesMutex);
             auto &s = state->services["LiveSpot"];
             s.ok = false;
             s.lastError = "Empty response";
@@ -291,8 +294,10 @@ void LiveSpotProvider::fetchWSPR() {
   std::string url = "http://db1.wspr.live/?query=" + encoded;
   LOG_I("LiveSpot", "Fetching WSPR via db1.wspr.live");
 
-  if (state_)
+  if (state_) {
+    std::lock_guard<std::mutex> lk(state_->servicesMutex);
     state_->services["LiveSpot"].lastError = "Fetching...";
+  }
 
   auto store = store_;
   auto myGrid4 = grid4;
@@ -309,6 +314,7 @@ void LiveSpotProvider::fetchWSPR() {
         if (body.empty()) {
           LOG_W("LiveSpot", "Empty response from db1.wspr.live");
           if (state) {
+            std::lock_guard<std::mutex> lk(state->servicesMutex);
             state->services["LiveSpot"].ok = false;
             state->services["LiveSpot"].lastError = "Empty response";
           }
@@ -352,6 +358,7 @@ void LiveSpotProvider::fetchWSPR() {
         }
 
         if (state) {
+          std::lock_guard<std::mutex> lk(state->servicesMutex);
           state->services["LiveSpot"].ok = true;
           state->services["LiveSpot"].lastSuccess =
               std::chrono::system_clock::now();
@@ -434,6 +441,7 @@ void LiveSpotProvider::fetchRBN() {
   }
 
   if (state_) {
+    std::lock_guard<std::mutex> lk(state_->servicesMutex);
     state_->services["LiveSpot"].ok = true;
     state_->services["LiveSpot"].lastSuccess = std::chrono::system_clock::now();
     state_->services["LiveSpot"].lastError = "";

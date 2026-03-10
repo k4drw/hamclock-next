@@ -20,8 +20,8 @@ private:
   std::shared_ptr<CallbookStore> store_;
 
   // Aggregation steps
-  void fetchCallook(const std::string &callsign, CallbookData &result,
+  void fetchCallook(const std::string &callsign, std::shared_ptr<CallbookData> result,
                     std::function<void()> onDone);
-  void fetchHamDB(const std::string &callsign, CallbookData &result,
+  void fetchHamDB(const std::string &callsign, std::shared_ptr<CallbookData> result,
                   std::function<void()> onDone);
 };

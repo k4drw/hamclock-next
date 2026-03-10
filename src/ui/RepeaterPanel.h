@@ -25,6 +25,7 @@ private:
   std::shared_ptr<RepeaterStore> store_;
   RepeaterData currentData_;
   int scrollOffset_ = 0;
+  int maxScroll_ = 0;
 
   int titleFontSize_ = 12;
   int rowFontSize_ = 11;

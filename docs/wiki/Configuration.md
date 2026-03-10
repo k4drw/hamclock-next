@@ -176,6 +176,17 @@ If `lat`/`lon` are omitted, they are derived from the center of your grid square
 
 ---
 
+## Aux Clock
+
+| Field              | Type   | Default | Description                                                                                                     |
+| ------------------ | ------ | ------- | --------------------------------------------------------------------------------------------------------------- |
+| `auxClockTzOffset` | int    | `0`     | Hours offset from UTC (-12 to +14). Controlled by clicking the widget or via `/set_config?aux_tz_offset={n}`   |
+| `auxClockTzLabel`  | string | `"UTC"` | Display label shown in the widget title. Set via `/set_config?aux_tz_label={label}`. Preset cycle: UTC, EST, CST, MST, PST, CET, JST, AEST |
+
+**API control**: `GET /set_config?aux_tz_offset=-5&aux_tz_label=EST`
+
+---
+
 ## Countdown / Reminder
 
 | Field            | Type   | Default | Description                               |

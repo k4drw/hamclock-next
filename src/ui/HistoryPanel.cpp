@@ -183,6 +183,10 @@ void HistoryPanel::render(SDL_Renderer *renderer) {
   }
 }
 
+void HistoryPanel::onResize(int x, int y, int w, int h) {
+  Widget::onResize(x, y, w, h);
+}
+
 void HistoryPanel::onMouseMove(int mx, int my) {
   if (!currentSeries_.valid || currentSeries_.points.empty()) {
     tooltip_.visible = false;

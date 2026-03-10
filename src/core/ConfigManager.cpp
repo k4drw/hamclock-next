@@ -176,6 +176,10 @@ bool ConfigManager::load(AppConfig &config) {
     if (!hexColor.empty()) {
       config.callsignColor = hexToColor(hexColor, config.callsignColor);
     }
+    std::string hexBgColor = ap.value("callsign_bg_color", "");
+    if (!hexBgColor.empty()) {
+      config.callsignBgColor = hexToColor(hexBgColor, {0, 0, 0, 0});
+    }
     config.theme = ap.value("theme", "default");
     config.mapNightLights = ap.value("map_night_lights", true);
     config.useMetric = ap.value("use_metric", true);
@@ -252,6 +256,13 @@ bool ConfigManager::load(AppConfig &config) {
         config.reminders.push_back(re);
       }
     }
+  }
+
+  // Aux Clock
+  if (json.contains("aux_clock")) {
+    config.auxClockTzOffset  = json["aux_clock"].value("tz_offset", 0);
+    config.auxClockTzLabel   = json["aux_clock"].value("tz_label", std::string("UTC"));
+    config.auxClockStarMode  = json["aux_clock"].value("star_mode", 1);
   }
 
   // RSS
@@ -543,6 +554,8 @@ bool ConfigManager::save(const AppConfig &config) {
   json["identity"]["lon"] = config.lon;
 
   json["appearance"]["callsign_color"] = colorToHex(config.callsignColor);
+  if (config.callsignBgColor.a > 0)
+    json["appearance"]["callsign_bg_color"] = colorToHex(config.callsignBgColor);
   json["appearance"]["theme"] = config.theme;
   json["appearance"]["map_night_lights"] = config.mapNightLights;
   json["appearance"]["use_metric"] = config.useMetric;
@@ -686,6 +699,10 @@ bool ConfigManager::save(const AppConfig &config) {
   json["live_spots"]["bands_mask"] = config.liveSpotsBands;
   json["live_spots"]["rbn_host"] = config.rbnHost;
   json["live_spots"]["rbn_port"] = config.rbnPort;
+
+  json["aux_clock"]["tz_offset"]  = config.auxClockTzOffset;
+  json["aux_clock"]["tz_label"]   = config.auxClockTzLabel;
+  json["aux_clock"]["star_mode"]  = config.auxClockStarMode;
 
   json["rss"]["enabled"] = config.rssEnabled;
   json["activity"]["onta_filter"] = config.ontaFilter;

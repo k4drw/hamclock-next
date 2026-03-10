@@ -2,11 +2,12 @@
 
 #include "../core/IonosondeData.h"
 #include "../network/NetworkManager.h"
+#include <memory>
 #include <mutex>
 #include <vector>
 #include <functional>
 
-class IonosondeProvider {
+class IonosondeProvider : public std::enable_shared_from_this<IonosondeProvider> {
 public:
   using Callback = std::function<void(const IonosondeData&)>;
 

@@ -62,7 +62,7 @@ void DstPanel::render(SDL_Renderer *renderer) {
   if (zeroY >= graphY && zeroY <= graphY + graphH) {
     RenderUtils::drawThickLine(renderer, (float)graphX, (float)zeroY,
                                (float)(graphX + graphW), (float)zeroY, 1.0f,
-                               {80, 80, 80, 255});
+                               themes.textDim);
   }
 
   // Plot
@@ -83,7 +83,7 @@ void DstPanel::render(SDL_Renderer *renderer) {
     else if (p2.value < -20)
       col = themes.warning; // Yellow for moderate
     else
-      col = {0, 255, 100, 255}; // Greenish-cyan for quiet
+      col = themes.success; // Green for quiet
 
     SDL_Texture *lineAA = texMgr_.get("line_aa");
     if (lineAA) {
@@ -97,12 +97,16 @@ void DstPanel::render(SDL_Renderer *renderer) {
   // Current value bubble
   char buf[16];
   std::snprintf(buf, sizeof(buf), "%.0f nT", currentData_.current_val);
-  cat->drawText(renderer, buf, x_ + width_ - pad, y_ + 5, {255, 255, 255, 255},
+  cat->drawText(renderer, buf, x_ + width_ - pad, y_ + 5, themes.text,
                 FontStyle::Micro, false, true);
 
   if (tooltip_.visible) {
     renderTooltip(renderer, fontMgr_);
   }
+}
+
+void DstPanel::onResize(int x, int y, int w, int h) {
+  Widget::onResize(x, y, w, h);
 }
 
 void DstPanel::onMouseMove(int mx, int my) {

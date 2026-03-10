@@ -10,16 +10,17 @@ AlertsPanel::AlertsPanel(int x, int y, int w, int h, FontManager &fontMgr,
 
 void AlertsPanel::update() { currentData_ = store_->get(); }
 
-SDL_Color AlertsPanel::severityColor(const std::string &severity) {
+SDL_Color AlertsPanel::severityColor(const std::string &severity) const {
+  ThemeColors themes = getThemeColors(this->theme_);
   if (severity == "Extreme")
-    return {255, 50, 50, 255};
+    return themes.danger;
   if (severity == "Severe")
-    return {255, 140, 0, 255};
+    return {255, 140, 0, 255}; // High orange fallback
   if (severity == "Moderate")
-    return {255, 220, 0, 255};
+    return themes.warning;
   if (severity == "Minor")
-    return {180, 220, 180, 255};
-  return {200, 200, 200, 255};
+    return themes.success;
+  return themes.textDim;
 }
 
 void AlertsPanel::render(SDL_Renderer *renderer) {
@@ -63,6 +64,8 @@ void AlertsPanel::render(SDL_Renderer *renderer) {
   const auto &alerts = currentData_.alerts;
   int rowH = rowFontSize_ + 6;
   int maxRows = (height_ - (curY - y_) - pad) / rowH;
+  maxScroll_ = std::max(0, (int)alerts.size() - maxRows);
+  scrollOffset_ = std::min(scrollOffset_, maxScroll_);
   int startIdx = std::max(0, scrollOffset_);
   int endIdx = std::min((int)alerts.size(), startIdx + maxRows);
 
@@ -102,6 +105,6 @@ void AlertsPanel::onResize(int x, int y, int w, int h) {
 }
 
 bool AlertsPanel::onMouseWheel(int scrollY) {
-  scrollOffset_ = std::max(0, scrollOffset_ - scrollY);
+  scrollOffset_ = std::clamp(scrollOffset_ - scrollY, 0, maxScroll_);
   return true;
 }

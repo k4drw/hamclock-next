@@ -1,6 +1,7 @@
 #include "DisplayPower.h"
 #include "Logger.h"
 
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -27,16 +28,25 @@
 DisplayPower::DisplayPower() { init(); }
 
 void DisplayPower::init() {
-#ifndef __EMSCRIPTEN__
+#if defined(__EMSCRIPTEN__)
+  methods_.push_back(Method::NONE);
+#else
   methods_.clear();
 
-  // 1. Test vcgencmd (RPi preferred)
+  // 1. DRM DPMS — preferred when available; setDrmFd() provides the master fd
+  //    so this works even when SDL2 KMSDRM holds DRM master.
+  if (access("/dev/dri/card0", W_OK) == 0) {
+    methods_.push_back(Method::DRM_DPMS);
+    LOG_I("Display", "Detected screen control: Direct DRM DPMS");
+  }
+
+  // 2. vcgencmd (RPi VideoCore firmware — works alongside KMSDRM)
   if (std::system("vcgencmd display_power -1 > /dev/null 2>&1") == 0) {
     methods_.push_back(Method::VCGENCMD);
     LOG_I("Display", "Detected screen control: vcgencmd");
   }
 
-  // 2. Test bl_power sysfs (DSI displays)
+  // 3. bl_power sysfs (DSI displays)
   blPowerPath_ = findBacklightPowerPath();
   if (!blPowerPath_.empty()) {
     methods_.push_back(Method::BL_POWER);
@@ -44,14 +54,14 @@ void DisplayPower::init() {
           blPowerPath_);
   }
 
-  // 3. Fallback to framebuffer blanking
+  // 4. Framebuffer blanking (visual fallback)
   if (access("/dev/fb0", W_OK) == 0) {
     methods_.push_back(Method::FRAMEBUFFER);
     LOG_I("Display",
           "Detected screen control: Framebuffer blanking (visual only)");
   }
 
-  // 4. X11 DPMS via xset (works when KMS is active, $DISPLAY is set)
+  // 5. X11 DPMS via xset
   {
     const char *disp = std::getenv("DISPLAY");
     if (disp && disp[0] && binaryExists("xset")) {
@@ -61,13 +71,13 @@ void DisplayPower::init() {
     }
   }
 
-  // 5. tvservice (legacy RPi firmware stack)
+  // 6. tvservice (legacy RPi firmware stack)
   if (binaryExists("tvservice")) {
     methods_.push_back(Method::TVSERVICE);
     LOG_I("Display", "Detected screen control: tvservice (legacy RPi)");
   }
 
-  // 6. wlr-randr (Wayland compositors: sway, labwc, etc.)
+  // 7. wlr-randr (Wayland compositors: sway, labwc, etc.)
   {
     const char *wdisp = std::getenv("WAYLAND_DISPLAY");
     if (wdisp && wdisp[0] && binaryExists("wlr-randr")) {
@@ -79,22 +89,18 @@ void DisplayPower::init() {
         if (fgets(buf, sizeof(buf), fp)) {
           // Output line format: "HDMI-A-1 ..."
           char *sp = std::strchr(buf, ' ');
-          if (sp) *sp = '\0';
+          if (sp)
+            *sp = '\0';
           wlrRandrOutput_ = buf;
         }
         pclose(fp);
       }
       if (!wlrRandrOutput_.empty()) {
         methods_.push_back(Method::WLR_RANDR);
-        LOG_I("Display", "Detected screen control: wlr-randr ({})", wlrRandrOutput_);
+        LOG_I("Display", "Detected screen control: wlr-randr ({})",
+              wlrRandrOutput_);
       }
     }
-  }
-
-  // 7. DRM DPMS (Direct KMS/DRM control)
-  if (access("/dev/dri/card0", W_OK) == 0) {
-    methods_.push_back(Method::DRM_DPMS);
-    LOG_I("Display", "Detected screen control: Direct DRM DPMS");
   }
 
   // 8. VT Console blanking
@@ -106,15 +112,24 @@ void DisplayPower::init() {
   // 9. Always add SOFTWARE blanking as a robust fallback
   methods_.push_back(Method::SOFTWARE);
   LOG_I("Display", "Detected screen control: Software blanking");
-#else
-  methods_.push_back(Method::NONE);
 #endif
+}
+
+void DisplayPower::setDrmFd(int fd) {
+  drmFd_ = fd;
+  LOG_I("Display", "DRM master fd set to {} (provided by SDL2 KMSDRM)", fd);
+}
+
+void DisplayPower::excludeMethod(Method m) {
+  methods_.erase(std::remove(methods_.begin(), methods_.end(), m),
+                 methods_.end());
+  LOG_I("Display", "Excluded display power method: {}", methodToString(m));
 }
 
 bool DisplayPower::setPower(bool on) {
   bool success = false;
-#ifndef __EMSCRIPTEN__
-#ifdef _WIN32
+
+#if defined(__EMSCRIPTEN__) || defined(_WIN32)
   (void)on;
   success = false;
 #else
@@ -152,21 +167,20 @@ bool DisplayPower::setPower(bool on) {
     success = attempt(selectedMethod_);
   } else {
     for (auto method : methods_) {
-      if (attempt(method))
+      if (attempt(method)) {
         success = true;
+        break;
+      }
     }
   }
-#endif
-#else
-  (void)on;
-  success = false;
 #endif
 
   if (success) {
     currentPower_ = on;
+    if (!on)
+      needsBlackFrame_ = true;
     LOG_I("Display", "Screen power set to {}", on ? "ON" : "OFF");
   } else {
-    // Only log error on desktop
 #ifndef __EMSCRIPTEN__
     LOG_E("Display", "Failed to set screen power to {}", on ? "ON" : "OFF");
 #endif
@@ -176,8 +190,18 @@ bool DisplayPower::setPower(bool on) {
 
 bool DisplayPower::getPower() const { return currentPower_; }
 
+bool DisplayPower::consumeBlackFrame() {
+  if (needsBlackFrame_) {
+    needsBlackFrame_ = false;
+    return true;
+  }
+  return false;
+}
+
 std::string DisplayPower::getMethodName() const {
-#ifndef __EMSCRIPTEN__
+#if defined(__EMSCRIPTEN__)
+  return "none";
+#else
   std::string name;
   for (auto m : methods_) {
     if (!name.empty())
@@ -217,11 +241,10 @@ std::string DisplayPower::getMethodName() const {
   }
   return name.empty() ? "none" : name;
 #endif
-  return "none";
 }
 
 std::string DisplayPower::findBacklightPowerPath() {
-#ifndef __EMSCRIPTEN__
+#if !defined(__EMSCRIPTEN__)
   const char *paths[] = {"/sys/class/backlight/rpi_backlight/bl_power",
                          "/sys/class/backlight/10-0045/bl_power",
                          "/sys/class/backlight/6-0045/bl_power", nullptr};
@@ -237,13 +260,7 @@ std::string DisplayPower::findBacklightPowerPath() {
 
 bool DisplayPower::writeSysfs(const std::string &path,
                               const std::string &value) {
-#ifndef __EMSCRIPTEN__
-#ifdef _WIN32
-  (void)path;
-  (void)value;
-  return false;
-#else
-#ifdef __linux__
+#if defined(__linux__) && !defined(__EMSCRIPTEN__)
   int fd = open(path.c_str(), O_WRONLY);
   if (fd < 0)
     return false;
@@ -255,24 +272,13 @@ bool DisplayPower::writeSysfs(const std::string &path,
   (void)value;
   return false;
 #endif
-#endif
-#else
-  (void)path;
-  (void)value;
-  return false;
-#endif
 }
 
 bool DisplayPower::runVcgencmd(bool on) {
-#ifndef __EMSCRIPTEN__
-#ifdef _WIN32
-  (void)on;
-  return false;
-#else
+#if defined(__linux__) && !defined(__EMSCRIPTEN__)
   std::string cmd =
       on ? "vcgencmd display_power 1" : "vcgencmd display_power 0";
   return std::system((cmd + " > /dev/null 2>&1").c_str()) == 0;
-#endif
 #else
   (void)on;
   return false;
@@ -280,24 +286,25 @@ bool DisplayPower::runVcgencmd(bool on) {
 }
 
 bool DisplayPower::blankFramebuffer(bool blank) {
-#ifndef __EMSCRIPTEN__
-#ifdef __linux__
+#if defined(__linux__) && !defined(__EMSCRIPTEN__)
   int fd = open("/dev/fb0", O_RDWR);
   if (fd < 0)
     return false;
 
-  int level = blank ? FB_BLANK_POWERDOWN : FB_BLANK_UNBLANK;
-  if (ioctl(fd, FBIOBLANK, level) < 0) {
-    close(fd);
-    return false;
+  if (blank) {
+    if (ioctl(fd, FBIOBLANK, FB_BLANK_POWERDOWN) < 0) {
+      close(fd);
+      return false;
+    }
+  } else {
+    if (ioctl(fd, FBIOBLANK, FB_BLANK_UNBLANK) < 0) {
+      close(fd);
+      return false;
+    }
   }
 
   close(fd);
   return true;
-#else
-  (void)blank;
-  return false;
-#endif
 #else
   (void)blank;
   return false;
@@ -320,7 +327,7 @@ bool DisplayPower::runXsetDpms(bool on) {
   if (!xDisplayEnv_.empty())
     cmd = "DISPLAY=" + xDisplayEnv_ + " ";
   cmd += on ? "xset dpms force on > /dev/null 2>&1"
-             : "xset dpms force off > /dev/null 2>&1";
+            : "xset dpms force off > /dev/null 2>&1";
   return std::system(cmd.c_str()) == 0;
 #else
   (void)on;
@@ -330,8 +337,8 @@ bool DisplayPower::runXsetDpms(bool on) {
 
 bool DisplayPower::runTvservice(bool on) {
 #if !defined(__EMSCRIPTEN__) && !defined(_WIN32)
-  std::string cmd = on ? "tvservice -p > /dev/null 2>&1"
-                       : "tvservice -o > /dev/null 2>&1";
+  std::string cmd =
+      on ? "tvservice -p > /dev/null 2>&1" : "tvservice -o > /dev/null 2>&1";
   return std::system(cmd.c_str()) == 0;
 #else
   (void)on;
@@ -346,8 +353,8 @@ bool DisplayPower::runWlrRandr(bool on) {
   std::string cmd;
   if (!wlDisplayEnv_.empty())
     cmd = "WAYLAND_DISPLAY=" + wlDisplayEnv_ + " ";
-  cmd += "wlr-randr --output " + wlrRandrOutput_ +
-         (on ? " --on" : " --off") + " > /dev/null 2>&1";
+  cmd += "wlr-randr --output " + wlrRandrOutput_ + (on ? " --on" : " --off") +
+         " > /dev/null 2>&1";
   return std::system(cmd.c_str()) == 0;
 #else
   (void)on;
@@ -357,16 +364,23 @@ bool DisplayPower::runWlrRandr(bool on) {
 
 bool DisplayPower::runDrmDpms(bool on) {
 #if defined(__linux__) && !defined(__EMSCRIPTEN__)
-  int fd = open("/dev/dri/card0", O_RDWR | O_CLOEXEC);
+  bool ownedFd = false;
+  int fd = drmFd_;
   if (fd < 0) {
-    LOG_E("DisplayPower", "Failed to open /dev/dri/card0: %s", std::strerror(errno));
-    return false;
+    fd = open("/dev/dri/card0", O_RDWR | O_CLOEXEC);
+    if (fd < 0) {
+      LOG_E("DisplayPower", "Failed to open /dev/dri/card0: %s",
+            std::strerror(errno));
+      return false;
+    }
+    ownedFd = true;
   }
 
   drmModeRes *res = drmModeGetResources(fd);
   if (!res) {
     LOG_E("DisplayPower", "drmModeGetResources failed");
-    close(fd);
+    if (ownedFd)
+      close(fd);
     return false;
   }
 
@@ -395,7 +409,7 @@ bool DisplayPower::runDrmDpms(bool on) {
                                           dpmsValue) == 0) {
             anySuccess = true;
           } else {
-            LOG_E("DisplayPower", "Failed to set DPMS on connector %u: %s",
+            LOG_E("DisplayPower", "Failed to set DPMS on connector {}: {}",
                   conn->connector_id, std::strerror(errno));
           }
         }
@@ -405,7 +419,8 @@ bool DisplayPower::runDrmDpms(bool on) {
   }
 
   drmModeFreeResources(res);
-  close(fd);
+  if (ownedFd)
+    close(fd);
   return anySuccess;
 #else
   (void)on;
@@ -489,5 +504,3 @@ DisplayPower::Method DisplayPower::stringToMethod(const std::string &s) {
     return Method::CONSOLE;
   return Method::NONE;
 }
-
-

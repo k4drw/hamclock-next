@@ -111,6 +111,7 @@ All overlays are configurable by **band**, **mode**, and **power** (watts).
 ## Map Enhancements
 
 - **Robinson projection** — an additional map projection option alongside Mercator (equirectangular) and Azimuthal
+- **Single Azimuthal projection** — DE-centered azimuthal equidistant circle; the original HamClock only offered the dual-hemisphere variant
 - **POTA activator map pins** — lime-green pins on the map for active POTA activations (requires On The Air widget in a pane)
 - **ADIF QSO map pins** — plots your logged QSOs from an ADIF file on the map (requires ADIF widget)
 - **Satellite ground track** — the selected satellite's orbital path is drawn as an arc on the map (`showSatTrack`)
@@ -175,9 +176,11 @@ Presets make it simple to switch between operating contexts (contest, casual DX,
 - **Large Kp number overlay** — current Planetary K-index rendered as a large color-coded number over the bar chart in the Aurora Graph widget (storm level colors)
 - **Contest detail popup** — clicking a contest row in the Contests widget opens a detail panel with exchange, rules link, and category summary
 - **On The Air filter chip** — the original On The Air widget showed all POTA and SOTA activations with no way to separate them; HamClock-Next adds a filter chip (All / POTA / SOTA) so you can focus on one program at a time (`ontaFilter` config field)
-- **Scrollable widget list in Setup** — the 44-widget checklist in Setup → Widgets scrolls with mouse wheel and `^`/`v` arrows when it overflows
+- **Scrollable widget list in Setup** — the 45-widget checklist in Setup → Widgets scrolls with mouse wheel and `^`/`v` arrows when it overflows
+- **Greyline DX scroll** — the Greyline DX widget list now scrolls with mouse wheel when more entities are active than fit in the pane
 - **Worker thread pool** — background tasks (propagation engine computation, RSS parsing) run in a thread pool so the UI never blocks
 - **QRZ premium callbook** — in addition to free Callook and HamDB lookups, QRZ.com XML API is supported for subscribers
+- **Aux Clock timezone cycling** — click the Aux Clock widget to cycle through preset timezones (UTC, EST, CST, MST, PST, CET, JST, AEST). The selected timezone persists across restarts. Useful for running a local-time clock alongside a full-pane DX Cluster so meetings are not missed. Can also be set via API: `/set_config?aux_tz_offset=-5&aux_tz_label=EST`
 
 ---
 

@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "hamclock-bridge": {
+      "command": "node",
+      "args": [".mcp/dist/index.js"]
+    }
+  }
+}

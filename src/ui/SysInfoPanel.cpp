@@ -297,6 +297,7 @@ void SysInfoPanel::render(SDL_Renderer *renderer) {
   // Row 6+: Provider errors (show up to 3 failing services)
   if (state_) {
     int shown = 0;
+    std::lock_guard<std::mutex> lk(state_->servicesMutex);
     for (const auto &kv : state_->services) {
       if (curY + cat->ptSize(FontStyle::Micro) > y_ + height_ - 2)
         break;

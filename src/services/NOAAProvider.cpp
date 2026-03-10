@@ -92,6 +92,7 @@ void NOAAProvider::fetchKIndex() {
   net_.fetchAsync(K_INDEX_URL, [state](std::string body) {
     if (body.empty()) {
       if (state) {
+        std::lock_guard<std::mutex> lk(state->servicesMutex);
         auto &s = state->services["NOAA:KIndex"];
         s.ok = false;
         s.lastError = "Empty response";
@@ -127,6 +128,7 @@ void NOAAProvider::fetchKIndex() {
       SDL_PushEvent(&event);
 
       if (state) {
+        std::lock_guard<std::mutex> lk(state->servicesMutex);
         auto &s = state->services["NOAA:KIndex"];
         s.ok = true;
         s.lastSuccess = std::chrono::system_clock::now();
@@ -663,6 +665,7 @@ void NOAAProvider::fetchXRay() {
   net_.fetchAsync(XRAY_URL, [state, xrayStore](std::string body) {
     if (body.empty()) {
       if (state) {
+        std::lock_guard<std::mutex> lk(state->servicesMutex);
         auto &s = state->services["NOAA:XRay"];
         s.ok = false;
         s.lastError = "Empty response";
@@ -675,6 +678,7 @@ void NOAAProvider::fetchXRay() {
         auto j = nlohmann::json::parse(body, nullptr, false);
         if (j.is_discarded() || !j.is_array() || j.empty()) {
           if (state) {
+            std::lock_guard<std::mutex> lk(state->servicesMutex);
             state->services["NOAA:XRay"].ok = false;
             state->services["NOAA:XRay"].lastError = "Invalid JSON";
           }
@@ -724,12 +728,14 @@ void NOAAProvider::fetchXRay() {
           SDL_PushEvent(&event);
 
           if (state) {
+            std::lock_guard<std::mutex> lk(state->servicesMutex);
             auto &s = state->services["NOAA:XRay"];
             s.ok = true;
             s.lastSuccess = std::chrono::system_clock::now();
           }
         } else {
           if (state) {
+            std::lock_guard<std::mutex> lk(state->servicesMutex);
             state->services["NOAA:XRay"].ok = false;
             state->services["NOAA:XRay"].lastError = "No 0.1-0.8nm data found";
           }
@@ -737,6 +743,7 @@ void NOAAProvider::fetchXRay() {
       } catch (const std::exception &e) {
         LOG_E("NOAAProvider", "X-ray parse error: {}", e.what());
         if (state) {
+          std::lock_guard<std::mutex> lk(state->servicesMutex);
           auto &s = state->services["NOAA:XRay"];
           s.ok = false;
           s.lastError = e.what();
@@ -751,6 +758,7 @@ void NOAAProvider::fetchProtonFlux() {
   net_.fetchAsync(PROTON_URL, [state](std::string body) {
     if (body.empty()) {
       if (state) {
+        std::lock_guard<std::mutex> lk(state->servicesMutex);
         auto &s = state->services["NOAA:ProtonFlux"];
         s.ok = false;
         s.lastError = "Empty response";
@@ -763,6 +771,7 @@ void NOAAProvider::fetchProtonFlux() {
         auto j = nlohmann::json::parse(body, nullptr, false);
         if (j.is_discarded() || !j.is_array() || j.empty()) {
           if (state) {
+            std::lock_guard<std::mutex> lk(state->servicesMutex);
             state->services["NOAA:ProtonFlux"].ok = false;
             state->services["NOAA:ProtonFlux"].lastError = "Invalid JSON";
           }
@@ -799,12 +808,14 @@ void NOAAProvider::fetchProtonFlux() {
           SDL_PushEvent(&event);
 
           if (state) {
+            std::lock_guard<std::mutex> lk(state->servicesMutex);
             auto &s = state->services["NOAA:ProtonFlux"];
             s.ok = true;
             s.lastSuccess = std::chrono::system_clock::now();
           }
         } else {
           if (state) {
+            std::lock_guard<std::mutex> lk(state->servicesMutex);
             state->services["NOAA:ProtonFlux"].ok = false;
             state->services["NOAA:ProtonFlux"].lastError =
                 "No >=10 MeV data found";
@@ -813,6 +824,7 @@ void NOAAProvider::fetchProtonFlux() {
       } catch (const std::exception &e) {
         LOG_E("NOAAProvider", "Proton flux parse error: {}", e.what());
         if (state) {
+          std::lock_guard<std::mutex> lk(state->servicesMutex);
           auto &s = state->services["NOAA:ProtonFlux"];
           s.ok = false;
           s.lastError = e.what();

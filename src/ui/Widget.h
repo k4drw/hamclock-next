@@ -2,6 +2,7 @@
 
 #include "FontCatalog.h"
 #include "FontManager.h"
+#include "../core/Theme.h"
 #include <SDL.h>
 #include <nlohmann/json.hpp>
 #include <string>
@@ -114,10 +115,11 @@ protected:
     if (tooltip_.text.empty())
       return;
 
+    ThemeColors themes = getThemeColors(theme_);
     auto *cat = fontMgr.catalog();
     int tw, th;
-    cat->renderText(renderer, tooltip_.text, {255, 255, 255, 255},
-                    FontStyle::Micro, &tw, &th);
+    cat->renderText(renderer, tooltip_.text, themes.text, FontStyle::Micro, &tw,
+                    &th);
 
     int padX = 8;
     int padY = 4;
@@ -136,12 +138,13 @@ protected:
 
     SDL_Rect box = {bx, by, boxW, boxH};
     SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-    SDL_SetRenderDrawColor(renderer, 20, 20, 20, 200);
+    SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, 200);
     SDL_RenderFillRect(renderer, &box);
-    SDL_SetRenderDrawColor(renderer, 100, 100, 100, 255);
+    SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
+                           themes.border.b, 255);
     SDL_RenderDrawRect(renderer, &box);
 
-    cat->drawText(renderer, tooltip_.text, bx + padX, by + padY,
-                  {255, 255, 255, 255}, FontStyle::Micro);
+    cat->drawText(renderer, tooltip_.text, bx + padX, by + padY, themes.text,
+                  FontStyle::Micro);
   }
 };

@@ -1,0 +1,26 @@
+name: Wiki Sync
+
+on:
+  push:
+    branches:
+      - master
+      - v1.0B04
+    paths:
+      - 'docs/wiki/**'
+
+jobs:
+  sync_wiki:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Sync to Wiki
+        uses: Andrew-Chen-Wang/github-wiki-action@v4
+        with:
+          strategy: clone
+          path: docs/wiki
+          commit-message: "Auto-sync wiki from docs/wiki [skip ci]"
+          token: ${{ secrets.GITHUB_TOKEN }}

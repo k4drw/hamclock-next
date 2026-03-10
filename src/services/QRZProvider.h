@@ -24,7 +24,7 @@ struct QRZLookupResult {
 
 // QRZ.com XML API provider
 // Requires QRZ.com XML subscription
-class QRZProvider {
+class QRZProvider : public std::enable_shared_from_this<QRZProvider> {
 public:
   QRZProvider(NetworkManager &netMgr);
   ~QRZProvider() = default;

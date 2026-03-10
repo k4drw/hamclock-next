@@ -155,7 +155,7 @@ void ContestPanel::renderPopup(SDL_Renderer *renderer) {
 
   // Semi-transparent dark background
   SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-  SDL_SetRenderDrawColor(renderer, 0, 0, 0, 210);
+  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, 210);
   SDL_RenderFillRect(renderer, &bg);
 
   // Border

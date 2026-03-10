@@ -77,9 +77,12 @@ public:
   bool isUpdateRequested() const { return updateRequested_; }
   void clearUpdateRequest() { updateRequested_ = false; }
 
-  // Callback invoked when callsign text or color is changed via the editor.
+  void setCallBgColor(SDL_Color color) { callBgColor_ = color; }
+
+  // Callback invoked when callsign text or colors are changed via the editor.
   using ConfigChangedCb =
-      std::function<void(const std::string &callsign, SDL_Color color)>;
+      std::function<void(const std::string &callsign, SDL_Color fgColor,
+                         SDL_Color bgColor)>;
   void setOnConfigChanged(ConfigChangedCb cb) {
     onConfigChanged_ = std::move(cb);
   }
@@ -94,11 +97,14 @@ private:
   TextureManager &texMgr_;
   std::string callsign_;
   SDL_Color callColor_ = {255, 165, 0, 255}; // default orange
+  SDL_Color callBgColor_ = {0, 0, 0, 0};     // default transparent (no bg)
 
   // Editor state
   bool editing_ = false;
+  bool editingBgColor_ = false; // palette is editing bg color vs fg color
   TextInput editInput_;
-  int selectedColorIdx_ = 2; // default to orange
+  int selectedColorIdx_ = 2;  // default to orange
+  int selectedBgColorIdx_ = -1; // -1 = none/transparent, 0-11 = kPalette
 
   static constexpr int kNumColors = 12;
   static constexpr std::array<SDL_Color, kNumColors> kPalette = {{

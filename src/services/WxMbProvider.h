@@ -23,7 +23,9 @@ struct WxQuiver {
 };
 // ---------------------------------------------------------------------------
 
-class WxMbProvider {
+#include <memory>
+
+class WxMbProvider : public std::enable_shared_from_this<WxMbProvider> {
 public:
   explicit WxMbProvider(NetworkManager &net);
   ~WxMbProvider();

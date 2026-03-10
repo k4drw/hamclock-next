@@ -5,7 +5,7 @@
 #include <memory>
 #include <string>
 
-class ForecastProvider {
+class ForecastProvider : public std::enable_shared_from_this<ForecastProvider> {
 public:
   ForecastProvider(NetworkManager &net, std::shared_ptr<ForecastStore> store);
 

@@ -1,4 +1,4 @@
-# HamClock-Next (v1.0B03)
+# HamClock-Next (v1.0B04)
 
 > **HamClock-Next** is a modern, multi-platform rewrite of the original HamClock
 > by **Elwood Downey, WB0OEW** (SK 29 January 2026).
@@ -49,7 +49,7 @@ passes valgrind, and runs stably on everything from a Raspberry Pi 3 to a browse
 
 ## 100% Feature Parity with the Original HamClock
 
-HamClock-Next implements all **71 original features** across every category:
+HamClock-Next implements all **82 original features** across every category:
 
 | Category                | Features                                                                                                                                 |
 | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
@@ -74,7 +74,7 @@ Every external data fetch is cached both in memory and on disk with ETag / HTTP 
 ### 3. Live Web Viewer & Remote Control
 - MJPEG live stream of the HamClock screen, viewable in any browser.
 - Full **mouse and keyboard passthrough** — click and type through the browser.
-- REST API with **30+ endpoints** for automation and home-automation integration.
+- REST API with **79 endpoints** for automation and home-automation integration.
 
 ### 4. Advanced Weather & Environment
 - **7-day NWS forecast panel** — hourly and daily outlook for your grid square.

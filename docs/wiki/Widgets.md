@@ -1,6 +1,6 @@
 # Widgets Reference
 
-HamClock-Next includes 44 widgets organized into six categories. Each pane can display any widget or cycle through a list of them.
+HamClock-Next includes 45 widgets organized into six categories. Each pane can display any widget or cycle through a list of them.
 
 To add a widget to a pane, click the **top strip** of the pane to open the widget picker.
 
@@ -10,7 +10,7 @@ To add a widget to a pane, click the **top strip** of the pane to open the widge
 
 ## Dashboard Rotation Gallery
 
-Since HamClock-Next allows multiple widgets per pane, the following snapshots show various dashboard configurations as the panes rotate. Use this gallery to see all **56+** widgets in action.
+Since HamClock-Next allows multiple widgets per pane, the following snapshots show various dashboard configurations as the panes rotate. Use this gallery to see all **45** widgets in action.
 
 |  ![Rotation 0](images/rotation_0.jpg)  |  ![Rotation 1](images/rotation_1.jpg)  |
 |  ![Rotation 2](images/rotation_2.jpg)  |  ![Rotation 3](images/rotation_3.jpg)  |
@@ -66,8 +66,9 @@ Since HamClock-Next allows multiple widgets per pane, the following snapshots sh
 
 | Widget           | Description                                               | Data Source                       |
 | ---------------- | --------------------------------------------------------- | --------------------------------- |
-| **DX Cluster**   | Live DX spots from a telnet DX cluster or WSJT-X UDP feed | Configured cluster host or WSJT-X |
-| **DX Peditions** | Upcoming and active DXpeditions list                      | ng3k.com                          |
+| **DX Cluster**   | Live DX spots from a telnet DX cluster or WSJT-X UDP feed          | Configured cluster host or WSJT-X |
+| **Greyline DX**  | DXCC entities currently in the greyline with minutes to peak offset | Internal / Astronomical calculation |
+| **DX Peditions** | Upcoming and active DXpeditions list                                | ng3k.com                          |
 | **On The Air**   | Active POTA and SOTA activations worldwide                | POTA / SOTA APIs                  |
 | **ADIF**         | Displays recent QSOs from a local ADIF log file           | Local file                        |
 | **Callbook**     | Callsign lookup results (name, QTH, grid)                 | Callook / HamDB / QRZ             |
@@ -121,7 +122,7 @@ Since HamClock-Next allows multiple widgets per pane, the following snapshots sh
 | ---------------- | ------------------------------------------------------------------------------------------------ | ------------------------ |
 | **DE Info**      | Your DE location details: callsign, grid, lat/lon, ITU zone, CQ zone, DXCC entity, bearing to DX | Internal config          |
 | **DX Info**      | Details on the current DX target entity: name, prefix, zones, bearing/distance from DE           | Internal / DXCC database |
-| **Clock Aux**    | Auxiliary analog or digital clock — useful for a second timezone                                 | Internal                 |
+| **Clock Aux**    | Auxiliary digital clock. Click to cycle through timezone presets (UTC, EST, CST, MST, PST, CET, JST, AEST). Useful for showing local time alongside a DX-focused pane | Internal |
 | **Countdown**    | Configurable countdown timer to a named event                                                    | Internal                 |
 | **Stopwatch**    | Simple stopwatch                                                                                 | Internal                 |
 | **Reminder**     | License expiry reminder and configurable date reminders                                          | Internal / FCC database  |

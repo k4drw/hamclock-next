@@ -50,6 +50,7 @@
 #include "services/MufRtProvider.h"
 #include "services/NOAAProvider.h"
 #include "services/RBNProvider.h"
+#include "services/QRZProvider.h"
 #include "services/RSSProvider.h"
 #include "services/ReachProvider.h"
 #include "services/RepeaterProvider.h"
@@ -127,6 +128,15 @@
 #include "ui/GreylineDXPanel.h"
 #include <SDL.h>
 #include <SDL_image.h>
+#include <SDL_syswm.h>
+// SDL_syswm.h pulls in X11 headers on Linux which define None, Success, etc.
+// Undefine them before any other headers that use those identifiers as names.
+#ifdef None
+#undef None
+#endif
+#ifdef Success
+#undef Success
+#endif
 #include <SDL_ttf.h>
 #ifndef __EMSCRIPTEN__
 #include <curl/curl.h>
@@ -284,32 +294,34 @@ struct DashboardContext {
   std::unique_ptr<HistoryProvider> historyProvider;
   std::unique_ptr<WeatherProvider> deWeatherProvider;
   std::unique_ptr<WeatherProvider> dxWeatherProvider;
-  std::unique_ptr<SDOProvider> sdoProvider;
+  std::shared_ptr<SDOProvider> sdoProvider;
   std::unique_ptr<DRAPProvider> drapProvider;
   std::shared_ptr<AuroraProvider> auroraProvider;
   std::shared_ptr<CallbookProvider> callbookProvider;
   FccProvider fccProvider;
-  std::unique_ptr<DstProvider> dstProvider;
+  std::shared_ptr<DstProvider> dstProvider;
   std::unique_ptr<ADIFProvider> adifProvider;
-  std::unique_ptr<MufRtProvider> mufRtProvider;
-  std::unique_ptr<CloudProvider> cloudProvider;
-  std::unique_ptr<IonosondeProvider> ionosondeProvider;
-  std::unique_ptr<ReachProvider> reachProvider;
+  std::shared_ptr<MufRtProvider> mufRtProvider;
+  std::shared_ptr<CloudProvider> cloudProvider;
+  std::shared_ptr<IonosondeProvider> ionosondeProvider;
+  std::shared_ptr<ReachProvider> reachProvider;
   std::unique_ptr<SantaProvider> santaProvider;
   std::unique_ptr<TropoProvider> tropoProvider;
-  std::unique_ptr<LightningProvider> lightningProvider;
+  std::shared_ptr<LightningProvider> lightningProvider;
   std::unique_ptr<MeteorProvider> meteorProvider;
-  std::unique_ptr<SolarStormProvider> solarStormProvider;
+  std::shared_ptr<SolarStormProvider> solarStormProvider;
   std::unique_ptr<SatelliteManager> satMgr;
-  std::unique_ptr<AsteroidProvider> asteroidProvider;
+  std::shared_ptr<AsteroidProvider> asteroidProvider;
   std::unique_ptr<BeaconProvider> beaconProvider;
   std::unique_ptr<AlertsProvider> alertsProvider;
-  std::unique_ptr<ForecastProvider> forecastProvider;
+  std::shared_ptr<ForecastProvider> forecastProvider;
   std::unique_ptr<RepeaterProvider> repeaterProvider;
   std::unique_ptr<HurricaneProvider> hurricaneProvider;
   std::unique_ptr<MarineProvider> marineProvider;
   std::unique_ptr<WinlinkProvider> winlinkProvider;
   std::unique_ptr<GreylineDXProvider> greylineDXProvider;
+  std::shared_ptr<WxMbProvider> wxMbProvider;
+  std::shared_ptr<QRZProvider> qrzProvider;
 
   // Services
 #ifndef __EMSCRIPTEN__
@@ -462,9 +474,6 @@ int main(int argc, char *argv[]) {
   Log::init(ctx.cfgMgr.configDir().string()); // stderr only until IDBFS ready
 #endif
 
-  ctx.displayPower = std::make_shared<DisplayPower>();
-  ctx.displayPower->init();
-
   // Parse command-line
   bool forceFullscreen = false;
   bool forceSoftware = false;
@@ -523,6 +532,8 @@ int main(int argc, char *argv[]) {
     Log::setLevel(spdlog::level::warn);
   }
 
+  ctx.displayPower = std::make_shared<DisplayPower>();
+
   LOG_INFO("Starting HamClock-Next {}...", HAMCLOCK_VERSION);
 
 #ifdef __EMSCRIPTEN__
@@ -535,6 +546,8 @@ int main(int argc, char *argv[]) {
     ctx.activeSetup = AppContext::SetupMode::Main;
   } else if (!ctx.cfgMgr.load(ctx.appCfg)) {
     ctx.activeSetup = AppContext::SetupMode::Main;
+  } else {
+    ctx.displayPower->setMethodByName(ctx.appCfg.displayPowerMethod);
   }
 #endif
 
@@ -557,6 +570,7 @@ int main(int argc, char *argv[]) {
   }
 #endif
 
+  SDL_SetHint(SDL_HINT_APP_NAME, "HamClock-Next");
   if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_EVENTS) != 0) {
     LOG_ERROR("SDL_Init failed: {}", SDL_GetError());
     return EXIT_FAILURE;
@@ -630,6 +644,17 @@ int main(int argc, char *argv[]) {
     LOG_ERROR("SDL_CreateWindow failed: {}", SDL_GetError());
     return EXIT_FAILURE;
   }
+
+#if defined(__linux__) && !defined(__EMSCRIPTEN__)
+  {
+    SDL_SysWMinfo wmInfo;
+    SDL_VERSION(&wmInfo.version);
+    if (SDL_GetWindowWMInfo(ctx.window, &wmInfo) &&
+        wmInfo.subsystem == SDL_SYSWM_KMSDRM) {
+      ctx.displayPower->setDrmFd(wmInfo.info.kmsdrm.drm_fd);
+    }
+  }
+#endif
 
 #ifdef __EMSCRIPTEN__
   // Resize the SDL window (and its backing canvas) whenever the browser
@@ -789,7 +814,7 @@ int main(int argc, char *argv[]) {
   emscripten_set_main_loop(main_tick, 10, 1);
 #else
   while (ctx.appRunning) {
-    static constexpr Uint32 kTargetFrameMs = 100; // ~10 FPS
+    static constexpr Uint32 kTargetFrameMs = 20; // 50fps event loop; render throttled internally
     static Uint32 s_lastFrameMs = 0;
     main_tick();
     Uint32 elapsed = SDL_GetTicks() - s_lastFrameMs;
@@ -1018,7 +1043,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
       std::make_unique<WeatherProvider>(netManager, dxWeatherStore, 1);
   dxWeatherProvider->fetch(state->dxLocation.lat, state->dxLocation.lon);
 
-  sdoProvider = std::make_unique<SDOProvider>(netManager);
+  sdoProvider = std::make_shared<SDOProvider>(netManager);
   drapProvider = std::make_unique<DRAPProvider>(netManager, ctx.drapDataStore);
   auroraProvider = std::make_shared<AuroraProvider>(netManager);
 
@@ -1026,7 +1051,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
       std::make_shared<CallbookProvider>(netManager, callbookStore);
   callbookProvider->lookup("K1ABC");
 
-  dstProvider = std::make_unique<DstProvider>(netManager, dstStore);
+  dstProvider = std::make_shared<DstProvider>(netManager, dstStore);
   if (isMasterMode || isWidgetConfigured(WidgetType::DST_INDEX))
     dstProvider->fetch();
 
@@ -1037,13 +1062,14 @@ DashboardContext::DashboardContext(AppContext &ctx)
     ctx.webServer->setADIFProvider(adifProvider.get());
 #endif
 
-  mufRtProvider = std::make_unique<MufRtProvider>(netManager);
+  mufRtProvider = std::make_shared<MufRtProvider>(netManager);
   mufRtProvider->update();
 
-  cloudProvider = std::make_unique<CloudProvider>(netManager);
+  cloudProvider = std::make_shared<CloudProvider>(netManager);
   cloudProvider->update();
 
-  asteroidProvider = std::make_unique<AsteroidProvider>(netManager);
+
+  asteroidProvider = std::make_shared<AsteroidProvider>(netManager);
   asteroidProvider->update();
 
   beaconProvider = std::make_unique<BeaconProvider>();
@@ -1054,7 +1080,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
     alertsProvider->fetch(appCfg.lat, appCfg.lon);
 
   forecastProvider =
-      std::make_unique<ForecastProvider>(netManager, ctx.forecastStore);
+      std::make_shared<ForecastProvider>(netManager, ctx.forecastStore);
   if (isMasterMode || isWidgetConfigured(WidgetType::FORECAST))
     forecastProvider->fetch(appCfg.lat, appCfg.lon);
 
@@ -1093,7 +1119,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
     }
   });
 
-  lightningProvider = std::make_unique<LightningProvider>(netManager);
+  lightningProvider = std::make_shared<LightningProvider>(netManager);
   lightningProvider->setCallback([this](const LightningData &d) {
     if (widgetPool.count(WidgetType::LIGHTNING)) {
       static_cast<LightningPanel *>(widgetPool[WidgetType::LIGHTNING].get())
@@ -1109,7 +1135,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
     }
   });
 
-  solarStormProvider = std::make_unique<SolarStormProvider>(netManager);
+  solarStormProvider = std::make_shared<SolarStormProvider>(netManager);
   solarStormProvider->setCallback([this](const SolarStormData &d) {
     if (widgetPool.count(WidgetType::SOLAR_STORM)) {
       static_cast<SolarStormPanel *>(widgetPool[WidgetType::SOLAR_STORM].get())
@@ -1117,7 +1143,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
     }
   });
 
-  ionosondeProvider = std::make_unique<IonosondeProvider>(netManager);
+  ionosondeProvider = std::make_shared<IonosondeProvider>(netManager);
   ionosondeProvider->setCallback([this](const IonosondeData &d) {
     if (widgetPool.count(WidgetType::IONOSONDE)) {
       static_cast<IonosondePanel *>(widgetPool[WidgetType::IONOSONDE].get())
@@ -1125,7 +1151,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
     }
   });
 
-  reachProvider = std::make_unique<ReachProvider>(netManager, state);
+  reachProvider = std::make_shared<ReachProvider>(netManager, state);
   reachProvider->setCallback([this](const ReachData &d) {
     if (mapArea) {
       mapArea->onPropDataReady(PropOverlayType::Heatmap, d.grid);
@@ -1135,10 +1161,12 @@ DashboardContext::DashboardContext(AppContext &ctx)
   timePanel =
       std::make_unique<TimePanel>(0, 0, 0, 0, fontMgr, texMgr, appCfg.callsign);
   timePanel->setCallColor(appCfg.callsignColor);
+  timePanel->setCallBgColor(appCfg.callsignBgColor);
   timePanel->setOnConfigChanged(
-      [&ctx](const std::string &call, SDL_Color color) {
+      [&ctx](const std::string &call, SDL_Color fgColor, SDL_Color bgColor) {
         ctx.appCfg.callsign = call;
-        ctx.appCfg.callsignColor = color;
+        ctx.appCfg.callsignColor = fgColor;
+        ctx.appCfg.callsignBgColor = bgColor;
         ctx.cfgMgr.save(ctx.appCfg);
       });
 
@@ -1276,7 +1304,8 @@ DashboardContext::DashboardContext(AppContext &ctx)
           0, 0, 0, 0, fontMgr, texMgr, netManager, moonStore);
       break;
     case WidgetType::CLOCK_AUX:
-      widgetPool[type] = std::make_unique<ClockAuxPanel>(0, 0, 0, 0, fontMgr);
+      widgetPool[type] = std::make_unique<ClockAuxPanel>(0, 0, 0, 0, fontMgr,
+                                                         appCfg, ctx.cfgMgr);
       break;
     case WidgetType::HISTORY_FLUX:
       widgetPool[type] = std::make_unique<HistoryPanel>(
@@ -1626,6 +1655,12 @@ DashboardContext::DashboardContext(AppContext &ctx)
 
   mapArea = std::make_unique<MapWidget>(0, 0, 0, 0, texMgr, fontMgr, netManager,
                                         state, appCfg);
+  // Share ownership of WxMbProvider so its async callbacks are safe if
+  // dashboard resets.
+  wxMbProvider = mapArea->getWxMbProvider();
+
+  qrzProvider = std::make_shared<QRZProvider>(netManager);
+  qrzProvider->setCredentials(appCfg.qrzUsername, appCfg.qrzPassword);
   mapArea->setOnConfigChanged([&ctx] { ctx.cfgMgr.save(ctx.appCfg); });
   mapArea->setSpotStore(spotStore);
   mapArea->setDXClusterStore(dxcStore);
@@ -2058,8 +2093,21 @@ void DashboardContext::update(AppContext &ctx) {
         if (event.key.keysym.sym == SDLK_k) {
           ctx.showActionHighlights = !ctx.showActionHighlights;
           consumed = true;
+        } else if (event.key.keysym.sym == SDLK_o && ctx.dashboard) {
+          ctx.dashboard->debugOverlay.toggle();
+          consumed = true;
+        } else if (event.key.keysym.sym == SDLK_F11) {
+
+          Uint32 flags = SDL_GetWindowFlags(ctx.window);
+          if (flags & SDL_WINDOW_FULLSCREEN_DESKTOP)
+            SDL_SetWindowFullscreen(ctx.window, 0);
+          else
+            SDL_SetWindowFullscreen(ctx.window, SDL_WINDOW_FULLSCREEN_DESKTOP);
+          consumed = true;
         }
+
         if (!consumed) {
+
           for (auto *w : eventWidgets) {
             if (w->onKeyDown(event.key.keysym.sym, event.key.keysym.mod)) {
               consumed = true;
@@ -2091,7 +2139,7 @@ void DashboardContext::update(AppContext &ctx) {
     case SDL_FINGERDOWN:
       if (appCfg.preventSleep)
         preventRPiSleep(true, ctx.displayPower.get());
-      [[fallthrough]];
+      break;
     case SDL_MOUSEBUTTONDOWN: {
       int smx = event.button.x, smy = event.button.y;
       if (FIDELITY_MODE && event.button.windowID != 0) {
@@ -2397,11 +2445,19 @@ void DashboardContext::update(AppContext &ctx) {
             ctx.setupWidget->onMouseDown(mx, my, 0, 1);
             ctx.setupWidget->onMouseUp(mx, my, 0, 1);
           } else {
-            // Check Map Modal first (MapViewMenu) via mapArea
-            if (ctx.dashboard->mapArea->isModalActive()) {
-              ctx.dashboard->mapArea->onMouseUp(mx, my, 0, 1);
+            // Scan all eventWidgets for an active modal/config, mirroring
+            // the SDL_MOUSEBUTTONUP focusedWidget logic so every modal
+            // (not just mapArea's MapViewMenu) receives web touch events.
+            Widget *focused = nullptr;
+            for (auto *w : ctx.dashboard->eventWidgets) {
+              if (w->isModalActive() || w->isConfiguring()) {
+                focused = w;
+                break;
+              }
+            }
+            if (focused) {
+              focused->onMouseUp(mx, my, 0, 1);
             } else {
-              // Dashboard widgets (normal mode)
               for (auto *w : ctx.dashboard->eventWidgets)
                 if (w->onMouseUp(mx, my, 0, 1))
                   break;
@@ -2416,11 +2472,17 @@ void DashboardContext::update(AppContext &ctx) {
               ctx.setupWidget) {
             ctx.setupWidget->onMouseWheel(dy);
           } else {
-            // Check Map Modal first (MapViewMenu) via mapArea
-            if (ctx.dashboard->mapArea->isModalActive()) {
-              ctx.dashboard->mapArea->onMouseWheel(dy);
+            // Same fix: scan all eventWidgets for active modal/config.
+            Widget *focused = nullptr;
+            for (auto *w : ctx.dashboard->eventWidgets) {
+              if (w->isModalActive() || w->isConfiguring()) {
+                focused = w;
+                break;
+              }
+            }
+            if (focused) {
+              focused->onMouseWheel(dy);
             } else {
-              // Dashboard widgets (e.g. scrollable top bar panes)
               for (auto *w : ctx.dashboard->eventWidgets)
                 if (w->onMouseWheel(dy))
                   break;
@@ -2483,9 +2545,13 @@ void DashboardContext::update(AppContext &ctx) {
         if (event.wheel.direction == SDL_MOUSEWHEEL_FLIPPED)
           scrollY = -scrollY;
 #endif
-        for (auto *w : eventWidgets)
-          if (w->onMouseWheel(scrollY))
-            break;
+        if (ctx.dashboard->mapArea->isModalActive()) {
+          ctx.dashboard->mapArea->onMouseWheel(scrollY);
+        } else {
+          for (auto *w : eventWidgets)
+            if (w->onMouseWheel(scrollY))
+              break;
+        }
       }
     }
   }
@@ -2569,7 +2635,18 @@ void DashboardContext::update(AppContext &ctx) {
 
   // 60-second RSS/VRAM heartbeat — helps diagnose memory growth on RPi
   if (now - lastMemLogMs > 60000) {
-    MemoryMonitor::getInstance().logStats("heartbeat");
+    auto &mm = MemoryMonitor::getInstance();
+    mm.logStats("heartbeat");
+    if (mm.isLowMemoryDevice()) {
+      size_t rss = mm.getRSS();
+      const size_t kFlushThresholdBytes = 650ULL * 1024 * 1024;
+      if (rss > kFlushThresholdBytes) {
+        LOG_W("Main", "RSS {:.1f} MB exceeds threshold on low-mem device — flushing caches",
+              rss / 1024.0 / 1024.0);
+        texMgr.clearCache();
+        texMgr.setMaxCacheSize(10);
+      }
+    }
     lastMemLogMs = now;
   }
 
@@ -2591,7 +2668,9 @@ void DashboardContext::render(AppContext &ctx) {
   }
 
   if (!ctx.displayPower->getPower()) {
-    return; // Stay black
+    if (ctx.displayPower->consumeBlackFrame())
+      SDL_RenderPresent(ctx.renderer); // one black frame to clear the display
+    return; // subsequent ticks: don't present — let KMSDRM pipeline go idle
   }
 
   Widget *activeModal = nullptr;
@@ -2832,6 +2911,21 @@ void main_tick() {
           }
           ctx.setupWidget->onResize(ctx.layLogicalOffX, ctx.layLogicalOffY,
                                     LOGICAL_WIDTH, LOGICAL_HEIGHT);
+        } else if (event.type >= AE_BASE_EVENT) {
+          switch (event.type - AE_BASE_EVENT) {
+            case AE_TOUCH: {
+              int mx = static_cast<int>(reinterpret_cast<intptr_t>(event.user.data1));
+              int my = static_cast<int>(reinterpret_cast<intptr_t>(event.user.data2));
+              ctx.setupWidget->onMouseDown(mx, my, 0, 1);
+              ctx.setupWidget->onMouseUp(mx, my, 0, 1);
+              break;
+            }
+            case AE_WHEEL: {
+              int dy = static_cast<int>(reinterpret_cast<intptr_t>(event.user.data1));
+              ctx.setupWidget->onMouseWheel(dy);
+              break;
+            }
+          }
         }
       }
     }
@@ -2917,6 +3011,13 @@ void main_tick() {
 #endif
     }
 
+    // Hold locationMutex for the entire update+render window so the WebServer
+    // thread cannot tear location/fps string fields mid-frame.  The lock is
+    // released at the end of this else-block (or at any early return) via RAII.
+    // Typical hold time: ~1–20 ms per tick; WebServer gets the lock in the
+    // SDL_Delay gap between ticks.
+    std::lock_guard<std::mutex> locLk(ctx.state->locationMutex);
+
     // Apply any config changes injected by the WebServer API (RPi/framebuffer
     // remote-control scenario).  The WebServer thread writes to ctx.appCfg
     // under the config mutex and then sets this flag; we re-apply live state
@@ -2928,6 +3029,7 @@ void main_tick() {
       ctx.netManager->setCorsProxyUrl(ctx.appCfg.corsProxyUrl);
       ctx.netManager->setHubConfig(ctx.appCfg.hubMode, ctx.appCfg.hubIp,
                                    ctx.appCfg.hubPort);
+      ctx.displayPower->setMethodByName(ctx.appCfg.displayPowerMethod);
 
       LOG_I("Main", "Config reloaded from remote API: callsign={}",
             ctx.appCfg.callsign);
@@ -2973,8 +3075,28 @@ void main_tick() {
       }
     }
 
+    // Always call update() — this processes SDL events and keeps interaction
+    // responsive. Only render() is throttled.
     ctx.dashboard->update(ctx);
+
+#ifndef __EMSCRIPTEN__
+    // Render at 2fps at idle; boost to 20fps for 2s after any mouse/touch input.
+    static Uint32 s_lastRenderMs = 0;
+    static constexpr Uint32 kIdleIntervalMs = 500;  // 2fps
+    static constexpr Uint32 kActiveIntervalMs = 50; // 20fps during interaction
+    static constexpr Uint32 kMouseWindowMs = 2000;  // stay fast 2s after input
+    const Uint32 renderNow = SDL_GetTicks();
+    const bool mouseActive =
+        (renderNow - ctx.dashboard->lastMouseMotionMs < kMouseWindowMs);
+    const Uint32 renderInterval =
+        mouseActive ? kActiveIntervalMs : kIdleIntervalMs;
+    if (renderNow - s_lastRenderMs >= renderInterval) {
+      s_lastRenderMs = renderNow;
+      ctx.dashboard->render(ctx);
+    }
+#else
     ctx.dashboard->render(ctx);
+#endif
 
     if (!ctx.appRunning) {
 #ifdef __EMSCRIPTEN__

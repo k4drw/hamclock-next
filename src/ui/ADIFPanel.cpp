@@ -95,11 +95,13 @@ void ADIFPanel::renderLogView(SDL_Renderer *renderer) {
   cat->drawText(renderer, "Recent QSOs", x_ + pad, headerY, themes.accent,
                 FontStyle::MicroBold);
   // Filter chips (clickable): band on the right side of title row
-  char chipBuf[32];
-  std::snprintf(chipBuf, sizeof(chipBuf), "[%s %s]",
-                kFilterBands[filterBandIdx_], kFilterModes[filterModeIdx_]);
-  cat->drawText(renderer, chipBuf, x_ + width_ - 65, headerY, themes.info,
-                FontStyle::Caption);
+  if (width_ > 130) {
+    char chipBuf[32];
+    std::snprintf(chipBuf, sizeof(chipBuf), "[%s %s]",
+                  kFilterBands[filterBandIdx_], kFilterModes[filterModeIdx_]);
+    cat->drawText(renderer, chipBuf, x_ + width_ - 65, headerY, themes.info,
+                  FontStyle::Caption);
+  }
   headerY += headerHeight_;
 
   // Build filtered QSO list

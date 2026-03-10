@@ -182,6 +182,7 @@ void RigService::commandWorker() {
     store_->setConnected(true);
 
     if (state_) {
+      std::lock_guard<std::mutex> lk(state_->servicesMutex);
       state_->services["Rig"].ok = true;
       state_->services["Rig"].lastError = "";
     }
@@ -191,6 +192,7 @@ void RigService::commandWorker() {
     store_->setConnected(false);
 
     if (state_) {
+      std::lock_guard<std::mutex> lk(state_->servicesMutex);
       state_->services["Rig"].ok = false;
       state_->services["Rig"].lastError = "Connection failed";
     }
@@ -228,6 +230,7 @@ void RigService::commandWorker() {
         store_->setConnected(true);
 
         if (state_) {
+          std::lock_guard<std::mutex> lk(state_->servicesMutex);
           state_->services["Rig"].ok = true;
           state_->services["Rig"].lastError = "";
         }
@@ -246,6 +249,7 @@ void RigService::commandWorker() {
       if (success) {
         store_->setFrequency(cmd.freqHz);
         if (state_) {
+          std::lock_guard<std::mutex> lk(state_->servicesMutex);
           state_->services["Rig"].lastSuccess =
               std::chrono::system_clock::now();
         }
@@ -289,6 +293,7 @@ void RigService::commandWorker() {
       store_->setConnected(false);
 
       if (state_) {
+        std::lock_guard<std::mutex> lk(state_->servicesMutex);
         state_->services["Rig"].ok = false;
         state_->services["Rig"].lastError = "Command execution failed";
       }
@@ -504,7 +509,7 @@ bool RigService::executeGetMode(std::string &mode, int &passbandHz) {
 
   // Parse response: "MODE\nPASSBAND\n"
   char modeStr[32];
-  if (std::sscanf(response.c_str(), "%s\n%d", modeStr, &passbandHz) == 2) {
+  if (std::sscanf(response.c_str(), "%31s\n%d", modeStr, &passbandHz) == 2) {
     mode = modeStr;
     LOG_I("Rig", "Mode read: {} ({}Hz)", mode, passbandHz);
     return true;

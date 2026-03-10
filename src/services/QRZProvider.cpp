@@ -27,7 +27,10 @@ void QRZProvider::lookup(const std::string &callsign,
   }
 
   // First ensure we have a valid session
-  establishSession([this, callsign, callback](bool success) {
+  std::weak_ptr<QRZProvider> self = shared_from_this();
+  establishSession([self, callsign, callback](bool success) {
+    auto p = self.lock();
+    if (!p) return;
     if (!success) {
       LOG_E("QRZ", "Failed to establish session");
       QRZLookupResult result;
@@ -38,13 +41,15 @@ void QRZProvider::lookup(const std::string &callsign,
     }
 
     // Now perform the lookup
-    std::string url = "https://xmldata.qrz.com/xml/current/?s=" + sessionKey_ +
+    std::string url = "https://xmldata.qrz.com/xml/current/?s=" + p->sessionKey_ +
                       "&callsign=" + callsign;
 
-    netMgr_.fetchAsync(
+    p->netMgr_.fetchAsync(
         url,
-        [this, callsign, callback](const std::string &xml) {
-          QRZLookupResult result = parseResponse(xml, callsign);
+        [self, callsign, callback](const std::string &xml) {
+          auto p2 = self.lock();
+          if (!p2) return;
+          QRZLookupResult result = p2->parseResponse(xml, callsign);
 
           if (result.found) {
             LOG_I("QRZ", "Lookup successful: {} - {} ({})", callsign,
@@ -71,19 +76,22 @@ void QRZProvider::establishSession(std::function<void(bool)> callback) {
   std::string url = "https://xmldata.qrz.com/xml/current/?username=" +
                     username_ + "&password=" + password_;
 
+  std::weak_ptr<QRZProvider> self = shared_from_this();
   netMgr_.fetchAsync(
       url,
-      [this, callback](const std::string &xml) {
+      [self, callback](const std::string &xml) {
+        auto p = self.lock();
+        if (!p) return;
         // Extract session key
-        sessionKey_ = extractTag(xml, "Key");
+        p->sessionKey_ = p->extractTag(xml, "Key");
 
-        if (!sessionKey_.empty()) {
-          sessionValid_ = true;
+        if (!p->sessionKey_.empty()) {
+          p->sessionValid_ = true;
           LOG_I("QRZ", "Session established");
           callback(true);
         } else {
-          sessionValid_ = false;
-          std::string error = extractTag(xml, "Error");
+          p->sessionValid_ = false;
+          std::string error = p->extractTag(xml, "Error");
           LOG_E("QRZ", "Authentication failed: {}", error);
           callback(false);
         }

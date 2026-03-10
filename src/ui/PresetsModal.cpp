@@ -1,5 +1,6 @@
 #include "PresetsModal.h"
 #include "FontCatalog.h"
+#include "../core/Theme.h"
 
 #include <algorithm>
 
@@ -68,16 +69,16 @@ void PresetsModal::render(SDL_Renderer *renderer) {
     return;
 
   auto *cat = fontMgr_.catalog();
+  ThemeColors themes = getThemeColors(cfg_->theme);
 
-  SDL_Color bgDark = {18, 22, 30, 255};
-  SDL_Color border = {80, 90, 110, 255};
-  SDL_Color btnFill = {40, 50, 65, 255};
-  SDL_Color btnBorder = {100, 120, 150, 255};
-  SDL_Color accent = {0, 200, 255, 255};
-  SDL_Color white = {255, 255, 255, 255};
-  SDL_Color dimGray = {130, 140, 155, 255};
-  SDL_Color redColor = {220, 60, 60, 255};
-  SDL_Color greenColor = {60, 200, 100, 255};
+  SDL_Color bgDark = themes.bg;
+  SDL_Color border = themes.border;
+  SDL_Color btnFill = themes.rowStripe1;
+  SDL_Color btnBorder = themes.border;
+  SDL_Color accent = themes.accent;
+  SDL_Color white = themes.text;
+  SDL_Color dimGray = themes.textDim;
+  SDL_Color greenColor = themes.success;
 
   // ── Dialog background + border ───────────────────────────────────────────
   SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
@@ -86,7 +87,7 @@ void PresetsModal::render(SDL_Renderer *renderer) {
 
   // ── Title bar ────────────────────────────────────────────────────────────
   SDL_Rect titleBg = {dialogRect_.x, dialogRect_.y, kModalW, 30};
-  fillRect(renderer, titleBg, {28, 35, 48, 255});
+  fillRect(renderer, titleBg, themes.rowStripe2);
   cat->drawText(renderer, "Presets", dialogRect_.x + 10, dialogRect_.y + 15,
                 white, FontStyle::UIBold, false, false, true);
 
@@ -110,8 +111,8 @@ void PresetsModal::render(SDL_Renderer *renderer) {
                 FontStyle::UIBold, true, false, true);
 
   // Close [X] button
-  fillRect(renderer, closeBtnRect_, {60, 30, 30, 255});
-  drawRect(renderer, closeBtnRect_, {140, 60, 60, 255});
+  fillRect(renderer, closeBtnRect_, themes.danger);
+  drawRect(renderer, closeBtnRect_, themes.textDim);
   cat->drawText(renderer, "X", closeBtnRect_.x + closeBtnRect_.w / 2,
                 closeBtnRect_.y + closeBtnRect_.h / 2, white, FontStyle::UIBold,
                 true, false, true);
@@ -127,8 +128,8 @@ void PresetsModal::render(SDL_Renderer *renderer) {
                   true, false, true);
   } else {
     // Name input field
-    SDL_Color fieldBg = {40, 40, 50, 255};
-    SDL_Color fieldBorder = {0, 200, 255, 255};
+    SDL_Color fieldBg = themes.rowStripe1;
+    SDL_Color fieldBorder = themes.accent;
     fillRect(renderer, nameFieldRect_, fieldBg);
     drawRect(renderer, nameFieldRect_, fieldBorder);
 
@@ -150,21 +151,21 @@ void PresetsModal::render(SDL_Renderer *renderer) {
         cursorX +=
             fontMgr_.getLogicalWidth(before, cat->ptSize(FontStyle::Fast));
       }
-      SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+      SDL_SetRenderDrawColor(renderer, themes.text.r, themes.text.g, themes.text.b, themes.text.a);
       SDL_RenderDrawLine(renderer, cursorX, nameFieldRect_.y + 3, cursorX,
                          nameFieldRect_.y + nameFieldRect_.h - 3);
     }
 
     // OK button
-    fillRect(renderer, nameOkRect_, {40, 100, 60, 255});
-    drawRect(renderer, nameOkRect_, {80, 180, 100, 255});
+    fillRect(renderer, nameOkRect_, themes.success);
+    drawRect(renderer, nameOkRect_, themes.border);
     cat->drawText(renderer, "OK", nameOkRect_.x + nameOkRect_.w / 2,
                   nameOkRect_.y + nameOkRect_.h / 2, white, FontStyle::Fast,
                   true, false, true);
   }
 
   // ── Separator ────────────────────────────────────────────────────────────
-  SDL_SetRenderDrawColor(renderer, 60, 70, 90, 255);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, themes.border.a);
   SDL_RenderDrawLine(renderer, dialogRect_.x + 4, listRect_.y - 2,
                      dialogRect_.x + kModalW - 4, listRect_.y - 2);
 
@@ -181,7 +182,7 @@ void PresetsModal::render(SDL_Renderer *renderer) {
     // Alternating row background
     if ((i % 2) == 0) {
       SDL_Rect rowBg = {listRect_.x, rowY, listRect_.w, kRowH};
-      fillRect(renderer, rowBg, {25, 30, 42, 255});
+      fillRect(renderer, rowBg, themes.rowStripe2);
     }
 
     // Name text (clipped to left portion)
@@ -191,18 +192,18 @@ void PresetsModal::render(SDL_Renderer *renderer) {
 
     // [Apply] button
     SDL_Rect applyR = {listRect_.x + listRect_.w - 130, rowY + 3, 60, 24};
-    fillRect(renderer, applyR, {30, 70, 40, 255});
-    drawRect(renderer, applyR, {60, 160, 80, 255});
+    fillRect(renderer, applyR, themes.rowStripe1);
+    drawRect(renderer, applyR, themes.border);
     cat->drawText(renderer, "Apply", applyR.x + applyR.w / 2,
                   applyR.y + applyR.h / 2, greenColor, FontStyle::Caption, true,
                   false, true);
 
     // [✕] delete button
     SDL_Rect delR = {listRect_.x + listRect_.w - 64, rowY + 3, 24, 24};
-    fillRect(renderer, delR, {60, 20, 20, 255});
-    drawRect(renderer, delR, {140, 50, 50, 255});
+    fillRect(renderer, delR, themes.danger);
+    drawRect(renderer, delR, themes.border);
     cat->drawText(renderer, "X", delR.x + delR.w / 2, delR.y + delR.h / 2,
-                  redColor, FontStyle::Caption, true, false, true);
+                  white, FontStyle::Caption, true, false, true);
 
     rowRects_.push_back({applyR, delR});
   }

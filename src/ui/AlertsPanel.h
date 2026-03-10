@@ -21,12 +21,13 @@ public:
   std::string getName() const override { return "WeatherAlerts"; }
 
 private:
-  static SDL_Color severityColor(const std::string &severity);
+  SDL_Color severityColor(const std::string &severity) const;
 
   FontManager &fontMgr_;
   std::shared_ptr<AlertsStore> store_;
   AlertsData currentData_;
   int scrollOffset_ = 0;
+  int maxScroll_ = 0;
 
   int titleFontSize_ = 12;
   int rowFontSize_ = 11;

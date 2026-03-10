@@ -68,6 +68,8 @@ void HurricanePanel::render(SDL_Renderer *renderer) {
   // Each storm block: name+category | wind | pressure | position
   int blockH = nameFontSize_ + detailFontSize_ * 2 + 8;
   int maxBlocks = (height_ - (curY - y_) - pad) / blockH;
+  maxScroll_ = std::max(0, (int)currentData_.storms.size() - maxBlocks);
+  scrollOffset_ = std::min(scrollOffset_, maxScroll_);
   int startIdx = std::max(0, scrollOffset_);
   int endIdx = std::min((int)currentData_.storms.size(), startIdx + maxBlocks);
 
@@ -133,6 +135,6 @@ void HurricanePanel::onResize(int x, int y, int w, int h) {
 }
 
 bool HurricanePanel::onMouseWheel(int scrollY) {
-  scrollOffset_ = std::max(0, scrollOffset_ - scrollY);
+  scrollOffset_ = std::clamp(scrollOffset_ - scrollY, 0, maxScroll_);
   return true;
 }

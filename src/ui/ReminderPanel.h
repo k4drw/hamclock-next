@@ -21,6 +21,7 @@ public:
 
   void update() override;
   void render(SDL_Renderer *renderer) override;
+  void onResize(int x, int y, int w, int h) override;
   bool onMouseUp(int mx, int my, Uint16 mod, int clicks) override;
   bool onKeyDown(SDL_Keycode key, Uint16 mod) override;
   bool onTextInput(const char *inputText) override;
@@ -79,6 +80,8 @@ private:
   SDL_Rect autoPopRect_ = {0, 0, 0, 0};
   SDL_Rect footerRect_ = {0, 0, 0, 0};
   std::vector<SDL_Rect> deleteRects_;
+  std::vector<SDL_Rect> labelRects_;
+  std::vector<SDL_Rect> dateRects_;
 
   // ── Private helpers ───────────────────────────────────────────────────────
   void renderReminderList(SDL_Renderer *renderer);

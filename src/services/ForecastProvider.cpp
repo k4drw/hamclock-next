@@ -17,14 +17,17 @@ void ForecastProvider::fetch(double lat, double lon, bool force) {
   std::snprintf(pointsUrl, sizeof(pointsUrl),
                 "https://api.weather.gov/points/%.4f,%.4f", lat, lon);
 
-  auto self = this;
+  std::weak_ptr<ForecastProvider> self = shared_from_this();
   net_.fetchAsync(
       pointsUrl,
-      [this](std::string body) {
-        if (body.empty())
+      [self](std::string body) {
+        auto p = self.lock();
+        if (!p || body.empty())
           return;
 
-        WorkerService::getInstance().submitTask([this, body]() {
+        WorkerService::getInstance().submitTask([self, body]() {
+          auto p2 = self.lock();
+          if (!p2) return;
           try {
             auto j = json::parse(body);
             if (j.contains("properties") &&
@@ -32,25 +35,26 @@ void ForecastProvider::fetch(double lat, double lon, bool force) {
                 j["properties"]["forecast"].is_string()) {
               std::string forecastUrl =
                   j["properties"]["forecast"].get<std::string>();
-              fetchForecast(forecastUrl, false);
+              p2->fetchForecast(forecastUrl, false);
             }
           } catch (...) {
           }
         });
       },
       86400); // Cache /points result for 24 h (it rarely changes)
-  (void)self;
 }
 
 void ForecastProvider::fetchForecast(const std::string &forecastUrl,
                                      bool force) {
+  std::weak_ptr<ForecastProvider> self = shared_from_this();
   net_.fetchAsync(
       forecastUrl,
-      [](std::string body) {
+      [self](std::string body) {
         if (body.empty())
           return;
 
         WorkerService::getInstance().submitTask([body]() {
+          // fetchForecast final step doesn't need 'this'
           try {
             auto j = json::parse(body);
             auto *update = new ForecastData();

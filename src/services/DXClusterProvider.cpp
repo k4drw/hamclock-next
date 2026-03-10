@@ -9,6 +9,8 @@
 #include "../core/HamClockState.h"
 #include "../core/Logger.h"
 #include "../core/PrefixManager.h"
+#include <httplib.h>
+#include <nlohmann/json.hpp>
 #ifdef _WIN32
 #include <winsock2.h>
 #include <ws2tcpip.h>
@@ -95,6 +97,10 @@ void DXClusterProvider::stop() {
 }
 
 void DXClusterProvider::run() {
+  if (config_.hubMode == HubMode::Client && !config_.hubIp.empty()) {
+    runHubClient();
+    return;
+  }
   while (!stopClicked_) {
     if (config_.dxClusterUseWSJTX) {
       runUDP(config_.wsjtxPort);
@@ -106,6 +112,7 @@ void DXClusterProvider::run() {
       } else {
         LOG_W("DXCluster", "Connection rate limit reached (10/hr)");
         if (state_) {
+          std::lock_guard<std::mutex> lk(state_->servicesMutex);
           state_->services["DXCluster"].ok = false;
           state_->services["DXCluster"].lastError = "Rate limit reached (10/hr)";
         }
@@ -118,6 +125,48 @@ void DXClusterProvider::run() {
 
     // Retry delay (increased to 60s to avoid hammering and IP bans)
     std::this_thread::sleep_for(std::chrono::seconds(60));
+  }
+}
+
+void DXClusterProvider::runHubClient() {
+  while (!stopClicked_) {
+    httplib::Client cli(config_.hubIp, config_.hubPort);
+    cli.set_connection_timeout(5);
+    auto resp = cli.Get("/api/hub/dxcluster");
+    if (resp && resp->status == 200) {
+      try {
+        auto arr = nlohmann::json::parse(resp->body);
+        std::vector<DXClusterSpot> spots;
+        for (const auto &j : arr) {
+          DXClusterSpot s;
+          s.txCall  = j.value("txCall", "");
+          s.txGrid  = j.value("txGrid", "");
+          s.rxCall  = j.value("rxCall", "");
+          s.rxGrid  = j.value("rxGrid", "");
+          s.mode    = j.value("mode", "");
+          s.freqKhz = j.value("freqKhz", 0.0);
+          s.snr     = j.value("snr", 0.0);
+          s.txLat   = j.value("txLat", 0.0);
+          s.txLon   = j.value("txLon", 0.0);
+          s.rxLat   = j.value("rxLat", 0.0);
+          s.rxLon   = j.value("rxLon", 0.0);
+          s.txDxcc  = j.value("txDxcc", 0);
+          s.rxDxcc  = j.value("rxDxcc", 0);
+          int64_t ts = j.value("spottedAt", (int64_t)0);
+          s.spottedAt = std::chrono::system_clock::time_point(
+                            std::chrono::seconds(ts));
+          spots.push_back(s);
+        }
+        if (store_) store_->setSpots(spots);
+        if (store_) store_->setConnected(true, "Hub client");
+      } catch (...) {
+        if (store_) store_->setConnected(false, "Hub parse error");
+      }
+    } else {
+      if (store_) store_->setConnected(false, "Hub unreachable");
+    }
+    for (int i = 0; i < 300 && !stopClicked_; ++i)
+      std::this_thread::sleep_for(std::chrono::milliseconds(100));
   }
 }
 
@@ -149,6 +198,7 @@ void DXClusterProvider::runTelnet(const std::string &host, int port,
                                   const std::string &login) {
   LOG_I("DXCluster", "Connecting to {}:{}", host, port);
   if (state_) {
+    std::lock_guard<std::mutex> lk(state_->servicesMutex);
     auto &s = state_->services["DXCluster"];
     s.ok = false;
     s.lastError = "Connecting...";
@@ -159,8 +209,10 @@ void DXClusterProvider::runTelnet(const std::string &host, int port,
   int sock = socket(AF_INET, SOCK_STREAM, 0);
   if (sock < 0) {
     LOG_E("DXCluster", "Failed to create socket");
-    if (state_)
+    if (state_) {
+      std::lock_guard<std::mutex> lk(state_->servicesMutex);
       state_->services["DXCluster"].lastError = "Socket error";
+    }
     return;
   }
 
@@ -172,8 +224,10 @@ void DXClusterProvider::runTelnet(const std::string &host, int port,
   std::string portStr = std::to_string(port);
   if (getaddrinfo(host.c_str(), portStr.c_str(), &hints, &res) != 0 || !res) {
     LOG_E("DXCluster", "Could not resolve {}", host);
-    if (state_)
+    if (state_) {
+      std::lock_guard<std::mutex> lk(state_->servicesMutex);
       state_->services["DXCluster"].lastError = "DNS failed";
+    }
     close(sock);
     return;
   }
@@ -198,8 +252,10 @@ void DXClusterProvider::runTelnet(const std::string &host, int port,
     if (errno != EINPROGRESS) {
 #endif
       LOG_E("DXCluster", "Connect to {} failed: {}", host, std::strerror(errno));
-      if (state_)
+      if (state_) {
+        std::lock_guard<std::mutex> lk(state_->servicesMutex);
         state_->services["DXCluster"].lastError = "Connect failed";
+      }
       close(sock);
       return;
     }
@@ -218,8 +274,10 @@ void DXClusterProvider::runTelnet(const std::string &host, int port,
 #endif
     if (ret <= 0) {
       LOG_E("DXCluster", "Connect to {} timed out after 10s", host);
-      if (state_)
+      if (state_) {
+        std::lock_guard<std::mutex> lk(state_->servicesMutex);
         state_->services["DXCluster"].lastError = "Connect timeout";
+      }
       close(sock);
       return;
     }
@@ -229,16 +287,20 @@ void DXClusterProvider::runTelnet(const std::string &host, int port,
     socklen_t len = sizeof(error);
     if (getsockopt(sock, SOL_SOCKET, SO_ERROR, (char *)&error, &len) < 0 || error != 0) {
       LOG_E("DXCluster", "Connect to {} failed: {}", host, std::strerror(error));
-      if (state_)
+      if (state_) {
+        std::lock_guard<std::mutex> lk(state_->servicesMutex);
         state_->services["DXCluster"].lastError = "Connect error";
+      }
       close(sock);
       return;
     }
   }
 
   LOG_I("DXCluster", "Connected to {}", host);
-  if (state_)
+  if (state_) {
+    std::lock_guard<std::mutex> lk(state_->servicesMutex);
     state_->services["DXCluster"].lastError = "Connected";
+  }
   store_->setConnected(true, "Connected to " + host);
 
   std::string buffer;
@@ -251,7 +313,11 @@ void DXClusterProvider::runTelnet(const std::string &host, int port,
 
   if (!login.empty() && !stopClicked_) {
     std::string cmd = login + "\r\n";
-    send(sock, cmd.c_str(), cmd.length(), 0);
+    if (send(sock, cmd.c_str(), cmd.length(), 0) < 0) {
+      LOG_W("DXCluster", "Failed to send login");
+      close(sock);
+      return;
+    }
   }
 
   while (!stopClicked_) {
@@ -275,6 +341,7 @@ void DXClusterProvider::runTelnet(const std::string &host, int port,
       if (n <= 0) {
         LOG_W("DXCluster", "Connection lost");
         if (state_) {
+          std::lock_guard<std::mutex> lk(state_->servicesMutex);
           state_->services["DXCluster"].ok = false;
           state_->services["DXCluster"].lastError = "Connection lost";
         }
@@ -306,6 +373,7 @@ void DXClusterProvider::runTelnet(const std::string &host, int port,
               // Reset connection attempt count on successful login
               connectionAttempts_ = 0;
               if (state_) {
+                std::lock_guard<std::mutex> lk(state_->servicesMutex);
                 auto &s = state_->services["DXCluster"];
                 s.ok = true;
                 s.lastSuccess = std::chrono::system_clock::now();
@@ -314,7 +382,10 @@ void DXClusterProvider::runTelnet(const std::string &host, int port,
             }
             if (!initialRequestSent) {
               const char *req = "sh/dx 30\r\n";
-              send(sock, req, std::strlen(req), 0);
+              if (send(sock, req, std::strlen(req), 0) < 0) {
+                LOG_W("DXCluster", "Failed to send initial request");
+                break;
+              }
               initialRequestSent = true;
             }
           }
@@ -324,7 +395,10 @@ void DXClusterProvider::runTelnet(const std::string &host, int port,
                 line.find("callsign:") != std::string::npos ||
                 line.find("Please enter your call:") != std::string::npos) {
               std::string cmd = login + "\r\n";
-              send(sock, cmd.c_str(), cmd.length(), 0);
+              if (send(sock, cmd.c_str(), cmd.length(), 0) < 0) {
+                LOG_W("DXCluster", "Failed to send callsign");
+                break;
+              }
             }
           }
         }
@@ -336,7 +410,10 @@ void DXClusterProvider::runTelnet(const std::string &host, int port,
             buffer.find("callsign:") != std::string::npos ||
             buffer.find("Please enter your call:") != std::string::npos) {
           std::string cmd = login + "\r\n";
-          send(sock, cmd.c_str(), cmd.length(), 0);
+          if (send(sock, cmd.c_str(), cmd.length(), 0) < 0) {
+            LOG_W("DXCluster", "Failed to send callsign for prompt");
+            break;
+          }
           buffer.clear();
         }
       }

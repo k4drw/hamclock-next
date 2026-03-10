@@ -46,6 +46,7 @@ void ContestProvider::fetch() {
         size_t t_end = item.find("</title>");
         if (t_start != std::string::npos && t_end != std::string::npos) {
           c.title = item.substr(t_start + 7, t_end - (t_start + 7));
+          if (c.title.length() > 64) c.title.resize(64);
         }
 
         // Extract link/url
@@ -62,6 +63,8 @@ void ContestProvider::fetch() {
                  (c.url.back() == ' ' || c.url.back() == '\n' ||
                   c.url.back() == '\r'))
             c.url.pop_back();
+
+          if (c.url.length() > 128) c.url.resize(128);
         }
 
         // Extract description (dates)

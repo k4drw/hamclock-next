@@ -21,12 +21,16 @@ void IonosondeProvider::update() {
   const char *url = "https://prop.kc2g.com/api/stations.json";
   LOG_I("IonosondeProvider", "Fetching ionosonde data from {}", url);
 
-  netMgr_.fetchAsync(url, [this, now](std::string body) {
-    if (!body.empty()) {
-      processData(body);
-      lastUpdateMs_ = now;
-    } else {
-      LOG_E("IonosondeProvider", "Failed to fetch ionosonde data");
+  std::weak_ptr<IonosondeProvider> self = shared_from_this();
+  netMgr_.fetchAsync(url, [self, now](std::string body) {
+    auto p = self.lock();
+    if (p) {
+      if (!body.empty()) {
+        p->processData(body);
+        p->lastUpdateMs_ = now;
+      } else {
+        LOG_E("IonosondeProvider", "Failed to fetch ionosonde data");
+      }
     }
   });
 }

@@ -27,6 +27,10 @@ SDL_Color TropoPanel::getLevelColor(TropoLevel l) {
   return {255, 255, 255, 255};
 }
 
+void TropoPanel::onResize(int x, int y, int w, int h) {
+  Widget::onResize(x, y, w, h);
+}
+
 void TropoPanel::render(SDL_Renderer *renderer) {
   if (!fontMgr_.ready()) return;
 
@@ -68,7 +72,7 @@ void TropoPanel::render(SDL_Renderer *renderer) {
   int barW = width_ - 2 * pad;
   int barH = 10;
   SDL_Rect barFrame = {x_ + pad, curY, barW, barH};
-  SDL_SetRenderDrawColor(renderer, 50, 50, 50, 255);
+  SDL_SetRenderDrawColor(renderer, themes.rowStripe1.r, themes.rowStripe1.g, themes.rowStripe1.b, 255);
   SDL_RenderFillRect(renderer, &barFrame);
   
   int fillW = (static_cast<int>(d.currentLevel) * barW) / 8;

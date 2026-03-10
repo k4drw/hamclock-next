@@ -20,7 +20,11 @@ void ReachProvider::fetch(const std::string& band, const std::string& mode) {
 void ReachProvider::fetchPSK(const std::string& band, const std::string& mode) {
     // PSK Reporter API: Query for signals heard BY our callsign (or heard US if configured)
     // For "Reach Heatmap", we usually want to see who heard US (transmitter reach).
-    std::string call = state_->deCallsign;
+    std::string call;
+    {
+        std::lock_guard<std::mutex> lk(state_->locationMutex);
+        call = state_->deCallsign;
+    }
     if (call.empty()) call = "NOCALL";
 
     // Example URL: https://pskreporter.info/query?senderCallsign=K1ABC&flowctrl=1
@@ -31,11 +35,15 @@ void ReachProvider::fetchPSK(const std::string& band, const std::string& mode) {
 
     LOG_I("ReachProvider", "Fetching PSK reach for {}: {}", call, url);
 
-    net_.fetchAsync(url, [this, band, mode](std::string body) {
-        if (!body.empty()) {
-            processPSK(body, band, mode);
-        } else {
-            LOG_E("ReachProvider", "PSK fetch failed or empty");
+    std::weak_ptr<ReachProvider> self = shared_from_this();
+    net_.fetchAsync(url, [self, band, mode](std::string body) {
+        auto p = self.lock();
+        if (p) {
+            if (!body.empty()) {
+                p->processPSK(body, band, mode);
+            } else {
+                LOG_E("ReachProvider", "PSK fetch failed or empty");
+            }
         }
     }, 300); // Cache for 5 mins
 }

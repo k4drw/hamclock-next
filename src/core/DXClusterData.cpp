@@ -4,21 +4,7 @@
 #include "StringUtils.h"
 #include <algorithm>
 #include <chrono>
-#include <sstream>
-
-namespace {
-std::string sqlEscape(const std::string &s) {
-  std::string out;
-  out.reserve(s.size());
-  for (char c : s) {
-    if (c == '\'')
-      out += "''";
-    else
-      out += c;
-  }
-  return out;
-}
-} // namespace
+#include <sqlite3.h>
 
 DXClusterDataStore::DXClusterDataStore()
     : data_(std::make_shared<DXClusterData>()) {
@@ -35,35 +21,35 @@ void DXClusterDataStore::loadPersisted() {
                          cutoff.time_since_epoch())
                          .count();
 
-  std::string sql =
-      "SELECT tx_call, tx_grid, rx_call, rx_grid, mode, freq_khz, snr, tx_lat, "
-      "tx_lon, rx_lat, rx_lon, spotted_at FROM dx_spots WHERE spotted_at > " +
-      std::to_string(cutoffTs);
-
   std::lock_guard<std::mutex> lock(mutex_);
   auto newData = std::make_shared<DXClusterData>(*data_);
   newData->spots.clear();
 
-  db.query(sql, [&newData](const DatabaseManager::Row &row) {
-    if (row.size() < 12)
-      return true;
-    DXClusterSpot s;
-    s.txCall = row[0];
-    s.txGrid = row[1];
-    s.rxCall = row[2];
-    s.rxGrid = row[3];
-    s.mode = row[4];
-    s.freqKhz = StringUtils::safe_stod(row[5]);
-    s.snr = StringUtils::safe_stod(row[6]);
-    s.txLat = StringUtils::safe_stod(row[7]);
-    s.txLon = StringUtils::safe_stod(row[8]);
-    s.rxLat = StringUtils::safe_stod(row[9]);
-    s.rxLon = StringUtils::safe_stod(row[10]);
-    int64_t ts = std::stoll(row[11]);
-    s.spottedAt =
-        std::chrono::system_clock::time_point(std::chrono::seconds(ts));
-    newData->spots.push_back(s);
-    return true;
+  static const char *kSelectSql =
+      "SELECT tx_call, tx_grid, rx_call, rx_grid, mode, freq_khz, snr, tx_lat, "
+      "tx_lon, rx_lat, rx_lon, spotted_at FROM dx_spots WHERE spotted_at > ?";
+
+  db.execPrepared(kSelectSql, [cutoffTs, &newData](sqlite3_stmt *stmt) {
+    sqlite3_bind_int64(stmt, 1, cutoffTs);
+
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
+      DXClusterSpot s;
+      s.txCall = reinterpret_cast<const char *>(sqlite3_column_text(stmt, 0));
+      s.txGrid = reinterpret_cast<const char *>(sqlite3_column_text(stmt, 1));
+      s.rxCall = reinterpret_cast<const char *>(sqlite3_column_text(stmt, 2));
+      s.rxGrid = reinterpret_cast<const char *>(sqlite3_column_text(stmt, 3));
+      s.mode = reinterpret_cast<const char *>(sqlite3_column_text(stmt, 4));
+      s.freqKhz = sqlite3_column_double(stmt, 5);
+      s.snr = sqlite3_column_double(stmt, 6);
+      s.txLat = sqlite3_column_double(stmt, 7);
+      s.txLon = sqlite3_column_double(stmt, 8);
+      s.rxLat = sqlite3_column_double(stmt, 9);
+      s.rxLon = sqlite3_column_double(stmt, 10);
+      int64_t ts = sqlite3_column_int64(stmt, 11);
+      s.spottedAt =
+          std::chrono::system_clock::time_point(std::chrono::seconds(ts));
+      newData->spots.push_back(s);
+    }
   });
 
   data_ = newData;
@@ -128,17 +114,26 @@ void DXClusterDataStore::addSpot(const DXClusterSpot &spot) {
                    s.spottedAt.time_since_epoch())
                    .count();
 
-  std::stringstream ss;
-  ss << "INSERT OR IGNORE INTO dx_spots (tx_call, tx_grid, rx_call, rx_grid, "
-        "mode, "
-        "freq_khz, snr, tx_lat, tx_lon, rx_lat, rx_lon, spotted_at) VALUES ('"
-     << sqlEscape(s.txCall) << "', '" << sqlEscape(s.txGrid) << "', '"
-     << sqlEscape(s.rxCall) << "', '" << sqlEscape(s.rxGrid) << "', '"
-     << sqlEscape(s.mode) << "', " << s.freqKhz << ", " << s.snr << ", "
-     << s.txLat << ", " << s.txLon << ", " << s.rxLat << ", " << s.rxLon << ", "
-     << ts << ")";
+  static const char *kInsertSql =
+      "INSERT OR IGNORE INTO dx_spots "
+      "(tx_call, tx_grid, rx_call, rx_grid, mode, "
+      "freq_khz, snr, tx_lat, tx_lon, rx_lat, rx_lon, spotted_at) "
+      "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)";
 
-  db.exec(ss.str());
+  db.execPrepared(kInsertSql, [&s, ts](sqlite3_stmt *stmt) {
+    sqlite3_bind_text(stmt, 1, s.txCall.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 2, s.txGrid.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 3, s.rxCall.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 4, s.rxGrid.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 5, s.mode.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_double(stmt, 6, s.freqKhz);
+    sqlite3_bind_double(stmt, 7, s.snr);
+    sqlite3_bind_double(stmt, 8, s.txLat);
+    sqlite3_bind_double(stmt, 9, s.txLon);
+    sqlite3_bind_double(stmt, 10, s.rxLat);
+    sqlite3_bind_double(stmt, 11, s.rxLon);
+    sqlite3_bind_int64(stmt, 12, ts);
+  });
 
   pruneOldSpots(); // This now only prunes the DB
 }
@@ -170,9 +165,19 @@ void DXClusterDataStore::pruneOldSpots() {
   int64_t cutoffTs = std::chrono::duration_cast<std::chrono::seconds>(
                          (now - maxAge).time_since_epoch())
                          .count();
-  std::string sql =
-      "DELETE FROM dx_spots WHERE spotted_at <= " + std::to_string(cutoffTs);
-  DatabaseManager::instance().exec(sql);
+  
+  static const char *kPruneSql = "DELETE FROM dx_spots WHERE spotted_at <= ?";
+  DatabaseManager::instance().execPrepared(kPruneSql, [cutoffTs](sqlite3_stmt *stmt) {
+    sqlite3_bind_int64(stmt, 1, cutoffTs);
+  });
+}
+
+void DXClusterDataStore::setSpots(const std::vector<DXClusterSpot> &spots) {
+  std::lock_guard<std::mutex> lk(mutex_);
+  auto newData = std::make_shared<DXClusterData>(*data_);
+  newData->spots = spots;
+  newData->lastUpdate = std::chrono::system_clock::now();
+  data_ = newData;
 }
 
 void DXClusterDataStore::selectSpot(const DXClusterSpot &spot) {

@@ -65,8 +65,8 @@ Reduces external API rate-limit consumption when multiple HamClock-Next instance
 | :------------- | :------------------------------------------- |
 | `F11`          | Toggle Fullscreen Mode                       |
 | `o`            | Toggle Debug Overlay (performance metrics)   |
-| `k`            | Cycle Layout Alignment (Left, Center, Right) |
-| `q` / `Ctrl+Q` | Quit Application                             |
+| `k`            | Toggle Action Highlights                     |
+| `Ctrl+Q`       | Quit Application (Native only)               |
 
 ---
 
@@ -76,6 +76,8 @@ Reduces external API rate-limit consumption when multiple HamClock-Next instance
 | :----- | :---------- |
 | `-f`, `--fullscreen` | Launch in fullscreen mode |
 | `-s`, `--software` | Force software rendering (no OpenGL/MSAA) |
+| `--live-web` | Enable interactive web control interface |
+| `--no-audio` | Permanently disable all audio output |
 | `--log-level <level>` | Set log verbosity: `debug`, `info`, `warn`, `error` (default: `warn`) |
 | `-h`, `--help` | Show help message |
 

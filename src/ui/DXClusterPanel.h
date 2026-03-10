@@ -86,4 +86,7 @@ private:
 
   int scrollOffset_ = 0;
   static constexpr int MAX_VISIBLE_ROWS = 15;
+
+  int contentY_ = 0;  // Y where spot rows begin — set in render(), used in onMouseUp()
+  int rowH_ = 14;     // Row height matching render — set in render(), used in onMouseUp()
 };

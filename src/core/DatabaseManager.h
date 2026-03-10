@@ -25,8 +25,12 @@ public:
   // Callback should return true to continue, false to stop.
   bool query(const std::string &sql, QueryCallback callback);
 
-  // Prepared statement helper could be added here, but for now simple
-  // exec/query is enough.
+  // Execute a non-query statement using a prepared statement.
+  // The caller provides a binder function that binds parameters to the stmt
+  // before execution (use sqlite3_bind_* inside the lambda).
+  // Returns true on success.
+  bool execPrepared(const std::string &sql,
+                    std::function<void(sqlite3_stmt *)> binder);
 
 private:
   DatabaseManager() = default;

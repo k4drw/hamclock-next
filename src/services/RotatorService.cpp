@@ -117,6 +117,7 @@ bool RotatorService::setPosition(double azimuth, double elevation) {
           elevation);
 
     // Update moving flag in store
+    if (!store_) return false;
     RotatorData data = store_->get();
     data.moving = true;
     store_->set(data);
@@ -146,6 +147,7 @@ bool RotatorService::stopRotator() {
     LOG_I("Rotator", "Stop command sent");
 
     // Update moving flag
+    if (!store_) return success;
     RotatorData data = store_->get();
     data.moving = false;
     store_->set(data);
@@ -177,12 +179,14 @@ void RotatorService::pollLoop() {
         connected_ = true;
 
         if (state_) {
+          std::lock_guard<std::mutex> lk(state_->servicesMutex);
           state_->services["Rotator"].ok = true;
           state_->services["Rotator"].lastError = "";
         }
       } else {
         // Connection failed, retry after delay
         if (state_) {
+          std::lock_guard<std::mutex> lk(state_->servicesMutex);
           state_->services["Rotator"].ok = false;
           state_->services["Rotator"].lastError = "Connection failed";
         }
@@ -205,6 +209,7 @@ void RotatorService::pollLoop() {
       store_->set(data);
 
       if (state_) {
+        std::lock_guard<std::mutex> lk(state_->servicesMutex);
         state_->services["Rotator"].ok = true;
         state_->services["Rotator"].lastSuccess =
             std::chrono::system_clock::now();
@@ -217,11 +222,13 @@ void RotatorService::pollLoop() {
       connected_ = false;
 
       if (state_) {
+        std::lock_guard<std::mutex> lk(state_->servicesMutex);
         state_->services["Rotator"].ok = false;
         state_->services["Rotator"].lastError = "Position query failed";
       }
 
       // Mark data as invalid
+      if (!store_) { std::this_thread::sleep_for(5s); continue; }
       RotatorData data = store_->get();
       data.connected = false;
       data.valid = false;
@@ -275,6 +282,7 @@ void RotatorService::pollLoop() {
           }
           // ----------------------------------------------------------------
 
+          if (!store_) continue;
           RotatorData current = store_->get();
           current.flipActive = flipActive_;
           double azErr = std::abs(azCmd - current.azimuth);

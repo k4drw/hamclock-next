@@ -94,6 +94,8 @@ public:
   void setIonosondeProvider(IonosondeProvider *p) { iono_ = p; }
   void setSolarDataStore(SolarDataStore *s) { solar_ = s; }
 
+  std::shared_ptr<WxMbProvider> getWxMbProvider() const { return wxmb_; }
+
   void setPanes(const std::vector<PaneContainer *> &panes) { panes_ = panes; }
 
   void setOnConfigChanged(std::function<void()> cb) { onConfigChanged_ = cb; }
@@ -154,7 +156,7 @@ private:
   std::shared_ptr<ActivityDataStore> activityStore_;
   MufRtProvider *mufrt_ = nullptr;
   CloudProvider *clouds_ = nullptr;
-  std::unique_ptr<WxMbProvider> wxmb_;
+  std::shared_ptr<WxMbProvider> wxmb_;
   BeaconProvider *beacons_ = nullptr;
   IonosondeProvider *iono_ = nullptr;
   SolarDataStore *solar_ = nullptr;

@@ -30,6 +30,7 @@ public:
 
 private:
   void run();
+  void runHubClient();
   void runTelnet(const std::string &host, int port, const std::string &login);
   void runUDP(int port);
 

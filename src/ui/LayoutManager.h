@@ -106,9 +106,9 @@ private:
     static constexpr SDL_Rect kTopBar[] = {
         {0, 0, 235, 148},   // TimePanel (Callsign+Clock+Aux)
         {235, 0, 160, 148}, // SpaceWx (Pane 1)
-        {405, 0, 160, 148}, // DX Cluster (Pane 2)
-        {575, 0, 160, 148}, // Live Spots (Pane 3)
-        {738, 0, 62, 148},  // BandCond (NCDXF/Status)
+        {395, 0, 160, 148}, // DX Cluster (Pane 2)
+        {555, 0, 160, 148}, // Live Spots (Pane 3)
+        {715, 0, 85, 148},  // BandCond (NCDXF/Status)
     };
     // SidePanel widgets (order: LocalPanel, DXSatPane)
     static constexpr SDL_Rect kSide[] = {

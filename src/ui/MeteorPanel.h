@@ -12,6 +12,7 @@ class MeteorPanel : public Widget {
 public:
   MeteorPanel(int x, int y, int w, int h, FontManager &fontMgr, TextureManager &texMgr);
 
+  std::string getName() const override { return "Meteor Scatter"; }
   void updateData(const MeteorData &data);
   void update() override {}
   void render(SDL_Renderer *renderer) override;

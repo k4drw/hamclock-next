@@ -49,7 +49,7 @@ Contents:
 | **DE grid**          | Your Maidenhead grid locator                 |
 | **Sunrise / Sunset** | Today's SR/SS times for your location        |
 | **Gear icon (⚙)**    | Opens the Setup modal                        |
-| **Star icon (★)**    | Opens the [Presets modal](Presets)           |
+| **Star icon (★)**    | Opens the [Presets modal](Presets.md)           |
 
 ---
 
@@ -61,7 +61,7 @@ Panes 1–6 are rotatable widget containers. Each pane independently cycles thro
 - **Rotation** advances automatically on a configurable timer (default 30 seconds)
 - Panes can be configured to rotate in sync with each other
 
-See [Pane Customization](Pane-Customization) for details.
+See [Pane Customization](Pane-Customization.md) for details.
 
 ---
 
@@ -77,7 +77,7 @@ The large center area displays the world map. It supports:
 - Beacon markers (NCDXF/IBP)
 - Satellite ground tracks
 
-See [Map & Overlays](Map-and-Overlays) for details.
+See [Map & Overlays](Map-and-Overlays.md) for details.
 
 ---
 
