@@ -1,7 +1,7 @@
 {
-  "mcp_version": "2.7",
+  "mcp_version": "2.8",
   "project": "hamclock-next",
-  "updated_at": "2026-03-09T00:00:00.000Z",
+  "updated_at": "2026-03-10T00:00:00.000Z",
   "project_context": {
     "title": "HamClock Next \u2014 SDL2 Rewrite",
     "callsign": "K4DRW",
@@ -416,6 +416,16 @@
         "method": "GET",
         "path": "/debug/*",
         "description": "Debug endpoints: /debug/widgets (all widget state), /debug/click (inject touch), /debug/reload (config reload)."
+      },
+      {
+        "method": "GET",
+        "path": "/api/config",
+        "description": "Returns full runtime config as JSON. Includes all fields from /get_config plus: panes (array of 6 pane rotation lists), panelMode (side panel layout mode), selectedSatellite, displayPowerMethod, and displayPowerMethods (array of available methods on this platform). Added v2.8."
+      },
+      {
+        "method": "GET",
+        "path": "/api/satellites",
+        "description": "Returns JSON array of all configured satellite names (strings) from the TLE satellite manager. Used by the Web Config UI to populate the satellite selector. Added v2.8."
       }
     ],
     "conventions": [
