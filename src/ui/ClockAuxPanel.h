@@ -14,6 +14,7 @@ class ClockAuxPanel : public Widget {
 public:
   ClockAuxPanel(int x, int y, int w, int h, FontManager &fontMgr,
                 AppConfig &config, ConfigManager &cfgMgr);
+  ~ClockAuxPanel();
 
   void update() override;
   void render(SDL_Renderer *renderer) override;
@@ -30,8 +31,15 @@ private:
   AppConfig &config_;
   ConfigManager &cfgMgr_;
   int labelFontSize_ = 12;
-  int timeFontSize_ = 18;
+  int hmFontSize_ = 0;
+  int secFontSize_ = 0;
   int infoFontSize_ = 12;
+  SDL_Texture *hmTex_ = nullptr;
+  SDL_Texture *secTex_ = nullptr;
+  int hmW_ = 0, hmH_ = 0;
+  int secW_ = 0, secH_ = 0;
+  std::string lastHM_;
+  std::string lastSec_;
 
   struct TzPreset {
     int offset;

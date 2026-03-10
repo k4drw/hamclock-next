@@ -48,15 +48,23 @@ void ReminderPanel::update() {
       }
       // Build label: "K4DRW Renewal" style
       std::string label = lic.callsign + " Renewal";
+      // Check config_.reminders as the source of truth to prevent
+      // loss when Done is clicked before async results arrive
       bool exists = false;
-      for (const auto &re : pendingReminders_) {
-        if (re.label == label) {
-          exists = true;
-          break;
+      for (const auto &re : config_.reminders) {
+        if (re.label == label) { exists = true; break; }
+      }
+      if (!exists) {
+        for (const auto &re : pendingReminders_) {
+          if (re.label == label) { exists = true; break; }
         }
       }
-      if (!exists && pendingReminders_.size() < 5)
-        pendingReminders_.push_back({label, lic.expiry, true, ""});
+      if (!exists && config_.reminders.size() < 5) {
+        ReminderEntry newEntry{label, lic.expiry, true, ""};
+        config_.reminders.push_back(newEntry);
+        pendingReminders_.push_back(newEntry);
+        cfgMgr_.save(config_);
+      }
     }
   }
 

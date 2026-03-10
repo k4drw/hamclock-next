@@ -309,6 +309,10 @@ bool ContestPanel::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
     return true;
   }
 
+  // Title bar → let PaneContainer show widget selector
+  if (my < y_ + 20)
+    return false;
+
   // Hit-test rows
   for (int i = 0; i < static_cast<int>(rowRects_.size()); ++i) {
     const SDL_Rect &r = rowRects_[i];

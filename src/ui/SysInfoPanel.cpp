@@ -266,8 +266,8 @@ void SysInfoPanel::render(SDL_Renderer *renderer) {
   } else {
     std::snprintf(ramBuf, sizeof(ramBuf), "RAM --");
   }
-  cat->drawText(renderer, ramBuf, cx, curY, themes.info, FontStyle::Micro, true);
-  curY += cat->ptSize(FontStyle::Micro) + 4;
+  cat->drawText(renderer, ramBuf, cx, curY, themes.info, FontStyle::Fast, true);
+  curY += cat->ptSize(FontStyle::Fast) + 4;
 
   // Row 3: Est. VRAM
   if (vramBytes_ >= 0) {
@@ -276,23 +276,23 @@ void SysInfoPanel::render(SDL_Renderer *renderer) {
   } else {
     std::snprintf(vramBuf, sizeof(vramBuf), "VRAM --");
   }
-  cat->drawText(renderer, vramBuf, cx, curY, themes.textDim, FontStyle::Micro,
+  cat->drawText(renderer, vramBuf, cx, curY, themes.textDim, FontStyle::Fast,
                 true);
-  curY += cat->ptSize(FontStyle::Micro) + 4;
+  curY += cat->ptSize(FontStyle::Fast) + 4;
 
   // Row 4: Disk
   if (diskPct_ >= 0) {
     char diskBuf[32];
     std::snprintf(diskBuf, sizeof(diskBuf), "Disk %d%%", diskPct_);
-    cat->drawText(renderer, diskBuf, cx, curY, themes.info, FontStyle::Micro,
+    cat->drawText(renderer, diskBuf, cx, curY, themes.info, FontStyle::Fast,
                   true);
-    curY += cat->ptSize(FontStyle::Micro) + 4;
+    curY += cat->ptSize(FontStyle::Fast) + 4;
   }
 
   // Row 5: IP
   cat->drawText(renderer, cachedIP_.c_str(), cx, curY, themes.textDim,
-                FontStyle::Micro, true);
-  curY += cat->ptSize(FontStyle::Micro) + 4;
+                FontStyle::Fast, true);
+  curY += cat->ptSize(FontStyle::Fast) + 4;
 
   // Row 6+: Provider errors (show up to 3 failing services)
   if (state_) {

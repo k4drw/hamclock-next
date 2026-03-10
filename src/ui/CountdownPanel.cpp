@@ -174,8 +174,12 @@ bool CountdownPanel::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
     return true;
   }
 
-  // Click anywhere to open setup
-  if (mx >= x_ && mx < x_ + width_ && my >= y_ && my < y_ + height_) {
+  // Title bar → let PaneContainer show widget selector
+  if (mx >= x_ && mx < x_ + width_ && my >= y_ && my < y_ + 20)
+    return false;
+
+  // Click body to open setup
+  if (mx >= x_ && mx < x_ + width_ && my >= y_ + 20 && my < y_ + height_) {
     startEditing(false);
     return true;
   }

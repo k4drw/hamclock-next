@@ -225,7 +225,7 @@ void BeaconPanel::onResize(int x, int y, int w, int h) {
   if (w < 100 || h < 140) {
     labelFontSize_ = cat->ptSize(FontStyle::Micro); // "NCDXF"
     callfontSize_ =
-        cat->ptSize(FontStyle::Micro); // Frequencies (12px fits ~24px row)
+        cat->ptSize(FontStyle::FastBold); // Frequencies
   } else {
     labelFontSize_ = cat->ptSize(FontStyle::FastBold);
     callfontSize_ = cat->ptSize(FontStyle::Micro);

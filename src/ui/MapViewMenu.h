@@ -23,8 +23,6 @@ public:
   bool onKeyDown(SDL_Keycode key, Uint16 mod) override;
   bool onMouseWheel(int scrollY) override;
 
-  void setTheme(const std::string &theme) override { theme_ = theme; }
-
 private:
   FontManager &fontMgr_;
   bool visible_ = false;
@@ -97,8 +95,6 @@ private:
   // SDL_Rect pb80_, pb40_, pb20_, pb15_, pb10_; // REMOVED
   SDL_Rect applyRect_, cancelRect_;
   int projHeaderY_ = 0, styleHeaderY_ = 0, gridHeaderY_ = 0, mufRtHeaderY_ = 0, weatherHeaderY_ = 0;
-
-  std::string theme_ = "default";
 
   void renderRadioButton(SDL_Renderer *renderer, const SDL_Rect &rect,
                          bool selected, const std::string &label,
