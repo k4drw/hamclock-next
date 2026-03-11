@@ -3487,15 +3487,17 @@ void MapWidget::renderOverlayInfo(SDL_Renderer *renderer) {
 
   SDL_Rect box = {cx - boxW / 2, cy - boxH / 2, boxW, boxH};
 
+  ThemeColors themes = getThemeColors(theme_);
+
   // Box
   SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-  SDL_SetRenderDrawColor(renderer, 20, 20, 20, 180); // Dark semi-transparent
+  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, 180); // Dark semi-transparent
   SDL_RenderFillRect(renderer, &box);
-  SDL_SetRenderDrawColor(renderer, 100, 100, 100, 255); // Border
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255); // Border
   SDL_RenderDrawRect(renderer, &box);
 
   // Text
-  fontMgr_.catalog()->drawText(renderer, text, cx, cy, {255, 255, 255, 255},
+  fontMgr_.catalog()->drawText(renderer, text, cx, cy, themes.text,
                                FontStyle::Micro, true, false, true);
 }
 

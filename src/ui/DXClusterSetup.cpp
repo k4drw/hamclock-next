@@ -45,10 +45,10 @@ void DXClusterSetup::render(SDL_Renderer *renderer) {
   int fieldH = cat->ptSize(FontStyle::UI) + 14;
   int textPad = 8;
 
-  SDL_Color white = {255, 255, 255, 255};
-  SDL_Color gray = {150, 150, 150, 255};
-  SDL_Color orange = {255, 165, 0, 255};
-  SDL_Color cyan = {0, 200, 255, 255};
+  SDL_Color white = themes.text;
+  SDL_Color gray = themes.textDim;
+  SDL_Color orange = themes.accent;
+  SDL_Color cyan = themes.info;
 
   int y = y_ + height_ / 10;
 

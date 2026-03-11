@@ -98,6 +98,8 @@ void MoonPanel::render(SDL_Renderer *renderer) {
   ThemeColors themes = getThemeColors(theme_);
 
   // Background
+  SDL_SetRenderDrawBlendMode(
+      renderer, (theme_ == "glass") ? SDL_BLENDMODE_BLEND : SDL_BLENDMODE_NONE);
   SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b,
                          themes.bg.a);
   SDL_Rect rect = {x_, y_, width_, height_};
@@ -133,7 +135,7 @@ void MoonPanel::render(SDL_Renderer *renderer) {
   char buf[32];
   std::snprintf(buf, sizeof(buf), "%.0f%% Illum", currentData_.illumination);
   fontMgr_.catalog()->drawText(renderer, buf, centerX,
-                               textY + labelFontSize_ + 2, {0, 255, 128, 255},
+                               textY + labelFontSize_ + 2, themes.success,
                                FontStyle::Fast, true);
 }
 

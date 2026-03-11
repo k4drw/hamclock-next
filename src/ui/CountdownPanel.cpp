@@ -76,7 +76,7 @@ void CountdownPanel::render(SDL_Renderer *renderer) {
 
   if (targetTime_ == std::chrono::system_clock::time_point()) {
     cat->drawText(renderer, "No target set", centerX, centerY + 5,
-                  {150, 150, 150, 255}, FontStyle::SmallRegular, true);
+                  themes.textDim, FontStyle::SmallRegular, true);
     return;
   }
 

@@ -37,6 +37,8 @@ void StopwatchPanel::render(SDL_Renderer *renderer) {
   ThemeColors themes = getThemeColors(theme_);
 
   // Background and border
+  SDL_SetRenderDrawBlendMode(
+      renderer, (theme_ == "glass") ? SDL_BLENDMODE_BLEND : SDL_BLENDMODE_NONE);
   SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b,
                          themes.bg.a);
   SDL_Rect rect = {x_, y_, width_, height_};
@@ -140,7 +142,7 @@ void StopwatchPanel::render(SDL_Renderer *renderer) {
 
       // Highlight most recent lap
       SDL_Color lapColor = (i == (int)laps_.size() - 1)
-                               ? SDL_Color{200, 255, 200, 255}
+                               ? themes.success
                                : themes.textDim;
       fontMgr_.catalog()->drawText(renderer, lapBuf, x_ + 6,
                                    lyBase + (i - start) * lapRowH + lapRowH / 2,

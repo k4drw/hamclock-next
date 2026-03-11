@@ -20,11 +20,19 @@ void ENVPanel::render(SDL_Renderer *renderer) {
   if (!fontMgr_.ready())
     return;
 
+  ThemeColors themes = getThemeColors(theme_);
+
   // Background
-  SDL_SetRenderDrawColor(renderer, 20, 30, 25, 255);
+  SDL_SetRenderDrawBlendMode(
+      renderer, (theme_ == "glass") ? SDL_BLENDMODE_BLEND : SDL_BLENDMODE_NONE);
+  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b,
+                         themes.bg.a);
   SDL_Rect rect = {x_, y_, width_, height_};
   SDL_RenderFillRect(renderer, &rect);
-  SDL_SetRenderDrawColor(renderer, 60, 100, 70, 255);
+
+  // Border
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
+                         themes.border.b, themes.border.a);
   SDL_RenderDrawRect(renderer, &rect);
 
   auto *cat = fontMgr_.catalog();
@@ -32,23 +40,19 @@ void ENVPanel::render(SDL_Renderer *renderer) {
 
   // Title
   const char *title = "ENV";
-  SDL_Color titleColor = {100, 220, 130, 255};
+  SDL_Color titleColor = themes.accent;
   switch (mode_) {
   case WidgetType::ENV_TEMP:
     title = "Temperature";
-    titleColor = {255, 160, 60, 255};
     break;
   case WidgetType::ENV_PRESSURE:
     title = "Pressure";
-    titleColor = {100, 180, 255, 255};
     break;
   case WidgetType::ENV_HUMIDITY:
     title = "Humidity";
-    titleColor = {80, 220, 200, 255};
     break;
   case WidgetType::ENV_DEWPOINT:
     title = "Dewpoint";
-    titleColor = {180, 220, 80, 255};
     break;
   default:
     break;
@@ -62,8 +66,8 @@ void ENVPanel::render(SDL_Renderer *renderer) {
   int centerY = y_ + titleH + (height_ - titleH) / 2;
 
   if (!wd.valid) {
-    cat->drawText(renderer, "No sensor", centerX, centerY,
-                  {100, 100, 100, 255}, FontStyle::Fast, true);
+    cat->drawText(renderer, "No sensor", centerX, centerY, themes.textDim,
+                  FontStyle::Fast, true);
     return;
   }
 
@@ -88,7 +92,7 @@ void ENVPanel::render(SDL_Renderer *renderer) {
     break;
   }
 
-  cat->drawText(renderer, valueBuf, centerX, centerY, {255, 255, 255, 255},
+  cat->drawText(renderer, valueBuf, centerX, centerY, themes.text,
                 FontStyle::SmallBold, true);
 }
 

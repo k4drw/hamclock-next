@@ -1,4 +1,5 @@
 #include "GimbalPanel.h"
+#include "../core/Theme.h"
 #include "FontCatalog.h"
 #include "RenderUtils.h"
 #include <cmath>
@@ -56,31 +57,37 @@ void GimbalPanel::render(SDL_Renderer *renderer) {
   if (!fontMgr_.ready())
     return;
 
+  ThemeColors themes = getThemeColors(theme_);
+
   // Background
-  SDL_SetRenderDrawColor(renderer, 20, 25, 25, 255); // Dark Slate tint
+  SDL_SetRenderDrawBlendMode(
+      renderer, (theme_ == "glass") ? SDL_BLENDMODE_BLEND : SDL_BLENDMODE_NONE);
+  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b,
+                         themes.bg.a);
   SDL_Rect rect = {x_, y_, width_, height_};
   SDL_RenderFillRect(renderer, &rect);
-  SDL_SetRenderDrawColor(renderer, 80, 80, 80, 255);
+
+  // Border
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
+                         themes.border.b, themes.border.a);
   SDL_RenderDrawRect(renderer, &rect);
 
   int titleH = 20;
-  SDL_Color accent = {0, 200, 255, 255}; // Default cyan-ish accent
   auto *cat = fontMgr_.catalog();
-  cat->drawText(renderer, "Rotator", x_ + 10, y_ + 5, accent,
+  cat->drawText(renderer, "Rotator", x_ + 10, y_ + 5, themes.accent,
                 FontStyle::MicroBold);
 
   if (flipActive_) {
     int upW = fontMgr_.getLogicalWidth("UPOVER", cat->ptSize(FontStyle::MicroBold));
     cat->drawText(renderer, "UPOVER", x_ + width_ - upW - 10, y_ + 5,
-                  {255, 128, 0, 255}, FontStyle::MicroBold);
+                  themes.warning, FontStyle::MicroBold);
   }
 
   // Display status line (Rotator status or Sat name)
   int statusY = y_ + titleH + 5;
   if (hasRotator_) {
     // Show rotator status
-    SDL_Color statusColor = rotatorConnected_ ? SDL_Color{0, 255, 0, 255}
-                                              : SDL_Color{255, 128, 0, 255};
+    SDL_Color statusColor = rotatorConnected_ ? themes.success : themes.warning;
     const char *statusText =
         rotatorConnected_ ? "ROTATOR CONNECTED" : "ROTATOR OFFLINE";
     cat->drawText(renderer, statusText, x_ + width_ / 2, statusY, statusColor,
@@ -88,11 +95,11 @@ void GimbalPanel::render(SDL_Renderer *renderer) {
   } else if (hasSat_) {
     // Show satellite name (prediction mode)
     cat->drawText(renderer, predictor_->satName(), x_ + width_ / 2, statusY,
-                  {0, 255, 0, 255}, FontStyle::Fast, true);
+                  themes.success, FontStyle::Fast, true);
   } else {
     // No data available
     cat->drawText(renderer, "No Data", x_ + width_ / 2,
-                  y_ + titleH + (height_ - titleH) / 2, {150, 150, 150, 255},
+                  y_ + titleH + (height_ - titleH) / 2, themes.textDim,
                   FontStyle::Fast, true);
     return;
   }
@@ -101,19 +108,19 @@ void GimbalPanel::render(SDL_Renderer *renderer) {
   char buf[64];
   std::snprintf(buf, sizeof(buf), "AZ: %.1f%c", az_,
                 hasRotator_ ? '\xb0' : ' ');
-  cat->drawText(renderer, buf, 15 + x_, y_ + 35, {255, 255, 255, 255},
+  cat->drawText(renderer, buf, 15 + x_, y_ + 35, themes.text,
                 FontStyle::SmallBold);
 
   std::snprintf(buf, sizeof(buf), "EL: %.1f%c", el_,
                 hasRotator_ ? '\xb0' : ' ');
-  cat->drawText(renderer, buf, 15 + x_, y_ + 60, {255, 255, 255, 255},
+  cat->drawText(renderer, buf, 15 + x_, y_ + 60, themes.text,
                 FontStyle::SmallBold);
 
   // Show data source indicator
   const char *sourceText =
       hasRotator_ ? "Live" : (hasSat_ ? "Predicted" : "---");
   SDL_Color sourceColor =
-      hasRotator_ ? SDL_Color{0, 255, 255, 255} : SDL_Color{128, 128, 128, 255};
+      hasRotator_ ? themes.info : themes.textDim;
   cat->drawText(renderer, sourceText, 15 + x_, y_ + 85, sourceColor,
                 FontStyle::Fast);
 
@@ -129,7 +136,7 @@ void GimbalPanel::render(SDL_Renderer *renderer) {
       azDiff += 360;
 
     std::snprintf(buf, sizeof(buf), "Err: Az%.0f El%.0f", azDiff, elDiff);
-    cat->drawText(renderer, buf, 15 + x_, y_ + 105, {255, 200, 0, 255},
+    cat->drawText(renderer, buf, 15 + x_, y_ + 105, themes.warning,
                   FontStyle::Caption);
   }
 
@@ -151,7 +158,7 @@ void GimbalPanel::render(SDL_Renderer *renderer) {
     }
     if (lineTex)
       RenderUtils::drawPolylineTextured(renderer, lineTex, pts, kSegs + 1, 1.2f,
-                                        {60, 60, 60, 255}, false);
+                                        themes.textDim, false);
   }
 
   // Crosshair
@@ -162,9 +169,9 @@ void GimbalPanel::render(SDL_Renderer *renderer) {
                           {(float)centerX, (float)(centerY + radius)}};
     if (lineTex) {
       RenderUtils::drawPolylineTextured(renderer, lineTex, hLine, 2, 1.0f,
-                                        {50, 50, 50, 200});
+                                        themes.textDim);
       RenderUtils::drawPolylineTextured(renderer, lineTex, vLine, 2, 1.0f,
-                                        {50, 50, 50, 200});
+                                        themes.textDim);
     }
   }
 
@@ -178,18 +185,15 @@ void GimbalPanel::render(SDL_Renderer *renderer) {
                            {(float)tipX, (float)tipY}};
     if (lineTex)
       RenderUtils::drawPolylineTextured(renderer, lineTex, needle, 2, 2.0f,
-                                        {255, 128, 0, 255});
+                                        themes.accent);
   }
-
-  // Add a small arrow head
-  // SDL_RenderFillRect(renderer, ...); // skip for simplicity
 
   // Elevation bar (Vertical on the right)
   int barW = 8;
   int barH = 60;
   int barX = x_ + width_ - 20;
   int barY = y_ + height_ - 80;
-  SDL_SetRenderDrawColor(renderer, 40, 40, 40, 255);
+  SDL_SetRenderDrawColor(renderer, themes.rowStripe2.r, themes.rowStripe2.g, themes.rowStripe2.b, 255);
   SDL_Rect barBg = {barX, barY, barW, barH};
   SDL_RenderFillRect(renderer, &barBg);
 
@@ -198,7 +202,7 @@ void GimbalPanel::render(SDL_Renderer *renderer) {
     double normEl = (el_ + 90.0) / 180.0;
     int fillH = static_cast<int>(normEl * barH);
     SDL_Rect barFill = {barX, barY + barH - fillH, barW, 4}; // indicator line
-    SDL_SetRenderDrawColor(renderer, 0, 255, 255, 255);
+    SDL_SetRenderDrawColor(renderer, themes.info.r, themes.info.g, themes.info.b, 255);
     SDL_RenderFillRect(renderer, &barFill);
 
     // Horizontal tick for 0 degrees (AA)
@@ -208,7 +212,7 @@ void GimbalPanel::render(SDL_Renderer *renderer) {
           {(float)barX + (float)barW + 2.0f, (float)barY + (float)barH * 0.5f}};
       if (lineTex)
         RenderUtils::drawPolylineTextured(renderer, lineTex, tick, 2, 1.0f,
-                                          {100, 100, 100, 200});
+                                          themes.textDim);
     }
   }
 }

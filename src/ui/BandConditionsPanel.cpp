@@ -86,7 +86,7 @@ void BandConditionsPanel::render(SDL_Renderer *renderer) {
 
   if (!dataValid_) {
     cat->drawText(renderer, "No Data", x_ + width_ / 2,
-                  y_ + titleH + (height_ - titleH) / 2, {150, 150, 150, 255},
+                  y_ + titleH + (height_ - titleH) / 2, themes.textDim,
                   FontStyle::Micro, true);
     return;
   }

@@ -5,6 +5,13 @@
 ThemeColors getThemeColors(const std::string &theme,
                            const std::map<std::string, SDL_Color> *overrides) {
   ThemeColors colors;
+
+  // Default semantic colors (status)
+  colors.success = {50, 200, 50, 255};
+  colors.danger = {220, 50, 50, 255};
+  colors.warning = {255, 180, 0, 255};
+  colors.info = {80, 180, 255, 255};
+
   if (theme == "dark") {
     colors.bg = {10, 10, 15, 255};
     colors.border = {60, 60, 80, 255};
@@ -21,6 +28,43 @@ ThemeColors getThemeColors(const std::string &theme,
     colors.accent = {100, 200, 255, 255};
     colors.rowStripe1 = {30, 35, 50, 150};
     colors.rowStripe2 = {20, 25, 40, 100};
+  } else if (theme == "midnight") {
+    colors.bg = {5, 5, 20, 255};
+    colors.border = {40, 40, 100, 255};
+    colors.text = {200, 200, 255, 255};
+    colors.textDim = {80, 80, 140, 255};
+    colors.accent = {0, 255, 255, 255};
+    colors.rowStripe1 = {15, 15, 40, 255};
+    colors.rowStripe2 = {10, 10, 30, 255};
+  } else if (theme == "amber") {
+    colors.bg = {20, 10, 0, 255};
+    colors.border = {80, 40, 0, 255};
+    colors.text = {255, 176, 0, 255};
+    colors.textDim = {180, 100, 0, 255};
+    colors.accent = {255, 210, 0, 255};
+    colors.rowStripe1 = {35, 20, 0, 255};
+    colors.rowStripe2 = {25, 15, 0, 255};
+  } else if (theme == "paper") {
+    colors.bg = {245, 245, 240, 255};
+    colors.border = {200, 200, 190, 255};
+    colors.text = {40, 40, 40, 255};
+    colors.textDim = {120, 120, 120, 255};
+    colors.accent = {0, 100, 200, 255};
+    colors.rowStripe1 = {235, 235, 230, 255};
+    colors.rowStripe2 = {225, 225, 220, 255};
+    // Override semantic colors for light theme contrast
+    colors.success = {20, 140, 20, 255};
+    colors.danger = {180, 20, 20, 255};
+    colors.warning = {160, 110, 0, 255};
+    colors.info = {0, 100, 180, 255};
+  } else if (theme == "matrix") {
+    colors.bg = {0, 0, 0, 255};
+    colors.border = {0, 80, 0, 255};
+    colors.text = {0, 255, 65, 255};
+    colors.textDim = {0, 100, 30, 255};
+    colors.accent = {0, 255, 100, 255};
+    colors.rowStripe1 = {0, 20, 0, 255};
+    colors.rowStripe2 = {0, 10, 0, 255};
   } else {
     // default (original HamClock-like colors often use dark backgrounds)
     colors.bg = {20, 20, 25, 255};
@@ -31,12 +75,6 @@ ThemeColors getThemeColors(const std::string &theme,
     colors.rowStripe1 = {30, 30, 35, 255};
     colors.rowStripe2 = {20, 20, 25, 255};
   }
-
-  // Semantic colors are the same across all themes by default
-  colors.success = {50, 200, 50, 255};
-  colors.danger = {220, 50, 50, 255};
-  colors.warning = {255, 180, 0, 255};
-  colors.info = {80, 180, 255, 255};
 
   // Apply overrides if theme is "custom" or for any theme if overrides exist
   // We prioritize the "custom" theme.

@@ -1492,6 +1492,14 @@ bool SetupScreen::onMouseDown(int mx, int my, Uint16 mod, int clicks) {
         theme_ = "dark";
       else if (theme_ == "dark")
         theme_ = "glass";
+      else if (theme_ == "glass")
+        theme_ = "midnight";
+      else if (theme_ == "midnight")
+        theme_ = "amber";
+      else if (theme_ == "amber")
+        theme_ = "paper";
+      else if (theme_ == "paper")
+        theme_ = "matrix";
       else
         theme_ = "default";
       return true;

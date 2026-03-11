@@ -688,6 +688,7 @@ static std::string formatDaysDuration(int totalDays) {
 }
 
 void ReminderPanel::renderReminderList(SDL_Renderer *renderer) {
+  ThemeColors themes = getThemeColors(theme_);
   int yOff = y_ + 25;
   int lineH = 15;
   auto *cat = fontMgr_.catalog();
@@ -768,7 +769,7 @@ void ReminderPanel::renderReminderList(SDL_Renderer *renderer) {
   if (config_.reminders.empty() && config_.callsignExpiry.empty() &&
       !checking_) {
     cat->drawText(renderer, "No Reminders", x_ + width_ / 2, y_ + height_ / 2,
-                  {150, 150, 150, 255}, FontStyle::Micro, true);
+                  themes.textDim, FontStyle::Micro, true);
   }
 
   if (tooltip_.visible) {

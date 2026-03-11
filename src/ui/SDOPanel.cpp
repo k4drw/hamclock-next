@@ -168,7 +168,7 @@ void SDOPanel::renderOverlays(SDL_Renderer *renderer,
   auto *cat = fontMgr_.catalog();
 
   char buf[32];
-  SDL_Color HUD = {255, 165, 0, 255}; // Orange HUD
+  SDL_Color HUD = themes.accent; // Themed HUD
 
   int titleH = height_ / 10;
   // Az: NN
@@ -215,7 +215,7 @@ void SDOPanel::renderOverlays(SDL_Renderer *renderer,
     std::time_t threshold = 86400;
     if (nowT - imageServerTime_ > threshold) {
       // Draw "NOT CURRENT" in red
-      SDL_Color staleColor = {255, 50, 50, 255};
+      SDL_Color staleColor = themes.danger;
       cat->drawText(renderer, "NOT CURRENT", x_ + width_ / 2, y_ + height_ / 2,
                     staleColor, FontStyle::SmallBold, true);
     }
@@ -225,15 +225,15 @@ void SDOPanel::renderOverlays(SDL_Renderer *renderer,
 void SDOPanel::renderMenu(SDL_Renderer *renderer, const ThemeColors &themes) {
   // Menu background (Glass style)
   SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-  SDL_SetRenderDrawColor(renderer, 20, 20, 20, 245);
+  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, 245);
   SDL_RenderFillRect(renderer, &menuRect_);
-  SDL_SetRenderDrawColor(renderer, 255, 255, 255, 100);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 100);
   SDL_RenderDrawRect(renderer, &menuRect_);
 
   // Icon and Title
   SDL_Rect iconRect = {menuRect_.x + 10, menuRect_.y + 8, 12, 12};
-  SDL_Color gearColor = {140, 140, 140, 255};
-  SDL_Color bgColor = {20, 20, 20, 255};
+  SDL_Color gearColor = themes.textDim;
+  SDL_Color bgColor = themes.bg;
   RenderUtils::drawGear(renderer, iconRect.x + iconRect.w / 2.0f,
                         iconRect.y + iconRect.h / 2.0f, iconRect.w / 2.0f,
                         gearColor, bgColor);
