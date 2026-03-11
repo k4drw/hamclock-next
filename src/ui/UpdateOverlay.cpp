@@ -35,14 +35,15 @@ void UpdateOverlay::update() {
         continue;
       }
 
+      ThemeColors themes = getThemeColors(theme_);
       int size = bodyPt;
-      SDL_Color col = {220, 220, 220, 255};
+      SDL_Color col = themes.text;
       bool bold = false;
       int indent = 0;
 
       if (line.find("###") == 0) {
         size = titlePt;
-        col = {0, 200, 255, 255};
+        col = themes.accent;
         bold = true;
         line = line.substr(3);
       } else if (line.find("-") == 0 || line.find("*") == 0) {
@@ -147,7 +148,7 @@ void UpdateOverlay::render(SDL_Renderer *renderer) {
     int sbW = 6;
     int sbX = notesArea_.x + notesArea_.w - sbW;
     SDL_Rect track = {sbX, notesArea_.y, sbW, notesArea_.h};
-    SDL_SetRenderDrawColor(renderer, 40, 45, 55, 255);
+    SDL_SetRenderDrawColor(renderer, themes.rowStripe1.r, themes.rowStripe1.g, themes.rowStripe1.b, 255);
     SDL_RenderFillRect(renderer, &track);
 
     float visiblePct =
@@ -156,7 +157,7 @@ void UpdateOverlay::render(SDL_Renderer *renderer) {
     int thumbY = notesArea_.y + (int)((float)scrollPos_ / maxScroll_ *
                                       (notesArea_.h - thumbH));
     SDL_Rect thumb = {sbX, thumbY, sbW, thumbH};
-    SDL_SetRenderDrawColor(renderer, 100, 110, 130, 255);
+    SDL_SetRenderDrawColor(renderer, themes.textDim.r, themes.textDim.g, themes.textDim.b, 255);
     SDL_RenderFillRect(renderer, &thumb);
   }
 
@@ -164,9 +165,9 @@ void UpdateOverlay::render(SDL_Renderer *renderer) {
   auto drawBtn = [&](SDL_Rect r, const char *label, SDL_Color bg) {
     SDL_SetRenderDrawColor(renderer, bg.r, bg.g, bg.b, 255);
     SDL_RenderFillRect(renderer, &r);
-    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 100);
+    SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
     SDL_RenderDrawRect(renderer, &r);
-    cat->drawText(renderer, label, r.x + r.w / 2, r.y + r.h / 2, white,
+    cat->drawText(renderer, label, r.x + r.w / 2, r.y + r.h / 2, themes.bg,
                   FontStyle::UI, true, false, true);
   };
 

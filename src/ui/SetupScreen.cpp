@@ -169,13 +169,6 @@ void SetupScreen::render(SDL_Renderer *renderer) {
     lastRenderHeight_ = height_;
   }
 
-  // Dim background
-  SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-  SDL_SetRenderDrawColor(renderer, 0, 0, 0, 160);
-  SDL_Rect full = {0, 0, width_, height_};
-  SDL_RenderFillRect(renderer, &full);
-  SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
-
   // Main Modal Box — fill the entire app canvas
   int modalW = width_;
   int modalH = height_;
@@ -183,8 +176,9 @@ void SetupScreen::render(SDL_Renderer *renderer) {
   int modalY = y_;
   modalRect_ = {modalX, modalY, modalW, modalH};
 
-  ThemeColors themes = getThemeColors(theme_, &colorOverrides_);
+  ThemeColors themes = getThemeColors(theme_, colorOverrides_);
 
+  // Background Fill (No extra dimming, use theme background)
   SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, 255);
   SDL_RenderFillRect(renderer, &modalRect_);
   SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
@@ -198,12 +192,12 @@ void SetupScreen::render(SDL_Renderer *renderer) {
   int fieldH = cat->ptSize(FontStyle::SmallRegular) + 14;
   int textPad = 7;
 
-  SDL_Color cyan = themes.accent;
+  SDL_Color titleCol = themes.text; // Use standard text color for title (was themes.accent/cyan)
 
   int y = modalRect_.y + pad;
 
   cat->drawText(renderer, "HamClock-Next Setup", cx,
-                y + cat->ptSize(FontStyle::MediumBold) / 2, cyan,
+                y + cat->ptSize(FontStyle::MediumBold) / 2, titleCol,
                 FontStyle::MediumBold, true, false, true);
   y += cat->ptSize(FontStyle::MediumBold) +
        pad / 2; // tightened: was +pad, halved gap to tab bar
@@ -247,7 +241,7 @@ void SetupScreen::render(SDL_Renderer *renderer) {
                            themes.border.b, active ? 255 : 80);
     SDL_RenderDrawRect(renderer, &tr);
     cat->drawText(renderer, tabs[i], tr.x + tabW / 2, tr.y + fieldH / 2,
-                  active ? themes.text : themes.textDim, tabStyle, true, false,
+                  active ? themes.text : themes.text, tabStyle, true, false,
                   true);
   }
   y += fieldH + pad / 2;
@@ -303,10 +297,10 @@ void SetupScreen::render(SDL_Renderer *renderer) {
   SDL_SetRenderDrawColor(renderer, themes.danger.r, themes.danger.g,
                          themes.danger.b, 255);
   SDL_RenderFillRect(renderer, &cancelBtn);
-  SDL_SetRenderDrawColor(renderer, 255, 255, 255, 100);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 100);
   SDL_RenderDrawRect(renderer, &cancelBtn);
   cat->drawText(renderer, "Cancel", cancelBtn.x + btnW / 2,
-                cancelBtn.y + btnH / 2, themes.text, FontStyle::SmallRegular,
+                cancelBtn.y + btnH / 2, themes.bg, FontStyle::SmallRegular,
                 true, false, true);
   cancelBtnRect_ = cancelBtn;
 
@@ -315,10 +309,10 @@ void SetupScreen::render(SDL_Renderer *renderer) {
   SDL_SetRenderDrawColor(renderer, themes.success.r, themes.success.g,
                          themes.success.b, 255);
   SDL_RenderFillRect(renderer, &okBtn);
-  SDL_SetRenderDrawColor(renderer, 255, 255, 255, 100);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 100);
   SDL_RenderDrawRect(renderer, &okBtn);
   cat->drawText(renderer, "Done", okBtn.x + btnW / 2, okBtn.y + btnH / 2,
-                themes.text, FontStyle::SmallRegular, true, false, true);
+                themes.bg, FontStyle::SmallRegular, true, false, true);
   okBtnRect_ = okBtn;
 }
 
@@ -329,7 +323,7 @@ void SetupScreen::renderTabIdentity(SDL_Renderer *renderer, int cx, int pad,
   int y =
       (modalRect_.y + cat->ptSize(FontStyle::MediumBold) + 2 * pad + fieldH);
   int vSpace = pad / 2;
-  ThemeColors themes = getThemeColors(theme_, &colorOverrides_);
+  ThemeColors themes = getThemeColors(theme_, colorOverrides_);
 
   int labelH = cat->ptSize(FontStyle::SmallBold) + 4;
 
@@ -338,7 +332,7 @@ void SetupScreen::renderTabIdentity(SDL_Renderer *renderer, int cx, int pad,
   callsignRect_ = {fieldX, y, fieldW, fieldH};
   callsignInput_.render(renderer, fontMgr_, fieldX, y, fieldW, fieldH,
                         FontStyle::SmallRegular, textPad, activeField_ == 0,
-                        !callsignInput_.getValue().empty(), themes.accent, themes.textDim, themes.success, themes.text, themes.textDim, "e.g. K4DRW");
+                        !callsignInput_.getValue().empty(), themes.accent, themes.textDim, themes.success, themes.text, themes.textDim, "e.g. K4DRW", &themes.rowStripe1);
   y += fieldH + vSpace;
 
   cat->drawText(renderer, "Grid Square:", fieldX, y, themes.text,
@@ -348,7 +342,7 @@ void SetupScreen::renderTabIdentity(SDL_Renderer *renderer, int cx, int pad,
   gridInput_.render(renderer, fontMgr_, fieldX, y, fieldW, fieldH,
                     FontStyle::SmallRegular, textPad, activeField_ == 1,
                     gridValid_, themes.accent, themes.textDim, themes.success, themes.text, themes.textDim,
-                    "e.g. EL87qr");
+                    "e.g. EL87qr", &themes.rowStripe1);
   y += fieldH + vSpace;
 
   int halfFieldW = (fieldW - pad) / 2;
@@ -377,13 +371,13 @@ void SetupScreen::renderTabIdentity(SDL_Renderer *renderer, int cx, int pad,
   latInput_.render(renderer, fontMgr_, fieldX, latY, halfFieldW, fieldH,
                    FontStyle::SmallRegular, textPad, activeField_ == 2,
                    !latInput_.getValue().empty(), themes.accent, themes.textDim, themes.text, themes.text,
-                   themes.textDim, "e.g. 27.76");
+                   themes.textDim, "e.g. 27.76", &themes.rowStripe1);
 
   int lonY = y;
   lonInput_.render(renderer, fontMgr_, fieldX + halfFieldW + pad, lonY,
                    halfFieldW, fieldH, FontStyle::SmallRegular, textPad,
                    activeField_ == 3, !lonInput_.getValue().empty(), themes.accent,
-                   themes.textDim, themes.text, themes.text, themes.textDim, "e.g. -82.64");
+                   themes.textDim, themes.text, themes.text, themes.textDim, "e.g. -82.64", &themes.rowStripe1);
   y = std::max(latY, lonY) + pad / 2 + pad;
 
   gpsToggleRect_ = {fieldX, y, 20, 20};
@@ -407,10 +401,10 @@ void SetupScreen::renderTabDXCluster(SDL_Renderer *renderer, int cx, int pad,
   int y =
       (modalRect_.y + cat->ptSize(FontStyle::MediumBold) + 2 * pad + fieldH);
   int vSpace = 5;
-  ThemeColors themes = getThemeColors(theme_, &colorOverrides_);
+  ThemeColors themes = getThemeColors(theme_, colorOverrides_);
 
   // --- DX CLUSTER SECTION ---
-  cat->drawText(renderer, "--- DX Cluster ---", cx, y, themes.info,
+  cat->drawText(renderer, "--- DX Cluster ---", cx, y, themes.accent,
                 FontStyle::SmallBold, true);
   y += cat->ptSize(FontStyle::SmallBold) + vSpace;
 
@@ -424,14 +418,14 @@ void SetupScreen::renderTabDXCluster(SDL_Renderer *renderer, int cx, int pad,
   clusterHostInput_.render(renderer, fontMgr_, fieldX, hostY, halfW, fieldH,
                            FontStyle::SmallRegular, textPad, activeField_ == 0,
                            !clusterHostInput_.getValue().empty(), themes.accent, themes.textDim,
-                           themes.text, themes.text, themes.textDim, "dxusa.net");
+                           themes.text, themes.text, themes.textDim, "dxusa.net", &themes.rowStripe1);
   clusterHostRect_ = {fieldX, hostY, halfW, fieldH};
   int portY = y;
   clusterPortInput_.render(renderer, fontMgr_, fieldX + halfW + pad, portY,
                            halfW, fieldH, FontStyle::SmallRegular, textPad,
                            activeField_ == 1,
                            !clusterPortInput_.getValue().empty(), themes.accent, themes.textDim,
-                           themes.text, themes.text, themes.textDim, "7300");
+                           themes.text, themes.text, themes.textDim, "7300", &themes.rowStripe1);
   clusterPortRect_ = {fieldX + halfW + pad, portY, halfW, fieldH};
   y += fieldH + vSpace;
 
@@ -440,7 +434,7 @@ void SetupScreen::renderTabDXCluster(SDL_Renderer *renderer, int cx, int pad,
   clusterLoginInput_.render(renderer, fontMgr_, fieldX, y, fieldW, fieldH,
                             FontStyle::SmallRegular, textPad, activeField_ == 2,
                             !clusterLoginInput_.getValue().empty(), themes.accent,
-                            themes.textDim, themes.text, themes.text, themes.textDim, "NOCALL");
+                            themes.textDim, themes.text, themes.text, themes.textDim, "NOCALL", &themes.rowStripe1);
   clusterLoginRect_ = {fieldX, y, fieldW, fieldH};
   y += fieldH + vSpace;
 
@@ -482,14 +476,14 @@ void SetupScreen::renderTabDXCluster(SDL_Renderer *renderer, int cx, int pad,
     wsjtxPortInput_.render(renderer, fontMgr_, portX, y, wPortW, fieldH,
                            FontStyle::SmallRegular, textPad, activeField_ == 3,
                            !wsjtxPortInput_.getValue().empty(), themes.accent, themes.textDim,
-                           themes.text, themes.text, themes.textDim, "2237");
+                           themes.text, themes.text, themes.textDim, "2237", &themes.rowStripe1);
   } else {
     wsjtxPortRect_ = {0, 0, 0, 0};
   }
   y += 30;
 
   // --- RBN SECTION ---
-  cat->drawText(renderer, "--- Reverse Beacon Network ---", cx, y, themes.info,
+  cat->drawText(renderer, "--- Reverse Beacon Network ---", cx, y, themes.accent,
                 FontStyle::SmallBold, true);
   y += cat->ptSize(FontStyle::SmallBold) + vSpace;
 
@@ -519,10 +513,10 @@ void SetupScreen::renderTabAppearance(SDL_Renderer *renderer, int cx, int pad,
   // (e.g. 1024x600 7" display). Available height / ~26 keeps all rows visible.
   int availH = (y_ + height_ - 52) - y;
   int vSpace = std::min(pad / 2, std::max(2, availH / 26));
-  ThemeColors themes = getThemeColors(theme_, &colorOverrides_);
+  ThemeColors themes = getThemeColors(theme_, colorOverrides_);
 
   // --- Appearance section ---
-  cat->drawText(renderer, "--- Appearance ---", cx, y, themes.info,
+  cat->drawText(renderer, "--- Appearance ---", cx, y, themes.accent,
                 FontStyle::SmallBold, true);
   y += cat->ptSize(FontStyle::SmallBold) + vSpace;
 
@@ -578,7 +572,7 @@ void SetupScreen::renderTabAppearance(SDL_Renderer *renderer, int cx, int pad,
   y += 20 + vSpace;
 
   // --- Brightness section ---
-  cat->drawText(renderer, "--- Brightness ---", cx, y, themes.info,
+  cat->drawText(renderer, "--- Brightness ---", cx, y, themes.accent,
                 FontStyle::SmallBold, true);
   y += cat->ptSize(FontStyle::SmallBold) + vSpace;
 
@@ -611,7 +605,7 @@ void SetupScreen::renderTabAppearance(SDL_Renderer *renderer, int cx, int pad,
     dimTimeRect_ = {dimX, y, halfFieldW, 24};
     dimTimeInput_.render(renderer, fontMgr_, dimX, y, halfFieldW, 24,
                          FontStyle::SmallRegular, textPad, activeField_ == 1,
-                         true, themes.accent, themes.textDim, themes.text, themes.text, themes.textDim, "HH:MM");
+                         true, themes.accent, themes.textDim, themes.text, themes.text, themes.textDim, "HH:MM", &themes.rowStripe1);
 
     cat->drawText(renderer, "Bright:", fieldX + halfW, y + 12, themes.text,
                   FontStyle::SmallRegular, false, false, true);
@@ -619,7 +613,7 @@ void SetupScreen::renderTabAppearance(SDL_Renderer *renderer, int cx, int pad,
     brightTimeRect_ = {brightX, y, halfFieldW, 24};
     brightTimeInput_.render(renderer, fontMgr_, brightX, y, halfFieldW, 24,
                             FontStyle::SmallRegular, textPad, activeField_ == 2,
-                            true, themes.accent, themes.textDim, themes.text, themes.text, themes.textDim, "HH:MM");
+                            true, themes.accent, themes.textDim, themes.text, themes.text, themes.textDim, "HH:MM", &themes.rowStripe1);
     y += 24 + vSpace;
   } else {
     dimTimeRect_ = {0, 0, 0, 0};
@@ -644,22 +638,20 @@ void SetupScreen::renderTabServices(SDL_Renderer *renderer, int cx, int pad,
   int y =
       (modalRect_.y + cat->ptSize(FontStyle::MediumBold) + 2 * pad + fieldH);
   int vSpace = pad / 2;
-  SDL_Color white = {255, 255, 255, 255};
-  SDL_Color orange = {255, 165, 0, 255};
-  SDL_Color gray = {140, 140, 140, 255};
+  ThemeColors themes = getThemeColors(theme_, colorOverrides_);
 
-  cat->drawText(renderer, "QRZ Username:", fieldX, y, white,
+  cat->drawText(renderer, "QRZ Username:", fieldX, y, themes.text,
                 FontStyle::SmallBold);
   int labelH = cat->ptSize(FontStyle::SmallBold) + 4;
   qrzUsernameRect_ = {fieldX, y, fieldW, labelH + fieldH};
   y += labelH;
   qrzUsernameInput_.render(renderer, fontMgr_, fieldX, y, fieldW, fieldH,
                            FontStyle::SmallRegular, textPad, activeField_ == 0,
-                           true, orange, gray, white, white, gray,
+                           true, themes.accent, themes.textDim, themes.text, themes.text, themes.textDim,
                            "e.g. K4DRW");
   y += fieldH + vSpace;
 
-  cat->drawText(renderer, "QRZ Password:", fieldX, y, white,
+  cat->drawText(renderer, "QRZ Password:", fieldX, y, themes.text,
                 FontStyle::SmallBold);
   qrzPasswordRect_ = {fieldX, y, fieldW, labelH + fieldH};
   y += labelH;
@@ -673,26 +665,26 @@ void SetupScreen::renderTabServices(SDL_Renderer *renderer, int cx, int pad,
     }
     tmpPwd.render(renderer, fontMgr_, fieldX, y, fieldW, fieldH,
                   FontStyle::SmallRegular, textPad, activeField_ == 1, true,
-                  orange, gray, white, white, gray, "********");
+                  themes.accent, themes.textDim, themes.text, themes.text, themes.textDim, "********", &themes.rowStripe1);
   }
   y += fieldH + vSpace;
 
-  cat->drawText(renderer, "RepeaterBook Key:", fieldX, y, white,
+  cat->drawText(renderer, "RepeaterBook Key:", fieldX, y, themes.text,
                 FontStyle::SmallBold);
   repeaterBookRect_ = {fieldX, y, fieldW, labelH + fieldH};
   y += labelH;
   repeaterBookInput_.render(renderer, fontMgr_, fieldX, y, fieldW, fieldH,
                             FontStyle::SmallRegular, textPad, activeField_ == 2,
-                            true, orange, gray, white, white, gray, "Key");
+                            true, themes.accent, themes.textDim, themes.text, themes.text, themes.textDim, "Key", &themes.rowStripe1);
   y += fieldH + vSpace;
 
-  cat->drawText(renderer, "Winlink Key:", fieldX, y, white,
+  cat->drawText(renderer, "Winlink Key:", fieldX, y, themes.text,
                 FontStyle::SmallBold);
   winlinkRect_ = {fieldX, y, fieldW, labelH + fieldH};
   y += labelH;
   winlinkInput_.render(renderer, fontMgr_, fieldX, y, fieldW, fieldH,
                        FontStyle::SmallRegular, textPad, activeField_ == 3,
-                       true, orange, gray, white, white, gray, "Key");
+                       true, themes.accent, themes.textDim, themes.text, themes.text, themes.textDim, "Key", &themes.rowStripe1);
   y += fieldH + vSpace;
 }
 
@@ -703,11 +695,9 @@ void SetupScreen::renderTabNetwork(SDL_Renderer *renderer, int /*cx*/, int pad,
   int y =
       (modalRect_.y + cat->ptSize(FontStyle::MediumBold) + 2 * pad + fieldH);
   int vSpace = pad / 2;
-  SDL_Color white = {255, 255, 255, 255};
-  SDL_Color orange = {255, 165, 0, 255};
-  SDL_Color gray = {140, 140, 140, 255};
+  ThemeColors themes = getThemeColors(theme_, colorOverrides_);
 
-  cat->drawText(renderer, "--- Local Data Hub ---", fieldX, y, orange,
+  cat->drawText(renderer, "--- Local Data Hub ---", fieldX, y, themes.accent,
                 FontStyle::SmallBold);
   y += cat->ptSize(FontStyle::SmallBold) + pad;
 
@@ -717,38 +707,37 @@ void SetupScreen::renderTabNetwork(SDL_Renderer *renderer, int /*cx*/, int pad,
                                                           : "Off";
   int btnW = 80;
   hubModeRect_ = {fieldX + fieldW - btnW, y, btnW, fieldH};
-  ThemeColors themes = getThemeColors(theme_, &colorOverrides_);
   cat->drawText(renderer, "Mode:", fieldX,
-                y + (fieldH - cat->ptSize(FontStyle::SmallRegular)) / 2, white,
+                y + (fieldH - cat->ptSize(FontStyle::SmallRegular)) / 2, themes.text,
                 FontStyle::SmallRegular);
   SDL_SetRenderDrawColor(renderer, themes.rowStripe1.r, themes.rowStripe1.g, themes.rowStripe1.b, 255);
   SDL_RenderFillRect(renderer, &hubModeRect_);
   SDL_SetRenderDrawColor(renderer, themes.accent.r, themes.accent.g, themes.accent.b, 255);
   SDL_RenderDrawRect(renderer, &hubModeRect_);
   cat->drawText(renderer, modeLabel, hubModeRect_.x + hubModeRect_.w / 2,
-                hubModeRect_.y + hubModeRect_.h / 2, orange,
+                hubModeRect_.y + hubModeRect_.h / 2, themes.accent,
                 FontStyle::SmallRegular, true, false, true);
   y += fieldH + vSpace;
 
   if (hubMode_ == HubMode::Client) {
     int labelH = cat->ptSize(FontStyle::SmallRegular) + 4;
-    cat->drawText(renderer, "Hub IP:", fieldX, y, white,
+    cat->drawText(renderer, "Hub IP:", fieldX, y, themes.text,
                   FontStyle::SmallRegular);
     hubIpRect_ = {fieldX, y, fieldW, labelH + fieldH};
     y += labelH;
     hubIpInput_.render(renderer, fontMgr_, fieldX, y, fieldW, fieldH,
                        FontStyle::SmallRegular, textPad, activeField_ == 0,
-                       true, orange, gray, white, white, gray,
+                       true, themes.accent, themes.textDim, themes.text, themes.text, themes.textDim,
                        "e.g. 192.168.1.100");
     y += fieldH + vSpace;
 
-    cat->drawText(renderer, "Hub Port:", fieldX, y, white,
+    cat->drawText(renderer, "Hub Port:", fieldX, y, themes.text,
                   FontStyle::SmallRegular);
     hubPortRect_ = {fieldX, y, fieldW, labelH + fieldH};
     y += labelH;
     hubPortInput_.render(renderer, fontMgr_, fieldX, y, fieldW, fieldH,
                          FontStyle::SmallRegular, textPad, activeField_ == 1,
-                         true, orange, gray, white, white, gray, "8080");
+                         true, themes.accent, themes.textDim, themes.text, themes.text, themes.textDim, "8080", &themes.rowStripe1);
     y += fieldH + vSpace;
   } else {
     hubIpRect_ = {0, 0, 0, 0};
@@ -757,12 +746,12 @@ void SetupScreen::renderTabNetwork(SDL_Renderer *renderer, int /*cx*/, int pad,
 
   if (hubMode_ == HubMode::Master) {
     cat->drawText(renderer, "This instance serves cached data to hub clients.",
-                  fieldX, y + vSpace, gray, FontStyle::Fast);
+                  fieldX, y + vSpace, themes.textDim, FontStyle::Fast);
   } else if (hubMode_ == HubMode::Client) {
     cat->drawText(renderer, "Fetches via hub; falls back to direct after 2s.",
-                  fieldX, y + vSpace, gray, FontStyle::Fast);
+                  fieldX, y + vSpace, themes.textDim, FontStyle::Fast);
   } else {
-    cat->drawText(renderer, "Hub mode disabled.", fieldX, y + vSpace, gray,
+    cat->drawText(renderer, "Hub mode disabled.", fieldX, y + vSpace, themes.textDim,
                   FontStyle::Fast);
   }
 }
@@ -778,7 +767,7 @@ void SetupScreen::renderTabRig(SDL_Renderer *renderer, int cx, int pad,
   int colW = fieldW / 2 - pad;
   int rightX = cx + pad / 2;
 
-  ThemeColors themes = getThemeColors(theme_, &colorOverrides_);
+  ThemeColors themes = getThemeColors(theme_, colorOverrides_);
 
   // --- Rig Section (Left Column) ---
   cat->drawText(renderer, "Rig / CAT Control:", fieldX, y, themes.text,
@@ -793,7 +782,7 @@ void SetupScreen::renderTabRig(SDL_Renderer *renderer, int cx, int pad,
   rigHostInput_.render(renderer, fontMgr_, fieldX, y, colW, fieldH,
                        FontStyle::SmallRegular, textPad,
                        (activeTab_ == Tab::Rig && activeField_ == 0), true,
-                       themes.accent, themes.textDim, themes.text, themes.text, themes.textDim, "localhost");
+                       themes.accent, themes.textDim, themes.text, themes.text, themes.textDim, "localhost", &themes.rowStripe1);
   y += fieldH + vSpace;
 
   cat->drawText(renderer, "rigctld Port:", fieldX, y, themes.text,
@@ -803,7 +792,7 @@ void SetupScreen::renderTabRig(SDL_Renderer *renderer, int cx, int pad,
   rigPortInput_.render(renderer, fontMgr_, fieldX, y, colW, fieldH,
                        FontStyle::SmallRegular, textPad,
                        (activeTab_ == Tab::Rig && activeField_ == 1), true,
-                       themes.accent, themes.textDim, themes.text, themes.text, themes.textDim, "4532");
+                       themes.accent, themes.textDim, themes.text, themes.text, themes.textDim, "4532", &themes.rowStripe1);
   y += fieldH + vSpace;
 
   // Auto-tune Toggle
@@ -836,7 +825,7 @@ void SetupScreen::renderTabRig(SDL_Renderer *renderer, int cx, int pad,
   rotatorHostInput_.render(renderer, fontMgr_, rightX, y, colW, fieldH,
                            FontStyle::SmallRegular, textPad,
                            (activeTab_ == Tab::Rig && activeField_ == 2), true,
-                           themes.accent, themes.textDim, themes.text, themes.text, themes.textDim, "localhost");
+                           themes.accent, themes.textDim, themes.text, themes.text, themes.textDim, "localhost", &themes.rowStripe1);
   y += fieldH + vSpace;
 
   cat->drawText(renderer, "rotctld Port:", rightX, y, themes.text,
@@ -846,7 +835,7 @@ void SetupScreen::renderTabRig(SDL_Renderer *renderer, int cx, int pad,
   rotatorPortInput_.render(renderer, fontMgr_, rightX, y, colW, fieldH,
                            FontStyle::SmallRegular, textPad,
                            (activeTab_ == Tab::Rig && activeField_ == 3), true,
-                           themes.accent, themes.textDim, themes.text, themes.text, themes.textDim, "4533");
+                           themes.accent, themes.textDim, themes.text, themes.text, themes.textDim, "4533", &themes.rowStripe1);
   y += fieldH + vSpace;
 
   // Auto-track and Upover Toggles
@@ -898,7 +887,7 @@ void SetupScreen::renderTabWidgets(SDL_Renderer *renderer, int cx, int pad,
 
   int y =
       (modalRect_.y + cat->ptSize(FontStyle::MediumBold) + 2 * pad + fieldH);
-  ThemeColors themes = getThemeColors(theme_, &colorOverrides_);
+  ThemeColors themes = getThemeColors(theme_, colorOverrides_);
 
   cat->drawText(renderer, "Select Active Widgets for Each Pane:", fieldX, y,
                 themes.text, FontStyle::SmallBold);
@@ -1037,9 +1026,9 @@ void SetupScreen::renderTabWidgets(SDL_Renderer *renderer, int cx, int pad,
       int drawX = fieldX + col * colW;
       int drawY = y + row * rowH;
       SDL_Rect r = {drawX, drawY, 16, 16};
-      SDL_SetRenderDrawColor(renderer, 45, 45, 48, 255);
+      SDL_SetRenderDrawColor(renderer, themes.rowStripe1.r, themes.rowStripe1.g, themes.rowStripe1.b, 255);
       SDL_RenderFillRect(renderer, &r);
-      SDL_SetRenderDrawColor(renderer, 100, 100, 120, 255);
+      SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
       SDL_RenderDrawRect(renderer, &r);
 
       if (allowed) {
@@ -1078,7 +1067,7 @@ void SetupScreen::renderTabWidgets(SDL_Renderer *renderer, int cx, int pad,
 
   // --- Side Panel section ---
   y = sideSecY;
-  cat->drawText(renderer, "--- Side Panel ---", cx, y, themes.info,
+  cat->drawText(renderer, "--- Side Panel ---", cx, y, themes.accent,
                 FontStyle::SmallBold, true);
   y += cat->ptSize(FontStyle::SmallBold) + 4;
 
@@ -1125,9 +1114,9 @@ void SetupScreen::renderTabUpdate(SDL_Renderer *renderer, int cx, int pad,
   auto *cat = fontMgr_.catalog();
   int y =
       (modalRect_.y + cat->ptSize(FontStyle::MediumBold) + 2 * pad + fieldH);
-  ThemeColors themes = getThemeColors(theme_, &colorOverrides_);
+  ThemeColors themes = getThemeColors(theme_, colorOverrides_);
 
-  cat->drawText(renderer, "--- Update Status ---", cx, y, themes.info,
+  cat->drawText(renderer, "--- Update Status ---", cx, y, themes.accent,
                 FontStyle::SmallBold, true);
   y += cat->ptSize(FontStyle::SmallBold) + pad;
 
@@ -1175,7 +1164,7 @@ void SetupScreen::renderTabUpdate(SDL_Renderer *renderer, int cx, int pad,
 
   cat->drawText(renderer, instr, cx, y, themes.text, FontStyle::SmallRegular, true);
   y += cat->ptSize(FontStyle::SmallRegular) + 8;
-  cat->drawText(renderer, cmd, cx, y, themes.info, FontStyle::SmallBold, true);
+  cat->drawText(renderer, cmd, cx, y, themes.accent, FontStyle::SmallBold, true);
 }
 
 void SetupScreen::onResize(int x, int y, int w, int h) {
@@ -1470,20 +1459,14 @@ bool SetupScreen::onMouseDown(int mx, int my, Uint16 mod, int clicks) {
   } else if (activeTab_ == Tab::Appearance) {
     if (mx >= themeRect_.x && mx < themeRect_.x + themeRect_.w &&
         my >= themeRect_.y && my < themeRect_.y + themeRect_.h) {
-      if (theme_ == "default")
-        theme_ = "dark";
-      else if (theme_ == "dark")
-        theme_ = "glass";
-      else if (theme_ == "glass")
-        theme_ = "midnight";
-      else if (theme_ == "midnight")
-        theme_ = "amber";
-      else if (theme_ == "amber")
-        theme_ = "paper";
-      else if (theme_ == "paper")
-        theme_ = "matrix";
-      else
-        theme_ = "default";
+      auto themes = getAvailableThemes();
+      auto it = std::find(themes.begin(), themes.end(), theme_);
+      size_t idx = (it != themes.end()) ? std::distance(themes.begin(), it) : 0;
+      idx = (idx + 1) % themes.size();
+      theme_ = themes[idx];
+      if (theme_ != "custom") {
+        colorOverrides_.clear();
+      }
       return true;
     }
     if (mx >= customizeBtnRect_.x &&
@@ -1903,7 +1886,7 @@ void SetupScreen::renderTabWatchlist(SDL_Renderer *renderer, int /*cx*/,
                                      int fieldX, int textPad) {
   auto *cat = fontMgr_.catalog();
   int y = modalRect_.y + cat->ptSize(FontStyle::MediumBold) + 2 * pad + fieldH;
-  ThemeColors themes = getThemeColors(theme_, &colorOverrides_);
+  ThemeColors themes = getThemeColors(theme_, colorOverrides_);
 
   cat->drawText(renderer, "Highlight Callsigns (Watchlist):", fieldX, y, themes.accent,
                 FontStyle::SmallBold);
@@ -1996,7 +1979,7 @@ void SetupScreen::renderTabWatchlist(SDL_Renderer *renderer, int /*cx*/,
   watchlistInputField_.render(
       renderer, fontMgr_, fieldX, y, inputW, fieldH, FontStyle::SmallRegular,
       textPad, activeTab_ == Tab::Watchlist && activeField_ == 0, false, themes.accent,
-      themes.textDim, themes.text, themes.text, themes.textDim, "Enter callsign...");
+      themes.textDim, themes.text, themes.text, themes.textDim, "Enter callsign...", &themes.rowStripe1);
   y += fieldH;
 
   SDL_SetRenderDrawColor(renderer, themes.success.r, themes.success.g, themes.success.b, 100);

@@ -309,15 +309,15 @@ void ClockAuxPanel::renderMenu(SDL_Renderer *renderer) {
 
   customOffsetInput_.render(renderer, fontMgr_, customOffsetRect_.x,
                             customOffsetRect_.y, customOffsetRect_.w,
-                            customOffsetRect_.h, FontStyle::UI, 4, offAct, true,
-                            themes.accent, themes.border, themes.text,
-                            themes.text, themes.textDim, "-5");
+                            customOffsetRect_.h, FontStyle::Fast, 4,
+                            offAct, true, themes.accent, themes.border,
+                            themes.text, themes.text, themes.textDim, "0", &themes.rowStripe1);
 
   customLabelInput_.render(renderer, fontMgr_, customLabelRect_.x,
                            customLabelRect_.y, customLabelRect_.w,
-                           customLabelRect_.h, FontStyle::UI, 4, lblAct, true,
-                           themes.accent, themes.border, themes.text,
-                           themes.text, themes.textDim, "EST");
+                           customLabelRect_.h, FontStyle::Fast, 4,
+                           lblAct, true, themes.accent, themes.border,
+                           themes.text, themes.text, themes.textDim, "UTC", &themes.rowStripe1);
 
   // Buttons — match SDOPanel lambda style
   auto drawBtn = [&](const SDL_Rect &r, const char *label, SDL_Color bg) {

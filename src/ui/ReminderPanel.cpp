@@ -218,18 +218,15 @@ void ReminderPanel::renderModal(SDL_Renderer *renderer) {
   SDL_SetRenderDrawColor(renderer, themes.rowStripe2.r, themes.rowStripe2.g, themes.rowStripe2.b, 255);
   SDL_Rect titleBar = {dx, dy, dW, 22};
   SDL_RenderFillRect(renderer, &titleBar);
-  SDL_Color white = {255, 255, 255, 255};
-  SDL_Color cyan = {0, 200, 255, 255};
-  SDL_Color yellow = {255, 220, 50, 255};
   auto *cat = fontMgr_.catalog();
 
   // Title text
-  cat->drawText(renderer, "Reminder Due", dx + dW / 2, dy + 22 / 2, cyan,
+  cat->drawText(renderer, "Reminder Due", dx + dW / 2, dy + 22 / 2, themes.accent,
                 FontStyle::Caption, true);
 
   // Reminder label (wrap at dialog width)
   int tw, th;
-  SDL_Texture *tex = cat->renderText(renderer, notifyLabel_, yellow,
+  SDL_Texture *tex = cat->renderText(renderer, notifyLabel_, themes.warning,
                                      FontStyle::Caption, &tw, &th);
   if (tex) {
     // Centre horizontally, keep within box
@@ -242,7 +239,7 @@ void ReminderPanel::renderModal(SDL_Renderer *renderer) {
   }
 
   // Date subtitle
-  cat->drawText(renderer, "Date: " + notifyDate_, dx + dW / 2, dy + 50, white,
+  cat->drawText(renderer, "Date: " + notifyDate_, dx + dW / 2, dy + 50, themes.text,
                 FontStyle::Tiny, true);
 
   // Snooze / Acknowledge buttons
@@ -258,7 +255,7 @@ void ReminderPanel::renderModal(SDL_Renderer *renderer) {
   SDL_RenderFillRect(renderer, &notifySnoozeRect_);
   SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
   SDL_RenderDrawRect(renderer, &notifySnoozeRect_);
-  cat->drawText(renderer, "Snooze 1h", bx + btnW / 2, btnY + btnH / 2, white,
+  cat->drawText(renderer, "Snooze 1h", bx + btnW / 2, btnY + btnH / 2, themes.text,
                 FontStyle::Caption, true);
 
   // Acknowledge
@@ -268,7 +265,7 @@ void ReminderPanel::renderModal(SDL_Renderer *renderer) {
   SDL_RenderFillRect(renderer, &notifyAckRect_);
   SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
   SDL_RenderDrawRect(renderer, &notifyAckRect_);
-  cat->drawText(renderer, "Acknowledge", ax + btnW / 2, btnY + btnH / 2, white,
+  cat->drawText(renderer, "Acknowledge", ax + btnW / 2, btnY + btnH / 2, themes.bg,
                 FontStyle::Caption, true);
 }
 
@@ -365,10 +362,11 @@ void ReminderPanel::renderSetup(SDL_Renderer *renderer) {
 
     // Label field
     SDL_Rect lRect = {x_ + 5, ry, halfW, fieldH};
-    SDL_SetRenderDrawColor(renderer, 30, 30, 40, 255);
+    SDL_SetRenderDrawColor(renderer, themes.rowStripe1.r, themes.rowStripe1.g, themes.rowStripe1.b, 255);
     SDL_RenderFillRect(renderer, &lRect);
-    SDL_SetRenderDrawColor(renderer, (activeField_ == (int)i) ? 255 : 100, 150,
-                           0, 255);
+    SDL_SetRenderDrawColor(renderer, (activeField_ == (int)i) ? themes.accent.r : themes.border.r,
+                           (activeField_ == (int)i) ? themes.accent.g : themes.border.g,
+                           (activeField_ == (int)i) ? themes.accent.b : themes.border.b, 255);
     SDL_RenderDrawRect(renderer, &lRect);
     labelRects_.push_back(lRect);
     cat->drawText(renderer, pendingReminders_[i].label, lRect.x + textPad,
@@ -376,12 +374,14 @@ void ReminderPanel::renderSetup(SDL_Renderer *renderer) {
 
     // Date field
     SDL_Rect dRect = {x_ + 5 + halfW + 5, ry, halfW, fieldH};
-    SDL_SetRenderDrawColor(renderer, 30, 30, 40, 255);
+    SDL_SetRenderDrawColor(renderer, themes.rowStripe1.r, themes.rowStripe1.g, themes.rowStripe1.b, 255);
     SDL_RenderFillRect(renderer, &dRect);
     SDL_SetRenderDrawColor(
         renderer,
-        (activeField_ == (int)(i + pendingReminders_.size())) ? 255 : 100, 150,
-        0, 255);
+        (activeField_ == (int)(i + pendingReminders_.size())) ? themes.accent.r : themes.border.r,
+        (activeField_ == (int)(i + pendingReminders_.size())) ? themes.accent.g : themes.border.g,
+        (activeField_ == (int)(i + pendingReminders_.size())) ? themes.accent.b : themes.border.b,
+        255);
     SDL_RenderDrawRect(renderer, &dRect);
     dateRects_.push_back(dRect);
     cat->drawText(renderer, pendingReminders_[i].date, dRect.x + textPad,
@@ -390,10 +390,10 @@ void ReminderPanel::renderSetup(SDL_Renderer *renderer) {
     // Delete (×) button
     SDL_Rect xRect = {x_ + width_ - 20, ry, 15, fieldH};
     deleteRects_.push_back(xRect);
-    SDL_SetRenderDrawColor(renderer, 80, 20, 20, 255);
+    SDL_SetRenderDrawColor(renderer, themes.danger.r, themes.danger.g, themes.danger.b, 255);
     SDL_RenderFillRect(renderer, &xRect);
     cat->drawText(renderer, "x", xRect.x + xRect.w / 2, xRect.y + xRect.h / 2,
-                  white, FontStyle::Tiny, true, false, true);
+                  themes.bg, FontStyle::Tiny, true, false, true);
 
     y += fieldH + 5;
   }
@@ -405,11 +405,11 @@ void ReminderPanel::renderSetup(SDL_Renderer *renderer) {
 
   // "+ Add"
   addRect_ = {x_ + 5, btnY - 32, 56, 20};
-  SDL_SetRenderDrawColor(renderer, 20, 60, 20, 255);
+  SDL_SetRenderDrawColor(renderer, themes.success.r, themes.success.g, themes.success.b, 80);
   SDL_RenderFillRect(renderer, &addRect_);
-  SDL_SetRenderDrawColor(renderer, 50, 150, 50, 255);
+  SDL_SetRenderDrawColor(renderer, themes.success.r, themes.success.g, themes.success.b, 255);
   SDL_RenderDrawRect(renderer, &addRect_);
-  tex = cat->renderText(renderer, "+ Add", white, FontStyle::Caption, &tw, &th);
+  tex = cat->renderText(renderer, "+ Add", themes.text, FontStyle::Caption, &tw, &th);
   if (tex) {
     SDL_Rect tr = {addRect_.x + (addRect_.w - tw) / 2,
                    addRect_.y + (addRect_.h - th) / 2, tw, th};
@@ -419,11 +419,11 @@ void ReminderPanel::renderSetup(SDL_Renderer *renderer) {
 
   // "Auto-Pop"
   autoPopRect_ = {x_ + 65, btnY - 32, 72, 20};
-  SDL_SetRenderDrawColor(renderer, 20, 20, 80, 255);
+  SDL_SetRenderDrawColor(renderer, themes.info.r, themes.info.g, themes.info.b, 80);
   SDL_RenderFillRect(renderer, &autoPopRect_);
-  SDL_SetRenderDrawColor(renderer, 50, 50, 150, 255);
+  SDL_SetRenderDrawColor(renderer, themes.info.r, themes.info.g, themes.info.b, 255);
   SDL_RenderDrawRect(renderer, &autoPopRect_);
-  tex = cat->renderText(renderer, fetching_ ? "..." : "Auto-Pop", white,
+  tex = cat->renderText(renderer, fetching_ ? "..." : "Auto-Pop", themes.text,
                         FontStyle::Caption, &tw, &th);
   if (tex) {
     SDL_Rect tr = {autoPopRect_.x + (autoPopRect_.w - tw) / 2,
@@ -437,10 +437,10 @@ void ReminderPanel::renderSetup(SDL_Renderer *renderer) {
   SDL_SetRenderDrawColor(renderer, themes.danger.r, themes.danger.g,
                          themes.danger.b, 255);
   SDL_RenderFillRect(renderer, &cancelRect_);
-  SDL_SetRenderDrawColor(renderer, 255, 255, 255, 100);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
   SDL_RenderDrawRect(renderer, &cancelRect_);
   tex =
-      cat->renderText(renderer, "Cancel", white, FontStyle::Caption, &tw, &th);
+      cat->renderText(renderer, "Cancel", themes.bg, FontStyle::Caption, &tw, &th);
   if (tex) {
     SDL_Rect tr = {cancelRect_.x + (btnW - tw) / 2,
                    cancelRect_.y + (btnH - th) / 2, tw, th};
@@ -453,9 +453,9 @@ void ReminderPanel::renderSetup(SDL_Renderer *renderer) {
   SDL_SetRenderDrawColor(renderer, themes.success.r, themes.success.g,
                          themes.success.b, 255);
   SDL_RenderFillRect(renderer, &saveRect_);
-  SDL_SetRenderDrawColor(renderer, 255, 255, 255, 100);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
   SDL_RenderDrawRect(renderer, &saveRect_);
-  tex = cat->renderText(renderer, "Done", white, FontStyle::Caption, &tw, &th);
+  tex = cat->renderText(renderer, "Done", themes.bg, FontStyle::Caption, &tw, &th);
   if (tex) {
     SDL_Rect tr = {saveRect_.x + (btnW - tw) / 2, saveRect_.y + (btnH - th) / 2,
                    tw, th};
@@ -699,7 +699,7 @@ void ReminderPanel::renderReminderList(SDL_Renderer *renderer) {
   if (!config_.callsign.empty()) {
     std::string label = config_.callsign + " Renewal";
     std::string date = config_.callsignExpiry;
-    SDL_Color color = {200, 200, 200, 255};
+    SDL_Color color = themes.text;
     std::string status;
     if (date.empty()) {
       status = checking_ ? "Checking..." : "Unknown";
@@ -707,9 +707,9 @@ void ReminderPanel::renderReminderList(SDL_Renderer *renderer) {
       int days = daysUntil(date);
       status = formatDaysDuration(days);
       if (days < 30)
-        color = {255, 50, 50, 255};
+        color = themes.danger;
       else if (days < 90)
-        color = {255, 255, 50, 255};
+        color = themes.warning;
     }
 
     int tw, th;
@@ -741,11 +741,11 @@ void ReminderPanel::renderReminderList(SDL_Renderer *renderer) {
     int days = daysUntil(re.date);
     std::string status;
     status = formatDaysDuration(days);
-    SDL_Color color = {255, 255, 255, 255};
+    SDL_Color color = themes.text;
     if (days < 0)
-      color = {100, 100, 100, 255};
+      color = themes.textDim;
     else if (days < 10)
-      color = {255, 100, 100, 255};
+      color = themes.danger;
 
     int tw, th;
     SDL_Texture *tex = cat->renderText(renderer, re.label, color,

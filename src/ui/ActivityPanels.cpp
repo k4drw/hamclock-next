@@ -246,7 +246,7 @@ void ONTAPanel::render(SDL_Renderer *renderer) {
     int rowY = curY + static_cast<int>(i) * rowH;
     const auto &spot = currentSpots_[i];
     auto &cache = spotCache_[i];
-    SDL_Color color = getRowColor(static_cast<int>(i), {255, 255, 255, 255});
+    SDL_Color color = getRowColor(static_cast<int>(i), getThemeColors(theme_).text);
 
     // 1. Mode
     if (!cache.modeTex || cache.lastMode != spot.mode) {

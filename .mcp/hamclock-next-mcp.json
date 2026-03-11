@@ -61,7 +61,7 @@
     ],
     "data_template": "// src/core/{Name}Data.h\n#pragma once\n#include <string>\n#include <vector>\n#include <ctime>\n\nstruct {Name}Data {\n    // --- domain fields ---\n    bool valid = false;       // set true once first fetch succeeds\n    time_t lastUpdate = 0;    // unix timestamp of last successful fetch\n};\n",
     "provider_template": "// src/services/{Name}Provider.h\n#pragma once\n#include \"core/{Name}Data.h\"\n\nclass {Name}Provider {\npublic:\n    static {Name}Provider& instance();\n    void update();               // called on interval by main loop\n    const {Name}Data& data() const { return _data; }\nprivate:\n    {Name}Provider() = default;\n    {Name}Data _data;\n    time_t _nextFetch = 0;\n    static constexpr int FETCH_INTERVAL_S = 300;\n};\n",
-    "panel_template": "// src/ui/{Name}Panel.cpp\n#include \"{Name}Panel.h\"\n#include \"../core/Theme.h\"\n\nvoid {Name}Panel::render(SDL_Renderer* renderer) {\n    ThemeColors themes = getThemeColors(theme_);\n    \n    // Draw background\n    SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, themes.bg.a);\n    SDL_Rect r = {x_, y_, width_, height_};\n    SDL_RenderFillRect(renderer, &r);\n\n    // Standard button example (PascalCase Done/Cancel, semantic colors)\n    // SDL_Rect okBtn = {x_ + 10, y_ + height_ - 34, 80, 28};\n    // SDL_SetRenderDrawColor(renderer, themes.success.r, themes.success.g, themes.success.b, 255);\n    // SDL_RenderFillRect(renderer, &okBtn);\n}\n",
+    "panel_template": "// src/ui/{Name}Panel.cpp\n#include \"{Name}Panel.h\"\n#include \"../core/Theme.h\"\n\nvoid {Name}Panel::render(SDL_Renderer* renderer) {\n    ThemeColors themes = getThemeColors(theme_);\n    \n    // Draw background\n    SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, themes.bg.a);\n    SDL_Rect r = {x_, y_, width_, height_};\n    SDL_RenderFillRect(renderer, &r);\n\n    // IMPORTANT: Never hardcode SDL_Color values. Always use ThemeColors tokens\n    // (themes.text, themes.accent, themes.success, etc.).\n    // Example text:\n    // int tw, th;\n    // auto* cat = fontMgr_.catalog();\n    // cat->drawText(renderer, \"Hello\", x_ + 10, y_ + 10, themes.text, FontStyle::Fast);\n}\n",
     "important_notes": [
       "NetworkManager handles HTTP. Call NetworkManager::instance().get(url) \u2014 it returns cached data when ETag/Last-Modified hasn't changed.",
       "ConfigManager::instance().getConfig() for reading/modifying settings. ConfigManager::instance().save(cfg) to persist.",
@@ -1937,12 +1937,12 @@
   },
   "decisions": {
     "voacap_overlays": {
-      "decision": "VOACAP world map overlays (MUF/REL/TOA) are the highest-priority parity gap. The open-hamclock-backend already has a complete physics engine (voacap_service.py with NumPy vectorization). The decision is to proxy to OHB rather than port the Python/NumPy physics to C++.",
-      "rationale": "voacap_service.py is 722 lines of complex ionospheric physics with NumPy vectorization. Porting to C++ would be months of work and risk introducing bugs in the physics model. OHB is already in the repo. The proxy approach lets us ship parity quickly while leaving the C++ port as a future optimization.",
+      "decision": "VOACAP world map overlays (MUF/REL/TOA) are implemented using an internal C++ propagation engine (PropEngine.cpp). This replaces the earlier dependency on an external Python backend.",
+      "rationale": "Porting the physics model to C++ ensures single-binary distribution, zero-latency rendering, and offline capability. The implementation uses a high-fidelity ionospheric model calibrated against KC2G and original HamClock data points.",
       "implementation_path": [
-        "1. Add fetchVOACAP-MUF.pl and fetchVOACAP-TOA.pl to open-hamclock-backend (they call voacap_service.py which is already there)",
-        "2. Create src/services/VoacapProvider.cpp that fetches from /api/propagation/voacap \u2192 overlay_endpoint",
-        "3. Add SDL_Texture overlay blending in MapWidget (pattern: same as DX Cluster spots, but full-image texture)",
+        "1. Implement PropEngine::calculateMUF/calculateReliability/calculateTOA in C++",
+        "2. Create src/services/VoacapProvider.cpp to manage grid generation and caching",
+        "3. Add SDL_Texture overlay blending in MapWidget",
         "4. Add overlay toggle in MapViewMenu"
       ],
       "backend_free_path": "KC2G MUF-RT only \u2014 fetch https://prop.kc2g.com/renders/current/mufd-normal-now.png. No frequency/mode params. Covers the most common use case (current MUF conditions).",
@@ -1952,7 +1952,7 @@
   },
   "gotchas": {
     "propagation_overlay_alignment": {
-      "issue": "VOACAP overlays from open-hamclock-backend are 660x330 equirectangular (lat/lon grid). MapWidget's default view is azimuthal equidistant centered on DE. These projections do not align \u2014 you cannot simply blit the overlay PNG onto the map.",
+      "issue": "VOACAP overlays from the internal engine are 660x330 equirectangular (lat/lon grid). MapWidget's default view is azimuthal equidistant centered on DE. These projections do not align \u2014 you cannot simply blit the overlay PNG onto the map.",
       "solution_mvp": "Show the overlay in a separate flat-map panel (e.g., a secondary MapWidget or a dedicated OverlayPanel with equirectangular rendering). The original HamClock also had two map modes \u2014 'map A' (azimuthal) and 'map B' (flat). Implement a similar switch.",
       "solution_full": "Re-project the 660x330 pixel grid: for each screen pixel in MapWidget, compute its lat/lon via screenToLatLon(), look up the corresponding pixel in the equirectangular overlay, and blend. This is O(screen_w * screen_h) per frame but can be done once when the overlay updates (every 30 min).",
       "wasm_note": "In WASM mode, the KC2G MUF-RT PNG is fetched via the CORS proxy (/proxy/https://prop.kc2g.com/renders/current/mufd-normal-now.png). Ensure serve.py or the nginx cors-proxy.conf proxies that URL pattern.",
@@ -2131,10 +2131,10 @@
         {
           "endpoint": "/api/propagation/voacap",
           "method": "GET",
-          "description": "VOACAP overlay schema and proxy URL. Returns request/response schema, colormap, and (if OHB_URL env is set) the proxied endpoint URL on open-hamclock-backend.",
+          "description": "VOACAP overlay metadata. Returns request/response schema, colormap, and the computed grid metadata from the internal engine.",
           "params": "tx_lat, tx_lon, band (80m-6m), freq_mhz, hour_utc, year, month, path (0/1), mode (SSB/CW/FT8/WSPR/AM/RTTY), watts, overlay_type (muf/reliability/toa)",
           "curl": "curl 'http://localhost:8080/api/propagation/voacap?tx_lat=38.9&tx_lon=-77.0&band=20m&overlay_type=reliability' | jq",
-          "notes": "When OHB_URL env var is set, returns overlay_endpoint pointing to open-hamclock-backend. Otherwise returns kc2g_muf_rt fallback info. Colormaps included in response for all overlay types."
+          "notes": "Returns metadata for MUF, Reliability, or TOA overlays. Colormaps included in response for all overlay types."
         },
         {
           "endpoint": "/api/propagation/muf_rt",

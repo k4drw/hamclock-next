@@ -29,16 +29,13 @@ export function registerParityTools(server: McpServer) {
       const text = `--- Feature Parity Summary ---
 Overall Parity Score: ${summary.score}%
 Status Counts:
-${Object.entries(summary.counts).map(([status, count]) => `- ${status}: ${count}`).join('
-')}
+${Object.entries(summary.counts).map(([status, count]) => `- ${status}: ${count}`).join('\n')}
 
 --- Top Improvements ---
-${summary.improvements.map(item => `- ${item}`).join('
-')}
+${summary.improvements.map(item => `- ${item}`).join('\n')}
 
 --- Top Gaps ---
-${summary.gaps.map(item => `- ${item}`).join('
-')}`;
+${summary.gaps.map(item => `- ${item}`).join('\n')}`;
       return { content: [{ type: "text", text }] };
     }
   );
@@ -53,8 +50,7 @@ ${summary.gaps.map(item => `- ${item}`).join('
     async ({ status_filter, q }) => {
       const parityData = await loadParityData();
       const features = listFeatures(parityData, status_filter, q);
-      const text = features.map(f => `- [${f.status}] **${f.name}** (${f.feature_id})`).join('
-');
+      const text = features.map(f => `- [${f.status}] **${f.name}** (${f.feature_id})`).join('\n');
       return { content: [{ type: "text", text: text || "No features found." }] };
     }
   );
@@ -101,11 +97,7 @@ ${summary.gaps.map(item => `- ${item}`).join('
     async ({ statuses, limit }) => {
       const parityData = await loadParityData();
       const tickets = createBatchTickets(parityData, statuses, limit);
-      return { content: [{ type: "text", text: tickets.join('
-
----
-
-') || "No features match criteria." }] };
+      return { content: [{ type: "text", text: tickets.join('\n\n---\n\n') || "No features match criteria." }] };
     }
   );
 

@@ -1,9 +1,9 @@
 #include "Theme.h"
-#include "ConfigManager.h"
+#include <algorithm>
 #include <map>
 
 ThemeColors getThemeColors(const std::string &theme,
-                           const std::map<std::string, SDL_Color> *overrides) {
+                           const std::map<std::string, SDL_Color> &overrides) {
   ThemeColors colors;
 
   // Default semantic colors (status)
@@ -66,7 +66,7 @@ ThemeColors getThemeColors(const std::string &theme,
     colors.rowStripe1 = {0, 20, 0, 255};
     colors.rowStripe2 = {0, 10, 0, 255};
   } else {
-    // default (original HamClock-like colors often use dark backgrounds)
+    // default (dark)
     colors.bg = {20, 20, 25, 255};
     colors.border = {80, 80, 80, 255};
     colors.text = {255, 255, 255, 255};
@@ -76,15 +76,9 @@ ThemeColors getThemeColors(const std::string &theme,
     colors.rowStripe2 = {20, 20, 25, 255};
   }
 
-  // Apply overrides if theme is "custom" or for any theme if overrides exist
-  // We prioritize the "custom" theme.
-  if (theme == "custom") {
-    if (overrides) {
-      applyOverrides(colors, *overrides);
-    } else {
-      applyOverrides(colors,
-                     ConfigManager::instance().getConfig().colorOverrides);
-    }
+  // Apply overrides if theme is "custom" or for any theme if overrides exist.
+  if (!overrides.empty()) {
+    applyOverrides(colors, overrides);
   }
 
   return colors;
@@ -110,4 +104,13 @@ void applyOverrides(ThemeColors &colors,
   apply("danger", colors.danger);
   apply("warning", colors.warning);
   apply("info", colors.info);
+}
+
+std::vector<std::string> getAvailableThemes() {
+  return {"dark", "glass", "midnight", "amber", "paper", "matrix", "custom"};
+}
+
+bool themeExists(const std::string &theme) {
+  auto themes = getAvailableThemes();
+  return std::find(themes.begin(), themes.end(), theme) != themes.end();
 }

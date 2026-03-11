@@ -44,8 +44,7 @@ export function registerDiagnosticTools(server: McpServer) {
         check_leaks ? "- No leaked handles detected in MapWidget rotation." : "",
         check_churn ? "- Churn reduced by 40% via immediate surface scaling." : "",
       ];
-      return { content: [{ type: "text", text: analysis.filter(l => l !== "").join("
-") }] };
+      return { content: [{ type: "text", text: analysis.filter(l => l !== "").join("\n") }] };
     }
   );
 

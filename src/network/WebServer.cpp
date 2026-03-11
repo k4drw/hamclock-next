@@ -308,7 +308,7 @@ void WebServer::run() {
       <label>Callsign</label>
       <input type="text" id="call" maxlength="12">
       <label>Grid Square</label>
-      <input type="text" id="grid" maxlength="8">
+      <input type="text" id="grid" maxlength="6">
       <label>Latitude</label>
       <input type="number" id="lat" step="0.0001" min="-90" max="90">
       <label>Longitude</label>
@@ -321,23 +321,36 @@ void WebServer::run() {
   <div id="appearance" class="panel">
     <div class="card">
       <label>Color Theme</label>
-      <select id="theme">
-        <option value="default">Default (Orange)</option>
-        <option value="dark">Modern Dark</option>
-        <option value="glass">Glass</option>
-      </select>
+      <select id="theme">)HTML";
+    for (const auto &t : getAvailableThemes()) {
+      html += "<option value=\"" + t + "\">" + t + "</option>";
+    }
+    html += R"HTML(</select>
       <label>Map Style</label>
       <select id="map-style">
         <option value="nasa">NASA Blue Marble</option>
-        <option value="terrain">Terrain</option>
-        <option value="countries">Countries</option>
+        <option value="topo">Topography</option>
+        <option value="topo_bathy">Topo + Bathymetry</option>
       </select>
       <label>Projection</label>
       <select id="projection">
         <option value="equirectangular">Equirectangular</option>
         <option value="robinson">Robinson</option>
+        <option value="azimuthal">Azimuthal</option>
+        <option value="mercator">Mercator</option>
+        <option value="dual_azimuthal">Dual Azimuthal</option>
       </select>
-      <label style="margin-top:4px"><input type="checkbox" id="show-borders"> Show Country Borders</label>
+      <div style="display:flex; gap:15px; margin-bottom:10px">
+        <label><input type="checkbox" id="show-borders"> Borders</label>
+        <label><input type="checkbox" id="show-beacons"> Beacons</label>
+        <label><input type="checkbox" id="show-sattrack"> Sat Track</label>
+      </div>
+      <label>Grid Overlay</label>
+      <select id="grid-mode">
+        <option value="none">None</option>
+        <option value="latlon">Lat/Lon</option>
+        <option value="maidenhead">Maidenhead</option>
+      </select>
       <label>Propagation Overlay</label>
       <select id="prop-overlay">
         <option value="none">None</option>
@@ -651,6 +664,15 @@ void WebServer::run() {
         document.getElementById('map-style').value = c.mapStyle || 'nasa';
         document.getElementById('projection').value = c.projection || 'equirectangular';
         document.getElementById('show-borders').checked = !!c.showBorders;
+        document.getElementById('show-beacons').checked = !!c.showBeacons;
+        document.getElementById('show-sattrack').checked = !!c.showSatTrack;
+        
+        let gridVal = 'none';
+        if (c.showGrid) {
+          gridVal = (c.gridType === 'maidenhead') ? 'maidenhead' : 'latlon';
+        }
+        document.getElementById('grid-mode').value = gridVal;
+
         document.getElementById('prop-overlay').value = c.propOverlay || 'none';
         document.getElementById('weather-overlay').value = c.weatherOverlay || 'none';
         document.getElementById('night-lights').checked = !!c.mapNightLights;
@@ -681,13 +703,21 @@ void WebServer::run() {
       const mapStyle = document.getElementById('map-style').value;
       const projection = document.getElementById('projection').value;
       const showBorders = document.getElementById('show-borders').checked ? '1' : '0';
+      const showBeacons = document.getElementById('show-beacons').checked ? '1' : '0';
+      const showSatTrack = document.getElementById('show-sattrack').checked ? '1' : '0';
+      const gridMode = document.getElementById('grid-mode').value;
       const propOverlay = document.getElementById('prop-overlay').value;
       const wxOverlay = document.getElementById('weather-overlay').value;
       const nl = document.getElementById('night-lights').checked ? '1' : '0';
       const mu = document.getElementById('use-metric').checked ? '1' : '0';
       const dpm = document.getElementById('display-power-method').value;
+      
+      const showGrid = (gridMode !== 'none') ? '1' : '0';
+      const gridType = (gridMode === 'maidenhead') ? 'maidenhead' : 'latlon';
+
       const params = new URLSearchParams({
         theme, map_style: mapStyle, projection, show_borders: showBorders,
+        show_beacons: showBeacons, show_sattrack: showSatTrack, show_grid: showGrid, grid_type: gridType,
         prop_overlay: propOverlay, wx_overlay: wxOverlay, night_lights: nl, use_metric: mu,
         display_power_method: dpm
       });
@@ -1337,6 +1367,8 @@ void WebServer::run() {
     j["showGrid"] = cfg_->showGrid;
     j["gridType"] = cfg_->gridType;
     j["showBorders"] = cfg_->showBorders;
+    j["showBeacons"] = cfg_->showBeacons;
+    j["showSatTrack"] = cfg_->showSatTrack;
     j["mapNightLights"] = cfg_->mapNightLights;
     j["useMetric"] = cfg_->useMetric;
     j["propOverlay"] = propOverlayToString(cfg_->propOverlay);
@@ -1434,6 +1466,10 @@ void WebServer::run() {
       cfg_->showGrid = req.get_param_value("show_grid") == "1";
     if (req.has_param("show_borders"))
       cfg_->showBorders = req.get_param_value("show_borders") == "1";
+    if (req.has_param("show_beacons"))
+      cfg_->showBeacons = req.get_param_value("show_beacons") == "1";
+    if (req.has_param("show_sattrack"))
+      cfg_->showSatTrack = req.get_param_value("show_sattrack") == "1";
     if (req.has_param("night_lights"))
       cfg_->mapNightLights = req.get_param_value("night_lights") == "1";
     if (req.has_param("use_metric"))

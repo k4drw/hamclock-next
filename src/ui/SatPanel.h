@@ -35,7 +35,7 @@ public:
 
 private:
   void destroyCache();
-  void renderPolarPlot(SDL_Renderer *renderer, float cx, float cy, int radius);
+  void renderPolarPlot(SDL_Renderer *renderer, float cx, float cy, int radius, const ThemeColors& themes);
 
   FontManager &fontMgr_;
   TextureManager &texMgr_;

@@ -51,9 +51,8 @@ export function formatRepoMap(index: RepoIndex): string {
     .sort((a, b) => a.name.localeCompare(b.name));
 
   for (const s of classStructs) {
-    lines.push(`- ${s.kind} `${s.name}` in `${s.file}:${s.line}``);
+    lines.push(`- ${s.kind} \`${s.name}\` in \`${s.file}:${s.line}\``);
   }
 
-  return lines.join("
-");
+  return lines.join("\n");
 }

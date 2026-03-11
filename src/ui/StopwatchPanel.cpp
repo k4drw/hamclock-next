@@ -159,8 +159,14 @@ void StopwatchPanel::render(SDL_Renderer *renderer) {
     SDL_SetRenderDrawColor(renderer, border.r, border.g, border.b, border.a);
     SDL_RenderDrawRect(renderer, &r);
     int bw, bh;
-    SDL_Texture *t =
-        fontMgr_.renderText(renderer, label, themes.text, 9, &bw, &bh);
+    SDL_Color txtCol =
+        (bg.r == themes.success.r && bg.g == themes.success.g &&
+         bg.b == themes.success.b) ||
+                (bg.r == themes.danger.r && bg.g == themes.danger.g &&
+                 bg.b == themes.danger.b)
+            ? themes.bg
+            : themes.text;
+    SDL_Texture *t = fontMgr_.renderText(renderer, label, txtCol, 9, &bw, &bh);
     if (t) {
       SDL_Rect dst = {r.x + (r.w - bw) / 2, r.y + (r.h - bh) / 2, bw, bh};
       SDL_RenderCopy(renderer, t, nullptr, &dst);
@@ -243,9 +249,10 @@ void StopwatchPanel::renderSetup(SDL_Renderer *renderer) {
   SDL_SetRenderDrawColor(renderer, themes.success.r, themes.success.g,
                          themes.success.b, 255);
   SDL_RenderFillRect(renderer, &doneRect_);
-  SDL_SetRenderDrawColor(renderer, 255, 255, 255, 100);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
+                         themes.border.b, 100);
   SDL_RenderDrawRect(renderer, &doneRect_);
-  t = fontMgr_.renderText(renderer, "Done", white, 10, &tw, &th);
+  t = fontMgr_.renderText(renderer, "Done", themes.bg, 10, &tw, &th);
   if (t) {
     SDL_Rect tr = {doneRect_.x + (btnW - tw) / 2, doneRect_.y + (btnH - th) / 2,
                    tw, th};

@@ -105,7 +105,7 @@ void EMEToolPanel::render(SDL_Renderer *renderer) {
     char hlabel[8];
     std::snprintf(hlabel, sizeof(hlabel), "%dh", i / 2);
     cat->drawText(renderer, hlabel, px + 2, chartY + 2,
-                  {70, 90, 70, 255}, FontStyle::Caption);
+                  themes.textDim, FontStyle::Caption);
   }
 
   if (curve_.size() < 2)
@@ -140,7 +140,7 @@ void EMEToolPanel::render(SDL_Renderer *renderer) {
                                     themes.accent);
 
   // Mark current time (vertical red tick at x=0)
-  SDL_SetRenderDrawColor(renderer, 255, 60, 60, 255);
+  SDL_SetRenderDrawColor(renderer, themes.danger.r, themes.danger.g, themes.danger.b, themes.danger.a);
   SDL_RenderDrawLine(renderer, chartX, chartY, chartX, chartY + chartH);
 
   // Tooltip
@@ -148,7 +148,7 @@ void EMEToolPanel::render(SDL_Renderer *renderer) {
       tooltip_.index < (int)curve_.size()) {
     int idx = tooltip_.index;
     float tx = dePoints[idx].x;
-    SDL_SetRenderDrawColor(renderer, 200, 200, 200, 100);
+    SDL_SetRenderDrawColor(renderer, themes.text.r, themes.text.g, themes.text.b, 100);
     SDL_RenderDrawLine(renderer, (int)tx, chartY, (int)tx, chartY + chartH);
 
     std::time_t t = curveBase_ + idx * kIntervalSec;
@@ -160,7 +160,7 @@ void EMEToolPanel::render(SDL_Renderer *renderer) {
                   utc.tm_min, curve_[idx].deEl, curve_[idx].dxEl);
 
     int tw, th;
-    cat->renderText(renderer, tbuf, {255, 255, 255, 255}, FontStyle::Micro, &tw,
+    cat->renderText(renderer, tbuf, themes.text, FontStyle::Micro, &tw,
                     &th);
     SDL_Rect tipRect = {tooltip_.x + 10, tooltip_.y - th - 5, tw + 10, th + 6};
     if (tipRect.x + tipRect.w > x_ + width_)
@@ -169,12 +169,12 @@ void EMEToolPanel::render(SDL_Renderer *renderer) {
       tipRect.y = tooltip_.y + 10;
 
     SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 200);
+    SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, 200);
     SDL_RenderFillRect(renderer, &tipRect);
-    SDL_SetRenderDrawColor(renderer, 100, 100, 100, 255);
+    SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, themes.border.a);
     SDL_RenderDrawRect(renderer, &tipRect);
     cat->drawText(renderer, tbuf, tipRect.x + 5, tipRect.y + tipRect.h / 2,
-                  {255, 255, 255, 255}, FontStyle::Micro, false, false, true);
+                  themes.text, FontStyle::Micro, false, false, true);
   }
 
   // --- Info section ---
@@ -202,7 +202,7 @@ void EMEToolPanel::render(SDL_Renderer *renderer) {
     std::snprintf(buf, sizeof(buf), "Next window: %02d:%02d UTC",
                   tm.tm_hour, tm.tm_min);
     cat->drawText(renderer, buf, centerX, infoY + 22,
-                  SDL_Color{200, 255, 100, 255}, FontStyle::Caption, true,
+                  themes.success, FontStyle::Caption, true,
                   false, true);
   } else {
     cat->drawText(renderer, "No mutual window in 48h", centerX, infoY + 22,

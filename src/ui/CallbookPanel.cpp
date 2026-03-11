@@ -57,19 +57,19 @@ void CallbookPanel::render(SDL_Renderer *renderer) {
   curY += cat->ptSize(FontStyle::Micro) + 4;
 
   std::snprintf(locBuf, sizeof(locBuf), "Grid: %s", currentData_.grid.c_str());
-  cat->drawText(renderer, locBuf, centerX, curY, {0, 255, 150, 255},
+  cat->drawText(renderer, locBuf, centerX, curY, themes.success,
                 FontStyle::MicroBold, true);
   curY += cat->ptSize(FontStyle::MicroBold) + 15;
 
   // QSL Info (Badges)
   int badgeX = x_ + 20;
   if (currentData_.lotw) {
-    cat->drawText(renderer, "[LoTW]", badgeX, curY, {200, 200, 255, 255},
+    cat->drawText(renderer, "[LoTW]", badgeX, curY, themes.info,
                   FontStyle::Tiny);
     badgeX += 60;
   }
   if (currentData_.eqsl) {
-    cat->drawText(renderer, "[eQSL]", badgeX, curY, {200, 255, 200, 255},
+    cat->drawText(renderer, "[eQSL]", badgeX, curY, themes.success,
                   FontStyle::Tiny);
   }
 

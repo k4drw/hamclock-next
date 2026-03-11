@@ -167,7 +167,7 @@ void LiveSpotPanel::render(SDL_Renderer *renderer) {
       SDL_SetRenderDrawColor(renderer, bd.color.r, bd.color.g, bd.color.b, 255);
     } else {
       // Dark background for unselected bands
-      SDL_SetRenderDrawColor(renderer, 25, 25, 30, 255);
+      SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, 255);
     }
     SDL_Rect cellRect = {cx + gap, cy + gap, colW - 2 * gap, cellH - 2 * gap};
     SDL_RenderFillRect(renderer, &cellRect);
@@ -273,19 +273,19 @@ void LiveSpotPanel::renderSetup(SDL_Renderer *renderer) {
 
   // Mode: DE/DX
   SDL_Rect box = {lx, y, 16, 16};
-  SDL_SetRenderDrawColor(renderer, 50, 50, 60, 255);
+  SDL_SetRenderDrawColor(renderer, themes.rowStripe1.r, themes.rowStripe1.g, themes.rowStripe1.b, 255);
   SDL_RenderFillRect(renderer, &box);
-  SDL_SetRenderDrawColor(renderer, 100, 100, 120, 255);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
   SDL_RenderDrawRect(renderer, &box);
   if (pendingOfDe_) {
-    SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
+    SDL_SetRenderDrawColor(renderer, themes.success.r, themes.success.g, themes.success.b, 255);
     SDL_Rect inner = {lx + 3, y + 3, 10, 10};
     SDL_RenderFillRect(renderer, &inner);
   }
   modeCheckRect_ = {lx, y, width_ - 20, 16};
 
   t = fontMgr_.renderText(renderer, "Mode: DE (Map receivers hearing Me)",
-                          pendingOfDe_ ? white : white, cellFontSize_, &tw,
+                          white, cellFontSize_, &tw,
                           &th);
   // If not DE, it's DX
   if (!pendingOfDe_) {
@@ -302,12 +302,12 @@ void LiveSpotPanel::renderSetup(SDL_Renderer *renderer) {
 
   // Filter: Call/Grid
   box = {lx, y, 16, 16};
-  SDL_SetRenderDrawColor(renderer, 50, 50, 60, 255);
+  SDL_SetRenderDrawColor(renderer, themes.rowStripe1.r, themes.rowStripe1.g, themes.rowStripe1.b, 255);
   SDL_RenderFillRect(renderer, &box);
-  SDL_SetRenderDrawColor(renderer, 100, 100, 120, 255);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
   SDL_RenderDrawRect(renderer, &box);
   if (pendingUseCall_) {
-    SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
+    SDL_SetRenderDrawColor(renderer, themes.success.r, themes.success.g, themes.success.b, 255);
     SDL_Rect inner = {lx + 3, y + 3, 10, 10};
     SDL_RenderFillRect(renderer, &inner);
   }
@@ -332,9 +332,9 @@ void LiveSpotPanel::renderSetup(SDL_Renderer *renderer) {
   SDL_SetRenderDrawColor(renderer, themes.danger.r, themes.danger.g,
                          themes.danger.b, 255);
   SDL_RenderFillRect(renderer, &cancelBtnRect_);
-  SDL_SetRenderDrawColor(renderer, 255, 255, 255, 100);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
   SDL_RenderDrawRect(renderer, &cancelBtnRect_);
-  t = fontMgr_.renderText(renderer, "Cancel", white, cellFontSize_, &tw, &th);
+  t = fontMgr_.renderText(renderer, "Cancel", themes.bg, cellFontSize_, &tw, &th);
   if (t) {
     SDL_Rect tr = {cancelBtnRect_.x + (btnW - tw) / 2,
                    cancelBtnRect_.y + (btnH - th) / 2, tw, th};
@@ -347,9 +347,9 @@ void LiveSpotPanel::renderSetup(SDL_Renderer *renderer) {
   SDL_SetRenderDrawColor(renderer, themes.success.r, themes.success.g,
                          themes.success.b, 255);
   SDL_RenderFillRect(renderer, &doneBtnRect_);
-  SDL_SetRenderDrawColor(renderer, 255, 255, 255, 100);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
   SDL_RenderDrawRect(renderer, &doneBtnRect_);
-  t = fontMgr_.renderText(renderer, "Done", white, cellFontSize_, &tw, &th);
+  t = fontMgr_.renderText(renderer, "Done", themes.bg, cellFontSize_, &tw, &th);
   if (t) {
     SDL_Rect tr = {doneBtnRect_.x + (btnW - tw) / 2,
                    doneBtnRect_.y + (btnH - th) / 2, tw, th};

@@ -87,7 +87,7 @@ void CountdownPanel::render(SDL_Renderer *renderer) {
 
   if (diff <= 0 && targetTime_.time_since_epoch().count() > 0) {
     cat->drawText(renderer, "EVENT ACTIVE!", centerX, centerY + 5,
-                  {255, 0, 0, 255}, FontStyle::MicroBold, true);
+                  themes.danger, FontStyle::MicroBold, true);
     if (!alarmTriggered_) {
       SoundManager::getInstance().playAlarm();
       alarmTriggered_ = true;
@@ -110,7 +110,7 @@ void CountdownPanel::render(SDL_Renderer *renderer) {
   }
 
   cat->drawText(renderer, "Remaining", centerX, y_ + height_ - 14,
-                {100, 100, 100, 255}, FontStyle::Caption, true);
+                themes.textDim, FontStyle::Caption, true);
 
   if (editing_) {
     renderEditOverlay(renderer);
@@ -295,7 +295,8 @@ void CountdownPanel::renderEditOverlay(SDL_Renderer *renderer) {
   if (!editingTime_ && (SDL_GetTicks() / 500) % 2 == 0) {
     int tw = fontMgr_.getLogicalWidth(editVal.substr(0, editInput_.getCursorPos()),
                                       cat->ptSize(FontStyle::UI));
-    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+    SDL_SetRenderDrawColor(renderer, themes.text.r, themes.text.g, themes.text.b,
+                           255);
     SDL_RenderDrawLine(renderer, x_ + pad + 4 + tw, startY + 4,
                        x_ + pad + 4 + tw, startY + boxH - 4);
   }
@@ -320,7 +321,8 @@ void CountdownPanel::renderEditOverlay(SDL_Renderer *renderer) {
   if (editingTime_ && (SDL_GetTicks() / 500) % 2 == 0) {
     int tw = fontMgr_.getLogicalWidth(editVal.substr(0, editInput_.getCursorPos()),
                                       cat->ptSize(FontStyle::UI));
-    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+    SDL_SetRenderDrawColor(renderer, themes.text.r, themes.text.g, themes.text.b,
+                           255);
     SDL_RenderDrawLine(renderer, x_ + pad + 4 + tw, timeY + 4,
                        x_ + pad + 4 + tw, timeY + boxH - 4);
   }
@@ -336,10 +338,11 @@ void CountdownPanel::renderEditOverlay(SDL_Renderer *renderer) {
   SDL_SetRenderDrawColor(renderer, themes.danger.r, themes.danger.g,
                          themes.danger.b, 255);
   SDL_RenderFillRect(renderer, &cancelRect);
-  SDL_SetRenderDrawColor(renderer, 255, 255, 255, 100);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
+                         themes.border.b, 100);
   SDL_RenderDrawRect(renderer, &cancelRect);
   cat->drawText(renderer, "Cancel", cancelRect.x + btnW / 2,
-                cancelRect.y + btnH / 2, white, FontStyle::UI, true, false,
+                cancelRect.y + btnH / 2, themes.bg, FontStyle::UI, true, false,
                 true);
 
   // Done
@@ -347,10 +350,11 @@ void CountdownPanel::renderEditOverlay(SDL_Renderer *renderer) {
   SDL_SetRenderDrawColor(renderer, themes.success.r, themes.success.g,
                          themes.success.b, 255);
   SDL_RenderFillRect(renderer, &okRect);
-  SDL_SetRenderDrawColor(renderer, 255, 255, 255, 100);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
+                         themes.border.b, 100);
   SDL_RenderDrawRect(renderer, &okRect);
-  cat->drawText(renderer, "Done", okRect.x + btnW / 2, okRect.y + btnH / 2, white,
-                FontStyle::UI, true, false, true);
+  cat->drawText(renderer, "Done", okRect.x + btnW / 2, okRect.y + btnH / 2,
+                themes.bg, FontStyle::UI, true, false, true);
 
   SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
 }

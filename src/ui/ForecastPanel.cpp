@@ -77,7 +77,7 @@ void ForecastPanel::render(SDL_Renderer *renderer) {
     } else {
       std::snprintf(tempBuf, sizeof(tempBuf), "%d F", p.tempF);
     }
-    SDL_Color tempCol = {0, 200, 255, 255};
+    SDL_Color tempCol = themes.info;
     cat->drawText(renderer, tempBuf, x_ + width_ - pad, curY, tempCol,
                   FontStyle::Fast, false, true);
 
@@ -93,7 +93,7 @@ void ForecastPanel::render(SDL_Renderer *renderer) {
       char ppBuf[16];
       std::snprintf(ppBuf, sizeof(ppBuf), "%d%%", p.precipitationPercent);
       cat->drawText(renderer, ppBuf, x_ + width_ - pad,
-                    curY + nameFontSize_ + 1, {100, 160, 255, 255},
+                    curY + nameFontSize_ + 1, themes.accent,
                     FontStyle::Micro, false, true);
     }
 

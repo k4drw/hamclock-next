@@ -27,8 +27,7 @@ export function registerScaffoldTools(server: McpServer) {
         lines.push("```");
       }
 
-      return { content: [{ type: "text", text: lines.join("
-") }] };
+      return { content: [{ type: "text", text: lines.join("\n") }] };
     }
   );
 }

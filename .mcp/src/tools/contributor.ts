@@ -85,8 +85,7 @@ ${pc.philosophy}`);
           lines.push(`- ${k}: ${v}`);
         }
       }
-      return { content: [{ type: "text", text: lines.join("
-") }] };
+      return { content: [{ type: "text", text: lines.join("\n") }] };
     }
   );
 
@@ -139,15 +138,10 @@ ${pc.philosophy}`);
         "## Generated Files",
       ];
       for (const { file, content } of substituted) {
-        lines.push(`
-### ${file}
-```cpp
-${content}
-````);
+        lines.push(`\n### ${file}\n\`\`\`cpp\n${content}\n\`\`\``);
       }
 
-      return { content: [{ type: "text", text: lines.join("
-") }] };
+      return { content: [{ type: "text", text: lines.join("\n") }] };
     }
   );
 
@@ -185,9 +179,7 @@ ${content}
 
       if (prw) {
         lines.push(`- **Branch naming:** ${prw.fork_and_branch ?? "feature/<name> or fix/<name>"}`);
-        lines.push(`- **Commit format:** ${prw.commit_format ?? "feat: one-line summary
-
-- bullet list"}`);
+        lines.push(`- **Commit format:** ${prw.commit_format ?? "feat: one-line summary\n\n- bullet list"}`);
         if (Array.isArray(prw.pr_checklist)) {
           lines.push("- **PR Checklist:**");
           for (const item of prw.pr_checklist) {
@@ -200,7 +192,7 @@ ${content}
         "",
         "## Where to Start",
         "Run: `open_issues`                      → see what needs doing",
-        "Run: `parity_list` with status_filter=["PARTIAL","MISSING"]  → see parity gaps",
+        "Run: `parity_list` with status_filter=[\"PARTIAL\",\"MISSING\"]  → see parity gaps",
         "Run: `get_scaffolding_template SolarFlux` → get boilerplate for a new widget",
         "Run: `new_feature_checklist SolarFlux`    → registration checklist for a widget",
         "",
@@ -218,8 +210,7 @@ ${content}
         "- After task completion: stop and wait for next instruction",
       );
 
-      return { content: [{ type: "text", text: lines.join("
-") }] };
+      return { content: [{ type: "text", text: lines.join("\n") }] };
     }
   );
 
@@ -279,8 +270,7 @@ ${content}
         }
       }
 
-      return { content: [{ type: "text", text: lines.join("
-") }] };
+      return { content: [{ type: "text", text: lines.join("\n") }] };
     }
   );
 
@@ -298,21 +288,22 @@ ${content}
       if (type === "widget") {
         lines.push(`# New Widget Checklist: ${name}`, "");
         lines.push("## Files to Create");
-        lines.push(`1. `src/ui/${name}Panel.h`       — widget class declaration`);
-        lines.push(`2. `src/ui/${name}Panel.cpp`     — widget render + update logic`);
-        lines.push(`3. `src/services/${name}Provider.h/.cpp` — data fetch (if new data source needed)`, "");
+        lines.push(`1. \`src/ui/${name}Panel.h\`       — widget class declaration`);
+        lines.push(`2. \`src/ui/${name}Panel.cpp\`     — widget render + update logic`);
+        lines.push(`3. \`src/services/${name}Provider.h/.cpp\` — data fetch (if new data source needed)`, "");
         lines.push("## Files to Modify");
-        lines.push(`4. `src/core/WidgetType.h`         — add ${name.toUpperCase()} to enum`);
-        lines.push(`5. `src/ui/WidgetSelector.cpp`     — add entry to allTypes[] array`);
-        lines.push(`6. `CMakeLists.txt`                — add ${name}Panel.cpp to SOURCES`, "");
+        lines.push(`4. \`src/core/WidgetType.h\`         — add ${name.toUpperCase()} to enum`);
+        lines.push(`5. \`src/ui/WidgetSelector.cpp\`     — add entry to allTypes[] array`);
+        lines.push(`6. \`CMakeLists.txt\`                — add ${name}Panel.cpp to SOURCES`, "");
         lines.push("## Registration Pattern");
         lines.push("- See: `src/ui/ENVPanel.cpp` for a minimal single-file example (added 2026-03-02)");
         lines.push("- See: `src/ui/AsteroidPanel.cpp` for the data-provider pattern", "");
         lines.push("## Testing");
-        lines.push(`- Build: `cmake --build build --target hamclock-next``);
+        lines.push(`- Build: \`cmake --build build --target hamclock-next\``);
         lines.push(`- Open widget selector (gear icon), verify ${name} appears`);
         lines.push(`- Select it in a pane, verify it renders without crash`);
-        lines.push(`- Run 5 minutes, verify data updates`, "");
+        lines.push(`- Run 5 minutes, verify data updates`);
+        lines.push(`- Verify rendering uses ThemeColors tokens and strictly avoids hardcoded RGB literals.`, "");
       } else if (type === "endpoint") {
         lines.push(`# New REST Endpoint Checklist: ${name}`, "");
         lines.push("## File to Modify");
@@ -350,8 +341,7 @@ ${content}
       lines.push("4. Parity impact: [yes/no, explain]");
       lines.push("5. Risk: Low / Medium / High");
 
-      return { content: [{ type: "text", text: lines.join("
-") }] };
+      return { content: [{ type: "text", text: lines.join("\n") }] };
     }
   );
 }

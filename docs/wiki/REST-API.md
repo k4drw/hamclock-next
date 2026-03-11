@@ -86,7 +86,7 @@ Query internally gathered telemetry and spot data quickly.
 
 ## 6. Propagation API
 Get data necessary to render map overlays.
-- `GET /api/propagation/voacap` : Returns VOACAP propagation map metadata based on parameters for use with open-hamclock-backend.
+- `GET /api/propagation/voacap` : Returns VOACAP propagation map metadata directly from the internal propagation engine.
 - `GET /api/propagation/muf_rt` : Returns near-real-time Maximum Usable Frequency map metadata from KC2G.
 
 ## 7. Interactive & Diagnostics

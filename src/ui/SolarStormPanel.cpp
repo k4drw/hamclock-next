@@ -63,14 +63,14 @@ void SolarStormPanel::render(SDL_Renderer *renderer) {
   // Flare Class Label
   std::string sClass = "Last Flare: " + d.lastFlareClass;
   SDL_Color flareCol = (d.rScale >= SolarStormScale::Strong)
-                           ? SDL_Color{255, 100, 100, 255}
+                           ? themes.danger
                            : themes.text;
   cat->drawText(renderer, sClass, x_ + pad, curY, flareCol, FontStyle::Micro);
 
   // Alert if CME impact predicted
   if (d.cmeImpactPredicted) {
     cat->drawText(renderer, "!! CME ALERT !!", x_ + width_ - pad, curY,
-                  {255, 50, 50, 255}, FontStyle::Micro, false, true);
+                  themes.danger, FontStyle::Micro, false, true);
   }
 
   curY += 15;
@@ -128,6 +128,7 @@ void SolarStormPanel::onMouseMove(int mx, int my) {
 void SolarStormPanel::drawBadge(SDL_Renderer *renderer, int x, int y,
                                 const std::string &label,
                                 SolarStormScale scale) {
+  ThemeColors themes = getThemeColors(theme_);
   int bw = 32;
   int bh = 34;
   int centerX = x + (((width_ - 20) / 3) / 2); // Center within its column
@@ -135,31 +136,32 @@ void SolarStormPanel::drawBadge(SDL_Renderer *renderer, int x, int y,
 
   SDL_Color fill;
   if (scale == SolarStormScale::None)
-    fill = {50, 50, 50, 255};
+    fill = themes.rowStripe1;
   else if (scale == SolarStormScale::Minor)
-    fill = {200, 200, 0, 255};
+    fill = themes.warning;
   else if (scale == SolarStormScale::Moderate)
-    fill = {255, 165, 0, 255};
+    fill = themes.accent;
   else
-    fill = {255, 50, 50, 255};
+    fill = themes.danger;
 
   SDL_SetRenderDrawColor(renderer, fill.r, fill.g, fill.b, 255);
   SDL_RenderFillRect(renderer, &r);
-  SDL_SetRenderDrawColor(renderer, 255, 255, 255, 120);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 120);
   SDL_RenderDrawRect(renderer, &r);
 
   auto *cat = fontMgr_.catalog();
   // Label R/S/G
-  cat->drawText(renderer, label, r.x + bw / 2, r.y + 4, {255, 255, 255, 255},
+  cat->drawText(renderer, label, r.x + bw / 2, r.y + 4, themes.bg,
                 FontStyle::MicroBold, true);
   // Value 0-5
   cat->drawText(renderer, std::to_string((int)scale), r.x + bw / 2, r.y + 18,
-                {255, 255, 255, 255}, FontStyle::Fast, true);
+                themes.bg, FontStyle::Fast, true);
 }
 
 void SolarStormPanel::drawSparkline(SDL_Renderer *renderer, int x, int y, int w,
                                     int h, const float *values) {
-  SDL_SetRenderDrawColor(renderer, 50, 50, 50, 150);
+  ThemeColors themes = getThemeColors(theme_);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 150);
   SDL_Rect frame = {x, y, w, h};
   SDL_RenderDrawRect(renderer, &frame);
 
@@ -183,10 +185,10 @@ void SolarStormPanel::drawSparkline(SDL_Renderer *renderer, int x, int y, int w,
 
   if (lineTex) {
     RenderUtils::drawPolylineTextured(renderer, lineTex, pts.data(), 60, 1.5f,
-                                      {255, 200, 50, 255});
+                                      themes.warning);
   } else {
     RenderUtils::drawPolyline(renderer, pts.data(), 60, 1.5f,
-                              {255, 200, 50, 255});
+                              themes.warning);
   }
 }
 

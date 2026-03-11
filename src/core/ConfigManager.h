@@ -64,7 +64,7 @@ struct AppConfig {
   bool mapNightLights = true;
   bool useMetric = true;
   std::string projection = "equirectangular"; // or "robinson"
-  std::string mapStyle = "nasa";              // "nasa", "terrain", "countries"
+  std::string mapStyle = "nasa";              // "nasa", "topo", "topo_bathy"
   bool showGrid = false;
   std::string gridType = "latlon"; // "latlon" or "maidenhead"
   PropOverlayType propOverlay = PropOverlayType::None;

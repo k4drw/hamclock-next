@@ -47,12 +47,12 @@ void LightningPanel::render(SDL_Renderer *renderer) {
     SDL_Rect alertBox = {x_ + 5, curY, width_ - 10, 25};
     Uint32 ms = SDL_GetTicks();
     if ((ms / 500) % 2 == 0) { // Blink
-      SDL_SetRenderDrawColor(renderer, 200, 0, 0, 255);
+      SDL_SetRenderDrawColor(renderer, themes.danger.r, themes.danger.g, themes.danger.b, themes.danger.a);
     } else {
-      SDL_SetRenderDrawColor(renderer, 100, 0, 0, 255);
+      SDL_SetRenderDrawColor(renderer, themes.danger.r, themes.danger.g, themes.danger.b, 128);
     }
     SDL_RenderFillRect(renderer, &alertBox);
-    cat->drawText(renderer, "STRIKE NEARBY", x_ + width_/2, curY + 12, {255, 255, 255, 255}, FontStyle::MicroBold, true);
+    cat->drawText(renderer, "STRIKE NEARBY", x_ + width_/2, curY + 12, themes.bg, FontStyle::MicroBold, true);
     curY += 30;
   }
 

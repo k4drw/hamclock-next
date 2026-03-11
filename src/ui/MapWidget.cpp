@@ -854,13 +854,14 @@ void MapWidget::renderGreatCircle(SDL_Renderer *renderer) {
     return;
 
   if (greatCircleDirty_) {
+    ThemeColors themes = getThemeColors(theme_);
     greatCircleVerts_.clear();
     greatCircleIndices_.clear();
 
     const auto &path = cachedGreatCircle_;
     float thickness = 1.2f;
     float r = thickness / 2.0f;
-    SDL_Color color = {255, 255, 0, 255}; // Yellow
+    SDL_Color color = themes.accent; // Yellow -> Theme Accent
 
     std::vector<SDL_FPoint> segment;
     auto add_segment_geom = [&](const std::vector<SDL_FPoint> &seg) {
@@ -1401,11 +1402,11 @@ void MapWidget::render(SDL_Renderer *renderer) {
   // Render paths and dynamic markers
   renderGreatCircle(renderer);
 
-  renderMarker(renderer, state_->deLocation.lat, state_->deLocation.lon, 255,
-               165, 0);
+  renderMarker(renderer, state_->deLocation.lat, state_->deLocation.lon, themes.accent.r,
+               themes.accent.g, themes.accent.b);
   if (state_->dxActive) {
-    renderMarker(renderer, state_->dxLocation.lat, state_->dxLocation.lon, 0,
-                 255, 0);
+    renderMarker(renderer, state_->dxLocation.lat, state_->dxLocation.lon, themes.success.r,
+                 themes.success.g, themes.success.b);
   }
 
   renderSatellite(renderer);
@@ -1416,7 +1417,7 @@ void MapWidget::render(SDL_Renderer *renderer) {
   renderONTASpots(renderer);
   renderBeacons(renderer);
 
-  renderMarker(renderer, sunLat_, sunLon_, 255, 255, 0, MarkerShape::Circle,
+  renderMarker(renderer, sunLat_, sunLon_, themes.warning.r, themes.warning.g, 0, MarkerShape::Circle,
                true);
 
   if (config_.projection == "azimuthal" ||
@@ -1436,7 +1437,7 @@ void MapWidget::render(SDL_Renderer *renderer) {
   // Note: MapViewMenu is rendered via renderModal() in the centralized modal
   // pass, not here. This prevents clipping to the map pane bounds.
 
-  SDL_SetRenderDrawColor(renderer, 80, 80, 80, 255);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, themes.border.a);
   SDL_Rect border = {x_, y_, width_, height_};
   SDL_RenderDrawRect(renderer, &border);
 }
@@ -1476,6 +1477,7 @@ void MapWidget::renderSatFootprint(SDL_Renderer *renderer, double lat,
   SDL_RenderSetClipRect(renderer, &mapRect_);
   std::vector<SDL_FPoint> segment;
   SDL_Texture *lineTex = texMgr_.get(LINE_AA_KEY);
+  ThemeColors themes = getThemeColors(theme_);
 
   for (int i = 0; i <= kSegments; ++i) {
     double theta = 2.0 * M_PI * i / kSegments;
@@ -1509,7 +1511,7 @@ void MapWidget::renderSatFootprint(SDL_Renderer *renderer, double lat,
         if (segment.size() >= 2) {
           RenderUtils::drawPolylineTextured(renderer, lineTex, segment.data(),
                                             static_cast<int>(segment.size()),
-                                            2.0f, {255, 255, 0, 120});
+                                            2.0f, {themes.accent.r, themes.accent.g, themes.accent.b, 120});
         }
         segment.clear();
         segment.push_back(latLonToScreen(borderLat, -borderLon));
@@ -1521,7 +1523,7 @@ void MapWidget::renderSatFootprint(SDL_Renderer *renderer, double lat,
   if (segment.size() >= 2) {
     RenderUtils::drawPolylineTextured(renderer, lineTex, segment.data(),
                                       static_cast<int>(segment.size()), 2.0f,
-                                      {255, 255, 0, 120});
+                                      {themes.accent.r, themes.accent.g, themes.accent.b, 120});
   }
 
   SDL_RenderSetClipRect(renderer, nullptr);
@@ -1536,13 +1538,15 @@ void MapWidget::renderSatGroundTrack(SDL_Renderer *renderer) {
   if (!lineTex)
     return;
 
+  ThemeColors themes = getThemeColors(theme_);
+
   if (satTrackDirty_) {
     satTrackVerts_.clear();
     satTrackIndices_.clear();
 
     float thickness = 1.5f;
     float r = thickness / 2.0f;
-    SDL_Color color = {255, 200, 0, 150};
+    SDL_Color color = {themes.accent.r, themes.accent.g, themes.accent.b, 150};
 
     std::vector<SDL_FPoint> segment;
     auto add_segment_geom = [&](const std::vector<SDL_FPoint> &seg) {
@@ -2056,8 +2060,9 @@ void MapWidget::renderONTASpots(SDL_Renderer *renderer) {
 
   // Case-insensitive program check for color
   std::string lowerProg = StringUtils::toLower(spot.program);
-  SDL_Color color = (lowerProg == "pota") ? SDL_Color{50, 255, 50, 255}
-                                          : SDL_Color{0, 200, 255, 255};
+  ThemeColors themes = getThemeColors(theme_); // Added to access the current theme
+  SDL_Color color = (lowerProg == "pota") ? themes.success
+                                          : themes.info;
 
   LatLon de = state_->deLocation;
   auto path = Astronomy::calculateGreatCirclePath(de, {spotLat, spotLon}, 100);
@@ -2819,7 +2824,8 @@ void MapWidget::renderLegend(SDL_Renderer *renderer) {
   }
 
   auto *cat = fontMgr_.catalog();
-  SDL_Color txtCol = {220, 220, 220, 255};
+  ThemeColors themes = getThemeColors(config_.theme);
+  SDL_Color txtCol = themes.text;
 
   // Draw Title
   cat->drawText(renderer, title, lx + legendW / 2, ly - 10, txtCol,
@@ -2827,9 +2833,9 @@ void MapWidget::renderLegend(SDL_Renderer *renderer) {
 
   // Draw Legend Strip (gradient)
   SDL_Rect strip = {lx, ly, legendW, legendH};
-  SDL_SetRenderDrawColor(renderer, 40, 40, 40, 200);
+  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, 200);
   SDL_RenderFillRect(renderer, &strip);
-  SDL_SetRenderDrawColor(renderer, 100, 100, 100, 255);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
   SDL_RenderDrawRect(renderer, &strip);
 
   // Draw 10 segments to approximate the color scale
@@ -2959,7 +2965,8 @@ void MapWidget::renderWxMbLegend(SDL_Renderer *renderer) {
   }
 
   auto *cat = fontMgr_.catalog();
-  SDL_Color txtCol = {220, 220, 220, 255};
+  ThemeColors themes = getThemeColors(config_.theme);
+  SDL_Color txtCol = themes.text;
 
   // Draw Title
   cat->drawText(renderer, "Pressure (hPa)", lx + legendW / 2, ly - 10, txtCol,
@@ -2967,9 +2974,9 @@ void MapWidget::renderWxMbLegend(SDL_Renderer *renderer) {
 
   // Draw Legend Strip (gradient)
   SDL_Rect strip = {lx, ly, legendW, legendH};
-  SDL_SetRenderDrawColor(renderer, 40, 40, 40, 200);
+  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, 200);
   SDL_RenderFillRect(renderer, &strip);
-  SDL_SetRenderDrawColor(renderer, 100, 100, 100, 255);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
   SDL_RenderDrawRect(renderer, &strip);
 
   // Color stops match buildSegments:
@@ -3090,13 +3097,14 @@ void MapWidget::renderTooltip(SDL_Renderer *renderer) {
     by = tooltip_.y + 16; // flip below cursor
 
   // Background
+  ThemeColors themes = getThemeColors(config_.theme);
   SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-  SDL_SetRenderDrawColor(renderer, 20, 20, 20, 210);
+  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, 210);
   SDL_Rect bg = {bx, by, boxW, boxH};
   SDL_RenderFillRect(renderer, &bg);
 
   // Border
-  SDL_SetRenderDrawColor(renderer, 100, 100, 100, 200);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 200);
   SDL_RenderDrawRect(renderer, &bg);
 
   // Text (using cached texture)
@@ -3398,37 +3406,35 @@ void MapWidget::renderProjectionSelect(SDL_Renderer *renderer) {
   // Position at top-left of Widget (independent of centered mapRect_)
   projRect_ = {x_ + 4, y_ + 4, 100, 22};
 
+  ThemeColors themes = getThemeColors(config_.theme);
+
   // Draw semi-transparent background
   SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-  SDL_SetRenderDrawColor(renderer, 0, 0, 0, 180);
+  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, 180);
   SDL_RenderFillRect(renderer, &projRect_);
 
   // Border
-  SDL_SetRenderDrawColor(renderer, 150, 150, 150, 255);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
   SDL_RenderDrawRect(renderer, &projRect_);
 
   auto *cat = fontMgr_.catalog();
   // Text
   cat->drawText(renderer, label, projRect_.x + projRect_.w / 2,
-                projRect_.y + projRect_.h / 2, {200, 200, 200, 255},
+                projRect_.y + projRect_.h / 2, themes.text,
                 FontStyle::Micro, true, false, true);
 }
 
 void MapWidget::renderRssButton(SDL_Renderer *renderer) {
-  // Draw "RSS" toggle button at top-right of the map area, symmetric with the
-  // "Map View ▼" button at top-left. Positioned here so it is never covered
-  // by the RSSBanner, which is a separate widget rendered after MapWidget in
-  // the main loop and occupies the bottom strip of the screen.
-  // Green border/text = enabled; gray = disabled.
-  // Position at top-right of Widget
+  // Draw "RSS" toggle button at top-right of the map area
   rssRect_ = {x_ + width_ - 48, y_ + 4, 44, 22};
 
+  ThemeColors themes = getThemeColors(config_.theme);
+
   SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-  SDL_SetRenderDrawColor(renderer, 0, 0, 0, 160);
+  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, 160);
   SDL_RenderFillRect(renderer, &rssRect_);
 
-  SDL_Color col = config_.rssEnabled ? SDL_Color{80, 220, 80, 255}
-                                     : SDL_Color{90, 90, 90, 255};
+  SDL_Color col = config_.rssEnabled ? themes.success : themes.textDim;
   SDL_SetRenderDrawColor(renderer, col.r, col.g, col.b, col.a);
   SDL_RenderDrawRect(renderer, &rssRect_);
 

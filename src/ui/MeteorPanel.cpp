@@ -110,7 +110,8 @@ void MeteorPanel::onMouseMove(int mx, int my) {
 }
 
 void MeteorPanel::drawGraph(SDL_Renderer *renderer, int x, int y, int w, int h, const float* values) {
-  SDL_SetRenderDrawColor(renderer, 50, 50, 50, 150);
+  ThemeColors themes = getThemeColors(theme_);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 150);
   SDL_Rect frame = {x, y, w, h};
   SDL_RenderDrawRect(renderer, &frame);
 
@@ -128,9 +129,9 @@ void MeteorPanel::drawGraph(SDL_Renderer *renderer, int x, int y, int w, int h, 
   }
 
   if (lineTex) {
-    RenderUtils::drawPolylineTextured(renderer, lineTex, pts.data(), 24, 2.0f, {100, 150, 255, 255});
+    RenderUtils::drawPolylineTextured(renderer, lineTex, pts.data(), 24, 2.0f, themes.info);
   } else {
-    RenderUtils::drawPolyline(renderer, pts.data(), 24, 1.5f, {100, 150, 255, 255});
+    RenderUtils::drawPolyline(renderer, pts.data(), 24, 1.5f, themes.info);
   }
 }
 
