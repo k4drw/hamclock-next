@@ -227,18 +227,20 @@ void TimePanel::render(SDL_Renderer *renderer) {
     // Pause / Next buttons — stacked above the gear icon (same column)
     auto *cat = fontMgr_.catalog();
     if (cat) {
-      SDL_Color ctrlColor = {120, 120, 120, 255};
-      SDL_Color activeColor = {0, 200, 255, 255};
       int btnSize = gearSize_ + 4;
       int btnGap = 3;
       int btnX = gearRect_.x + (gearRect_.w - btnSize) / 2;
 
       // Pause/Resume — directly above gear (persistent state, close to gear)
       pauseRect_ = {btnX, gearRect_.y - btnSize - btnGap, btnSize, btnSize};
-      SDL_SetRenderDrawColor(renderer, 30, 30, 40, 255);
+      SDL_Color pauseBg = rotationPaused_ ? themes.accent : themes.rowStripe1;
+      SDL_SetRenderDrawColor(renderer, pauseBg.r, pauseBg.g, pauseBg.b, 255);
       SDL_RenderFillRect(renderer, &pauseRect_);
+      SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
+      SDL_RenderDrawRect(renderer, &pauseRect_);
+
       const char *pauseLabel = rotationPaused_ ? "|>" : "||";
-      SDL_Color pauseColor = rotationPaused_ ? activeColor : ctrlColor;
+      SDL_Color pauseColor = rotationPaused_ ? themes.bg : themes.text;
       cat->drawText(renderer, pauseLabel,
                     pauseRect_.x + pauseRect_.w / 2,
                     pauseRect_.y + pauseRect_.h / 2,
@@ -246,12 +248,15 @@ void TimePanel::render(SDL_Renderer *renderer) {
 
       // Next — above Pause (one-shot action floats to top)
       nextRect_ = {btnX, pauseRect_.y - btnSize - btnGap, btnSize, btnSize};
-      SDL_SetRenderDrawColor(renderer, 30, 30, 40, 255);
+      SDL_SetRenderDrawColor(renderer, themes.rowStripe1.r, themes.rowStripe1.g, themes.rowStripe1.b, 255);
       SDL_RenderFillRect(renderer, &nextRect_);
+      SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
+      SDL_RenderDrawRect(renderer, &nextRect_);
+
       cat->drawText(renderer, ">>",
                     nextRect_.x + nextRect_.w / 2,
                     nextRect_.y + nextRect_.h / 2,
-                    ctrlColor, FontStyle::Caption, true, false, true);
+                    themes.text, FontStyle::Caption, true, false, true);
     }
   }
 
@@ -291,16 +296,14 @@ void TimePanel::render(SDL_Renderer *renderer) {
   // --- Time: HH:MM (large, white) + SS (superscript, gray) ---
   if (!hmTex_ || currentHM_ != lastHM_ || hmFontSize_ != lastHmFontSize_) {
     MemoryMonitor::getInstance().destroyTexture(hmTex_);
-    SDL_Color white = {255, 255, 255, 255};
-    hmTex_ = fontMgr_.renderText(renderer, currentHM_, white, hmFontSize_,
+    hmTex_ = fontMgr_.renderText(renderer, currentHM_, themes.text, hmFontSize_,
                                  &hmW_, &hmH_);
     lastHM_ = currentHM_;
     lastHmFontSize_ = hmFontSize_;
   }
   if (!secTex_ || currentSec_ != lastSec_ || secFontSize_ != lastSecFontSize_) {
     MemoryMonitor::getInstance().destroyTexture(secTex_);
-    SDL_Color white = {255, 255, 255, 255};
-    secTex_ = fontMgr_.renderText(renderer, currentSec_, white, secFontSize_,
+    secTex_ = fontMgr_.renderText(renderer, currentSec_, themes.text, secFontSize_,
                                   &secW_, &secH_, true);
     lastSec_ = currentSec_;
     lastSecFontSize_ = secFontSize_;

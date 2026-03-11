@@ -45,11 +45,11 @@ void CallsignClock::render(SDL_Renderer *renderer) {
   if (!fontMgr_.ready())
     return;
 
-  ThemeColors themes = getThemeColors("default");
+  ThemeColors themes = getThemeColors(theme_);
   auto *cat = fontMgr_.catalog();
 
   // Draw pane border
-  SDL_SetRenderDrawColor(renderer, 80, 80, 80, 255);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
   SDL_Rect border = {x_, y_, width_, height_};
   SDL_RenderDrawRect(renderer, &border);
 
@@ -60,8 +60,7 @@ void CallsignClock::render(SDL_Renderer *renderer) {
 
   // Callsign (large, colored)
   if (!callTex_) {
-    SDL_Color orange = {255, 165, 0, 255};
-    callTex_ = cat->renderText(renderer, callsign_, orange,
+    callTex_ = cat->renderText(renderer, callsign_, themes.accent,
                                FontStyle::MediumBold, &callW_, &callH_);
   }
   if (callTex_) {
@@ -75,8 +74,7 @@ void CallsignClock::render(SDL_Renderer *renderer) {
     if (timeTex_) {
       MemoryMonitor::getInstance().destroyTexture(timeTex_);
     }
-    SDL_Color white = {255, 255, 255, 255};
-    timeTex_ = cat->renderText(renderer, currentTime_, white,
+    timeTex_ = cat->renderText(renderer, currentTime_, themes.text,
                                FontStyle::SmallBold, &timeW_, &timeH_);
     lastTime_ = currentTime_;
   }
@@ -91,8 +89,7 @@ void CallsignClock::render(SDL_Renderer *renderer) {
     if (dateTex_) {
       MemoryMonitor::getInstance().destroyTexture(dateTex_);
     }
-    SDL_Color cyan = {0, 200, 255, 255};
-    dateTex_ = cat->renderText(renderer, currentDate_, cyan,
+    dateTex_ = cat->renderText(renderer, currentDate_, themes.textDim,
                                FontStyle::SmallRegular, &dateW_, &dateH_);
     lastDate_ = currentDate_;
   }

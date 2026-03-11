@@ -200,10 +200,11 @@ void ONTAPanel::render(SDL_Renderer *renderer) {
   // Render concept: Semi-transparent black background + border matching text
   // color
   SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-  SDL_SetRenderDrawColor(renderer, 0, 0, 0, 160);
+  SDL_Color btnBg = themes.rowStripe1;
+  SDL_SetRenderDrawColor(renderer, btnBg.r, btnBg.g, btnBg.b, 160);
   SDL_RenderFillRect(renderer, &btnRect);
 
-  SDL_SetRenderDrawColor(renderer, chipColor.r, chipColor.g, chipColor.b, 255);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
   SDL_RenderDrawRect(renderer, &btnRect);
 
   cat->drawText(renderer, chip, btnRect.x + btnRect.w / 2,

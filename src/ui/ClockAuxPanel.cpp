@@ -416,6 +416,11 @@ bool ClockAuxPanel::onMouseUp(int mx, int my, Uint16 /*mod*/, int /*clicks*/) {
         customSelected_ = false;
         customOffsetInput_.setActive(false);
         customLabelInput_.setActive(false);
+        // Apply preset to config immediately
+        config_.auxClockTzOffset = kPresets[i].offset;
+        config_.auxClockTzLabel = kPresets[i].label;
+        tzPresetIndex_ = i;
+        cfgMgr_.save(config_);
       } else {
         customSelected_ = true;
         if (customOffsetInput_.getValue().empty()) {

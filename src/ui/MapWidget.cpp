@@ -1168,8 +1168,8 @@ void MapWidget::renderNightOverlay(SDL_Renderer *renderer) {
 }
 
 void MapWidget::render(SDL_Renderer *renderer) {
-
-  SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+  ThemeColors themes = getThemeColors(theme_);
+  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, 255);
   SDL_Rect bg = {x_, y_, width_, height_};
   SDL_RenderFillRect(renderer, &bg);
 
@@ -3514,7 +3514,8 @@ void MapWidget::renderModal(SDL_Renderer *renderer) {
 
 void MapWidget::renderAzimuthalMask(SDL_Renderer *renderer) {
   SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
-  SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+  ThemeColors themes = getThemeColors(theme_);
+  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, 255);
 
   if (config_.projection == "dual_azimuthal") {
     // Two side-by-side circles
