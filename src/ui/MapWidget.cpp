@@ -2674,11 +2674,11 @@ void MapWidget::updatePropagationOverlay() {
   PropOverlayType overlayType = config_.propOverlay;
 
   // MUF (RT) uses real-time ionosonde data; VOACAP/Reliability use solar models
-  auto *ionoProvider = (overlayType == PropOverlayType::Muf) ? iono_ : nullptr;
+  std::shared_ptr<IonosondeProvider> provider = (overlayType == PropOverlayType::Muf) ? iono_ : nullptr;
 
-  WorkerService::getInstance().submitTask([params, sw, ionoProvider, outputType,
+  WorkerService::getInstance().submitTask([params, sw, provider, outputType,
                                            overlayType]() {
-    auto grid = PropEngine::generateGrid(params, sw, ionoProvider, outputType);
+    auto grid = PropEngine::generateGrid(params, sw, provider.get(), outputType);
 
     auto *result = new std::vector<float>(std::move(grid));
     SDL_Event event;

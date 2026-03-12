@@ -91,7 +91,7 @@ public:
   void setMufRtProvider(MufRtProvider *p) { mufrt_ = p; }
   void setCloudProvider(CloudProvider *p) { clouds_ = p; }
   void setBeaconProvider(BeaconProvider *p) { beacons_ = p; }
-  void setIonosondeProvider(IonosondeProvider *p) { iono_ = p; }
+  void setIonosondeProvider(std::shared_ptr<IonosondeProvider> p) { iono_ = std::move(p); }
   void setSolarDataStore(SolarDataStore *s) { solar_ = s; }
 
   std::shared_ptr<WxMbProvider> getWxMbProvider() const { return wxmb_; }
@@ -159,7 +159,7 @@ private:
   CloudProvider *clouds_ = nullptr;
   std::shared_ptr<WxMbProvider> wxmb_;
   BeaconProvider *beacons_ = nullptr;
-  IonosondeProvider *iono_ = nullptr;
+  std::shared_ptr<IonosondeProvider> iono_;
   SolarDataStore *solar_ = nullptr;
   OrbitPredictor *predictor_ = nullptr;
   AsteroidProvider *asteroidProvider_ = nullptr;

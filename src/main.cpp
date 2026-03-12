@@ -1049,7 +1049,6 @@ DashboardContext::DashboardContext(AppContext &ctx)
 
   callbookProvider =
       std::make_shared<CallbookProvider>(netManager, callbookStore);
-  callbookProvider->lookup("K1ABC");
 
   dstProvider = std::make_shared<DstProvider>(netManager, dstStore);
   if (isMasterMode || isWidgetConfigured(WidgetType::DST_INDEX))
@@ -1680,7 +1679,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
   mapArea->setAuroraStore(auroraHistoryStore);
   mapArea->setAuroraMapStore(auroraMapStore);
   mapArea->setDrapStore(ctx.drapDataStore);
-  mapArea->setIonosondeProvider(ionosondeProvider.get());
+  mapArea->setIonosondeProvider(ionosondeProvider);
   mapArea->setSolarDataStore(ctx.solarStore.get());
   mapArea->setActivityStore(ctx.activityStore);
 
