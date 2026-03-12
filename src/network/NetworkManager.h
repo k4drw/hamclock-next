@@ -6,6 +6,7 @@
 #include <filesystem>
 #include <functional>
 #include <mutex>
+#include <set>
 #include <string>
 #include <unordered_map>
 
@@ -49,6 +50,9 @@ private:
   std::string hubIp_;
   int         hubPort_  = 8080;
   std::mutex  hubMutex_;
+
+  std::set<std::string> activeFetches_;
+  std::mutex fetchMutex_;
 
   // Helper to compute safe filename for a URL (e.g. simple hash)
   std::string hashUrl(const std::string &url);

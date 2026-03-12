@@ -131,6 +131,16 @@ void NetworkManager::fetchAsync(const std::string &url,
         callback(cached.data);
         return;
       } else {
+        // Deduplicate in-flight disk loads
+        {
+          std::lock_guard<std::mutex> lock(fetchMutex_);
+          if (activeFetches_.count(url)) {
+            LOG_T("NetworkManager", "Fetch or Disk load already in progress for {}, skipping redundant request", url);
+            return;
+          }
+          activeFetches_.insert(url);
+        }
+
         LOG_T("NetworkManager",
               "Memory record found but no data (too large), loading from disk "
               "for {}",
@@ -150,12 +160,35 @@ void NetworkManager::fetchAsync(const std::string &url,
                           (std::istreambuf_iterator<char>()));
             }
           }
+          // Cleanup lock and call callback
+          {
+            std::lock_guard<std::mutex> lock(fetchMutex_);
+            activeFetches_.erase(url);
+          }
           callback(data);
         }).detach();
         return;
       }
     }
   }
+
+  // Deduplicate in-flight network fetches
+  {
+    std::lock_guard<std::mutex> lock(fetchMutex_);
+    if (activeFetches_.count(url)) {
+      LOG_T("NetworkManager", "Network fetch already in progress for {}, skipping redundant request", url);
+      return;
+    }
+    activeFetches_.insert(url);
+  }
+
+  auto safeCallback = [this, url, callback = std::move(callback)](std::string data) {
+    {
+      std::lock_guard<std::mutex> lock(fetchMutex_);
+      activeFetches_.erase(url);
+    }
+    callback(data);
+  };
 
 #ifdef __EMSCRIPTEN__
   std::string fetchUrl = url;
@@ -175,7 +208,7 @@ void NetworkManager::fetchAsync(const std::string &url,
     std::string url;
     std::function<void(std::string)> cb;
   };
-  auto *ctx = new FetchCtx{this, url, callback};
+  auto *ctx = new FetchCtx{this, url, std::move(safeCallback)};
   attr.userData = ctx;
 
   attr.onsuccess = [](emscripten_fetch_t *fetch) {
@@ -225,7 +258,7 @@ void NetworkManager::fetchAsync(const std::string &url,
       
       LOG_D("NetworkManager", "Hub client: Proxying request for {} to Hub at {}", url, hubUrl);
 
-      std::thread([this, hubUrl, url, callback = std::move(callback), hasCache,
+      std::thread([this, hubUrl, url, callback = std::move(safeCallback), hasCache,
                    cached]() mutable {
         std::string body = fetchFromHubSync(hubUrl);
         if (!body.empty()) {
@@ -248,7 +281,7 @@ void NetworkManager::fetchAsync(const std::string &url,
     }
   }
   // --- Direct fetch ---
-  std::thread([this, url, callback = std::move(callback), hasCache,
+  std::thread([this, url, callback = std::move(safeCallback), hasCache,
                cached]() mutable {
     fetchDirect(url, std::move(callback), hasCache, cached);
   }).detach();

@@ -113,6 +113,7 @@ public:
   // Thread-safe method for receiving data from background threads
   void onSatTrackReady(const std::vector<GroundTrackPoint> &track);
   void onPropDataReady(PropOverlayType type, const std::vector<float> &grid);
+  void onMapImageReady(bool night, std::string &&data);
 
 private:
   SDL_FPoint latLonToScreen(double lat, double lon) const;

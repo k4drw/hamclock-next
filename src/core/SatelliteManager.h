@@ -34,6 +34,9 @@ public:
   explicit SatelliteManager(NetworkManager &net);
   void fetch(bool force = false);
 
+  // Thread-safe method for receiving data from background threads
+  void onDataReady(const std::string &raw);
+
   // Deprecated: Tracking logic moved to RotatorService
   void update();
 

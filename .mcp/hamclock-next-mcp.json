@@ -1635,10 +1635,13 @@
         "src/main.cpp"
       ],
       "gotchas": [
-        "RSS button must be placed at top-right (not bottom-left) of map area \u2014 RSSBanner is a separate widget rendered AFTER MapWidget in the main loop and will paint over anything at the bottom edge.",
-        "ONTAPanel lambda capture: inner setOnFilterChanged callbacks must use [&ctx] not [this] \u2014 addToPool is a [&] lambda with no enclosing class.",
+        "RSS button must be placed at top-right (not bottom-left) of map area — RSSBanner is a separate widget rendered AFTER MapWidget in the main loop and will paint over anything at the bottom edge.",
+        "ONTAPanel lambda capture: inner setOnFilterChanged callbacks must use [&ctx] not [this] — addToPool is a [&] lambda with no enclosing class.",
         "Contest row hit-testing: rowRects_/displayedIndices_ rebuilt each frame in render() to stay correct after scroll/resize/data change.",
-        "isModalActive() must return true while popup is open \u2014 PaneContainer routes all events to the active widget when modal is active."
+        "isModalActive() must return true while popup is open — PaneContainer routes all events to the active widget when modal is active.",
+        "DashboardContext Self-Validation Pattern: Async callbacks MUST capture DashboardContext* and validate 'ctx.dashboard.get() == self' before accessing members to prevent segfaults on dashboard reset.",
+        "Network Deduplication: NetworkManager::fetchAsync automatically deduplicates concurrent requests for the same URL; no manual guarding needed in providers.",
+        "Event-Driven UI Updates: For heavy assets (maps, moon images) or long-lived background tasks, use SDL_PushEvent(AE_...) to deliver results to the main thread securely."
       ]
     },
     "phase_44": {

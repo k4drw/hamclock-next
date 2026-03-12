@@ -997,9 +997,9 @@ DashboardContext::DashboardContext(AppContext &ctx)
 
   // Re-fetch POTA spots once the parks CSV is parsed so spots get coordinates.
   // The CSV is read/parsed in a background thread; spots often arrive first.
-  ActivityLocationManager::getInstance().setOnParksReady([this]() {
-    if (activityProvider)
-      activityProvider->fetch();
+  ActivityLocationManager::getInstance().setOnParksReady([&ctx, self = this]() {
+    if (ctx.dashboard.get() == self && self->activityProvider)
+      self->activityProvider->fetch();
   });
 
   dxcProvider = std::make_unique<DXClusterProvider>(
@@ -1112,49 +1112,58 @@ DashboardContext::DashboardContext(AppContext &ctx)
   santaProvider->update();
 
   tropoProvider = std::make_unique<TropoProvider>(netManager);
-  tropoProvider->setCallback([this](const TropoData &d) {
-    if (widgetPool.count(WidgetType::TROPO)) {
-      static_cast<TropoPanel *>(widgetPool[WidgetType::TROPO].get())
+  tropoProvider->setCallback([&ctx, self = this](const TropoData &d) {
+    if (ctx.dashboard.get() == self &&
+        self->widgetPool.count(WidgetType::TROPO)) {
+      static_cast<TropoPanel *>(self->widgetPool[WidgetType::TROPO].get())
           ->updateData(d);
     }
   });
 
   lightningProvider = std::make_shared<LightningProvider>(netManager);
-  lightningProvider->setCallback([this](const LightningData &d) {
-    if (widgetPool.count(WidgetType::LIGHTNING)) {
-      static_cast<LightningPanel *>(widgetPool[WidgetType::LIGHTNING].get())
+  lightningProvider->setCallback([&ctx, self = this](const LightningData &d) {
+    if (ctx.dashboard.get() == self &&
+        self->widgetPool.count(WidgetType::LIGHTNING)) {
+      static_cast<LightningPanel *>(
+          self->widgetPool[WidgetType::LIGHTNING].get())
           ->updateData(d);
     }
   });
 
   meteorProvider = std::make_unique<MeteorProvider>();
-  meteorProvider->setCallback([this](const MeteorData &d) {
-    if (widgetPool.count(WidgetType::METEOR)) {
-      static_cast<MeteorPanel *>(widgetPool[WidgetType::METEOR].get())
+  meteorProvider->setCallback([&ctx, self = this](const MeteorData &d) {
+    if (ctx.dashboard.get() == self &&
+        self->widgetPool.count(WidgetType::METEOR)) {
+      static_cast<MeteorPanel *>(self->widgetPool[WidgetType::METEOR].get())
           ->updateData(d);
     }
   });
 
   solarStormProvider = std::make_shared<SolarStormProvider>(netManager);
-  solarStormProvider->setCallback([this](const SolarStormData &d) {
-    if (widgetPool.count(WidgetType::SOLAR_STORM)) {
-      static_cast<SolarStormPanel *>(widgetPool[WidgetType::SOLAR_STORM].get())
-          ->updateData(d);
-    }
-  });
+  solarStormProvider->setCallback(
+      [&ctx, self = this](const SolarStormData &d) {
+        if (ctx.dashboard.get() == self &&
+            self->widgetPool.count(WidgetType::SOLAR_STORM)) {
+          static_cast<SolarStormPanel *>(
+              self->widgetPool[WidgetType::SOLAR_STORM].get())
+              ->updateData(d);
+        }
+      });
 
   ionosondeProvider = std::make_shared<IonosondeProvider>(netManager);
-  ionosondeProvider->setCallback([this](const IonosondeData &d) {
-    if (widgetPool.count(WidgetType::IONOSONDE)) {
-      static_cast<IonosondePanel *>(widgetPool[WidgetType::IONOSONDE].get())
+  ionosondeProvider->setCallback([&ctx, self = this](const IonosondeData &d) {
+    if (ctx.dashboard.get() == self &&
+        self->widgetPool.count(WidgetType::IONOSONDE)) {
+      static_cast<IonosondePanel *>(
+          self->widgetPool[WidgetType::IONOSONDE].get())
           ->updateData(d);
     }
   });
 
   reachProvider = std::make_shared<ReachProvider>(netManager, state);
-  reachProvider->setCallback([this](const ReachData &d) {
-    if (mapArea) {
-      mapArea->onPropDataReady(PropOverlayType::Heatmap, d.grid);
+  reachProvider->setCallback([&ctx, self = this](const ReachData &d) {
+    if (ctx.dashboard.get() == self && self->mapArea) {
+      self->mapArea->onPropDataReady(PropOverlayType::Heatmap, d.grid);
     }
   });
 
@@ -2236,6 +2245,24 @@ void DashboardContext::update(AppContext &ctx) {
           delete track; // Free the memory allocated by the worker thread
           break;
         }
+        case AE_SATELLITE_DATA_READY: {
+          auto *raw = static_cast<std::string *>(event.user.data1);
+          if (raw && ctx.dashboard && ctx.dashboard->satMgr) {
+            ctx.dashboard->satMgr->onDataReady(*raw);
+          }
+          delete raw;
+          break;
+        }
+#ifndef __EMSCRIPTEN__
+        case AE_UPDATE_DATA_READY: {
+          auto *raw = static_cast<std::string *>(event.user.data1);
+          if (raw && ctx.updateChecker) {
+            ctx.updateChecker->onDataReady(*raw);
+          }
+          delete raw;
+          break;
+        }
+#endif
         case AE_RSS_DATA_READY: {
           int feed_idx = event.user.code;
           auto *headlines =
@@ -2432,6 +2459,30 @@ void DashboardContext::update(AppContext &ctx) {
           if (update && ctx.winlinkStore)
             ctx.winlinkStore->update(*update);
           delete update;
+          break;
+        }
+        case AE_MAP_IMAGE_READY: {
+          auto *data = static_cast<std::string *>(event.user.data1);
+          bool isNight = (event.user.code == 1);
+          if (data && ctx.dashboard && ctx.dashboard->mapArea) {
+            ctx.dashboard->mapArea->onMapImageReady(isNight, std::move(*data));
+          }
+          delete data;
+          break;
+        }
+        case AE_MOON_IMAGE_READY: {
+          auto *surf = static_cast<SDL_Surface *>(event.user.data1);
+          if (surf && ctx.dashboard) {
+            if (ctx.dashboard->widgetPool.count(WidgetType::MOON)) {
+              static_cast<MoonPanel *>(
+                  ctx.dashboard->widgetPool[WidgetType::MOON].get())
+                  ->onImageReady(surf);
+            } else {
+              SDL_FreeSurface(surf);
+            }
+          } else if (surf) {
+            SDL_FreeSurface(surf);
+          }
           break;
         }
         case AE_TOUCH: {

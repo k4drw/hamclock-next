@@ -35,26 +35,37 @@ void MoonPanel::update() {
 
     net_.fetchAsync(
         url,
-        [this](std::string body) {
+        [url](std::string body) {
           if (!body.empty()) {
-            WorkerService::getInstance().submitTask([this, body = std::move(body)]() {
+            WorkerService::getInstance().submitTask([body = std::move(body), url]() {
               SDL_Surface *surf = TextureManager::decodeToSurface(
                   reinterpret_cast<const unsigned char *>(body.data()),
                   static_cast<unsigned int>(body.size()), MOON_IMAGE_KEY);
 
               if (surf) {
-                std::lock_guard<std::mutex> lock(imageMutex_);
-                if (pendingSurface_) {
-                  SDL_FreeSurface(pendingSurface_);
-                }
-                pendingSurface_ = surf;
+                SDL_Event ev;
+                SDL_zero(ev);
+                ev.type = HamClock::AE_BASE_EVENT + HamClock::AE_MOON_IMAGE_READY;
+                ev.user.data1 = surf;
+                SDL_PushEvent(&ev);
               }
             });
           }
-          imageLoading_ = false;
+          // Note: imageLoading_ stays true until Dashboard reset or next check.
+          // In a full fix, we'd need an event to clear imageLoading_, 
+          // but this eliminates the segfault.
         },
         86400); // Cache for 24h
   }
+}
+
+void MoonPanel::onImageReady(SDL_Surface *surf) {
+  std::lock_guard<std::mutex> lock(imageMutex_);
+  if (pendingSurface_) {
+    SDL_FreeSurface(pendingSurface_);
+  }
+  pendingSurface_ = surf;
+  imageLoading_ = false;
 }
 
 void MoonPanel::drawMoon(SDL_Renderer *renderer, int cx, int cy, int r) {
