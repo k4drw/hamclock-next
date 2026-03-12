@@ -49,11 +49,11 @@ The map is the primary tool for propagation and location tracking.
 ### Setup → Network Tab (Local Data Hub)
 Reduces external API rate-limit consumption when multiple HamClock-Next instances share a LAN.
 
-| Mode | Behavior |
-| :--- | :------- |
-| **Off** | Default — each instance fetches directly from the internet. |
-| **Master** | This instance caches API responses and serves them to clients via `GET /api/hub/fetch`. No IP to configure. |
-| **Client** | This instance proxies its data fetches through the Master. Enter the Master's **IP** and **Port** (default `8080`). Falls back to a direct internet fetch automatically after a 2-second timeout if the master is unreachable. |
+| Mode       | Behavior                                                                                                                                                                                                                        |
+| :--------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Off**    | Default — each instance fetches directly from the internet.                                                                                                                                                                     |
+| **Master** | This instance caches API responses and serves them to clients via `GET /api/hub/fetch`. No IP to configure.                                                                                                                     |
+| **Client** | This instance proxies its data fetches through the Master. Enter the Master's **IP** and **Port** (default `8080`). Falls back to a direct internet fetch automatically after a 10-second timeout if the master is unreachable. |
 
 **Typical LAN setup**: Run one instance in Master mode on a always-on Pi, configure all other HamClock instances as Clients pointing to that Pi's IP.
 
@@ -61,25 +61,25 @@ Reduces external API rate-limit consumption when multiple HamClock-Next instance
 
 ## ⌨️ Keyboard Shortcuts
 
-| Key            | Action                                       |
-| :------------- | :------------------------------------------- |
-| `F11`          | Toggle Fullscreen Mode                       |
-| `o`            | Toggle Debug Overlay (performance metrics)   |
-| `k`            | Toggle Action Highlights                     |
-| `Ctrl+Q`       | Quit Application (Native only)               |
+| Key      | Action                                     |
+| :------- | :----------------------------------------- |
+| `F11`    | Toggle Fullscreen Mode                     |
+| `o`      | Toggle Debug Overlay (performance metrics) |
+| `k`      | Toggle Action Highlights                   |
+| `Ctrl+Q` | Quit Application (Native only)             |
 
 ---
 
 ## 🖥️ Command Line Options
 
-| Option | Description |
-| :----- | :---------- |
-| `-f`, `--fullscreen` | Launch in fullscreen mode |
-| `-s`, `--software` | Force software rendering (no OpenGL/MSAA) |
-| `--live-web` | Enable interactive web control interface |
-| `--no-audio` | Permanently disable all audio output |
+| Option                | Description                                                           |
+| :-------------------- | :-------------------------------------------------------------------- |
+| `-f`, `--fullscreen`  | Launch in fullscreen mode                                             |
+| `-s`, `--software`    | Force software rendering (no OpenGL/MSAA)                             |
+| `--live-web`          | Enable interactive web control interface                              |
+| `--no-audio`          | Permanently disable all audio output                                  |
 | `--log-level <level>` | Set log verbosity: `debug`, `info`, `warn`, `error` (default: `warn`) |
-| `-h`, `--help` | Show help message |
+| `-h`, `--help`        | Show help message                                                     |
 
 ---
 

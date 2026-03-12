@@ -257,6 +257,7 @@ private:
   SDL_Texture *propTexture_ = nullptr;
   uint32_t lastMufUpdateMs_ = 0;
   uint64_t wxLastCheckMs_ = 0;
+  uint64_t cloudLastCheckMs_ = 0;
   uint32_t lastPropUpdateMs_ = 0;
   std::chrono::system_clock::time_point lastAuroraUpdateTime_;
   std::string lastAuroraProjection_;

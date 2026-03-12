@@ -43,6 +43,7 @@ void CloudProvider::update() {
 
   std::string url = oss.str();
   LOG_I("CloudProvider", "Fetching clouds from {}", url);
+  hasData_ = false; // Mark as empty until new data arrives
 
   std::weak_ptr<CloudProvider> self = shared_from_this();
   netMgr_.fetchAsync(
@@ -51,9 +52,10 @@ void CloudProvider::update() {
         auto p = self.lock();
         if (!p) return;
         if (data.empty()) {
-          LOG_E("CloudProvider", "Fetch failed or empty for {}", url);
+          LOG_E("CloudProvider", "Fetch returned EMPTY data for {}", url);
           return;
         }
+        LOG_I("CloudProvider", "Fetch received {} bytes of cloud data", data.size());
 
         // Offload decoding to background thread
         WorkerService::getInstance().submitTask([self, data = std::move(data)]() {
@@ -89,7 +91,7 @@ const std::string &CloudProvider::getData() const {
   return empty; // jpgData_ removed to save RAM since we decode in background
 }
 
-SDL_Texture *CloudProvider::getTexture(SDL_Renderer *renderer, int w, int h) {
+SDL_Texture *CloudProvider::getTexture(SDL_Renderer *renderer, int w, int h, SDL_Color tint) {
   std::lock_guard<std::mutex> lock(mutex_);
 
   // Check for new surface from background thread
@@ -112,5 +114,20 @@ SDL_Texture *CloudProvider::getTexture(SDL_Renderer *renderer, int w, int h) {
     return nullptr;
   }
 
+  // Apply theme-based tinting
+  SDL_SetTextureColorMod(texture_, tint.r, tint.g, tint.b);
+
   return texture_;
+}
+
+void CloudProvider::invalidateTexture() {
+  std::lock_guard<std::mutex> lock(mutex_);
+  if (texture_) {
+    SDL_DestroyTexture(texture_);
+    texture_ = nullptr;
+  }
+  if (pendingSurface_) {
+    SDL_FreeSurface(pendingSurface_);
+    pendingSurface_ = nullptr;
+  }
 }

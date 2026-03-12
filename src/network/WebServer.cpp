@@ -135,8 +135,9 @@ wxOverlayFromString(const std::string &s) {
 }
 
 static std::string base64Decode(const std::string &in) {
+  // URL-safe base64 (RFC 4648 §5): '-' and '_' instead of '+' and '/'
   static const std::string chars =
-      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
   std::vector<int> T(256, -1);
   for (int i = 0; i < 64; i++)
     T[(unsigned char)chars[i]] = i;
@@ -144,7 +145,7 @@ static std::string base64Decode(const std::string &in) {
   int val = 0, valb = -8;
   for (unsigned char c : in) {
     if (T[c] == -1)
-      break;
+      continue;  // skip padding ('=') and any stray characters
     val = (val << 6) + T[c];
     valb += 6;
     if (valb >= 0) {
@@ -1518,6 +1519,8 @@ void WebServer::run() {
                                 httplib::Response &res) {
     if (req.has_param("call"))
       cfg_->callsign = req.get_param_value("call");
+    if (req.has_param("theme"))
+      cfg_->theme = req.get_param_value("theme");
     if (req.has_param("grid"))
       cfg_->grid = req.get_param_value("grid");
     if (req.has_param("projection"))
@@ -1815,10 +1818,10 @@ void WebServer::run() {
       res.status = 403;
       return;
     }
-    std::promise<std::string> prom;
-    auto fut = prom.get_future();
+    auto prom = std::make_shared<std::promise<std::string>>();
+    auto fut = prom->get_future();
     netMgr_->fetchAsync(
-        targetUrl, [&prom](std::string b) { prom.set_value(std::move(b)); },
+        targetUrl, [prom](std::string b) { prom->set_value(std::move(b)); },
         3600);
     if (fut.wait_for(std::chrono::seconds(20)) == std::future_status::timeout) {
       res.status = 504;
@@ -2788,6 +2791,20 @@ void WebServer::run() {
       return;
     }
     cfg_->callsign = req.get_param_value("call");
+    if (cfgMgr_)
+      cfgMgr_->save(*cfg_);
+    if (reloadFlag_)
+      reloadFlag_->store(true, std::memory_order_release);
+    res.set_content("ok", "text/plain");
+  });
+
+  svr.Get("/set_theme", [this](const httplib::Request &req,
+                               httplib::Response &res) {
+    if (!req.has_param("theme")) {
+      res.status = 400;
+      return;
+    }
+    cfg_->theme = req.get_param_value("theme");
     if (cfgMgr_)
       cfgMgr_->save(*cfg_);
     if (reloadFlag_)

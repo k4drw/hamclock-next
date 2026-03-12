@@ -181,12 +181,13 @@ MapWidget::MapWidget(int x, int y, int w, int h, TextureManager &texMgr,
 
   // Initialize MapViewMenu
   mapViewMenu_ = std::make_unique<MapViewMenu>(fontMgr);
-  mapViewMenu_->setTheme(config.theme);
+  setTheme(config.theme);
 
   // Initialize map rectangle
   recalcMapRect();
 }
 void MapWidget::setTheme(const std::string &theme) {
+  const bool themeChanged = (theme != theme_);
   Widget::setTheme(theme);
   if (mapViewMenu_) {
     mapViewMenu_->setTheme(theme);
@@ -196,6 +197,11 @@ void MapWidget::setTheme(const std::string &theme) {
     MemoryMonitor::getInstance().destroyTexture(tooltip_.cachedTexture);
     tooltip_.cachedTexture = nullptr;
     tooltip_.cachedText.clear();
+  }
+  // Force cloud overlay re-decode when theme changes so tinting is correct
+  if (themeChanged && clouds_) {
+    clouds_->invalidateTexture();
+    cloudLastCheckMs_ = 0; // trigger immediate re-fetch in next update()
   }
 }
 void MapWidget::setMetric(bool metric) {
@@ -525,6 +531,14 @@ void MapWidget::update() {
     if (nowMs - (uint32_t)wxLastCheckMs_ > 600000 || wxLastCheckMs_ == 0) {
       wxLastCheckMs_ = (uint64_t)nowMs;
       wxmb_->update();
+    }
+  }
+
+  // Cloud overlay (check every hour — NetworkManager caches the JPEG)
+  if (config_.weatherOverlay == WeatherOverlayType::Clouds && clouds_) {
+    if (cloudLastCheckMs_ == 0 || nowMs - (uint32_t)cloudLastCheckMs_ > 3600000) {
+      cloudLastCheckMs_ = (uint64_t)nowMs;
+      clouds_->update();
     }
   }
 
@@ -2354,9 +2368,10 @@ void MapWidget::renderCloudOverlay(SDL_Renderer *renderer) {
   if (!clouds_)
     return;
 
-  // Use dark clouds for light themes (paper) to maintain contrast.
-  SDL_Color cloudTint = (config_.theme == "paper") ? SDL_Color{80, 80, 90, 255}
-                                                   : SDL_Color{255, 255, 255, 255};
+  // Use dark tint for light themes to maintain contrast against bright backgrounds.
+  bool isLight = (theme_ == "paper");
+  SDL_Color cloudTint = isLight ? SDL_Color{140, 140, 160, 255}
+                                : SDL_Color{255, 255, 255, 255};
   SDL_Texture *tex = clouds_->getTexture(renderer, mapRect_.w, mapRect_.h, cloudTint);
   if (!tex)
     return;
@@ -2891,7 +2906,7 @@ void MapWidget::renderLegend(SDL_Renderer *renderer) {
   }
 
   auto *cat = fontMgr_.catalog();
-  ThemeColors themes = getThemeColors(config_.theme);
+  ThemeColors themes = getThemeColors(theme_);
   SDL_Color txtCol = themes.text;
 
   // Draw Title
@@ -3032,7 +3047,7 @@ void MapWidget::renderWxMbLegend(SDL_Renderer *renderer) {
   }
 
   auto *cat = fontMgr_.catalog();
-  ThemeColors themes = getThemeColors(config_.theme);
+  ThemeColors themes = getThemeColors(theme_);
   SDL_Color txtCol = themes.text;
 
   // Draw Title
@@ -3164,7 +3179,7 @@ void MapWidget::renderTooltip(SDL_Renderer *renderer) {
     by = tooltip_.y + 16; // flip below cursor
 
   // Background
-  ThemeColors themes = getThemeColors(config_.theme);
+  ThemeColors themes = getThemeColors(theme_);
   SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
   SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, 210);
   SDL_Rect bg = {bx, by, boxW, boxH};
@@ -3482,7 +3497,7 @@ void MapWidget::renderProjectionSelect(SDL_Renderer *renderer) {
   // Position at top-left of Widget (independent of centered mapRect_)
   projRect_ = {x_ + 4, y_ + 4, 100, 22};
 
-  ThemeColors themes = getThemeColors(config_.theme);
+  ThemeColors themes = getThemeColors(theme_);
 
   // Draw semi-transparent background
   SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
@@ -3504,7 +3519,7 @@ void MapWidget::renderRssButton(SDL_Renderer *renderer) {
   // Draw "RSS" toggle button at top-right of the map area
   rssRect_ = {x_ + width_ - 48, y_ + 4, 44, 22};
 
-  ThemeColors themes = getThemeColors(config_.theme);
+  ThemeColors themes = getThemeColors(theme_);
 
   SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
   SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, 160);

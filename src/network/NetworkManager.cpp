@@ -54,8 +54,11 @@ static size_t headerCallback(char *ptr, size_t size, size_t nmemb,
 
 // ... (existing includes)
 
+// URL-safe base64 (RFC 4648 §5): uses '-' and '_' instead of '+' and '/'
+// so the encoded string can be placed in URL query parameters without
+// percent-encoding.  Padding is omitted (the decoder handles this).
 static const char kB64Chars[] =
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
 
 static std::string base64Encode(const std::string &in) {
   std::string out;
@@ -70,8 +73,7 @@ static std::string base64Encode(const std::string &in) {
   }
   if (valb > -6)
     out.push_back(kB64Chars[((val << 8) >> (valb + 8)) & 0x3F]);
-  while (out.size() % 4)
-    out.push_back('=');
+  // No '=' padding — decoder handles unpadded input
   return out;
 }
 
@@ -135,17 +137,18 @@ void NetworkManager::fetchAsync(const std::string &url,
         {
           std::lock_guard<std::mutex> lock(fetchMutex_);
           if (activeFetches_.count(url)) {
-            LOG_T("NetworkManager", "Fetch or Disk load already in progress for {}, skipping redundant request", url);
+            LOG_T("NetworkManager", "Disk load already in progress for {}, queuing callback", url);
+            activeFetches_[url].push_back(std::move(callback));
             return;
           }
-          activeFetches_.insert(url);
+          activeFetches_[url] = {};
         }
 
         LOG_T("NetworkManager",
               "Memory record found but no data (too large), loading from disk "
               "for {}",
               url);
-        std::thread([this, url, callback]() {
+        std::thread([this, url, callback = std::move(callback)]() {
           std::filesystem::path p = cacheDir_ / hashUrl(url);
           std::ifstream ifs(p, std::ios::binary);
           std::string data;
@@ -160,12 +163,14 @@ void NetworkManager::fetchAsync(const std::string &url,
                           (std::istreambuf_iterator<char>()));
             }
           }
-          // Cleanup lock and call callback
+          std::vector<std::function<void(std::string)>> pending;
           {
             std::lock_guard<std::mutex> lock(fetchMutex_);
+            pending = std::move(activeFetches_[url]);
             activeFetches_.erase(url);
           }
           callback(data);
+          for (auto &cb : pending) cb(data);
         }).detach();
         return;
       }
@@ -176,18 +181,22 @@ void NetworkManager::fetchAsync(const std::string &url,
   {
     std::lock_guard<std::mutex> lock(fetchMutex_);
     if (activeFetches_.count(url)) {
-      LOG_T("NetworkManager", "Network fetch already in progress for {}, skipping redundant request", url);
+      LOG_T("NetworkManager", "Network fetch already in progress for {}, queuing callback", url);
+      activeFetches_[url].push_back(std::move(callback));
       return;
     }
-    activeFetches_.insert(url);
+    activeFetches_[url] = {};
   }
 
   auto safeCallback = [this, url, callback = std::move(callback)](std::string data) {
+    std::vector<std::function<void(std::string)>> pending;
     {
       std::lock_guard<std::mutex> lock(fetchMutex_);
+      pending = std::move(activeFetches_[url]);
       activeFetches_.erase(url);
     }
     callback(data);
+    for (auto &cb : pending) cb(data);
   };
 
 #ifdef __EMSCRIPTEN__
@@ -270,6 +279,8 @@ void NetworkManager::fetchAsync(const std::string &url,
             if (body.size() < 512 * 1024)
               entry.data = body;
             cache_[url] = entry;
+            if (!cacheDir_.empty())
+              saveToDisk(url, entry, body);
           }
           callback(std::move(body));
           return;

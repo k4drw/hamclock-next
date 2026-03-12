@@ -748,7 +748,7 @@ void SetupScreen::renderTabNetwork(SDL_Renderer *renderer, int /*cx*/, int pad,
     cat->drawText(renderer, "This instance serves cached data to hub clients.",
                   fieldX, y + vSpace, themes.textDim, FontStyle::Fast);
   } else if (hubMode_ == HubMode::Client) {
-    cat->drawText(renderer, "Fetches via hub; falls back to direct after 2s.",
+    cat->drawText(renderer, "Fetches via hub; falls back to direct after 10s.",
                   fieldX, y + vSpace, themes.textDim, FontStyle::Fast);
   } else {
     cat->drawText(renderer, "Hub mode disabled.", fieldX, y + vSpace, themes.textDim,

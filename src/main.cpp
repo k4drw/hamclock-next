@@ -1786,6 +1786,14 @@ DashboardContext::DashboardContext(AppContext &ctx)
   lastFpsUpdate = SDL_GetTicks();
   frames = 0;
 
+  // Propagate theme and metric to all dashboard widgets
+  for (auto *w : widgets) {
+    if (w) {
+      w->setTheme(appCfg.theme);
+      w->setMetric(appCfg.useMetric);
+    }
+  }
+
   // Initial layout calculation
   fontCatalog.recalculate(LOGICAL_WIDTH, LOGICAL_HEIGHT);
   layout.recalculate(LOGICAL_WIDTH, LOGICAL_HEIGHT, ctx.layLogicalOffX,

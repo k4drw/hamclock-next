@@ -6,9 +6,9 @@
 #include <filesystem>
 #include <functional>
 #include <mutex>
-#include <set>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 class NetworkManager {
 public:
@@ -51,7 +51,9 @@ private:
   int         hubPort_  = 8080;
   std::mutex  hubMutex_;
 
-  std::set<std::string> activeFetches_;
+  // Maps in-flight URL → list of callbacks waiting on the same fetch.
+  // When a fetch completes, the primary callback plus all queued callbacks are called.
+  std::unordered_map<std::string, std::vector<std::function<void(std::string)>>> activeFetches_;
   std::mutex fetchMutex_;
 
   // Helper to compute safe filename for a URL (e.g. simple hash)

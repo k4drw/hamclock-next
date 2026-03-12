@@ -63,16 +63,19 @@
     "provider_template": "// src/services/{Name}Provider.h\n#pragma once\n#include \"core/{Name}Data.h\"\n\nclass {Name}Provider {\npublic:\n    static {Name}Provider& instance();\n    void update();               // called on interval by main loop\n    const {Name}Data& data() const { return _data; }\nprivate:\n    {Name}Provider() = default;\n    {Name}Data _data;\n    time_t _nextFetch = 0;\n    static constexpr int FETCH_INTERVAL_S = 300;\n};\n",
     "panel_template": "// src/ui/{Name}Panel.cpp\n#include \"{Name}Panel.h\"\n#include \"../core/Theme.h\"\n\nvoid {Name}Panel::render(SDL_Renderer* renderer) {\n    ThemeColors themes = getThemeColors(theme_);\n    \n    // Draw background\n    SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, themes.bg.a);\n    SDL_Rect r = {x_, y_, width_, height_};\n    SDL_RenderFillRect(renderer, &r);\n\n    // IMPORTANT: Never hardcode SDL_Color values. Always use ThemeColors tokens\n    // (themes.text, themes.accent, themes.success, etc.).\n    // Example text:\n    // int tw, th;\n    // auto* cat = fontMgr_.catalog();\n    // cat->drawText(renderer, \"Hello\", x_ + 10, y_ + 10, themes.text, FontStyle::Fast);\n}\n",
     "important_notes": [
-      "NetworkManager handles HTTP. Call NetworkManager::instance().get(url) \u2014 it returns cached data when ETag/Last-Modified hasn't changed.",
+      "NetworkManager handles HTTP. Call NetworkManager::instance().fetchAsync(url, callback) \u2014 it automatically deduplicates concurrent requests for the same URL and provides thread-safe disk caching.",
       "ConfigManager::instance().getConfig() for reading/modifying settings. ConfigManager::instance().save(cfg) to persist.",
       "Theme.h has all color constants. Use getThemeColors(theme_) to obtain a ThemeColors struct \u2014 never hardcode SDL_Color values.",
       "Standardize all setup/confirmation buttons: Use 'Done' and 'Cancel' labels (PascalCase).",
       "Standard button sizes: 100x34 for main modals, 80x28 for small widget-based setups.",
       "FontManager handles scaled TTF fonts. Never load your own TTF file.",
       "SDL coordinates: (0,0) is top-left. x_/y_ is the panel's top-left corner.",
-      "All render() calls happen on the main thread. Providers run on a background thread. Use a mutex or std::atomic if sharing state.",
+      "All render() calls happen on the main thread. Providers run on a background thread. Use the SDL Event Queue (AE_... constants) to deliver results to the main thread.",
       "The WebServer debug endpoint /debug/widgets calls getDebugData() on all registered panels \u2014 always implement it.",
-      "If a provider uses NetworkManager::fetchAsync, it MUST inherit from std::enable_shared_from_this and capture a weak_ptr in the lambda to prevent use-after-free crashes during configuration reloads.",
+      "ASYNCHRONOUS SAFETY (CRITICAL):",
+      "- DASHBOARD LIFECYCLE: DashboardContext is transient. When capturing 'this' in a lambda, you MUST use the Self-Validation Pattern: capture 'DashboardContext* self = this' and 'AppContext& ctx', then check 'ctx.dashboard.get() == self' before execution.",
+      "- EVENT-DRIVEN RESULTS: For transient objects (owned by DashboardContext), preferred delivery is via SDL_PushEvent. The main thread handler (main.cpp) validates the dashboard exists before applying results.",
+      "- MEMORY OWNERSHIP: Heap-allocated event data (std::string*, SDL_Surface*, etc.) passed via user.data1 MUST be deleted/freed in the main thread handler to prevent leaks.",
       "If a provider's API may be unavailable or require auth, add a `bool fetched` flag to the data struct (default false). The provider pushes event on completion with `fetched=true, valid=false` on error \u2014 panel shows meaningful status (e.g. 'API key required') rather than indefinite 'Loading...' state.",
       "Widget::onMouseDown(int mx, int my, Uint16 mod) added for advanced interactivity (Phase 60).",
       "Widget::onMouseUp now takes `int clicks` as 4th parameter (Uint16 mod, int clicks). Update all Widget subclasses when overriding.",
@@ -170,7 +173,7 @@
       {
         "method": "GET",
         "path": "/set_theme",
-        "description": "Set color theme. Params: ?theme=dark|light|solarized"
+        "description": "Set color theme. Params: ?theme=dark|glass|midnight|amber|paper|matrix"
       },
       {
         "method": "GET",
@@ -492,11 +495,11 @@
   "feature_status_summary": {
     "total": 88,
     "implemented": 82,
-    "partial": 1,
+    "partial": 0,
     "missing": 0,
     "not_needed": 5,
-    "percent_done": "100% (82/82 parity features — updated 2026-03-07)",
-    "notes": "v1.0B04. Updated 2026-03-09: post-B04 bug fixes — RigService sscanf width guard, RotatorService null store_ guard, OrbitPredictor overflow cap, hardcoded color constants replaced with ThemeColors (11 files), MapWidget antimeridian div-by-zero at 5 edge sites, DXClusterData INSERT → prepared statements, DatabaseManager execPrepared() added, SECURITY.md added. DisplayPower KMSDRM one-shot-black-frame architecture verified on RPi3B."
+    "percent_done": "100% (82/82 parity features \u2014 updated 2026-03-12)",
+    "notes": "v1.0 Release Candidate. Updated 2026-03-12: Comprehensive stability hardening \u2014 implemented Self-Validation Pattern for async callbacks, NetworkManager request deduplication (prevents disk cache corruption), and event-driven UI updates via SDL queue. All post-B04 fixes integrated (RigService, RotatorService, OrbitPredictor, MapWidget antimeridian). ThemeColors standardization complete (11+ files). Documentation plan for v1.0 initiated: theme showcase, interactive feature screenshots, and layout updates."
   },
   "implemented_features": [
     {
@@ -2361,5 +2364,5 @@
       }
     ]
   },
-  "schema_version": "2.2"
+  "schema_version": "2.3"
 }
