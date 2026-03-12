@@ -15,42 +15,58 @@ static std::string normalizeDate(const std::string &dateStr) {
   return dateStr;
 }
 
-CallbookProvider::CallbookProvider(NetworkManager &net,
-                                   std::shared_ptr<CallbookStore> store)
-    : net_(net), store_(store) {}
+// Static helpers avoid capturing `this` in async callbacks.
+// CallbookProvider lives in DashboardContext which may be reset while
+// network callbacks are in-flight; static helpers + explicit captures
+// ensure no dangling pointer access.
 
-void CallbookProvider::lookup(const std::string &callsign) {
-  if (callsign.empty())
-    return;
+static void fetchHamDBAsync(NetworkManager &net, const std::string &callsign,
+                             std::shared_ptr<CallbookData> result,
+                             std::function<void()> onDone) {
+  std::string url =
+      "http://api.hamdb.org/" + callsign + "/json/hamclock-next";
 
-  auto result = std::make_shared<CallbookData>();
-  result->callsign = callsign;
-  result->source = "Aggregating...";
+  net.fetchAsync(url, [onDone, result](std::string body) {
+    try {
+      if (!body.empty()) {
+        auto j = json::parse(body);
+        if (j.contains("hamdb") &&
+            j["hamdb"]["messages"]["status"] == "OK") {
+          auto call = j["hamdb"]["callsign"];
 
-  // Chain the lookups
-  fetchCallook(callsign, result, [this, result, callsign]() {
-    // If Callook failed or was incomplete, try HamDB
-    fetchHamDB(callsign, result, [this, result]() {
-      result->valid = true;
-      store_->set(*result);
-    });
+          if (result->name.empty())
+            result->name = call["name"].get<std::string>();
+
+          if (call.contains("lotw"))
+            result->lotw = (call["lotw"].get<std::string>() == "Y");
+
+          if (result->source.empty()) {
+            result->source = "HamDB.org";
+          } else if (result->source != "HamDB.org") {
+            result->source += " + HamDB";
+          }
+        }
+      }
+    } catch (...) {
+    }
+    onDone();
   });
 }
 
-void CallbookProvider::fetchCallook(const std::string &callsign,
-                                    std::shared_ptr<CallbookData> result,
-                                    std::function<void()> onDone) {
+static void fetchCallookAsync(NetworkManager &net, const std::string &callsign,
+                               std::shared_ptr<CallbookData> result,
+                               std::function<void()> onDone) {
   std::string url = "https://callook.info/" + callsign + "/json";
 
-  net_.fetchAsync(url, [onDone, result](std::string body) {
+  net.fetchAsync(url, [onDone, result](std::string body) {
     try {
       if (!body.empty()) {
         auto j = json::parse(body);
         if (j["status"] == "VALID") {
-          result->name = j["name"].get<std::string>();
+          result->name    = j["name"].get<std::string>();
           result->address = j["address"]["line1"].get<std::string>();
-          result->city = j["address"]["line2"].get<std::string>();
-          result->grid = j["location"]["gridsquare"].get<std::string>();
+          result->city    = j["address"]["line2"].get<std::string>();
+          result->grid    = j["location"]["gridsquare"].get<std::string>();
           result->lat = StringUtils::safe_stof(
               j["location"]["latitude"].get<std::string>());
           result->lon = StringUtils::safe_stof(
@@ -74,36 +90,31 @@ void CallbookProvider::fetchCallook(const std::string &callsign,
   });
 }
 
-void CallbookProvider::fetchHamDB(const std::string &callsign,
-                                  std::shared_ptr<CallbookData> result,
-                                  std::function<void()> onDone) {
-  // HamDB is good for international calls and extra meta
-  std::string url = "http://api.hamdb.org/" + callsign + "/json/hamclock-next";
+CallbookProvider::CallbookProvider(NetworkManager &net,
+                                   std::shared_ptr<CallbookStore> store)
+    : net_(net), store_(store) {}
 
-  net_.fetchAsync(url, [onDone, result](std::string body) {
-    try {
-      if (!body.empty()) {
-        auto j = json::parse(body);
-        if (j.contains("hamdb") && j["hamdb"]["messages"]["status"] == "OK") {
-          auto call = j["hamdb"]["callsign"];
+void CallbookProvider::lookup(const std::string &callsign) {
+  if (callsign.empty())
+    return;
 
-          // Only overwrite if Callook didn't find it or if we want more data
-          if (result->name.empty())
-            result->name = call["name"].get<std::string>();
+  auto result = std::make_shared<CallbookData>();
+  result->callsign = callsign;
+  result->source   = "Aggregating...";
 
-          // Fetch social/QSL hints if present (some APIs provide this)
-          if (call.contains("lotw"))
-            result->lotw = (call["lotw"].get<std::string>() == "Y");
+  // Capture store_ by value (shared_ptr copy; CallbookStore lives in AppContext
+  // and outlasts DashboardContext) and net_ as a raw pointer (NetworkManager is
+  // also AppContext-lifetime). Do NOT capture `this`: CallbookProvider lives in
+  // DashboardContext and may be destroyed before these callbacks fire.
+  auto store   = store_;
+  auto *netPtr = &net_;
 
-          if (result->source.empty()) {
-            result->source = "HamDB.org";
-          } else if (result->source != "HamDB.org") {
-            result->source += " + HamDB";
-          }
-        }
-      }
-    } catch (...) {
-    }
-    onDone();
-  });
+  fetchCallookAsync(*netPtr, callsign, result,
+                    [netPtr, result, callsign, store]() {
+                      fetchHamDBAsync(*netPtr, callsign, result,
+                                      [store, result]() {
+                                        result->valid = true;
+                                        store->set(*result);
+                                      });
+                    });
 }

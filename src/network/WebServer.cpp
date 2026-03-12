@@ -579,6 +579,33 @@ void WebServer::run() {
         </div>
       </div>
       
+      <div class="section-hdr" style="margin-top:16px">Aux Clock</div>
+      <label>Timezone</label>
+      <select id="aux-tz-preset" onchange="toggleAuxCustom()">
+        <option value="999|Local">Local (system time, DST-aware)</option>
+        <option value="0|UTC">UTC</option>
+        <option value="-5|EST">EST (UTC-5)</option>
+        <option value="-6|CST">CST (UTC-6)</option>
+        <option value="-7|MST">MST (UTC-7)</option>
+        <option value="-8|PST">PST (UTC-8)</option>
+        <option value="1|CET">CET (UTC+1)</option>
+        <option value="9|JST">JST (UTC+9)</option>
+        <option value="10|AEST">AEST (UTC+10)</option>
+        <option value="custom|custom">Custom...</option>
+      </select>
+      <div id="aux-custom-fields" style="display:none; margin-top:6px">
+        <label>UTC Offset (hours, -12 to +14)</label>
+        <input type="number" id="aux-tz-offset" min="-12" max="14">
+        <label>Label (max 8 chars)</label>
+        <input type="text" id="aux-tz-label" maxlength="8">
+      </div>
+      <label>Star Date Mode</label>
+      <select id="aux-star-mode">
+        <option value="0">K (Klingon Stardates)</option>
+        <option value="1">P (Pavel Stardates)</option>
+        <option value="2">C (Countdown to Warp 1)</option>
+      </select>
+
       <button onclick="saveWidgets()" style="margin-top:16px">Save Widgets</button>
       <div id="widgets-msg"></div>
     </div>
@@ -1070,6 +1097,21 @@ void WebServer::run() {
 
         toggleSidePanelSettings();
 
+        // Aux Clock
+        const tzOff = c.auxClockTzOffset !== undefined ? c.auxClockTzOffset : 0;
+        const tzLbl = c.auxClockTzLabel || 'UTC';
+        const tzPresets = [{v:999,l:'Local'},{v:0,l:'UTC'},{v:-5,l:'EST'},
+                           {v:-6,l:'CST'},{v:-7,l:'MST'},{v:-8,l:'PST'},
+                           {v:1,l:'CET'},{v:9,l:'JST'},{v:10,l:'AEST'}];
+        const match = tzPresets.find(p => p.v === tzOff && p.l === tzLbl);
+        document.getElementById('aux-tz-preset').value = match ? (tzOff+'|'+tzLbl) : 'custom|custom';
+        if (!match) {
+          document.getElementById('aux-tz-offset').value = tzOff;
+          document.getElementById('aux-tz-label').value  = tzLbl;
+        }
+        document.getElementById('aux-star-mode').value = c.auxClockStarMode !== undefined ? c.auxClockStarMode : 1;
+        toggleAuxCustom();
+
       } catch(e) {}
     }
 
@@ -1083,6 +1125,11 @@ void WebServer::run() {
     function toggleSatSelect() {
       const pm = document.getElementById('panel-mode').value;
       document.getElementById('sat-select-container').style.display = (pm === 'sat') ? 'block' : 'none';
+    }
+
+    function toggleAuxCustom() {
+      const v = document.getElementById('aux-tz-preset').value;
+      document.getElementById('aux-custom-fields').style.display = v.startsWith('custom') ? 'block' : 'none';
     }
 
     async function saveWidgets() {
@@ -1103,13 +1150,28 @@ void WebServer::run() {
       const pm = document.getElementById('panel-mode').value;
       const sat = document.getElementById('selected-satellite').value;
 
+      const auxPreset = document.getElementById('aux-tz-preset').value;
+      let auxOffset, auxLabel;
+      if (auxPreset.startsWith('custom')) {
+        auxOffset = document.getElementById('aux-tz-offset').value;
+        auxLabel  = document.getElementById('aux-tz-label').value || 'UTC';
+      } else {
+        const parts = auxPreset.split('|');
+        auxOffset = parts[0];
+        auxLabel  = parts[1];
+      }
+      const auxStarMode = document.getElementById('aux-star-mode').value;
+
       const params = new URLSearchParams({
         rotation_interval: document.getElementById('rot-interval').value,
         sync_rotation: document.getElementById('sync-rot').checked ? '1' : '0',
         pane0: panes[0], pane1: panes[1], pane2: panes[2], pane3: panes[3],
         side_panel_mode: spMode,
         panel_mode: pm,
-        selected_satellite: sat
+        selected_satellite: sat,
+        aux_tz_offset: auxOffset,
+        aux_tz_label: auxLabel,
+        aux_star_mode: auxStarMode
       });
       try {
         const r = await fetch('/set_config?' + params);
@@ -1415,6 +1477,9 @@ void WebServer::run() {
     j["dimMinute"] = cfg_->dimMinute;
     j["brightHour"] = cfg_->brightHour;
     j["brightMinute"] = cfg_->brightMinute;
+    j["auxClockTzOffset"] = cfg_->auxClockTzOffset;
+    j["auxClockTzLabel"]  = cfg_->auxClockTzLabel;
+    j["auxClockStarMode"] = cfg_->auxClockStarMode;
     j["version"] = HAMCLOCK_VERSION;
     j["arch"] = HAMCLOCK_ARCH;
     j["installType"] = HAMCLOCK_INSTALL_TYPE;
@@ -1625,6 +1690,9 @@ void WebServer::run() {
           StringUtils::safe_stoi(req.get_param_value("aux_tz_offset"));
     if (req.has_param("aux_tz_label"))
       cfg_->auxClockTzLabel = req.get_param_value("aux_tz_label");
+    if (req.has_param("aux_star_mode"))
+      cfg_->auxClockStarMode =
+          StringUtils::safe_stoi(req.get_param_value("aux_star_mode"));
 
     if (req.has_param("side_panel_mode")) {
       std::string m = req.get_param_value("side_panel_mode");

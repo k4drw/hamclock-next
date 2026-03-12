@@ -2964,7 +2964,18 @@ void main_tick() {
       if (ctx.activeSetup == AppContext::SetupMode::Main) {
         auto *s = static_cast<SetupScreen *>(ctx.setupWidget.get());
         if (!s->wasCancelled()) {
+          // Preserve fields not managed by SetupScreen
+          const int savedTzOffset = ctx.appCfg.auxClockTzOffset;
+          const std::string savedTzLabel = ctx.appCfg.auxClockTzLabel;
+          const int savedStarMode = ctx.appCfg.auxClockStarMode;
+
           ctx.appCfg = s->getConfig();
+
+          // Restore aux_clock (not owned by SetupScreen)
+          ctx.appCfg.auxClockTzOffset = savedTzOffset;
+          ctx.appCfg.auxClockTzLabel  = savedTzLabel;
+          ctx.appCfg.auxClockStarMode = savedStarMode;
+
           // Sync watchlist store from updated config
           auto oldW = ctx.watchlistStore->getAll();
           for (const auto &c : oldW)
