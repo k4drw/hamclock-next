@@ -246,7 +246,7 @@ void AsteroidPanel::render(SDL_Renderer *renderer) {
   int swatchStartX = x_ + (width_ - totalSwatchW) / 2;
 
   SDL_Color curColor =
-      config_ ? config_->asteroidColor : SDL_Color{255, 140, 0, 255};
+      config_ ? config_->asteroidColor : themes.warning;
 
   for (int k = 0; k < kPaletteSize; ++k) {
     int sx = swatchStartX + k * (swatchSize + pad);

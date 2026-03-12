@@ -190,6 +190,8 @@ void ReminderPanel::renderModal(SDL_Renderer *renderer) {
     return;
 
   // Full-screen dark overlay
+  // Intentional: modal backdrop is always opaque black at fixed alpha;
+  // this is a screen-dimmer, not a themed UI element.
   SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
   SDL_SetRenderDrawColor(renderer, 0, 0, 0, 180);
   SDL_Rect full = {0, 0, 9999, 9999};

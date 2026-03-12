@@ -92,6 +92,8 @@ void UpdateOverlay::render(SDL_Renderer *renderer) {
   ThemeColors themes = getThemeColors(theme_);
 
   // Semi-transparent dimming of backbuffer
+  // Intentional: modal backdrop is always opaque black at fixed alpha;
+  // this is a screen-dimmer, not a themed UI element.
   SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
   SDL_SetRenderDrawColor(renderer, 0, 0, 0, 180);
   SDL_Rect screen = {0, 0, 2048, 2048}; // Sufficiently large

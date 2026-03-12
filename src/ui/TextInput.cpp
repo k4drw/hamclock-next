@@ -273,6 +273,8 @@ void TextInput::render(SDL_Renderer *renderer, FontManager &fontMgr, int fieldX,
   if (bgColor) {
     SDL_SetRenderDrawColor(renderer, bgColor->r, bgColor->g, bgColor->b, bgColor->a);
   } else {
+    // All production callers supply bgColor from their ThemeColors; this
+    // branch is a defensive fallback and is not reached in normal use.
     SDL_SetRenderDrawColor(renderer, 20, 20, 20, 255);
   }
   SDL_Rect rect = {fieldX, fieldY, fieldW, fieldH};
