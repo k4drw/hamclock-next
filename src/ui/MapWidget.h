@@ -100,6 +100,9 @@ public:
 
   void setOnConfigChanged(std::function<void()> cb) { onConfigChanged_ = cb; }
 
+  void setTheme(const std::string &theme) override;
+  void setMetric(bool metric) override;
+
   // Modal interface for MapViewMenu
   bool isModalActive() const override;
   void renderModal(SDL_Renderer *renderer) override;

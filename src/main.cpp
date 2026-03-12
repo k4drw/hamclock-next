@@ -1960,7 +1960,9 @@ void DashboardContext::update(AppContext &ctx) {
     if (mufOverlayActive)
       ionosondeProvider->update();
 
-    // --- Asteroid widget + map pin ---
+    // --- Cloud data & Asteroid widget + map pin ---
+    if (cloudProvider)
+      cloudProvider->update();
     if (isMaster || isWidgetActive(WidgetType::ASTEROID))
       asteroidProvider->update();
 
@@ -3048,8 +3050,15 @@ void main_tick() {
       ctx.state->deGrid = ctx.appCfg.grid;
       ctx.state->deLocation = {ctx.appCfg.lat, ctx.appCfg.lon};
 
-      // Re-apply side-panel pane rotations and layout immediately
+      // Re-apply theme, rotations and layout immediately
       if (ctx.dashboard) {
+        // Propagate theme and metric to all dashboard widgets
+        for (auto *w : ctx.dashboard->widgets) {
+          if (w) {
+            w->setTheme(ctx.appCfg.theme);
+            w->setMetric(ctx.appCfg.useMetric);
+          }
+        }
         ctx.dashboard->applySidePanelMode(ctx.appCfg.pane5Rotation.empty()
                                               ? WidgetType::DE_INFO
                                               : ctx.appCfg.pane5Rotation[0],

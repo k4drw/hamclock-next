@@ -186,6 +186,21 @@ MapWidget::MapWidget(int x, int y, int w, int h, TextureManager &texMgr,
   // Initialize map rectangle
   recalcMapRect();
 }
+void MapWidget::setTheme(const std::string &theme) {
+  Widget::setTheme(theme);
+  if (mapViewMenu_) {
+    mapViewMenu_->setTheme(theme);
+  }
+  // Invalidate tooltip cache to pick up new colors
+  if (tooltip_.cachedTexture) {
+    MemoryMonitor::getInstance().destroyTexture(tooltip_.cachedTexture);
+    tooltip_.cachedTexture = nullptr;
+    tooltip_.cachedText.clear();
+  }
+}
+void MapWidget::setMetric(bool metric) {
+  Widget::setMetric(metric);
+}
 
 MapWidget::~MapWidget() {
   MemoryMonitor::getInstance().destroyTexture(nightOverlayTexture_);
@@ -2339,12 +2354,15 @@ void MapWidget::renderCloudOverlay(SDL_Renderer *renderer) {
   if (!clouds_)
     return;
 
-  SDL_Texture *tex = clouds_->getTexture(renderer, mapRect_.w, mapRect_.h);
+  // Use dark clouds for light themes (paper) to maintain contrast.
+  SDL_Color cloudTint = (config_.theme == "paper") ? SDL_Color{80, 80, 90, 255}
+                                                   : SDL_Color{255, 255, 255, 255};
+  SDL_Texture *tex = clouds_->getTexture(renderer, mapRect_.w, mapRect_.h, cloudTint);
   if (!tex)
     return;
 
   SDL_SetTextureBlendMode(tex, SDL_BLENDMODE_BLEND);
-  SDL_SetTextureAlphaMod(tex, 64); // 25% opacity, moved behind prop map
+  SDL_SetTextureAlphaMod(tex, 180); // 70% opacity, moved behind prop map
 
   SDL_RenderSetClipRect(renderer, &mapRect_);
 
@@ -3111,7 +3129,7 @@ void MapWidget::renderTooltip(SDL_Renderer *renderer) {
     // Create new texture
     int actualW = 0, actualH = 0;
     tooltip_.cachedTexture =
-        fontMgr_.renderText(renderer, tooltip_.text, {255, 255, 255, 255},
+        fontMgr_.renderText(renderer, tooltip_.text, getThemeColors(theme_).text,
                             ptSize, &actualW, &actualH);
 
     if (!tooltip_.cachedTexture) {
