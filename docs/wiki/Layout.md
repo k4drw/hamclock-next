@@ -2,7 +2,7 @@
 
 HamClock-Next divides the screen into a fixed set of regions. Understanding the layout is the first step to customizing your dashboard.
 
-![Full dashboard with labeled regions](images/dashboard-live.jpg)
+![Full dashboard with labeled regions](images/v1_0/hc_v1_dark_robinson_muf_rot1_asteroids_forecast_wx_alerts_ncdxf_de_info_satellite.png)
 <!-- TODO: annotated screenshot needed -->
 
 ---

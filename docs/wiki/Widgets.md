@@ -12,16 +12,16 @@ To add a widget to a pane, click the **top strip** of the pane to open the widge
 
 Since HamClock-Next allows multiple widgets per pane, the following snapshots show various dashboard configurations as the panes rotate. Use this gallery to see all **45** widgets in action.
 
-|  ![Rotation 0](images/rotation_0.jpg)  |  ![Rotation 1](images/rotation_1.jpg)  |
-|  ![Rotation 2](images/rotation_2.jpg)  |  ![Rotation 3](images/rotation_3.jpg)  |
-|  ![Rotation 4](images/rotation_4.jpg)  |  ![Rotation 5](images/rotation_5.jpg)  |
-|  ![Rotation 6](images/rotation_6.jpg)  |  ![Rotation 7](images/rotation_7.jpg)  |
-|  ![Rotation 8](images/rotation_8.jpg)  |  ![Rotation 9](images/rotation_9.jpg)  |
-| ![Rotation 10](images/rotation_10.jpg) | ![Rotation 11](images/rotation_11.jpg) |
-| ![Rotation 12](images/rotation_12.jpg) | ![Rotation 13](images/rotation_13.jpg) |
-| ![Rotation 14](images/rotation_14.jpg) | ![Rotation 15](images/rotation_15.jpg) |
-| ![Rotation 16](images/rotation_16.jpg) | ![Rotation 17](images/rotation_17.jpg) |
-| ![Rotation 18](images/rotation_18.jpg) | ![Rotation 19](images/rotation_19.jpg) |
+|  ![Rotation 1](images/v1_0/hc_v1_dark_robinson_muf_rot1_asteroids_forecast_wx_alerts_ncdxf_de_info_satellite.png)  |  ![Rotation 2](images/v1_0/hc_v1_dark_robinson_muf_rot2_band_cond_ionosonde_santa_tracker_dx_weather_de_info_satellite.png)  |
+|  ![Rotation 3](images/v1_0/hc_v1_dark_robinson_muf_rot3_aurora_graph_k-index_solar_flux_ncdxf_de_info_satellite.png)  |  ![Rotation 4](images/v1_0/hc_v1_dark_robinson_muf_rot4_aurora_lightning_solar_storm_de_weather_de_info_satellite.png)  |
+|  ![Rotation 5](images/v1_0/hc_v1_dark_robinson_muf_rot5_contests_gimbal_tropics_dx_weather_de_info_satellite.png)  |  ![Rotation 6](images/v1_0/hc_v1_dark_robinson_muf_rot6_clock_aux_moon_system_info_ncdxf_de_info_satellite.png)  |
+|  ![Rotation 7](images/v1_0/hc_v1_midnight_azimuthal_aurora_rot1_aurora_graph_k-index_solar_flux_ncdxf_de_info_satellite.png)  |  ![Rotation 8](images/v1_0/hc_v1_midnight_azimuthal_aurora_rot2_aurora_lightning_solar_storm_de_weather_de_info_satellite.png)  |
+|  ![Rotation 9](images/v1_0/hc_v1_midnight_azimuthal_aurora_rot3_contests_gimbal_tropics_dx_weather_de_info_satellite.png)  |  ![Rotation 10](images/v1_0/hc_v1_midnight_azimuthal_aurora_rot4_clock_aux_moon_system_info_ncdxf_de_info_satellite.png)  |
+| ![Rotation 11](images/v1_0/hc_v1_midnight_azimuthal_aurora_rot5_callbook_meteor_scat_sunspots_de_weather_de_info_satellite.png) | ![Rotation 12](images/v1_0/hc_v1_midnight_azimuthal_aurora_rot6_countdown_marine_stopwatch_dx_weather_de_info_satellite.png) |
+| ![Rotation 13](images/v1_0/hc_v1_paper_mercator_drap_isobars_rot1_aurora_lightning_solar_storm_de_weather_de_info_satellite.png) | ![Rotation 14](images/v1_0/hc_v1_paper_mercator_drap_isobars_rot2_contests_gimbal_tropics_dx_weather_de_info_satellite.png) |
+| ![Rotation 15](images/v1_0/hc_v1_paper_mercator_drap_isobars_rot3_clock_aux_moon_system_info_ncdxf_de_info_satellite.png) | ![Rotation 16](images/v1_0/hc_v1_paper_mercator_drap_isobars_rot4_callbook_meteor_scat_sunspots_de_weather_de_info_satellite.png) |
+| ![Rotation 17](images/v1_0/hc_v1_paper_mercator_drap_isobars_rot5_countdown_marine_stopwatch_dx_weather_de_info_satellite.png) | ![Rotation 18](images/v1_0/hc_v1_paper_mercator_drap_isobars_rot6_drap_live_spots_tropo_cond_ncdxf_de_info_satellite.png) |
+| ![Rotation 19](images/v1_0/hc_v1_glass_dual_az_clouds_rot1_contests_gimbal_tropics_dx_weather_de_info_satellite.png) | ![Rotation 20](images/v1_0/hc_v1_glass_dual_az_clouds_rot2_clock_aux_moon_system_info_ncdxf_de_info_satellite.png) |
 
 
 ---
@@ -34,12 +34,12 @@ Since HamClock-Next allows multiple widgets per pane, the following snapshots sh
 | **SDO**          | Live solar imagery from the Solar Dynamics Observatory in selectable wavelengths; optional movie loop         | NASA SDO                 |
 | **Aurora**       | Global aurora forecast map from the NOAA OVATION model                                                        | NOAA SWPC                |
 | **Aurora Graph** | Time-series graph of geomagnetic Kp index and aurora activity                                                 | NOAA SWPC                |
-| **DRAP**         | D-Region Absorption Prediction — HF absorption map showing where ionospheric absorption degrades propagation  | NOAA SWPC                |
+| **DRAP**         | D-Region Absorption Prediction \u2014 HF absorption map showing where ionospheric absorption degrades propagation  | NOAA SWPC                |
 | **Solar Storm**  | Current geomagnetic storm watch/warning/alert status                                                          | NOAA SWPC                |
 | **History Flux** | Historical solar flux (SFI) graph over multiple days                                                          | NOAA SWPC                |
 | **History KP**   | Historical Kp geomagnetic index graph                                                                         | NOAA SWPC                |
 | **History SSN**  | Historical sunspot number graph                                                                               | NOAA SWPC                |
-| **DST Index**    | Disturbance Storm Time index — a measure of geomagnetic storm severity                                        | NOAA SWPC (Kyoto)        |
+| **DST Index**    | Disturbance Storm Time index \u2014 a measure of geomagnetic storm severity                                        | NOAA SWPC (Kyoto)        |
 | **Ionosonde**    | Ionospheric sounding data                                                                                     | Remote ionosonde network |
 
 ![Solar widget](images/widget-solar-flux.png)
@@ -52,7 +52,7 @@ Since HamClock-Next allows multiple widgets per pane, the following snapshots sh
 
 | Widget              | Description                                                                                 | Data Source        |
 | ------------------- | ------------------------------------------------------------------------------------------- | ------------------ |
-| **Band Conditions** | Color-coded HF band condition summary (160m–10m) by path type                               | NOAA SWPC derived  |
+| **Band Conditions** | Color-coded HF band condition summary (160m\u201310m) by path type                               | NOAA SWPC derived  |
 | **Live Spots**      | Real-time decoded signal spots from PSK Reporter or Reverse Beacon Network, plotted by band | PSK Reporter / RBN |
 | **NCDXF**           | NCDXF/IBP international beacon schedule and current beacon on air                           | NCDXF              |
 
@@ -107,7 +107,7 @@ Since HamClock-Next allows multiple widgets per pane, the following snapshots sh
 | **Moon**          | Moon phase, rise/set times, azimuth/elevation, distance                                                                                                       | Astronomical calculation    |
 | **Gimbal**        | Antenna rotator position display (requires Hamlib rotctld)                                                                                                    | Hamlib rotctld              |
 | **EME Tool**      | Earth-Moon-Earth (moonbounce) window calculator                                                                                                               | Astronomical calculation    |
-| **Santa Tracker** | Tracks Santa's position on Christmas Eve; activates on Dec 24 only (originally a hidden easter egg in the original HamClock — now a proper selectable widget) | Internal calculation        |
+| **Santa Tracker** | Tracks Santa's position on Christmas Eve; activates on Dec 24 only (originally a hidden easter egg in the original HamClock \u2014 now a proper selectable widget) | Internal calculation        |
 | **Asteroid**      | Next 5 close Earth approaches from the Minor Planet Center / JPL                                                                                              | JPL SBDB Close Approach API |
 
 ![Moon widget](images/widget-moon.png)

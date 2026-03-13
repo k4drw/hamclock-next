@@ -22,7 +22,7 @@ A compromise projection that balances distortion of area, shape, distance, and d
 
 Centered on your DE location. Shows true bearing and distance in all directions as straight lines from your QTH. Useful for antenna pointing. The original HamClock only offered the dual-hemisphere variant; this single-circle view is a HamClock-Next addition.
 
-![Azimuthal projection](images/map-azimuthal.jpg)
+![Azimuthal projection](images/v1_0/hc_v1_midnight_azimuthal_aurora_rot1_aurora_graph_k-index_solar_flux_ncdxf_de_info_satellite.png)
 
 ### Mercator
 
@@ -30,7 +30,7 @@ A cylindrical projection that preserves angles and shapes locally. Useful for na
 
 ### Dual Azimuthal
 
-Displays two side-by-side azimuthal equidistant circles: the left centered on DE and the right centered on the antipodal point. Together they show the complete globe — every location on Earth appears in one of the two circles with no clipping. Great-circle paths remain straight within each hemisphere.
+Displays two side-by-side azimuthal equidistant circles: the left centered on DE and the right centered on the antipodal point. Together they show the complete globe \u2014 every location on Earth appears in one of the two circles with no clipping. Great-circle paths remain straight within each hemisphere.
 
 ---
 
@@ -72,15 +72,15 @@ Select the active overlay and configure band/mode/power from the Configuration s
 | Overlay             | Description                                                                                                                |
 | ------------------- | -------------------------------------------------------------------------------------------------------------------------- |
 | **None**            | No propagation overlay                                                                                                     |
-| **MUF (Real-time)** | Maximum Usable Frequency derived from real-time NOAA ionospheric data — shows areas where the selected band is likely open |
+| **MUF (Real-time)** | Maximum Usable Frequency derived from real-time NOAA ionospheric data \u2014 shows areas where the selected band is likely open |
 | **VOACAP Area**     | VOACAP-based propagation reliability prediction from DE to all areas of the map on the selected band                       |
 | **VOACAP Point**    | VOACAP prediction from DE to a specific DX target point                                                                    |
 | **Reliability**     | Circuit reliability percentage map                                                                                         |
 | **TOA**             | Take-Off Angle prediction                                                                                                  |
-| **Heatmap**         | Live spot density heat map from PSK Reporter data                                                                          |
+| **Heatmap**      | Live spot density heat map from PSK Reporter data                                                                          |
 | **DRAP**            | D-Region Absorption Prediction (also available as a widget)                                                                |
 
-![MUF propagation overlay](images/map-prop-muf.jpg)
+![MUF propagation overlay](images/v1_0/hc_v1_dark_robinson_muf_rot1_asteroids_forecast_wx_alerts_ncdxf_de_info_satellite.png)
 
 ![VOACAP overlay](images/map-prop-voacap.png)
 <!-- TODO: screenshot needed -->
@@ -94,7 +94,7 @@ Configure these fields in [Setup & Configuration](Configuration.md):
 | `propBand`     | Amateur band to model (e.g., `20m`, `40m`, `10m`) |
 | `propMode`     | Emission mode (`SSB`, `CW`, `FT8`, etc.)          |
 | `propPower`    | Transmitter power in watts                        |
-| `mufRtOpacity` | Opacity of the MUF real-time overlay (0–100)      |
+| `mufRtOpacity` | Opacity of the MUF real-time overlay (0\u2013100)      |
 
 ---
 
@@ -105,10 +105,10 @@ Weather overlays can be displayed independently of propagation overlays.
 | Overlay          | Description                                                     |
 | ---------------- | --------------------------------------------------------------- |
 | **None**         | No weather overlay                                              |
-| **Clouds (GFS)** | Global cloud cover from NOAA GFS model (GRIB2, 0.25°, 6h cycle)|
-| **WX/Pressure**  | Surface pressure / weather map contours                         |
+| **Clouds (GFS)** | High-fidelity layered cloud system from NOAA GFS model (GRIB2, 0.25\u00b0 / 1440x721). Blends Low, Middle, and High altitude data with transparency tuning for realistic depth. Features \"Seam Stitching\" to ensure gap-free viewing at the Date Line antimeridian in all projections. |
+| **WX/Pressure**  | Surface pressure / weather map contours                                                                                                                                                                                                                                                             |
 
-![Cloud cover overlay](images/map-weather-clouds.jpg)
+![Cloud cover overlay](images/v1_0/hc_v1_dark_robinson_clouds_layered_rot1_asteroids_forecast_wx_alerts_ncdxf_de_info_satellite.png)
 
 ---
 

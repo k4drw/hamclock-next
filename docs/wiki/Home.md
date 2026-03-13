@@ -4,7 +4,7 @@ HamClock-Next is an open-source amateur radio dashboard that displays real-time 
 
 It is a community continuation of the original HamClock created by Elwood Downey, WB0OEW (Silent Key, 29 January 2026), modernized with a SDL2-based rendering engine, a six-pane rotatable widget layout, and full browser support via WebAssembly.
 
-![Full dashboard overview](images/dashboard-live.jpg)
+![Full dashboard overview](images/v1_0/hc_v1_dark_robinson_muf_rot1_asteroids_forecast_wx_alerts_ncdxf_de_info_satellite.png)
 
 ---
 

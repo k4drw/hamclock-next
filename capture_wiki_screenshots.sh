@@ -16,7 +16,8 @@ LOOKS=(
     "robinson|muf|none|dark|v1_dark_robinson_muf"
     "azimuthal|aurora|none|midnight|v1_midnight_azimuthal_aurora"
     "mercator|drap|wx_mb|paper|v1_paper_mercator_drap_isobars"
-    "dual_azimuthal|none|clouds|glass|v1_glass_dual_az_clouds"
+    "dual_azimuthal|none|clouds_grib|glass|v1_glass_dual_az_clouds"
+    "robinson|none|clouds_grib|dark|v1_dark_robinson_clouds_layered"
     "azimuthal|none|none|amber|v1_amber_clean"
     "robinson|none|none|matrix|v1_matrix_robinson"
 )

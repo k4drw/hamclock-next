@@ -33,6 +33,14 @@ Automated builds are produced for: **x86-64**, **ARM64**, **ARMhf**, and **WASM*
 
 ---
 
+## Major Architectural Enhancements
+
+### Local Data Hub (LAN Rate-Limit Sharing)
+
+HamClock-Next instances can share a common data cache on a local network. One instance acts as the **Master** and proxies API requests for other **Client** instances. This reduces external network traffic and prevents multiple instances from hitting API rate limits. Clients fall back silently to direct fetching if the Hub is unavailable.
+
+---
+
 ## Layout
 
 ### Pane Rotation — Manual Cycling and Configurable Interval
@@ -101,9 +109,9 @@ All overlays are configurable by **band**, **mode**, and **power** (watts).
 
 ## Weather Overlays
 
-| Overlay                | Description                                                                           |
-| ---------------------- | ------------------------------------------------------------------------------------- |
-| **Cloud Cover (GFS)**  | Global cloud cover from NOAA GFS GRIB2 (TCDC, 0.25°); replaces VIIRS JPEG composite  |
+| Overlay                | Description                                                                                                                                                                                                                               |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Cloud Cover (GFS)**  | High-fidelity layered cloud system from NOAA GFS model (GRIB2, 0.25° / 1440x721). Blends Low, Middle, and High altitude data with transparency tuning. Features "Seam Stitching" to ensure gap-free viewing at the Date Line antimeridian. |
 | **WX Pressure (WxMb)** | Surface pressure contours from NOAA NOMADS GRIB2 data, rendered with Marching Squares |
 
 ---
@@ -164,7 +172,6 @@ Presets make it simple to switch between operating contexts (contest, casual DX,
 - **Automatic migration** — the config loader auto-migrates legacy flat keys from earlier HamClock-Next versions
 - **Brightness schedule** — configure dim and bright times (hour:minute) for automatic display brightness control
 - **Color overrides** — per-element color customization via `colorOverrides` map
-- **Hub mode** — run HamClock-Next as a local data server (`Server`) that other instances act as clients of (`Client`), enabling a shared data feed on a local network
 - **RSS ticker** — optional scrolling RSS feed display
 - **CORS proxy** — configurable proxy URL for browser (WASM) builds where direct cross-origin requests are blocked
 
