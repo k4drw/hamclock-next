@@ -16,7 +16,7 @@
 #include "../core/WorldBorders.h"
 #include "../services/AsteroidProvider.h"
 #include "../services/BeaconProvider.h"
-#include "../services/CloudProvider.h"
+#include "../services/GribCloudProvider.h"
 #include "../services/IonosondeProvider.h"
 #include "../services/WxMbProvider.h"
 #include "EmbeddedIcons.h"
@@ -176,8 +176,9 @@ MapWidget::MapWidget(int x, int y, int w, int h, TextureManager &texMgr,
           "KMSDRM detected, enabling night overlay compatibility path.");
   }
 
-  // Initialize WxMbProvider
+  // Initialize WxMbProvider and GribCloudProvider
   wxmb_ = std::make_shared<WxMbProvider>(netMgr_);
+  gribCloud_ = std::make_shared<GribCloudProvider>(netMgr_);
 
   // Initialize MapViewMenu
   mapViewMenu_ = std::make_unique<MapViewMenu>(fontMgr);
@@ -187,7 +188,6 @@ MapWidget::MapWidget(int x, int y, int w, int h, TextureManager &texMgr,
   recalcMapRect();
 }
 void MapWidget::setTheme(const std::string &theme) {
-  const bool themeChanged = (theme != theme_);
   Widget::setTheme(theme);
   if (mapViewMenu_) {
     mapViewMenu_->setTheme(theme);
@@ -197,11 +197,6 @@ void MapWidget::setTheme(const std::string &theme) {
     MemoryMonitor::getInstance().destroyTexture(tooltip_.cachedTexture);
     tooltip_.cachedTexture = nullptr;
     tooltip_.cachedText.clear();
-  }
-  // Force cloud overlay re-decode when theme changes so tinting is correct
-  if (themeChanged && clouds_) {
-    clouds_->invalidateTexture();
-    cloudLastCheckMs_ = 0; // trigger immediate re-fetch in next update()
   }
 }
 void MapWidget::setMetric(bool metric) {
@@ -215,6 +210,8 @@ MapWidget::~MapWidget() {
   MemoryMonitor::getInstance().destroyTexture(tooltip_.cachedTexture);
   if (wxFillTex_)
     MemoryMonitor::getInstance().destroyTexture(wxFillTex_);
+  if (gribCloudFillTex_)
+    MemoryMonitor::getInstance().destroyTexture(gribCloudFillTex_);
 }
 void MapWidget::recalcMapRect() {
   if (config_.projection == "azimuthal") {
@@ -534,11 +531,12 @@ void MapWidget::update() {
     }
   }
 
-  // Cloud overlay (check every hour — NetworkManager caches the JPEG)
-  if (config_.weatherOverlay == WeatherOverlayType::Clouds && clouds_) {
-    if (cloudLastCheckMs_ == 0 || nowMs - (uint32_t)cloudLastCheckMs_ > 3600000) {
-      cloudLastCheckMs_ = (uint64_t)nowMs;
-      clouds_->update();
+  // GFS TCDC cloud overlay (check every 10 minutes — GFS cycles every 6h)
+  if (config_.weatherOverlay == WeatherOverlayType::CloudsGrib && gribCloud_) {
+    if (gribCloudLastCheckMs_ == 0 ||
+        nowMs - (uint32_t)gribCloudLastCheckMs_ > 600000) {
+      gribCloudLastCheckMs_ = (uint64_t)nowMs;
+      gribCloud_->update();
     }
   }
 
@@ -1466,7 +1464,7 @@ void MapWidget::render(SDL_Renderer *renderer) {
   }
 
   renderWxMbOverlay(renderer);
-  renderCloudOverlay(renderer);
+  renderGribCloudOverlay(renderer);
   renderPropagationOverlay(renderer);
   renderMufRtOverlay(renderer);
   renderNightOverlay(renderer);
@@ -2362,32 +2360,44 @@ void MapWidget::renderPropagationOverlay(SDL_Renderer *renderer) {
   SDL_RenderSetClipRect(renderer, nullptr);
 }
 
-void MapWidget::renderCloudOverlay(SDL_Renderer *renderer) {
-  if (config_.weatherOverlay != WeatherOverlayType::Clouds)
+void MapWidget::renderGribCloudOverlay(SDL_Renderer *renderer) {
+  if (config_.weatherOverlay != WeatherOverlayType::CloudsGrib)
     return;
-  if (!clouds_)
+  if (!gribCloud_)
     return;
 
-  // Use dark tint for light themes to maintain contrast against bright backgrounds.
+  // Pick up any newly decoded surface and upload to GPU.
+  SDL_Surface *surf = gribCloud_->takeSurface();
+  if (surf) {
+    if (gribCloudFillTex_)
+      MemoryMonitor::getInstance().destroyTexture(gribCloudFillTex_);
+    gribCloudFillTex_ = SDL_CreateTextureFromSurface(renderer, surf);
+    if (gribCloudFillTex_) {
+      MemoryMonitor::getInstance().addVram((int64_t)surf->w * surf->h * 4);
+      SDL_SetTextureBlendMode(gribCloudFillTex_, SDL_BLENDMODE_BLEND);
+    }
+    SDL_FreeSurface(surf);
+  }
+
+  if (!gribCloudFillTex_)
+    return;
+
+  // Apply theme-aware tint (same logic as VIIRS cloud overlay).
   bool isLight = (theme_ == "paper");
-  SDL_Color cloudTint = isLight ? SDL_Color{140, 140, 160, 255}
-                                : SDL_Color{255, 255, 255, 255};
-  SDL_Texture *tex = clouds_->getTexture(renderer, mapRect_.w, mapRect_.h, cloudTint);
-  if (!tex)
-    return;
+  if (isLight)
+    SDL_SetTextureColorMod(gribCloudFillTex_, 140, 140, 160);
+  else
+    SDL_SetTextureColorMod(gribCloudFillTex_, 255, 255, 255);
 
-  SDL_SetTextureBlendMode(tex, SDL_BLENDMODE_BLEND);
-  SDL_SetTextureAlphaMod(tex, 180); // 70% opacity, moved behind prop map
-
+  SDL_SetTextureAlphaMod(gribCloudFillTex_, 180);
   SDL_RenderSetClipRect(renderer, &mapRect_);
 
   if (config_.projection != "equirectangular" && !mapVerts_.empty()) {
-    // Warp cloud texture to match map projection using map geometry
-    SDL_RenderGeometry(renderer, tex, mapVerts_.data(), (int)mapVerts_.size(),
-                       nightIndices_.data(), (int)nightIndices_.size());
+    SDL_RenderGeometry(renderer, gribCloudFillTex_, mapVerts_.data(),
+                       (int)mapVerts_.size(), nightIndices_.data(),
+                       (int)nightIndices_.size());
   } else {
-    // Standard blit
-    SDL_RenderCopy(renderer, tex, nullptr, &mapRect_);
+    SDL_RenderCopy(renderer, gribCloudFillTex_, nullptr, &mapRect_);
   }
 
   SDL_RenderSetClipRect(renderer, nullptr);
@@ -3562,10 +3572,10 @@ void MapWidget::renderOverlayInfo(SDL_Renderer *renderer) {
     if (!text.empty())
       text += " + ";
     text += "WX/Pressure";
-  } else if (config_.weatherOverlay == WeatherOverlayType::Clouds) {
+  } else if (config_.weatherOverlay == WeatherOverlayType::CloudsGrib) {
     if (!text.empty())
       text += " + ";
-    text += "Clouds";
+    text += "Clouds (GFS)";
   }
 
   if (text.empty())

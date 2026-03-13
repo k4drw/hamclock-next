@@ -102,11 +102,11 @@ Configure these fields in [Setup & Configuration](Configuration.md):
 
 Weather overlays can be displayed independently of propagation overlays.
 
-| Overlay    | Description                               |
-| ---------- | ----------------------------------------- |
-| **None**   | No weather overlay                        |
-| **Clouds** | Global cloud cover from satellite imagery |
-| **WxMb**   | Surface pressure / weather map contours   |
+| Overlay          | Description                                                     |
+| ---------------- | --------------------------------------------------------------- |
+| **None**         | No weather overlay                                              |
+| **Clouds (GFS)** | Global cloud cover from NOAA GFS model (GRIB2, 0.25°, 6h cycle)|
+| **WX/Pressure**  | Surface pressure / weather map contours                         |
 
 ![Cloud cover overlay](images/map-weather-clouds.jpg)
 

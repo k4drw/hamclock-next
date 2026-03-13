@@ -117,18 +117,18 @@ propOverlayFromString(const std::string &s) {
   switch (t) {
   case WeatherOverlayType::None:
     return "none";
-  case WeatherOverlayType::Clouds:
-    return "clouds";
   case WeatherOverlayType::WxMb:
     return "wxmb";
+  case WeatherOverlayType::CloudsGrib:
+    return "clouds_grib";
   }
   return "none";
 }
 
 [[maybe_unused]] static WeatherOverlayType
 wxOverlayFromString(const std::string &s) {
-  if (s == "clouds")
-    return WeatherOverlayType::Clouds;
+  if (s == "clouds_grib" || s == "clouds")
+    return WeatherOverlayType::CloudsGrib;
   if (s == "wxmb")
     return WeatherOverlayType::WxMb;
   return WeatherOverlayType::None;
@@ -366,8 +366,8 @@ void WebServer::run() {
       <label>Weather Overlay</label>
       <select id="weather-overlay">
         <option value="none">None</option>
-        <option value="clouds">Clouds</option>
-        <option value="wxmb">WxMB</option>
+        <option value="wxmb">WX/Pressure</option>
+        <option value="clouds_grib">Clouds (GFS)</option>
       </select>
       <label style="margin-top:10px"><input type="checkbox" id="night-lights"> Show Night Lights</label>
       <label><input type="checkbox" id="use-metric"> Use Metric Units</label>

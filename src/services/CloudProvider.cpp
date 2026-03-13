@@ -28,7 +28,13 @@ void CloudProvider::update() {
   // composite is complete before requesting it.
 
   auto now = std::chrono::system_clock::now();
-  auto yesterday = now - std::chrono::hours(24);
+  // VIIRS daily composites are typically complete by ~15:00 UTC the following day.
+  // After that threshold use yesterday's data; before it fall back to 48h ago
+  // so we never request an incomplete mosaic.
+  std::time_t now_t = std::chrono::system_clock::to_time_t(now);
+  std::tm now_utc = *std::gmtime(&now_t);
+  int hoursBack = (now_utc.tm_hour >= 15) ? 24 : 48;
+  auto yesterday = now - std::chrono::hours(hoursBack);
   std::time_t t = std::chrono::system_clock::to_time_t(yesterday);
   std::tm tm = *std::gmtime(&t);
 

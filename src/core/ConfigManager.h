@@ -20,7 +20,7 @@ enum class PropOverlayType {
   Drap,
   Aurora
 };
-enum class WeatherOverlayType { None, Clouds, WxMb };
+enum class WeatherOverlayType { None, WxMb, CloudsGrib };
 enum class HubMode { Off, Master, Client };
 
 struct ReminderEntry {

@@ -31,7 +31,6 @@
 #include "services/BandConditionsProvider.h"
 #include "services/BeaconProvider.h"
 #include "services/CallbookProvider.h"
-#include "services/CloudProvider.h"
 #include "services/ContestProvider.h"
 #include "services/DRAPProvider.h"
 #include "services/DXClusterProvider.h"
@@ -302,7 +301,6 @@ struct DashboardContext {
   std::shared_ptr<DstProvider> dstProvider;
   std::unique_ptr<ADIFProvider> adifProvider;
   std::shared_ptr<MufRtProvider> mufRtProvider;
-  std::shared_ptr<CloudProvider> cloudProvider;
   std::shared_ptr<IonosondeProvider> ionosondeProvider;
   std::shared_ptr<ReachProvider> reachProvider;
   std::unique_ptr<SantaProvider> santaProvider;
@@ -1064,8 +1062,6 @@ DashboardContext::DashboardContext(AppContext &ctx)
   mufRtProvider = std::make_shared<MufRtProvider>(netManager);
   mufRtProvider->update();
 
-  cloudProvider = std::make_shared<CloudProvider>(netManager);
-  cloudProvider->update();
 
 
   asteroidProvider = std::make_shared<AsteroidProvider>(netManager);
@@ -1674,7 +1670,6 @@ DashboardContext::DashboardContext(AppContext &ctx)
   mapArea->setDXClusterStore(dxcStore);
   mapArea->setADIFStore(adifStore);
   mapArea->setMufRtProvider(mufRtProvider.get());
-  mapArea->setCloudProvider(cloudProvider.get());
   mapArea->setBeaconProvider(beaconProvider.get());
   mapArea->setAuroraStore(auroraHistoryStore);
   mapArea->setAuroraMapStore(auroraMapStore);
@@ -1968,9 +1963,7 @@ void DashboardContext::update(AppContext &ctx) {
     if (mufOverlayActive)
       ionosondeProvider->update();
 
-    // --- Cloud data & Asteroid widget + map pin ---
-    if (cloudProvider)
-      cloudProvider->update();
+    // --- Asteroid widget + map pin ---
     if (isMaster || isWidgetActive(WidgetType::ASTEROID))
       asteroidProvider->update();
 

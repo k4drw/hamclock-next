@@ -156,9 +156,9 @@ public:
       return nullptr;
     surface = rgbaSurface;
 
-    bool hasTint = (tint.r != 255 || tint.g != 255 || tint.b != 255) || (key == "clouds");
+    bool hasTint = (tint.r != 255 || tint.g != 255 || tint.b != 255);
 
-    if (key == "nasa_moon" || key == "sdo_latest" || key == "clouds") {
+    if (key == "nasa_moon" || key == "sdo_latest") {
       uint8_t *pixels = (uint8_t *)surface->pixels;
       for (int y = 0; y < surface->h; ++y) {
         uint32_t *row = (uint32_t *)(pixels + y * surface->pitch);
@@ -174,7 +174,7 @@ public:
             else if (br < 100)
               br = (uint8_t)(((br - 20) / 80.0f) * br);
             row[x] = SDL_MapRGBA(surface->format, r, g, b, br);
-          } else if (key == "sdo_latest" || key == "clouds") {
+          } else if (key == "sdo_latest") {
             if (hasTint) {
               // Map grayscale brightness to tint color
               r = (uint8_t)((br / 255.0f) * tint.r);

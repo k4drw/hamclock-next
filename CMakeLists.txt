@@ -501,7 +501,6 @@ set(HAMCLOCK_SOURCES
     src/services/NOAAProvider.cpp
     src/services/RSSProvider.cpp
     src/services/BME280Provider.cpp
-    src/services/CloudProvider.cpp
     src/services/ADIFProvider.cpp
     src/services/ActivityProvider.cpp
     src/services/DRAPProvider.cpp
@@ -511,6 +510,7 @@ set(HAMCLOCK_SOURCES
     src/services/AuroraProvider.cpp
     src/services/MufRtProvider.cpp
     src/services/WxMbProvider.cpp
+    src/services/GribCloudProvider.cpp
     src/services/IonosondeProvider.cpp
     src/services/HistoryProvider.cpp
     src/services/BandConditionsProvider.cpp

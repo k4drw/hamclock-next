@@ -103,7 +103,7 @@ All overlays are configurable by **band**, **mode**, and **power** (watts).
 
 | Overlay                | Description                                                                           |
 | ---------------------- | ------------------------------------------------------------------------------------- |
-| **Cloud Cover**        | Global cloud imagery from NASA GIBS satellite composite                               |
+| **Cloud Cover (GFS)**  | Global cloud cover from NOAA GFS GRIB2 (TCDC, 0.25°); replaces VIIRS JPEG composite  |
 | **WX Pressure (WxMb)** | Surface pressure contours from NOAA NOMADS GRIB2 data, rendered with Marching Squares |
 
 ---
