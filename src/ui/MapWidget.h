@@ -245,6 +245,7 @@ private:
 
   void renderLegend(SDL_Renderer *renderer);
   void renderWxMbLegend(SDL_Renderer *renderer);
+  void renderCloudLegend(SDL_Renderer *renderer);
   void renderTooltip(SDL_Renderer *renderer);
   void renderProjectionSelect(SDL_Renderer *renderer);
 

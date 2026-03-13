@@ -26,7 +26,7 @@ public:
 
 private:
   static std::string buildUrl();
-  static SDL_Surface *decodeTCDC(const std::vector<uint8_t> &data);
+  static SDL_Surface *decodeGrib(const std::vector<uint8_t> &data);
 
   NetworkManager &net_;
   SDL_Surface *pendingSurface_ = nullptr;

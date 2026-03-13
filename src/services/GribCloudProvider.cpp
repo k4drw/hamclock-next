@@ -47,8 +47,13 @@ static uint32_t readBits(const uint8_t *data, size_t bitOffset, int n) {
 // discipline=0, parameterCategory=6, parameterNumber=1
 // ---------------------------------------------------------------------------
 
-SDL_Surface *GribCloudProvider::decodeTCDC(const std::vector<uint8_t> &data) {
+SDL_Surface *GribCloudProvider::decodeGrib(const std::vector<uint8_t> &data) {
   size_t pos = 0;
+  int nx = 1440, ny = 721;
+  std::vector<float> lcdc(nx * ny, 0.0f);
+  std::vector<float> mcdc(nx * ny, 0.0f);
+  std::vector<float> hcdc(nx * ny, 0.0f);
+  bool gotL = false, gotM = false, gotH = false;
 
   while (pos + 16 <= data.size()) {
     if (data[pos] != 'G' || data[pos + 1] != 'R' || data[pos + 2] != 'I' ||
@@ -69,7 +74,7 @@ SDL_Surface *GribCloudProvider::decodeTCDC(const std::vector<uint8_t> &data) {
     size_t secPos = pos + 16;
     uint8_t discipline = data[pos + 6];
 
-    int nx = 0, ny = 0;
+    int msgNx = 0, msgNy = 0;
     uint8_t paramCat = 255, paramNum = 255;
     float R = 0.0f;
     int16_t E = 0, D = 0;
@@ -107,9 +112,9 @@ SDL_Surface *GribCloudProvider::decodeTCDC(const std::vector<uint8_t> &data) {
       switch (secNum) {
       case 3:
         if (bodyLen >= 34 && u16be(body + 7) == 0) {
-          nx = (int)u32be(body + 25);
-          ny = (int)u32be(body + 29);
-          got3 = (nx > 0 && ny > 0);
+          msgNx = (int)u32be(body + 25);
+          msgNy = (int)u32be(body + 29);
+          got3 = (msgNx > 0 && msgNy > 0);
         }
         break;
 
@@ -159,9 +164,10 @@ SDL_Surface *GribCloudProvider::decodeTCDC(const std::vector<uint8_t> &data) {
         break;
 
       case 7:
-        if (got3 && got4 && got5 && got6 && !hasBitmap &&
-            discipline == 0 && paramCat == 6 && paramNum == 1) {
-          size_t count = std::min((size_t)nx * ny, (size_t)nValues);
+        if (got3 && got4 && got5 && got6 && !hasBitmap && discipline == 0 &&
+            paramCat == 6 && (paramNum == 3 || paramNum == 4 || paramNum == 5)) {
+
+          size_t count = std::min((size_t)msgNx * msgNy, (size_t)nValues);
           std::vector<float> vals;
 
           if (packType == PACK_SIMPLE && nBits > 0) {
@@ -173,11 +179,9 @@ SDL_Surface *GribCloudProvider::decodeTCDC(const std::vector<uint8_t> &data) {
               uint32_t raw = readBits(body, i * nBits, nBits);
               vals[i] = (float)((R + raw * s2E) / s10D);
             }
-
           } else if ((packType == PACK_COMPLEX ||
                       packType == PACK_COMPLEX_SPATIAL) &&
                      nGroups > 0 && missingMgmt == 0) {
-
             std::vector<int64_t> initVals;
             int64_t minDiff = 0;
             size_t bitPos = 0;
@@ -242,13 +246,11 @@ SDL_Surface *GribCloudProvider::decodeTCDC(const std::vector<uint8_t> &data) {
               size_t idx = 0;
               for (uint32_t g = 0; g < nGroups && idx < count; ++g) {
                 uint32_t len = L[g], w = W[g];
-                uint32_t canDo =
-                    (uint32_t)std::min((size_t)len, count - idx);
+                uint32_t canDo = (uint32_t)std::min((size_t)len, count - idx);
                 for (uint32_t k = 0; k < canDo; ++k, ++idx) {
-                  intVals[idx] = (w == 0)
-                                     ? (int64_t)X1[g]
-                                     : (int64_t)X1[g] +
-                                           (int64_t)readBits(body, bitPos, w);
+                  intVals[idx] = (w == 0) ? (int64_t)X1[g]
+                                          : (int64_t)X1[g] +
+                                                (int64_t)readBits(body, bitPos, w);
                   if (w > 0)
                     bitPos += w;
                 }
@@ -268,8 +270,8 @@ SDL_Surface *GribCloudProvider::decodeTCDC(const std::vector<uint8_t> &data) {
                 restored[0] = initVals[0];
                 restored[1] = initVals[1];
                 for (size_t i = 2; i < count; ++i)
-                  restored[i] = intVals[i] + minDiff +
-                                 (2 * restored[i - 1]) - restored[i - 2];
+                  restored[i] = intVals[i] + minDiff + (2 * restored[i - 1]) -
+                                 restored[i - 2];
               }
               intVals = std::move(restored);
             }
@@ -281,42 +283,21 @@ SDL_Surface *GribCloudProvider::decodeTCDC(const std::vector<uint8_t> &data) {
               vals[i] = (float)((R + (double)intVals[i] * s2E) / s10D);
           }
 
-          if (vals.empty()) {
-            LOG_W("GribCloud", "TCDC decode produced no values");
-            pos = msgEnd;
-            break;
-          }
-
-          LOG_I("GribCloud", "Decoding TCDC: {}x{} count={}", nx, ny,
-                vals.size());
-
-          // Build surface at native GRIB resolution (nx x ny = 1440x721).
-          // GRIB is south-first (row 0 = lat -90); flip rows so row 0 = lat +90.
-          SDL_Surface *surf = SDL_CreateRGBSurfaceWithFormat(
-              0, nx, ny, 32, SDL_PIXELFORMAT_RGBA8888);
-          if (!surf) {
-            pos = msgEnd;
-            break;
-          }
-
-          uint32_t *px = (uint32_t *)surf->pixels;
-          int pitch = surf->pitch / 4;
-
-          for (int iy = 0; iy < ny; ++iy) {
-            int grib_row = ny - 1 - iy; // flip: surface row 0 = north pole
-            for (int ix = 0; ix < nx; ++ix) {
-              size_t idx = (size_t)grib_row * nx + ix;
-              float cov = (idx < vals.size()) ? vals[idx] : 0.0f;
-              if (cov < 0.0f) cov = 0.0f;
-              if (cov > 100.0f) cov = 100.0f;
-              uint8_t alpha =
-                  (cov > 5.0f) ? (uint8_t)std::min(200.0f, cov * 2.0f) : 0;
-              px[iy * pitch + ix] =
-                  SDL_MapRGBA(surf->format, 255, 255, 255, alpha);
+          if (!vals.empty()) {
+            if (paramNum == 3) {
+              lcdc = std::move(vals);
+              gotL = true;
+              LOG_I("GribCloud", "Decoded LCDC");
+            } else if (paramNum == 4) {
+              mcdc = std::move(vals);
+              gotM = true;
+              LOG_I("GribCloud", "Decoded MCDC");
+            } else if (paramNum == 5) {
+              hcdc = std::move(vals);
+              gotH = true;
+              LOG_I("GribCloud", "Decoded HCDC");
             }
           }
-
-          return surf;
         }
         break;
 
@@ -325,12 +306,43 @@ SDL_Surface *GribCloudProvider::decodeTCDC(const std::vector<uint8_t> &data) {
       }
       secPos += secLen;
     }
-
     pos = msgEnd;
   }
 
-  LOG_W("GribCloud", "TCDC field not found in GRIB2 data");
-  return nullptr;
+  if (!gotL && !gotM && !gotH) {
+    LOG_W("GribCloud", "No cloud fields (LCDC/MCDC/HCDC) found in GRIB2 data");
+    return nullptr;
+  }
+
+  // Build surface at native GRIB resolution (1440x721).
+  SDL_Surface *surf =
+      SDL_CreateRGBSurfaceWithFormat(0, nx, ny, 32, SDL_PIXELFORMAT_RGBA8888);
+  if (!surf)
+    return nullptr;
+
+  uint32_t *px = (uint32_t *)surf->pixels;
+  int pitch = surf->pitch / 4;
+
+  for (int iy = 0; iy < ny; ++iy) {
+    int grib_row = ny - 1 - iy; // flip: surface row 0 = north pole
+    for (int ix = 0; ix < nx; ++ix) {
+      size_t idx = (size_t)grib_row * nx + ix;
+      float l = (gotL && idx < lcdc.size()) ? lcdc[idx] : 0.0f;
+      float m = (gotM && idx < mcdc.size()) ? mcdc[idx] : 0.0f;
+      float h = (gotH && idx < hcdc.size()) ? hcdc[idx] : 0.0f;
+
+      // Weighted blend from suggestions
+      float combined = (0.6f * l + 0.8f * m + 1.0f * h);
+      float cloud_fraction = std::clamp(combined / 100.0f, 0.0f, 1.0f);
+
+      // Nonlinear alpha mapping: alpha = pow(cloud_fraction, 1.5)
+      uint8_t alpha = (uint8_t)(255.0f * std::pow(cloud_fraction, 1.5f));
+
+      px[iy * pitch + ix] = SDL_MapRGBA(surf->format, 255, 255, 255, alpha);
+    }
+  }
+
+  return surf;
 }
 
 // ---------------------------------------------------------------------------
@@ -347,11 +359,12 @@ std::string GribCloudProvider::buildUrl() {
   gmtime_r(&t, &gmt);
 #endif
   int hh = (gmt.tm_hour / 6) * 6;
-  char buf[512];
+  char buf[1024];
   std::snprintf(buf, sizeof(buf),
                 "https://nomads.ncep.noaa.gov/cgi-bin/filter_gfs_0p25.pl"
                 "?file=gfs.t%02dz.pgrb2.0p25.f000"
-                "&lev_entire_atmosphere=on&var_TCDC=on"
+                "&lev_low_cloud_layer=on&lev_middle_cloud_layer=on"
+                "&lev_high_cloud_layer=on&var_LCDC=on&var_MCDC=on&var_HCDC=on"
                 "&leftlon=0&rightlon=359.75&toplat=90&bottomlat=-90"
                 "&dir=%%2Fgfs.%04d%02d%02d%%2F%02d%%2Fatmos",
                 hh, gmt.tm_year + 1900, gmt.tm_mon + 1, gmt.tm_mday, hh);
@@ -378,7 +391,7 @@ void GribCloudProvider::update() {
     fetchingUrl_ = url;
   }
 
-  LOG_I("GribCloud", "Fetching GFS TCDC: {}", url);
+  LOG_I("GribCloud", "Fetching GFS Clouds: {}", url);
   std::weak_ptr<GribCloudProvider> self = shared_from_this();
   net_.fetchAsync(
       url,
@@ -399,7 +412,7 @@ void GribCloudProvider::update() {
                 return;
 
               std::vector<uint8_t> bytes(rawData.begin(), rawData.end());
-              SDL_Surface *surf = decodeTCDC(bytes);
+              SDL_Surface *surf = decodeGrib(bytes);
 
               std::lock_guard<std::mutex> lk(p2->mutex_);
               p2->fetchingUrl_ = "";
