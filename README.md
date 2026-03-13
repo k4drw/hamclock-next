@@ -35,12 +35,15 @@ extended, and ported without archaeology.
 
 ---
 
-## Project Philosophy — AI as Co-Developer
+### Project Philosophy — AI as Co-Developer
 
 HamClock-Next is, by deliberate design, a near-**100% AI-written codebase**.
-The implementation itself is written by AI assistants (Antigravity/Gemini 3.0 Flash, 
-Gemini CLI, and Claude Code) while humans serve as architects: defining the structure, 
-owning the design decisions, setting acceptance criteria, and reviewing every output.
+The implementation itself is written by AI assistants while humans serve as architects: 
+defining the structure, owning the design decisions, and reviewing output.
+
+#### Multi-Agent Consensus & Model Diversity
+A cornerstone of our methodology is the use of **diverse AI models** (Gemini 3, Claude Code, and Codex) to perform peer-reviewed implementation and code audits. By leveraging the unique training biases of different agents, we achieve a "multi-agent consensus" that eliminates hallucinations and surfaces architectural edge cases, resulting in a more robust and stable codebase than any single model could produce alone.
+
 
 The result is a production-quality, modern C++ codebase that compiles clean, 
 passes valgrind, and runs stably on everything from a Raspberry Pi 3 to a browser tab.

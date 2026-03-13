@@ -6,9 +6,28 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
-## [Unreleased — v1.0.0]
+## [v1.0.0] — 2026-03-13
 
-Planned stable release following B04 validation.
+### Added
+- **Heritage Release** — First stable 1.0.0 release.
+- **100% Feature Parity** (82/82 features) with original HamClock by WB0OEW.
+- **Dual-Hemisphere Azimuthal Projection** — Sidebar-by-side globes centered on DE and antipode.
+- **High-Fidelity GribCloud Overlay** — 1440x721 layered cloud system from NOAA GFS.
+- **Seamless Date Line Overlays** — Eliminates gaps at -180/180 longitude across all projections.
+- **Manual Pane Rotation** — Navigation arrows on widgets for immediate pane cycling.
+- **Dedicated WSJT-X UDP Port** — Separate configuration for digital mode spotting.
+- **Aux Clock Timezone Cycling** — Quick-switch between preset zones by clicking the widget.
+
+### Changed
+- **Unified Side Panels** — Side panels (DE/DX Info) are now standard panes supporting all 45 widgets.
+- **Standardized UI Tokens** — Full migration to `ThemeColors` tokens across all UI components.
+- **Optimized Memory Management** — Automatic low-memory mode detection for 1GB devices.
+
+### Fixed
+- **Antimeridian Path Clipping** — Corrects streaks in sat/asteroid tracks crossing the Date Line.
+- **Division-by-zero Guards** — Epsilon checks in Great Circle and coordinate transformation math.
+- **Security Hardening** — Weak-pointer callbacks and SQL prepared statements throughout.
+- **REST API Completion** — 79 endpoints verified and documented.
 
 ---
 

@@ -13,7 +13,7 @@ Features are grouped by category. Each entry includes a brief description and, w
 The original HamClock used a custom framebuffer/X11 rendering stack that limited it to Linux. HamClock-Next is built on **SDL2**, which enables:
 
 - **Linux** — framebuffer and native window, including Raspberry Pi (ARM)
-- **macOS** — native window (Intel and Apple Silicon)
+- **macOS** — native window (Apple Silicon)
 - **Windows** — native x64 binary and NSIS installer (`HamClock-Next-Setup.exe`)
 - **Browser** — via WebAssembly (Emscripten), runs in any modern browser with no installation
 

@@ -29,15 +29,14 @@ Full build instructions: see [Getting Started](docs/wiki/Getting-Started.md).
 
 | Branch | Purpose |
 | ------ | ------- |
-| `master` | Stable releases |
-| `v1.0B04` (or current beta) | Active development |
-| Feature branches | Short-lived; branched from the active beta |
+| `master` | Stable releases & hotfixes |
+| `v1.0` | Current release line |
+| `feature/*` | New work and enhancements |
 
 1. Fork the repository.
-2. Branch from the current beta branch (e.g. `v1.0B04`), not `master`.
+2. Branch from the current stable branch (e.g. `v1.0`) or `master` for hotfixes.
 3. Keep changes focused — one logical change per PR.
-4. Open a PR against the beta branch.
-5. Reference any parity item or issue in the PR description.
+4. Reference any parity item or issue in the PR description.
 
 ---
 

@@ -69,6 +69,16 @@ The answer to the experiment so far: it works. v1.0B01 has shipped with all 71
 original features and over 10 new ones. The code compiles clean, passes
 valgrind, and runs stably on everything from a Raspberry Pi 3 to a browser tab.
 
+### Multi-Agent Consensus & Model Diversity
+
+A key discovery during development was the "force multiplier" effect of using a diverse set of AI agents for the same task. By providing identical prompts to different models, we leveraged their unique training biases to create a robust peer-review loop:
+
+- **Gemini 3 (Antigravity / Gemini CLI)**: Demonstrated high velocity and exceptional strength in complex C++ geometry and immediate functional delivery.
+- **Claude Code**: Provided a highly analytical "second opinion," often pausing to ask for deep architectural clarification before implementation, which surfaced subtle edge cases that direct implementation might miss.
+- **Multi-Model Orchestration**: By treating the agents as a "Board of Directors," we resolved implementation conflicts by evaluating the rationale of each agent. This consensus-based approach eliminated common "hallucinations" and ensured that the final code followed the most robust path suggested by the collective.
+
+This methodology has been so effective that it is now a formal part of the HamClock-Next development workflow and is being evaluated as a template for professional engineering organizations looking to streamline high-complexity work.
+
 ---
 
 ## The MCP Ecosystem
@@ -183,7 +193,7 @@ Every external data fetch is cached both in memory and on disk.
 ### 8. Platform & Build
 
 - **Linux** — x86_64 and ARM (Raspberry Pi 3/4/5, armhf and arm64); framebuffer and X11/Wayland
-- **macOS** — Intel and Apple Silicon; native `.app` bundle
+- **macOS** — Apple Silicon; native `.app` bundle
 - **Windows x64** — cross-compiled executable and NSIS installer (`HamClock-Next-Setup.exe`)
 - **WebAssembly / Browser** — full Emscripten build; serve from any web server; no install required
 - **OTA update notifications** — version string turns amber when a newer release is available on GitHub
