@@ -47,6 +47,11 @@ void ClockAuxPanel::syncFromConfig() {
   }
 }
 
+ClockAuxPanel::~ClockAuxPanel() {
+  if (hmTex_)  SDL_DestroyTexture(hmTex_);
+  if (secTex_) SDL_DestroyTexture(secTex_);
+}
+
 void ClockAuxPanel::update() {}
 
 void ClockAuxPanel::render(SDL_Renderer *renderer) {
@@ -80,14 +85,44 @@ void ClockAuxPanel::render(SDL_Renderer *renderer) {
   cat->drawText(renderer, title, x_ + 10, y_ + 5, themes.accent,
                 FontStyle::MicroBold);
 
-  int curY = y_ + titleH + 10;
+  int curY = y_ + titleH + 4;
   int centerX = x_ + width_ / 2;
 
   char buf[64];
-  std::strftime(buf, sizeof(buf), "%H:%M:%S", gmt);
-  cat->drawText(renderer, buf, centerX, curY + timeFontSize_ / 2, themes.text,
-                FontStyle::MediumBold, true);
-  curY += timeFontSize_ + 12;
+
+  // Build HH:MM and SS strings
+  char hmBuf[8], secBuf[4];
+  std::strftime(hmBuf, sizeof(hmBuf), "%H:%M", gmt);
+  std::strftime(secBuf, sizeof(secBuf), "%S",   gmt);
+  std::string hmStr(hmBuf), secStr(secBuf);
+
+  // Rebuild textures only when string changes
+  if (hmStr != lastHM_ || !hmTex_) {
+    if (hmTex_) { SDL_DestroyTexture(hmTex_); hmTex_ = nullptr; }
+    hmTex_ = fontMgr_.renderText(renderer, hmStr, themes.text, hmFontSize_,
+                                 &hmW_, &hmH_, true);
+    lastHM_ = hmStr;
+  }
+  if (secStr != lastSec_ || !secTex_) {
+    if (secTex_) { SDL_DestroyTexture(secTex_); secTex_ = nullptr; }
+    secTex_ = fontMgr_.renderText(renderer, secStr, themes.text, secFontSize_,
+                                  &secW_, &secH_, true);
+    lastSec_ = secStr;
+  }
+
+  // Center HH:MM+SS composite block
+  if (hmTex_) {
+    int totalW = hmW_ + 2 + (secTex_ ? secW_ : 0);
+    int startX = centerX - totalW / 2;
+    SDL_Rect hmDst = {startX, curY, hmW_, hmH_};
+    SDL_RenderCopy(renderer, hmTex_, nullptr, &hmDst);
+    if (secTex_) {
+      int secY = curY + (int)(hmH_ * 0.15f);
+      SDL_Rect secDst = {startX + hmW_ + 2, secY, secW_, secH_};
+      SDL_RenderCopy(renderer, secTex_, nullptr, &secDst);
+    }
+  }
+  curY += hmH_ + 8;
 
   std::strftime(buf, sizeof(buf), "%Y-%m-%d", gmt);
   cat->drawText(renderer, buf, centerX, curY, themes.text, FontStyle::Fast,
@@ -141,12 +176,14 @@ void ClockAuxPanel::onResize(int x, int y, int w, int h) {
   Widget::onResize(x, y, w, h);
   auto *cat = fontMgr_.catalog();
   labelFontSize_ = cat->ptSize(FontStyle::FastBold);
-  timeFontSize_ = cat->ptSize(FontStyle::SmallBold);
-  infoFontSize_ = cat->ptSize(FontStyle::Fast);
-
-  if (h > 120) {
-    timeFontSize_ = cat->ptSize(FontStyle::SmallBold) * 1.5;
-  }
+  hmFontSize_    = cat->ptSize(FontStyle::MediumBold) * 4 / 3;  // ~32pt at 1x
+  secFontSize_   = cat->ptSize(FontStyle::FastBold);
+  infoFontSize_  = cat->ptSize(FontStyle::Fast);
+  // Invalidate cached textures on resize
+  if (hmTex_)  { SDL_DestroyTexture(hmTex_);  hmTex_  = nullptr; }
+  if (secTex_) { SDL_DestroyTexture(secTex_); secTex_ = nullptr; }
+  lastHM_.clear();
+  lastSec_.clear();
 }
 
 // ── Popup layout ─────────────────────────────────────────────────────────────
@@ -272,15 +309,15 @@ void ClockAuxPanel::renderMenu(SDL_Renderer *renderer) {
 
   customOffsetInput_.render(renderer, fontMgr_, customOffsetRect_.x,
                             customOffsetRect_.y, customOffsetRect_.w,
-                            customOffsetRect_.h, FontStyle::UI, 4, offAct, true,
-                            themes.accent, themes.border, themes.text,
-                            themes.text, themes.textDim, "-5");
+                            customOffsetRect_.h, FontStyle::Fast, 4,
+                            offAct, true, themes.accent, themes.border,
+                            themes.text, themes.text, themes.textDim, "0", &themes.rowStripe1);
 
   customLabelInput_.render(renderer, fontMgr_, customLabelRect_.x,
                            customLabelRect_.y, customLabelRect_.w,
-                           customLabelRect_.h, FontStyle::UI, 4, lblAct, true,
-                           themes.accent, themes.border, themes.text,
-                           themes.text, themes.textDim, "EST");
+                           customLabelRect_.h, FontStyle::Fast, 4,
+                           lblAct, true, themes.accent, themes.border,
+                           themes.text, themes.text, themes.textDim, "UTC", &themes.rowStripe1);
 
   // Buttons — match SDOPanel lambda style
   auto drawBtn = [&](const SDL_Rect &r, const char *label, SDL_Color bg) {
@@ -379,6 +416,11 @@ bool ClockAuxPanel::onMouseUp(int mx, int my, Uint16 /*mod*/, int /*clicks*/) {
         customSelected_ = false;
         customOffsetInput_.setActive(false);
         customLabelInput_.setActive(false);
+        // Apply preset to config immediately
+        config_.auxClockTzOffset = kPresets[i].offset;
+        config_.auxClockTzLabel = kPresets[i].label;
+        tzPresetIndex_ = i;
+        cfgMgr_.save(config_);
       } else {
         customSelected_ = true;
         if (customOffsetInput_.getValue().empty()) {

@@ -59,7 +59,7 @@ void ThemeCustomizer::loadOverrides() {
     colorPicker_->setColor(it->second);
   } else {
     // Fallback to current theme's color
-    ThemeColors current = getThemeColors(theme_, &overrides_);
+    ThemeColors current = getThemeColors(theme_, overrides_);
     SDL_Color c = {0, 0, 0, 255};
     std::string k = colorKeys_[selectedIndex_].key;
     if (k == "bg")
@@ -97,27 +97,26 @@ void ThemeCustomizer::render(SDL_Renderer *renderer) {
   if (!active_)
     return;
 
-  ThemeColors themes = getThemeColors(theme_, &overrides_);
+  ThemeColors themes = getThemeColors(theme_, overrides_);
   auto *cat = fontMgr_.catalog();
 
   // Draw background semi-transparent
   SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-  SDL_SetRenderDrawColor(renderer, 20, 20, 25, 230);
+  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, 230);
   SDL_Rect bg = {x_, y_, width_, height_};
   SDL_RenderFillRect(renderer, &bg);
-  SDL_SetRenderDrawColor(renderer, 100, 100, 150, 255);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
   SDL_RenderDrawRect(renderer, &bg);
 
   // 1. Draw List of Keys
   for (size_t i = 0; i < colorKeys_.size(); ++i) {
     SDL_Rect r = {rectList_.x, rectList_.y + (int)i * 25, rectList_.w, 22};
     if (selectedIndex_ == (int)i) {
-      SDL_SetRenderDrawColor(renderer, 60, 60, 90, 255);
+      SDL_SetRenderDrawColor(renderer, themes.accent.r, themes.accent.g, themes.accent.b, 80);
       SDL_RenderFillRect(renderer, &r);
     }
-    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
     cat->drawText(renderer, colorKeys_[i].label.c_str(), rectList_.x + 5,
-                  rectList_.y + (int)i * 25 + 2, {255, 255, 255, 255},
+                  rectList_.y + (int)i * 25 + 2, themes.text,
                   FontStyle::SmallRegular);
   }
 
@@ -128,10 +127,10 @@ void ThemeCustomizer::render(SDL_Renderer *renderer) {
   auto drawBottomBtn = [&](const SDL_Rect &r, const char *label, SDL_Color bg) {
     SDL_SetRenderDrawColor(renderer, bg.r, bg.g, bg.b, 255);
     SDL_RenderFillRect(renderer, &r);
-    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+    SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 150);
     SDL_RenderDrawRect(renderer, &r);
     cat->drawText(renderer, label, r.x + r.w / 2, r.y + r.h / 2,
-                  {255, 255, 255, 255}, FontStyle::UIBold, true, false, true);
+                  themes.bg, FontStyle::UIBold, true, false, true);
   };
 
   drawBottomBtn(rectCancel_, "Cancel", themes.danger);

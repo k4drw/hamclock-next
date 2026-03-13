@@ -46,7 +46,8 @@ public:
                 SDL_Color activeBorder, SDL_Color inactiveBorder,
                 SDL_Color validColor, SDL_Color textColor,
                 SDL_Color placeholderColor,
-                const std::string &placeholder = "") const;
+                const std::string &placeholder = "",
+                const SDL_Color *bgColor = nullptr) const;
 
     // Focus
     void setActive(bool active) { active_ = active; }

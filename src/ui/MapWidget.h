@@ -25,7 +25,7 @@
 
 class AsteroidProvider;
 class MufRtProvider;
-class CloudProvider;
+class GribCloudProvider;
 class WxMbProvider;
 class BeaconProvider;
 class IonosondeProvider;
@@ -89,9 +89,8 @@ public:
   }
 
   void setMufRtProvider(MufRtProvider *p) { mufrt_ = p; }
-  void setCloudProvider(CloudProvider *p) { clouds_ = p; }
   void setBeaconProvider(BeaconProvider *p) { beacons_ = p; }
-  void setIonosondeProvider(IonosondeProvider *p) { iono_ = p; }
+  void setIonosondeProvider(std::shared_ptr<IonosondeProvider> p) { iono_ = std::move(p); }
   void setSolarDataStore(SolarDataStore *s) { solar_ = s; }
 
   std::shared_ptr<WxMbProvider> getWxMbProvider() const { return wxmb_; }
@@ -99,6 +98,9 @@ public:
   void setPanes(const std::vector<PaneContainer *> &panes) { panes_ = panes; }
 
   void setOnConfigChanged(std::function<void()> cb) { onConfigChanged_ = cb; }
+
+  void setTheme(const std::string &theme) override;
+  void setMetric(bool metric) override;
 
   // Modal interface for MapViewMenu
   bool isModalActive() const override;
@@ -113,6 +115,7 @@ public:
   // Thread-safe method for receiving data from background threads
   void onSatTrackReady(const std::vector<GroundTrackPoint> &track);
   void onPropDataReady(PropOverlayType type, const std::vector<float> &grid);
+  void onMapImageReady(bool night, std::string &&data);
 
 private:
   SDL_FPoint latLonToScreen(double lat, double lon) const;
@@ -136,7 +139,7 @@ private:
   void renderONTASpots(SDL_Renderer *renderer);
   void renderBeacons(SDL_Renderer *renderer);
   void renderMufRtOverlay(SDL_Renderer *renderer);
-  void renderCloudOverlay(SDL_Renderer *renderer);
+  void renderGribCloudOverlay(SDL_Renderer *renderer);
   void renderWxMbOverlay(SDL_Renderer *renderer);
   void renderPropagationOverlay(SDL_Renderer *renderer);
   void updatePropagationOverlay();
@@ -155,10 +158,10 @@ private:
   std::shared_ptr<ADIFStore> adifStore_;
   std::shared_ptr<ActivityDataStore> activityStore_;
   MufRtProvider *mufrt_ = nullptr;
-  CloudProvider *clouds_ = nullptr;
   std::shared_ptr<WxMbProvider> wxmb_;
+  std::shared_ptr<GribCloudProvider> gribCloud_;
   BeaconProvider *beacons_ = nullptr;
-  IonosondeProvider *iono_ = nullptr;
+  std::shared_ptr<IonosondeProvider> iono_;
   SolarDataStore *solar_ = nullptr;
   OrbitPredictor *predictor_ = nullptr;
   AsteroidProvider *asteroidProvider_ = nullptr;
@@ -212,7 +215,8 @@ private:
   // WX/Pressure overlay GPU geometry (rebuilt when new GFS data arrives)
   std::vector<SDL_Vertex> wxVerts_;
   std::vector<int> wxIndices_;
-  SDL_Texture *wxFillTex_ = nullptr; // pressure fill layer (blue-white-red)
+  SDL_Texture *wxFillTex_ = nullptr;       // pressure fill layer (blue-white-red)
+  SDL_Texture *gribCloudFillTex_ = nullptr; // GFS TCDC cloud fill layer
 
   // Buffers for batching spots (dynamic per frame)
   std::vector<SDL_Vertex> spotVerts_;
@@ -241,6 +245,7 @@ private:
 
   void renderLegend(SDL_Renderer *renderer);
   void renderWxMbLegend(SDL_Renderer *renderer);
+  void renderCloudLegend(SDL_Renderer *renderer);
   void renderTooltip(SDL_Renderer *renderer);
   void renderProjectionSelect(SDL_Renderer *renderer);
 
@@ -253,6 +258,7 @@ private:
   SDL_Texture *propTexture_ = nullptr;
   uint32_t lastMufUpdateMs_ = 0;
   uint64_t wxLastCheckMs_ = 0;
+  uint64_t gribCloudLastCheckMs_ = 0;
   uint32_t lastPropUpdateMs_ = 0;
   std::chrono::system_clock::time_point lastAuroraUpdateTime_;
   std::string lastAuroraProjection_;

@@ -1,6 +1,7 @@
 #include "SatelliteManager.h"
 #include "../services/RotatorService.h"
 #include "Logger.h"
+#include "Constants.h"
 
 #include <algorithm>
 #include <cctype>
@@ -33,12 +34,16 @@ void SatelliteManager::fetch(bool force) {
 
   net_.fetchAsync(
       TLE_URL,
-      [this](std::string response) {
+      [](std::string response) {
         if (response.empty()) {
           LOG_E("SatelliteManager", "Fetch failed (empty response)");
           return;
         }
-        parse(response);
+        SDL_Event ev;
+        SDL_zero(ev);
+        ev.type = HamClock::AE_BASE_EVENT + HamClock::AE_SATELLITE_DATA_READY;
+        ev.user.data1 = new std::string(std::move(response));
+        SDL_PushEvent(&ev);
       },
       86400); // 24 hour cache age
 
@@ -47,6 +52,10 @@ void SatelliteManager::fetch(bool force) {
   for (int scc : cfg.customSatelliteSCCs) {
     fetchSCC(scc);
   }
+}
+
+void SatelliteManager::onDataReady(const std::string &raw) {
+  parse(raw);
 }
 
 void SatelliteManager::update() {
@@ -281,35 +290,17 @@ void SatelliteManager::fetchSCC(int noradId) {
 
   net_.fetchAsync(
       url,
-      [this, noradId](std::string response) {
+      [noradId](std::string response) {
         if (response.empty()) {
           LOG_W("SatelliteManager", "Fetch failed for SCC {}", noradId);
           return;
         }
 
-        // We use a temporary stringstream to use our existing parse logic
-        // but it parses into a vector. We want to single it out.
-        std::istringstream stream(response);
-        std::string line, n, l1, l2;
-        if (std::getline(stream, n) && std::getline(stream, l1) &&
-            std::getline(stream, l2)) {
-          SatelliteTLE tle;
-          tle.name = trim(n);
-          tle.line1 = trim(l1);
-          tle.line2 = trim(l2);
-          tle.noradId = noradId;
-
-          std::lock_guard<std::mutex> lock(mutex_);
-          // Remove potential existing custom one for this ID
-          customSatellites_.erase(
-              std::remove_if(customSatellites_.begin(), customSatellites_.end(),
-                             [noradId](const SatelliteTLE &s) {
-                               return s.noradId == noradId;
-                             }),
-              customSatellites_.end());
-          customSatellites_.push_back(tle);
-          LOG_I("SatelliteManager", "Fetched custom satellite: {}", tle.name);
-        }
+        SDL_Event ev;
+        SDL_zero(ev);
+        ev.type = HamClock::AE_BASE_EVENT + HamClock::AE_SATELLITE_DATA_READY;
+        ev.user.data1 = new std::string(std::move(response));
+        SDL_PushEvent(&ev);
       },
       86400);
 }

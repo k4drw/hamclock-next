@@ -22,7 +22,7 @@ Each preset captures a complete snapshot of the visual configuration:
 | Pane 1–6 widget rotations | The full widget rotation list for each pane |
 | `rotationIntervalS` | How long each widget is displayed before rotating |
 | `propOverlay` | Active propagation overlay (MUF, VOACAP, DRAP, etc.) |
-| `weatherOverlay` | Active weather overlay (Clouds, WxMb) |
+| `weatherOverlay` | Active weather overlay (`none`, `wxmb`, `clouds_grib`) |
 | `mapStyle` | Map tile style (nasa, terrain, countries) |
 | `mapNightLights` | Night lights on/off |
 | `showGrid` | Grid lines on/off |

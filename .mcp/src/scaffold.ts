@@ -99,7 +99,12 @@ void ${name}::render(SDL_Renderer *renderer) {
   // Example text
   // int tw, th;
   // auto* cat = fontMgr_.catalog();
-  // cat->drawText(renderer, "Hello", x_ + 10, y_ + 10, themes.text, FontStyle::UI);
+  // IMPORTANT: Never hardcode SDL_Color values. Always use ThemeColors tokens
+  // (themes.text, themes.accent, themes.success, etc.).
+  // Example text:
+  // int tw, th;
+  // auto* cat = fontMgr_.catalog();
+  // cat->drawText(renderer, "Hello", x_ + 10, y_ + 10, themes.text, FontStyle::Fast);
 }
 
 bool ${name}::onMouseDown(int mx, int my, Uint16 mod) {

@@ -114,6 +114,8 @@ void ColorPicker::calculateLayout() {
 }
 
 void ColorPicker::render(SDL_Renderer *renderer) {
+  ThemeColors themes = getThemeColors(theme_);
+
   // 1. Draw SV Square
   for (int j = 0; j < rectSV_.h; ++j) {
     for (int i = 0; i < rectSV_.w; ++i) {
@@ -130,12 +132,12 @@ void ColorPicker::render(SDL_Renderer *renderer) {
   // Draw SV Crosshair
   int crossX = rectSV_.x + (int)(s_ * (rectSV_.w - 1));
   int crossY = rectSV_.y + (int)((1.0f - v_) * (rectSV_.h - 1));
-  SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+  SDL_SetRenderDrawColor(renderer, themes.text.r, themes.text.g, themes.text.b,
+                         255);
   SDL_RenderDrawLine(renderer, crossX - 5, crossY, crossX + 5, crossY);
   SDL_RenderDrawLine(renderer, crossX, crossY - 5, crossX, crossY + 5);
 
-  // 2. Draw Hue Strip (Pre-calculating every pixel is slow, but
-  // SDL_RenderDrawPoint is okay for this size)
+  // 2. Draw Hue Strip
   for (int j = 0; j < rectHue_.h; ++j) {
     float h = (float)j / (rectHue_.h - 1) * 360.0f;
     float r, g, b;
@@ -148,7 +150,8 @@ void ColorPicker::render(SDL_Renderer *renderer) {
 
   // Draw Hue Indicator
   int hueY = rectHue_.y + (int)(h_ / 360.0f * (rectHue_.h - 1));
-  SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+  SDL_SetRenderDrawColor(renderer, themes.text.r, themes.text.g, themes.text.b,
+                         255);
   SDL_Rect hueInd = {rectHue_.x - 2, hueY - 2, rectHue_.w + 4, 4};
   SDL_RenderDrawRect(renderer, &hueInd);
 
@@ -159,7 +162,8 @@ void ColorPicker::render(SDL_Renderer *renderer) {
 
   for (int i = 0; i < 3; ++i) {
     // Track
-    SDL_SetRenderDrawColor(renderer, 50, 50, 50, 255);
+    SDL_SetRenderDrawColor(renderer, themes.rowStripe1.r, themes.rowStripe1.g,
+                           themes.rowStripe1.b, 255);
     SDL_RenderFillRect(renderer, &rectSliders_[i]);
 
     // Fill
@@ -170,7 +174,8 @@ void ColorPicker::render(SDL_Renderer *renderer) {
     SDL_RenderFillRect(renderer, &fill);
 
     // Border
-    SDL_SetRenderDrawColor(renderer, 150, 150, 150, 255);
+    SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
+                           themes.border.b, 255);
     SDL_RenderDrawRect(renderer, &rectSliders_[i]);
   }
 
@@ -178,7 +183,8 @@ void ColorPicker::render(SDL_Renderer *renderer) {
   SDL_SetRenderDrawColor(renderer, currentColor_.r, currentColor_.g,
                          currentColor_.b, 255);
   SDL_RenderFillRect(renderer, &rectPreview_);
-  SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
+                         themes.border.b, 255);
   SDL_RenderDrawRect(renderer, &rectPreview_);
 }
 

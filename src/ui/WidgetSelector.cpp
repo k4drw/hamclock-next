@@ -79,7 +79,7 @@ void WidgetSelector::render(SDL_Renderer *renderer) {
 
   // Dim background
   SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-  SDL_SetRenderDrawColor(renderer, 0, 0, 0, 150);
+  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, 150);
   SDL_Rect screen = {0, 0, HamClock::LOGICAL_WIDTH, HamClock::LOGICAL_HEIGHT};
   SDL_RenderFillRect(renderer, &screen);
 
@@ -106,7 +106,8 @@ void WidgetSelector::render(SDL_Renderer *renderer) {
 
     // Draw focus indicator BEFORE text so it doesn't cover the text
     if (visible_ && static_cast<int>(i) == focusedIdx_) {
-      SDL_SetRenderDrawColor(renderer, 0, 150, 255, 100);
+      SDL_SetRenderDrawColor(renderer, themes.accent.r, themes.accent.g,
+                             themes.accent.b, 80);
       SDL_Rect focusRect = itemRects_[i];
       focusRect.x += 5;
       focusRect.w -= 10;
@@ -117,7 +118,7 @@ void WidgetSelector::render(SDL_Renderer *renderer) {
     if (isSelected) {
       textColor = themes.accent; // Selected always takes priority
     } else if (isForbidden) {
-      textColor = {80, 80, 90, 255}; // Dim if forbidden and not current
+      textColor = themes.textDim;
     }
 
     cat->drawText(renderer, widgetTypeDisplayName(t),
@@ -153,16 +154,17 @@ void WidgetSelector::render(SDL_Renderer *renderer) {
                          themes.success.b, 255);
   SDL_RenderFillRect(renderer, &okRect_);
 
-  SDL_SetRenderDrawColor(renderer, 255, 255, 255, 100);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
+                         themes.border.b, 100);
   SDL_RenderDrawRect(renderer, &cancelRect_);
   SDL_RenderDrawRect(renderer, &okRect_);
 
   cat->drawText(renderer, "Cancel", cancelRect_.x + cancelRect_.w / 2,
-                cancelRect_.y + cancelRect_.h / 2, themes.text, FontStyle::UI,
+                cancelRect_.y + cancelRect_.h / 2, themes.bg, FontStyle::UI,
                 true, false, true);
   cat->drawText(renderer, "Done", okRect_.x + okRect_.w / 2,
-                okRect_.y + okRect_.h / 2, themes.accent, FontStyle::UIBold,
-                true, false, true);
+                okRect_.y + okRect_.h / 2, themes.bg, FontStyle::UIBold, true,
+                false, true);
 }
 
 bool WidgetSelector::onMouseUp(int mx, int my, Uint16 /*mod*/, int clicks) {

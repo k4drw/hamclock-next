@@ -143,7 +143,7 @@ void DXClusterPanel::render(SDL_Renderer *renderer) {
     int rowY = curY + static_cast<int>(i) * rowH;
     const auto &spot = visibleSpots_[i];
     auto &cache = spotCache_[i];
-    SDL_Color color = getRowColor(i, {255, 255, 255, 255});
+    SDL_Color color = getRowColor(i, getThemeColors(theme_).text);
 
     // 1. Freq (right-aligned within freq column)
     if (!cache.freqTex || std::abs(cache.lastFreq - spot.freq) > 0.001) {

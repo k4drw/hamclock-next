@@ -37,6 +37,8 @@ void StopwatchPanel::render(SDL_Renderer *renderer) {
   ThemeColors themes = getThemeColors(theme_);
 
   // Background and border
+  SDL_SetRenderDrawBlendMode(
+      renderer, (theme_ == "glass") ? SDL_BLENDMODE_BLEND : SDL_BLENDMODE_NONE);
   SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b,
                          themes.bg.a);
   SDL_Rect rect = {x_, y_, width_, height_};
@@ -140,7 +142,7 @@ void StopwatchPanel::render(SDL_Renderer *renderer) {
 
       // Highlight most recent lap
       SDL_Color lapColor = (i == (int)laps_.size() - 1)
-                               ? SDL_Color{200, 255, 200, 255}
+                               ? themes.success
                                : themes.textDim;
       fontMgr_.catalog()->drawText(renderer, lapBuf, x_ + 6,
                                    lyBase + (i - start) * lapRowH + lapRowH / 2,
@@ -157,8 +159,14 @@ void StopwatchPanel::render(SDL_Renderer *renderer) {
     SDL_SetRenderDrawColor(renderer, border.r, border.g, border.b, border.a);
     SDL_RenderDrawRect(renderer, &r);
     int bw, bh;
-    SDL_Texture *t =
-        fontMgr_.renderText(renderer, label, themes.text, 9, &bw, &bh);
+    SDL_Color txtCol =
+        (bg.r == themes.success.r && bg.g == themes.success.g &&
+         bg.b == themes.success.b) ||
+                (bg.r == themes.danger.r && bg.g == themes.danger.g &&
+                 bg.b == themes.danger.b)
+            ? themes.bg
+            : themes.text;
+    SDL_Texture *t = fontMgr_.renderText(renderer, label, txtCol, 9, &bw, &bh);
     if (t) {
       SDL_Rect dst = {r.x + (r.w - bw) / 2, r.y + (r.h - bh) / 2, bw, bh};
       SDL_RenderCopy(renderer, t, nullptr, &dst);
@@ -241,9 +249,10 @@ void StopwatchPanel::renderSetup(SDL_Renderer *renderer) {
   SDL_SetRenderDrawColor(renderer, themes.success.r, themes.success.g,
                          themes.success.b, 255);
   SDL_RenderFillRect(renderer, &doneRect_);
-  SDL_SetRenderDrawColor(renderer, 255, 255, 255, 100);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
+                         themes.border.b, 100);
   SDL_RenderDrawRect(renderer, &doneRect_);
-  t = fontMgr_.renderText(renderer, "Done", white, 10, &tw, &th);
+  t = fontMgr_.renderText(renderer, "Done", themes.bg, 10, &tw, &th);
   if (t) {
     SDL_Rect tr = {doneRect_.x + (btnW - tw) / 2, doneRect_.y + (btnH - th) / 2,
                    tw, th};

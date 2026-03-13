@@ -107,37 +107,35 @@ void DXSatPane::render(SDL_Renderer *renderer) {
   }
 
   if (mode_ == Mode::SAT && !isModalActive()) {
+    ThemeColors themes = getThemeColors(theme_);
     int headerH = std::max(1, height_ / 10);
 
     // Rotator "Trk" button (top-right corner)
     trackButtonRect_ = {x_ + width_ - headerH, y_, headerH, headerH};
     bool isTracking = (satMgr_.getTrackedSatellite() == selectedSatName_);
-    SDL_Color rotColor =
-        isTracking ? SDL_Color{0, 210, 0, 255} : SDL_Color{80, 80, 80, 255};
-    SDL_SetRenderDrawColor(renderer, rotColor.r / 5, rotColor.g / 5,
-                           rotColor.b / 5, 255);
+    SDL_Color rotBg = isTracking ? themes.success : themes.rowStripe1;
+
+    SDL_SetRenderDrawColor(renderer, rotBg.r, rotBg.g, rotBg.b, 255);
     SDL_RenderFillRect(renderer, &trackButtonRect_);
-    SDL_SetRenderDrawColor(renderer, rotColor.r, rotColor.g, rotColor.b, 255);
+    SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
     SDL_RenderDrawRect(renderer, &trackButtonRect_);
     fontMgr_.catalog()->drawText(renderer, "Trk",
                                  trackButtonRect_.x + trackButtonRect_.w / 2,
                                  trackButtonRect_.y + trackButtonRect_.h / 2,
-                                 rotColor, FontStyle::Tiny, true, false, true);
+                                 isTracking ? themes.bg : themes.text, FontStyle::Tiny, true, false, true);
 
     // Map "Pth" button (to the left of Trk): toggles satellite ground track
     mapTrackBtnRect_ = {x_ + width_ - 2 * headerH - 2, y_, headerH, headerH};
-    SDL_Color pathColor = mapTrackVisible_ ? SDL_Color{80, 200, 255, 255}
-                                           : SDL_Color{80, 80, 80, 255};
-    SDL_SetRenderDrawColor(renderer, pathColor.r / 5, pathColor.g / 5,
-                           pathColor.b / 5, 255);
+    SDL_Color pathBg = mapTrackVisible_ ? themes.accent : themes.rowStripe1;
+
+    SDL_SetRenderDrawColor(renderer, pathBg.r, pathBg.g, pathBg.b, 255);
     SDL_RenderFillRect(renderer, &mapTrackBtnRect_);
-    SDL_SetRenderDrawColor(renderer, pathColor.r, pathColor.g, pathColor.b,
-                           255);
+    SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
     SDL_RenderDrawRect(renderer, &mapTrackBtnRect_);
     fontMgr_.catalog()->drawText(renderer, "Pth",
                                  mapTrackBtnRect_.x + mapTrackBtnRect_.w / 2,
                                  mapTrackBtnRect_.y + mapTrackBtnRect_.h / 2,
-                                 pathColor, FontStyle::Tiny, true, false, true);
+                                 mapTrackVisible_ ? themes.bg : themes.text, FontStyle::Tiny, true, false, true);
   }
 }
 
@@ -395,8 +393,9 @@ void DXSatPane::executeAction(int action) {
 
 void DXSatPane::drawRadio(SDL_Renderer *renderer, int cx, int cy, int r,
                           bool filled) {
-  // White outer circle
-  SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+  ThemeColors themes = getThemeColors(theme_);
+  // Outer circle
+  SDL_SetRenderDrawColor(renderer, themes.text.r, themes.text.g, themes.text.b, 255);
   for (int dy = -r; dy <= r; ++dy) {
     int dx = static_cast<int>(std::sqrt(r * r - dy * dy));
     SDL_RenderDrawLine(renderer, cx - dx, cy + dy, cx + dx, cy + dy);
@@ -404,7 +403,7 @@ void DXSatPane::drawRadio(SDL_Renderer *renderer, int cx, int cy, int r,
 
   if (!filled) {
     // Punch out inner to create ring
-    SDL_SetRenderDrawColor(renderer, 20, 20, 20, 255);
+    SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, 255);
     int inner = std::max(1, r - 2);
     for (int dy = -inner; dy <= inner; ++dy) {
       int dx = static_cast<int>(std::sqrt(inner * inner - dy * dy));

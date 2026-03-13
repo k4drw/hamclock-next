@@ -17,6 +17,9 @@ public:
   // Results are cached for 6 hours by NetworkManager.
   void fetch();
 
+  // Thread-safe method for receiving data from background threads
+  void onDataReady(const std::string &raw);
+
   // Returns true if a release tag different from HAMCLOCK_VERSION was found.
   bool updateAvailable() const;
 

@@ -72,7 +72,7 @@ All network requests are made by the HamClock-Next process itself. In browser (W
 |------|----------|----------|---------|
 | Current conditions | Open-Meteo | 30 min | DE Weather, DX Weather |
 | Forecast | Open-Meteo | 1 hour | Forecast widget |
-| Cloud cover overlay | Satellite imagery provider | 3 hours | Map weather overlay |
+| Cloud cover overlay | NOAA NOMADS GFS GRIB2 (TCDC) | 6 hours | Map weather overlay |
 | Hurricane tracks | NHC / NOAA | 6 hours | Hurricane widget |
 
 ---

@@ -148,22 +148,22 @@ void SysInfoPanel::update() {
 // ---------------------------------------------------------------------------
 // Colour helpers
 // ---------------------------------------------------------------------------
-static SDL_Color colorForTemp(float tempC) {
+static SDL_Color colorForTemp(float tempC, const ThemeColors &themes) {
   if (tempC < 50.0f)
-    return {0, 255, 0, 255}; // Green
+    return themes.success; // Green
   if (tempC < 70.0f)
-    return {255, 255, 0, 255}; // Yellow
+    return themes.warning; // Yellow
   if (tempC < 85.0f)
     return {255, 165, 0, 255}; // Orange
-  return {255, 0, 0, 255};     // Red
+  return themes.danger;     // Red
 }
 
-static SDL_Color colorForCpu(float pct) {
+static SDL_Color colorForCpu(float pct, const ThemeColors &themes) {
   if (pct < 50.0f)
-    return {0, 200, 100, 255}; // Green
+    return themes.success; // Green
   if (pct < 75.0f)
-    return {255, 200, 0, 255}; // Yellow
-  return {255, 60, 60, 255};   // Red
+    return themes.warning; // Yellow
+  return themes.danger;    // Red
 }
 
 // ---------------------------------------------------------------------------
@@ -199,8 +199,8 @@ void SysInfoPanel::render(SDL_Renderer *renderer) {
   const char *tempUnit = useMetric_ ? "C" : "F";
   float tempC =
       useMetric_ ? currentTemp_ : (currentTemp_ - 32.0f) * 5.0f / 9.0f;
-  SDL_Color tempColor = colorForTemp(tempC);
-  SDL_Color cpuColor = colorForCpu(cpuPercent_);
+  SDL_Color tempColor = colorForTemp(tempC, themes);
+  SDL_Color cpuColor = colorForCpu(cpuPercent_, themes);
 
   char tempBuf[32], cpuBuf[32], ramBuf[48], vramBuf[32];
   std::snprintf(tempBuf, sizeof(tempBuf), "%.1f°%s", currentTemp_, tempUnit);
@@ -266,8 +266,8 @@ void SysInfoPanel::render(SDL_Renderer *renderer) {
   } else {
     std::snprintf(ramBuf, sizeof(ramBuf), "RAM --");
   }
-  cat->drawText(renderer, ramBuf, cx, curY, themes.info, FontStyle::Micro, true);
-  curY += cat->ptSize(FontStyle::Micro) + 4;
+  cat->drawText(renderer, ramBuf, cx, curY, themes.info, FontStyle::Fast, true);
+  curY += cat->ptSize(FontStyle::Fast) + 4;
 
   // Row 3: Est. VRAM
   if (vramBytes_ >= 0) {
@@ -276,23 +276,23 @@ void SysInfoPanel::render(SDL_Renderer *renderer) {
   } else {
     std::snprintf(vramBuf, sizeof(vramBuf), "VRAM --");
   }
-  cat->drawText(renderer, vramBuf, cx, curY, themes.textDim, FontStyle::Micro,
+  cat->drawText(renderer, vramBuf, cx, curY, themes.textDim, FontStyle::Fast,
                 true);
-  curY += cat->ptSize(FontStyle::Micro) + 4;
+  curY += cat->ptSize(FontStyle::Fast) + 4;
 
   // Row 4: Disk
   if (diskPct_ >= 0) {
     char diskBuf[32];
     std::snprintf(diskBuf, sizeof(diskBuf), "Disk %d%%", diskPct_);
-    cat->drawText(renderer, diskBuf, cx, curY, themes.info, FontStyle::Micro,
+    cat->drawText(renderer, diskBuf, cx, curY, themes.info, FontStyle::Fast,
                   true);
-    curY += cat->ptSize(FontStyle::Micro) + 4;
+    curY += cat->ptSize(FontStyle::Fast) + 4;
   }
 
   // Row 5: IP
   cat->drawText(renderer, cachedIP_.c_str(), cx, curY, themes.textDim,
-                FontStyle::Micro, true);
-  curY += cat->ptSize(FontStyle::Micro) + 4;
+                FontStyle::Fast, true);
+  curY += cat->ptSize(FontStyle::Fast) + 4;
 
   // Row 6+: Provider errors (show up to 3 failing services)
   if (state_) {

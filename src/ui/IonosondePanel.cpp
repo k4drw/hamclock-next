@@ -46,9 +46,9 @@ void IonosondePanel::render(SDL_Renderer *renderer) {
   // Overview stats
   cat->drawText(renderer, "Avg foF2:", x_ + pad, curY, themes.text, FontStyle::Fast);
   
-  SDL_Color idxCol = {100, 200, 100, 255}; // Green
-  if (d.avgFof2 < 5.0f) idxCol = {200, 200, 100, 255}; // Yellow
-  if (d.avgFof2 < 3.0f) idxCol = {255, 100, 100, 255}; // Red
+  SDL_Color idxCol = themes.success; // Green
+  if (d.avgFof2 < 5.0f) idxCol = themes.warning; // Yellow
+  if (d.avgFof2 < 3.0f) idxCol = themes.danger; // Red
   
   char buf[32];
   std::snprintf(buf, sizeof(buf), "%.1f MHz", d.avgFof2);

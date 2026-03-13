@@ -34,14 +34,14 @@ static PropOverlayType propOverlayFromStr(const std::string &s) {
 }
 
 static std::string weatherOverlayToStr(WeatherOverlayType t) {
-  if (t == WeatherOverlayType::Clouds) return "clouds";
-  if (t == WeatherOverlayType::WxMb)   return "wxmb";
+  if (t == WeatherOverlayType::WxMb)       return "wxmb";
+  if (t == WeatherOverlayType::CloudsGrib) return "clouds_grib";
   return "none";
 }
 
 static WeatherOverlayType weatherOverlayFromStr(const std::string &s) {
-  if (s == "clouds") return WeatherOverlayType::Clouds;
-  if (s == "wxmb")   return WeatherOverlayType::WxMb;
+  if (s == "wxmb")        return WeatherOverlayType::WxMb;
+  if (s == "clouds_grib" || s == "clouds") return WeatherOverlayType::CloudsGrib;
   return WeatherOverlayType::None;
 }
 
@@ -205,13 +205,8 @@ bool ConfigManager::load(AppConfig &config) {
     }
 
     if (ap.contains("weather_overlay")) {
-      std::string wo = ap.value("weather_overlay", "none");
-      if (wo == "clouds")
-        config.weatherOverlay = WeatherOverlayType::Clouds;
-      else if (wo == "wxmb")
-        config.weatherOverlay = WeatherOverlayType::WxMb;
-      else
-        config.weatherOverlay = WeatherOverlayType::None;
+      config.weatherOverlay =
+          weatherOverlayFromStr(ap.value("weather_overlay", "none"));
     }
 
     config.propBand = ap.value("prop_band", "20m");
@@ -569,14 +564,7 @@ bool ConfigManager::save(const AppConfig &config) {
   else if (config.propOverlay == PropOverlayType::Voacap)
     po = "voacap";
   json["appearance"]["prop_overlay"] = po;
-  {
-    std::string wo = "none";
-    if (config.weatherOverlay == WeatherOverlayType::Clouds)
-      wo = "clouds";
-    else if (config.weatherOverlay == WeatherOverlayType::WxMb)
-      wo = "wxmb";
-    json["appearance"]["weather_overlay"] = wo;
-  }
+  json["appearance"]["weather_overlay"] = weatherOverlayToStr(config.weatherOverlay);
   json["appearance"]["prop_band"] = config.propBand;
   json["appearance"]["prop_mode"] = config.propMode;
   json["appearance"]["prop_power"] = config.propPower;

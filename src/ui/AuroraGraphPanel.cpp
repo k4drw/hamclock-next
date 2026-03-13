@@ -67,7 +67,7 @@ void AuroraGraphPanel::render(SDL_Renderer *renderer) {
     return; // Too small to draw graph
 
   // Draw grid lines and labels
-  SDL_Color gridColor = {40, 40, 40, 255};
+  SDL_Color gridColor = themes.rowStripe1;
 
   // Horizontal grid lines (0, 20, 40, 60, 80, 100%)
   for (int pct = 0; pct <= 100; pct += 20) {
@@ -102,8 +102,6 @@ void AuroraGraphPanel::render(SDL_Renderer *renderer) {
 
   // Calculate time range (24 hours)
   auto now = std::chrono::system_clock::now();
-
-  SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255); // Green line
 
   // Draw line graph
   for (size_t i = 1; i < history.size(); ++i) {
@@ -144,9 +142,10 @@ void AuroraGraphPanel::render(SDL_Renderer *renderer) {
     y2 = std::max(graphY, std::min(graphY + graphH, y2));
 
     // Dim color for Kp-estimated (backfill) segments
-    SDL_Color segColor = (prev.isBackfill || curr.isBackfill)
-                             ? SDL_Color{0, 140, 80, 180}
-                             : SDL_Color{0, 255, 128, 255};
+    SDL_Color segColor = themes.success;
+    if (prev.isBackfill || curr.isBackfill) {
+      segColor.a = 160; // Dim estimated segments
+    }
 
     SDL_Texture *lineAA = texMgr_.get("line_aa");
     if (lineAA) {

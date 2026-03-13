@@ -69,7 +69,7 @@ void RepeaterPanel::render(SDL_Renderer *renderer) {
     // Frequency (left)
     char freqBuf[24];
     std::snprintf(freqBuf, sizeof(freqBuf), "%.4g", r.freqMHz);
-    cat->drawText(renderer, freqBuf, x_ + pad, curY, {0, 255, 180, 255},
+    cat->drawText(renderer, freqBuf, x_ + pad, curY, themes.success,
                   FontStyle::Fast);
 
     // Callsign (center)

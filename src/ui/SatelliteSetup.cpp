@@ -90,7 +90,7 @@ void SatelliteSetup::render(SDL_Renderer *renderer) {
                    themes.accent,
                    {themes.border.r, themes.border.g, themes.border.b, 100},
                    themes.text, themes.text, themes.textDim,
-                   "Click to type ID...");
+                   "Click to type ID...", &themes.rowStripe1);
 
   // TLE Input
   cat->drawText(renderer, "TLE (3 lines):", rectTleInput_.x,
@@ -117,10 +117,10 @@ void SatelliteSetup::render(SDL_Renderer *renderer) {
   auto drawBtn = [&](const SDL_Rect &r, const char *label, SDL_Color bg) {
     SDL_SetRenderDrawColor(renderer, bg.r, bg.g, bg.b, 255);
     SDL_RenderFillRect(renderer, &r);
-    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 150);
+    SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 150);
     SDL_RenderDrawRect(renderer, &r);
     cat->drawText(renderer, label, r.x + r.w / 2, r.y + r.h / 2,
-                  {255, 255, 255, 255}, FontStyle::UIBold, true, false, true);
+                  themes.bg, FontStyle::UIBold, true, false, true);
   };
 
   drawBtn(rectCancel_, "Cancel", themes.danger);

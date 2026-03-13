@@ -28,7 +28,13 @@ void CloudProvider::update() {
   // composite is complete before requesting it.
 
   auto now = std::chrono::system_clock::now();
-  auto yesterday = now - std::chrono::hours(24);
+  // VIIRS daily composites are typically complete by ~15:00 UTC the following day.
+  // After that threshold use yesterday's data; before it fall back to 48h ago
+  // so we never request an incomplete mosaic.
+  std::time_t now_t = std::chrono::system_clock::to_time_t(now);
+  std::tm now_utc = *std::gmtime(&now_t);
+  int hoursBack = (now_utc.tm_hour >= 15) ? 24 : 48;
+  auto yesterday = now - std::chrono::hours(hoursBack);
   std::time_t t = std::chrono::system_clock::to_time_t(yesterday);
   std::tm tm = *std::gmtime(&t);
 
@@ -43,6 +49,7 @@ void CloudProvider::update() {
 
   std::string url = oss.str();
   LOG_I("CloudProvider", "Fetching clouds from {}", url);
+  hasData_ = false; // Mark as empty until new data arrives
 
   std::weak_ptr<CloudProvider> self = shared_from_this();
   netMgr_.fetchAsync(
@@ -51,9 +58,10 @@ void CloudProvider::update() {
         auto p = self.lock();
         if (!p) return;
         if (data.empty()) {
-          LOG_E("CloudProvider", "Fetch failed or empty for {}", url);
+          LOG_E("CloudProvider", "Fetch returned EMPTY data for {}", url);
           return;
         }
+        LOG_I("CloudProvider", "Fetch received {} bytes of cloud data", data.size());
 
         // Offload decoding to background thread
         WorkerService::getInstance().submitTask([self, data = std::move(data)]() {
@@ -89,7 +97,7 @@ const std::string &CloudProvider::getData() const {
   return empty; // jpgData_ removed to save RAM since we decode in background
 }
 
-SDL_Texture *CloudProvider::getTexture(SDL_Renderer *renderer, int w, int h) {
+SDL_Texture *CloudProvider::getTexture(SDL_Renderer *renderer, int w, int h, SDL_Color tint) {
   std::lock_guard<std::mutex> lock(mutex_);
 
   // Check for new surface from background thread
@@ -112,5 +120,20 @@ SDL_Texture *CloudProvider::getTexture(SDL_Renderer *renderer, int w, int h) {
     return nullptr;
   }
 
+  // Apply theme-based tinting
+  SDL_SetTextureColorMod(texture_, tint.r, tint.g, tint.b);
+
   return texture_;
+}
+
+void CloudProvider::invalidateTexture() {
+  std::lock_guard<std::mutex> lock(mutex_);
+  if (texture_) {
+    SDL_DestroyTexture(texture_);
+    texture_ = nullptr;
+  }
+  if (pendingSurface_) {
+    SDL_FreeSurface(pendingSurface_);
+    pendingSurface_ = nullptr;
+  }
 }

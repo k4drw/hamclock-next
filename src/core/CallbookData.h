@@ -1,5 +1,6 @@
 #pragma once
 
+#include <mutex>
 #include <string>
 
 struct CallbookData {
@@ -31,9 +32,10 @@ struct CallbookData {
 
 class CallbookStore {
 public:
-  const CallbookData &get() const { return data_; }
-  void set(const CallbookData &d) { data_ = d; }
+  CallbookData get() const { std::lock_guard<std::mutex> lk(mu_); return data_; }
+  void set(const CallbookData &d) { std::lock_guard<std::mutex> lk(mu_); data_ = d; }
 
 private:
+  mutable std::mutex mu_;
   CallbookData data_;
 };

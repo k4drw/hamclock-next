@@ -108,7 +108,6 @@ private:
   bool pskUseCall_ = true;
   int pskMaxAge_ = 30;
   int rotationInterval_ = 30;
-  std::string theme_ = "default";
   SDL_Color callsignColor_ = {255, 165, 0, 255};
   std::string panelMode_ = "dx";
   std::string selectedSatellite_;

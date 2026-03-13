@@ -60,7 +60,7 @@ void HistoryPanel::render(SDL_Renderer *renderer) {
   }
 
   // Axes
-  SDL_SetRenderDrawColor(renderer, 60, 60, 60, 255);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
   SDL_RenderDrawLine(renderer, graphX, graphY, graphX, graphY + graphH);
   SDL_RenderDrawLine(renderer, graphX, graphY + graphH, graphX + graphW,
                      graphY + graphH);
@@ -84,11 +84,11 @@ void HistoryPanel::render(SDL_Renderer *renderer) {
                       (int)barW - 1, bh};
 
       if (val >= 5)
-        SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
+        SDL_SetRenderDrawColor(renderer, themes.danger.r, themes.danger.g, themes.danger.b, 255);
       else if (val >= 4)
-        SDL_SetRenderDrawColor(renderer, 255, 255, 0, 255);
+        SDL_SetRenderDrawColor(renderer, themes.warning.r, themes.warning.g, themes.warning.b, 255);
       else
-        SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
+        SDL_SetRenderDrawColor(renderer, themes.success.r, themes.success.g, themes.success.b, 255);
 
       SDL_RenderFillRect(renderer, &bar);
     }
@@ -128,10 +128,10 @@ void HistoryPanel::render(SDL_Renderer *renderer) {
 
     if (lineTex) {
       RenderUtils::drawPolylineTextured(renderer, lineTex, pts.data(), n, 2.0f,
-                                        {255, 255, 0, 255});
+                                        themes.accent);
     } else {
       RenderUtils::drawPolyline(renderer, pts.data(), n, 1.5f,
-                                {255, 255, 0, 255});
+                                themes.accent);
     }
 
     // Current value as large overlay (matching Kp style)
@@ -144,7 +144,7 @@ void HistoryPanel::render(SDL_Renderer *renderer) {
         std::snprintf(buf, sizeof(buf), "%.0f", valNow);
       }
       cat->drawText(renderer, buf, graphX + graphW / 2, graphY + 15,
-                    {255, 255, 255, 255}, FontStyle::MediumBold, true, false,
+                    themes.text, FontStyle::MediumBold, true, false,
                     true);
     }
   }
@@ -158,7 +158,7 @@ void HistoryPanel::render(SDL_Renderer *renderer) {
       int lx = graphX + static_cast<int>(idx * stepX);
 
       // Tick mark
-      SDL_SetRenderDrawColor(renderer, 60, 60, 60, 255);
+      SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
       SDL_RenderDrawLine(renderer, lx, graphY + graphH, lx,
                          graphY + graphH + 3);
 

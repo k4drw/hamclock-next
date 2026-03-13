@@ -23,6 +23,9 @@ public:
   void render(SDL_Renderer *renderer) override;
   void onResize(int x, int y, int w, int h) override;
 
+  // Thread-safe method for receiving data from background threads
+  void onImageReady(SDL_Surface *surf);
+
 private:
   FontManager &fontMgr_;
   TextureManager &texMgr_;

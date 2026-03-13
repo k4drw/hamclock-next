@@ -246,7 +246,7 @@ void AsteroidPanel::render(SDL_Renderer *renderer) {
   int swatchStartX = x_ + (width_ - totalSwatchW) / 2;
 
   SDL_Color curColor =
-      config_ ? config_->asteroidColor : SDL_Color{255, 140, 0, 255};
+      config_ ? config_->asteroidColor : themes.warning;
 
   for (int k = 0; k < kPaletteSize; ++k) {
     int sx = swatchStartX + k * (swatchSize + pad);
@@ -259,7 +259,8 @@ void AsteroidPanel::render(SDL_Renderer *renderer) {
     bool selected =
         (sc.r == curColor.r && sc.g == curColor.g && sc.b == curColor.b);
     if (selected) {
-      SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+      SDL_SetRenderDrawColor(renderer, themes.text.r, themes.text.g,
+                             themes.text.b, 255);
       SDL_RenderDrawRect(renderer, &sr);
     }
   }
@@ -366,8 +367,9 @@ void AsteroidPanel::renderPolarPlot(SDL_Renderer *renderer, float cx, float cy,
   static const char *kCompassLabels[4] = {"N", "E", "S", "W"};
 
   // --- Concentric elevation rings (90°/60°/30°/0° = horizon) ---
-  SDL_Color ringColor = {60, 60, 60, 255};
-  SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+  SDL_Color ringColor = themes.border;
+  ringColor.a = 80;
+  SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
   for (int elev = 0; elev <= 60; elev += 30) {
     float r = static_cast<float>(radius) * (90.0f - elev) / 90.0f;
     constexpr int kSegs = 64;

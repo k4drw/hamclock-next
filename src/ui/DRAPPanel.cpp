@@ -60,8 +60,8 @@ void DRAPPanel::render(SDL_Renderer *renderer) {
                 FontStyle::MicroBold);
 
   if (!dataReady_) {
-    cat->drawText(renderer, "Loading...", x_ + width_ / 2,
-                  y_ + titleH + (height_ - titleH) / 2, {150, 150, 150, 255},
+    cat->drawText(renderer, "Loading DRAP...", x_ + width_ / 2,
+                  y_ + titleH + (height_ - titleH) / 2, themes.textDim,
                   FontStyle::Fast, true);
     return;
   }
@@ -82,7 +82,7 @@ void DRAPPanel::render(SDL_Renderer *renderer) {
   } else if (freq < 10.0f) {
     valueColor = themes.warning; // Yellow
   } else {
-    valueColor = {255, 50, 50, 255}; // Red
+    valueColor = themes.danger; // Red
   }
 
   // Display the value prominently

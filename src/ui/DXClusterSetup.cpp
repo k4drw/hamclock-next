@@ -32,8 +32,8 @@ void DXClusterSetup::render(SDL_Renderer *renderer) {
 
   ThemeColors themes = getThemeColors(theme_);
 
-  // Dark background with a slight fade to indicate it's an overlay
-  SDL_SetRenderDrawColor(renderer, 10, 10, 20, 250);
+  // Dark background with a slight fade
+  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, 250);
   SDL_Rect bg = {x_, y_, width_, height_};
   SDL_RenderFillRect(renderer, &bg);
 
@@ -45,10 +45,10 @@ void DXClusterSetup::render(SDL_Renderer *renderer) {
   int fieldH = cat->ptSize(FontStyle::UI) + 14;
   int textPad = 8;
 
-  SDL_Color white = {255, 255, 255, 255};
-  SDL_Color gray = {150, 150, 150, 255};
-  SDL_Color orange = {255, 165, 0, 255};
-  SDL_Color cyan = {0, 200, 255, 255};
+  SDL_Color white = themes.text;
+  SDL_Color gray = themes.textDim;
+  SDL_Color orange = themes.accent;
+  SDL_Color cyan = themes.info;
 
   int y = y_ + height_ / 10;
 
@@ -67,11 +67,11 @@ void DXClusterSetup::render(SDL_Renderer *renderer) {
   int hostFieldW = fieldW - 110;
   hostInput_.render(renderer, fontMgr_, fieldX, y, hostFieldW, fieldH,
                     FontStyle::UI, textPad, activeField_ == 0, false,
-                    orange, gray, white, white, gray, "e.g. dxc.k3lr.com");
+                    orange, gray, white, white, gray, "exc.k3lr.com", &themes.rowStripe1);
 
   portInput_.render(renderer, fontMgr_, fieldX + fieldW - 100, y, 100, fieldH,
                     FontStyle::UI, textPad, activeField_ == 1, false,
-                    orange, gray, white, white, gray, "7000");
+                    orange, gray, white, white, gray, "7000", &themes.rowStripe1);
 
   y += fieldH + pad;
 
@@ -80,17 +80,17 @@ void DXClusterSetup::render(SDL_Renderer *renderer) {
   y += cat->ptSize(FontStyle::UI) + 4;
   loginInput_.render(renderer, fontMgr_, fieldX, y, fieldW, fieldH,
                      FontStyle::UI, textPad, activeField_ == 2, false,
-                     orange, gray, white, white, gray, "Your callsign");
+                     orange, gray, white, white, gray, "Your callsign", &themes.rowStripe1);
   y += fieldH + pad;
 
   // --- UDP / WSJT-X ---
   toggleRect_ = {fieldX, y, 24, 24};
-  SDL_SetRenderDrawColor(renderer, 40, 40, 50, 255);
+  SDL_SetRenderDrawColor(renderer, themes.rowStripe1.r, themes.rowStripe1.g, themes.rowStripe1.b, 255);
   SDL_RenderFillRect(renderer, &toggleRect_);
-  SDL_SetRenderDrawColor(renderer, 200, 200, 200, 255);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
   SDL_RenderDrawRect(renderer, &toggleRect_);
   if (useWSJTX_) {
-    SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
+    SDL_SetRenderDrawColor(renderer, themes.success.r, themes.success.g, themes.success.b, 255);
     SDL_Rect inner = {toggleRect_.x + 4, toggleRect_.y + 4, 16, 16};
     SDL_RenderFillRect(renderer, &inner);
   }
@@ -108,20 +108,20 @@ void DXClusterSetup::render(SDL_Renderer *renderer) {
   SDL_SetRenderDrawColor(renderer, themes.success.r, themes.success.g,
                          themes.success.b, 255);
   SDL_RenderFillRect(renderer, &saveRect_);
-  SDL_SetRenderDrawColor(renderer, 255, 255, 255, 50);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
   SDL_RenderDrawRect(renderer, &saveRect_);
   cat->drawText(renderer, "Done", saveRect_.x + btnW / 2,
-                saveRect_.y + btnH / 2, white, FontStyle::UIBold, true, false,
+                saveRect_.y + btnH / 2, themes.bg, FontStyle::UIBold, true, false,
                 true);
 
   // Cancel Button
   SDL_SetRenderDrawColor(renderer, themes.danger.r, themes.danger.g,
                          themes.danger.b, 255);
   SDL_RenderFillRect(renderer, &cancelRect_);
-  SDL_SetRenderDrawColor(renderer, 255, 255, 255, 50);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
   SDL_RenderDrawRect(renderer, &cancelRect_);
   cat->drawText(renderer, "Cancel", cancelRect_.x + btnW / 2,
-                cancelRect_.y + btnH / 2, white, FontStyle::UIBold, true, false,
+                cancelRect_.y + btnH / 2, themes.bg, FontStyle::UIBold, true, false,
                 true);
 
   y += btnH + pad;

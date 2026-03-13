@@ -220,6 +220,8 @@ public:
     if (!texture)
       return nullptr;
     SDL_SetRenderTarget(renderer, texture);
+    // Intentional: earth-map placeholder uses fixed ocean/land colors
+    // independent of UI theme. No ThemeColors token applies here.
     SDL_SetRenderDrawColor(renderer, 10, 20, 60, 255);
     SDL_RenderClear(renderer);
 

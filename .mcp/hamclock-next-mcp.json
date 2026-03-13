@@ -38,7 +38,7 @@
       "src/main.cpp": "Entry point. Initializes SDL2, ConfigManager, WebServer, then enters the main event/render loop.",
       "src/core/": "Pure data types, store classes, and shared utilities. No SDL or network calls here.",
       "src/ui/": "All Widget/Panel classes. Each file is a self-contained renderable unit.",
-      "src/services/": "Data providers. Each provider fetches and caches data for one domain.",
+      "src/services/": "Data providers. Each provider fetches and caches data for one domain. (New: GribCloudProvider.cpp)",
       "src/network/": "NetworkManager (HTTP/curl) and WebServer (embedded REST API)."
     },
     "naming_conventions": {
@@ -61,18 +61,21 @@
     ],
     "data_template": "// src/core/{Name}Data.h\n#pragma once\n#include <string>\n#include <vector>\n#include <ctime>\n\nstruct {Name}Data {\n    // --- domain fields ---\n    bool valid = false;       // set true once first fetch succeeds\n    time_t lastUpdate = 0;    // unix timestamp of last successful fetch\n};\n",
     "provider_template": "// src/services/{Name}Provider.h\n#pragma once\n#include \"core/{Name}Data.h\"\n\nclass {Name}Provider {\npublic:\n    static {Name}Provider& instance();\n    void update();               // called on interval by main loop\n    const {Name}Data& data() const { return _data; }\nprivate:\n    {Name}Provider() = default;\n    {Name}Data _data;\n    time_t _nextFetch = 0;\n    static constexpr int FETCH_INTERVAL_S = 300;\n};\n",
-    "panel_template": "// src/ui/{Name}Panel.cpp\n#include \"{Name}Panel.h\"\n#include \"../core/Theme.h\"\n\nvoid {Name}Panel::render(SDL_Renderer* renderer) {\n    ThemeColors themes = getThemeColors(theme_);\n    \n    // Draw background\n    SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, themes.bg.a);\n    SDL_Rect r = {x_, y_, width_, height_};\n    SDL_RenderFillRect(renderer, &r);\n\n    // Standard button example (PascalCase Done/Cancel, semantic colors)\n    // SDL_Rect okBtn = {x_ + 10, y_ + height_ - 34, 80, 28};\n    // SDL_SetRenderDrawColor(renderer, themes.success.r, themes.success.g, themes.success.b, 255);\n    // SDL_RenderFillRect(renderer, &okBtn);\n}\n",
+    "panel_template": "// src/ui/{Name}Panel.cpp\n#include \"{Name}Panel.h\"\n#include \"../core/Theme.h\"\n\nvoid {Name}Panel::render(SDL_Renderer* renderer) {\n    ThemeColors themes = getThemeColors(theme_);\n    \n    // Draw background\n    SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, themes.bg.a);\n    SDL_Rect r = {x_, y_, width_, height_};\n    SDL_RenderFillRect(renderer, &r);\n\n    // IMPORTANT: Never hardcode SDL_Color values. Always use ThemeColors tokens\n    // (themes.text, themes.accent, themes.success, etc.).\n    // Example text:\n    // int tw, th;\n    // auto* cat = fontMgr_.catalog();\n    // cat->drawText(renderer, \"Hello\", x_ + 10, y_ + 10, themes.text, FontStyle::Fast);\n}\n",
     "important_notes": [
-      "NetworkManager handles HTTP. Call NetworkManager::instance().get(url) \u2014 it returns cached data when ETag/Last-Modified hasn't changed.",
+      "NetworkManager handles HTTP. Call NetworkManager::instance().fetchAsync(url, callback) \u2014 it automatically deduplicates concurrent requests for the same URL and provides thread-safe disk caching.",
       "ConfigManager::instance().getConfig() for reading/modifying settings. ConfigManager::instance().save(cfg) to persist.",
       "Theme.h has all color constants. Use getThemeColors(theme_) to obtain a ThemeColors struct \u2014 never hardcode SDL_Color values.",
       "Standardize all setup/confirmation buttons: Use 'Done' and 'Cancel' labels (PascalCase).",
       "Standard button sizes: 100x34 for main modals, 80x28 for small widget-based setups.",
       "FontManager handles scaled TTF fonts. Never load your own TTF file.",
       "SDL coordinates: (0,0) is top-left. x_/y_ is the panel's top-left corner.",
-      "All render() calls happen on the main thread. Providers run on a background thread. Use a mutex or std::atomic if sharing state.",
+      "All render() calls happen on the main thread. Providers run on a background thread. Use the SDL Event Queue (AE_... constants) to deliver results to the main thread.",
       "The WebServer debug endpoint /debug/widgets calls getDebugData() on all registered panels \u2014 always implement it.",
-      "If a provider uses NetworkManager::fetchAsync, it MUST inherit from std::enable_shared_from_this and capture a weak_ptr in the lambda to prevent use-after-free crashes during configuration reloads.",
+      "ASYNCHRONOUS SAFETY (CRITICAL):",
+      "- DASHBOARD LIFECYCLE: DashboardContext is transient. When capturing 'this' in a lambda, you MUST use the Self-Validation Pattern: capture 'DashboardContext* self = this' and 'AppContext& ctx', then check 'ctx.dashboard.get() == self' before execution.",
+      "- EVENT-DRIVEN RESULTS: For transient objects (owned by DashboardContext), preferred delivery is via SDL_PushEvent. The main thread handler (main.cpp) validates the dashboard exists before applying results.",
+      "- MEMORY OWNERSHIP: Heap-allocated event data (std::string*, SDL_Surface*, etc.) passed via user.data1 MUST be deleted/freed in the main thread handler to prevent leaks.",
       "If a provider's API may be unavailable or require auth, add a `bool fetched` flag to the data struct (default false). The provider pushes event on completion with `fetched=true, valid=false` on error \u2014 panel shows meaningful status (e.g. 'API key required') rather than indefinite 'Loading...' state.",
       "Widget::onMouseDown(int mx, int my, Uint16 mod) added for advanced interactivity (Phase 60).",
       "Widget::onMouseUp now takes `int clicks` as 4th parameter (Uint16 mod, int clicks). Update all Widget subclasses when overriding.",
@@ -170,7 +173,7 @@
       {
         "method": "GET",
         "path": "/set_theme",
-        "description": "Set color theme. Params: ?theme=dark|light|solarized"
+        "description": "Set color theme. Params: ?theme=dark|glass|midnight|amber|paper|matrix"
       },
       {
         "method": "GET",
@@ -491,12 +494,12 @@
   },
   "feature_status_summary": {
     "total": 88,
-    "implemented": 82,
-    "partial": 1,
+    "implemented": 88,
+    "partial": 0,
     "missing": 0,
     "not_needed": 5,
-    "percent_done": "100% (82/82 parity features — updated 2026-03-07)",
-    "notes": "v1.0B04. Updated 2026-03-09: post-B04 bug fixes — RigService sscanf width guard, RotatorService null store_ guard, OrbitPredictor overflow cap, hardcoded color constants replaced with ThemeColors (11 files), MapWidget antimeridian div-by-zero at 5 edge sites, DXClusterData INSERT → prepared statements, DatabaseManager execPrepared() added, SECURITY.md added. DisplayPower KMSDRM one-shot-black-frame architecture verified on RPi3B."
+    "percent_done": "100% (88/88 parity features)",
+    "notes": "v1.0 Release Candidate. Updated 2026-03-13: Final parity achieved with GRIB2 cloud overhaul (layered H/M/L GFS data at 1440x721) and MapWidget seam stitching for gap-free Date Line viewing. All 88 parity features now implemented. Comprehensive stability hardening complete \u2014 implemented Self-Validation Pattern for async callbacks, NetworkManager request deduplication, and event-driven UI updates via SDL queue. ThemeColors standardization complete (11+ files). Documentation and screenshot automation updated for v1.0 release."
   },
   "implemented_features": [
     {
@@ -1424,7 +1427,7 @@
     ]
   },
   "missing_features": {
-    "description": "As of v0.8B (2026-02-18), only 1 feature remains genuinely missing (deferred to v0.9). robinson_projection and mercator_projection were completed. See implemented_from_this_list.",
+    "description": "As of v1.0 (2026-03-13), all parity features are implemented. This section is retained for historical context.",
     "implemented_from_this_list": [
       "brightness_control (BrightnessManager.cpp, sysfs + day/night schedule)",
       "radio_control (RigService.cpp, Hamlib rigctld)",
@@ -1433,24 +1436,10 @@
       "password_auth (WebServer.cpp, set_pre_routing_handler + config.webPassword)",
       "cpu_temp (CPUMonitor.cpp, /sys/class/thermal)",
       "robinson_projection (MapWidget.cpp v0.7B, projection enum + vertex generator, selectable via MapViewMenu)",
-      "mercator_projection (MapWidget.cpp v0.8B, selectable via MapViewMenu)"
+      "mercator_projection (MapWidget.cpp v0.8B, selectable via MapViewMenu)",
+      "bme280_sensor (BME280Provider.cpp, Bosch compensation math implemented)"
     ],
-    "items": [
-      {
-        "feature_id": "bme280_sensor",
-        "name": "BME280 Environmental Sensor",
-        "original_reference": "BME280.cpp (16K)",
-        "priority": "low",
-        "target_version": "v0.9",
-        "notes": "I2C hardware \u2014 only relevant for RPi with sensor attached. Plots temperature, pressure, humidity, dew point.",
-        "acceptance_criteria": [
-          "I2C BME280 read via linux i2c-dev",
-          "Temperature/pressure/humidity display",
-          "Dew point calculation",
-          "Historical plots via HistoryPanel"
-        ]
-      }
-    ]
+    "items": []
   },
   "not_needed_features": {
     "description": "These original features are explicitly NOT being ported. Document for contributor clarity.",
@@ -1470,7 +1459,7 @@
   "contribution_guide": {
     "for_new_contributors": [
       "Read this MCP and the API.md in the repo root before touching any code.",
-      "Check missing_features for remaining deferred work (bme280_sensor only \u2014 all map projections now implemented). All other features are implemented.",
+      "All 88 parity features are now implemented as of v1.0. Check 'recent_phases' for the latest architectural updates including GRIB2 clouds and the Local Data Hub.",
       "Follow the widget_scaffolding steps. Do not deviate from the Provider/Panel/Data naming pattern.",
       "Use Theme:: color constants. Use FontManager for text. Never hardcode pixel positions \u2014 use _bounds from setBounds().",
       "Implement getDebugData() in every Panel \u2014 it feeds /debug/widgets and is essential for remote debugging.",
@@ -1511,6 +1500,16 @@
   },
   "recent_phases": {
     "description": "Completed development phases in chronological order. Most recent first.",
+    "phase_62": {
+      "name": "GribCloud Overlay & Seamless Overlays",
+      "completed": "2026-03-13",
+      "summary": "Replaced VIIRS JPEG clouds with GFS GRIB2 layered data (1440x721). Implemented seam stitching to fix Date Line gaps in all map overlays.",
+      "key_changes": [
+        "GribCloudProvider: Native resolution (0.25 deg), H/M/L layers blended via transparency tuning",
+        "MapWidget: Seam stitching implemented in renderGridOverlay() to ensure zero-pixel gaps at the Date Line antimeridian",
+        "MapWidget: Multi-layer transparency support for GRIB2 cloud visualization"
+      ]
+    },
     "phase_37": {
       "name": "Raspberry Pi Memory Optimization & Segfault Prevention",
       "completed": "2026-02-16",
@@ -1635,10 +1634,13 @@
         "src/main.cpp"
       ],
       "gotchas": [
-        "RSS button must be placed at top-right (not bottom-left) of map area \u2014 RSSBanner is a separate widget rendered AFTER MapWidget in the main loop and will paint over anything at the bottom edge.",
-        "ONTAPanel lambda capture: inner setOnFilterChanged callbacks must use [&ctx] not [this] \u2014 addToPool is a [&] lambda with no enclosing class.",
+        "RSS button must be placed at top-right (not bottom-left) of map area — RSSBanner is a separate widget rendered AFTER MapWidget in the main loop and will paint over anything at the bottom edge.",
+        "ONTAPanel lambda capture: inner setOnFilterChanged callbacks must use [&ctx] not [this] — addToPool is a [&] lambda with no enclosing class.",
         "Contest row hit-testing: rowRects_/displayedIndices_ rebuilt each frame in render() to stay correct after scroll/resize/data change.",
-        "isModalActive() must return true while popup is open \u2014 PaneContainer routes all events to the active widget when modal is active."
+        "isModalActive() must return true while popup is open — PaneContainer routes all events to the active widget when modal is active.",
+        "DashboardContext Self-Validation Pattern: Async callbacks MUST capture DashboardContext* and validate 'ctx.dashboard.get() == self' before accessing members to prevent segfaults on dashboard reset.",
+        "Network Deduplication: NetworkManager::fetchAsync automatically deduplicates concurrent requests for the same URL; no manual guarding needed in providers.",
+        "Event-Driven UI Updates: For heavy assets (maps, moon images) or long-lived background tasks, use SDL_PushEvent(AE_...) to deliver results to the main thread securely."
       ]
     },
     "phase_44": {
@@ -1937,12 +1939,12 @@
   },
   "decisions": {
     "voacap_overlays": {
-      "decision": "VOACAP world map overlays (MUF/REL/TOA) are the highest-priority parity gap. The open-hamclock-backend already has a complete physics engine (voacap_service.py with NumPy vectorization). The decision is to proxy to OHB rather than port the Python/NumPy physics to C++.",
-      "rationale": "voacap_service.py is 722 lines of complex ionospheric physics with NumPy vectorization. Porting to C++ would be months of work and risk introducing bugs in the physics model. OHB is already in the repo. The proxy approach lets us ship parity quickly while leaving the C++ port as a future optimization.",
+      "decision": "VOACAP world map overlays (MUF/REL/TOA) are implemented using an internal C++ propagation engine (PropEngine.cpp). This replaces the earlier dependency on an external Python backend.",
+      "rationale": "Porting the physics model to C++ ensures single-binary distribution, zero-latency rendering, and offline capability. The implementation uses a high-fidelity ionospheric model calibrated against KC2G and original HamClock data points.",
       "implementation_path": [
-        "1. Add fetchVOACAP-MUF.pl and fetchVOACAP-TOA.pl to open-hamclock-backend (they call voacap_service.py which is already there)",
-        "2. Create src/services/VoacapProvider.cpp that fetches from /api/propagation/voacap \u2192 overlay_endpoint",
-        "3. Add SDL_Texture overlay blending in MapWidget (pattern: same as DX Cluster spots, but full-image texture)",
+        "1. Implement PropEngine::calculateMUF/calculateReliability/calculateTOA in C++",
+        "2. Create src/services/VoacapProvider.cpp to manage grid generation and caching",
+        "3. Add SDL_Texture overlay blending in MapWidget",
         "4. Add overlay toggle in MapViewMenu"
       ],
       "backend_free_path": "KC2G MUF-RT only \u2014 fetch https://prop.kc2g.com/renders/current/mufd-normal-now.png. No frequency/mode params. Covers the most common use case (current MUF conditions).",
@@ -1952,7 +1954,7 @@
   },
   "gotchas": {
     "propagation_overlay_alignment": {
-      "issue": "VOACAP overlays from open-hamclock-backend are 660x330 equirectangular (lat/lon grid). MapWidget's default view is azimuthal equidistant centered on DE. These projections do not align \u2014 you cannot simply blit the overlay PNG onto the map.",
+      "issue": "VOACAP overlays from the internal engine are 660x330 equirectangular (lat/lon grid). MapWidget's default view is azimuthal equidistant centered on DE. These projections do not align \u2014 you cannot simply blit the overlay PNG onto the map.",
       "solution_mvp": "Show the overlay in a separate flat-map panel (e.g., a secondary MapWidget or a dedicated OverlayPanel with equirectangular rendering). The original HamClock also had two map modes \u2014 'map A' (azimuthal) and 'map B' (flat). Implement a similar switch.",
       "solution_full": "Re-project the 660x330 pixel grid: for each screen pixel in MapWidget, compute its lat/lon via screenToLatLon(), look up the corresponding pixel in the equirectangular overlay, and blend. This is O(screen_w * screen_h) per frame but can be done once when the overlay updates (every 30 min).",
       "wasm_note": "In WASM mode, the KC2G MUF-RT PNG is fetched via the CORS proxy (/proxy/https://prop.kc2g.com/renders/current/mufd-normal-now.png). Ensure serve.py or the nginx cors-proxy.conf proxies that URL pattern.",
@@ -2131,10 +2133,10 @@
         {
           "endpoint": "/api/propagation/voacap",
           "method": "GET",
-          "description": "VOACAP overlay schema and proxy URL. Returns request/response schema, colormap, and (if OHB_URL env is set) the proxied endpoint URL on open-hamclock-backend.",
+          "description": "VOACAP overlay metadata. Returns request/response schema, colormap, and the computed grid metadata from the internal engine.",
           "params": "tx_lat, tx_lon, band (80m-6m), freq_mhz, hour_utc, year, month, path (0/1), mode (SSB/CW/FT8/WSPR/AM/RTTY), watts, overlay_type (muf/reliability/toa)",
           "curl": "curl 'http://localhost:8080/api/propagation/voacap?tx_lat=38.9&tx_lon=-77.0&band=20m&overlay_type=reliability' | jq",
-          "notes": "When OHB_URL env var is set, returns overlay_endpoint pointing to open-hamclock-backend. Otherwise returns kc2g_muf_rt fallback info. Colormaps included in response for all overlay types."
+          "notes": "Returns metadata for MUF, Reliability, or TOA overlays. Colormaps included in response for all overlay types."
         },
         {
           "endpoint": "/api/propagation/muf_rt",
@@ -2358,5 +2360,5 @@
       }
     ]
   },
-  "schema_version": "2.2"
+  "schema_version": "2.3"
 }

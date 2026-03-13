@@ -158,8 +158,8 @@ void SatPanel::render(SDL_Renderer *renderer) {
   int curY = y_ + titleH + pad;
 
   // Text colors
-  SDL_Color white = {255, 255, 255, 255};
-  SDL_Color gray = {180, 180, 180, 255};
+  SDL_Color white = themes.text;
+  SDL_Color gray = themes.textDim;
 
   // Render text lines (centered)
   for (int i = 0; i < kNumLines; ++i) {
@@ -203,7 +203,7 @@ void SatPanel::render(SDL_Renderer *renderer) {
     float cy = plotTop + plotH / 2.0f;
     texMgr_.generateLineTexture(renderer, "line_aa");
     texMgr_.generateMarkerTextures(renderer);
-    renderPolarPlot(renderer, cx, cy, radius);
+    renderPolarPlot(renderer, cx, cy, radius, themes);
   }
 
   SDL_RenderSetClipRect(renderer, nullptr);
@@ -267,7 +267,7 @@ nlohmann::json SatPanel::getDebugData() const {
 }
 
 void SatPanel::renderPolarPlot(SDL_Renderer *renderer, float cx, float cy,
-                               int radius) {
+                               int radius, const ThemeColors& themes) {
   // --- Compass labels (outside the circle) ---
   if (compassFontSize_ != lastCompassFontSize_) {
     for (int i = 0; i < kNumCompass; ++i) {
@@ -276,7 +276,7 @@ void SatPanel::renderPolarPlot(SDL_Renderer *renderer, float cx, float cy,
     lastCompassFontSize_ = compassFontSize_;
   }
 
-  SDL_Color dimGray = {120, 120, 120, 255};
+  SDL_Color dimGray = themes.textDim;
   for (int i = 0; i < kNumCompass; ++i) {
     if (!compassTex_[i]) {
       compassTex_[i] =
@@ -310,7 +310,7 @@ void SatPanel::renderPolarPlot(SDL_Renderer *renderer, float cx, float cy,
     }
     RenderUtils::drawPolylineTextured(renderer, lineTex, segs.data(),
                                       static_cast<int>(segs.size()), 1.5f,
-                                      {60, 60, 60, 255});
+                                      themes.border);
   }
 
   // --- Radial lines (every 45 degrees) ---
@@ -320,7 +320,7 @@ void SatPanel::renderPolarPlot(SDL_Renderer *renderer, float cx, float cy,
     float ey = static_cast<float>(cy - radius * std::cos(angle));
     RenderUtils::drawThickLineTextured(
         renderer, lineTex, static_cast<float>(cx), static_cast<float>(cy), ex,
-        ey, 1.5f, {60, 60, 60, 255});
+        ey, 1.5f, themes.border);
   }
 
   // --- Pass trajectory arc (green) ---
@@ -334,7 +334,7 @@ void SatPanel::renderPolarPlot(SDL_Renderer *renderer, float cx, float cy,
     }
     RenderUtils::drawPolylineTextured(renderer, lineTex, poly.data(),
                                       static_cast<int>(poly.size()), 3.0f,
-                                      {0, 200, 0, 255});
+                                      themes.success);
   }
 
   // --- Current satellite position (if above horizon) ---
@@ -348,7 +348,7 @@ void SatPanel::renderPolarPlot(SDL_Renderer *renderer, float cx, float cy,
     SDL_Texture *mTex = texMgr_.get("marker_circle");
     if (mTex) {
       SDL_FRect mDst = {sx - markerR, sy - markerR, markerR * 2, markerR * 2};
-      SDL_SetTextureColorMod(mTex, 0, 255, 0);
+      SDL_SetTextureColorMod(mTex, themes.success.r, themes.success.g, themes.success.b);
       SDL_SetTextureAlphaMod(mTex, 255);
       SDL_RenderCopyF(renderer, mTex, nullptr, &mDst);
     }
@@ -356,10 +356,9 @@ void SatPanel::renderPolarPlot(SDL_Renderer *renderer, float cx, float cy,
     // Label: elevation angle
     char elBuf[16];
     std::snprintf(elBuf, sizeof(elBuf), "%.0f°", currentPos_.el);
-    SDL_Color green = {0, 255, 0, 255};
     fontMgr_.catalog()->drawText(
         renderer, elBuf, static_cast<int>(sx + markerR + 2),
-        static_cast<int>(sy - compassFontSize_ / 2.0f), green, FontStyle::Fast);
+        static_cast<int>(sy - compassFontSize_ / 2.0f), themes.success, FontStyle::Fast);
   }
 }
 

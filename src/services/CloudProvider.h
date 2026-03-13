@@ -20,7 +20,11 @@ public:
 
   // Returns a texture representing the cloud data, created/cached for the given renderer.
   // Returns nullptr if no data is available.
-  SDL_Texture *getTexture(SDL_Renderer *renderer, int w, int h);
+  SDL_Texture *getTexture(SDL_Renderer *renderer, int w, int h, SDL_Color tint = {255, 255, 255, 255});
+
+  // Forces destruction of the cached GPU texture so it will be rebuilt
+  // from the next decoded surface. Call update() after to queue re-decode.
+  void invalidateTexture();
 
 private:
   NetworkManager &netMgr_;

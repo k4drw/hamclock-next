@@ -220,25 +220,27 @@ void TimePanel::render(SDL_Renderer *renderer) {
     float gcx = gearRect_.x + gearRect_.w / 2.0f;
     float gcy = gearRect_.y + gearRect_.h / 2.0f;
     float r = gearSize_ / 2.0f;
-    SDL_Color gearColor = {140, 140, 140, 255};
-    SDL_Color bgColor = {10, 10, 20, 255};
+    SDL_Color gearColor = themes.textDim;
+    SDL_Color bgColor = themes.bg;
     RenderUtils::drawGear(renderer, gcx, gcy, r, gearColor, bgColor);
 
     // Pause / Next buttons — stacked above the gear icon (same column)
     auto *cat = fontMgr_.catalog();
     if (cat) {
-      SDL_Color ctrlColor = {120, 120, 120, 255};
-      SDL_Color activeColor = {0, 200, 255, 255};
       int btnSize = gearSize_ + 4;
       int btnGap = 3;
       int btnX = gearRect_.x + (gearRect_.w - btnSize) / 2;
 
       // Pause/Resume — directly above gear (persistent state, close to gear)
       pauseRect_ = {btnX, gearRect_.y - btnSize - btnGap, btnSize, btnSize};
-      SDL_SetRenderDrawColor(renderer, 30, 30, 40, 255);
+      SDL_Color pauseBg = rotationPaused_ ? themes.accent : themes.rowStripe1;
+      SDL_SetRenderDrawColor(renderer, pauseBg.r, pauseBg.g, pauseBg.b, 255);
       SDL_RenderFillRect(renderer, &pauseRect_);
+      SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
+      SDL_RenderDrawRect(renderer, &pauseRect_);
+
       const char *pauseLabel = rotationPaused_ ? "|>" : "||";
-      SDL_Color pauseColor = rotationPaused_ ? activeColor : ctrlColor;
+      SDL_Color pauseColor = rotationPaused_ ? themes.bg : themes.text;
       cat->drawText(renderer, pauseLabel,
                     pauseRect_.x + pauseRect_.w / 2,
                     pauseRect_.y + pauseRect_.h / 2,
@@ -246,12 +248,15 @@ void TimePanel::render(SDL_Renderer *renderer) {
 
       // Next — above Pause (one-shot action floats to top)
       nextRect_ = {btnX, pauseRect_.y - btnSize - btnGap, btnSize, btnSize};
-      SDL_SetRenderDrawColor(renderer, 30, 30, 40, 255);
+      SDL_SetRenderDrawColor(renderer, themes.rowStripe1.r, themes.rowStripe1.g, themes.rowStripe1.b, 255);
       SDL_RenderFillRect(renderer, &nextRect_);
+      SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
+      SDL_RenderDrawRect(renderer, &nextRect_);
+
       cat->drawText(renderer, ">>",
                     nextRect_.x + nextRect_.w / 2,
                     nextRect_.y + nextRect_.h / 2,
-                    ctrlColor, FontStyle::Caption, true, false, true);
+                    themes.text, FontStyle::Caption, true, false, true);
     }
   }
 
@@ -279,7 +284,7 @@ void TimePanel::render(SDL_Renderer *renderer) {
       SDL_Color verColor = gray;
       if (updateAvailable_) {
         verStr += "*";
-        verColor = {255, 200, 0, 255}; // amber
+        verColor = themes.warning; // amber
       }
       TTF_SizeUTF8(infoFont, verStr.c_str(), &tw, &th);
       int vx = x_ + width_ - pad - tw;
@@ -291,16 +296,14 @@ void TimePanel::render(SDL_Renderer *renderer) {
   // --- Time: HH:MM (large, white) + SS (superscript, gray) ---
   if (!hmTex_ || currentHM_ != lastHM_ || hmFontSize_ != lastHmFontSize_) {
     MemoryMonitor::getInstance().destroyTexture(hmTex_);
-    SDL_Color white = {255, 255, 255, 255};
-    hmTex_ = fontMgr_.renderText(renderer, currentHM_, white, hmFontSize_,
+    hmTex_ = fontMgr_.renderText(renderer, currentHM_, themes.text, hmFontSize_,
                                  &hmW_, &hmH_);
     lastHM_ = currentHM_;
     lastHmFontSize_ = hmFontSize_;
   }
   if (!secTex_ || currentSec_ != lastSec_ || secFontSize_ != lastSecFontSize_) {
     MemoryMonitor::getInstance().destroyTexture(secTex_);
-    SDL_Color white = {255, 255, 255, 255};
-    secTex_ = fontMgr_.renderText(renderer, currentSec_, white, secFontSize_,
+    secTex_ = fontMgr_.renderText(renderer, currentSec_, themes.text, secFontSize_,
                                   &secW_, &secH_, true);
     lastSec_ = currentSec_;
     lastSecFontSize_ = secFontSize_;
@@ -324,8 +327,8 @@ void TimePanel::render(SDL_Renderer *renderer) {
   if (!dateTex_ || currentDate_ != lastDate_ ||
       dateFontSize_ != lastDateFontSize_) {
     MemoryMonitor::getInstance().destroyTexture(dateTex_);
-    SDL_Color cyan = {0, 200, 255, 255};
-    dateTex_ = fontMgr_.renderText(renderer, currentDate_, cyan, dateFontSize_,
+    SDL_Color dateColor = themes.info;
+    dateTex_ = fontMgr_.renderText(renderer, currentDate_, dateColor, dateFontSize_,
                                    &dateW_, &dateH_);
     lastDate_ = currentDate_;
     lastDateFontSize_ = dateFontSize_;
@@ -339,12 +342,12 @@ void TimePanel::render(SDL_Renderer *renderer) {
 
   // Star (presets) button — bottom-left of date row
   if (!editing_ && presetsRect_.w > 0) {
-    SDL_SetRenderDrawColor(renderer, 20, 25, 35, 255);
+    SDL_SetRenderDrawColor(renderer, themes.rowStripe1.r, themes.rowStripe1.g, themes.rowStripe1.b, 255);
     SDL_RenderFillRect(renderer, &presetsRect_);
-    SDL_SetRenderDrawColor(renderer, 80, 90, 110, 255);
+    SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
     SDL_RenderDrawRect(renderer, &presetsRect_);
     if (!starTex_) {
-      SDL_Color starCol = {200, 180, 60, 255};
+      SDL_Color starCol = themes.accent;
       int ptSize = std::max(8, presetsRect_.h - 2);
       starTex_ = fontMgr_.renderText(renderer, "\xe2\x9c\xaf", starCol, ptSize,
                                      &starW_, &starH_);
@@ -601,9 +604,10 @@ bool TimePanel::onTextInput(const char *text) {
 }
 
 void TimePanel::renderEditOverlay(SDL_Renderer *renderer) {
-  // Semi-transparent dark overlay over the entire panel
+  ThemeColors themes = getThemeColors(theme_);
+  // Semi-transparent overlay
   SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-  SDL_SetRenderDrawColor(renderer, 0, 0, 0, 200);
+  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, 200);
   SDL_Rect bg = {x_, y_, width_, height_};
   SDL_RenderFillRect(renderer, &bg);
 
@@ -613,7 +617,7 @@ void TimePanel::renderEditOverlay(SDL_Renderer *renderer) {
 
   // --- Text field background ---
   int fieldY = y_ + pad;
-  SDL_SetRenderDrawColor(renderer, 40, 40, 40, 255);
+  SDL_SetRenderDrawColor(renderer, themes.rowStripe1.r, themes.rowStripe1.g, themes.rowStripe1.b, 255);
   SDL_Rect fieldBg = {x_ + pad, fieldY, width_ - 2 * pad, textFieldH};
   SDL_RenderFillRect(renderer, &fieldBg);
 
@@ -648,7 +652,7 @@ void TimePanel::renderEditOverlay(SDL_Renderer *renderer) {
   // Blinking cursor (visible 500ms on, 500ms off)
   auto ms = SDL_GetTicks();
   if ((ms / 500) % 2 == 0) {
-    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+    SDL_SetRenderDrawColor(renderer, themes.text.r, themes.text.g, themes.text.b, 255);
     SDL_RenderDrawLine(renderer, cursorX, fieldY + 3, cursorX,
                        fieldY + textFieldH - 3);
   }
@@ -669,17 +673,16 @@ void TimePanel::renderEditOverlay(SDL_Renderer *renderer) {
     SDL_SetRenderDrawColor(renderer, fc.r, fc.g, fc.b, 255);
     SDL_RenderDrawRect(renderer, &fgTab);
     if (!editingBgColor_) {
-      SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+      SDL_SetRenderDrawColor(renderer, themes.accent.r, themes.accent.g,
+                             themes.accent.b, 255);
       SDL_Rect outline = {fgTab.x - 1, fgTab.y - 1, fgTab.w + 2, fgTab.h + 2};
       SDL_RenderDrawRect(renderer, &outline);
     }
-    SDL_Color lbl = {220, 220, 220, 255};
-    cat->drawText(renderer, "TEXT", fgTab.x + fgTab.w / 2,
-                  fgTab.y + fgTab.h / 2, lbl, FontStyle::Tiny, true, false,
-                  true);
+    cat->drawText(renderer, "TEXT", fgTab.x + fgTab.w / 2, fgTab.y + fgTab.h / 2,
+                  themes.text, FontStyle::Tiny, true, false, true);
   }
 
-  // BG tab: filled with current bg color (or dark gray if none)
+  // BG tab: filled with current bg color (or themes.bg if none)
   {
     if (selectedBgColorIdx_ >= 0) {
       SDL_Color bc = kPalette[selectedBgColorIdx_];
@@ -688,26 +691,28 @@ void TimePanel::renderEditOverlay(SDL_Renderer *renderer) {
       SDL_SetRenderDrawColor(renderer, bc.r, bc.g, bc.b, 255);
       SDL_RenderDrawRect(renderer, &bgTab);
     } else {
-      SDL_SetRenderDrawColor(renderer, 35, 35, 35, 255);
+      SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b,
+                             255);
       SDL_RenderFillRect(renderer, &bgTab);
-      SDL_SetRenderDrawColor(renderer, 90, 90, 90, 255);
+      SDL_SetRenderDrawColor(renderer, themes.textDim.r, themes.textDim.g,
+                             themes.textDim.b, 255);
       SDL_RenderDrawRect(renderer, &bgTab);
       // X mark for "none"
-      SDL_SetRenderDrawColor(renderer, 120, 120, 120, 255);
+      SDL_SetRenderDrawColor(renderer, themes.textDim.r, themes.textDim.g,
+                             themes.textDim.b, 255);
       SDL_RenderDrawLine(renderer, bgTab.x + 3, bgTab.y + 3,
                          bgTab.x + bgTab.w - 4, bgTab.y + bgTab.h - 4);
       SDL_RenderDrawLine(renderer, bgTab.x + bgTab.w - 4, bgTab.y + 3,
                          bgTab.x + 3, bgTab.y + bgTab.h - 4);
     }
     if (editingBgColor_) {
-      SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+      SDL_SetRenderDrawColor(renderer, themes.accent.r, themes.accent.g,
+                             themes.accent.b, 255);
       SDL_Rect outline = {bgTab.x - 1, bgTab.y - 1, bgTab.w + 2, bgTab.h + 2};
       SDL_RenderDrawRect(renderer, &outline);
     }
-    SDL_Color lbl = {220, 220, 220, 255};
-    cat->drawText(renderer, "BG", bgTab.x + bgTab.w / 2,
-                  bgTab.y + bgTab.h / 2, lbl, FontStyle::Tiny, true, false,
-                  true);
+    cat->drawText(renderer, "BG", bgTab.x + bgTab.w / 2, bgTab.y + bgTab.h / 2,
+                  themes.text, FontStyle::Tiny, true, false, true);
   }
 
   // --- Color palette ---
@@ -728,15 +733,18 @@ void TimePanel::renderEditOverlay(SDL_Renderer *renderer) {
 
     if (editingBgColor_ && i == 0) {
       // "None" cell
-      SDL_SetRenderDrawColor(renderer, 35, 35, 35, 255);
+      SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b,
+                             255);
       SDL_RenderFillRect(renderer, &swatch);
-      SDL_SetRenderDrawColor(renderer, 90, 90, 90, 255);
+      SDL_SetRenderDrawColor(renderer, themes.textDim.r, themes.textDim.g,
+                             themes.textDim.b, 255);
       SDL_RenderDrawLine(renderer, sx + 3, sy + 3, sx + swatchSize - 4,
                          sy + swatchSize - 4);
       SDL_RenderDrawLine(renderer, sx + swatchSize - 4, sy + 3, sx + 3,
                          sy + swatchSize - 4);
       if (selectedBgColorIdx_ == -1) {
-        SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+        SDL_SetRenderDrawColor(renderer, themes.accent.r, themes.accent.g,
+                               themes.accent.b, 255);
         SDL_Rect outline = {sx - 1, sy - 1, swatchSize + 2, swatchSize + 2};
         SDL_RenderDrawRect(renderer, &outline);
       }
@@ -749,7 +757,7 @@ void TimePanel::renderEditOverlay(SDL_Renderer *renderer) {
       bool selected = editingBgColor_ ? (palIdx == selectedBgColorIdx_)
                                       : (palIdx == selectedColorIdx_);
       if (selected) {
-        SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+        SDL_SetRenderDrawColor(renderer, themes.accent.r, themes.accent.g, themes.accent.b, 255);
         SDL_Rect outline = {sx - 1, sy - 1, swatchSize + 2, swatchSize + 2};
         SDL_RenderDrawRect(renderer, &outline);
       }
@@ -759,9 +767,8 @@ void TimePanel::renderEditOverlay(SDL_Renderer *renderer) {
   // --- Hint text ---
   int hintY = paletteY + ((numCells + cols - 1) / cols) * (swatchSize + gap) + 2;
   if (hintY + 11 < y_ + height_) {
-    SDL_Color gray = {140, 140, 140, 255};
-    cat->drawText(renderer, "Enter=Done  Esc=Cancel", x_ + pad, hintY, gray,
-                  FontStyle::Caption);
+    cat->drawText(renderer, "Enter=Done  Esc=Cancel", x_ + pad, hintY,
+                  themes.textDim, FontStyle::Caption);
   }
 
   SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);

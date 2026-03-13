@@ -264,12 +264,19 @@ void TextInput::render(SDL_Renderer *renderer, FontManager &fontMgr, int fieldX,
                        SDL_Color activeBorder, SDL_Color inactiveBorder,
                        SDL_Color validColor, SDL_Color textColor,
                        SDL_Color placeholderColor,
-                       const std::string &placeholder) const {
+                       const std::string &placeholder,
+                       const SDL_Color *bgColor) const {
   SDL_Color border = active ? activeBorder : inactiveBorder;
   auto *cat = fontMgr.catalog();
 
   // Background
-  SDL_SetRenderDrawColor(renderer, 30, 30, 40, 255);
+  if (bgColor) {
+    SDL_SetRenderDrawColor(renderer, bgColor->r, bgColor->g, bgColor->b, bgColor->a);
+  } else {
+    // All production callers supply bgColor from their ThemeColors; this
+    // branch is a defensive fallback and is not reached in normal use.
+    SDL_SetRenderDrawColor(renderer, 20, 20, 20, 255);
+  }
   SDL_Rect rect = {fieldX, fieldY, fieldW, fieldH};
   SDL_RenderFillRect(renderer, &rect);
   SDL_SetRenderDrawColor(renderer, border.r, border.g, border.b, 255);
@@ -300,7 +307,7 @@ void TextInput::render(SDL_Renderer *renderer, FontManager &fontMgr, int fieldX,
                                        cat->ptSize(fieldStyle),
                                        FontCatalog::isBold(fieldStyle));
     SDL_Rect selRect = {selX, fieldY + 4, selW, fieldH - 8};
-    SDL_SetRenderDrawColor(renderer, 60, 60, 100, 255);
+    SDL_SetRenderDrawColor(renderer, activeBorder.r, activeBorder.g, activeBorder.b, 80);
     SDL_RenderFillRect(renderer, &selRect);
   }
 
@@ -325,7 +332,7 @@ void TextInput::render(SDL_Renderer *renderer, FontManager &fontMgr, int fieldX,
                                          FontCatalog::isBold(fieldStyle));
     }
     if ((SDL_GetTicks() / 500) % 2 == 0) {
-      SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+      SDL_SetRenderDrawColor(renderer, textColor.r, textColor.g, textColor.b, 255);
       SDL_RenderDrawLine(renderer, cursorX, fieldY + 4, cursorX,
                          fieldY + fieldH - 4);
     }

@@ -23,8 +23,6 @@ public:
   bool onKeyDown(SDL_Keycode key, Uint16 mod) override;
   bool onMouseWheel(int scrollY) override;
 
-  void setTheme(const std::string &theme) override { theme_ = theme; }
-
 private:
   FontManager &fontMgr_;
   bool visible_ = false;
@@ -54,7 +52,8 @@ private:
   std::vector<std::string> overlayOpts_ = {"None", "MUF", "VOACAP",
                                            "Reliability", "TOA", "Heatmap",
                                            "DRAP", "Aurora"};
-  std::vector<std::string> weatherOpts_ = {"None", "WX/Pressure", "Clouds"};
+  std::vector<std::string> weatherOpts_ = {"None", "WX/Pressure",
+                                           "Clouds (GFS)"};
   std::vector<std::string> bandOpts_ = {"80m", "60m", "40m", "30m", "20m",
                                         "17m", "15m", "12m", "10m", "6m"};
   std::vector<std::string> modeOpts_ = {"SSB", "CW", "FT8", "AM", "WSPR"};
@@ -97,8 +96,6 @@ private:
   // SDL_Rect pb80_, pb40_, pb20_, pb15_, pb10_; // REMOVED
   SDL_Rect applyRect_, cancelRect_;
   int projHeaderY_ = 0, styleHeaderY_ = 0, gridHeaderY_ = 0, mufRtHeaderY_ = 0, weatherHeaderY_ = 0;
-
-  std::string theme_ = "default";
 
   void renderRadioButton(SDL_Renderer *renderer, const SDL_Rect &rect,
                          bool selected, const std::string &label,

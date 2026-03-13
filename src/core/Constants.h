@@ -55,7 +55,11 @@ static constexpr uint32_t AE_REPEATER_DATA_READY = 13;
 static constexpr uint32_t AE_HURRICANE_DATA_READY = 14;
 static constexpr uint32_t AE_MARINE_DATA_READY = 15;
 static constexpr uint32_t AE_WINLINK_DATA_READY = 16;
-static constexpr uint32_t AE_TOUCH = 17; // REST /set_touch: data1=x, data2=y (logical)
-static constexpr uint32_t AE_WHEEL = 18; // REST /set_wheel: data1=deltaY (positive=up, negative=down)
+static constexpr uint32_t AE_MAP_IMAGE_READY = 17;
+static constexpr uint32_t AE_MOON_IMAGE_READY = 18;
+static constexpr uint32_t AE_TOUCH = 19; // REST /set_touch: data1=x, data2=y (logical)
+static constexpr uint32_t AE_WHEEL = 20; // REST /set_wheel: data1=deltaY (positive=up, negative=down)
+static constexpr uint32_t AE_SATELLITE_DATA_READY = 21;
+static constexpr uint32_t AE_UPDATE_DATA_READY = 22;
 
 } // namespace HamClock

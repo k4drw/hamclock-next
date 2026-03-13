@@ -94,13 +94,13 @@ void BeaconPanel::render(SDL_Renderer *renderer) {
 
     // (Old layout-specific title was here, now replaced by standard one above)
 
-    // Band colors (approx based on screenshot)
+    // Band colors (standardized with theme tokens)
     SDL_Color bandColors[] = {
-        {255, 255, 0, 255},   // 20m: Yellow
-        {150, 255, 0, 255},   // 17m: Green
-        {0, 255, 200, 255},   // 15m: Cyan
-        {0, 150, 255, 255},   // 12m: Blue
-        {255, 180, 200, 255}, // 10m: Pink
+        themes.warning, // 20m: Yellow/Warning
+        themes.success, // 17m: Green/Success
+        themes.info,    // 15m: Cyan/Info
+        themes.info,    // 12m: Info
+        themes.accent,  // 10m: Accent
     };
     const char *freqs[] = {"14.10", "18.11", "21.15", "24.93", "28.20"};
 
@@ -138,7 +138,7 @@ void BeaconPanel::render(SDL_Renderer *renderer) {
     int barH = 2;
     SDL_Rect progRect = {x_ + 2, y_ + height_ - barH - 2,
                          (int)((width_ - 4) * progress_), barH};
-    SDL_SetRenderDrawColor(renderer, 0, 200, 255, 255);
+    SDL_SetRenderDrawColor(renderer, themes.accent.r, themes.accent.g, themes.accent.b, 255);
     SDL_RenderFillRect(renderer, &progRect);
     return;
   }
@@ -192,7 +192,7 @@ void BeaconPanel::render(SDL_Renderer *renderer) {
       if (a.index == i) {
         int cellX = x_ + pad + callWidth + a.bandIndex * bandWidth;
         SDL_Rect cell = {cellX + 2, rowY, bandWidth - 4, rowHeight - 1};
-        SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
+        SDL_SetRenderDrawColor(renderer, themes.success.r, themes.success.g, themes.success.b, themes.success.a);
         SDL_RenderFillRect(renderer, &cell);
       }
     }
@@ -202,7 +202,7 @@ void BeaconPanel::render(SDL_Renderer *renderer) {
   int barH = 2;
   SDL_Rect progressRect = {x_ + pad, y_ + height_ - barH - 2,
                            (int)((width_ - 2 * pad) * progress_), barH};
-  SDL_SetRenderDrawColor(renderer, 0, 200, 255, 255);
+  SDL_SetRenderDrawColor(renderer, themes.accent.r, themes.accent.g, themes.accent.b, themes.accent.a);
   SDL_RenderFillRect(renderer, &progressRect);
 }
 
@@ -225,7 +225,7 @@ void BeaconPanel::onResize(int x, int y, int w, int h) {
   if (w < 100 || h < 140) {
     labelFontSize_ = cat->ptSize(FontStyle::Micro); // "NCDXF"
     callfontSize_ =
-        cat->ptSize(FontStyle::Micro); // Frequencies (12px fits ~24px row)
+        cat->ptSize(FontStyle::FastBold); // Frequencies
   } else {
     labelFontSize_ = cat->ptSize(FontStyle::FastBold);
     callfontSize_ = cat->ptSize(FontStyle::Micro);

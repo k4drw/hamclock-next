@@ -48,7 +48,7 @@ If `lat`/`lon` are omitted, they are derived from the center of your grid square
 | Field            | Type    | Default  | Description                                                                                                           |
 | ---------------- | ------- | -------- | --------------------------------------------------------------------------------------------------------------------- |
 | `propOverlay`    | string  | `"None"` | Active propagation overlay (`None`, `MUF_RT`, `VOACAP_AREA`, `VOACAP_POINT`, `RELIABILITY`, `TOA`, `HEATMAP`, `DRAP`) |
-| `weatherOverlay` | string  | `"None"` | Active weather overlay (`None`, `CLOUDS`, `WXMB`)                                                                     |
+| `weatherOverlay` | string  | `"none"` | Active weather overlay (`none`, `wxmb`, `clouds_grib`)                                                                |
 | `propBand`       | string  | `"20m"`  | Band for propagation modeling                                                                                         |
 | `propMode`       | string  | `"SSB"`  | Mode for propagation modeling                                                                                         |
 | `propPower`      | integer | `100`    | Power in watts for propagation modeling                                                                               |

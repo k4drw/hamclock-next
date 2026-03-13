@@ -2859,7 +2859,7 @@
       "status": "implemented",
       "acceptance": [
         "Master mode: /api/hub/fetch returns upstream response; 403 when not in master mode",
-        "Client mode: fetchAsync routes through hub IP:port; falls back to direct on 2s timeout",
+        "Client mode: fetchAsync routes through hub IP:port; falls back to direct on 10s timeout",
         "Off mode: no change to existing fetch behavior",
         "SetupScreen Network tab: mode cycles Off→Master→Client; IP+Port fields shown only in Client mode",
         "Config persists across restart; hub section in config.json",

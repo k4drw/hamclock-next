@@ -49,20 +49,22 @@ void DEInfo::render(SDL_Renderer *renderer) {
   if (!fontMgr_.ready())
     return;
 
+  ThemeColors themes = getThemeColors(theme_);
+
   // Clip to widget bounds
   SDL_Rect clip = {x_, y_, width_, height_};
   SDL_RenderSetClipRect(renderer, &clip);
 
   // Draw pane border
-  SDL_SetRenderDrawColor(renderer, 80, 80, 80, 255);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, themes.border.a);
   SDL_RenderDrawRect(renderer, &clip);
 
   int pad = static_cast<int>(width_ * 0.04f);
   SDL_Color colors[kNumLines] = {
-      {255, 165, 0, 255},   // "DE:" label: orange
-      {255, 200, 0, 255},   // Callsign: yellow
-      {255, 255, 255, 255}, // Local time: white
-      {0, 255, 128, 255},   // Grid + lat/lon: green
+      themes.accent,  // "DE:" label
+      themes.warning, // Callsign
+      themes.text,    // Local time
+      themes.success, // Grid + lat/lon
   };
 
   int curY = y_ + pad;

@@ -105,22 +105,27 @@ void PaneContainer::update() {
 void PaneContainer::render(SDL_Renderer *renderer) {
   if (width_ <= 0 || height_ <= 0)
     return;
+
+  ThemeColors themes = getThemeColors(theme_);
+
   // Draw content
   if (activeWidget_) {
     activeWidget_->render(renderer);
   } else {
     // Background for empty pane
-    SDL_SetRenderDrawColor(renderer, 20, 20, 25, 255);
+    SDL_SetRenderDrawColor(renderer, themes.rowStripe1.r, themes.rowStripe1.g,
+                           themes.rowStripe1.b, 255);
     SDL_Rect r = {x_, y_, width_, height_};
     SDL_RenderFillRect(renderer, &r);
 
     fontMgr_.catalog()->drawText(renderer, widgetTypeDisplayName(currentType_),
                                  x_ + width_ / 2, y_ + height_ / 2,
-                                 {100, 100, 120, 255}, FontStyle::UI, true);
+                                 themes.textDim, FontStyle::UI, true);
   }
 
   // Draw border
-  SDL_SetRenderDrawColor(renderer, 50, 50, 60, 255);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
+                         themes.border.b, themes.border.a);
   SDL_Rect border = {x_, y_, width_, height_};
   SDL_RenderDrawRect(renderer, &border);
 
@@ -135,16 +140,16 @@ void PaneContainer::render(SDL_Renderer *renderer) {
     SDL_Rect rArr = {x_ + width_ - arrowW, cy - arrowH / 2, arrowW, arrowH};
 
     SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 140);
+    SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, 140);
     SDL_RenderFillRect(renderer, &lArr);
     SDL_RenderFillRect(renderer, &rArr);
     SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
 
     fontMgr_.catalog()->drawText(renderer, "<", lArr.x + lArr.w / 2,
-                                 lArr.y + lArr.h / 2, {220, 220, 220, 255},
+                                 lArr.y + lArr.h / 2, themes.text,
                                  FontStyle::Fast, true, false, true);
     fontMgr_.catalog()->drawText(renderer, ">", rArr.x + rArr.w / 2,
-                                 rArr.y + rArr.h / 2, {220, 220, 220, 255},
+                                 rArr.y + rArr.h / 2, themes.text,
                                  FontStyle::Fast, true, false, true);
   }
 }

@@ -1,6 +1,7 @@
 #include "UpdateChecker.h"
 #include "../core/Logger.h"
 #include "../network/NetworkManager.h"
+#include "../core/Constants.h"
 #include <nlohmann/json.hpp>
 
 static constexpr const char *kApiUrl =
@@ -96,40 +97,49 @@ UpdateChecker::UpdateChecker(NetworkManager &net) : net_(net) {}
 void UpdateChecker::fetch() {
   net_.fetchAsync(
       kApiUrl,
-      [this](std::string data) {
+      [](std::string data) {
         if (data.empty())
           return;
-        try {
-          auto j = nlohmann::json::parse(data);
-          const std::string current = HAMCLOCK_VERSION;
-
-          if (j.contains("tag_name")) {
-            std::string tag = j["tag_name"];
-            if (tag.empty() || (tag[0] != 'v' && tag[0] != 'V')) {
-              tag = "v" + tag;
-            }
-            std::string notes = j.value("body", "");
-            const bool available = isVersionNewer(tag, current);
-
-            std::lock_guard<std::mutex> lock(mutex_);
-            latestVersion_ = tag;
-            releaseNotes_ = notes;
-            updateAvailable_ = available;
-
-            if (available) {
-              LOG_I("UpdateChecker", "Update available: {} → {} (current: {})",
-                    current, tag, current);
-            } else {
-              LOG_D("UpdateChecker", "Up to date ({})", current);
-            }
-          } else {
-            LOG_D("UpdateChecker", "Up to date ({})", current);
-          }
-        } catch (...) {
-          LOG_W("UpdateChecker", "Failed to parse GitHub releases response");
-        }
+        
+        SDL_Event ev;
+        SDL_zero(ev);
+        ev.type = HamClock::AE_BASE_EVENT + HamClock::AE_UPDATE_DATA_READY;
+        ev.user.data1 = new std::string(std::move(data));
+        SDL_PushEvent(&ev);
       },
       kCacheSeconds);
+}
+
+void UpdateChecker::onDataReady(const std::string &data) {
+  try {
+    auto j = nlohmann::json::parse(data);
+    const std::string current = HAMCLOCK_VERSION;
+
+    if (j.contains("tag_name")) {
+      std::string tag = j["tag_name"];
+      if (tag.empty() || (tag[0] != 'v' && tag[0] != 'V')) {
+        tag = "v" + tag;
+      }
+      std::string notes = j.value("body", "");
+      const bool available = isVersionNewer(tag, current);
+
+      std::lock_guard<std::mutex> lock(mutex_);
+      latestVersion_ = tag;
+      releaseNotes_ = notes;
+      updateAvailable_ = available;
+
+      if (available) {
+        LOG_I("UpdateChecker", "Update available: {} → {} (current: {})",
+              current, tag, current);
+      } else {
+        LOG_D("UpdateChecker", "Up to date ({})", current);
+      }
+    } else {
+      LOG_D("UpdateChecker", "Up to date ({})", current);
+    }
+  } catch (...) {
+    LOG_W("UpdateChecker", "Failed to parse GitHub releases response");
+  }
 }
 
 bool UpdateChecker::updateAvailable() const {

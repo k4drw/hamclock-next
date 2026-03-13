@@ -58,8 +58,7 @@ void MarinePanel::render(SDL_Renderer *renderer) {
       float ht = useMetric_ ? (float)(t.heightFt * 0.3048) : (float)t.heightFt;
       std::snprintf(buf, sizeof(buf), "%s  %s  %.2f%s", t.time.c_str(),
                     isHigh ? "HI" : "LO", ht, useMetric_ ? "m" : "ft");
-      SDL_Color col =
-          isHigh ? SDL_Color{0, 200, 255, 255} : SDL_Color{180, 160, 100, 255};
+      SDL_Color col = isHigh ? themes.accent : themes.textDim;
       cat->drawText(renderer, buf, x_ + pad, curY, col, FontStyle::Fast);
       curY += rowFontSize_ + 3;
     }
@@ -90,7 +89,7 @@ void MarinePanel::render(SDL_Renderer *renderer) {
           useMetric_ ? (float)b.waterTempC : (float)(b.waterTempC * 1.8 + 32);
       std::snprintf(buf, sizeof(buf), "Water: %.1f%s", wt,
                     useMetric_ ? "C" : "F");
-      cat->drawText(renderer, buf, x_ + pad, curY, {0, 200, 200, 255},
+      cat->drawText(renderer, buf, x_ + pad, curY, themes.info,
                     FontStyle::Fast);
       curY += rowFontSize_ + 2;
     }
@@ -254,12 +253,9 @@ void MarinePanel::recalcMenuLayout() {
 void MarinePanel::renderMenu(SDL_Renderer *renderer,
                              const ThemeColors &themes) {
   auto *cat = fontMgr_.catalog();
-  SDL_Color white = {255, 255, 255, 255};
-  SDL_Color gray = {100, 100, 100, 255};
-  SDL_Color orange = {255, 165, 0, 255};
 
   // Background
-  SDL_SetRenderDrawColor(renderer, 20, 20, 20, 240);
+  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, 255);
   SDL_RenderFillRect(renderer, &menuRect_);
   SDL_SetRenderDrawColor(renderer, themes.accent.r, themes.accent.g,
                          themes.accent.b, 255);
@@ -277,34 +273,43 @@ void MarinePanel::renderMenu(SDL_Renderer *renderer,
   // Fields
   stationInput_.render(renderer, fontMgr_, stationRect_.x, stationRect_.y,
                        stationRect_.w, stationRect_.h, FontStyle::SmallRegular,
-                       6, activeField_ == 0, true, orange, gray, themes.accent,
-                       white, gray, "e.g. 8722670");
+                       6, activeField_ == 0, true, themes.accent, themes.border,
+                       themes.success, themes.text, themes.textDim,
+                       "e.g. 8722670", &themes.rowStripe1);
 
   buoyInput_.render(renderer, fontMgr_, buoyRect_.x, buoyRect_.y, buoyRect_.w,
                     buoyRect_.h, FontStyle::SmallRegular, 6, activeField_ == 1,
-                    true, orange, gray, themes.accent, white, gray,
-                    "e.g. 41114");
+                    true, themes.accent, themes.border, themes.success,
+                    themes.text, themes.textDim, "e.g. 41114",
+                    &themes.rowStripe1);
 
   // Buttons
-  auto drawBtn = [&](const SDL_Rect &r, const char *label, bool hover) {
-    SDL_SetRenderDrawColor(renderer, hover ? 60 : 40, hover ? 60 : 40,
-                           hover ? 60 : 40, 255);
+  auto drawBtn = [&](const SDL_Rect &r, const char *label, SDL_Color bgCol,
+                     bool hover) {
+    if (hover) {
+      SDL_SetRenderDrawColor(renderer, bgCol.r, bgCol.g, bgCol.b, 255);
+    } else {
+      SDL_SetRenderDrawColor(renderer, themes.rowStripe1.r, themes.rowStripe1.g,
+                             themes.rowStripe1.b, 255);
+    }
     SDL_RenderFillRect(renderer, &r);
-    SDL_SetRenderDrawColor(renderer, 100, 100, 100, 255);
+    SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
+                           themes.border.b, 255);
     SDL_RenderDrawRect(renderer, &r);
-    cat->drawText(renderer, label, r.x + r.w / 2, r.y + r.h / 2, white,
-                  FontStyle::Micro, true, false, true);
+    cat->drawText(renderer, label, r.x + r.w / 2, r.y + r.h / 2,
+                  hover ? themes.bg : themes.text, FontStyle::Micro, true,
+                  false, true);
   };
 
   int mx, my;
   SDL_GetMouseState(&mx, &my);
-  bool okHover =
-      mx >= okRect_.x && mx < okRect_.x + okRect_.w && my >= okRect_.y && my < okRect_.y + okRect_.h;
+  bool okHover = mx >= okRect_.x && mx < okRect_.x + okRect_.w &&
+                 my >= okRect_.y && my < okRect_.y + okRect_.h;
   bool cancelHover = mx >= cancelRect_.x && mx < cancelRect_.x + cancelRect_.w &&
                      my >= cancelRect_.y && my < cancelRect_.y + cancelRect_.h;
 
-  drawBtn(okRect_, "Save", okHover);
-  drawBtn(cancelRect_, "Cancel", cancelHover);
+  drawBtn(okRect_, "Save", themes.success, okHover);
+  drawBtn(cancelRect_, "Cancel", themes.accent, cancelHover);
 }
 
 void MarinePanel::saveSettings() {

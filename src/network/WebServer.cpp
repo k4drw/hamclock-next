@@ -117,26 +117,27 @@ propOverlayFromString(const std::string &s) {
   switch (t) {
   case WeatherOverlayType::None:
     return "none";
-  case WeatherOverlayType::Clouds:
-    return "clouds";
   case WeatherOverlayType::WxMb:
     return "wxmb";
+  case WeatherOverlayType::CloudsGrib:
+    return "clouds_grib";
   }
   return "none";
 }
 
 [[maybe_unused]] static WeatherOverlayType
 wxOverlayFromString(const std::string &s) {
-  if (s == "clouds")
-    return WeatherOverlayType::Clouds;
+  if (s == "clouds_grib" || s == "clouds")
+    return WeatherOverlayType::CloudsGrib;
   if (s == "wxmb")
     return WeatherOverlayType::WxMb;
   return WeatherOverlayType::None;
 }
 
 static std::string base64Decode(const std::string &in) {
+  // URL-safe base64 (RFC 4648 §5): '-' and '_' instead of '+' and '/'
   static const std::string chars =
-      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
   std::vector<int> T(256, -1);
   for (int i = 0; i < 64; i++)
     T[(unsigned char)chars[i]] = i;
@@ -144,7 +145,7 @@ static std::string base64Decode(const std::string &in) {
   int val = 0, valb = -8;
   for (unsigned char c : in) {
     if (T[c] == -1)
-      break;
+      continue;  // skip padding ('=') and any stray characters
     val = (val << 6) + T[c];
     valb += 6;
     if (valb >= 0) {
@@ -308,7 +309,7 @@ void WebServer::run() {
       <label>Callsign</label>
       <input type="text" id="call" maxlength="12">
       <label>Grid Square</label>
-      <input type="text" id="grid" maxlength="8">
+      <input type="text" id="grid" maxlength="6">
       <label>Latitude</label>
       <input type="number" id="lat" step="0.0001" min="-90" max="90">
       <label>Longitude</label>
@@ -321,23 +322,36 @@ void WebServer::run() {
   <div id="appearance" class="panel">
     <div class="card">
       <label>Color Theme</label>
-      <select id="theme">
-        <option value="default">Default (Orange)</option>
-        <option value="dark">Modern Dark</option>
-        <option value="glass">Glass</option>
-      </select>
+      <select id="theme">)HTML";
+    for (const auto &t : getAvailableThemes()) {
+      html += "<option value=\"" + t + "\">" + t + "</option>";
+    }
+    html += R"HTML(</select>
       <label>Map Style</label>
       <select id="map-style">
         <option value="nasa">NASA Blue Marble</option>
-        <option value="terrain">Terrain</option>
-        <option value="countries">Countries</option>
+        <option value="topo">Topography</option>
+        <option value="topo_bathy">Topo + Bathymetry</option>
       </select>
       <label>Projection</label>
       <select id="projection">
         <option value="equirectangular">Equirectangular</option>
         <option value="robinson">Robinson</option>
+        <option value="azimuthal">Azimuthal</option>
+        <option value="mercator">Mercator</option>
+        <option value="dual_azimuthal">Dual Azimuthal</option>
       </select>
-      <label style="margin-top:4px"><input type="checkbox" id="show-borders"> Show Country Borders</label>
+      <div style="display:flex; gap:15px; margin-bottom:10px">
+        <label><input type="checkbox" id="show-borders"> Borders</label>
+        <label><input type="checkbox" id="show-beacons"> Beacons</label>
+        <label><input type="checkbox" id="show-sattrack"> Sat Track</label>
+      </div>
+      <label>Grid Overlay</label>
+      <select id="grid-mode">
+        <option value="none">None</option>
+        <option value="latlon">Lat/Lon</option>
+        <option value="maidenhead">Maidenhead</option>
+      </select>
       <label>Propagation Overlay</label>
       <select id="prop-overlay">
         <option value="none">None</option>
@@ -352,8 +366,8 @@ void WebServer::run() {
       <label>Weather Overlay</label>
       <select id="weather-overlay">
         <option value="none">None</option>
-        <option value="clouds">Clouds</option>
-        <option value="wxmb">WxMB</option>
+        <option value="wxmb">WX/Pressure</option>
+        <option value="clouds_grib">Clouds (GFS)</option>
       </select>
       <label style="margin-top:10px"><input type="checkbox" id="night-lights"> Show Night Lights</label>
       <label><input type="checkbox" id="use-metric"> Use Metric Units</label>
@@ -566,6 +580,33 @@ void WebServer::run() {
         </div>
       </div>
       
+      <div class="section-hdr" style="margin-top:16px">Aux Clock</div>
+      <label>Timezone</label>
+      <select id="aux-tz-preset" onchange="toggleAuxCustom()">
+        <option value="999|Local">Local (system time, DST-aware)</option>
+        <option value="0|UTC">UTC</option>
+        <option value="-5|EST">EST (UTC-5)</option>
+        <option value="-6|CST">CST (UTC-6)</option>
+        <option value="-7|MST">MST (UTC-7)</option>
+        <option value="-8|PST">PST (UTC-8)</option>
+        <option value="1|CET">CET (UTC+1)</option>
+        <option value="9|JST">JST (UTC+9)</option>
+        <option value="10|AEST">AEST (UTC+10)</option>
+        <option value="custom|custom">Custom...</option>
+      </select>
+      <div id="aux-custom-fields" style="display:none; margin-top:6px">
+        <label>UTC Offset (hours, -12 to +14)</label>
+        <input type="number" id="aux-tz-offset" min="-12" max="14">
+        <label>Label (max 8 chars)</label>
+        <input type="text" id="aux-tz-label" maxlength="8">
+      </div>
+      <label>Star Date Mode</label>
+      <select id="aux-star-mode">
+        <option value="0">K (Klingon Stardates)</option>
+        <option value="1">P (Pavel Stardates)</option>
+        <option value="2">C (Countdown to Warp 1)</option>
+      </select>
+
       <button onclick="saveWidgets()" style="margin-top:16px">Save Widgets</button>
       <div id="widgets-msg"></div>
     </div>
@@ -651,6 +692,15 @@ void WebServer::run() {
         document.getElementById('map-style').value = c.mapStyle || 'nasa';
         document.getElementById('projection').value = c.projection || 'equirectangular';
         document.getElementById('show-borders').checked = !!c.showBorders;
+        document.getElementById('show-beacons').checked = !!c.showBeacons;
+        document.getElementById('show-sattrack').checked = !!c.showSatTrack;
+        
+        let gridVal = 'none';
+        if (c.showGrid) {
+          gridVal = (c.gridType === 'maidenhead') ? 'maidenhead' : 'latlon';
+        }
+        document.getElementById('grid-mode').value = gridVal;
+
         document.getElementById('prop-overlay').value = c.propOverlay || 'none';
         document.getElementById('weather-overlay').value = c.weatherOverlay || 'none';
         document.getElementById('night-lights').checked = !!c.mapNightLights;
@@ -681,13 +731,21 @@ void WebServer::run() {
       const mapStyle = document.getElementById('map-style').value;
       const projection = document.getElementById('projection').value;
       const showBorders = document.getElementById('show-borders').checked ? '1' : '0';
+      const showBeacons = document.getElementById('show-beacons').checked ? '1' : '0';
+      const showSatTrack = document.getElementById('show-sattrack').checked ? '1' : '0';
+      const gridMode = document.getElementById('grid-mode').value;
       const propOverlay = document.getElementById('prop-overlay').value;
       const wxOverlay = document.getElementById('weather-overlay').value;
       const nl = document.getElementById('night-lights').checked ? '1' : '0';
       const mu = document.getElementById('use-metric').checked ? '1' : '0';
       const dpm = document.getElementById('display-power-method').value;
+      
+      const showGrid = (gridMode !== 'none') ? '1' : '0';
+      const gridType = (gridMode === 'maidenhead') ? 'maidenhead' : 'latlon';
+
       const params = new URLSearchParams({
         theme, map_style: mapStyle, projection, show_borders: showBorders,
+        show_beacons: showBeacons, show_sattrack: showSatTrack, show_grid: showGrid, grid_type: gridType,
         prop_overlay: propOverlay, wx_overlay: wxOverlay, night_lights: nl, use_metric: mu,
         display_power_method: dpm
       });
@@ -1040,6 +1098,21 @@ void WebServer::run() {
 
         toggleSidePanelSettings();
 
+        // Aux Clock
+        const tzOff = c.auxClockTzOffset !== undefined ? c.auxClockTzOffset : 0;
+        const tzLbl = c.auxClockTzLabel || 'UTC';
+        const tzPresets = [{v:999,l:'Local'},{v:0,l:'UTC'},{v:-5,l:'EST'},
+                           {v:-6,l:'CST'},{v:-7,l:'MST'},{v:-8,l:'PST'},
+                           {v:1,l:'CET'},{v:9,l:'JST'},{v:10,l:'AEST'}];
+        const match = tzPresets.find(p => p.v === tzOff && p.l === tzLbl);
+        document.getElementById('aux-tz-preset').value = match ? (tzOff+'|'+tzLbl) : 'custom|custom';
+        if (!match) {
+          document.getElementById('aux-tz-offset').value = tzOff;
+          document.getElementById('aux-tz-label').value  = tzLbl;
+        }
+        document.getElementById('aux-star-mode').value = c.auxClockStarMode !== undefined ? c.auxClockStarMode : 1;
+        toggleAuxCustom();
+
       } catch(e) {}
     }
 
@@ -1053,6 +1126,11 @@ void WebServer::run() {
     function toggleSatSelect() {
       const pm = document.getElementById('panel-mode').value;
       document.getElementById('sat-select-container').style.display = (pm === 'sat') ? 'block' : 'none';
+    }
+
+    function toggleAuxCustom() {
+      const v = document.getElementById('aux-tz-preset').value;
+      document.getElementById('aux-custom-fields').style.display = v.startsWith('custom') ? 'block' : 'none';
     }
 
     async function saveWidgets() {
@@ -1073,13 +1151,28 @@ void WebServer::run() {
       const pm = document.getElementById('panel-mode').value;
       const sat = document.getElementById('selected-satellite').value;
 
+      const auxPreset = document.getElementById('aux-tz-preset').value;
+      let auxOffset, auxLabel;
+      if (auxPreset.startsWith('custom')) {
+        auxOffset = document.getElementById('aux-tz-offset').value;
+        auxLabel  = document.getElementById('aux-tz-label').value || 'UTC';
+      } else {
+        const parts = auxPreset.split('|');
+        auxOffset = parts[0];
+        auxLabel  = parts[1];
+      }
+      const auxStarMode = document.getElementById('aux-star-mode').value;
+
       const params = new URLSearchParams({
         rotation_interval: document.getElementById('rot-interval').value,
         sync_rotation: document.getElementById('sync-rot').checked ? '1' : '0',
         pane0: panes[0], pane1: panes[1], pane2: panes[2], pane3: panes[3],
         side_panel_mode: spMode,
         panel_mode: pm,
-        selected_satellite: sat
+        selected_satellite: sat,
+        aux_tz_offset: auxOffset,
+        aux_tz_label: auxLabel,
+        aux_star_mode: auxStarMode
       });
       try {
         const r = await fetch('/set_config?' + params);
@@ -1337,6 +1430,8 @@ void WebServer::run() {
     j["showGrid"] = cfg_->showGrid;
     j["gridType"] = cfg_->gridType;
     j["showBorders"] = cfg_->showBorders;
+    j["showBeacons"] = cfg_->showBeacons;
+    j["showSatTrack"] = cfg_->showSatTrack;
     j["mapNightLights"] = cfg_->mapNightLights;
     j["useMetric"] = cfg_->useMetric;
     j["propOverlay"] = propOverlayToString(cfg_->propOverlay);
@@ -1383,6 +1478,9 @@ void WebServer::run() {
     j["dimMinute"] = cfg_->dimMinute;
     j["brightHour"] = cfg_->brightHour;
     j["brightMinute"] = cfg_->brightMinute;
+    j["auxClockTzOffset"] = cfg_->auxClockTzOffset;
+    j["auxClockTzLabel"]  = cfg_->auxClockTzLabel;
+    j["auxClockStarMode"] = cfg_->auxClockStarMode;
     j["version"] = HAMCLOCK_VERSION;
     j["arch"] = HAMCLOCK_ARCH;
     j["installType"] = HAMCLOCK_INSTALL_TYPE;
@@ -1421,6 +1519,8 @@ void WebServer::run() {
                                 httplib::Response &res) {
     if (req.has_param("call"))
       cfg_->callsign = req.get_param_value("call");
+    if (req.has_param("theme"))
+      cfg_->theme = req.get_param_value("theme");
     if (req.has_param("grid"))
       cfg_->grid = req.get_param_value("grid");
     if (req.has_param("projection"))
@@ -1434,6 +1534,10 @@ void WebServer::run() {
       cfg_->showGrid = req.get_param_value("show_grid") == "1";
     if (req.has_param("show_borders"))
       cfg_->showBorders = req.get_param_value("show_borders") == "1";
+    if (req.has_param("show_beacons"))
+      cfg_->showBeacons = req.get_param_value("show_beacons") == "1";
+    if (req.has_param("show_sattrack"))
+      cfg_->showSatTrack = req.get_param_value("show_sattrack") == "1";
     if (req.has_param("night_lights"))
       cfg_->mapNightLights = req.get_param_value("night_lights") == "1";
     if (req.has_param("use_metric"))
@@ -1589,6 +1693,9 @@ void WebServer::run() {
           StringUtils::safe_stoi(req.get_param_value("aux_tz_offset"));
     if (req.has_param("aux_tz_label"))
       cfg_->auxClockTzLabel = req.get_param_value("aux_tz_label");
+    if (req.has_param("aux_star_mode"))
+      cfg_->auxClockStarMode =
+          StringUtils::safe_stoi(req.get_param_value("aux_star_mode"));
 
     if (req.has_param("side_panel_mode")) {
       std::string m = req.get_param_value("side_panel_mode");
@@ -1711,10 +1818,10 @@ void WebServer::run() {
       res.status = 403;
       return;
     }
-    std::promise<std::string> prom;
-    auto fut = prom.get_future();
+    auto prom = std::make_shared<std::promise<std::string>>();
+    auto fut = prom->get_future();
     netMgr_->fetchAsync(
-        targetUrl, [&prom](std::string b) { prom.set_value(std::move(b)); },
+        targetUrl, [prom](std::string b) { prom->set_value(std::move(b)); },
         3600);
     if (fut.wait_for(std::chrono::seconds(20)) == std::future_status::timeout) {
       res.status = 504;
@@ -2684,6 +2791,20 @@ void WebServer::run() {
       return;
     }
     cfg_->callsign = req.get_param_value("call");
+    if (cfgMgr_)
+      cfgMgr_->save(*cfg_);
+    if (reloadFlag_)
+      reloadFlag_->store(true, std::memory_order_release);
+    res.set_content("ok", "text/plain");
+  });
+
+  svr.Get("/set_theme", [this](const httplib::Request &req,
+                               httplib::Response &res) {
+    if (!req.has_param("theme")) {
+      res.status = 400;
+      return;
+    }
+    cfg_->theme = req.get_param_value("theme");
     if (cfgMgr_)
       cfgMgr_->save(*cfg_);
     if (reloadFlag_)

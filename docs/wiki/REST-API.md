@@ -24,7 +24,7 @@ These endpoints handle reading and writing application settings.
 - `GET /set_mapcolor?theme={name}` : Changes the map background theme.
 - `GET /set_projection?type={mercator|azimuthal}` : Changes the map projection.
 - `GET /set_prop_overlay?type={none|muf|drap|aurora|...}` : Sets the map propagation overlay.
-- `GET /set_wx_overlay?type={none|temp|rain|wind}` : Sets the map weather overlay.
+- `GET /set_wx_overlay?type={none|wxmb|clouds_grib}` : Sets the map weather overlay.
 - `GET /api/hub/fetch?url={B64_URL}&max_age={SEC}` : Proxies a fetch through the Master's cache (Master mode only).
 - `GET /api/hub/dxcluster` : Returns recent spots from the Master's DX Cluster store.
 - `POST /set_adif` : Uploads an ADIF log file body to the ADIFProvider.
@@ -86,7 +86,7 @@ Query internally gathered telemetry and spot data quickly.
 
 ## 6. Propagation API
 Get data necessary to render map overlays.
-- `GET /api/propagation/voacap` : Returns VOACAP propagation map metadata based on parameters for use with open-hamclock-backend.
+- `GET /api/propagation/voacap` : Returns VOACAP propagation map metadata directly from the internal propagation engine.
 - `GET /api/propagation/muf_rt` : Returns near-real-time Maximum Usable Frequency map metadata from KC2G.
 
 ## 7. Interactive & Diagnostics

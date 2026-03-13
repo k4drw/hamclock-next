@@ -34,8 +34,7 @@ export function registerRepoTools(server: McpServer) {
           {
             type: "text",
             text: results.length
-              ? results.map((f) => `- ${f.path} (${f.line_count} lines)`).join("
-")
+              ? results.map((f) => `- ${f.path} (${f.line_count} lines)`).join("\n")
               : "No files found matching pattern.",
           },
         ],
@@ -62,13 +61,11 @@ export function registerRepoTools(server: McpServer) {
               ? results
                   .map(
                     (r) =>
-                      `- `${r.symbol.name}` (${r.symbol.kind}) in `${r.file}:${r.symbol.line}`${
-                        r.symbol.signature ? `
-  `${r.symbol.signature}`` : ""
+                      `- \`${r.symbol.name}\` (${r.symbol.kind}) in \`${r.file}:${r.symbol.line}\`${
+                        r.symbol.signature ? `\n  \`${r.symbol.signature}\`` : ""
                       }`
                   )
-                  .join("
-")
+                  .join("\n")
               : "No symbols found matching pattern.",
           },
         ],

@@ -63,7 +63,7 @@ void AuroraPanel::render(SDL_Renderer *renderer) {
     SDL_RenderCopy(renderer, tex, nullptr, &dst);
   } else {
     cat->drawText(renderer, "Loading Aurora...", x_ + width_ / 2,
-                  y_ + titleH + (height_ - titleH) / 2, {150, 150, 150, 255},
+                  y_ + titleH + (height_ - titleH) / 2, themes.textDim,
                   FontStyle::Fast, true);
   }
 

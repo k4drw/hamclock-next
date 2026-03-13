@@ -167,8 +167,8 @@ void MapViewMenu::render(SDL_Renderer *renderer) {
   std::string weatherLabel = "None";
   if (weatherOverlay_ == WeatherOverlayType::WxMb)
     weatherLabel = "WX/Pressure";
-  else if (weatherOverlay_ == WeatherOverlayType::Clouds)
-    weatherLabel = "Clouds";
+  else if (weatherOverlay_ == WeatherOverlayType::CloudsGrib)
+    weatherLabel = "Clouds (GFS)";
   drawDropdown(renderer, weatherRec_, weatherLabel,
                openCombo_ == COMBO_WEATHER);
 
@@ -222,40 +222,41 @@ void MapViewMenu::render(SDL_Renderer *renderer) {
   SDL_SetRenderDrawColor(renderer, themes.danger.r, themes.danger.g,
                          themes.danger.b, 255);
   SDL_RenderFillRect(renderer, &cancelRect_);
-  SDL_SetRenderDrawColor(renderer, 255, 255, 255, 100);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
   SDL_RenderDrawRect(renderer, &cancelRect_);
   cat->drawText(renderer, "Cancel", cancelRect_.x + cancelRect_.w / 2,
-                cancelRect_.y + cancelRect_.h / 2, {255, 255, 255, 255},
+                cancelRect_.y + cancelRect_.h / 2, themes.bg,
                 FontStyle::UI, true, false, true);
 
   // Apply button
   SDL_SetRenderDrawColor(renderer, themes.success.r, themes.success.g,
                          themes.success.b, 255);
   SDL_RenderFillRect(renderer, &applyRect_);
-  SDL_SetRenderDrawColor(renderer, 255, 255, 255, 100);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
   SDL_RenderDrawRect(renderer, &applyRect_);
   cat->drawText(renderer, "Apply", applyRect_.x + applyRect_.w / 2,
-                applyRect_.y + applyRect_.h / 2, {255, 255, 255, 255},
+                applyRect_.y + applyRect_.h / 2, themes.bg,
                 FontStyle::UI, true, false, true);
 }
 
 void MapViewMenu::drawDropdown(SDL_Renderer *renderer, const SDL_Rect &rect,
-                               const std::string &currentVal, bool isOpen) {
-  SDL_SetRenderDrawColor(renderer, 40, 40, 50, 255);
+                               const std::string &currentVal, bool /*isOpen*/) {
+  ThemeColors themes = getThemeColors(theme_);
+  SDL_SetRenderDrawColor(renderer, themes.rowStripe1.r, themes.rowStripe1.g, themes.rowStripe1.b, 255);
   SDL_RenderFillRect(renderer, &rect);
-  SDL_SetRenderDrawColor(renderer, 100, 100, 120, 255);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
   SDL_RenderDrawRect(renderer, &rect);
 
   auto *cat = fontMgr_.catalog();
 
   // Text
-  SDL_Color txtCol = {220, 220, 220, 255};
-  cat->drawText(renderer, currentVal, rect.x + 10, rect.y + rect.h / 2, txtCol,
+  cat->drawText(renderer, currentVal, rect.x + 10, rect.y + rect.h / 2, themes.text,
                 FontStyle::Fast, false, false, true);
 
   // Arrow
   int cx = rect.x + rect.w - 15;
   int cy = rect.y + rect.h / 2;
+  SDL_SetRenderDrawColor(renderer, themes.text.r, themes.text.g, themes.text.b, 255);
   SDL_RenderDrawLine(renderer, cx - 4, cy - 2, cx + 4, cy - 2);
   SDL_RenderDrawLine(renderer, cx - 4, cy - 2, cx, cy + 3);
   SDL_RenderDrawLine(renderer, cx, cy + 3, cx + 4, cy - 2);
@@ -268,6 +269,7 @@ int MapViewMenu::getDropdownHeight(int numOpts) {
 void MapViewMenu::drawDropdownList(SDL_Renderer *renderer,
                                    const SDL_Rect &headerRect,
                                    const std::vector<std::string> &opts) {
+  ThemeColors themes = getThemeColors(theme_);
   int h = getDropdownHeight(opts.size());
   SDL_Rect listRect = {headerRect.x, headerRect.y + headerRect.h, headerRect.w,
                        h};
@@ -275,9 +277,9 @@ void MapViewMenu::drawDropdownList(SDL_Renderer *renderer,
   auto *cat = fontMgr_.catalog();
 
   // Background
-  SDL_SetRenderDrawColor(renderer, 30, 30, 40, 255);
+  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, 255);
   SDL_RenderFillRect(renderer, &listRect);
-  SDL_SetRenderDrawColor(renderer, 150, 150, 150, 255);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
   SDL_RenderDrawRect(renderer, &listRect);
 
   int visibleCount = std::min((int)opts.size(), maxVisibleItems_);
@@ -289,12 +291,12 @@ void MapViewMenu::drawDropdownList(SDL_Renderer *renderer,
     SDL_Rect itemRec = {listRect.x, listRect.y + i * 30, listRect.w, 30};
 
     cat->drawText(renderer, opts[idx], itemRec.x + 10,
-                  itemRec.y + itemRec.h / 2, {255, 255, 255, 255},
+                  itemRec.y + itemRec.h / 2, themes.text,
                   FontStyle::Fast, false, false, true);
 
     // Divider
     if (i < visibleCount - 1) {
-      SDL_SetRenderDrawColor(renderer, 60, 60, 70, 255);
+      SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 100);
       SDL_RenderDrawLine(renderer, itemRec.x, itemRec.y + 29,
                          itemRec.x + itemRec.w, itemRec.y + 29);
     }
@@ -315,11 +317,11 @@ void MapViewMenu::drawDropdownList(SDL_Renderer *renderer,
         (scrollableItems > 0) ? (float)listScroll_ / scrollableItems : 0.0f;
     int thumbY = track.y + (int)(scrollPct * (trackH - thumbH));
 
-    SDL_SetRenderDrawColor(renderer, 60, 60, 70, 255);
+    SDL_SetRenderDrawColor(renderer, themes.rowStripe2.r, themes.rowStripe2.g, themes.rowStripe2.b, 255);
     SDL_RenderFillRect(renderer, &track);
 
     SDL_Rect thumb = {track.x, thumbY, sbWidth, thumbH};
-    SDL_SetRenderDrawColor(renderer, 180, 180, 180, 255);
+    SDL_SetRenderDrawColor(renderer, themes.textDim.r, themes.textDim.g, themes.textDim.b, 255);
     SDL_RenderFillRect(renderer, &thumb);
   }
 }
@@ -428,7 +430,7 @@ bool MapViewMenu::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
                     else if (idx == 1)
                       weatherOverlay_ = WeatherOverlayType::WxMb;
                     else if (idx == 2)
-                      weatherOverlay_ = WeatherOverlayType::Clouds;
+                      weatherOverlay_ = WeatherOverlayType::CloudsGrib;
                   }))
                 return true;
           
@@ -515,17 +517,18 @@ void MapViewMenu::renderRadioButton(SDL_Renderer *renderer, const SDL_Rect &rect
                                     bool selected, const std::string &label,
                                     const SDL_Color &textColor) {
   auto *cat = fontMgr_.catalog();
+  ThemeColors themes = getThemeColors(theme_);
 
   // Draw the outer square
-  SDL_SetRenderDrawColor(renderer, 60, 60, 70, 255);
+  SDL_SetRenderDrawColor(renderer, themes.rowStripe1.r, themes.rowStripe1.g, themes.rowStripe1.b, 255);
   SDL_RenderFillRect(renderer, &rect);
-  SDL_SetRenderDrawColor(renderer, 150, 150, 150, 255);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
   SDL_RenderDrawRect(renderer, &rect);
 
   // If selected, draw the inner "checked" square
   if (selected) {
     SDL_Rect check = {rect.x + 4, rect.y + 4, rect.w - 8, rect.h - 8};
-    SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255); // Green check
+    SDL_SetRenderDrawColor(renderer, themes.success.r, themes.success.g, themes.success.b, 255);
     SDL_RenderFillRect(renderer, &check);
   }
 
