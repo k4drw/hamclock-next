@@ -40,8 +40,13 @@ void LiveSpotPanel::update() {
     break;
   }
 
-  std::string grid = data->valid ? data->grid : "...";
-  std::string sub = "of " + grid + " - " + srcTag + " " +
+  std::string target;
+  if (config_.liveSpotsOfDe || config_.liveSpotsUseCall)
+    target = config_.callsign.empty() ? "?" : config_.callsign;
+  else
+    target = data->valid ? data->grid : "...";
+  std::string modePrefix = config_.liveSpotsOfDe ? "of " : "by ";
+  std::string sub = modePrefix + target + " - " + srcTag + " " +
                     std::to_string(config_.liveSpotsMaxAge) + " mins";
 
   if (sub != lastSubtitle_) {
@@ -300,26 +305,29 @@ void LiveSpotPanel::renderSetup(SDL_Renderer *renderer) {
   }
   y += 24;
 
-  // Filter: Call/Grid
-  box = {lx, y, 16, 16};
-  SDL_SetRenderDrawColor(renderer, themes.rowStripe1.r, themes.rowStripe1.g, themes.rowStripe1.b, 255);
-  SDL_RenderFillRect(renderer, &box);
-  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
-  SDL_RenderDrawRect(renderer, &box);
-  if (pendingUseCall_) {
-    SDL_SetRenderDrawColor(renderer, themes.success.r, themes.success.g, themes.success.b, 255);
-    SDL_Rect inner = {lx + 3, y + 3, 10, 10};
-    SDL_RenderFillRect(renderer, &inner);
-  }
-  filterCheckRect_ = {lx, y, width_ - 20, 16};
+  // Filter: Call/Grid — hidden in "of DE" mode (always callsign)
+  filterCheckRect_ = {0, 0, 0, 0};
+  if (!pendingOfDe_) {
+    box = {lx, y, 16, 16};
+    SDL_SetRenderDrawColor(renderer, themes.rowStripe1.r, themes.rowStripe1.g, themes.rowStripe1.b, 255);
+    SDL_RenderFillRect(renderer, &box);
+    SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
+    SDL_RenderDrawRect(renderer, &box);
+    if (pendingUseCall_) {
+      SDL_SetRenderDrawColor(renderer, themes.success.r, themes.success.g, themes.success.b, 255);
+      SDL_Rect inner = {lx + 3, y + 3, 10, 10};
+      SDL_RenderFillRect(renderer, &inner);
+    }
+    filterCheckRect_ = {lx, y, width_ - 20, 16};
 
-  t = fontMgr_.renderText(renderer,
-                          pendingUseCall_ ? "Filter: Callsign" : "Filter: Grid",
-                          white, cellFontSize_, &tw, &th);
-  if (t) {
-    SDL_Rect tr = {lx + 24, y + (16 - th) / 2, tw, th};
-    SDL_RenderCopy(renderer, t, nullptr, &tr);
-    MemoryMonitor::getInstance().destroyTexture(t);
+    t = fontMgr_.renderText(renderer,
+                            pendingUseCall_ ? "Filter: Callsign" : "Filter: Grid",
+                            white, cellFontSize_, &tw, &th);
+    if (t) {
+      SDL_Rect tr = {lx + 24, y + (16 - th) / 2, tw, th};
+      SDL_RenderCopy(renderer, t, nullptr, &tr);
+      MemoryMonitor::getInstance().destroyTexture(t);
+    }
   }
 
   // Buttons at bottom
@@ -425,7 +433,8 @@ bool LiveSpotPanel::handleSetupClick(int mx, int my) {
     pendingOfDe_ = !pendingOfDe_;
     return true;
   }
-  if (mx >= filterCheckRect_.x &&
+  if (!pendingOfDe_ &&
+      mx >= filterCheckRect_.x &&
       mx <= filterCheckRect_.x + filterCheckRect_.w &&
       my >= filterCheckRect_.y &&
       my <= filterCheckRect_.y + filterCheckRect_.h) {
