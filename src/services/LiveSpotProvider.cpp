@@ -100,14 +100,29 @@ void LiveSpotProvider::fetch() {
 
 void LiveSpotProvider::fetchPSK() {
   std::string target;
-  if (config_.liveSpotsUseCall) {
-    target = config_.callsign;
-  } else {
-    if (config_.grid.size() < 4) {
-      LOG_W("LiveSpot", "Grid too short for PSK query: {}", config_.grid);
+  std::string param;
+
+  if (config_.liveSpotsOfDe) {
+    // "of DE": I am the sender. Always identify by callsign.
+    if (config_.callsign.empty()) {
+      LOG_W("LiveSpot", "No callsign configured for 'of DE' query, skipping");
       return;
     }
-    target = config_.grid.substr(0, 4);
+    target = config_.callsign;
+    param = "senderCallsign=";
+  } else {
+    // "by DE": I am the receiver. Filter by callsign or grid.
+    if (config_.liveSpotsUseCall) {
+      target = config_.callsign;
+      param = "receiverCallsign=";
+    } else {
+      if (config_.grid.size() < 4) {
+        LOG_W("LiveSpot", "Grid too short for PSK query: {}", config_.grid);
+        return;
+      }
+      target = config_.grid.substr(0, 4);
+      param = "receiverLocator=";
+    }
   }
 
   if (target.empty()) {
@@ -119,15 +134,6 @@ void LiveSpotProvider::fetchPSK() {
   auto now = std::time(nullptr);
   int64_t quantizedNow = (static_cast<int64_t>(now) / 300) * 300;
   int64_t windowStart = quantizedNow - (config_.liveSpotsMaxAge * 60);
-
-  std::string param;
-  if (config_.liveSpotsOfDe) {
-    // We are sender: Who heard ME?
-    param = config_.liveSpotsUseCall ? "senderCallsign=" : "senderLocator=";
-  } else {
-    // We are receiver: Who did I hear? (or who did people in my grid hear)
-    param = config_.liveSpotsUseCall ? "receiverCallsign=" : "receiverLocator=";
-  }
 
   std::string baseUrl = "https://retrieve.pskreporter.info";
   if (!config_.pskrProxyUrl.empty()) {
@@ -224,7 +230,14 @@ void LiveSpotProvider::fetchWSPR() {
   std::string grid4 =
       config_.grid.size() >= 4 ? config_.grid.substr(0, 4) : std::string{};
 
-  if (config_.liveSpotsUseCall) {
+  if (config_.liveSpotsOfDe) {
+    // "of DE": I am the transmitter. Always identify by callsign.
+    if (config_.callsign.empty()) {
+      LOG_W("LiveSpot", "No callsign configured for WSPR 'of DE' query, skipping");
+      return;
+    }
+    target = config_.callsign;
+  } else if (config_.liveSpotsUseCall) {
     target = config_.callsign;
     if (target.empty()) {
       LOG_W("LiveSpot", "No callsign configured for WSPR query");
@@ -260,7 +273,7 @@ void LiveSpotProvider::fetchWSPR() {
   const char *otherRole = config_.liveSpotsOfDe ? "rx" : "tx";
 
   std::string condition;
-  if (config_.liveSpotsUseCall) {
+  if (config_.liveSpotsOfDe || config_.liveSpotsUseCall) {
     condition = fmt::format("{}_sign = '{}'", myRole, target);
   } else {
     condition = fmt::format("{}_loc LIKE '{}%'", myRole, target);
@@ -389,9 +402,18 @@ void LiveSpotProvider::fetchRBN() {
 
   const std::string &myCall = config_.callsign;
   std::string myGrid4 =
-      config_.grid.size() >= 4 ? config_.grid.substr(0, 4) : config_.grid;
+      config_.grid.size() >= 4 ? config_.grid.substr(0, 4) : std::string{};
   bool ofDe = config_.liveSpotsOfDe;
   bool useCall = config_.liveSpotsUseCall;
+
+  if (useCall && myCall.empty()) {
+    LOG_W("LiveSpot", "No callsign configured for RBN callsign filter, skipping");
+    return;
+  }
+  if (!useCall && myGrid4.empty()) {
+    LOG_W("LiveSpot", "Grid too short for RBN filter: {}", config_.grid);
+    return;
+  }
 
   auto snapshot = dxStore_->snapshot();
   LiveSpotData data;

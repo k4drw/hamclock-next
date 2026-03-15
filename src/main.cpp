@@ -3017,17 +3017,10 @@ void main_tick() {
       if (ctx.activeSetup == AppContext::SetupMode::Main) {
         auto *s = static_cast<SetupScreen *>(ctx.setupWidget.get());
         if (!s->wasCancelled()) {
-          // Preserve fields not managed by SetupScreen
-          const int savedTzOffset = ctx.appCfg.auxClockTzOffset;
-          const std::string savedTzLabel = ctx.appCfg.auxClockTzLabel;
-          const int savedStarMode = ctx.appCfg.auxClockStarMode;
-
-          ctx.appCfg = s->getConfig();
-
-          // Restore aux_clock (not owned by SetupScreen)
-          ctx.appCfg.auxClockTzOffset = savedTzOffset;
-          ctx.appCfg.auxClockTzLabel  = savedTzLabel;
-          ctx.appCfg.auxClockStarMode = savedStarMode;
+          // Merge: getConfig() starts from the current config and only
+          // overwrites the fields SetupScreen manages, so all other fields
+          // (asteroid prefs, live spots, alarms, etc.) survive untouched.
+          ctx.appCfg = s->getConfig(ctx.appCfg);
 
           // Sync watchlist store from updated config
           auto oldW = ctx.watchlistStore->getAll();

@@ -2095,8 +2095,8 @@ void SetupScreen::setConfig(const AppConfig &cfg) {
   callsignInput_.setCursorToEnd();
 }
 
-AppConfig SetupScreen::getConfig() const {
-  AppConfig cfg;
+AppConfig SetupScreen::getConfig(const AppConfig& base) const {
+  AppConfig cfg = base;
   cfg.gpsEnabled = gpsEnabled_;
   cfg.callsign = callsignInput_.getValue();
   cfg.grid = gridInput_.getValue();

@@ -38,7 +38,7 @@ public:
   void setConfig(const AppConfig &cfg);
   bool isComplete() const { return complete_; }
   bool wasCancelled() const { return cancelled_; }
-  AppConfig getConfig() const;
+  AppConfig getConfig(const AppConfig& base = AppConfig{}) const;
 
   enum class Tab {
     Identity,
