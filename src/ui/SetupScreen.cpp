@@ -135,8 +135,8 @@ void SetupScreen::update() {
   mismatchWarning_ = false;
   if (latLonManual_ && gridValid_ && !latInput_.getValue().empty() &&
       !lonInput_.getValue().empty()) {
-    double manLat = std::atof(latInput_.getValue().c_str());
-    double manLon = std::atof(lonInput_.getValue().c_str());
+    double manLat = StringUtils::safe_stod(latInput_.getValue());
+    double manLon = StringUtils::safe_stod(lonInput_.getValue());
     double tolLat = (gridInput_.getValue().size() >= 6) ? 0.5 : 1.0;
     double tolLon = (gridInput_.getValue().size() >= 6) ? 1.0 : 2.0;
     if (std::fabs(manLat - gridLat_) > tolLat ||
@@ -1864,7 +1864,7 @@ bool SetupScreen::onTextInput(const char *inputText) {
     if (ti) {
       std::string testValue = ti->getValue();
       testValue += inputText;
-      int port = std::atoi(testValue.c_str());
+      int port = StringUtils::safe_stoi(testValue);
       if (port > 65535 || port == 0) {
         return true;
       }
@@ -2101,16 +2101,16 @@ AppConfig SetupScreen::getConfig(const AppConfig& base) const {
   cfg.callsign = callsignInput_.getValue();
   cfg.grid = gridInput_.getValue();
   cfg.callsignFrn = frnText_;
-  cfg.lat = std::atof(latInput_.getValue().c_str());
-  cfg.lon = std::atof(lonInput_.getValue().c_str());
+  cfg.lat = StringUtils::safe_stod(latInput_.getValue());
+  cfg.lon = StringUtils::safe_stod(lonInput_.getValue());
   cfg.dxClusterHost = clusterHostInput_.getValue();
-  cfg.dxClusterPort = std::atoi(clusterPortInput_.getValue().c_str());
+  cfg.dxClusterPort = StringUtils::safe_stoi(clusterPortInput_.getValue());
   if (cfg.dxClusterPort == 0)
     cfg.dxClusterPort = 7300;
   cfg.dxClusterLogin = clusterLoginInput_.getValue();
   cfg.dxClusterEnabled = clusterEnabled_;
   cfg.dxClusterUseWSJTX = clusterWSJTX_;
-  cfg.wsjtxPort = std::atoi(wsjtxPortInput_.getValue().c_str());
+  cfg.wsjtxPort = StringUtils::safe_stoi(wsjtxPortInput_.getValue());
   if (cfg.wsjtxPort == 0)
     cfg.wsjtxPort = 2237;
   cfg.rbnEnabled = rbnEnabled_;
@@ -2162,13 +2162,13 @@ AppConfig SetupScreen::getConfig(const AppConfig& base) const {
   cfg.pane6Rotation = paneRotations_[5];
 
   cfg.rigHost = rigHostInput_.getValue();
-  cfg.rigPort = std::atoi(rigPortInput_.getValue().c_str());
+  cfg.rigPort = StringUtils::safe_stoi(rigPortInput_.getValue());
   if (cfg.rigPort == 0)
     cfg.rigPort = 4532;
   cfg.rigAutoTune = rigAutoTune_;
 
   cfg.rotatorHost = rotatorHostInput_.getValue();
-  cfg.rotatorPort = std::atoi(rotatorPortInput_.getValue().c_str());
+  cfg.rotatorPort = StringUtils::safe_stoi(rotatorPortInput_.getValue());
   if (cfg.rotatorPort == 0)
     cfg.rotatorPort = 4533;
   cfg.rotatorAutoTrack = rotatorAutoTrack_;
@@ -2176,7 +2176,7 @@ AppConfig SetupScreen::getConfig(const AppConfig& base) const {
 
   cfg.hubMode = hubMode_;
   cfg.hubIp = hubIpInput_.getValue();
-  cfg.hubPort = std::atoi(hubPortInput_.getValue().c_str());
+  cfg.hubPort = StringUtils::safe_stoi(hubPortInput_.getValue());
   if (cfg.hubPort == 0)
     cfg.hubPort = 8080;
 

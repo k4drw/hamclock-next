@@ -2,6 +2,7 @@
 #include "../services/RotatorService.h"
 #include "Logger.h"
 #include "Constants.h"
+#include "StringUtils.h"
 
 #include <algorithm>
 #include <cctype>
@@ -140,7 +141,7 @@ void SatelliteManager::parse(const std::string &raw) {
 
     // Extract NORAD ID from line 1 (columns 3-7)
     if (l1.size() >= 7) {
-      tle.noradId = std::atoi(l1.substr(2, 5).c_str());
+      tle.noradId = StringUtils::safe_stoi(l1.substr(2, 5));
     }
 
     result.push_back(std::move(tle));
@@ -327,7 +328,7 @@ void SatelliteManager::loadLocalTLEs() {
     tle.line1 = trim(l1);
     tle.line2 = trim(l2);
     if (tle.line1.size() >= 7) {
-      tle.noradId = std::atoi(tle.line1.substr(2, 5).c_str());
+      tle.noradId = StringUtils::safe_stoi(tle.line1.substr(2, 5));
     }
     loaded.push_back(tle);
   }
