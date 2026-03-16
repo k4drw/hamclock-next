@@ -1159,8 +1159,16 @@ DashboardContext::DashboardContext(AppContext &ctx)
 
   reachProvider = std::make_shared<ReachProvider>(netManager, state);
   reachProvider->setCallback([&ctx, self = this](const ReachData &d) {
+    // Push SDL event so onPropDataReady runs on the main/render thread,
+    // not the network worker thread where SDL_GL_GetCurrentWindow() is NULL.
     if (ctx.dashboard.get() == self && self->mapArea) {
-      self->mapArea->onPropDataReady(PropOverlayType::Heatmap, d.grid);
+      auto *result = new std::vector<float>(d.grid);
+      SDL_Event event;
+      SDL_zero(event);
+      event.type = HamClock::AE_BASE_EVENT + HamClock::AE_PROP_DATA_READY;
+      event.user.code = static_cast<int>(PropOverlayType::Heatmap);
+      event.user.data1 = result;
+      SDL_PushEvent(&event);
     }
   });
 
@@ -2039,7 +2047,7 @@ void DashboardContext::update(AppContext &ctx) {
   }
 
   if (appCfg.propOverlay == PropOverlayType::Heatmap &&
-      now - lastReachFetchMs > 5 * 60 * 1000) {
+      (lastReachFetchMs == 0 || now - lastReachFetchMs > 5 * 60 * 1000)) {
     reachProvider->fetch(appCfg.propBand, appCfg.propMode);
     lastReachFetchMs = now;
   }

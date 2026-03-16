@@ -19,6 +19,7 @@ static std::string propOverlayToStr(PropOverlayType t) {
   case PropOverlayType::Toa:         return "toa";
   case PropOverlayType::Heatmap:     return "heatmap";
   case PropOverlayType::Drap:        return "drap";
+  case PropOverlayType::Aurora:      return "aurora";
   default:                           return "none";
   }
 }
@@ -30,6 +31,7 @@ static PropOverlayType propOverlayFromStr(const std::string &s) {
   if (s == "toa")         return PropOverlayType::Toa;
   if (s == "heatmap")     return PropOverlayType::Heatmap;
   if (s == "drap")        return PropOverlayType::Drap;
+  if (s == "aurora")      return PropOverlayType::Aurora;
   return PropOverlayType::None;
 }
 
@@ -191,13 +193,7 @@ bool ConfigManager::load(AppConfig &config) {
 
     // Legacy migration: if show_muf_rt is present and true, defaulting to Muf
     if (ap.contains("prop_overlay")) {
-      std::string po = ap.value("prop_overlay", "none");
-      if (po == "muf")
-        config.propOverlay = PropOverlayType::Muf;
-      else if (po == "voacap")
-        config.propOverlay = PropOverlayType::Voacap;
-      else
-        config.propOverlay = PropOverlayType::None;
+      config.propOverlay = propOverlayFromStr(ap.value("prop_overlay", "none"));
     } else if (ap.contains("show_muf_rt")) {
       bool showMuf = ap.value("show_muf_rt", false);
       config.propOverlay =
@@ -559,12 +555,7 @@ bool ConfigManager::save(const AppConfig &config) {
   json["appearance"]["map_style"] = config.mapStyle;
   json["appearance"]["show_grid"] = config.showGrid;
   json["appearance"]["grid_type"] = config.gridType;
-  std::string po = "none";
-  if (config.propOverlay == PropOverlayType::Muf)
-    po = "muf";
-  else if (config.propOverlay == PropOverlayType::Voacap)
-    po = "voacap";
-  json["appearance"]["prop_overlay"] = po;
+  json["appearance"]["prop_overlay"] = propOverlayToStr(config.propOverlay);
   json["appearance"]["weather_overlay"] = weatherOverlayToStr(config.weatherOverlay);
   json["appearance"]["prop_band"] = config.propBand;
   json["appearance"]["prop_mode"] = config.propMode;

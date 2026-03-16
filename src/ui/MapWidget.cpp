@@ -1247,6 +1247,7 @@ void MapWidget::renderNightOverlay(SDL_Renderer *renderer) {
 }
 
 void MapWidget::render(SDL_Renderer *renderer) {
+  cachedRenderer_ = renderer;
   ThemeColors themes = getThemeColors(theme_);
   SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, 255);
   SDL_Rect bg = {x_, y_, width_, height_};
@@ -2653,10 +2654,7 @@ void MapWidget::updatePropagationOverlay() {
       return;
     }
 
-    SDL_Window *win = SDL_GL_GetCurrentWindow();
-    if (!win)
-      return;
-    SDL_Renderer *renderer = SDL_GetRenderer(win);
+    SDL_Renderer *renderer = cachedRenderer_;
     if (!renderer)
       return;
 
@@ -2688,8 +2686,15 @@ void MapWidget::updatePropagationOverlay() {
 
   // Heatmap data comes from ReachProvider via onPropDataReady() callback —
   // not from PropEngine.  Skip the engine computation entirely.
-  if (config_.propOverlay == PropOverlayType::Heatmap)
+  if (config_.propOverlay == PropOverlayType::Heatmap) {
+    // If we just switched TO Heatmap, destroy the stale texture from the
+    // previous overlay so nothing renders until fresh heatmap data arrives.
+    if (lastPropType_ != PropOverlayType::Heatmap && propTexture_) {
+      MemoryMonitor::getInstance().destroyTexture(propTexture_);
+      propTexture_ = nullptr;
+    }
     return;
+  }
 
   PropPathParams params;
   params.txLat = state_->deLocation.lat;
@@ -2764,17 +2769,8 @@ void MapWidget::onPropDataReady(PropOverlayType type,
   if (grid.size() != PropEngine::MAP_W * PropEngine::MAP_H)
     return;
 
-  // Create/recreate texture if needed
-  // We use standard SDL_Renderer from main, but MapWidget doesn't store it.
-  // We'll use the one from the last render call or just create it lazily.
-  // Actually, we can't create textures on background threads, and this
-  // method is called on the MAIN thread via SDL_PushEvent handler.
-
-  // We need a renderer. We'll grab it from the window.
-  SDL_Window *win = SDL_GL_GetCurrentWindow();
-  if (!win)
-    return;
-  SDL_Renderer *renderer = SDL_GetRenderer(win);
+  // Use the renderer cached during the last render() call.
+  SDL_Renderer *renderer = cachedRenderer_;
   if (!renderer)
     return;
 
@@ -2782,6 +2778,8 @@ void MapWidget::onPropDataReady(PropOverlayType type,
     propTexture_ = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32,
                                      SDL_TEXTUREACCESS_STATIC,
                                      PropEngine::MAP_W, PropEngine::MAP_H);
+    if (!propTexture_)
+      return;
     SDL_SetTextureBlendMode(propTexture_, SDL_BLENDMODE_BLEND);
   }
 
@@ -2791,6 +2789,8 @@ void MapWidget::onPropDataReady(PropOverlayType type,
     maxVal = 100.0f;
   else if (type == PropOverlayType::Toa)
     maxVal = 40.0f;
+  else if (type == PropOverlayType::Heatmap)
+    maxVal = 1.0f;  // ReachProvider normalizes grid to 0..1
   else
     maxVal = 50.0f;  // MUF
 

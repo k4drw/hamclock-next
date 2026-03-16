@@ -20,20 +20,23 @@ void ReachProvider::fetch(const std::string& band, const std::string& mode) {
 void ReachProvider::fetchPSK(const std::string& band, const std::string& mode) {
     // PSK Reporter API: Query for signals heard BY our callsign (or heard US if configured)
     // For "Reach Heatmap", we usually want to see who heard US (transmitter reach).
-    std::string call;
-    {
-        std::lock_guard<std::mutex> lk(state_->locationMutex);
-        call = state_->deCallsign;
+    // locationMutex is already held by the main thread (via main_tick) for the
+    // entire update window, so re-acquiring it here would self-deadlock.
+    std::string grid = state_->deGrid;
+    if (grid.size() < 4) {
+        LOG_E("ReachProvider", "DE grid not set, skipping reach fetch");
+        return;
     }
-    if (call.empty()) call = "NOCALL";
+    // Use first 4 characters (field+square) for broader coverage
+    std::string grid4 = grid.substr(0, 4);
 
-    // Example URL: https://pskreporter.info/query?senderCallsign=K1ABC&flowctrl=1
+    // Query by sender locator: show where signals FROM our grid are being received
     char url[256];
-    std::snprintf(url, sizeof(url), 
-        "https://pskreporter.info/query?senderCallsign=%s&flowctrl=1", 
-        call.c_str());
+    std::snprintf(url, sizeof(url),
+        "https://pskreporter.info/query?senderLocator=%s&flowctrl=1",
+        grid4.c_str());
 
-    LOG_I("ReachProvider", "Fetching PSK reach for {}: {}", call, url);
+    LOG_I("ReachProvider", "Fetching PSK reach for grid {}: {}", grid4, url);
 
     std::weak_ptr<ReachProvider> self = shared_from_this();
     net_.fetchAsync(url, [self, band, mode](std::string body) {

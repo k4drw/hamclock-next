@@ -256,6 +256,7 @@ private:
   SDL_Texture *nightOverlayTexture_ = nullptr;
   SDL_Texture *mufRtTexture_ = nullptr;
   SDL_Texture *propTexture_ = nullptr;
+  SDL_Renderer *cachedRenderer_ = nullptr;
   uint32_t lastMufUpdateMs_ = 0;
   uint64_t wxLastCheckMs_ = 0;
   uint64_t gribCloudLastCheckMs_ = 0;
