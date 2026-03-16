@@ -1289,8 +1289,14 @@ DashboardContext::DashboardContext(AppContext &ctx)
       auto ontaPanel = std::make_unique<ONTAPanel>(
           0, 0, 0, 0, fontMgr, *activityProvider, activityStore);
       ontaPanel->setFilter(appCfg.ontaFilter);
+      ontaPanel->setDeLocation(appCfg.lat, appCfg.lon);
+      ontaPanel->setMaxDistKm(appCfg.ontaMaxDistKm);
       ontaPanel->setOnFilterChanged([&ctx](const std::string &f) {
         ctx.appCfg.ontaFilter = f;
+        ctx.cfgMgr.save(ctx.appCfg);
+      });
+      ontaPanel->setOnMaxDistChanged([&ctx](int km) {
+        ctx.appCfg.ontaMaxDistKm = km;
         ctx.cfgMgr.save(ctx.appCfg);
       });
       widgetPool[type] = std::move(ontaPanel);

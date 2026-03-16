@@ -268,6 +268,7 @@ bool ConfigManager::load(AppConfig &config) {
   // Activity panels
   if (json.contains("activity")) {
     config.ontaFilter = json["activity"].value("onta_filter", "all");
+    config.ontaMaxDistKm = json["activity"].value("onta_max_dist_km", 0);
   }
 
   if (json.contains("asteroid")) {
@@ -694,6 +695,7 @@ bool ConfigManager::save(const AppConfig &config) {
 
   json["rss"]["enabled"] = config.rssEnabled;
   json["activity"]["onta_filter"] = config.ontaFilter;
+  json["activity"]["onta_max_dist_km"] = config.ontaMaxDistKm;
   json["asteroid"]["icon"] = config.asteroidIcon;
   json["asteroid"]["color"]["r"] = config.asteroidColor.r;
   json["asteroid"]["color"]["g"] = config.asteroidColor.g;
