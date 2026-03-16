@@ -3071,6 +3071,8 @@ void main_tick() {
         ctx.webServer->setPanes(&ctx.dashboard->panes);
         ctx.webServer->setWeatherStore(ctx.deWeatherStore);
         ctx.webServer->setBrightnessManager(ctx.brightnessMgr);
+        ctx.webServer->setStopwatch(static_cast<StopwatchPanel *>(
+            ctx.dashboard->widgetFactory_(WidgetType::STOPWATCH)));
       }
 #endif
     }

@@ -1,5 +1,6 @@
 #include "WebServer.h"
 #include "../ui/PaneContainer.h"
+#include "../ui/StopwatchPanel.h"
 #include "NetworkManager.h"
 
 #include <SDL.h>
@@ -2896,6 +2897,25 @@ void WebServer::run() {
     }
     SDL_PushEvent(&e);
     res.set_content("ok", "text/plain");
+  });
+
+  svr.Get("/get_stopwatch.txt", [this](const httplib::Request &,
+                                       httplib::Response &res) {
+    if (!stopwatch_) {
+      res.status = 503;
+      return;
+    }
+    using ms = std::chrono::milliseconds;
+    auto elapsedMs = std::chrono::duration_cast<ms>(stopwatch_->elapsed()).count();
+    std::ostringstream oss;
+    oss << "Running    " << (stopwatch_->isRunning() ? "yes" : "no") << "\n";
+    oss << "Elapsed_ms " << elapsedMs << "\n";
+    oss << "Lap_count  " << stopwatch_->laps().size() << "\n";
+    for (size_t i = 0; i < stopwatch_->laps().size(); ++i) {
+      auto lapMs = std::chrono::duration_cast<ms>(stopwatch_->laps()[i]).count();
+      oss << "Lap_" << (i + 1) << "     " << lapMs << "\n";
+    }
+    res.set_content(oss.str(), "text/plain");
   });
 
   svr.Get("/get_satellite.txt", [this](const httplib::Request &,

@@ -28,6 +28,7 @@ class PaneContainer;
 class WeatherStore;
 class BrightnessManager;
 class ADIFProvider;
+class StopwatchPanel;
 
 class WebServer {
 public:
@@ -68,6 +69,7 @@ public:
   }
   void setADIFProvider(ADIFProvider *p) { adifProvider_ = p; }
   void setMapReloadFlag(std::atomic<bool> *flag) { mapReloadFlag_ = flag; }
+  void setStopwatch(StopwatchPanel *s) { stopwatch_ = s; }
 
 private:
   void run();
@@ -97,6 +99,7 @@ private:
   std::shared_ptr<WeatherStore> weatherStore_;
   std::shared_ptr<BrightnessManager> brightnessMgr_;
   ADIFProvider *adifProvider_ = nullptr;
+  StopwatchPanel *stopwatch_ = nullptr;
   bool screenLocked_ = false;
   bool liveWebEnabled_ = false;
   int port_;
