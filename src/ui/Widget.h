@@ -109,6 +109,22 @@ protected:
     int cachedH = 0;
   } tooltip_;
 
+  // Draw the standard background fill + border rect for this widget.
+  // Panels opt-in by calling this at the top of their render() method.
+  void renderChrome(SDL_Renderer *renderer) {
+    ThemeColors themes = getThemeColors(theme_);
+    SDL_SetRenderDrawBlendMode(
+        renderer,
+        (theme_ == "glass") ? SDL_BLENDMODE_BLEND : SDL_BLENDMODE_NONE);
+    SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b,
+                           themes.bg.a);
+    SDL_Rect rect = {x_, y_, width_, height_};
+    SDL_RenderFillRect(renderer, &rect);
+    SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
+                           themes.border.b, themes.border.a);
+    SDL_RenderDrawRect(renderer, &rect);
+  }
+
   // Default tooltip renderer — shared by all panels with simple tooltips.
   // Panels with custom tooltip logic (e.g. MapWidget) override this.
   void renderTooltip(SDL_Renderer *renderer, FontManager &fontMgr) {
