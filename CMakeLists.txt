@@ -571,6 +571,7 @@ set(HAMCLOCK_SOURCES
     src/ui/WeatherPanel.cpp
     src/ui/ClockAuxPanel.cpp
     src/ui/ENVPanel.cpp
+    src/ui/RigControlPanel.cpp
     src/ui/DXPanel.cpp
     src/ui/DXSatPane.cpp
     src/ui/ListPanel.cpp

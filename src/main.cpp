@@ -125,6 +125,7 @@
 #include "core/Logger.h"
 #include "services/GreylineDXProvider.h"
 #include "ui/GreylineDXPanel.h"
+#include "ui/RigControlPanel.h"
 #include <SDL.h>
 #include <SDL_image.h>
 #include <SDL_syswm.h>
@@ -1399,6 +1400,15 @@ DashboardContext::DashboardContext(AppContext &ctx)
       break;
     case WidgetType::STOPWATCH:
       widgetPool[type] = std::make_unique<StopwatchPanel>(0, 0, 0, 0, fontMgr);
+      break;
+    case WidgetType::RIG_CONTROL:
+#ifndef __EMSCRIPTEN__
+      widgetPool[type] = std::make_unique<RigControlPanel>(
+          0, 0, 0, 0, fontMgr, rigService.get());
+#else
+      widgetPool[type] = std::make_unique<RigControlPanel>(
+          0, 0, 0, 0, fontMgr, nullptr);
+#endif
       break;
     case WidgetType::REMINDER:
       widgetPool[type] = std::make_unique<ReminderPanel>(
