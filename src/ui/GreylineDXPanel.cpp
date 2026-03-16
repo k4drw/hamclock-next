@@ -1,7 +1,9 @@
 #include "GreylineDXPanel.h"
 #include "../core/Theme.h"
 #include "FontCatalog.h"
+#include <SDL.h>
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
 
 GreylineDXPanel::GreylineDXPanel(int x, int y, int w, int h,
@@ -15,12 +17,32 @@ void GreylineDXPanel::update() {
   }
 }
 
+// Format minutesToPeak as "+Xm Ys" / "-Xm Ys" countdown string.
+static void formatCountdown(char *buf, int bufSize, double minutesToPeak) {
+  char sign = (minutesToPeak >= 0) ? '+' : '-';
+  double absMins = std::abs(minutesToPeak);
+  int m = static_cast<int>(absMins);
+  int s = static_cast<int>((absMins - m) * 60.0 + 0.5);
+  if (s >= 60) { ++m; s = 0; }
+  std::snprintf(buf, bufSize, "%c%dm%02ds", sign, m, s);
+}
+
 void GreylineDXPanel::render(SDL_Renderer *renderer) {
   if (!fontMgr_.ready())
     return;
 
   ThemeColors themes = getThemeColors(theme_);
 
+  // Check if any entity is within 5 minutes of its peak (approaching)
+  bool alertActive = false;
+  for (const auto &e : currentData_.activeEntities) {
+    if (e.minutesToPeak >= 0.0 && e.minutesToPeak < 5.0) {
+      alertActive = true;
+      break;
+    }
+  }
+
+  // Background
   SDL_SetRenderDrawBlendMode(
       renderer, (theme_ == "glass") ? SDL_BLENDMODE_BLEND : SDL_BLENDMODE_NONE);
   SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b,
@@ -28,8 +50,13 @@ void GreylineDXPanel::render(SDL_Renderer *renderer) {
   SDL_Rect rect = {x_, y_, width_, height_};
   SDL_RenderFillRect(renderer, &rect);
 
-  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
-                         themes.border.b, themes.border.a);
+  // Border — pulse warning color when any entity is near peak
+  SDL_Color borderColor = themes.border;
+  if (alertActive && (SDL_GetTicks() / 500) % 2 == 0)
+    borderColor = themes.warning;
+  SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+  SDL_SetRenderDrawColor(renderer, borderColor.r, borderColor.g, borderColor.b,
+                         borderColor.a);
   SDL_RenderDrawRect(renderer, &rect);
 
   int titleH = 20;
@@ -58,12 +85,12 @@ void GreylineDXPanel::render(SDL_Renderer *renderer) {
   // Column offsets
   int colPX = x_ + pad;
   int colOX = x_ + 35;
-  int colNX = x_ + 75;
+  int colNX = x_ + 90;
 
   // Header
   cat->drawText(renderer, "PFX", colPX, curY + rowH / 2, themes.textDim,
                 FontStyle::Tiny, false, false, true);
-  cat->drawText(renderer, "OFFSET", colOX, curY + rowH / 2, themes.textDim,
+  cat->drawText(renderer, "CNTDWN", colOX, curY + rowH / 2, themes.textDim,
                 FontStyle::Tiny, false, false, true);
   cat->drawText(renderer, "ENTITY", colNX, curY + rowH / 2, themes.textDim,
                 FontStyle::Tiny, false, false, true);
@@ -76,23 +103,24 @@ void GreylineDXPanel::render(SDL_Renderer *renderer) {
 
     std::string pfx = entity.prefix.empty() ? "??" : entity.prefix;
     char oBuf[16];
-    std::snprintf(oBuf, sizeof(oBuf), "%c%02.0fm",
-                  entity.minutesToPeak >= 0 ? '+' : '-',
-                  std::abs(entity.minutesToPeak));
+    formatCountdown(oBuf, sizeof(oBuf), entity.minutesToPeak);
 
-    SDL_Color valColor = entity.isSunrise ? themes.warning : themes.info;
+    // Approaching peak < 5 min: highlight row
+    bool nearPeak = entity.minutesToPeak >= 0.0 && entity.minutesToPeak < 5.0;
+    SDL_Color rowColor = nearPeak ? themes.warning
+                       : (entity.isSunrise ? themes.warning : themes.info);
+    SDL_Color cntColor = nearPeak ? themes.warning : themes.text;
 
-    // Draw row
     cat->drawText(renderer, pfx, colPX, curY + rowH / 2, themes.text,
                   FontStyle::Fast, false, false, true);
-    cat->drawText(renderer, oBuf, colOX, curY + rowH / 2, themes.text,
+    cat->drawText(renderer, oBuf, colOX, curY + rowH / 2, cntColor,
                   FontStyle::Fast, false, false, true);
 
     // Entity name (truncated if needed)
     std::string name = entity.name;
-    if (name.length() > 14)
-      name = name.substr(0, 12) + "..";
-    cat->drawText(renderer, name, colNX, curY + rowH / 2, valColor,
+    if (name.length() > 12)
+      name = name.substr(0, 10) + "..";
+    cat->drawText(renderer, name, colNX, curY + rowH / 2, rowColor,
                   FontStyle::Micro, false, false, true);
 
     curY += rowH;
