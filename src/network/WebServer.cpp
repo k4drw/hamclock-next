@@ -1865,9 +1865,7 @@ void WebServer::run() {
     res.set_content(arr.dump(), "application/json");
   });
 
-  // ============================================================
-  // Phase 1 — Live Web View
-  // ============================================================
+  // --- Live Web View ---
 
   svr.Get("/live/status", [this](const httplib::Request &,
                                  httplib::Response &res) {
@@ -2344,9 +2342,7 @@ void WebServer::run() {
     }
   });
 
-  // ============================================================
-  // Phase 2 — Legacy Data Getters
-  // ============================================================
+  // --- Legacy Data Getters ---
 
   svr.Get("/get_config.txt", [this](const httplib::Request &,
                                     httplib::Response &res) {
@@ -2681,9 +2677,7 @@ void WebServer::run() {
     res.set_content(oss.str(), "text/plain");
   });
 
-  // ============================================================
-  // Phase 3 — Legacy Control Setters
-  // ============================================================
+  // --- Legacy Control Setters ---
 
   svr.Get("/set_screenlock", [this](const httplib::Request &req,
                                     httplib::Response &res) {
@@ -3206,9 +3200,7 @@ void WebServer::run() {
     }
   });
 
-  // ============================================================
-  // Phase 4 — Propagation, Debug, and Reload
-  // ============================================================
+  // --- Propagation, Debug, and Reload ---
 
   svr.Get("/api/propagation/voacap",
           [](const httplib::Request &, httplib::Response &res) {
