@@ -1,5 +1,6 @@
 #include "CallsignClock.h"
 #include "../core/Astronomy.h"
+#include "../core/TimeUtils.h"
 #include "FontCatalog.h"
 
 #include <algorithm>
@@ -26,9 +27,7 @@ void CallsignClock::update() {
   Astronomy::portable_gmtime(&t, &utc);
 
   char buf[32];
-  std::snprintf(buf, sizeof(buf), "%02d:%02d:%02d UTC", utc.tm_hour, utc.tm_min,
-                utc.tm_sec);
-  currentTime_ = buf;
+  currentTime_ = TimeUtils::hms(utc.tm_hour, utc.tm_min, utc.tm_sec) + " UTC";
 
   std::snprintf(buf, sizeof(buf), "%s %02d %s %04d",
                 (const char *[]){"Sun", "Mon", "Tue", "Wed", "Thu", "Fri",

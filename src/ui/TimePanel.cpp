@@ -2,6 +2,7 @@
 #include "../core/Astronomy.h"
 #include "../core/StringUtils.h"
 #include "../core/Theme.h"
+#include "../core/TimeUtils.h"
 #include "FontCatalog.h"
 #include "RenderUtils.h"
 #include "TextureManager.h"
@@ -126,8 +127,7 @@ void TimePanel::update() {
   Astronomy::portable_gmtime(&t, &utc);
 
   char buf[32];
-  std::snprintf(buf, sizeof(buf), "%02d:%02d", utc.tm_hour, utc.tm_min);
-  currentHM_ = buf;
+  currentHM_ = TimeUtils::hm(utc.tm_hour, utc.tm_min);
 
   std::snprintf(buf, sizeof(buf), "%02d", utc.tm_sec);
   currentSec_ = buf;

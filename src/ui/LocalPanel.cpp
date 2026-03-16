@@ -2,6 +2,7 @@
 #include "../core/Astronomy.h"
 #include "../core/MemoryMonitor.h"
 #include "../core/Theme.h"
+#include "../core/TimeUtils.h"
 #include "FontCatalog.h"
 
 #include <algorithm>
@@ -34,8 +35,7 @@ void LocalPanel::update() {
   lineText_[0] = "DE:";
 
   char buf[64];
-  std::snprintf(buf, sizeof(buf), "%02d:%02d", local.tm_hour, local.tm_min);
-  lineText_[1] = buf;
+  lineText_[1] = TimeUtils::hm(local.tm_hour, local.tm_min);
 
   std::snprintf(buf, sizeof(buf), "%02d", local.tm_sec);
   currentSec_ = buf;
