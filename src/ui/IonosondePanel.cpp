@@ -1,6 +1,7 @@
 #include "IonosondePanel.h"
 #include "../core/Theme.h"
 #include "FontCatalog.h"
+#include "GraphHelper.h"
 #include "RenderUtils.h"
 
 namespace HamClock {
@@ -119,11 +120,12 @@ void IonosondePanel::onMouseMove(int mx, int my) {
 
 void IonosondePanel::drawGraph(SDL_Renderer *renderer, int x, int y, int w, int h, const std::vector<IonosondeStation>& stations) {
   ThemeColors themes = getThemeColors(theme_);
-  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 150);
-  SDL_Rect frame = {x, y, w, h};
-  SDL_RenderDrawRect(renderer, &frame);
 
-  if (stations.empty()) return;
+  if (stations.empty()) {
+    GraphHelper::drawTimeSeries(renderer, nullptr, x, y, w, h, nullptr, 0,
+                                themes.accent, themes.border);
+    return;
+  }
 
   float maxVal = 10.0f; // Minimum scale up to 10 MHz
   for(const auto& st : stations) {
@@ -142,17 +144,8 @@ void IonosondePanel::drawGraph(SDL_Renderer *renderer, int x, int y, int w, int 
     pts.push_back({px, py});
   }
 
-  if (lineTex && count > 1) {
-    RenderUtils::drawPolylineTextured(renderer, lineTex, pts.data(), count, 2.0f, themes.accent);
-  } else if (count > 1) {
-    RenderUtils::drawPolyline(renderer, pts.data(), count, 1.5f, themes.accent);
-  } else if (count == 1) {
-    SDL_SetRenderDrawColor(renderer, themes.accent.r, themes.accent.g, themes.accent.b, themes.accent.a);
-    SDL_RenderDrawPoint(renderer, (int)pts[0].x, (int)pts[0].y);
-    SDL_RenderDrawPoint(renderer, (int)pts[0].x+1, (int)pts[0].y);
-    SDL_RenderDrawPoint(renderer, (int)pts[0].x, (int)pts[0].y+1);
-    SDL_RenderDrawPoint(renderer, (int)pts[0].x+1, (int)pts[0].y+1);
-  }
+  GraphHelper::drawTimeSeries(renderer, lineTex, x, y, w, h, pts.data(), count,
+                              themes.accent, themes.border);
 }
 
 

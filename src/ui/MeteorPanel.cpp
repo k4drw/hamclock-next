@@ -1,6 +1,7 @@
 #include "MeteorPanel.h"
 #include "../core/Theme.h"
 #include "FontCatalog.h"
+#include "GraphHelper.h"
 #include "RenderUtils.h"
 #include <algorithm>
 
@@ -111,9 +112,6 @@ void MeteorPanel::onMouseMove(int mx, int my) {
 
 void MeteorPanel::drawGraph(SDL_Renderer *renderer, int x, int y, int w, int h, const float* values) {
   ThemeColors themes = getThemeColors(theme_);
-  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 150);
-  SDL_Rect frame = {x, y, w, h};
-  SDL_RenderDrawRect(renderer, &frame);
 
   float maxVal = 0.1f;
   for(int i=0; i<24; ++i) if(values[i] > maxVal) maxVal = values[i];
@@ -128,11 +126,8 @@ void MeteorPanel::drawGraph(SDL_Renderer *renderer, int x, int y, int w, int h, 
     pts.push_back({px, py});
   }
 
-  if (lineTex) {
-    RenderUtils::drawPolylineTextured(renderer, lineTex, pts.data(), 24, 2.0f, themes.info);
-  } else {
-    RenderUtils::drawPolyline(renderer, pts.data(), 24, 1.5f, themes.info);
-  }
+  GraphHelper::drawTimeSeries(renderer, lineTex, x, y, w, h, pts.data(), 24,
+                              themes.info, themes.border);
 }
 
 
