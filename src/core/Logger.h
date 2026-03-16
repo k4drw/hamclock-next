@@ -1,16 +1,53 @@
 #pragma once
 
+#include <deque>
 #include <fmt/format.h>
 #include <memory>
+#include <mutex>
+#include <spdlog/sinks/base_sink.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/spdlog.h>
 #include <string>
+#include <vector>
+
+// In-memory circular log buffer sink (last kCapacity lines).
+class RingBufferSink : public spdlog::sinks::base_sink<std::mutex> {
+public:
+  static constexpr int kCapacity = 200;
+
+  std::vector<std::string> getLines() const {
+    std::lock_guard<std::mutex> lk(bufMutex_);
+    return {buf_.begin(), buf_.end()};
+  }
+
+protected:
+  void sink_it_(const spdlog::details::log_msg &msg) override {
+    spdlog::memory_buf_t formatted;
+    base_sink<std::mutex>::formatter_->format(msg, formatted);
+    std::lock_guard<std::mutex> lk(bufMutex_);
+    if ((int)buf_.size() >= kCapacity)
+      buf_.pop_front();
+    buf_.push_back(fmt::to_string(formatted));
+  }
+  void flush_() override {}
+
+private:
+  mutable std::mutex bufMutex_;
+  std::deque<std::string> buf_;
+};
 
 class Log {
 public:
   static void init(const std::string &fallbackDir = "");
 
   static std::shared_ptr<spdlog::logger> &get() { return s_Logger; }
+
+  // Return the last N log lines from the in-memory ring buffer.
+  static std::vector<std::string> getRecentLogs() {
+    if (s_RingSink)
+      return s_RingSink->getLines();
+    return {};
+  }
 
   // Set log level at runtime
   static void setLevel(spdlog::level::level_enum level) {
@@ -95,4 +132,5 @@ public:
 
 private:
   static std::shared_ptr<spdlog::logger> s_Logger;
+  static std::shared_ptr<RingBufferSink> s_RingSink;
 };

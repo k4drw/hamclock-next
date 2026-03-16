@@ -1,4 +1,5 @@
 #include "WebServer.h"
+#include "../core/Logger.h"
 #include "../ui/PaneContainer.h"
 #include "../ui/StopwatchPanel.h"
 #include "NetworkManager.h"
@@ -3294,7 +3295,11 @@ void WebServer::run() {
 
   svr.Get("/debug/logs",
           [](const httplib::Request &, httplib::Response &res) {
-            res.set_content("[]", "application/json");
+            auto lines = Log::getRecentLogs();
+            nlohmann::json j = nlohmann::json::array();
+            for (const auto &line : lines)
+              j.push_back(line);
+            res.set_content(j.dump(), "application/json");
           });
 
 #ifdef ENABLE_DEBUG_API
