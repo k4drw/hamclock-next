@@ -52,8 +52,9 @@ enum class WidgetType {
   ENV_PRESSURE,  // BME280 pressure (hPa)
   ENV_HUMIDITY,  // BME280 humidity (%)
   ENV_DEWPOINT,  // Derived dewpoint (C)
-  GREYLINE_DX,   // Entities currently in greyline
-  RIG_CONTROL,   // Hamlib rigctld read-only display
+  GREYLINE_DX,      // Entities currently in greyline
+  RIG_CONTROL,      // Hamlib rigctld read-only display
+  SOLAR_TIMELINE,   // Kp forecast timeline (NOAA 3-day)
 };
 
 inline const char *widgetTypeToString(WidgetType t) {
@@ -158,6 +159,8 @@ inline const char *widgetTypeToString(WidgetType t) {
     return "greyline_dx";
   case WidgetType::RIG_CONTROL:
     return "rig_control";
+  case WidgetType::SOLAR_TIMELINE:
+    return "solar_timeline";
   }
   return "solar";
 }
@@ -264,6 +267,8 @@ inline const char *widgetTypeDisplayName(WidgetType t) {
     return "Greyline DX";
   case WidgetType::RIG_CONTROL:
     return "Rig Control";
+  case WidgetType::SOLAR_TIMELINE:
+    return "Solar Impact";
   }
   return "Solar";
 }
@@ -370,6 +375,8 @@ inline WidgetType widgetTypeFromString(const std::string &s,
     return WidgetType::GREYLINE_DX;
   if (s == "rig_control")
     return WidgetType::RIG_CONTROL;
+  if (s == "solar_timeline")
+    return WidgetType::SOLAR_TIMELINE;
   std::fprintf(stderr, "WidgetType: unknown '%s', using fallback\n", s.c_str());
   return fallback;
 }

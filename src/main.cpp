@@ -126,6 +126,7 @@
 #include "services/GreylineDXProvider.h"
 #include "ui/GreylineDXPanel.h"
 #include "ui/RigControlPanel.h"
+#include "ui/SolarTimelinePanel.h"
 #include <SDL.h>
 #include <SDL_image.h>
 #include <SDL_syswm.h>
@@ -1415,6 +1416,10 @@ DashboardContext::DashboardContext(AppContext &ctx)
       widgetPool[type] = std::make_unique<RigControlPanel>(
           0, 0, 0, 0, fontMgr, nullptr);
 #endif
+      break;
+    case WidgetType::SOLAR_TIMELINE:
+      widgetPool[type] = std::make_unique<SolarTimelinePanel>(
+          0, 0, 0, 0, fontMgr, netManager);
       break;
     case WidgetType::REMINDER:
       widgetPool[type] = std::make_unique<ReminderPanel>(

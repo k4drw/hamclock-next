@@ -596,6 +596,7 @@ set(HAMCLOCK_SOURCES
     src/ui/MeteorPanel.cpp
     src/ui/IonosondePanel.cpp
     src/ui/SolarStormPanel.cpp
+    src/ui/SolarTimelinePanel.cpp
     src/ui/StopwatchPanel.cpp
     src/ui/ReminderPanel.cpp
     src/ui/UpdateOverlay.cpp
