@@ -150,6 +150,11 @@ private:
   bool syncRotation_ = false;
   SDL_Rect syncRotationRect_ = {0, 0, 0, 0};
 
+  // Contest Mode state
+  bool contestModeActive_ = false;
+  std::vector<WidgetType> contestSavedRotations_[6];
+  SDL_Rect contestModeBtn_ = {0, 0, 0, 0};
+
   // Watchlist tab
   std::vector<std::string> watchlistEntries_;
   TextInput watchlistInputField_;

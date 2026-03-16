@@ -225,6 +225,9 @@ struct AppConfig {
 #endif
   std::map<std::string, SDL_Color> colorOverrides;
 
+  // Contest Mode
+  bool contestModeActive = false; // true while contest preset is active
+
   // Presets
   std::vector<ConfigPreset> presets;
 };

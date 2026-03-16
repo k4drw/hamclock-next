@@ -1,5 +1,6 @@
 #include "SetupScreen.h"
 #include "../core/Astronomy.h"
+#include "../core/ContestModeManager.h"
 #include "../core/DisplayPower.h"
 #include "../core/Logger.h"
 #include "../core/StringUtils.h"
@@ -944,6 +945,26 @@ void SetupScreen::renderTabWidgets(SDL_Renderer *renderer, int cx, int pad,
                 FontStyle::Fast, true, false, true);
   y += 20;
 
+  // --- Contest Mode toggle button ---
+  {
+    const int cmBtnH = 22;
+    const int cmBtnW = 120;
+    contestModeBtn_ = {fieldX, y, cmBtnW, cmBtnH};
+    SDL_Color btnFill = contestModeActive_ ? themes.warning : themes.rowStripe1;
+    SDL_SetRenderDrawColor(renderer, btnFill.r, btnFill.g, btnFill.b, 255);
+    SDL_RenderFillRect(renderer, &contestModeBtn_);
+    SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
+                           themes.border.b, 255);
+    SDL_RenderDrawRect(renderer, &contestModeBtn_);
+    const char *label = contestModeActive_ ? "Contest Mode: ON" : "Contest Mode";
+    cat->drawText(renderer, label,
+                  contestModeBtn_.x + contestModeBtn_.w / 2,
+                  contestModeBtn_.y + contestModeBtn_.h / 2,
+                  contestModeActive_ ? themes.bg : themes.text,
+                  FontStyle::Fast, true, false, true);
+    y += cmBtnH + 4;
+  }
+
   // --- Widget checklist (scrollable) ---
   widgetRects_.clear();
   int rowH = cat->ptSize(FontStyle::Fast) + 4;
@@ -1346,7 +1367,21 @@ bool SetupScreen::onMouseDown(int mx, int my, Uint16 mod, int clicks) {
       return true;
     }
 
-    // 5. Side Panel Mode
+    // 5. Contest Mode Toggle
+    if (contestModeBtn_.w > 0 &&
+        mx >= contestModeBtn_.x && mx < contestModeBtn_.x + contestModeBtn_.w &&
+        my >= contestModeBtn_.y && my < contestModeBtn_.y + contestModeBtn_.h) {
+      if (!contestModeActive_) {
+        ContestModeManager::activate(paneRotations_, contestSavedRotations_);
+        contestModeActive_ = true;
+      } else {
+        ContestModeManager::deactivate(paneRotations_, contestSavedRotations_);
+        contestModeActive_ = false;
+      }
+      return true;
+    }
+
+    // 6. Side Panel Mode
     static const WidgetType kMode5[] = {
         WidgetType::DE_INFO, WidgetType::DX_CLUSTER, WidgetType::ON_THE_AIR,
         WidgetType::LIVE_SPOTS};
@@ -2035,6 +2070,7 @@ void SetupScreen::setConfig(const AppConfig &cfg) {
 
   rotationInterval_ = cfg.rotationIntervalS;
   syncRotation_ = cfg.syncRotation;
+  contestModeActive_ = cfg.contestModeActive;
   watchlistEntries_ = cfg.watchlist;
   watchlistInputField_.clear();
   watchlistScrollOffset_ = 0;
@@ -2160,6 +2196,7 @@ AppConfig SetupScreen::getConfig(const AppConfig& base) const {
   cfg.pane4Rotation = paneRotations_[3];
   cfg.pane5Rotation = paneRotations_[4];
   cfg.pane6Rotation = paneRotations_[5];
+  cfg.contestModeActive = contestModeActive_;
 
   cfg.rigHost = rigHostInput_.getValue();
   cfg.rigPort = StringUtils::safe_stoi(rigPortInput_.getValue());
