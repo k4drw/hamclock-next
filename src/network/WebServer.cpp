@@ -10,6 +10,7 @@
 #include "../core/SolarData.h"
 #include "../core/StringUtils.h"
 #include "../core/WatchlistStore.h"
+#include "../core/WeatherData.h"
 // Cap the httplib thread pool to 2 (default is max(8, hw_concurrency-1)).
 // On RPi3B (4 cores) the default spawns 8 idle worker threads that
 // continuously wake the scheduler, adding ~14% system CPU at idle.
@@ -2897,6 +2898,30 @@ void WebServer::run() {
     }
     SDL_PushEvent(&e);
     res.set_content("ok", "text/plain");
+  });
+
+  svr.Get("/get_env.txt", [this](const httplib::Request &,
+                                  httplib::Response &res) {
+    if (!weatherStore_) {
+      res.status = 503;
+      return;
+    }
+    WeatherData d = weatherStore_->get();
+    if (!d.valid) {
+      res.status = 503;
+      return;
+    }
+    // Magnus formula dewpoint (valid -40..60 C)
+    constexpr float a = 17.62f, b = 243.12f;
+    float alpha = a * d.temp / (b + d.temp) + std::log(d.humidity / 100.0f);
+    float dp = b * alpha / (a - alpha);
+    std::ostringstream oss;
+    oss << std::fixed << std::setprecision(1);
+    oss << "Temp_C     " << d.temp << "\n";
+    oss << "Pressure_hPa " << d.pressure << "\n";
+    oss << "Humidity_pct " << d.humidity << "\n";
+    oss << "Dewpoint_C " << dp << "\n";
+    res.set_content(oss.str(), "text/plain");
   });
 
   svr.Get("/get_stopwatch.txt", [this](const httplib::Request &,
