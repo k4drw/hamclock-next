@@ -1,5 +1,6 @@
 #include "SatelliteSetup.h"
 #include "../core/Constants.h"
+#include "../core/StringUtils.h"
 #include "../core/Theme.h"
 #include "FontCatalog.h"
 #include <algorithm>
@@ -326,7 +327,7 @@ bool SatelliteSetup::onKeyDown(SDL_Keycode key, Uint16 mod) {
 }
 
 void SatelliteSetup::addSatelliteBySCC() {
-  int id = std::atoi(sccInput_.getValue().c_str());
+  int id = StringUtils::safe_stoi(sccInput_.getValue());
   if (id > 0) {
     satMgr_.addCustomSCC(id);
   }
@@ -342,7 +343,7 @@ void SatelliteSetup::addSatelliteByTLE() {
     tle.line1 = l1;
     tle.line2 = l2;
     if (tle.line1.size() >= 7) {
-      tle.noradId = std::atoi(tle.line1.substr(2, 5).c_str());
+      tle.noradId = StringUtils::safe_stoi(tle.line1.substr(2, 5));
     }
     satMgr_.addCustomTLE(tle);
   }

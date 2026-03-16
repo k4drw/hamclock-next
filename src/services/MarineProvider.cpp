@@ -1,5 +1,6 @@
 #include "MarineProvider.h"
 #include "../core/Constants.h"
+#include "../core/StringUtils.h"
 #include "../core/WorkerService.h"
 #include <SDL_events.h>
 #include <chrono>
@@ -58,10 +59,7 @@ void MarineProvider::fetch(const std::string &tideStation,
                   if (p.contains("type") && p["type"].is_string())
                     tp.type = p["type"].get<std::string>();
                   if (p.contains("v") && p["v"].is_string()) {
-                    try {
-                      tp.heightFt = std::stod(p["v"].get<std::string>());
-                    } catch (...) {
-                    }
+                    tp.heightFt = StringUtils::safe_stod(p["v"].get<std::string>());
                   }
                   update.tides.push_back(tp);
                   if ((int)update.tides.size() >= 6)

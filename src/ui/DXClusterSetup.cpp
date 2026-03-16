@@ -1,4 +1,5 @@
 #include "DXClusterSetup.h"
+#include "../core/StringUtils.h"
 #include "../core/Theme.h"
 #include "FontCatalog.h"
 #include <algorithm>
@@ -284,7 +285,7 @@ void DXClusterSetup::setConfig(const AppConfig &cfg) {
 
 AppConfig DXClusterSetup::updateConfig(AppConfig cfg) const {
   cfg.dxClusterHost = hostInput_.getValue();
-  cfg.dxClusterPort = std::atoi(portInput_.getValue().c_str());
+  cfg.dxClusterPort = StringUtils::safe_stoi(portInput_.getValue());
   if (cfg.dxClusterPort == 0)
     cfg.dxClusterPort = 7300;
   cfg.dxClusterLogin = loginInput_.getValue();

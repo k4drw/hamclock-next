@@ -1,6 +1,7 @@
 #include "ClockAuxPanel.h"
 
 #include "../core/Constants.h"
+#include "../core/StringUtils.h"
 #include "../core/Theme.h"
 #include "FontCatalog.h"
 
@@ -383,7 +384,7 @@ bool ClockAuxPanel::onMouseUp(int mx, int my, Uint16 /*mod*/, int /*clicks*/) {
       my >= doneRect_.y && my < doneRect_.y + doneRect_.h) {
     if (customSelected_) {
       std::string offStr = customOffsetInput_.getValue();
-      int off = offStr.empty() ? 0 : std::atoi(offStr.c_str());
+      int off = StringUtils::safe_stoi(offStr);
       off = std::clamp(off, -12, 14);
       std::string lbl = customLabelInput_.getValue();
       if (lbl.empty())
@@ -485,7 +486,7 @@ bool ClockAuxPanel::onKeyDown(SDL_Keycode key, Uint16 mod) {
     } else {
       // Commit
       std::string offStr = customOffsetInput_.getValue();
-      int off = offStr.empty() ? 0 : std::atoi(offStr.c_str());
+      int off = StringUtils::safe_stoi(offStr);
       off = std::clamp(off, -12, 14);
       std::string lbl = customLabelInput_.getValue();
       if (lbl.empty())
