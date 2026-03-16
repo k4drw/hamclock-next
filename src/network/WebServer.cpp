@@ -1,6 +1,7 @@
 #include "WebServer.h"
 #include "../core/Logger.h"
 #include "../ui/PaneContainer.h"
+#include "../core/CalendarData.h"
 #include "../ui/StopwatchPanel.h"
 #include "NetworkManager.h"
 
@@ -3388,6 +3389,95 @@ void WebServer::run() {
     res.set_content("ok", "text/plain");
   });
 #endif
+
+  // --- Calendar endpoints ---
+
+  // POST /set_calendar.json — accepts a JSON array of event objects from an
+  // external script (e.g. evolution-to-hamclock.py). Each object must have:
+  //   "summary": string, "start": "YYYY-MM-DD HH:MM:SS", "end": ...,
+  //   "source": string (optional).
+  svr.Post("/set_calendar.json", [this](const httplib::Request &req,
+                                        httplib::Response &res) {
+    if (!calendarStore_) {
+      res.status = 503;
+      return;
+    }
+    try {
+      auto j = nlohmann::json::parse(req.body);
+      if (!j.is_array()) {
+        res.status = 400;
+        res.set_content("expected JSON array", "text/plain");
+        return;
+      }
+      std::vector<CalendarEvent> events;
+      for (const auto &item : j) {
+        CalendarEvent ev;
+        ev.summary = item.value("summary", std::string{});
+        ev.source  = item.value("source", std::string{});
+
+        auto parseTime = [](const std::string &s) -> time_t {
+          struct tm t{};
+          if (std::sscanf(s.c_str(), "%d-%d-%d %d:%d:%d", &t.tm_year,
+                          &t.tm_mon, &t.tm_mday, &t.tm_hour, &t.tm_min,
+                          &t.tm_sec) != 6)
+            return 0;
+          t.tm_year -= 1900;
+          t.tm_mon  -= 1;
+          return Astronomy::portable_timegm(&t);
+        };
+
+        ev.start = parseTime(item.value("start", std::string{}));
+        ev.end   = parseTime(item.value("end",   std::string{}));
+        if (ev.start == 0)
+          continue;
+        if (ev.end <= ev.start)
+          ev.end = ev.start + 3600;
+
+        // Detect all-day: midnight start, duration >= 23h
+        struct tm st{};
+        Astronomy::portable_gmtime(&ev.start, &st);
+        ev.allDay = (st.tm_hour == 0 && st.tm_min == 0 && st.tm_sec == 0 &&
+                     (ev.end - ev.start) >= 23 * 3600);
+
+        events.push_back(std::move(ev));
+      }
+      calendarStore_->set(std::move(events));
+      res.set_content("ok", "text/plain");
+    } catch (const std::exception &e) {
+      res.status = 400;
+      res.set_content(e.what(), "text/plain");
+    }
+  });
+
+  svr.Get("/get_calendar.json", [this](const httplib::Request &,
+                                       httplib::Response &res) {
+    if (!calendarStore_) {
+      res.status = 503;
+      return;
+    }
+    auto events = calendarStore_->snapshot();
+    auto arr = nlohmann::json::array();
+    for (const auto &ev : events) {
+      nlohmann::json je;
+      je["summary"] = ev.summary;
+      je["source"]  = ev.source;
+      je["all_day"] = ev.allDay;
+
+      auto fmtTime = [](time_t t) -> std::string {
+        struct tm tm{};
+        Astronomy::portable_gmtime(&t, &tm);
+        char buf[24];
+        std::snprintf(buf, sizeof(buf), "%04d-%02d-%02d %02d:%02d:%02d",
+                      tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
+                      tm.tm_hour, tm.tm_min, tm.tm_sec);
+        return buf;
+      };
+      je["start"] = fmtTime(ev.start);
+      je["end"]   = fmtTime(ev.end);
+      arr.push_back(je);
+    }
+    res.set_content(arr.dump(2), "application/json");
+  });
 
   svr.listen("0.0.0.0", port_);
 #endif

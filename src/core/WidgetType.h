@@ -55,6 +55,7 @@ enum class WidgetType {
   GREYLINE_DX,      // Entities currently in greyline
   RIG_CONTROL,      // Hamlib rigctld read-only display
   SOLAR_TIMELINE,   // Kp forecast timeline (NOAA 3-day)
+  CALENDAR,         // External calendar feed (POST /set_calendar.json)
 };
 
 inline const char *widgetTypeToString(WidgetType t) {
@@ -161,6 +162,8 @@ inline const char *widgetTypeToString(WidgetType t) {
     return "rig_control";
   case WidgetType::SOLAR_TIMELINE:
     return "solar_timeline";
+  case WidgetType::CALENDAR:
+    return "calendar";
   }
   return "solar";
 }
@@ -269,6 +272,8 @@ inline const char *widgetTypeDisplayName(WidgetType t) {
     return "Rig Control";
   case WidgetType::SOLAR_TIMELINE:
     return "Solar Impact";
+  case WidgetType::CALENDAR:
+    return "Calendar";
   }
   return "Solar";
 }
@@ -377,6 +382,8 @@ inline WidgetType widgetTypeFromString(const std::string &s,
     return WidgetType::RIG_CONTROL;
   if (s == "solar_timeline")
     return WidgetType::SOLAR_TIMELINE;
+  if (s == "calendar")
+    return WidgetType::CALENDAR;
   std::fprintf(stderr, "WidgetType: unknown '%s', using fallback\n", s.c_str());
   return fallback;
 }

@@ -29,6 +29,7 @@
 
 #include <SDL_video.h>
 #include <chrono>
+#include <ctime>
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
@@ -1513,6 +1514,7 @@ void MapWidget::render(SDL_Renderer *renderer) {
   renderCloudLegend(renderer);
 
   renderTooltip(renderer);
+  renderCalendarAlert(renderer);
 
   // Note: MapViewMenu is rendered via renderModal() in the centralized modal
   // pass, not here. This prevents clipping to the map pane bounds.
@@ -3905,4 +3907,83 @@ void MapWidget::renderCountryBorders(SDL_Renderer *renderer) {
                        (int)borderVerts_.size(), borderIndices_.data(),
                        (int)borderIndices_.size());
   }
+}
+
+// ---------------------------------------------------------------------------
+// Calendar alert overlay
+// ---------------------------------------------------------------------------
+
+void MapWidget::showCalendarAlert(const std::string &summary,
+                                  const std::string &source,
+                                  time_t startTime) {
+  calendarAlert_.active = true;
+  calendarAlert_.summary = summary;
+  calendarAlert_.source = source;
+  calendarAlert_.startTime = startTime;
+  calendarAlert_.shownAtMs = SDL_GetTicks();
+}
+
+void MapWidget::renderCalendarAlert(SDL_Renderer *renderer) {
+  if (!calendarAlert_.active)
+    return;
+
+  static constexpr uint32_t kAlertDurationMs = 30000;
+  uint32_t elapsed = SDL_GetTicks() - calendarAlert_.shownAtMs;
+  if (elapsed >= kAlertDurationMs) {
+    calendarAlert_.active = false;
+    return;
+  }
+
+  if (!fontMgr_.ready())
+    return;
+  auto *cat = fontMgr_.catalog();
+
+  // Panel dimensions: 60% of map width, centered
+  const int panW = (int)(mapRect_.w * 0.60);
+  const int panH = 110;
+  const int panX = mapRect_.x + (mapRect_.w - panW) / 2;
+  const int panY = mapRect_.y + (mapRect_.h - panH) / 2;
+
+  // Background
+  SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+  SDL_SetRenderDrawColor(renderer, 10, 10, 30, 220);
+  SDL_Rect panRect = {panX, panY, panW, panH};
+  SDL_RenderFillRect(renderer, &panRect);
+
+  // Border
+  SDL_SetRenderDrawColor(renderer, 100, 160, 255, 255);
+  SDL_RenderDrawRect(renderer, &panRect);
+
+  // Header: "CALENDAR ALERT"
+  ThemeColors themes = getThemeColors(theme_);
+  cat->drawText(renderer, "CALENDAR ALERT", panX + panW / 2, panY + 8,
+                themes.accent, FontStyle::MicroBold, true);
+
+  // Event summary
+  std::string summary = calendarAlert_.summary;
+  if (summary.size() > 48)
+    summary = summary.substr(0, 47) + "\xe2\x80\xa6";
+  cat->drawText(renderer, summary.c_str(), panX + panW / 2, panY + 30,
+                themes.text, FontStyle::UIBold, true);
+
+  // Source + start time
+  char timeBuf[24];
+  struct tm t{};
+  Astronomy::portable_gmtime(&calendarAlert_.startTime, &t);
+  std::snprintf(timeBuf, sizeof(timeBuf), "%02d:%02dZ", t.tm_hour, t.tm_min);
+
+  std::string sub = calendarAlert_.source + "  \xe2\x80\xa2  " + timeBuf;
+  cat->drawText(renderer, sub.c_str(), panX + panW / 2, panY + 54,
+                themes.textDim, FontStyle::Caption, true);
+
+  // Progress bar (counts down to 0)
+  float frac = 1.0f - (float)elapsed / kAlertDurationMs;
+  int barW = (int)((panW - 16) * frac);
+  SDL_SetRenderDrawColor(renderer, 100, 160, 255, 180);
+  SDL_Rect bar = {panX + 8, panY + panH - 12, barW, 6};
+  SDL_RenderFillRect(renderer, &bar);
+
+  // Dismiss hint
+  cat->drawText(renderer, "tap to dismiss", panX + panW / 2, panY + panH - 20,
+                themes.textDim, FontStyle::Micro, true);
 }

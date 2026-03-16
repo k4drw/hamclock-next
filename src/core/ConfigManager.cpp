@@ -267,6 +267,14 @@ bool ConfigManager::load(AppConfig &config) {
     config.ontaMaxDistKm = json["activity"].value("onta_max_dist_km", 0);
   }
 
+  // Calendar notifications
+  if (json.contains("calendar")) {
+    config.calendarNotifyMinutes =
+        json["calendar"].value("notify_minutes", 10);
+    config.calendarAllDayNotifyHour =
+        json["calendar"].value("allday_notify_hour", 8);
+  }
+
   if (json.contains("asteroid")) {
     config.asteroidIcon = json["asteroid"].value("icon", std::string("☄"));
     if (json["asteroid"].contains("color")) {
@@ -687,6 +695,9 @@ bool ConfigManager::save(const AppConfig &config) {
   json["rss"]["enabled"] = config.rssEnabled;
   json["activity"]["onta_filter"] = config.ontaFilter;
   json["activity"]["onta_max_dist_km"] = config.ontaMaxDistKm;
+
+  json["calendar"]["notify_minutes"] = config.calendarNotifyMinutes;
+  json["calendar"]["allday_notify_hour"] = config.calendarAllDayNotifyHour;
   json["asteroid"]["icon"] = config.asteroidIcon;
   json["asteroid"]["color"]["r"] = config.asteroidColor.r;
   json["asteroid"]["color"]["g"] = config.asteroidColor.g;

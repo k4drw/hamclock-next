@@ -127,6 +127,8 @@
 #include "ui/GreylineDXPanel.h"
 #include "ui/RigControlPanel.h"
 #include "ui/SolarTimelinePanel.h"
+#include "core/CalendarData.h"
+#include "ui/CalendarPanel.h"
 #include <SDL.h>
 #include <SDL_image.h>
 #include <SDL_syswm.h>
@@ -229,6 +231,7 @@ struct AppContext {
   std::shared_ptr<XRayHistoryStore> xrayHistoryStore;
   std::shared_ptr<GreylineDXStore> greylineDXStore;
   std::shared_ptr<AuroraMapStore> auroraMapStore;
+  std::shared_ptr<CalendarStore> calendarStore;
 
   // Managers & Services
   std::unique_ptr<NetworkManager> netManager;
@@ -352,6 +355,7 @@ struct DashboardContext {
   Uint32 lastGreylineFetchMs = 0;
   Uint32 lastReachFetchMs = 0;
   Uint32 lastDrapFetchMs = 0;
+  Uint32 lastCalendarCheckMs = 0;
   Uint32 lastResizeMs = 0;
   Uint32 lastFpsUpdate = 0;
   int frames = 0;
@@ -753,6 +757,9 @@ int main(int argc, char *argv[]) {
   ctx.winlinkStore = std::make_shared<WinlinkStore>();
   ctx.greylineDXStore = std::make_shared<GreylineDXStore>();
   ctx.auroraMapStore = std::make_shared<AuroraMapStore>();
+  ctx.calendarStore = std::make_shared<CalendarStore>();
+  ctx.calendarStore->setCachePath(ctx.cfgMgr.configDir() / "calendar_cache.json");
+  ctx.calendarStore->loadCache();
   ctx.state = std::make_shared<HamClockState>();
 
   ctx.state->deCallsign = ctx.appCfg.callsign;
@@ -1429,6 +1436,18 @@ DashboardContext::DashboardContext(AppContext &ctx)
       widgetPool[type] = std::make_unique<SolarTimelinePanel>(
           0, 0, 0, 0, fontMgr, netManager);
       break;
+    case WidgetType::CALENDAR: {
+      auto *calPanel = new CalendarPanel(0, 0, 0, 0, fontMgr, ctx.calendarStore);
+      calPanel->setNotifyMinutes(appCfg.calendarNotifyMinutes);
+      calPanel->setAllDayNotifyHour(appCfg.calendarAllDayNotifyHour);
+      calPanel->setOnConfigChanged([&ctx](int mins, int hour) {
+        ctx.appCfg.calendarNotifyMinutes = mins;
+        ctx.appCfg.calendarAllDayNotifyHour = hour;
+        ctx.cfgMgr.save(ctx.appCfg);
+      });
+      widgetPool[type] = std::unique_ptr<CalendarPanel>(calPanel);
+      break;
+    }
     case WidgetType::REMINDER:
       widgetPool[type] = std::make_unique<ReminderPanel>(
           0, 0, 0, 0, fontMgr, ctx.appCfg, ctx.cfgMgr, *callbookProvider,
@@ -1580,7 +1599,8 @@ DashboardContext::DashboardContext(AppContext &ctx)
       WidgetType::DE_INFO,       WidgetType::DX_INFO,
       WidgetType::ENV_TEMP,      WidgetType::ENV_PRESSURE,
       WidgetType::ENV_HUMIDITY,  WidgetType::ENV_DEWPOINT,
-      WidgetType::GREYLINE_DX};
+      WidgetType::GREYLINE_DX,
+      WidgetType::CALENDAR};
 
   if (!appCfg.repeaterBookKey.empty()) {
     allTypes.push_back(WidgetType::REPEATER_DIR);
@@ -2050,6 +2070,35 @@ void DashboardContext::update(AppContext &ctx) {
       (lastReachFetchMs == 0 || now - lastReachFetchMs > 5 * 60 * 1000)) {
     reachProvider->fetch(appCfg.propBand, appCfg.propMode);
     lastReachFetchMs = now;
+  }
+
+  // Calendar notification check — runs once per minute
+  if (ctx.calendarStore && mapArea &&
+      (lastCalendarCheckMs == 0 || now - lastCalendarCheckMs >= 60000)) {
+    lastCalendarCheckMs = now;
+    auto events = ctx.calendarStore->snapshot();
+    time_t nowT = std::time(nullptr);
+    for (const auto &ev : events) {
+      time_t triggerAt;
+      if (ev.allDay) {
+        // All-day: notify at configured hour on the event day (UTC)
+        struct tm evDay{};
+        Astronomy::portable_gmtime(&ev.start, &evDay);
+        evDay.tm_hour = appCfg.calendarAllDayNotifyHour;
+        evDay.tm_min  = 0;
+        evDay.tm_sec  = 0;
+        triggerAt = Astronomy::portable_timegm(&evDay);
+      } else {
+        triggerAt = ev.start - (time_t)(appCfg.calendarNotifyMinutes * 60);
+      }
+      // Fire within a 60-second window around the trigger time
+      if (nowT >= triggerAt && nowT < triggerAt + 60) {
+        if (ctx.calendarStore->markNotified(ev.start)) {
+          mapArea->showCalendarAlert(ev.summary, ev.source, ev.start);
+          break; // Show one alert at a time
+        }
+      }
+    }
   }
 
 #ifndef __EMSCRIPTEN__
@@ -3102,6 +3151,7 @@ void main_tick() {
         ctx.webServer->setBrightnessManager(ctx.brightnessMgr);
         ctx.webServer->setStopwatch(static_cast<StopwatchPanel *>(
             ctx.dashboard->widgetFactory_(WidgetType::STOPWATCH)));
+        ctx.webServer->setCalendarStore(ctx.calendarStore);
       }
 #endif
     }

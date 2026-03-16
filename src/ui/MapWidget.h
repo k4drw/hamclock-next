@@ -19,6 +19,7 @@
 
 #include <SDL.h>
 
+#include <ctime>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -116,6 +117,11 @@ public:
   void onSatTrackReady(const std::vector<GroundTrackPoint> &track);
   void onPropDataReady(PropOverlayType type, const std::vector<float> &grid);
   void onMapImageReady(bool night, std::string &&data);
+
+  // Show a calendar event alert overlay (30-second auto-dismiss).
+  // Safe to call from the main thread.
+  void showCalendarAlert(const std::string &summary, const std::string &source,
+                         time_t startTime);
 
 private:
   SDL_FPoint latLonToScreen(double lat, double lon) const;
@@ -274,6 +280,15 @@ private:
   void renderOverlayInfo(SDL_Renderer *renderer);
   void renderRssButton(SDL_Renderer *renderer);
   void renderAsteroidOverlay(SDL_Renderer *renderer);
+  void renderCalendarAlert(SDL_Renderer *renderer);
+
+  struct CalendarAlertState {
+    bool active = false;
+    std::string summary;
+    std::string source;
+    time_t startTime = 0;
+    uint32_t shownAtMs = 0;
+  } calendarAlert_;
 
   SDL_Rect rssRect_ = {};
 };
