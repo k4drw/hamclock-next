@@ -360,6 +360,7 @@ struct DashboardContext {
   Uint32 lastFpsUpdate = 0;
   int frames = 0;
   Uint32 lastMouseMotionMs = 0;
+  int expandedPaneIdx_ = -1;
   bool cursorVisible = true;
   Uint32 lastSleepAssert = 0;
   Uint32 lastMemLogMs = 0;
@@ -372,6 +373,8 @@ struct DashboardContext {
   ~DashboardContext();
 
   void applySidePanelMode(WidgetType chosen, AppContext &ctx);
+  void expandPane(int idx, AppContext &ctx);
+  void restorePane(AppContext &ctx);
   void update(AppContext &ctx);
   void render(AppContext &ctx);
 };
@@ -1704,6 +1707,13 @@ DashboardContext::DashboardContext(AppContext &ctx)
         // Don't open global setup generically.
       }
     });
+    panes[i]->setOnMaximizeRequested([this, &ctx](int idx) {
+      if (expandedPaneIdx_ == idx)
+        restorePane(ctx);
+      else
+        expandPane(idx, ctx);
+    });
+    panes[i]->setLineAATexture(texMgr.get("line_aa"));
   }
 
   mapArea = std::make_unique<MapWidget>(0, 0, 0, 0, texMgr, fontMgr, netManager,
@@ -1883,6 +1893,29 @@ void DashboardContext::applySidePanelMode(WidgetType chosen, AppContext &ctx) {
   ctx.appCfg.pane5Rotation = p5;
   ctx.appCfg.pane6Rotation = p6;
   ctx.cfgMgr.save(ctx.appCfg);
+}
+
+void DashboardContext::expandPane(int idx, AppContext &ctx) {
+  if (expandedPaneIdx_ >= 0 || idx < 0 || idx >= (int)panes.size())
+    return;
+  expandedPaneIdx_ = idx;
+  SDL_Rect mr = mapArea->getRect();
+  panes[idx]->onResize(mr.x, mr.y, mr.w, mr.h);
+  panes[idx]->setExpanded(true);
+  panes[idx]->setPaused(true);
+}
+
+void DashboardContext::restorePane(AppContext &ctx) {
+  if (expandedPaneIdx_ < 0)
+    return;
+  panes[expandedPaneIdx_]->setExpanded(false);
+  panes[expandedPaneIdx_]->setPaused(false);
+  expandedPaneIdx_ = -1;
+  if (FIDELITY_MODE)
+    layout.recalculate(LOGICAL_WIDTH, LOGICAL_HEIGHT, ctx.layLogicalOffX,
+                       ctx.layLogicalOffY);
+  else
+    layout.recalculate(ctx.globalWinW, ctx.globalWinH);
 }
 
 void DashboardContext::update(AppContext &ctx) {
@@ -2806,6 +2839,8 @@ void DashboardContext::render(AppContext &ctx) {
 
   Widget *activeModal = nullptr;
   for (auto *w : widgets) {
+    if (expandedPaneIdx_ >= 0 && w == mapArea.get())
+      continue;  // hide map behind expanded pane
     if (w->isModalActive())
       activeModal = w;
     SDL_Rect clip = w->getRect();
