@@ -2686,6 +2686,11 @@ void MapWidget::updatePropagationOverlay() {
     return;
   }
 
+  // Heatmap data comes from ReachProvider via onPropDataReady() callback —
+  // not from PropEngine.  Skip the engine computation entirely.
+  if (config_.propOverlay == PropOverlayType::Heatmap)
+    return;
+
   PropPathParams params;
   params.txLat = state_->deLocation.lat;
   params.txLon = state_->deLocation.lon;
