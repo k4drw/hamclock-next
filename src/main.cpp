@@ -845,10 +845,6 @@ int main(int argc, char *argv[]) {
   return EXIT_SUCCESS;
 }
 
-// =========================================================================================
-// Implementation
-// =========================================================================================
-
 void AppContext::updateLayoutMetrics() {
   SDL_GetWindowSize(window, &globalWinW, &globalWinH);
   SDL_GetRendererOutputSize(renderer, &globalDrawW, &globalDrawH);

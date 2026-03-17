@@ -147,11 +147,7 @@ void MarineProvider::fetchBuoy(const std::string &buoyStation, bool force) {
             auto toDouble = [](const std::string &s, double missing) -> double {
               if (s == "MM" || s == "9999" || s == "999.0")
                 return missing;
-              try {
-                return std::stod(s);
-              } catch (...) {
-                return missing;
-              }
+              return StringUtils::safe_stod(s);
             };
 
             b.waveHeightM = toDouble(colVal("WVHT"), -1.0);
@@ -160,10 +156,7 @@ void MarineProvider::fetchBuoy(const std::string &buoyStation, bool force) {
             b.windSpeedMps = toDouble(colVal("WSPD"), -1.0);
             auto wdStr = colVal("WDIR");
             if (wdStr != "MM")
-              try {
-                b.windDirDeg = std::stoi(wdStr);
-              } catch (...) {
-              }
+              b.windDirDeg = StringUtils::safe_stoi(wdStr);
 
             update.buoyValid = true;
             update.lastUpdate = std::chrono::system_clock::now();

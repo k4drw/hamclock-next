@@ -1,6 +1,7 @@
 #include "SolarTimelinePanel.h"
 #include "../core/Astronomy.h"
 #include "../core/Logger.h"
+#include "../core/StringUtils.h"
 #include "../core/Theme.h"
 #include "FontCatalog.h"
 #include <SDL.h>
@@ -52,7 +53,7 @@ void SolarTimelinePanel::update() {
 
             KpForecastBlock blk;
             blk.timeUtc = Astronomy::portable_timegm(&t);
-            blk.kp      = std::stof(kpStr);
+            blk.kp      = StringUtils::safe_stof(kpStr);
             d.blocks.push_back(blk);
           }
           d.fetchedAt = std::time(nullptr);
