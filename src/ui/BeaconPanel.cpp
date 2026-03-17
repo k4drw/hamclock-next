@@ -65,18 +65,7 @@ void BeaconPanel::render(SDL_Renderer *renderer) {
 
   ThemeColors themes = getThemeColors(theme_);
 
-  // Background
-  SDL_SetRenderDrawBlendMode(
-      renderer, (theme_ == "glass") ? SDL_BLENDMODE_BLEND : SDL_BLENDMODE_NONE);
-  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b,
-                         themes.bg.a);
-  SDL_Rect rect = {x_, y_, width_, height_};
-  SDL_RenderFillRect(renderer, &rect);
-
-  // Border
-  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
-                         themes.border.b, themes.border.a);
-  SDL_RenderDrawRect(renderer, &rect);
+  renderChrome(renderer);
 
   bool isNarrow = (width_ < 100 || height_ < 140);
   int titleH = 20;
