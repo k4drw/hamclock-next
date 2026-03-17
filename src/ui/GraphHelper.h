@@ -12,7 +12,8 @@ namespace GraphHelper {
 inline void drawTimeSeries(SDL_Renderer *renderer, SDL_Texture *lineTex,
                            int x, int y, int w, int h,
                            const SDL_FPoint *pts, int count,
-                           SDL_Color lineColor, SDL_Color borderColor) {
+                           SDL_Color lineColor, SDL_Color borderColor,
+                           float thickness = 2.0f) {
   SDL_SetRenderDrawColor(renderer, borderColor.r, borderColor.g,
                          borderColor.b, 150);
   SDL_Rect frame = {x, y, w, h};
@@ -21,10 +22,10 @@ inline void drawTimeSeries(SDL_Renderer *renderer, SDL_Texture *lineTex,
   if (count == 0) return;
 
   if (lineTex && count > 1) {
-    RenderUtils::drawPolylineTextured(renderer, lineTex, pts, count, 2.0f,
+    RenderUtils::drawPolylineTextured(renderer, lineTex, pts, count, thickness,
                                       lineColor);
   } else if (count > 1) {
-    RenderUtils::drawPolyline(renderer, pts, count, 1.5f, lineColor);
+    RenderUtils::drawPolyline(renderer, pts, count, thickness, lineColor);
   } else {
     // Single-point: render a 2x2 dot for visibility.
     SDL_SetRenderDrawColor(renderer, lineColor.r, lineColor.g, lineColor.b,
