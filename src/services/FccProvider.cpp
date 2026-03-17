@@ -1,5 +1,6 @@
 #include "FccProvider.h"
 #include "../core/Logger.h"
+#include "../core/TimeUtils.h"
 
 #if !defined(__EMSCRIPTEN__)
 #include <curl/curl.h>
@@ -59,9 +60,7 @@ static std::string stripTags(const std::string &html) {
 static std::string normalizeDate(const std::string &s) {
   int m = 0, d = 0, y = 0;
   if (std::sscanf(s.c_str(), "%d/%d/%d", &m, &d, &y) == 3) {
-    char buf[16];
-    std::snprintf(buf, sizeof(buf), "%04d-%02d-%02d", y, m, d);
-    return buf;
+    return TimeUtils::dateISO(y, m, d);
   }
   return s;
 }
