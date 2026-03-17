@@ -1947,9 +1947,7 @@ void WebServer::run() {
     res.set_content("ok", "text/plain");
   });
 
-  // ----------------------------------------------------------------
   // /api/live/vectors — spot + projection data for canvas overlay
-  // ----------------------------------------------------------------
   svr.Get("/api/live/vectors", [this](const httplib::Request &,
                                       httplib::Response &res) {
     if (!cfg_ || !state_) {

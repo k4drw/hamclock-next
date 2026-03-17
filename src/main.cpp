@@ -1588,10 +1588,6 @@ DashboardContext::DashboardContext(AppContext &ctx)
     allTypes.push_back(WidgetType::RIG_CONTROL);
   }
 
-  // Remove eager loading loop
-  // for (auto t : allTypes)
-  //   addToPool(t);
-
   // Callback wiring moved to getOrAddWidget for lazy compatibility
 
   for (int i = 0; i < 6; ++i) {

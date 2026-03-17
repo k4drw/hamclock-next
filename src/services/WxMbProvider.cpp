@@ -8,9 +8,7 @@
 #include <cstring>
 #include <ctime>
 
-// ---------------------------------------------------------------------------
 // GRIB2 binary helpers (big-endian)
-// ---------------------------------------------------------------------------
 
 static inline uint16_t u16be(const uint8_t *p) {
   return ((uint16_t)p[0] << 8) | p[1];
@@ -44,9 +42,7 @@ static uint32_t readBits(const uint8_t *data, size_t bitOffset, int n) {
   return (uint32_t)buf;
 }
 
-// ---------------------------------------------------------------------------
 // GRIB2 decoder — Template 5.0 (simple), 5.2 (complex), 5.3 (complex+spatial)
-// ---------------------------------------------------------------------------
 
 bool WxMbProvider::decodeGFS(const std::vector<uint8_t> &data,
                              GribField &out_prmsl, GribField &out_ugrd,
@@ -355,11 +351,9 @@ bool WxMbProvider::decodeGFS(const std::vector<uint8_t> &data,
          !out_ugrd.values.empty() && !out_vgrd.values.empty();
 }
 
-// ---------------------------------------------------------------------------
 // Marching squares — segment table
 // bit0=TL, bit1=TR, bit2=BR, bit3=BL
 // Edges: 0=top(TL-TR), 1=right(TR-BR), 2=bottom(BR-BL), 3=left(BL-TL)
-// ---------------------------------------------------------------------------
 static const int8_t MC_SEGS[16][2][2] = {
     {{-1, -1}, {-1, -1}}, // 0  all outside
     {{0, 3}, {-1, -1}},   // 1  TL
@@ -379,9 +373,7 @@ static const int8_t MC_SEGS[16][2][2] = {
     {{-1, -1}, {-1, -1}}, // 15 all inside
 };
 
-// ---------------------------------------------------------------------------
 // buildSegments — marching squares + quivers → lat/lon geometry
-// ---------------------------------------------------------------------------
 
 void WxMbProvider::buildSegments(const GribField &prmsl, const GribField &ugrd,
                                  const GribField &vgrd, float pMin, float pMax,
@@ -589,9 +581,7 @@ void WxMbProvider::buildSegments(const GribField &prmsl, const GribField &ugrd,
   }
 }
 
-// ---------------------------------------------------------------------------
 // GFS cycle URL construction
-// ---------------------------------------------------------------------------
 
 std::string WxMbProvider::buildNomadsUrl() {
   std::time_t t = std::time(nullptr) - 4 * 3600;
@@ -614,9 +604,7 @@ std::string WxMbProvider::buildNomadsUrl() {
   return buf;
 }
 
-// ---------------------------------------------------------------------------
 // WxMbProvider public interface
-// ---------------------------------------------------------------------------
 
 WxMbProvider::WxMbProvider(NetworkManager &net) : net_(net) {}
 WxMbProvider::~WxMbProvider() {

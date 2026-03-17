@@ -246,12 +246,6 @@ bool SatelliteSetup::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
     return true;
   }
 
-  // Click outside dialog to dismiss?
-  if (!pointInRect(mx, my, dialogRect_)) {
-    // setActive(false);
-    // return true;
-  }
-
   return true;
 }
 

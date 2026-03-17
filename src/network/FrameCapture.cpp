@@ -7,10 +7,8 @@
 #include <chrono>
 #include <cstring>
 
-// ---------------------------------------------------------------------------
 // Growing-buffer SDL_RWops — allows IMG_SaveJPG_RW to write to a std::vector
 // without a fixed size limit.
-// ---------------------------------------------------------------------------
 
 struct GrowBuf {
   std::vector<uint8_t> data;
@@ -72,8 +70,6 @@ static SDL_RWops *makeGrowBufRW(GrowBuf *g) {
   rw->hidden.unknown.data1 = g;
   return rw;
 }
-
-// ---------------------------------------------------------------------------
 
 FrameCapture::FrameCapture() : maxFps_(10), running_(false) {}
 

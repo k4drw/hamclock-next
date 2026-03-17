@@ -566,8 +566,6 @@ void DXClusterProvider::processLine(const std::string &line) {
   if (line.empty())
     return;
 
-  // std::fprintf(stderr, "DXCluster: data: %s\n", line.c_str());
-
   // Example: DX de KD0AA:     18100.0  JR1FYS       FT8 LOUD in FL! 2156Z
   if (line.find("DX de ") != std::string::npos) {
     DXClusterSpot spot;
