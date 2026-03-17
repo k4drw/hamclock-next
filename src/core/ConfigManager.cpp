@@ -273,6 +273,8 @@ bool ConfigManager::load(AppConfig &config) {
         json["calendar"].value("notify_minutes", 10);
     config.calendarAllDayNotifyHour =
         json["calendar"].value("allday_notify_hour", 8);
+    config.calendarDismissMinutes =
+        json["calendar"].value("dismiss_minutes", 10);
   }
 
   if (json.contains("asteroid")) {
@@ -698,6 +700,7 @@ bool ConfigManager::save(const AppConfig &config) {
 
   json["calendar"]["notify_minutes"] = config.calendarNotifyMinutes;
   json["calendar"]["allday_notify_hour"] = config.calendarAllDayNotifyHour;
+  json["calendar"]["dismiss_minutes"] = config.calendarDismissMinutes;
   json["asteroid"]["icon"] = config.asteroidIcon;
   json["asteroid"]["color"]["r"] = config.asteroidColor.r;
   json["asteroid"]["color"]["g"] = config.asteroidColor.g;

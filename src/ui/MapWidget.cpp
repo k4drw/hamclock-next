@@ -3915,21 +3915,21 @@ void MapWidget::renderCountryBorders(SDL_Renderer *renderer) {
 
 void MapWidget::showCalendarAlert(const std::string &summary,
                                   const std::string &source,
-                                  time_t startTime) {
+                                  time_t startTime, int dismissMinutes) {
   calendarAlert_.active = true;
   calendarAlert_.summary = summary;
   calendarAlert_.source = source;
   calendarAlert_.startTime = startTime;
   calendarAlert_.shownAtMs = SDL_GetTicks();
+  calendarAlert_.durationMs = (uint32_t)(dismissMinutes * 60 * 1000);
 }
 
 void MapWidget::renderCalendarAlert(SDL_Renderer *renderer) {
   if (!calendarAlert_.active)
     return;
 
-  static constexpr uint32_t kAlertDurationMs = 30000;
   uint32_t elapsed = SDL_GetTicks() - calendarAlert_.shownAtMs;
-  if (elapsed >= kAlertDurationMs) {
+  if (elapsed >= calendarAlert_.durationMs) {
     calendarAlert_.active = false;
     return;
   }
@@ -3977,7 +3977,7 @@ void MapWidget::renderCalendarAlert(SDL_Renderer *renderer) {
                 themes.textDim, FontStyle::Caption, true);
 
   // Progress bar (counts down to 0)
-  float frac = 1.0f - (float)elapsed / kAlertDurationMs;
+  float frac = 1.0f - (float)elapsed / (float)calendarAlert_.durationMs;
   int barW = (int)((panW - 16) * frac);
   SDL_SetRenderDrawColor(renderer, 100, 160, 255, 180);
   SDL_Rect bar = {panX + 8, panY + panH - 12, barW, 6};

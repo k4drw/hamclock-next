@@ -151,9 +151,9 @@ void CalendarPanel::renderSetup(SDL_Renderer *renderer) {
                 FontStyle::MicroBold, true);
   y += 22;
 
-  const int btnW = 22;
-  const int btnH = 22;
-  const int rowH = 32;
+  const int btnW = 18;
+  const int btnH = 20;
+  const int rowH = 28;
   int lx = x_ + 10;
 
   // Row 1: Alert (mins)
@@ -170,7 +170,7 @@ void CalendarPanel::renderSetup(SDL_Renderer *renderer) {
     SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
                            themes.border.b, 255);
     SDL_RenderDrawRect(renderer, &minsDecBtn_);
-    cat->drawText(renderer, "-", bx + btnW / 2, y + 3, themes.text,
+    cat->drawText(renderer, "-", bx + btnW / 2, y + btnH / 2 - 6, themes.text,
                   FontStyle::MicroBold, true);
 
     bx = x_ + width_ - btnW - 6;
@@ -181,7 +181,7 @@ void CalendarPanel::renderSetup(SDL_Renderer *renderer) {
     SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
                            themes.border.b, 255);
     SDL_RenderDrawRect(renderer, &minsIncBtn_);
-    cat->drawText(renderer, "+", bx + btnW / 2, y + 3, themes.text,
+    cat->drawText(renderer, "+", bx + btnW / 2, y + btnH / 2 - 6, themes.text,
                   FontStyle::MicroBold, true);
 
     y += rowH;
@@ -201,7 +201,7 @@ void CalendarPanel::renderSetup(SDL_Renderer *renderer) {
     SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
                            themes.border.b, 255);
     SDL_RenderDrawRect(renderer, &hourDecBtn_);
-    cat->drawText(renderer, "-", bx + btnW / 2, y + 3, themes.text,
+    cat->drawText(renderer, "-", bx + btnW / 2, y + btnH / 2 - 6, themes.text,
                   FontStyle::MicroBold, true);
 
     bx = x_ + width_ - btnW - 6;
@@ -212,7 +212,38 @@ void CalendarPanel::renderSetup(SDL_Renderer *renderer) {
     SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
                            themes.border.b, 255);
     SDL_RenderDrawRect(renderer, &hourIncBtn_);
-    cat->drawText(renderer, "+", bx + btnW / 2, y + 3, themes.text,
+    cat->drawText(renderer, "+", bx + btnW / 2, y + btnH / 2 - 6, themes.text,
+                  FontStyle::MicroBold, true);
+
+    y += rowH;
+  }
+
+  // Row 3: Alert dismiss timeout
+  {
+    char label[32];
+    std::snprintf(label, sizeof(label), "Dismiss: %d min", pendingDismiss_);
+    cat->drawText(renderer, label, lx, y + 4, themes.text, FontStyle::Caption);
+
+    int bx = x_ + width_ - btnW * 2 - 16;
+    dismissDecBtn_ = {bx, y, btnW, btnH};
+    SDL_SetRenderDrawColor(renderer, themes.rowStripe1.r, themes.rowStripe1.g,
+                           themes.rowStripe1.b, 255);
+    SDL_RenderFillRect(renderer, &dismissDecBtn_);
+    SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
+                           themes.border.b, 255);
+    SDL_RenderDrawRect(renderer, &dismissDecBtn_);
+    cat->drawText(renderer, "-", bx + btnW / 2, y + btnH / 2 - 6, themes.text,
+                  FontStyle::MicroBold, true);
+
+    bx = x_ + width_ - btnW - 6;
+    dismissIncBtn_ = {bx, y, btnW, btnH};
+    SDL_SetRenderDrawColor(renderer, themes.rowStripe1.r, themes.rowStripe1.g,
+                           themes.rowStripe1.b, 255);
+    SDL_RenderFillRect(renderer, &dismissIncBtn_);
+    SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
+                           themes.border.b, 255);
+    SDL_RenderDrawRect(renderer, &dismissIncBtn_);
+    cat->drawText(renderer, "+", bx + btnW / 2, y + btnH / 2 - 6, themes.text,
                   FontStyle::MicroBold, true);
 
     y += rowH;
@@ -243,6 +274,7 @@ bool CalendarPanel::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
       my >= footerRect_.y && my <= footerRect_.y + footerRect_.h) {
     pendingMinutes_ = notifyMinutes_;
     pendingHour_ = allDayHour_;
+    pendingDismiss_ = dismissMinutes_;
     showSetup_ = true;
     return true;
   }
@@ -275,12 +307,25 @@ bool CalendarPanel::handleSetupClick(int mx, int my) {
       ++pendingHour_;
     return true;
   }
+  if (mx >= dismissDecBtn_.x && mx <= dismissDecBtn_.x + dismissDecBtn_.w &&
+      my >= dismissDecBtn_.y && my <= dismissDecBtn_.y + dismissDecBtn_.h) {
+    if (pendingDismiss_ > 1)
+      --pendingDismiss_;
+    return true;
+  }
+  if (mx >= dismissIncBtn_.x && mx <= dismissIncBtn_.x + dismissIncBtn_.w &&
+      my >= dismissIncBtn_.y && my <= dismissIncBtn_.y + dismissIncBtn_.h) {
+    if (pendingDismiss_ < 120)
+      ++pendingDismiss_;
+    return true;
+  }
   if (mx >= doneBtn_.x && mx <= doneBtn_.x + doneBtn_.w &&
       my >= doneBtn_.y && my <= doneBtn_.y + doneBtn_.h) {
     notifyMinutes_ = pendingMinutes_;
     allDayHour_ = pendingHour_;
+    dismissMinutes_ = pendingDismiss_;
     if (onConfigChanged_)
-      onConfigChanged_(notifyMinutes_, allDayHour_);
+      onConfigChanged_(notifyMinutes_, allDayHour_, dismissMinutes_);
     showSetup_ = false;
     return true;
   }

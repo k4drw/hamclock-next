@@ -976,44 +976,9 @@ void SetupScreen::renderTabWidgets(SDL_Renderer *renderer, int cx, int pad,
   int listEndY = sideSecY - pad / 2;
   int listAvailH = listEndY - y;
 
-  static const WidgetType kAllTypes[] = {WidgetType::ADIF,
-                                         WidgetType::ASTEROID,
-                                         WidgetType::AURORA,
-                                         WidgetType::AURORA_GRAPH,
-                                         WidgetType::BAND_CONDITIONS,
-                                         WidgetType::CALLBOOK,
-                                         WidgetType::CLOCK_AUX,
-                                         WidgetType::CONTESTS,
-                                         WidgetType::COUNTDOWN,
-                                         WidgetType::DE_WEATHER,
-                                         WidgetType::DRAP,
-                                         WidgetType::DST_INDEX,
-                                         WidgetType::DX_CLUSTER,
-                                         WidgetType::DX_PEDITIONS,
-                                         WidgetType::DX_WEATHER,
-                                         WidgetType::EME_TOOL,
-                                         WidgetType::FORECAST,
-                                         WidgetType::GIMBAL,
-                                         WidgetType::HISTORY_KP,
-                                         WidgetType::LIVE_SPOTS,
-                                         WidgetType::MARINE,
-                                         WidgetType::MOON,
-                                         WidgetType::NCDXF,
-                                         WidgetType::ON_THE_AIR,
-                                         WidgetType::REMINDER,
-                                         WidgetType::SANTA_TRACKER,
-                                         WidgetType::SDO,
-                                         WidgetType::SOLAR,
-                                         WidgetType::HISTORY_FLUX,
-                                         WidgetType::STOPWATCH,
-                                         WidgetType::HISTORY_SSN,
-                                         WidgetType::SYS_INFO,
-                                         WidgetType::HURRICANE,
-                                         WidgetType::WATCHLIST,
-                                         WidgetType::ALERTS};
-  constexpr int kNWidgets =
-      static_cast<int>(sizeof(kAllTypes) / sizeof(kAllTypes[0]));
-  constexpr int kColItems = (kNWidgets + 2) / 3; // items per column = 12
+  auto kAllTypesVec = getAllBaseWidgetTypes();
+  const int kNWidgets = static_cast<int>(kAllTypesVec.size());
+  const int kColItems = (kNWidgets + 2) / 3;
 
   int visRows = std::max(1, listAvailH / rowH);
   widgetListMaxScroll_ = std::max(0, kColItems - visRows);
@@ -1036,7 +1001,7 @@ void SetupScreen::renderTabWidgets(SDL_Renderer *renderer, int cx, int pad,
       int idx = col * kColItems + widgetListScrollOffset_ + row;
       if (idx >= kNWidgets)
         break;
-      WidgetType t = kAllTypes[idx];
+      WidgetType t = kAllTypesVec[idx];
 
       bool allowed = true;
       if (activePane_ == 3) {

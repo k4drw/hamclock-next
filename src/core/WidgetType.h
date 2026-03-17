@@ -2,6 +2,7 @@
 
 #include <cstdio>
 #include <string>
+#include <vector>
 
 enum class WidgetType {
   SOLAR,
@@ -386,4 +387,36 @@ inline WidgetType widgetTypeFromString(const std::string &s,
     return WidgetType::CALENDAR;
   std::fprintf(stderr, "WidgetType: unknown '%s', using fallback\n", s.c_str());
   return fallback;
+}
+
+inline std::vector<WidgetType> getAllBaseWidgetTypes() {
+  return {
+    WidgetType::ADIF,          WidgetType::ALERTS,
+    WidgetType::ASTEROID,      WidgetType::AURORA,
+    WidgetType::AURORA_GRAPH,  WidgetType::BAND_CONDITIONS,
+    WidgetType::CALLBOOK,      WidgetType::CLOCK_AUX,
+    WidgetType::CONTESTS,      WidgetType::COUNTDOWN,
+    WidgetType::DE_INFO,       WidgetType::DE_WEATHER,
+    WidgetType::DRAP,          WidgetType::DST_INDEX,
+    WidgetType::DX_CLUSTER,    WidgetType::DX_INFO,
+    WidgetType::DX_PEDITIONS,  WidgetType::DX_WEATHER,
+    WidgetType::EME_TOOL,      WidgetType::ENV_DEWPOINT,
+    WidgetType::ENV_HUMIDITY,  WidgetType::ENV_PRESSURE,
+    WidgetType::ENV_TEMP,      WidgetType::FORECAST,
+    WidgetType::GIMBAL,        WidgetType::GREYLINE_DX,
+    WidgetType::HISTORY_FLUX,  WidgetType::HISTORY_KP,
+    WidgetType::HISTORY_SSN,   WidgetType::HURRICANE,
+    WidgetType::IONOSONDE,     WidgetType::LIGHTNING,
+    WidgetType::LIVE_SPOTS,    WidgetType::MARINE,
+    WidgetType::METEOR,        WidgetType::MOON,
+    WidgetType::NCDXF,         WidgetType::ON_THE_AIR,
+    WidgetType::REMINDER,      WidgetType::SANTA_TRACKER,
+    WidgetType::SDO,           WidgetType::SOLAR,
+    WidgetType::SOLAR_STORM,   WidgetType::SOLAR_TIMELINE,
+    WidgetType::STOPWATCH,     WidgetType::SYS_INFO,
+    WidgetType::TROPO,         WidgetType::WATCHLIST,
+    WidgetType::CALENDAR,
+  };
+  // Note: REPEATER_DIR, WINLINK, RIG_CONTROL are excluded —
+  // they require config keys and are conditionally added by callers.
 }

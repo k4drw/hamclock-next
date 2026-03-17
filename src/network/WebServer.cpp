@@ -1253,24 +1253,7 @@ void WebServer::run() {
   svr.Get("/api/widgets/available",
           [](const httplib::Request &, httplib::Response &res) {
             nlohmann::json j = nlohmann::json::array();
-            static const WidgetType all[] = {
-                WidgetType::SOLAR,        WidgetType::DX_CLUSTER,
-                WidgetType::LIVE_SPOTS,   WidgetType::BAND_CONDITIONS,
-                WidgetType::CONTESTS,     WidgetType::ON_THE_AIR,
-                WidgetType::GIMBAL,       WidgetType::MOON,
-                WidgetType::CLOCK_AUX,    WidgetType::DX_PEDITIONS,
-                WidgetType::DE_WEATHER,   WidgetType::DX_WEATHER,
-                WidgetType::NCDXF,        WidgetType::SDO,
-                WidgetType::HISTORY_FLUX, WidgetType::HISTORY_KP,
-                WidgetType::HISTORY_SSN,  WidgetType::DRAP,
-                WidgetType::AURORA,       WidgetType::AURORA_GRAPH,
-                WidgetType::ADIF,         WidgetType::EME_TOOL,
-                WidgetType::SYS_INFO,     WidgetType::ASTEROID,
-                WidgetType::ALERTS,       WidgetType::FORECAST,
-                WidgetType::HURRICANE,    WidgetType::MARINE,
-                WidgetType::GREYLINE_DX,  WidgetType::METEOR,
-                WidgetType::IONOSONDE,    WidgetType::SOLAR_STORM,
-                WidgetType::DE_INFO,      WidgetType::DX_INFO};
+            auto all = getAllBaseWidgetTypes();
             for (auto t : all) {
               nlohmann::json w;
               w["id"] = widgetTypeToString(t);

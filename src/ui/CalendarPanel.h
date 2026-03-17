@@ -23,9 +23,10 @@ public:
   // Initialize config values from AppConfig before first render
   void setNotifyMinutes(int m) { notifyMinutes_ = pendingMinutes_ = m; }
   void setAllDayNotifyHour(int h) { allDayHour_ = pendingHour_ = h; }
+  void setDismissMinutes(int m) { dismissMinutes_ = pendingDismiss_ = m; }
 
-  // Called with (notifyMinutes, allDayHour) when user taps Done
-  void setOnConfigChanged(std::function<void(int, int)> cb) {
+  // Called with (notifyMinutes, allDayHour, dismissMinutes) when user taps Done
+  void setOnConfigChanged(std::function<void(int, int, int)> cb) {
     onConfigChanged_ = std::move(cb);
   }
 
@@ -39,10 +40,12 @@ private:
   // Config values (live) and pending (while setup is open)
   int notifyMinutes_ = 10;
   int allDayHour_ = 8;
+  int dismissMinutes_ = 10;
   int pendingMinutes_ = 10;
   int pendingHour_ = 8;
+  int pendingDismiss_ = 10;
 
-  std::function<void(int, int)> onConfigChanged_;
+  std::function<void(int, int, int)> onConfigChanged_;
 
   // Setup state
   bool showSetup_ = false;
@@ -51,5 +54,7 @@ private:
   SDL_Rect minsIncBtn_ = {};
   SDL_Rect hourDecBtn_ = {};
   SDL_Rect hourIncBtn_ = {};
+  SDL_Rect dismissDecBtn_ = {};
+  SDL_Rect dismissIncBtn_ = {};
   SDL_Rect doneBtn_ = {};
 };

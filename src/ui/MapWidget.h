@@ -118,10 +118,10 @@ public:
   void onPropDataReady(PropOverlayType type, const std::vector<float> &grid);
   void onMapImageReady(bool night, std::string &&data);
 
-  // Show a calendar event alert overlay (30-second auto-dismiss).
+  // Show a calendar event alert overlay. dismissMinutes controls auto-dismiss.
   // Safe to call from the main thread.
   void showCalendarAlert(const std::string &summary, const std::string &source,
-                         time_t startTime);
+                         time_t startTime, int dismissMinutes);
 
 private:
   SDL_FPoint latLonToScreen(double lat, double lon) const;
@@ -288,6 +288,7 @@ private:
     std::string source;
     time_t startTime = 0;
     uint32_t shownAtMs = 0;
+    uint32_t durationMs = 30000;
   } calendarAlert_;
 
   SDL_Rect rssRect_ = {};

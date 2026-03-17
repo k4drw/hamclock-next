@@ -229,8 +229,9 @@ struct AppConfig {
   bool contestModeActive = false; // true while contest preset is active
 
   // Calendar notifications
-  int calendarNotifyMinutes = 10;  // minutes before event to show alert
-  int calendarAllDayNotifyHour = 8; // hour (UTC) to alert for all-day events
+  int calendarNotifyMinutes = 10;       // minutes before event to show alert
+  int calendarAllDayNotifyHour = 8;     // hour (UTC) to alert for all-day events
+  int calendarDismissMinutes = 10;      // minutes before auto-dismissing the alert overlay
 
   // Presets
   std::vector<ConfigPreset> presets;

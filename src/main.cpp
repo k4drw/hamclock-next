@@ -1443,9 +1443,11 @@ DashboardContext::DashboardContext(AppContext &ctx)
       auto *calPanel = new CalendarPanel(0, 0, 0, 0, fontMgr, ctx.calendarStore);
       calPanel->setNotifyMinutes(appCfg.calendarNotifyMinutes);
       calPanel->setAllDayNotifyHour(appCfg.calendarAllDayNotifyHour);
-      calPanel->setOnConfigChanged([&ctx](int mins, int hour) {
+      calPanel->setDismissMinutes(appCfg.calendarDismissMinutes);
+      calPanel->setOnConfigChanged([&ctx](int mins, int hour, int dismiss) {
         ctx.appCfg.calendarNotifyMinutes = mins;
         ctx.appCfg.calendarAllDayNotifyHour = hour;
+        ctx.appCfg.calendarDismissMinutes = dismiss;
         ctx.cfgMgr.save(ctx.appCfg);
       });
       widgetPool[type] = std::unique_ptr<CalendarPanel>(calPanel);
@@ -1578,32 +1580,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
     return widgetPool[type].get();
   };
 
-  std::vector<WidgetType> allTypes = {
-      WidgetType::ADIF,          WidgetType::ALERTS,
-      WidgetType::ASTEROID,      WidgetType::AURORA,
-      WidgetType::AURORA_GRAPH,  WidgetType::BAND_CONDITIONS,
-      WidgetType::CALLBOOK,      WidgetType::CLOCK_AUX,
-      WidgetType::CONTESTS,      WidgetType::COUNTDOWN,
-      WidgetType::DE_WEATHER,    WidgetType::DRAP,
-      WidgetType::DST_INDEX,     WidgetType::DX_CLUSTER,
-      WidgetType::DX_PEDITIONS,  WidgetType::DX_WEATHER,
-      WidgetType::EME_TOOL,      WidgetType::FORECAST,
-      WidgetType::GIMBAL,        WidgetType::HISTORY_FLUX,
-      WidgetType::HISTORY_KP,    WidgetType::HISTORY_SSN,
-      WidgetType::HURRICANE,     WidgetType::LIVE_SPOTS,
-      WidgetType::MARINE,        WidgetType::MOON,
-      WidgetType::NCDXF,         WidgetType::ON_THE_AIR,
-      WidgetType::SANTA_TRACKER, WidgetType::SDO,
-      WidgetType::SOLAR,         WidgetType::SYS_INFO,
-      WidgetType::WATCHLIST,     WidgetType::STOPWATCH,
-      WidgetType::REMINDER,      WidgetType::TROPO,
-      WidgetType::LIGHTNING,     WidgetType::METEOR,
-      WidgetType::IONOSONDE,     WidgetType::SOLAR_STORM,
-      WidgetType::DE_INFO,       WidgetType::DX_INFO,
-      WidgetType::ENV_TEMP,      WidgetType::ENV_PRESSURE,
-      WidgetType::ENV_HUMIDITY,  WidgetType::ENV_DEWPOINT,
-      WidgetType::GREYLINE_DX,
-      WidgetType::CALENDAR};
+  std::vector<WidgetType> allTypes = getAllBaseWidgetTypes();
 
   if (!appCfg.repeaterBookKey.empty()) {
     allTypes.push_back(WidgetType::REPEATER_DIR);
@@ -2130,7 +2107,8 @@ void DashboardContext::update(AppContext &ctx) {
       // Fire within a 60-second window around the trigger time
       if (nowT >= triggerAt && nowT < triggerAt + 60) {
         if (ctx.calendarStore->markNotified(ev.start)) {
-          mapArea->showCalendarAlert(ev.summary, ev.source, ev.start);
+          mapArea->showCalendarAlert(ev.summary, ev.source, ev.start,
+                                     appCfg.calendarDismissMinutes);
           break; // Show one alert at a time
         }
       }
