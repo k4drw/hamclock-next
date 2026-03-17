@@ -5,44 +5,42 @@
 #include "../core/RigData.h"
 
 #include <atomic>
+#include <chrono>
 #include <condition_variable>
 #include <memory>
 #include <mutex>
 #include <queue>
 #include <string>
 #include <thread>
+#include <vector>
 
-// Service for interfacing with Hamlib rigctld daemon
-// Implements async producer-consumer pattern for CAT command execution
+// Service for interfacing with Hamlib rigctld daemon.
+// Implements async producer-consumer pattern for CAT command execution.
+// Periodically polls rig state (freq, mode, signal level, VFO, RIT, split).
 class RigService {
 public:
   RigService(std::shared_ptr<RigDataStore> store, const AppConfig &config,
              HamClockState *state = nullptr);
   ~RigService();
 
-  // Start/stop background command processing thread
   void start();
   void stop();
 
-  // High-level CAT command interface (producer)
-  // These methods queue commands for async execution
+  // --- Control interface (producer: queues async commands) ---
 
-  // Set radio frequency (in Hz)
   bool setFrequency(long long freqHz);
-
-  // Set operating mode (USB, LSB, CW, FM, AM, etc.)
+  bool setFrequencyB(long long freqHz);   // Set VFO-B frequency (Hamlib >= 3.3)
   bool setMode(const std::string &mode, int passbandHz = 0);
-
-  // Set PTT state
   bool setPTT(bool on);
+  bool setVFO(bool vfoA);                 // Switch active VFO (true=A, false=B)
+  bool setRIT(long long ritHz);           // Set RIT offset in Hz
+  bool setSplit(bool on);                 // Enable/disable split (TX on VFO-B)
+  bool vfoSwap();                         // Swap VFO-A and VFO-B frequencies
 
-  // Get current rig state (non-blocking, returns cached data)
+  // Non-blocking read of cached state
   RigData getState() const;
 
-  // Check if service is running
   bool isRunning() const { return running_; }
-
-  // Check if connected to rig
   bool isConnected() const;
 
 private:
@@ -53,33 +51,42 @@ private:
   std::atomic<bool> running_{false};
   std::atomic<bool> connected_{false};
 
-  // Producer-consumer queue infrastructure
   std::queue<RigCommandRequest> commandQueue_;
   std::mutex queueMutex_;
   std::condition_variable queueCV_;
   std::thread workerThread_;
-
-  // Protects sockfd_ against concurrent read/write from worker and stop()
   std::mutex sockMutex_;
 
-  // Worker thread that processes commands from queue
-  void commandWorker();
+  int sockfd_ = -1;
 
-  // Low-level Hamlib rigctld communication
+  // Periodic poll tracking
+  std::chrono::steady_clock::time_point lastPollTime_;
+  bool spectrumProbed_ = false;
+  static constexpr int POLL_INTERVAL_MS = 2000;
+  static constexpr size_t MAX_QUEUE_SIZE = 100;
+
+  void commandWorker();
+  void pollRigState();
+
   bool connectToRig();
   void disconnectFromRig();
   bool sendCommand(const std::string &cmd, std::string &response);
 
-  // Command execution (consumer)
+  // --- Execute methods (consumer: called from worker thread) ---
   bool executeSetFreq(long long freqHz);
   bool executeGetFreq(long long &freqHz);
+  bool executeSetFreqB(long long freqHz);
+  bool executeGetFreqB(long long &freqHz);
   bool executeSetMode(const std::string &mode, int passbandHz);
   bool executeGetMode(std::string &mode, int &passbandHz);
   bool executeSetPTT(bool on);
-
-  // Socket file descriptor
-  int sockfd_ = -1;
-
-  // Maximum queue depth (prevent memory growth)
-  static constexpr size_t MAX_QUEUE_SIZE = 100;
+  bool executeSetVFO(bool vfoA);
+  bool executeGetVFO(bool &vfoA);
+  bool executeSetRIT(long long ritHz);
+  bool executeGetRIT(long long &ritHz);
+  bool executeSetSplit(bool on);
+  bool executeGetSplit(bool &split);
+  bool executeGetLevel(float &dbm);
+  bool executeVFOSwap();
+  bool executeGetSpectrum(std::vector<float> &data); // Placeholder
 };

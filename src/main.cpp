@@ -1611,6 +1611,9 @@ DashboardContext::DashboardContext(AppContext &ctx)
   if (!appCfg.winlinkKey.empty()) {
     allTypes.push_back(WidgetType::WINLINK);
   }
+  if (!appCfg.rigHost.empty() && appCfg.rigPort != 0) {
+    allTypes.push_back(WidgetType::RIG_CONTROL);
+  }
 
   // Remove eager loading loop
   // for (auto t : allTypes)
