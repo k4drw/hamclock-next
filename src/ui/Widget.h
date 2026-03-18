@@ -127,6 +127,17 @@ protected:
     SDL_RenderDrawRect(renderer, &rect);
   }
 
+  // Draw the standard panel title at (x_+10, y_+5) in accent/MicroBold.
+  // Panels opt-in by calling this after renderChrome() in their render() method.
+  void renderTitle(SDL_Renderer *renderer, FontManager &fontMgr,
+                   const std::string &title) {
+    ThemeColors themes = getThemeColors(theme_);
+    auto *cat = fontMgr.catalog();
+    if (cat)
+      cat->drawText(renderer, title, x_ + 10, y_ + 5, themes.accent,
+                    FontStyle::MicroBold);
+  }
+
   // Default tooltip renderer — shared by all panels with simple tooltips.
   // Panels with custom tooltip logic (e.g. MapWidget) override this.
   // If tooltip_.text2 is set, it is drawn as a second dimmer line below text.

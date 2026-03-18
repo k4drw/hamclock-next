@@ -70,8 +70,6 @@ private:
 function generateSource(name: string, type: "Widget" | "Service"): string {
     if (type === "Widget") {
         return `#include "${name}.h"
-#include "../core/Theme.h"
-#include "RenderUtils.h"
 
 ${name}::${name}(int x, int y, int w, int h, FontManager &fontMgr, std::shared_ptr<HamClockState> state)
     : Widget(x, y, w, h), fontMgr_(fontMgr), state_(state) {
@@ -82,29 +80,16 @@ void ${name}::update() {
 }
 
 void ${name}::render(SDL_Renderer *renderer) {
-  ThemeColors themes = getThemeColors(theme_);
+  renderChrome(renderer);
+  renderTitle(renderer, fontMgr_, "${name}");
 
-  // Draw background
-  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, themes.bg.a);
-  SDL_Rect rect = {x_, y_, width_, height_};
-  SDL_RenderFillRect(renderer, &rect);
-  
-  // Draw border
-  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, themes.border.a);
-  SDL_RenderDrawRect(renderer, &rect);
-  
-  // Draw content
   if (!fontMgr_.ready()) return;
-  
-  // Example text
-  // int tw, th;
+
+  // ThemeColors themes = getThemeColors(theme_);
   // auto* cat = fontMgr_.catalog();
   // IMPORTANT: Never hardcode SDL_Color values. Always use ThemeColors tokens
   // (themes.text, themes.accent, themes.success, etc.).
-  // Example text:
-  // int tw, th;
-  // auto* cat = fontMgr_.catalog();
-  // cat->drawText(renderer, "Hello", x_ + 10, y_ + 10, themes.text, FontStyle::Fast);
+  // cat->drawText(renderer, "Hello", x_ + 10, y_ + 30, themes.text, FontStyle::Fast);
 }
 
 bool ${name}::onMouseDown(int mx, int my, Uint16 mod) {

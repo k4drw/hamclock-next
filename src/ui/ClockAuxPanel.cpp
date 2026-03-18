@@ -61,13 +61,7 @@ void ClockAuxPanel::render(SDL_Renderer *renderer) {
 
   ThemeColors themes = getThemeColors(theme_);
 
-  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b,
-                         themes.bg.a);
-  SDL_Rect rect = {x_, y_, width_, height_};
-  SDL_RenderFillRect(renderer, &rect);
-  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
-                         themes.border.b, themes.border.a);
-  SDL_RenderDrawRect(renderer, &rect);
+  renderChrome(renderer);
 
   auto now = std::chrono::system_clock::now();
   std::time_t now_c = std::chrono::system_clock::to_time_t(now);
@@ -83,8 +77,7 @@ void ClockAuxPanel::render(SDL_Renderer *renderer) {
 
   int titleH = 20;
   std::string title = config_.auxClockTzLabel + " Time";
-  cat->drawText(renderer, title, x_ + 10, y_ + 5, themes.accent,
-                FontStyle::MicroBold);
+  renderTitle(renderer, fontMgr_, title);
 
   int curY = y_ + titleH + 4;
   int centerX = x_ + width_ / 2;
