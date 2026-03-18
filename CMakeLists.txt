@@ -580,6 +580,8 @@ set(HAMCLOCK_SOURCES
     src/ui/LiveSpotPanel.cpp
     src/ui/LocalPanel.cpp
     src/ui/MapWidget.cpp
+    src/ui/MapWidget_Input.cpp
+    src/ui/MapWidget_Overlays.cpp
     src/ui/MapViewMenu.cpp
     src/ui/PaneContainer.cpp
     src/ui/PlaceholderWidget.cpp

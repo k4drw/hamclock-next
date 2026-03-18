@@ -1412,6 +1412,14 @@ void DashboardContext::update(AppContext &ctx) {
     lastGreylineFetchMs = now;
   }
 
+  // Reset fetch timer when switching away from Heatmap so re-selecting it
+  // triggers an immediate refresh rather than waiting out the 5-min interval.
+  if (prevPropOverlayForReach_ == PropOverlayType::Heatmap &&
+      appCfg.propOverlay != PropOverlayType::Heatmap) {
+    lastReachFetchMs = 0;
+  }
+  prevPropOverlayForReach_ = appCfg.propOverlay;
+
   if (appCfg.propOverlay == PropOverlayType::Heatmap &&
       (lastReachFetchMs == 0 || now - lastReachFetchMs > 5 * 60 * 1000)) {
     reachProvider->fetch(appCfg.propBand, appCfg.propMode);

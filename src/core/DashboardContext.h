@@ -211,6 +211,7 @@ struct DashboardContext {
   Uint32 lastFetchMs = 0;
   Uint32 lastGreylineFetchMs = 0;
   Uint32 lastReachFetchMs = 0;
+  PropOverlayType prevPropOverlayForReach_ = PropOverlayType::None;
   Uint32 lastDrapFetchMs = 0;
   Uint32 lastCalendarCheckMs = 0;
   Uint32 lastResizeMs = 0;
