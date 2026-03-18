@@ -592,7 +592,15 @@ set(HAMCLOCK_SOURCES
     src/ui/SatPanel.cpp
     src/ui/SetupScreen.cpp
     src/ui/SetupScreen_Appearance.cpp
+    src/ui/SetupScreen_Config.cpp
+    src/ui/SetupScreen_Events.cpp
+    src/ui/SetupScreen_Identity.cpp
+    src/ui/SetupScreen_Network.cpp
     src/ui/SetupScreen_Rig.cpp
+    src/ui/SetupScreen_Services.cpp
+    src/ui/SetupScreen_Spotting.cpp
+    src/ui/SetupScreen_Update.cpp
+    src/ui/SetupScreen_Watchlist.cpp
     src/ui/SetupScreen_Widgets.cpp
     src/ui/TextInput.cpp
     src/ui/SpaceWeatherPanel.cpp
