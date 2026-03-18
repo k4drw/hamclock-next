@@ -1,10 +1,11 @@
 #pragma once
 
+#include "ProviderBase.h"
 #include "../core/HurricaneData.h"
 #include "../network/NetworkManager.h"
 #include <memory>
 
-class HurricaneProvider {
+class HurricaneProvider : public ProviderBase {
 public:
   HurricaneProvider(NetworkManager &net,
                     std::shared_ptr<HurricaneStore> store);

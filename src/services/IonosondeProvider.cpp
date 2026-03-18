@@ -14,7 +14,7 @@ IonosondeProvider::IonosondeProvider(NetworkManager &netMgr)
 
 void IonosondeProvider::update() {
   uint32_t now = SDL_GetTicks();
-  if (hasData_ && (now - lastUpdateMs_ < UPDATE_INTERVAL_MS)) {
+  if (hasData_ && (now - lastFetchMs_ < UPDATE_INTERVAL_MS)) {
     return;
   }
 
@@ -27,7 +27,7 @@ void IonosondeProvider::update() {
     if (p) {
       if (!body.empty()) {
         p->processData(body);
-        p->lastUpdateMs_ = now;
+        p->lastFetchMs_ = now;
       } else {
         LOG_E("IonosondeProvider", "Failed to fetch ionosonde data");
       }

@@ -1,11 +1,12 @@
 #pragma once
 
+#include "ProviderBase.h"
 #include "../core/ContestData.h"
 #include "../network/NetworkManager.h"
 #include <memory>
 #include <string>
 
-class ContestProvider {
+class ContestProvider : public ProviderBase {
 public:
   ContestProvider(NetworkManager &net, std::shared_ptr<ContestStore> store);
 

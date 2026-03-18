@@ -1,6 +1,7 @@
 #include "NOAAProvider.h"
 
 #include "../core/Astronomy.h"
+#include <SDL.h>
 #include "../core/Constants.h"
 #include "../core/HamClockState.h"
 #include "../core/Logger.h"
@@ -71,6 +72,7 @@ static int calculateGScale(int kp_index) {
 }
 
 void NOAAProvider::fetch() {
+  lastFetchMs_ = SDL_GetTicks();
   LOG_I("NOAAProvider", "Starting solar data fetch cycle");
   fetchKIndex();
   fetchSFI();

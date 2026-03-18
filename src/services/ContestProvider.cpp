@@ -1,5 +1,6 @@
 #include "ContestProvider.h"
 #include "../core/Astronomy.h"
+#include <SDL.h>
 #include "../core/Constants.h"
 #include "../core/StringUtils.h"
 #include "../core/WorkerService.h"
@@ -14,6 +15,7 @@ ContestProvider::ContestProvider(NetworkManager &net,
     : net_(net), store_(std::move(store)) {}
 
 void ContestProvider::fetch() {
+  lastFetchMs_ = SDL_GetTicks();
   net_.fetchAsync(CONTEST_URL, [](std::string body) {
     if (body.empty())
       return;

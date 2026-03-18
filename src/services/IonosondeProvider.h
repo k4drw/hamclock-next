@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ProviderBase.h"
 #include "../core/IonosondeData.h"
 #include "../network/NetworkManager.h"
 #include <memory>
@@ -7,7 +8,7 @@
 #include <vector>
 #include <functional>
 
-class IonosondeProvider : public std::enable_shared_from_this<IonosondeProvider> {
+class IonosondeProvider : public ProviderBase, public std::enable_shared_from_this<IonosondeProvider> {
 public:
   using Callback = std::function<void(const IonosondeData&)>;
 
@@ -22,7 +23,7 @@ public:
   /**
    * For my widget: immediate fetch or update.
    */
-  void fetch(double lat, double lon, bool force = false) { (void)lat; (void)lon; if (force) lastUpdateMs_ = 0; update(); }
+  void fetch(double lat, double lon, bool force = false) { (void)lat; (void)lon; if (force) lastFetchMs_ = 0; update(); }
 
   /**
    * Interpolate ionospheric parameters at a given location.
@@ -31,7 +32,7 @@ public:
   InterpolatedIonosonde interpolate(double lat, double lon) const;
 
   bool hasData() const;
-  uint32_t getLastUpdateMs() const { return lastUpdateMs_; }
+  uint32_t getLastUpdateMs() const { return lastFetchMs_; }
 
   void setCallback(Callback cb) { callback_ = std::move(cb); }
   IonosondeData getData() const;
@@ -42,7 +43,6 @@ private:
   NetworkManager &netMgr_;
   std::vector<IonosondeStation> stations_;
   bool hasData_ = false;
-  uint32_t lastUpdateMs_ = 0;
   mutable std::mutex mutex_;
   Callback callback_;
 
