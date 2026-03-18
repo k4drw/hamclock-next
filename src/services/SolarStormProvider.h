@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ProviderBase.h"
 #include "../core/SolarStormData.h"
 #include "../network/NetworkManager.h"
 #include <functional>
@@ -9,7 +10,7 @@
 
 namespace HamClock {
 
-class SolarStormProvider : public std::enable_shared_from_this<SolarStormProvider> {
+class SolarStormProvider : public ::ProviderBase, public std::enable_shared_from_this<SolarStormProvider> {
 public:
   using Callback = std::function<void(const SolarStormData&)>;
 

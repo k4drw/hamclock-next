@@ -14,6 +14,7 @@ ReachProvider::ReachProvider(NetworkManager &net, std::shared_ptr<HamClockState>
 }
 
 void ReachProvider::fetch(const std::string& band, const std::string& mode) {
+    lastFetchMs_ = SDL_GetTicks();
     fetchPSK(band, mode);
 }
 

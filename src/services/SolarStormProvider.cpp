@@ -18,7 +18,8 @@ SolarStormProvider::SolarStormProvider(NetworkManager &netMgr) : netMgr_(netMgr)
 }
 
 void SolarStormProvider::update() {
-  uint32_t now = SDL_GetTicks();
+  lastFetchMs_ = SDL_GetTicks();
+  uint32_t now = lastFetchMs_;
   // Use a special case for first update (lastUpdate == 0) to ensure immediate fetch
   if (lastFluxUpdate_ == 0 || (now - lastFluxUpdate_ >= FLUX_INTERVAL_MS)) {
     LOG_I("SolarStormProvider", "Triggering X-ray flux fetch");

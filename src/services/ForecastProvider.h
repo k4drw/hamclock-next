@@ -1,11 +1,12 @@
 #pragma once
 
+#include "ProviderBase.h"
 #include "../core/ForecastData.h"
 #include "../network/NetworkManager.h"
 #include <memory>
 #include <string>
 
-class ForecastProvider : public std::enable_shared_from_this<ForecastProvider> {
+class ForecastProvider : public ProviderBase, public std::enable_shared_from_this<ForecastProvider> {
 public:
   ForecastProvider(NetworkManager &net, std::shared_ptr<ForecastStore> store);
 

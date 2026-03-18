@@ -1,7 +1,7 @@
 #include "ForecastProvider.h"
 #include "../core/Constants.h"
 #include "../core/WorkerService.h"
-#include <SDL_events.h>
+#include <SDL.h>
 #include <chrono>
 #include <nlohmann/json.hpp>
 
@@ -12,6 +12,7 @@ ForecastProvider::ForecastProvider(NetworkManager &net,
     : net_(net), store_(std::move(store)) {}
 
 void ForecastProvider::fetch(double lat, double lon, bool force) {
+  lastFetchMs_ = SDL_GetTicks();
   // Step 1: Resolve the /points endpoint to get forecast URL for this lat/lon.
   char pointsUrl[256];
   std::snprintf(pointsUrl, sizeof(pointsUrl),

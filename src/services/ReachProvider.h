@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ProviderBase.h"
 #include "../network/NetworkManager.h"
 #include "../core/ReachData.h"
 #include "../core/HamClockState.h"
@@ -10,7 +11,7 @@
 
 namespace HamClock {
 
-class ReachProvider : public std::enable_shared_from_this<ReachProvider> {
+class ReachProvider : public ::ProviderBase, public std::enable_shared_from_this<ReachProvider> {
 public:
     using Callback = std::function<void(const ReachData&)>;
 
