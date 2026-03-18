@@ -4,6 +4,7 @@
 #include "GraphHelper.h"
 #include <algorithm>
 #include <cmath>
+#include <ctime>
 
 namespace HamClock {
 
@@ -56,9 +57,22 @@ void SolarStormPanel::render(SDL_Renderer *renderer) {
                            : themes.text;
   cat->drawText(renderer, sClass, x_ + pad, curY, flareCol, FontStyle::Micro);
 
-  // Alert if CME impact predicted
+  // CME alert with arrival countdown when time is available
   if (d.cmeImpactPredicted) {
-    cat->drawText(renderer, "!! CME ALERT !!", x_ + width_ - pad, curY,
+    char cmeBuf[24];
+    if (d.cmeArrivalUtc > 0) {
+      int64_t diff = static_cast<int64_t>(d.cmeArrivalUtc) - static_cast<int64_t>(time(nullptr));
+      if (diff > 0) {
+        int h = static_cast<int>(diff / 3600);
+        int m = static_cast<int>((diff % 3600) / 60);
+        std::snprintf(cmeBuf, sizeof(cmeBuf), "CME ~%dh%02dm", h, m);
+      } else {
+        std::snprintf(cmeBuf, sizeof(cmeBuf), "CME ARRIVED");
+      }
+    } else {
+      std::snprintf(cmeBuf, sizeof(cmeBuf), "!! CME ALERT !!");
+    }
+    cat->drawText(renderer, cmeBuf, x_ + width_ - pad, curY,
                   themes.danger, FontStyle::Micro, false, true);
   }
 
@@ -139,12 +153,13 @@ void SolarStormPanel::drawBadge(SDL_Renderer *renderer, int x, int y,
   SDL_RenderDrawRect(renderer, &r);
 
   auto *cat = fontMgr_.catalog();
+  SDL_Color textColor = (scale == SolarStormScale::None) ? themes.text : themes.bg;
   // Label R/S/G
-  cat->drawText(renderer, label, r.x + bw / 2, r.y + 4, themes.bg,
+  cat->drawText(renderer, label, r.x + bw / 2, r.y + 4, textColor,
                 FontStyle::MicroBold, true);
   // Value 0-5
   cat->drawText(renderer, std::to_string((int)scale), r.x + bw / 2, r.y + 18,
-                themes.bg, FontStyle::Fast, true);
+                textColor, FontStyle::Fast, true);
 }
 
 void SolarStormPanel::drawSparkline(SDL_Renderer *renderer, int x, int y, int w,
