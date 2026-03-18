@@ -504,7 +504,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
     }
   });
 
-  reachProvider = std::make_shared<ReachProvider>(netManager, state);
+  reachProvider = std::make_shared<ReachProvider>(netManager, state, spotStore);
   reachProvider->setCallback([&ctx, self = this](const ReachData &d) {
     // Push SDL event so onPropDataReady runs on the main/render thread,
     // not the network worker thread where SDL_GL_GetCurrentWindow() is NULL.
