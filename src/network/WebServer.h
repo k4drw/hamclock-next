@@ -9,6 +9,9 @@
 // Forward declaration to avoid pulling SDL into the header
 struct SDL_Renderer;
 
+// Forward declaration for httplib::Server (full definition in WebServer.cpp via httplib.h)
+namespace httplib { class Server; }
+
 struct AppConfig;
 struct HamClockState;
 class ConfigManager;
@@ -77,6 +80,7 @@ public:
 
 private:
   void run();
+  void registerRoutes(httplib::Server &svr);
 
   SDL_Renderer *renderer_;
   AppConfig *cfg_;

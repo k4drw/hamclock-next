@@ -49,7 +49,7 @@ void IonosondeProvider::processData(const std::string &body) {
         std::string s = j[key].get<std::string>();
         if (s.empty()) return std::nullopt;
         try {
-            return std::stod(s);
+            return StringUtils::safe_stod(s);
         } catch (...) {
             return std::nullopt;
         }
@@ -68,7 +68,7 @@ void IonosondeProvider::processData(const std::string &body) {
         std::string s = j[key].get<std::string>();
         if (s.empty()) return fallback;
         try {
-            return std::stoi(s);
+            return StringUtils::safe_stoi(s);
         } catch (...) {
             return fallback;
         }
