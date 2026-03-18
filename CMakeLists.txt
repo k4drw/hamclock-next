@@ -476,6 +476,7 @@ endif()
 
 set(HAMCLOCK_SOURCES
     src/main.cpp
+    src/core/DashboardContext.cpp
     src/core/Theme.cpp
     src/core/Logger.cpp
     src/core/ConfigManager.cpp
@@ -497,6 +498,7 @@ set(HAMCLOCK_SOURCES
     src/network/FrameCapture.cpp
     src/network/NetworkManager.cpp
     src/network/WebServer.cpp
+    src/network/WebServer_Routes.cpp
     src/services/UpdateChecker.cpp
     src/services/NOAAProvider.cpp
     src/services/RSSProvider.cpp
@@ -587,6 +589,9 @@ set(HAMCLOCK_SOURCES
     src/ui/SatelliteSetup.cpp
     src/ui/SatPanel.cpp
     src/ui/SetupScreen.cpp
+    src/ui/SetupScreen_Appearance.cpp
+    src/ui/SetupScreen_Rig.cpp
+    src/ui/SetupScreen_Widgets.cpp
     src/ui/TextInput.cpp
     src/ui/SpaceWeatherPanel.cpp
     src/ui/ThemeCustomizer.cpp
@@ -639,6 +644,7 @@ if(EMSCRIPTEN)
 
     target_include_directories(hamclock-wasm PRIVATE
         ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/src
         ${libpredict_BINARY_DIR}/include
     )
 
@@ -669,6 +675,7 @@ else()
 
     target_include_directories(hamclock-next PRIVATE
         ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/src
     )
     target_include_directories(hamclock-next SYSTEM PRIVATE
         ${libpredict_BINARY_DIR}/include
