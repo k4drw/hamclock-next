@@ -1,11 +1,12 @@
 #pragma once
 
+#include "ProviderBase.h"
 #include "../core/HistoryData.h"
 #include "../network/NetworkManager.h"
 #include <memory>
 #include <string>
 
-class HistoryProvider {
+class HistoryProvider : public ProviderBase {
 public:
   enum class SeriesType { Flux, SSN, Kp };
 

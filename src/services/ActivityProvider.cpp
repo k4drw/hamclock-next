@@ -13,6 +13,7 @@
 #include "../core/Logger.h"
 #include "../core/StringUtils.h"
 #include "../core/WorkerService.h"
+#include <SDL.h>
 #include <SDL_events.h>
 #include <nlohmann/json.hpp>
 
@@ -23,6 +24,7 @@ ActivityProvider::ActivityProvider(NetworkManager &net,
     : net_(net), store_(store) {}
 
 void ActivityProvider::fetch() {
+  lastFetchMs_ = SDL_GetTicks();
   fetchDXPeds();
   fetchPOTA();
   fetchSOTA();

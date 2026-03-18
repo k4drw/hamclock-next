@@ -2,6 +2,7 @@
 #include "../core/Astronomy.h"
 #include "../core/Constants.h"
 #include "../core/WorkerService.h"
+#include <SDL.h>
 #include <SDL_events.h>
 #include <algorithm>
 #include <nlohmann/json.hpp>
@@ -12,6 +13,7 @@ HistoryProvider::HistoryProvider(NetworkManager &net,
     : net_(net), store_(std::move(store)) {}
 
 void HistoryProvider::fetchFlux() {
+  lastFetchMs_ = SDL_GetTicks();
   net_.fetchAsync(FLUX_URL, [](std::string body) {
     if (body.empty())
       return;
@@ -66,6 +68,7 @@ void HistoryProvider::fetchFlux() {
 }
 
 void HistoryProvider::fetchSSN() {
+  lastFetchMs_ = SDL_GetTicks();
   net_.fetchAsync(FLUX_URL, [](std::string body) {
     if (body.empty())
       return;
@@ -119,6 +122,7 @@ void HistoryProvider::fetchSSN() {
 }
 
 void HistoryProvider::fetchKp() {
+  lastFetchMs_ = SDL_GetTicks();
   net_.fetchAsync(KP_URL, [](std::string body) {
     if (body.empty())
       return;

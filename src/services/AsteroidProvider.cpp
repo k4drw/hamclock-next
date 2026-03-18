@@ -25,6 +25,7 @@ std::string AsteroidProvider::getCurrentDate() const {
 }
 
 void AsteroidProvider::update(bool force) {
+  lastFetchMs_ = SDL_GetTicks();
   // Always filter stale asteroids from local cache, even between fetches
   {
     std::lock_guard<std::mutex> lock(mutex_);

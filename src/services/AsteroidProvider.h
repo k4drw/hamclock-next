@@ -1,12 +1,13 @@
 #pragma once
 
+#include "ProviderBase.h"
 #include "../core/AsteroidData.h"
 #include "../network/NetworkManager.h"
 #include <functional>
 #include <map>
 #include <memory>
 
-class AsteroidProvider : public std::enable_shared_from_this<AsteroidProvider> {
+class AsteroidProvider : public ProviderBase, public std::enable_shared_from_this<AsteroidProvider> {
 public:
   using Callback = std::function<void(const AsteroidData &)>;
 

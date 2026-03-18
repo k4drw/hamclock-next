@@ -1,10 +1,11 @@
 #pragma once
 
+#include "ProviderBase.h"
 #include "../core/ActivityData.h"
 #include "../network/NetworkManager.h"
 #include <memory>
 
-class ActivityProvider {
+class ActivityProvider : public ProviderBase {
 public:
   enum class UpdateType { DXPeds, POTA, SOTA };
 
