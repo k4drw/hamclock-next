@@ -2222,6 +2222,30 @@ void WebServer::registerRoutes(httplib::Server &svr) {
     res.set_content(j.dump(), "application/json");
   });
 
+  svr.Get("/get_build.txt", [](const httplib::Request &, httplib::Response &res) {
+    SDL_version sdlLinked;
+    SDL_GetVersion(&sdlLinked);
+    std::ostringstream oss;
+#if defined(__EMSCRIPTEN__)
+    oss << "Platform   WASM\n";
+#elif defined(_WIN32)
+    oss << "Platform   Windows\n";
+#elif defined(__APPLE__)
+    oss << "Platform   macOS\n";
+#else
+    oss << "Platform   Linux\n";
+#endif
+#ifdef NDEBUG
+    oss << "Build      release\n";
+#else
+    oss << "Build      debug\n";
+#endif
+    oss << "SDL_version " << static_cast<int>(sdlLinked.major) << "."
+        << static_cast<int>(sdlLinked.minor) << "."
+        << static_cast<int>(sdlLinked.patch) << "\n";
+    res.set_content(oss.str(), "text/plain");
+  });
+
 #ifdef ENABLE_DEBUG_API
   svr.Get("/debug/widgets",
           [](const httplib::Request &, httplib::Response &res) {
