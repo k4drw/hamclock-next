@@ -26,6 +26,7 @@
 #include "../core/ActivityData.h"
 #include "../core/BrightnessManager.h"
 #include "../core/ContestData.h"
+#include "../core/Theme.h"
 #include "../core/DXClusterData.h"
 #include "../core/LiveSpotData.h"
 #include "../core/SatelliteManager.h"
@@ -232,6 +233,35 @@ void WebServer::registerRoutes(httplib::Server &svr) {
               res.status = 503;
           });
 
+  svr.Get("/get_pane_rect",
+          [this](const httplib::Request &req, httplib::Response &res) {
+            int idx = StringUtils::safe_stoi(req.get_param_value("pane")) - 1;
+            if (!panes_ || idx < 0 || idx >= (int)panes_->size()) {
+              res.status = 404;
+              return;
+            }
+            SDL_Rect r = (*panes_)[idx]->getRect();
+            int outW = 0, outH = 0;
+            int logW = 0, logH = 0;
+            if (renderer_) {
+              SDL_GetRendererOutputSize(renderer_, &outW, &outH);
+              SDL_RenderGetLogicalSize(renderer_, &logW, &logH);
+            }
+            // If no logical size is set, logical is HamClock's native 800x480
+            if (logW == 0) logW = 800;
+            if (logH == 0) logH = 480;
+            nlohmann::json j;
+            j["x"] = r.x;
+            j["y"] = r.y;
+            j["w"] = r.w;
+            j["h"] = r.h;
+            j["renderer_w"] = outW;
+            j["renderer_h"] = outH;
+            j["logical_w"]  = logW;
+            j["logical_h"]  = logH;
+            res.set_content(j.dump(), "application/json");
+          });
+
   svr.Get("/api/panes/toggle", [this](const httplib::Request &req,
                                       httplib::Response &res) {
     int pIdx = StringUtils::safe_stoi(req.get_param_value("pane"));
@@ -408,6 +438,12 @@ void WebServer::registerRoutes(httplib::Server &svr) {
     }
 
     res.set_content(j.dump(2), "application/json");
+  });
+
+  // Alias: /get_config.json → /api/config (consistent with *.txt naming convention)
+  svr.Get("/get_config.json", [](const httplib::Request &,
+                                  httplib::Response &res) {
+    res.set_redirect("/api/config", 302);
   });
 
   svr.Get("/set_config", [this](const httplib::Request &req,
@@ -2012,9 +2048,43 @@ void WebServer::registerRoutes(httplib::Server &svr) {
           rot.erase(std::remove(rot.begin(), rot.end(), wt), rot.end());
           if (!rot.empty())
             pane->setRotation(rot, cfg_->rotationIntervalS, cfg_->syncRotation);
+        } else if (action == "solo" && !widget.empty()) {
+          WidgetType wt = widgetTypeFromString(widget, WidgetType::SOLAR);
+          pane->setRotation({wt}, cfg_->rotationIntervalS, cfg_->syncRotation);
+          pane->forceAdvance();
         }
         res.set_content("ok", "text/plain");
       });
+
+  svr.Get("/get_capabilities",
+          [](const httplib::Request &, httplib::Response &res) {
+            nlohmann::json j;
+
+            nlohmann::json wArr = nlohmann::json::array();
+            for (WidgetType wt : getAllBaseWidgetTypes())
+              wArr.push_back(widgetTypeToString(wt));
+            j["widgets"] = wArr;
+
+            j["projections"] = nlohmann::json::array({"equirectangular",
+                                                       "robinson", "azimuthal",
+                                                       "mercator",
+                                                       "dual_azimuthal"});
+
+            nlohmann::json tArr = nlohmann::json::array();
+            for (const auto &t : getAvailableThemes())
+              if (t != "custom")
+                tArr.push_back(t);
+            j["themes"] = tArr;
+
+            j["prop_overlays"] = nlohmann::json::array(
+                {"none", "muf", "voacap", "reliability", "toa", "heatmap",
+                 "drap", "aurora"});
+
+            j["wx_overlays"] =
+                nlohmann::json::array({"none", "wxmb", "clouds_grib"});
+
+            res.set_content(j.dump(), "application/json");
+          });
 
   svr.Get("/set_displayTimes", [this](const httplib::Request &req,
                                       httplib::Response &res) {
