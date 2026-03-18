@@ -1,6 +1,7 @@
 #include "SpaceWeatherPanel.h"
 #include "../core/Theme.h"
 #include "FontCatalog.h"
+#include "GraphHelper.h"
 #include "RenderUtils.h"
 
 #include <algorithm>
@@ -366,17 +367,8 @@ void SpaceWeatherPanel::render(SDL_Renderer *renderer) {
       slPts.push_back({static_cast<float>(timeToX(pt.timestamp)),
                        static_cast<float>(fluxToY(pt.flux))});
     }
-    if (slPts.size() >= 2) {
-      SDL_Texture *spLineTex = texMgr_.get("line_aa");
-      if (spLineTex)
-        RenderUtils::drawPolylineTextured(renderer, spLineTex, slPts.data(),
-                                          static_cast<int>(slPts.size()), 1.5f,
-                                          themes.info);
-      else
-        RenderUtils::drawPolyline(renderer, slPts.data(),
-                                  static_cast<int>(slPts.size()), 1.5f,
-                                  themes.info);
-    }
+    GraphHelper::drawPolyline(renderer, texMgr_.get("line_aa"), slPts.data(),
+                              static_cast<int>(slPts.size()), themes.info, 1.5f);
   }
 
   // Draw pagination bar (bottom) - 4 segments

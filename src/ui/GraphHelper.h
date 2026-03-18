@@ -37,4 +37,16 @@ inline void drawTimeSeries(SDL_Renderer *renderer, SDL_Texture *lineTex,
   }
 }
 
+// Draw a polyline with textured/plain fallback; no-ops if count < 2.
+inline void drawPolyline(SDL_Renderer *renderer, SDL_Texture *lineTex,
+                         const SDL_FPoint *pts, int count,
+                         SDL_Color lineColor, float thickness = 2.0f) {
+  if (count < 2) return;
+  if (lineTex)
+    RenderUtils::drawPolylineTextured(renderer, lineTex, pts, count, thickness,
+                                      lineColor);
+  else
+    RenderUtils::drawPolyline(renderer, pts, count, thickness, lineColor);
+}
+
 } // namespace GraphHelper

@@ -1,6 +1,7 @@
 #include "HistoryPanel.h"
 #include "../core/Theme.h"
 #include "FontCatalog.h"
+#include "GraphHelper.h"
 #include "RenderUtils.h"
 #include <SDL.h>
 #include <algorithm>
@@ -115,13 +116,7 @@ void HistoryPanel::render(SDL_Renderer *renderer) {
       pts.push_back({graphX + i * stepX, py});
     }
 
-    if (lineTex) {
-      RenderUtils::drawPolylineTextured(renderer, lineTex, pts.data(), n, 2.0f,
-                                        themes.accent);
-    } else {
-      RenderUtils::drawPolyline(renderer, pts.data(), n, 1.5f,
-                                themes.accent);
-    }
+    GraphHelper::drawPolyline(renderer, lineTex, pts.data(), n, themes.accent);
 
     // Current value as large overlay (matching Kp style)
     {

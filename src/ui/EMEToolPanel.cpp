@@ -2,6 +2,7 @@
 #include "../core/Astronomy.h"
 #include "../core/Theme.h"
 #include "FontCatalog.h"
+#include "GraphHelper.h"
 #include "RenderUtils.h"
 #include <cstdio>
 #include <ctime>
@@ -122,14 +123,12 @@ void EMEToolPanel::render(SDL_Renderer *renderer) {
   }
 
   // Draw DE curve (green)
-  RenderUtils::drawPolylineTextured(renderer, lineTex, dePoints.data(),
-                                    (int)dePoints.size(), 2.0f,
-                                    themes.success);
+  GraphHelper::drawPolyline(renderer, lineTex, dePoints.data(),
+                            (int)dePoints.size(), themes.success);
 
   // Draw DX curve (blue)
-  RenderUtils::drawPolylineTextured(renderer, lineTex, dxPoints.data(),
-                                    (int)dxPoints.size(), 2.0f,
-                                    themes.accent);
+  GraphHelper::drawPolyline(renderer, lineTex, dxPoints.data(),
+                            (int)dxPoints.size(), themes.accent);
 
   // Mark current time (vertical red tick at x=0)
   SDL_SetRenderDrawColor(renderer, themes.danger.r, themes.danger.g, themes.danger.b, themes.danger.a);
