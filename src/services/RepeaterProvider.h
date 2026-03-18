@@ -1,11 +1,12 @@
 #pragma once
 
 #include "../core/RepeaterData.h"
+#include "ProviderBase.h"
 #include "../network/NetworkManager.h"
 #include <memory>
 #include <string>
 
-class RepeaterProvider {
+class RepeaterProvider : public ProviderBase {
 public:
   RepeaterProvider(NetworkManager &net, std::shared_ptr<RepeaterStore> store);
 

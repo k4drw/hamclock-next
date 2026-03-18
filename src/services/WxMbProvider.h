@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ProviderBase.h"
 #include "../network/NetworkManager.h"
 #include <SDL.h>
 #include <mutex>
@@ -25,7 +26,7 @@ struct WxQuiver {
 
 #include <memory>
 
-class WxMbProvider : public std::enable_shared_from_this<WxMbProvider> {
+class WxMbProvider : public ProviderBase, public std::enable_shared_from_this<WxMbProvider> {
 public:
   explicit WxMbProvider(NetworkManager &net);
   ~WxMbProvider();

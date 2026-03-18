@@ -2,6 +2,7 @@
 #include "../core/Constants.h"
 #include "../core/StringUtils.h"
 #include "../core/WorkerService.h"
+#include <SDL.h>
 #include <SDL_events.h>
 #include <algorithm>
 #include <chrono>
@@ -30,6 +31,7 @@ double RepeaterProvider::haversineKm(double lat1, double lon1, double lat2,
 
 void RepeaterProvider::fetch(double lat, double lon, const std::string &state,
                               bool force) {
+  lastFetchMs_ = SDL_GetTicks();
   // RepeaterBook API. Use key if configured in AppConfig.
   auto &cfg = ConfigManager::instance().getConfig();
   std::string key = cfg.repeaterBookKey;

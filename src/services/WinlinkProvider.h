@@ -1,10 +1,11 @@
 #pragma once
 
 #include "../core/WinlinkData.h"
+#include "ProviderBase.h"
 #include "../network/NetworkManager.h"
 #include <memory>
 
-class WinlinkProvider {
+class WinlinkProvider : public ProviderBase {
 public:
   WinlinkProvider(NetworkManager &net, std::shared_ptr<WinlinkStore> store);
 

@@ -613,6 +613,7 @@ WxMbProvider::~WxMbProvider() {
 }
 
 void WxMbProvider::update() {
+  lastFetchMs_ = SDL_GetTicks();
   std::string url = buildNomadsUrl();
   {
     std::lock_guard<std::mutex> lk(mutex_);
