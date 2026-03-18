@@ -1,5 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import { loadParityData } from "../state.js";
 
 const VOACAP_SCHEMA = {
   schema_version: "1.1",
@@ -68,9 +69,10 @@ export function registerPropagationTools(server: McpServer) {
       section: z.enum(["full", "request", "response", "colormaps", "alignment", "backend_free"]).optional()
         .describe("Schema section to retrieve. Omit for full schema."),
     },
+    { readOnlyHint: true },
     async ({ section }) => {
       if (!section || section === "full") {
-        return { content: [{ type: "text" as const, text: JSON.stringify(VOACAP_SCHEMA, null, 2), mimeType: "application/json" }] };
+        return { content: [{ type: "text" as const, text: JSON.stringify(VOACAP_SCHEMA, null, 2) }] };
       }
       const sectionMap: Record<string, object> = {
         request: VOACAP_SCHEMA.request,
@@ -81,13 +83,13 @@ export function registerPropagationTools(server: McpServer) {
       };
       const data = sectionMap[section];
       if (!data) return { isError: true, content: [{ type: "text" as const, text: "Section not found" }] };
-      return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2), mimeType: "application/json" }] };
+      return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
     }
   );
 
   server.tool(
     "get_voacap_overlay",
-    "Request a VOACAP propagation map overlay. This uses the internal HamClock-Next propagation engine.",
+    "Build VOACAP propagation map overlay parameters and return the API endpoint URL for fetching the overlay from a running hamclock-next instance.",
     {
       tx_lat: z.number().describe("Transmitter latitude (-90 to 90)."),
       tx_lon: z.number().describe("Transmitter longitude (-180 to 180)."),
@@ -101,6 +103,7 @@ export function registerPropagationTools(server: McpServer) {
       watts: z.number().optional().describe("TX power in watts"),
       overlay_type: z.enum(["muf","reliability","toa"]).optional().describe("Overlay type"),
     },
+    { readOnlyHint: true },
     async ({ tx_lat, tx_lon, band, freq_mhz, hour_utc, year, month, path, mode, watts, overlay_type }) => {
       const now = new Date();
       const utcHour = hour_utc ?? now.getUTCHours();
@@ -129,35 +132,56 @@ export function registerPropagationTools(server: McpServer) {
 
   server.tool(
     "propagation_parity_gaps",
-    "List all propagation-related parity gaps between hamclock-original and hamclock-next, with implementation priority and suggested approach for each.",
+    "List all propagation-related parity gaps between hamclock-original and hamclock-next, sourced from parity_v2.json with a static fallback.",
     {},
+    { readOnlyHint: true },
     async () => {
-      const gaps = [
+      const PROPAGATION_KEYWORDS = ["propagat", "voacap", "grayline", "muf", "band_condition", "ionospher"];
+      let text = "# Propagation Parity Gaps\n\n";
+
+      try {
+        const parityData = await loadParityData();
+        const propFeatures = parityData.features.filter(f =>
+          PROPAGATION_KEYWORDS.some(kw =>
+            f.feature_id.toLowerCase().includes(kw) || f.name.toLowerCase().includes(kw)
+          )
+        );
+        if (propFeatures.length > 0) {
+          for (const f of propFeatures) {
+            text += `## ${f.name}\n- **Status:** ${f.status}\n- **Notes:** ${f.notes}\n`;
+            if (f.suggested_gaps.length > 0) {
+              text += `- **Gaps:** ${f.suggested_gaps.join("; ")}\n`;
+            }
+            text += "\n";
+          }
+          return { content: [{ type: "text", text }] };
+        }
+      } catch {
+        // parity data unavailable — fall through to static list
+      }
+
+      // Static fallback when parity data is not loaded
+      const staticGaps = [
         {
           feature: "VOACAP MUF Map",
-          priority: "High",
           status: "Implemented (Internal)",
-          suggested_approach: "The internal engine handles MUF map generation. Improvements should be made directly to PropEngine.cpp."
+          notes: "The internal engine handles MUF map generation. Improvements should be made directly to PropEngine.cpp."
         },
         {
           feature: "VOACAP TOA Map",
-          priority: "Medium",
           status: "Implemented (Internal)",
-          suggested_approach: "TOA map is currently calculated using path-length based on ionospheric reflection height."
+          notes: "TOA map is currently calculated using path-length based on ionospheric reflection height."
         },
         {
           feature: "Grayline Propagation Enhancement",
-          priority: "Medium",
           status: "Partial",
-          suggested_approach: "The original HamClock includes a 1dB signal boost near the terminator. This logic should be calibrated in PropEngine.cpp."
+          notes: "The original HamClock includes a 1dB signal boost near the terminator. This logic should be calibrated in PropEngine.cpp."
         }
       ];
-
-      let text = "# Propagation Parity Gaps\n\n";
-      for (const gap of gaps) {
-        text += `## ${gap.feature}\n- **Priority:** ${gap.priority}\n- **Status:** ${gap.status}\n- **Approach:** ${gap.suggested_approach}\n\n`;
+      text += "*Note: parity_v2.json not loaded — showing static fallback. Run `parity_sync` to load live data.*\n\n";
+      for (const gap of staticGaps) {
+        text += `## ${gap.feature}\n- **Status:** ${gap.status}\n- **Notes:** ${gap.notes}\n\n`;
       }
-
       return { content: [{ type: "text", text }] };
     }
   );

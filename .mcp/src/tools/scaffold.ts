@@ -1,33 +1,25 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import { scaffoldFeature } from "../scaffold.js";
+import { NEXT_PATH } from "../state.js";
 
 export function registerScaffoldTools(server: McpServer) {
   server.tool(
     "scaffold_feature",
-    "Generate boilerplate code for a new feature (Widget or Service).",
+    "Generate and write boilerplate C++ files for a new feature (Widget or Service) into the hamclock-next source tree.",
     {
       name: z.string().describe("Name of the feature (e.g. 'SolarPanel')"),
       type: z.enum(["Widget", "Service"]).describe("Type of component to scaffold"),
     },
+    { readOnlyHint: false, destructiveHint: false },
     async ({ name, type }) => {
-      const lines: string[] = [`# Scaffolding ${type}: ${name}`, ""];
-
-      if (type === "Widget") {
-        lines.push(`## src/ui/${name}Panel.h`);
-        lines.push("```cpp");
-        lines.push("#pragma once");
-        lines.push('#include "Widget.h"');
-        lines.push(`class ${name}Panel : public Widget { /* ... */ };`);
-        lines.push("```");
-      } else {
-        lines.push(`## src/services/${name}Provider.h`);
-        lines.push("```cpp");
-        lines.push("#pragma once");
-        lines.push(`class ${name}Provider { /* ... */ };`);
-        lines.push("```");
+      try {
+        const result = await scaffoldFeature(NEXT_PATH, name, type);
+        const text = result.instructions + "\n\nFiles created:\n" + result.files.join("\n");
+        return { content: [{ type: "text", text }] };
+      } catch (e: any) {
+        return { isError: true, content: [{ type: "text", text: `Failed to scaffold ${type} '${name}': ${e.message}` }] };
       }
-
-      return { content: [{ type: "text", text: lines.join("\n") }] };
     }
   );
 }

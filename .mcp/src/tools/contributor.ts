@@ -1,6 +1,8 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { ensureProjectContext, PROJECT_CONTEXT_PATH, loadParityData } from "../state.js";
+import { existsSync } from "fs";
+import { resolve } from "path";
+import { ensureProjectContext, PROJECT_CONTEXT_PATH, loadParityData, NEXT_PATH } from "../state.js";
 
 export function registerContributorTools(server: McpServer) {
   server.tool(
@@ -24,6 +26,7 @@ export function registerContributorTools(server: McpServer) {
         "Specific section to retrieve. Omit to get the full project_context and source_layout summary."
       ),
     },
+    { readOnlyHint: true },
     async ({ section }) => {
       const ctx = await ensureProjectContext();
       if (!ctx || Object.keys(ctx).length === 0) {
@@ -42,7 +45,7 @@ export function registerContributorTools(server: McpServer) {
           };
         }
         return {
-          content: [{ type: "text", text: JSON.stringify(data, null, 2), mimeType: "application/json" }]
+          content: [{ type: "text", text: JSON.stringify(data, null, 2) }]
         };
       }
 
@@ -95,6 +98,7 @@ ${pc.philosophy}`);
     {
       name: z.string().describe("PascalCase feature name, e.g. 'BandConditions' or 'NcdxfBeacon'"),
     },
+    { readOnlyHint: true },
     async ({ name }) => {
       const ctx = await ensureProjectContext();
       if (!ctx || Object.keys(ctx).length === 0) {
@@ -149,6 +153,7 @@ ${pc.philosophy}`);
     "contributor_start",
     "Single-call onboarding for a ham + AI assistant. Returns everything needed to begin contributing: project origin, tech stack, build instructions, PR workflow, where to start, and the AI execution rules.",
     {},
+    { readOnlyHint: true },
     async () => {
       const ctx = await ensureProjectContext();
       const pc = ctx["project_context"] as Record<string, any> | undefined;
@@ -221,6 +226,7 @@ ${pc.philosophy}`);
       difficulty: z.enum(["easy", "medium", "hard", "all"]).optional().default("all")
         .describe("Filter by difficulty level. Default: all"),
     },
+    { readOnlyHint: true },
     async ({ difficulty }) => {
       const ctx = await ensureProjectContext();
       const issues = ctx["open_issues"] as Record<string, any> | undefined;
@@ -282,6 +288,7 @@ ${pc.philosophy}`);
       type: z.enum(["widget", "endpoint", "config_field"]).optional().default("widget")
         .describe("Type of feature to add. Default: widget"),
     },
+    { readOnlyHint: true },
     async ({ name, type }) => {
       const lines: string[] = [];
 
@@ -296,8 +303,14 @@ ${pc.philosophy}`);
         lines.push(`5. \`src/ui/WidgetSelector.cpp\`     — add entry to allTypes[] array`);
         lines.push(`6. \`CMakeLists.txt\`                — add ${name}Panel.cpp to SOURCES`, "");
         lines.push("## Registration Pattern");
-        lines.push("- See: `src/ui/ENVPanel.cpp` for a minimal single-file example (added 2026-03-02)");
-        lines.push("- See: `src/ui/AsteroidPanel.cpp` for the data-provider pattern", "");
+        const minimalExample = existsSync(resolve(NEXT_PATH, "src/ui/ENVPanel.cpp"))
+          ? "`src/ui/ENVPanel.cpp`"
+          : "an existing minimal Panel in `src/ui/`";
+        const providerExample = existsSync(resolve(NEXT_PATH, "src/ui/AsteroidPanel.cpp"))
+          ? "`src/ui/AsteroidPanel.cpp`"
+          : "an existing Panel + Provider pair in `src/ui/` and `src/services/`";
+        lines.push(`- See: ${minimalExample} for a minimal single-file example`);
+        lines.push(`- See: ${providerExample} for the data-provider pattern`, "");
         lines.push("## Testing");
         lines.push(`- Build: \`cmake --build build --target hamclock-next\``);
         lines.push(`- Open widget selector (gear icon), verify ${name} appears`);
