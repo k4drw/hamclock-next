@@ -1,11 +1,13 @@
 #include "SDOProvider.h"
 #include "../core/Astronomy.h"
+#include <SDL.h>
 #include <cstdio>
 #include <ctime>
 
 SDOProvider::SDOProvider(NetworkManager &net) : net_(net) {}
 
 void SDOProvider::fetch(const std::string &wavelength, bool pfss, DataCb cb) {
+  lastFetchMs_ = SDL_GetTicks();
   // 1. Prepare LMSAL URL (Now Primary)
   std::string primaryUrl;
   if (wavelength == "211193171") {

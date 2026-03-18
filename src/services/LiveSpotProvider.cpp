@@ -2,6 +2,7 @@
 #include "../core/HamClockState.h"
 #include "../core/Logger.h"
 #include "../core/StringUtils.h"
+#include <SDL.h>
 
 #include <cctype>
 #include <chrono>
@@ -85,6 +86,7 @@ LiveSpotProvider::LiveSpotProvider(NetworkManager &net,
       config_(config), state_(state) {}
 
 void LiveSpotProvider::fetch() {
+  lastFetchMs_ = SDL_GetTicks();
   switch (config_.liveSpotSource) {
   case LiveSpotSource::WSPR:
     fetchWSPR();

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ProviderBase.h"
 #include "../network/NetworkManager.h"
 #include <SDL.h>
 #include <memory>
@@ -9,7 +10,7 @@
 // Fetches GFS total cloud cover (TCDC) from NOMADS and decodes the GRIB2
 // into a 360x180 RGBA SDL_Surface (white pixels, alpha = coverage).
 class GribCloudProvider
-    : public std::enable_shared_from_this<GribCloudProvider> {
+    : public ProviderBase, public std::enable_shared_from_this<GribCloudProvider> {
 public:
   explicit GribCloudProvider(NetworkManager &net);
   ~GribCloudProvider();

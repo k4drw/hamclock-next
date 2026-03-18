@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ProviderBase.h"
 #include "../network/NetworkManager.h"
 #include <memory>
 #include <string>
@@ -24,7 +25,7 @@ struct QRZLookupResult {
 
 // QRZ.com XML API provider
 // Requires QRZ.com XML subscription
-class QRZProvider : public std::enable_shared_from_this<QRZProvider> {
+class QRZProvider : public ProviderBase, public std::enable_shared_from_this<QRZProvider> {
 public:
   QRZProvider(NetworkManager &netMgr);
   ~QRZProvider() = default;

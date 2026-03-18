@@ -1,10 +1,11 @@
 #pragma once
 
+#include "ProviderBase.h"
 #include "../network/NetworkManager.h"
 #include <mutex>
 #include <string>
 
-class MufRtProvider {
+class MufRtProvider : public ProviderBase {
 public:
   MufRtProvider(NetworkManager &netMgr);
 
