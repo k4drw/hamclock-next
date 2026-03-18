@@ -2,7 +2,7 @@
 #include "../core/Constants.h"
 #include "../core/StringUtils.h"
 #include "../core/WorkerService.h"
-#include <SDL_events.h>
+#include <SDL.h>
 #include <chrono>
 #include <cstdio>
 #include <nlohmann/json.hpp>
@@ -16,6 +16,7 @@ MarineProvider::MarineProvider(NetworkManager &net,
 
 void MarineProvider::fetch(const std::string &tideStation,
                            const std::string &buoyStation, bool force) {
+  lastFetchMs_ = SDL_GetTicks();
   if (tideStation.empty() && buoyStation.empty())
     return;
 

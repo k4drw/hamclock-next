@@ -1,6 +1,7 @@
 #include "CallbookProvider.h"
 #include "../core/StringUtils.h"
 #include "../core/TimeUtils.h"
+#include <SDL.h>
 #include <nlohmann/json.hpp>
 
 using json = nlohmann::json;
@@ -94,6 +95,7 @@ CallbookProvider::CallbookProvider(NetworkManager &net,
     : net_(net), store_(store) {}
 
 void CallbookProvider::lookup(const std::string &callsign) {
+  lastFetchMs_ = SDL_GetTicks();
   if (callsign.empty())
     return;
 

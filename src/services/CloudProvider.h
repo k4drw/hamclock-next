@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ProviderBase.h"
 #include "../network/NetworkManager.h"
 #include <SDL.h>
 #include <mutex>
@@ -7,7 +8,7 @@
 
 #include <memory>
 
-class CloudProvider : public std::enable_shared_from_this<CloudProvider> {
+class CloudProvider : public ProviderBase, public std::enable_shared_from_this<CloudProvider> {
 public:
   CloudProvider(NetworkManager &netMgr);
   ~CloudProvider();

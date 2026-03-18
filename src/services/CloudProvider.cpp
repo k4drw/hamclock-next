@@ -22,6 +22,7 @@ CloudProvider::~CloudProvider() {
 }
 
 void CloudProvider::update() {
+  lastFetchMs_ = SDL_GetTicks();
   // NASA GIBS WMS URL for VIIRS SNPP TrueColor.
   // VIIRS has a wider swath (~3000 km vs MODIS 2330 km) producing fewer
   // orbital gaps than MODIS Terra. We use "yesterday" to ensure the daily

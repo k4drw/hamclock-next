@@ -1,10 +1,11 @@
 #pragma once
 
+#include "ProviderBase.h"
 #include "../network/NetworkManager.h"
 #include <functional>
 #include <string>
 
-class AuroraProvider {
+class AuroraProvider : public ProviderBase {
 public:
   using DataCb = std::function<void(const std::string &data)>;
 
