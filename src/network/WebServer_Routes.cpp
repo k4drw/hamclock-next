@@ -6,6 +6,7 @@
 #include "../ui/PaneContainer.h"
 #include "../core/CalendarData.h"
 #include "../ui/StopwatchPanel.h"
+#include "../ui/TimePanel.h"
 #include "NetworkManager.h"
 #include <SDL.h>
 #include "../core/ConfigManager.h"
@@ -259,6 +260,41 @@ void WebServer::registerRoutes(httplib::Server &svr) {
             j["renderer_h"] = outH;
             j["logical_w"]  = logW;
             j["logical_h"]  = logH;
+            res.set_content(j.dump(), "application/json");
+          });
+
+  svr.Get("/api/panes/expand",
+          [this](const httplib::Request &req, httplib::Response &res) {
+            int idx = StringUtils::safe_stoi(req.get_param_value("pane")) - 1;
+            if (idx < 0 || idx > 5) { res.status = 400; return; }
+            if (paneExpandCmd_)
+              paneExpandCmd_->store(idx, std::memory_order_release);
+            res.set_content("ok", "text/plain");
+          });
+
+  svr.Get("/api/panes/collapse",
+          [this](const httplib::Request &, httplib::Response &res) {
+            if (paneExpandCmd_)
+              paneExpandCmd_->store(-2, std::memory_order_release);
+            res.set_content("ok", "text/plain");
+          });
+
+  svr.Get("/get_timepanel_rect",
+          [this](const httplib::Request &, httplib::Response &res) {
+            if (!timePanel_) { res.status = 503; return; }
+            SDL_Rect r = timePanel_->getRect();
+            int outW = 0, outH = 0;
+            int logW = 0, logH = 0;
+            if (renderer_) {
+              SDL_GetRendererOutputSize(renderer_, &outW, &outH);
+              SDL_RenderGetLogicalSize(renderer_, &logW, &logH);
+            }
+            if (logW == 0) logW = 800;
+            if (logH == 0) logH = 480;
+            nlohmann::json j;
+            j["x"] = r.x; j["y"] = r.y; j["w"] = r.w; j["h"] = r.h;
+            j["renderer_w"] = outW; j["renderer_h"] = outH;
+            j["logical_w"]  = logW; j["logical_h"]  = logH;
             res.set_content(j.dump(), "application/json");
           });
 

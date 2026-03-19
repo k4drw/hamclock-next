@@ -7,6 +7,7 @@
 
 - [Screen Layout](Layout.md)
 - [Widgets Reference](Widgets.md)
+- [Widget Gallery](Widget-Gallery.md)
 - [Map & Overlays](Map-and-Overlays.md)
 - [Pane Customization](Pane-Customization.md)
 - [Configuration Presets](Presets.md)

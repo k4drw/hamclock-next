@@ -33,6 +33,7 @@ class BrightnessManager;
 class ADIFProvider;
 class StopwatchPanel;
 class CalendarStore;
+class TimePanel;
 
 class WebServer {
 public:
@@ -77,6 +78,8 @@ public:
   void setCalendarStore(std::shared_ptr<CalendarStore> s) {
     calendarStore_ = std::move(s);
   }
+  void setTimePanel(TimePanel *tp) { timePanel_ = tp; }
+  void setPaneExpandControl(std::atomic<int> *cmd) { paneExpandCmd_ = cmd; }
 
 private:
   void run();
@@ -109,6 +112,8 @@ private:
   ADIFProvider *adifProvider_ = nullptr;
   StopwatchPanel *stopwatch_ = nullptr;
   std::shared_ptr<CalendarStore> calendarStore_;
+  TimePanel *timePanel_ = nullptr;
+  std::atomic<int> *paneExpandCmd_ = nullptr;
   bool screenLocked_ = false;
   bool liveWebEnabled_ = false;
   int port_;

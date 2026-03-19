@@ -8,20 +8,23 @@ To add a widget to a pane, click the **top strip** of the pane to open the widge
 
 ---
 
-## Dashboard Rotation Gallery
+## Map Looks Gallery
 
-Since HamClock-Next allows multiple widgets per pane, the following snapshots show various dashboard configurations as the panes rotate. Use this gallery to see all **45** widgets in action.
+<!-- BEGIN MAP LOOKS -->
+| | |
+|---|---|
+| ![azimuthal_aurora_midnight](images/map_looks/azimuthal_aurora_midnight.png) | ![azimuthal_clean_amber](images/map_looks/azimuthal_clean_amber.png) |
+| | |
+|---|---|
+| ![dual_az_clouds_glass](images/map_looks/dual_az_clouds_glass.png) | ![mercator_drap_wxmb_paper](images/map_looks/mercator_drap_wxmb_paper.png) |
+| | |
+|---|---|
+| ![robinson_clouds_dark](images/map_looks/robinson_clouds_dark.png) | ![robinson_matrix](images/map_looks/robinson_matrix.png) |
+| | |
+|---|---|
+| ![robinson_muf_dark](images/map_looks/robinson_muf_dark.png) |  |
 
-|  ![Rotation 1](images/v1_0/hc_v1_dark_robinson_muf_rot1_asteroids_forecast_wx_alerts_ncdxf_de_info_satellite.png)  |  ![Rotation 2](images/v1_0/hc_v1_dark_robinson_muf_rot2_band_cond_ionosonde_santa_tracker_dx_weather_de_info_satellite.png)  |
-|  ![Rotation 3](images/v1_0/hc_v1_dark_robinson_muf_rot3_aurora_graph_k-index_solar_flux_ncdxf_de_info_satellite.png)  |  ![Rotation 4](images/v1_0/hc_v1_dark_robinson_muf_rot4_aurora_lightning_solar_storm_de_weather_de_info_satellite.png)  |
-|  ![Rotation 5](images/v1_0/hc_v1_dark_robinson_muf_rot5_contests_gimbal_tropics_dx_weather_de_info_satellite.png)  |  ![Rotation 6](images/v1_0/hc_v1_dark_robinson_muf_rot6_clock_aux_moon_system_info_ncdxf_de_info_satellite.png)  |
-|  ![Rotation 7](images/v1_0/hc_v1_midnight_azimuthal_aurora_rot1_aurora_graph_k-index_solar_flux_ncdxf_de_info_satellite.png)  |  ![Rotation 8](images/v1_0/hc_v1_midnight_azimuthal_aurora_rot2_aurora_lightning_solar_storm_de_weather_de_info_satellite.png)  |
-|  ![Rotation 9](images/v1_0/hc_v1_midnight_azimuthal_aurora_rot3_contests_gimbal_tropics_dx_weather_de_info_satellite.png)  |  ![Rotation 10](images/v1_0/hc_v1_midnight_azimuthal_aurora_rot4_clock_aux_moon_system_info_ncdxf_de_info_satellite.png)  |
-| ![Rotation 11](images/v1_0/hc_v1_midnight_azimuthal_aurora_rot5_callbook_meteor_scat_sunspots_de_weather_de_info_satellite.png) | ![Rotation 12](images/v1_0/hc_v1_midnight_azimuthal_aurora_rot6_countdown_marine_stopwatch_dx_weather_de_info_satellite.png) |
-| ![Rotation 13](images/v1_0/hc_v1_paper_mercator_drap_isobars_rot1_aurora_lightning_solar_storm_de_weather_de_info_satellite.png) | ![Rotation 14](images/v1_0/hc_v1_paper_mercator_drap_isobars_rot2_contests_gimbal_tropics_dx_weather_de_info_satellite.png) |
-| ![Rotation 15](images/v1_0/hc_v1_paper_mercator_drap_isobars_rot3_clock_aux_moon_system_info_ncdxf_de_info_satellite.png) | ![Rotation 16](images/v1_0/hc_v1_paper_mercator_drap_isobars_rot4_callbook_meteor_scat_sunspots_de_weather_de_info_satellite.png) |
-| ![Rotation 17](images/v1_0/hc_v1_paper_mercator_drap_isobars_rot5_countdown_marine_stopwatch_dx_weather_de_info_satellite.png) | ![Rotation 18](images/v1_0/hc_v1_paper_mercator_drap_isobars_rot6_drap_live_spots_tropo_cond_ncdxf_de_info_satellite.png) |
-| ![Rotation 19](images/v1_0/hc_v1_glass_dual_az_clouds_rot1_contests_gimbal_tropics_dx_weather_de_info_satellite.png) | ![Rotation 20](images/v1_0/hc_v1_glass_dual_az_clouds_rot2_clock_aux_moon_system_info_ncdxf_de_info_satellite.png) |
+<!-- END MAP LOOKS -->
 
 
 ---

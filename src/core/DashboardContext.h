@@ -331,6 +331,9 @@ struct AppContext {
   std::atomic<int> rotationCmd{0};
   std::atomic<int> rotationCmdPane{-1};
   std::atomic<int> rotationCmdWidget{-1};
+  // Pane expand/collapse command from WebServer thread, consumed on main thread.
+  // -1=idle, 0-5=expand that pane index, -2=collapse
+  std::atomic<int> paneExpandCmd{-1};
   bool startOnUpdateTab = false;
   bool startOnServicesTab = false;
 

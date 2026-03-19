@@ -16,13 +16,15 @@ HamClock-Next uses a **Top Bar** and a **Left Side Panel** to maximize map area.
 | Time     | Pane 1   | Pane 2   | Pane 3   | Pane4 |
 | Panel    | (rot)    | (rot)    | (rot)    | (stat)|
 +----------+----------+----------+----------+-------+
+|          |                                        |
 | Pane 5   |                                        |
 | (rot)    |                                        |
-+----------+             MAP AREA                   |
-| Pane 6   |             (center)                   |
+|          |             MAP AREA                   |
++----------+             (center)                   |
+|          |                                        |
+| Pane 6   |                                        |
 | (rot)    |                                        |
-+----------+                                        |
-| RSS Ticker (optional)                             |
+|          |        RSS Ticker (optional)           |
 +---------------------------------------------------+
 ```
 
@@ -36,8 +38,8 @@ HamClock-Next uses a **Top Bar** and a **Left Side Panel** to maximize map area.
 
 The Time Panel occupies the top-left corner and is **not** a rotatable pane — it always displays the same content.
 
-![Time panel detail](images/timepanel.png)
-<!-- TODO: screenshot needed -->
+![Time panel detail](images/widgets/time_panel.jpg)
+
 
 Contents:
 
@@ -49,7 +51,7 @@ Contents:
 | **DE grid**          | Your Maidenhead grid locator                 |
 | **Sunrise / Sunset** | Today's SR/SS times for your location        |
 | **Gear icon (⚙)**    | Opens the Setup modal                        |
-| **Star icon (★)**    | Opens the [Presets modal](Presets.md)           |
+| **Star icon (★)**    | Opens the [Presets modal](Presets.md)        |
 
 ---
 

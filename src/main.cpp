@@ -885,6 +885,8 @@ void main_tick() {
         ctx.webServer->setSatelliteManager(ctx.dashboard->satMgr.get());
         ctx.webServer->setRotatorService(ctx.dashboard->rotatorService.get());
         ctx.webServer->setPanes(&ctx.dashboard->panes);
+        ctx.webServer->setTimePanel(ctx.dashboard->timePanel.get());
+        ctx.webServer->setPaneExpandControl(&ctx.paneExpandCmd);
         ctx.webServer->setWeatherStore(ctx.deWeatherStore);
         ctx.webServer->setBrightnessManager(ctx.brightnessMgr);
         ctx.webServer->setStopwatch(static_cast<StopwatchPanel *>(
@@ -920,6 +922,16 @@ void main_tick() {
       // Rebuild dashboard to refresh all widgets with new config (host, port,
       // overlays, theme, metric, etc.)
       if (ctx.dashboard) {
+        // Null out WebServer's dashboard-owned raw pointers before teardown to
+        // prevent heap-use-after-free: WebServer threads can be mid-handler
+        // reading panes_/timePanel_/etc. while the main thread destroys them.
+        if (ctx.webServer) {
+          ctx.webServer->setPanes(nullptr);
+          ctx.webServer->setTimePanel(nullptr);
+          ctx.webServer->setSatelliteManager(nullptr);
+          ctx.webServer->setRotatorService(nullptr);
+          ctx.webServer->setStopwatch(nullptr);
+        }
         ctx.dashboard.reset();
         LOG_I("Main", "Dashboard rebuild triggered by remote config reload");
         return; // Exit tick early; dashboard will be re-created on next frame
@@ -957,6 +969,13 @@ void main_tick() {
           applyPane(*p);
       }
     }
+
+    // Process pane expand/collapse commands from REST API.
+    int ecmd = ctx.paneExpandCmd.exchange(-1, std::memory_order_acq_rel);
+    if (ecmd >= 0 && ctx.dashboard)
+      ctx.dashboard->expandPane(ecmd, ctx);
+    else if (ecmd == -2 && ctx.dashboard)
+      ctx.dashboard->restorePane(ctx);
 
     // Always call update() — this processes SDL events and keeps interaction
     // responsive. Only render() is throttled.
