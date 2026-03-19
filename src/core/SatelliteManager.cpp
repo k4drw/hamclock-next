@@ -70,8 +70,8 @@ void SatelliteManager::trackSatellite(const std::string &satName) {
 
   if (rotator_) {
     if (satName.empty()) {
+      rotator_->stopAutoTrack(); // null RotatorService::currentSat_ before destroying Satellite
       currentSat_.reset();
-      rotator_->stopAutoTrack();
     } else {
       // Find the TLE for this satellite
       auto it = std::find_if(
@@ -90,8 +90,8 @@ void SatelliteManager::trackSatellite(const std::string &satName) {
         rotator_->autoTrack(currentSat_.get());
       } else {
         LOG_W("SatManager", "Cannot track '{}': TLE not found", satName);
+        rotator_->stopAutoTrack(); // null RotatorService::currentSat_ before destroying Satellite
         currentSat_.reset();
-        rotator_->stopAutoTrack();
       }
     }
   }
@@ -172,6 +172,7 @@ void SatelliteManager::parse(const std::string &raw) {
         });
 
     if (it != satellites_.end()) {
+      rotator_->stopAutoTrack(); // null before destroying old Satellite
       currentSat_ = std::make_unique<Satellite>(*it);
       currentSat_->setObserver(obsLat_, obsLon_);
       rotator_->autoTrack(currentSat_.get()); // Update TLE
@@ -191,20 +192,21 @@ bool SatelliteManager::hasData() const {
   return dataValid_;
 }
 
-const SatelliteTLE *SatelliteManager::findByNoradId(int noradId) const {
+std::optional<SatelliteTLE>
+SatelliteManager::findByNoradId(int noradId) const {
   std::lock_guard<std::mutex> lock(mutex_);
   for (const auto &sat : satellites_) {
     if (sat.noradId == noradId)
-      return &sat;
+      return sat;
   }
   for (const auto &sat : customSatellites_) {
     if (sat.noradId == noradId)
-      return &sat;
+      return sat;
   }
-  return nullptr;
+  return std::nullopt;
 }
 
-const SatelliteTLE *
+std::optional<SatelliteTLE>
 SatelliteManager::findByName(const std::string &search) const {
   std::lock_guard<std::mutex> lock(mutex_);
 
@@ -220,7 +222,7 @@ SatelliteManager::findByName(const std::string &search) const {
     std::transform(sat.name.begin(), sat.name.end(), satLower.begin(),
                    [](unsigned char c) { return std::tolower(c); });
     if (satLower.find(lower) != std::string::npos)
-      return &sat;
+      return sat;
   }
   for (const auto &sat : customSatellites_) {
     std::string satLower;
@@ -228,9 +230,9 @@ SatelliteManager::findByName(const std::string &search) const {
     std::transform(sat.name.begin(), sat.name.end(), satLower.begin(),
                    [](unsigned char c) { return std::tolower(c); });
     if (satLower.find(lower) != std::string::npos)
-      return &sat;
+      return sat;
   }
-  return nullptr;
+  return std::nullopt;
 }
 
 void SatelliteManager::addCustomSCC(int noradId) {

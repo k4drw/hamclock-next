@@ -1177,6 +1177,8 @@ DashboardContext::~DashboardContext() {
     rbnProvider->stop();
   if (rigService)
     rigService->stop();
+  if (satMgr)
+    satMgr->setRotatorService(nullptr); // prevent UAF: satMgr callbacks must not call rotator_ after stop
   if (rotatorService)
     rotatorService->stop();
 #endif

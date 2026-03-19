@@ -1937,7 +1937,7 @@ void WebServer::registerRoutes(httplib::Server &svr) {
             }
             std::ostringstream oss;
             oss << "Satellite  " << name << "\n";
-            const SatelliteTLE *tle = satMgr_->findByName(name);
+            auto tle = satMgr_->findByName(name);
             if (tle) {
               Satellite sat(*tle);
               double deLat, deLon;

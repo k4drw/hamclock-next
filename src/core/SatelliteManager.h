@@ -6,6 +6,7 @@
 #include <chrono>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -42,8 +43,8 @@ public:
 
   std::vector<SatelliteTLE> getSatellites() const;
   bool hasData() const;
-  const SatelliteTLE *findByNoradId(int noradId) const;
-  const SatelliteTLE *findByName(const std::string &search) const;
+  std::optional<SatelliteTLE> findByNoradId(int noradId) const;
+  std::optional<SatelliteTLE> findByName(const std::string &search) const;
 
   void setRotatorService(RotatorService *rotator) { rotator_ = rotator; }
   void trackSatellite(const std::string &satName);

@@ -659,9 +659,21 @@ void main_tick() {
 #endif
 
   if (ctx.activeSetup != AppContext::SetupMode::None) {
-    // Destroy dashboard if needed
-    if (ctx.dashboard)
+    // Destroy dashboard if needed — null WebServer's raw aliases first to
+    // prevent heap-use-after-free in in-flight HTTP handlers (same guard as
+    // the config-reload path below).
+    if (ctx.dashboard) {
+#ifndef __EMSCRIPTEN__
+      if (ctx.webServer) {
+        ctx.webServer->setPanes(nullptr);
+        ctx.webServer->setTimePanel(nullptr);
+        ctx.webServer->setSatelliteManager(nullptr);
+        ctx.webServer->setRotatorService(nullptr);
+        ctx.webServer->setStopwatch(nullptr);
+      }
+#endif
       ctx.dashboard.reset();
+    }
 
     ctx.updateLayoutMetrics();
 
@@ -925,6 +937,7 @@ void main_tick() {
         // Null out WebServer's dashboard-owned raw pointers before teardown to
         // prevent heap-use-after-free: WebServer threads can be mid-handler
         // reading panes_/timePanel_/etc. while the main thread destroys them.
+#ifndef __EMSCRIPTEN__
         if (ctx.webServer) {
           ctx.webServer->setPanes(nullptr);
           ctx.webServer->setTimePanel(nullptr);
@@ -932,6 +945,7 @@ void main_tick() {
           ctx.webServer->setRotatorService(nullptr);
           ctx.webServer->setStopwatch(nullptr);
         }
+#endif
         ctx.dashboard.reset();
         LOG_I("Main", "Dashboard rebuild triggered by remote config reload");
         return; // Exit tick early; dashboard will be re-created on next frame

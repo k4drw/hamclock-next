@@ -57,7 +57,7 @@ void DXSatPane::restoreState(const std::string &panelMode,
   selectedSatName_ = satName;
   if (panelMode == "sat" && !satName.empty()) {
     // Try to load satellite now; if data isn't available yet, defer
-    const SatelliteTLE *tle = satMgr_.findByName(satName);
+    auto tle = satMgr_.findByName(satName);
     if (tle && predictor_.loadTLE(*tle)) {
       selectedSatName_ = tle->name;
       satPanel_.setPredictor(&predictor_);
@@ -80,7 +80,7 @@ void DXSatPane::notifyModeChanged() {
 void DXSatPane::update() {
   // Deferred satellite restore: retry once data arrives
   if (!pendingSatRestore_.empty() && satMgr_.hasData()) {
-    const SatelliteTLE *tle = satMgr_.findByName(pendingSatRestore_);
+    auto tle = satMgr_.findByName(pendingSatRestore_);
     if (tle && predictor_.loadTLE(*tle)) {
       selectedSatName_ = tle->name;
       satPanel_.setPredictor(&predictor_);
