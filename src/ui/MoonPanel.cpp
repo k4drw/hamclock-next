@@ -73,6 +73,12 @@ void MoonPanel::drawMoon(SDL_Renderer *renderer, int cx, int cy, int r) {
   if (tex) {
     SDL_Rect dst = {cx - r, cy - r, 2 * r, 2 * r};
 
+    // Draw dark moon body first so the unlit side is visible on light themes.
+    // The NASA image uses alpha=0 for the dark background, so without this
+    // backing circle the unlit portion blends into a light panel background.
+    RenderUtils::drawCircle(renderer, (float)cx, (float)cy, (float)r,
+                            {30, 30, 45, 255});
+
     // "Flip it for north up": Dial-a-Moon is usually upright,
     // but the user might want explicitly flipped or rotated based on posangle.
     // NASA's posangle is rotation from celestial north.

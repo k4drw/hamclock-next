@@ -129,6 +129,11 @@ void SDOPanel::render(SDL_Renderer *renderer) {
     SDL_Rect dst = {x_ + (width_ - drawSz) / 2,
                     y_ + titleH + (height_ - titleH - drawSz) / 2, drawSz,
                     drawSz};
+    // Fill space background black before rendering the SDO image.
+    // The image uses alpha=0 for the black space background; without this
+    // backing rect it shows the panel background color on light themes.
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+    SDL_RenderFillRect(renderer, &dst);
     SDL_RenderCopy(renderer, tex, nullptr, &dst);
 
     fontMgr_.catalog()->drawText(renderer, "SDO Solar", x_ + 10, y_ + 5,
