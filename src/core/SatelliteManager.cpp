@@ -21,6 +21,19 @@ static std::string trim(const std::string &s) {
 
 SatelliteManager::SatelliteManager(NetworkManager &net) : net_(net) {}
 
+SatelliteManager::~SatelliteManager() {
+  if (rotator_) {
+    rotator_->stopAutoTrack();
+  }
+}
+
+void SatelliteManager::setRotatorService(RotatorService *rotator) {
+  if (rotator_ && !rotator) {
+    rotator_->stopAutoTrack();
+  }
+  rotator_ = rotator;
+}
+
 void SatelliteManager::fetch(bool force) {
   // Skip if data is fresh (< 24 hours) unless forced
   if (!force && dataValid_) {

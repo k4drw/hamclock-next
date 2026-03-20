@@ -33,6 +33,7 @@ private:
 class SatelliteManager {
 public:
   explicit SatelliteManager(NetworkManager &net);
+  ~SatelliteManager();
   void fetch(bool force = false);
 
   // Thread-safe method for receiving data from background threads
@@ -46,7 +47,7 @@ public:
   std::optional<SatelliteTLE> findByNoradId(int noradId) const;
   std::optional<SatelliteTLE> findByName(const std::string &search) const;
 
-  void setRotatorService(RotatorService *rotator) { rotator_ = rotator; }
+  void setRotatorService(RotatorService *rotator);
   void trackSatellite(const std::string &satName);
   std::string getTrackedSatellite() const;
 

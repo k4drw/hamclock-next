@@ -178,26 +178,27 @@ void WebServer::registerRoutes(httplib::Server &svr) {
           });
 
   svr.Get("/api/panes",
-          [this](const httplib::Request &, httplib::Response &res) {
-            nlohmann::json j = nlohmann::json::array();
-            if (panes_) {
-              for (const auto &p : *panes_) {
-                nlohmann::json pj;
-                pj["current"] = widgetTypeDisplayName(p->getActiveType());
-                pj["paused"] = p->isPaused();
-                nlohmann::json rot = nlohmann::json::array();
-                for (auto t : p->getRotation())
-                  rot.push_back(widgetTypeDisplayName(t));
-                pj["rotation"] = rot;
-                j.push_back(pj);
-              }
-            }
-            res.set_content(j.dump(2), "application/json");
-          });
-
+         [this](const httplib::Request &, httplib::Response &res) {
+           nlohmann::json j = nlohmann::json::array();
+           std::lock_guard<std::mutex> lk(dataMutex_);
+           if (panes_) {
+             for (const auto &p : *panes_) {
+               nlohmann::json pj;
+               pj["current"] = widgetTypeDisplayName(p->getActiveType());
+               pj["paused"] = p->isPaused();
+               nlohmann::json rot = nlohmann::json::array();
+               for (auto t : p->getRotation())
+                 rot.push_back(widgetTypeDisplayName(t));
+               pj["rotation"] = rot;
+               j.push_back(pj);
+             }
+           }
+           res.set_content(j.dump(2), "application/json");
+         });
   svr.Get("/api/panes/rotate",
           [this](const httplib::Request &req, httplib::Response &res) {
             int idx = StringUtils::safe_stoi(req.get_param_value("pane"));
+            std::lock_guard<std::mutex> lk(dataMutex_);
             if (panes_ && idx >= 0 && idx < (int)panes_->size()) {
               (*panes_)[idx]->forceAdvance();
               res.set_content("ok", "text/plain");
@@ -207,6 +208,7 @@ void WebServer::registerRoutes(httplib::Server &svr) {
 
   svr.Get("/api/panes/rotate_all",
           [this](const httplib::Request &, httplib::Response &res) {
+            std::lock_guard<std::mutex> lk(dataMutex_);
             if (panes_) {
               for (auto &p : *panes_) p->forceAdvance();
               res.set_content("ok", "text/plain");
@@ -217,6 +219,7 @@ void WebServer::registerRoutes(httplib::Server &svr) {
   svr.Get("/api/panes/pause",
           [this](const httplib::Request &req, httplib::Response &res) {
             int idx = StringUtils::safe_stoi(req.get_param_value("pane"));
+            std::lock_guard<std::mutex> lk(dataMutex_);
             if (panes_ && idx >= 0 && idx < (int)panes_->size()) {
               (*panes_)[idx]->setPaused(!(*panes_)[idx]->isPaused());
               res.set_content("ok", "text/plain");
@@ -227,6 +230,7 @@ void WebServer::registerRoutes(httplib::Server &svr) {
   svr.Get("/api/panes/pause_all",
           [this](const httplib::Request &req, httplib::Response &res) {
             bool p = req.get_param_value("paused") == "1";
+            std::lock_guard<std::mutex> lk(dataMutex_);
             if (panes_) {
               for (auto &pane : *panes_) pane->setPaused(p);
               res.set_content("ok", "text/plain");
@@ -237,6 +241,7 @@ void WebServer::registerRoutes(httplib::Server &svr) {
   svr.Get("/get_pane_rect",
           [this](const httplib::Request &req, httplib::Response &res) {
             int idx = StringUtils::safe_stoi(req.get_param_value("pane")) - 1;
+            std::lock_guard<std::mutex> lk(dataMutex_);
             if (!panes_ || idx < 0 || idx >= (int)panes_->size()) {
               res.status = 404;
               return;
@@ -267,6 +272,7 @@ void WebServer::registerRoutes(httplib::Server &svr) {
           [this](const httplib::Request &req, httplib::Response &res) {
             int idx = StringUtils::safe_stoi(req.get_param_value("pane")) - 1;
             if (idx < 0 || idx > 5) { res.status = 400; return; }
+            std::lock_guard<std::mutex> lk(dataMutex_);
             if (paneExpandCmd_)
               paneExpandCmd_->store(idx, std::memory_order_release);
             res.set_content("ok", "text/plain");
@@ -274,6 +280,7 @@ void WebServer::registerRoutes(httplib::Server &svr) {
 
   svr.Get("/api/panes/collapse",
           [this](const httplib::Request &, httplib::Response &res) {
+            std::lock_guard<std::mutex> lk(dataMutex_);
             if (paneExpandCmd_)
               paneExpandCmd_->store(-2, std::memory_order_release);
             res.set_content("ok", "text/plain");
@@ -281,6 +288,7 @@ void WebServer::registerRoutes(httplib::Server &svr) {
 
   svr.Get("/get_timepanel_rect",
           [this](const httplib::Request &, httplib::Response &res) {
+            std::lock_guard<std::mutex> lk(dataMutex_);
             if (!timePanel_) { res.status = 503; return; }
             SDL_Rect r = timePanel_->getRect();
             int outW = 0, outH = 0;
@@ -302,6 +310,7 @@ void WebServer::registerRoutes(httplib::Server &svr) {
                                       httplib::Response &res) {
     int pIdx = StringUtils::safe_stoi(req.get_param_value("pane"));
     std::string wId = req.get_param_value("widget");
+    std::lock_guard<std::mutex> lk(dataMutex_);
     if (panes_ && pIdx >= 0 && pIdx < (int)panes_->size()) {
       auto &pane = (*panes_)[pIdx];
       std::vector<WidgetType> rot = pane->getRotation();
@@ -698,6 +707,7 @@ void WebServer::registerRoutes(httplib::Server &svr) {
   svr.Get("/api/satellites",
           [this](const httplib::Request &, httplib::Response &res) {
             nlohmann::json j = nlohmann::json::array();
+            std::lock_guard<std::mutex> lk(dataMutex_);
             if (satMgr_) {
               for (const auto &s : satMgr_->getSatellites()) {
                 j.push_back(s.name);
@@ -748,6 +758,7 @@ void WebServer::registerRoutes(httplib::Server &svr) {
                if (ofs) {
                  ofs.write(file.content.data(), file.content.size());
                  ofs.close();
+                 std::lock_guard<std::mutex> lk(dataMutex_);
                  if (adifProvider_) {
                    adifProvider_->fetch(path);
                  }
@@ -794,9 +805,17 @@ void WebServer::registerRoutes(httplib::Server &svr) {
     }
     auto prom = std::make_shared<std::promise<std::string>>();
     auto fut = prom->get_future();
-    netMgr_->fetchAsync(
-        targetUrl, [prom](std::string b) { prom->set_value(std::move(b)); },
-        3600);
+    {
+      std::lock_guard<std::mutex> lk(dataMutex_);
+      if (netMgr_) {
+        netMgr_->fetchAsync(
+            targetUrl, [prom](std::string b) { prom->set_value(std::move(b)); },
+            3600);
+      } else {
+        res.status = 503;
+        return;
+      }
+    }
     if (fut.wait_for(std::chrono::seconds(20)) == std::future_status::timeout) {
       res.status = 504;
       return;
@@ -811,6 +830,7 @@ void WebServer::registerRoutes(httplib::Server &svr) {
 
   svr.Get("/api/hub/dxcluster", [this](const httplib::Request &,
                                        httplib::Response &res) {
+    std::lock_guard<std::mutex> lk(dataMutex_);
     if (!cfg_ || cfg_->hubMode != HubMode::Master || !dxc_) {
       res.status = 403;
       return;
@@ -857,6 +877,7 @@ void WebServer::registerRoutes(httplib::Server &svr) {
 
   svr.Get("/live/touch", [this](const httplib::Request &req,
                                 httplib::Response &res) {
+    std::unique_lock<std::mutex> lk(dataMutex_);
     if (!liveWebEnabled_) {
       res.status = 403;
       return;
@@ -877,11 +898,13 @@ void WebServer::registerRoutes(httplib::Server &svr) {
     SDL_PushEvent(&e);
     if (frameCapture_)
       frameCapture_->requestBaseCapture();
+    lk.unlock();
     res.set_content("ok", "text/plain");
   });
 
   svr.Get("/live/wheel",
           [this](const httplib::Request &req, httplib::Response &res) {
+            std::unique_lock<std::mutex> lk(dataMutex_);
             if (!liveWebEnabled_) {
               res.status = 403;
               return;
@@ -893,11 +916,13 @@ void WebServer::registerRoutes(httplib::Server &svr) {
             SDL_PushEvent(&e);
             if (frameCapture_)
               frameCapture_->requestBaseCapture();
+            lk.unlock();
             res.set_content("ok", "text/plain");
           });
 
   svr.Get("/live/key",
           [this](const httplib::Request &req, httplib::Response &res) {
+            std::unique_lock<std::mutex> lk(dataMutex_);
             if (!liveWebEnabled_) {
               res.status = 403;
               return;
@@ -918,11 +943,13 @@ void WebServer::registerRoutes(httplib::Server &svr) {
             SDL_PushEvent(&up);
             if (frameCapture_)
               frameCapture_->requestBaseCapture();
+            lk.unlock();
             res.set_content("ok", "text/plain");
           });
 
   svr.Get("/live/mouse",
           [this](const httplib::Request &req, httplib::Response &res) {
+            std::unique_lock<std::mutex> lk(dataMutex_);
             if (!liveWebEnabled_) {
               res.status = 403;
               return;
@@ -939,12 +966,14 @@ void WebServer::registerRoutes(httplib::Server &svr) {
             e.motion.x = px;
             e.motion.y = py;
             SDL_PushEvent(&e);
+            lk.unlock();
             res.set_content("ok", "text/plain");
           });
 
   // /api/live/vectors — spot + projection data for canvas overlay
   svr.Get("/api/live/vectors", [this](const httplib::Request &,
                                       httplib::Response &res) {
+    std::lock_guard<std::mutex> lk(dataMutex_);
     if (!cfg_ || !state_) {
       res.status = 503;
       return;
@@ -952,7 +981,7 @@ void WebServer::registerRoutes(httplib::Server &svr) {
     nlohmann::json j;
     j["projection"] = cfg_->projection;
     {
-      std::lock_guard<std::mutex> lk(state_->locationMutex);
+      std::lock_guard<std::mutex> lk_state(state_->locationMutex);
       j["deLat"] = state_->deLocation.lat;
       j["deLon"] = state_->deLocation.lon;
       j["dxLat"] = state_->dxLocation.lat;
@@ -1261,7 +1290,11 @@ void WebServer::registerRoutes(httplib::Server &svr) {
       // Full spot suppression from the MJPEG base is deferred (requires
       // MapWidget render-loop refactoring); spots are also drawn by the
       // browser canvas overlay.
-      frameCapture_->addBaseSubscriber();
+      {
+        std::lock_guard<std::mutex> lk(dataMutex_);
+        if (frameCapture_)
+          frameCapture_->addBaseSubscriber();
+      }
       uint64_t seq = 0;
       res.set_content_provider(
           "multipart/x-mixed-replace;boundary=hamclock",
@@ -1270,7 +1303,10 @@ void WebServer::registerRoutes(httplib::Server &svr) {
             if (!sink.is_writable())
               return false;
             uint64_t outSeq = 0;
-            auto frame = frameCapture_->waitBaseFrame(seq, 10000, outSeq);
+            FrameCapture *fc;
+            { std::lock_guard<std::mutex> lk(dataMutex_); fc = frameCapture_; }
+            if (!fc) return false;
+            auto frame = fc->waitBaseFrame(seq, 10000, outSeq);
             if (frame.empty())
               return sink.is_writable();
             seq = outSeq;
@@ -1285,11 +1321,16 @@ void WebServer::registerRoutes(httplib::Server &svr) {
             return sink.write("\r\n", 2);
           },
           [this](bool) {
+            std::lock_guard<std::mutex> lk(dataMutex_);
             if (frameCapture_)
               frameCapture_->removeBaseSubscriber();
           });
     } else {
-      frameCapture_->addSubscriber();
+      {
+        std::lock_guard<std::mutex> lk(dataMutex_);
+        if (frameCapture_)
+          frameCapture_->addSubscriber();
+      }
       uint64_t seq = 0;
       res.set_content_provider(
           "multipart/x-mixed-replace;boundary=hamclock",
@@ -1298,7 +1339,10 @@ void WebServer::registerRoutes(httplib::Server &svr) {
             if (!sink.is_writable())
               return false;
             uint64_t outSeq = 0;
-            auto frame = frameCapture_->waitFrame(seq, 5000, outSeq);
+            FrameCapture *fc;
+            { std::lock_guard<std::mutex> lk(dataMutex_); fc = frameCapture_; }
+            if (!fc) return false;
+            auto frame = fc->waitFrame(seq, 5000, outSeq);
             if (frame.empty())
               return sink.is_writable();
             seq = outSeq;
@@ -1313,6 +1357,7 @@ void WebServer::registerRoutes(httplib::Server &svr) {
             return sink.write("\r\n", 2);
           },
           [this](bool) {
+            std::lock_guard<std::mutex> lk(dataMutex_);
             if (frameCapture_)
               frameCapture_->removeSubscriber();
           });
@@ -1466,6 +1511,7 @@ void WebServer::registerRoutes(httplib::Server &svr) {
 
   svr.Get("/get_satellites.txt",
           [this](const httplib::Request &, httplib::Response &res) {
+            std::lock_guard<std::mutex> lk(dataMutex_);
             if (!satMgr_) {
               res.status = 503;
               return;
@@ -1478,6 +1524,7 @@ void WebServer::registerRoutes(httplib::Server &svr) {
 
   svr.Get("/get_ontheair.txt",
           [this](const httplib::Request &, httplib::Response &res) {
+            std::lock_guard<std::mutex> lk(dataMutex_);
             if (!activityStore_) {
               res.status = 503;
               return;
@@ -1492,6 +1539,7 @@ void WebServer::registerRoutes(httplib::Server &svr) {
 
   svr.Get("/get_dxpeds.txt",
           [this](const httplib::Request &, httplib::Response &res) {
+            std::lock_guard<std::mutex> lk(dataMutex_);
             if (!activityStore_) {
               res.status = 503;
               return;
@@ -1505,14 +1553,16 @@ void WebServer::registerRoutes(httplib::Server &svr) {
 
   svr.Get("/get_capture", [this](const httplib::Request &req,
                                  httplib::Response &res) {
-    if (!frameCapture_) {
+    FrameCapture *fc;
+    { std::lock_guard<std::mutex> lk(dataMutex_); fc = frameCapture_; }
+    if (!fc) {
       res.status = 503;
       return;
     }
 
     // Increment subscribers so FrameCapture::capture() actually runs on the
     // main thread
-    frameCapture_->addSubscriber();
+    fc->addSubscriber();
 
     std::string seqParam = req.get_param_value("seq");
     uint64_t afterSeq = 0;
@@ -1520,16 +1570,16 @@ void WebServer::registerRoutes(httplib::Server &svr) {
       // If no seq is provided, wait for the NEXT frame after the current one.
       // This ensures we don't get a stale cached frame from when nobody was
       // watching.
-      afterSeq = frameCapture_->latestSeq();
+      afterSeq = fc->latestSeq();
     } else {
       afterSeq = static_cast<uint64_t>(StringUtils::safe_stoi(seqParam));
     }
     uint64_t outSeq = 0;
 
     // Increased timeout to 1000ms to allow for RPi 3B scheduling and encoding
-    auto frame = frameCapture_->waitFrame(afterSeq, 1000, outSeq);
+    auto frame = fc->waitFrame(afterSeq, 1000, outSeq);
 
-    frameCapture_->removeSubscriber();
+    fc->removeSubscriber();
 
     if (frame.empty()) {
       res.status = 503;
@@ -1545,19 +1595,21 @@ void WebServer::registerRoutes(httplib::Server &svr) {
   // clients and by the MCP verification tool.
   svr.Get("/live.jpg", [this](const httplib::Request &req,
                               httplib::Response &res) {
-    if (!frameCapture_) {
+    FrameCapture *fc;
+    { std::lock_guard<std::mutex> lk(dataMutex_); fc = frameCapture_; }
+    if (!fc) {
       res.status = 503;
       return;
     }
-    frameCapture_->addSubscriber();
+    fc->addSubscriber();
     std::string seqParam = req.get_param_value("seq");
     uint64_t afterSeq =
         seqParam.empty()
-            ? frameCapture_->latestSeq()
+            ? fc->latestSeq()
             : static_cast<uint64_t>(StringUtils::safe_stoi(seqParam));
     uint64_t outSeq = 0;
-    auto frame = frameCapture_->waitFrame(afterSeq, 1000, outSeq);
-    frameCapture_->removeSubscriber();
+    auto frame = fc->waitFrame(afterSeq, 1000, outSeq);
+    fc->removeSubscriber();
     if (frame.empty()) {
       res.status = 503;
       return;
@@ -1574,6 +1626,7 @@ void WebServer::registerRoutes(httplib::Server &svr) {
                                httplib::Response &res) {
     int x = StringUtils::safe_stoi(req.get_param_value("x"));
     int y = StringUtils::safe_stoi(req.get_param_value("y"));
+    std::lock_guard<std::mutex> lk(dataMutex_);
     int outW = LOGICAL_WIDTH, outH = LOGICAL_HEIGHT;
     if (renderer_)
       SDL_GetRendererOutputSize(renderer_, &outW, &outH);
@@ -1905,6 +1958,7 @@ void WebServer::registerRoutes(httplib::Server &svr) {
 
   svr.Get("/get_stopwatch.txt", [this](const httplib::Request &,
                                        httplib::Response &res) {
+    std::lock_guard<std::mutex> lk(dataMutex_);
     if (!stopwatch_) {
       res.status = 503;
       return;
@@ -1926,6 +1980,7 @@ void WebServer::registerRoutes(httplib::Server &svr) {
 
   svr.Get("/get_satellite.txt",
           [this](const httplib::Request &, httplib::Response &res) {
+            std::lock_guard<std::mutex> lk(dataMutex_);
             if (!satMgr_) {
               res.status = 503;
               return;
@@ -1942,7 +1997,7 @@ void WebServer::registerRoutes(httplib::Server &svr) {
               Satellite sat(*tle);
               double deLat, deLon;
               {
-                std::lock_guard<std::mutex> lk(state_->locationMutex);
+                std::lock_guard<std::mutex> lk_state(state_->locationMutex);
                 deLat = state_->deLocation.lat;
                 deLon = state_->deLocation.lon;
               }
@@ -1958,6 +2013,7 @@ void WebServer::registerRoutes(httplib::Server &svr) {
 
   svr.Get("/set_satname",
           [this](const httplib::Request &req, httplib::Response &res) {
+            std::lock_guard<std::mutex> lk(dataMutex_);
             if (!satMgr_) {
               res.status = 503;
               return;
@@ -1972,6 +2028,7 @@ void WebServer::registerRoutes(httplib::Server &svr) {
 
   svr.Get("/set_sattle",
           [this](const httplib::Request &req, httplib::Response &res) {
+            std::lock_guard<std::mutex> lk(dataMutex_);
             if (!satMgr_) {
               res.status = 503;
               return;

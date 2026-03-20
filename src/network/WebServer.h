@@ -3,6 +3,7 @@
 #include "../core/Constants.h"
 #include <atomic>
 #include <memory>
+#include <mutex>
 #include <thread>
 #include <vector>
 
@@ -52,39 +53,42 @@ public:
   void start();
   void stop();
 
-  void setFrameCapture(FrameCapture *fc) { frameCapture_ = fc; }
+  void setFrameCapture(FrameCapture *fc) { std::lock_guard<std::mutex> lk(dataMutex_); frameCapture_ = fc; }
   void setLiveWebEnabled(bool enabled) { liveWebEnabled_ = enabled; }
   bool isLiveWebEnabled() const { return liveWebEnabled_; }
-  void setNetworkManager(NetworkManager *nm) { netMgr_ = nm; }
-  void setActivityStore(ActivityDataStore *a) { activityStore_ = a; }
-  void setSatelliteManager(SatelliteManager *s) { satMgr_ = s; }
-  void setRotatorService(RotatorService *r) { rotatorSvc_ = r; }
+  void setNetworkManager(NetworkManager *nm) { std::lock_guard<std::mutex> lk(dataMutex_); netMgr_ = nm; }
+  void setActivityStore(ActivityDataStore *a) { std::lock_guard<std::mutex> lk(dataMutex_); activityStore_ = a; }
+  void setSatelliteManager(SatelliteManager *s) { std::lock_guard<std::mutex> lk(dataMutex_); satMgr_ = s; }
+  void setRotatorService(RotatorService *r) { std::lock_guard<std::mutex> lk(dataMutex_); rotatorSvc_ = r; }
   void setRotationControl(std::atomic<int> *cmd, std::atomic<int> *pane,
                           std::atomic<int> *widget) {
+    std::lock_guard<std::mutex> lk(dataMutex_);
     rotationCmd_ = cmd;
     rotationCmdPane_ = pane;
     rotationCmdWidget_ = widget;
   }
   void setPanes(std::vector<std::unique_ptr<PaneContainer>> *panes) {
+    std::lock_guard<std::mutex> lk(dataMutex_);
     panes_ = panes;
   }
   void setWeatherStore(std::shared_ptr<WeatherStore> ws) { weatherStore_ = ws; }
   void setBrightnessManager(std::shared_ptr<BrightnessManager> bm) {
     brightnessMgr_ = bm;
   }
-  void setADIFProvider(ADIFProvider *p) { adifProvider_ = p; }
-  void setMapReloadFlag(std::atomic<bool> *flag) { mapReloadFlag_ = flag; }
-  void setStopwatch(StopwatchPanel *s) { stopwatch_ = s; }
+  void setADIFProvider(ADIFProvider *p) { std::lock_guard<std::mutex> lk(dataMutex_); adifProvider_ = p; }
+  void setMapReloadFlag(std::atomic<bool> *flag) { std::lock_guard<std::mutex> lk(dataMutex_); mapReloadFlag_ = flag; }
+  void setStopwatch(StopwatchPanel *s) { std::lock_guard<std::mutex> lk(dataMutex_); stopwatch_ = s; }
   void setCalendarStore(std::shared_ptr<CalendarStore> s) {
     calendarStore_ = std::move(s);
   }
-  void setTimePanel(TimePanel *tp) { timePanel_ = tp; }
-  void setPaneExpandControl(std::atomic<int> *cmd) { paneExpandCmd_ = cmd; }
+  void setTimePanel(TimePanel *tp) { std::lock_guard<std::mutex> lk(dataMutex_); timePanel_ = tp; }
+  void setPaneExpandControl(std::atomic<int> *cmd) { std::lock_guard<std::mutex> lk(dataMutex_); paneExpandCmd_ = cmd; }
 
 private:
   void run();
   void registerRoutes(httplib::Server &svr);
 
+  std::mutex dataMutex_;
   SDL_Renderer *renderer_;
   AppConfig *cfg_;
   HamClockState *state_;
