@@ -336,6 +336,7 @@ struct AppContext {
   std::atomic<int> paneExpandCmd{-1};
   bool startOnUpdateTab = false;
   bool startOnServicesTab = false;
+  bool startupAnnounceDone = false;
 
   // Dashboard State (Transient)
   std::unique_ptr<DashboardContext> dashboard;

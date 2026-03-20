@@ -905,7 +905,10 @@ void main_tick() {
             ctx.dashboard->widgetFactory_(WidgetType::STOPWATCH)));
         ctx.webServer->setCalendarStore(ctx.calendarStore);
       }
-      SoundManager::getInstance().speak("HamClock system online");
+      if (!ctx.startupAnnounceDone) {
+        ctx.startupAnnounceDone = true;
+        SoundManager::getInstance().speak("HamClock system online");
+      }
 #endif
     }
 

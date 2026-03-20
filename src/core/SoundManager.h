@@ -1,6 +1,7 @@
 #pragma once
 #include <SDL.h>
 #include <SDL_mixer.h>
+#include <atomic>
 #include <mutex>
 #include <string>
 #ifdef HAMCLOCK_AUDIO_TTS
@@ -27,12 +28,18 @@ public:
   // No-op if HAMCLOCK_AUDIO_TTS is not compiled in or SoundManager is disabled.
   void speak(std::string text);
 
+  // Suppress TTS while the display is off.  Call setScreenOn(false) when the
+  // screen is powered off, setScreenOn(true) when it comes back on.
+  void setScreenOn(bool on) { screenOn_.store(on, std::memory_order_relaxed); }
+  bool isScreenOn() const { return screenOn_.load(std::memory_order_relaxed); }
+
 private:
   SoundManager() = default;
   ~SoundManager();
 
   bool initialized_ = false;
   bool disabled_ = false;
+  std::atomic<bool> screenOn_{true};
   Mix_Chunk *alarmChunk_ = nullptr;
   std::mutex mutex_;
 

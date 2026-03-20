@@ -6,7 +6,9 @@
 #include "../core/WatchlistHitStore.h"
 #include "../core/WatchlistStore.h"
 #include <atomic>
+#include <condition_variable>
 #include <memory>
+#include <mutex>
 #include <nlohmann/json.hpp>
 #include <string>
 #include <thread>
@@ -53,4 +55,6 @@ private:
   std::thread thread_;
   std::atomic<bool> running_{false};
   std::atomic<bool> stopClicked_{false};
+  std::mutex sleepMutex_;
+  std::condition_variable sleepCv_;
 };

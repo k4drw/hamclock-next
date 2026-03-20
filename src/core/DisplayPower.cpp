@@ -1,5 +1,6 @@
 #include "DisplayPower.h"
 #include "Logger.h"
+#include "SoundManager.h"
 
 #include <algorithm>
 #include <cstdio>
@@ -179,6 +180,7 @@ bool DisplayPower::setPower(bool on) {
     currentPower_ = on;
     if (!on)
       needsBlackFrame_ = true;
+    SoundManager::getInstance().setScreenOn(on);
     LOG_I("Display", "Screen power set to {}", on ? "ON" : "OFF");
   } else {
 #ifndef __EMSCRIPTEN__

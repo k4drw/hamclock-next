@@ -91,6 +91,7 @@ void DXClusterProvider::start(const AppConfig &config) {
 
 void DXClusterProvider::stop() {
   stopClicked_ = true;
+  sleepCv_.notify_one();
   if (thread_.joinable()) {
     thread_.join();
   }
@@ -125,7 +126,12 @@ void DXClusterProvider::run() {
       break;
 
     // Retry delay (increased to 60s to avoid hammering and IP bans)
-    std::this_thread::sleep_for(std::chrono::seconds(60));
+    // Interruptible: stop() will wake this immediately via sleepCv_.notify_one()
+    {
+      std::unique_lock<std::mutex> lk(sleepMutex_);
+      sleepCv_.wait_for(lk, std::chrono::seconds(60),
+                        [this] { return stopClicked_.load(); });
+    }
   }
 }
 

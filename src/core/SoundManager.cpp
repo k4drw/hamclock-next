@@ -106,6 +106,7 @@ void SoundManager::cleanup() {
 void SoundManager::speak(std::string text) {
 #ifdef HAMCLOCK_AUDIO_TTS
   if (disabled_) return;
+  if (!screenOn_.load(std::memory_order_relaxed)) return;
   {
     std::lock_guard<std::mutex> lk(ttsMutex_);
     if (!ttsThreadStarted_) {
