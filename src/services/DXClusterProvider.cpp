@@ -9,6 +9,7 @@
 #include "../core/HamClockState.h"
 #include "../core/Logger.h"
 #include "../core/PrefixManager.h"
+#include "../core/SoundManager.h"
 #include <httplib.h>
 #include <nlohmann/json.hpp>
 #ifdef _WIN32
@@ -558,6 +559,7 @@ void DXClusterProvider::processWSJTX(const uint8_t *packet, size_t len) {
       hit.source = "WSJT-X";
       hit.time = spot.spottedAt;
       hits_->addHit(hit);
+      SoundManager::getInstance().speak("Watchlist: " + hit.call);
     }
   }
 }
@@ -625,6 +627,7 @@ void DXClusterProvider::processLine(const std::string &line) {
           hit.source = "Cluster";
           hit.time = spot.spottedAt;
           hits_->addHit(hit);
+          SoundManager::getInstance().speak("Watchlist: " + hit.call);
         }
       }
     }

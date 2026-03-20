@@ -24,7 +24,7 @@ docker run --rm -v "$(pwd)":/work:z -w /work $IMAGE bash -c "
         libxrandr-dev:armhf libxss-dev:armhf libxxf86vm-dev:armhf libxinerama-dev:armhf \
         libwayland-dev:armhf libxkbcommon-dev:armhf wayland-protocols \
         libdrm-dev:armhf libgbm-dev:armhf libegl-dev:armhf libgles-dev:armhf \
-        libdbus-1-dev:armhf libudev-dev:armhf libasound2-dev:armhf && \
+        libdbus-1-dev:armhf libudev-dev:armhf libasound2-dev:armhf flite1-dev:armhf && \
     export PKG_CONFIG_PATH=/usr/lib/arm-linux-gnueabihf/pkgconfig && \
     export PKG_CONFIG_LIBDIR=/usr/lib/arm-linux-gnueabihf/pkgconfig && \
     cmake -B$BUILD_DIR -H. \

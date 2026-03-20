@@ -33,12 +33,14 @@ BuildRequires:  libgbm-devel
 BuildRequires:  Mesa-libEGL-devel
 BuildRequires:  Mesa-libGLESv2-devel
 BuildRequires:  alsa-devel
+BuildRequires:  flite1-dev
 BuildRequires:  update-desktop-files
 %else
 BuildRequires:  mesa-libgbm-devel
 BuildRequires:  mesa-libEGL-devel
 BuildRequires:  mesa-libGLES-devel
 BuildRequires:  alsa-lib-devel
+BuildRequires:  flite-devel
 %endif
 BuildRequires:  desktop-file-utils
 

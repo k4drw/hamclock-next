@@ -3,8 +3,10 @@
 #include "../core/CalendarData.h"
 #include "FontManager.h"
 #include "Widget.h"
+#include <ctime>
 #include <functional>
 #include <memory>
+#include <set>
 #include <vector>
 
 // Displays upcoming calendar events from CalendarStore (fed by POST
@@ -65,4 +67,7 @@ private:
   int firstRowY_ = 0;
   int lastRowH_ = 0;
   int numRows_ = 0;
+
+  // TTS dedup: event start times that have already been spoken
+  std::set<time_t> spokenEventStarts_;
 };

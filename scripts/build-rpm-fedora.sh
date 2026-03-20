@@ -26,7 +26,7 @@ docker run --rm \
     -w /src \
     $IMAGE \
     /bin/bash -c "
-        dnf install -y rpm-build cmake gcc-c++ git libstdc++-static libX11-devel libXext-devel libXcursor-devel libXi-devel libXrandr-devel libXScrnSaver-devel libXxf86vm-devel libXinerama-devel libcurl-devel openssl-devel libdrm-devel mesa-libgbm-devel mesa-libEGL-devel mesa-libGLES-devel alsa-lib-devel tar gzip desktop-file-utils && \
+        dnf install -y rpm-build cmake gcc-c++ git libstdc++-static libX11-devel libXext-devel libXcursor-devel libXi-devel libXrandr-devel libXScrnSaver-devel libXxf86vm-devel libXinerama-devel libcurl-devel openssl-devel libdrm-devel mesa-libgbm-devel mesa-libEGL-devel mesa-libGLES-devel alsa-lib-devel flite-devel tar gzip desktop-file-utils && \
         
         # Create tarball for Source0
         tar --exclude='./build*' --exclude='./.git' -czf /src/$BUILD_DIR/hamclock-next-${VERSION}.tar.gz . && \

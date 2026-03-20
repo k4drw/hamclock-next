@@ -24,7 +24,7 @@ docker run --rm -v "$(pwd)":/work:z -w /work $IMAGE bash -c "
         libxrandr-dev:arm64 libxss-dev:arm64 libxxf86vm-dev:arm64 libxinerama-dev:arm64 \
         libwayland-dev:arm64 libxkbcommon-dev:arm64 wayland-protocols \
         libdrm-dev:arm64 libgbm-dev:arm64 libegl-dev:arm64 libgles-dev:arm64 \
-        libdbus-1-dev:arm64 libudev-dev:arm64 libasound2-dev:arm64 && \
+        libdbus-1-dev:arm64 libudev-dev:arm64 libasound2-dev:arm64 flite1-dev:arm64 && \
     export PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig && \
     export PKG_CONFIG_LIBDIR=/usr/lib/aarch64-linux-gnu/pkgconfig && \
     cmake -B$BUILD_DIR -H. \

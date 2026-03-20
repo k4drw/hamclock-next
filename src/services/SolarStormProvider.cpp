@@ -1,6 +1,7 @@
 #include "SolarStormProvider.h"
 #include "../core/Astronomy.h"
 #include "../core/Logger.h"
+#include "../core/SoundManager.h"
 #include <SDL.h>
 #include <algorithm>
 #include <cmath>
@@ -107,6 +108,16 @@ void SolarStormProvider::processXrayFlux(const std::string& body) {
     else if (lastFlux >= 1e-6) data_.lastFlareClass = "C";
     else if (lastFlux >= 1e-7) data_.lastFlareClass = "B";
     else data_.lastFlareClass = "A";
+
+    // Voice alert on new X or M class flare (dedup: only once per class transition)
+    if ((data_.lastFlareClass == "X" || data_.lastFlareClass == "M") &&
+        data_.lastFlareClass != lastSpokenFlareClass_) {
+      lastSpokenFlareClass_ = data_.lastFlareClass;
+      SoundManager::getInstance().speak("Class " + data_.lastFlareClass + " solar flare");
+    }
+    if (data_.lastFlareClass != "X" && data_.lastFlareClass != "M") {
+      lastSpokenFlareClass_.clear(); // reset when conditions improve
+    }
 
     if (callback_) callback_(data_);
   } catch (const std::exception &e) {

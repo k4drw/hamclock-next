@@ -34,6 +34,7 @@ private:
 
   uint32_t lastFluxUpdate_ = 0;
   uint32_t lastAlertUpdate_ = 0;
+  std::string lastSpokenFlareClass_; // dedup: only speak when class changes to X/M
 
   static constexpr uint32_t FLUX_INTERVAL_MS = 60000; // 1 min (high frequency)
   static constexpr uint32_t ALERT_INTERVAL_MS = 300000; // 5 mins

@@ -29,7 +29,7 @@ docker run --rm -v "$(pwd)":/work:z -w /work $IMAGE bash -c "
         libxrandr-dev libxss-dev libxxf86vm-dev libxinerama-dev \
         libwayland-dev libxkbcommon-dev wayland-protocols \
         libdrm-dev libgbm-dev libegl-dev libgles-dev \
-        libdbus-1-dev libudev-dev libasound2-dev curl && \
+        libdbus-1-dev libudev-dev libasound2-dev flite1-dev curl && \
     cmake -B$BUILD_DIR -H. \
         -DCMAKE_BUILD_TYPE=Release \
         -DENABLE_DEBUG_API=OFF \

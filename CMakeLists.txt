@@ -710,6 +710,30 @@ else()
         ${LIBDRM_LIBRARIES}
     )
 
+    # TTS: platform-native voice alerts
+    if(APPLE)
+        message(STATUS "TTS: macOS 'say' — voice alerts enabled")
+        target_compile_definitions(hamclock-next PRIVATE HAMCLOCK_AUDIO_TTS)
+    elseif(WIN32)
+        message(STATUS "TTS: Windows SAPI — voice alerts enabled")
+        target_compile_definitions(hamclock-next PRIVATE HAMCLOCK_AUDIO_TTS)
+        target_link_libraries(hamclock-next PRIVATE ole32 oleaut32)
+    else()
+        # Linux: flite (optional)
+        find_library(FLITE_LIB flite)
+        find_library(FLITE_VOICE_LIB flite_cmu_us_kal16)
+        find_path(FLITE_INCLUDE_DIR flite/flite.h)
+        if(FLITE_LIB AND FLITE_VOICE_LIB AND FLITE_INCLUDE_DIR)
+            message(STATUS "TTS: flite found — voice alerts enabled")
+            target_compile_definitions(hamclock-next PRIVATE HAMCLOCK_AUDIO_TTS)
+            target_link_libraries(hamclock-next PRIVATE
+                ${FLITE_LIB} ${FLITE_VOICE_LIB} flite_usenglish flite_cmulex)
+            target_include_directories(hamclock-next PRIVATE ${FLITE_INCLUDE_DIR})
+        else()
+            message(STATUS "TTS: flite not found — voice alerts disabled (install flite1-dev)")
+        endif()
+    endif()
+
     if(WIN32)
         add_definitions(-D_WIN32_WINNT=0x0601) # Target Windows 7+
         target_link_libraries(hamclock-next PRIVATE ws2_32 psapi iphlpapi)

@@ -1,5 +1,6 @@
 #include "CalendarPanel.h"
 #include "../core/Astronomy.h"
+#include "../core/SoundManager.h"
 #include "../core/Theme.h"
 #include "FontCatalog.h"
 #include <SDL.h>
@@ -36,6 +37,12 @@ void CalendarPanel::render(SDL_Renderer *renderer) {
   auto events = store_->snapshot();
   time_t nowT = std::time(nullptr);
   time_t horizon = nowT + 24 * 3600;
+
+  // Prune spoken events that ended more than 1 hour ago
+  for (auto it = spokenEventStarts_.begin(); it != spokenEventStarts_.end(); ) {
+    if (*it < nowT - 3600) it = spokenEventStarts_.erase(it);
+    else ++it;
+  }
 
   // Filter and sort: only events that end in the future and start within 24h
   std::vector<const CalendarEvent *> upcoming;
@@ -80,6 +87,12 @@ void CalendarPanel::render(SDL_Renderer *renderer) {
       bool alreadyStarted = (ev.start <= nowT && ev.end > nowT);
       bool active = alreadyStarted;
       bool soon = (!active && ev.start > nowT && ev.start - nowT < 15 * 60);
+
+      // Voice alert when event first enters the "soon" window (dedup by start time)
+      if (soon && spokenEventStarts_.find(ev.start) == spokenEventStarts_.end()) {
+        spokenEventStarts_.insert(ev.start);
+        SoundManager::getInstance().speak("Upcoming: " + ev.summary);
+      }
 
       // Time label
       char timeBuf[16];

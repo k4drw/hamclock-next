@@ -83,6 +83,7 @@ void CountdownPanel::render(SDL_Renderer *renderer) {
                   themes.danger, FontStyle::MicroBold, true);
     if (!alarmTriggered_) {
       SoundManager::getInstance().playAlarm();
+      SoundManager::getInstance().speak("Timer expired");
       alarmTriggered_ = true;
     }
   } else {
