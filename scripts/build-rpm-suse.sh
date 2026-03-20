@@ -42,7 +42,7 @@ docker run --rm \
             libX11-devel libXext-devel libXcursor-devel libXi-devel \
             libXrandr-devel libXss-devel libXxf86vm-devel libXinerama-devel \
             libcurl-devel libopenssl-devel libdrm-devel libgbm-devel \
-            Mesa-libEGL-devel Mesa-libGLESv2-devel alsa-devel flite1-dev \
+            Mesa-libEGL-devel Mesa-libGLESv2-devel alsa-devel flite-devel \
             desktop-file-utils update-desktop-files tar gzip && \
         
         # Setup RPM build tree
