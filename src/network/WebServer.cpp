@@ -206,7 +206,8 @@ void WebServer::run() {
       <input type="number" id="lat" step="0.0001" min="-90" max="90">
       <label>Longitude</label>
       <input type="number" id="lon" step="0.0001" min="-180" max="180">
-      <button onclick="saveConfig()">Save</button>
+      <label style="margin-top:4px"><input type="checkbox" id="audio-muted"> Mute Audio / TTS</label>
+      <button onclick="saveConfig()" style="margin-top:8px">Save</button>
       <div id="msg"></div>
     </div>
   </div>
@@ -263,6 +264,9 @@ void WebServer::run() {
       </select>
       <label style="margin-top:10px"><input type="checkbox" id="night-lights"> Show Night Lights</label>
       <label><input type="checkbox" id="use-metric"> Use Metric Units</label>
+      <div class="section-hdr" style="margin-top:16px">Font</div>
+      <label>Font</label>
+      <select id="font-path"></select>
       <button onclick="saveAppearance()" style="margin-top:10px">Save Appearance</button>
       <div id="app-msg"></div>
     </div>
@@ -571,9 +575,27 @@ void WebServer::run() {
         const c = await r.json();
         document.getElementById('call').value = c.callsign || '';
         document.getElementById('grid').value = c.grid || '';
-        document.getElementById('lat').value = c.lat || '';
-        document.getElementById('lon').value = c.lon || '';
+        document.getElementById('lat').value = (c.lat !== undefined) ? c.lat : '';
+        document.getElementById('lon').value = (c.lon !== undefined) ? c.lon : '';
+        document.getElementById('audio-muted').checked = !!c.audioMuted;
       } catch(e) { setMsg('Failed to load config: ' + e, true); }
+    }
+
+    async function loadFonts(selectedPath) {
+      try {
+        const r = await fetch('/api/fonts');
+        const fonts = await r.json();
+        const sel = document.getElementById('font-path');
+        sel.innerHTML = '';
+        fonts.forEach(f => {
+          const opt = document.createElement('option');
+          opt.value = f.path;
+          opt.textContent = f.name;
+          sel.appendChild(opt);
+        });
+        sel.value = selectedPath || '';
+        if (sel.value !== (selectedPath || '')) sel.value = '';
+      } catch(e) {}
     }
 
     async function loadAppearance() {
@@ -597,7 +619,8 @@ void WebServer::run() {
         document.getElementById('weather-overlay').value = c.weatherOverlay || 'none';
         document.getElementById('night-lights').checked = !!c.mapNightLights;
         document.getElementById('use-metric').checked = !!c.useMetric;
-        
+        await loadFonts(c.fontPath || '');
+
         const dpmSelect = document.getElementById('display-power-method');
         dpmSelect.innerHTML = '<option value="auto">Auto-detect</option>';
         if (c.displayPowerMethods) {
@@ -635,11 +658,12 @@ void WebServer::run() {
       const showGrid = (gridMode !== 'none') ? '1' : '0';
       const gridType = (gridMode === 'maidenhead') ? 'maidenhead' : 'latlon';
 
+      const fontPath = document.getElementById('font-path').value.trim();
       const params = new URLSearchParams({
         theme, map_style: mapStyle, projection, show_borders: showBorders,
         show_beacons: showBeacons, show_sattrack: showSatTrack, show_grid: showGrid, grid_type: gridType,
         prop_overlay: propOverlay, wx_overlay: wxOverlay, night_lights: nl, use_metric: mu,
-        display_power_method: dpm
+        display_power_method: dpm, font_path: fontPath
       });
       try {
         const r = await fetch('/set_config?' + params);
@@ -668,7 +692,8 @@ void WebServer::run() {
       const grid = document.getElementById('grid').value.trim();
       const lat  = document.getElementById('lat').value;
       const lon  = document.getElementById('lon').value;
-      const params = new URLSearchParams({call, grid, lat, lon});
+      const audioMuted = document.getElementById('audio-muted').checked ? '1' : '0';
+      const params = new URLSearchParams({call, grid, lat, lon, audio_muted: audioMuted});
       try {
         const r = await fetch('/set_config?' + params);
         const t = await r.text();

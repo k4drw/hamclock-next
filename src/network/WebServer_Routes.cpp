@@ -37,6 +37,8 @@
 #include "../core/UIRegistry.h"
 #endif
 #include <iomanip>
+#include <algorithm>
+#include <filesystem>
 
 using namespace HamClock;
 
@@ -162,7 +164,6 @@ static bool isPrivateOrLoopbackUrl(const std::string &url) {
   return false;
 }
 
-
 void WebServer::registerRoutes(httplib::Server &svr) {
   svr.Get("/api/widgets/available",
           [](const httplib::Request &, httplib::Response &res) {
@@ -178,23 +179,23 @@ void WebServer::registerRoutes(httplib::Server &svr) {
           });
 
   svr.Get("/api/panes",
-         [this](const httplib::Request &, httplib::Response &res) {
-           nlohmann::json j = nlohmann::json::array();
-           std::lock_guard<std::mutex> lk(dataMutex_);
-           if (panes_) {
-             for (const auto &p : *panes_) {
-               nlohmann::json pj;
-               pj["current"] = widgetTypeDisplayName(p->getActiveType());
-               pj["paused"] = p->isPaused();
-               nlohmann::json rot = nlohmann::json::array();
-               for (auto t : p->getRotation())
-                 rot.push_back(widgetTypeDisplayName(t));
-               pj["rotation"] = rot;
-               j.push_back(pj);
-             }
-           }
-           res.set_content(j.dump(2), "application/json");
-         });
+          [this](const httplib::Request &, httplib::Response &res) {
+            nlohmann::json j = nlohmann::json::array();
+            std::lock_guard<std::mutex> lk(dataMutex_);
+            if (panes_) {
+              for (const auto &p : *panes_) {
+                nlohmann::json pj;
+                pj["current"] = widgetTypeDisplayName(p->getActiveType());
+                pj["paused"] = p->isPaused();
+                nlohmann::json rot = nlohmann::json::array();
+                for (auto t : p->getRotation())
+                  rot.push_back(widgetTypeDisplayName(t));
+                pj["rotation"] = rot;
+                j.push_back(pj);
+              }
+            }
+            res.set_content(j.dump(2), "application/json");
+          });
   svr.Get("/api/panes/rotate",
           [this](const httplib::Request &req, httplib::Response &res) {
             int idx = StringUtils::safe_stoi(req.get_param_value("pane"));
@@ -254,8 +255,10 @@ void WebServer::registerRoutes(httplib::Server &svr) {
               SDL_RenderGetLogicalSize(renderer_, &logW, &logH);
             }
             // If no logical size is set, logical is HamClock's native 800x480
-            if (logW == 0) logW = 800;
-            if (logH == 0) logH = 480;
+            if (logW == 0)
+              logW = 800;
+            if (logH == 0)
+              logH = 480;
             nlohmann::json j;
             j["x"] = r.x;
             j["y"] = r.y;
@@ -263,15 +266,18 @@ void WebServer::registerRoutes(httplib::Server &svr) {
             j["h"] = r.h;
             j["renderer_w"] = outW;
             j["renderer_h"] = outH;
-            j["logical_w"]  = logW;
-            j["logical_h"]  = logH;
+            j["logical_w"] = logW;
+            j["logical_h"] = logH;
             res.set_content(j.dump(), "application/json");
           });
 
   svr.Get("/api/panes/expand",
           [this](const httplib::Request &req, httplib::Response &res) {
             int idx = StringUtils::safe_stoi(req.get_param_value("pane")) - 1;
-            if (idx < 0 || idx > 5) { res.status = 400; return; }
+            if (idx < 0 || idx > 5) {
+              res.status = 400;
+              return;
+            }
             std::lock_guard<std::mutex> lk(dataMutex_);
             if (paneExpandCmd_)
               paneExpandCmd_->store(idx, std::memory_order_release);
@@ -289,7 +295,10 @@ void WebServer::registerRoutes(httplib::Server &svr) {
   svr.Get("/get_timepanel_rect",
           [this](const httplib::Request &, httplib::Response &res) {
             std::lock_guard<std::mutex> lk(dataMutex_);
-            if (!timePanel_) { res.status = 503; return; }
+            if (!timePanel_) {
+              res.status = 503;
+              return;
+            }
             SDL_Rect r = timePanel_->getRect();
             int outW = 0, outH = 0;
             int logW = 0, logH = 0;
@@ -297,12 +306,19 @@ void WebServer::registerRoutes(httplib::Server &svr) {
               SDL_GetRendererOutputSize(renderer_, &outW, &outH);
               SDL_RenderGetLogicalSize(renderer_, &logW, &logH);
             }
-            if (logW == 0) logW = 800;
-            if (logH == 0) logH = 480;
+            if (logW == 0)
+              logW = 800;
+            if (logH == 0)
+              logH = 480;
             nlohmann::json j;
-            j["x"] = r.x; j["y"] = r.y; j["w"] = r.w; j["h"] = r.h;
-            j["renderer_w"] = outW; j["renderer_h"] = outH;
-            j["logical_w"]  = logW; j["logical_h"]  = logH;
+            j["x"] = r.x;
+            j["y"] = r.y;
+            j["w"] = r.w;
+            j["h"] = r.h;
+            j["renderer_w"] = outW;
+            j["renderer_h"] = outH;
+            j["logical_w"] = logW;
+            j["logical_h"] = logH;
             res.set_content(j.dump(), "application/json");
           });
 
@@ -452,6 +468,10 @@ void WebServer::registerRoutes(httplib::Server &svr) {
     j["auxClockTzOffset"] = cfg_->auxClockTzOffset;
     j["auxClockTzLabel"] = cfg_->auxClockTzLabel;
     j["auxClockStarMode"] = cfg_->auxClockStarMode;
+    j["lat"] = cfg_->lat;
+    j["lon"] = cfg_->lon;
+    j["audioMuted"] = cfg_->audioMuted;
+    j["fontPath"] = cfg_->fontPath;
     j["version"] = HAMCLOCK_VERSION;
     j["arch"] = HAMCLOCK_ARCH;
     j["installType"] = HAMCLOCK_INSTALL_TYPE;
@@ -485,11 +505,12 @@ void WebServer::registerRoutes(httplib::Server &svr) {
     res.set_content(j.dump(2), "application/json");
   });
 
-  // Alias: /get_config.json → /api/config (consistent with *.txt naming convention)
-  svr.Get("/get_config.json", [](const httplib::Request &,
-                                  httplib::Response &res) {
-    res.set_redirect("/api/config", 302);
-  });
+  // Alias: /get_config.json → /api/config (consistent with *.txt naming
+  // convention)
+  svr.Get("/get_config.json",
+          [](const httplib::Request &, httplib::Response &res) {
+            res.set_redirect("/api/config", 302);
+          });
 
   svr.Get("/set_config", [this](const httplib::Request &req,
                                 httplib::Response &res) {
@@ -696,6 +717,14 @@ void WebServer::registerRoutes(httplib::Server &svr) {
       cfg_->selectedSatellite = req.get_param_value("selected_satellite");
     if (req.has_param("display_power_method"))
       cfg_->displayPowerMethod = req.get_param_value("display_power_method");
+    if (req.has_param("lat"))
+      cfg_->lat = StringUtils::safe_stod(req.get_param_value("lat"));
+    if (req.has_param("lon"))
+      cfg_->lon = StringUtils::safe_stod(req.get_param_value("lon"));
+    if (req.has_param("audio_muted"))
+      cfg_->audioMuted = req.get_param_value("audio_muted") == "1";
+    if (req.has_param("font_path"))
+      cfg_->fontPath = req.get_param_value("font_path");
 
     if (cfgMgr_)
       cfgMgr_->save(*cfg_);
@@ -770,6 +799,48 @@ void WebServer::registerRoutes(httplib::Server &svr) {
                res.status = 400;
              }
            });
+
+  svr.Get("/api/fonts", [](const httplib::Request &, httplib::Response &res) {
+    nlohmann::json j = nlohmann::json::array();
+    nlohmann::json builtin;
+    builtin["name"] = "Built-in (Default)";
+    builtin["path"] = "";
+    j.push_back(builtin);
+#ifndef __EMSCRIPTEN__
+    std::vector<std::pair<std::string, std::string>> fonts;
+    std::vector<std::string> dirs = {"/usr/share/fonts"};
+    const char *home = std::getenv("HOME");
+    if (home) {
+      dirs.push_back(std::string(home) + "/.local/share/fonts");
+      dirs.push_back(std::string(home) + "/.fonts");
+    }
+    for (const auto &dir : dirs) {
+      std::error_code ec;
+      if (!std::filesystem::exists(dir, ec))
+        continue;
+      for (auto &entry :
+           std::filesystem::recursive_directory_iterator(dir, ec)) {
+        if (ec)
+          continue;
+        auto ext = entry.path().extension().string();
+        std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+        if (ext == ".ttf" || ext == ".otf") {
+          fonts.push_back(
+              {entry.path().stem().string(), entry.path().string()});
+        }
+      }
+    }
+    std::sort(fonts.begin(), fonts.end());
+    for (const auto &[name, path] : fonts) {
+      nlohmann::json f;
+      f["name"] = name;
+      f["path"] = path;
+      j.push_back(f);
+    }
+#endif
+    res.set_header("Access-Control-Allow-Origin", "*");
+    res.set_content(j.dump(), "application/json");
+  });
 
   svr.Get("/api/display/status", [this](const httplib::Request &,
                                         httplib::Response &res) {
@@ -1304,8 +1375,12 @@ void WebServer::registerRoutes(httplib::Server &svr) {
               return false;
             uint64_t outSeq = 0;
             FrameCapture *fc;
-            { std::lock_guard<std::mutex> lk(dataMutex_); fc = frameCapture_; }
-            if (!fc) return false;
+            {
+              std::lock_guard<std::mutex> lk(dataMutex_);
+              fc = frameCapture_;
+            }
+            if (!fc)
+              return false;
             auto frame = fc->waitBaseFrame(seq, 10000, outSeq);
             if (frame.empty())
               return sink.is_writable();
@@ -1340,8 +1415,12 @@ void WebServer::registerRoutes(httplib::Server &svr) {
               return false;
             uint64_t outSeq = 0;
             FrameCapture *fc;
-            { std::lock_guard<std::mutex> lk(dataMutex_); fc = frameCapture_; }
-            if (!fc) return false;
+            {
+              std::lock_guard<std::mutex> lk(dataMutex_);
+              fc = frameCapture_;
+            }
+            if (!fc)
+              return false;
             auto frame = fc->waitFrame(seq, 5000, outSeq);
             if (frame.empty())
               return sink.is_writable();
@@ -1554,7 +1633,10 @@ void WebServer::registerRoutes(httplib::Server &svr) {
   svr.Get("/get_capture", [this](const httplib::Request &req,
                                  httplib::Response &res) {
     FrameCapture *fc;
-    { std::lock_guard<std::mutex> lk(dataMutex_); fc = frameCapture_; }
+    {
+      std::lock_guard<std::mutex> lk(dataMutex_);
+      fc = frameCapture_;
+    }
     if (!fc) {
       res.status = 503;
       return;
@@ -1596,7 +1678,10 @@ void WebServer::registerRoutes(httplib::Server &svr) {
   svr.Get("/live.jpg", [this](const httplib::Request &req,
                               httplib::Response &res) {
     FrameCapture *fc;
-    { std::lock_guard<std::mutex> lk(dataMutex_); fc = frameCapture_; }
+    {
+      std::lock_guard<std::mutex> lk(dataMutex_);
+      fc = frameCapture_;
+    }
     if (!fc) {
       res.status = 503;
       return;
@@ -2149,35 +2234,33 @@ void WebServer::registerRoutes(httplib::Server &svr) {
         res.set_content("ok", "text/plain");
       });
 
-  svr.Get("/get_capabilities",
-          [](const httplib::Request &, httplib::Response &res) {
-            nlohmann::json j;
+  svr.Get("/get_capabilities", [](const httplib::Request &,
+                                  httplib::Response &res) {
+    nlohmann::json j;
 
-            nlohmann::json wArr = nlohmann::json::array();
-            for (WidgetType wt : getAllBaseWidgetTypes())
-              wArr.push_back(widgetTypeToString(wt));
-            j["widgets"] = wArr;
+    nlohmann::json wArr = nlohmann::json::array();
+    for (WidgetType wt : getAllBaseWidgetTypes())
+      wArr.push_back(widgetTypeToString(wt));
+    j["widgets"] = wArr;
 
-            j["projections"] = nlohmann::json::array({"equirectangular",
-                                                       "robinson", "azimuthal",
-                                                       "mercator",
-                                                       "dual_azimuthal"});
+    j["projections"] =
+        nlohmann::json::array({"equirectangular", "robinson", "azimuthal",
+                               "mercator", "dual_azimuthal"});
 
-            nlohmann::json tArr = nlohmann::json::array();
-            for (const auto &t : getAvailableThemes())
-              if (t != "custom")
-                tArr.push_back(t);
-            j["themes"] = tArr;
+    nlohmann::json tArr = nlohmann::json::array();
+    for (const auto &t : getAvailableThemes())
+      if (t != "custom")
+        tArr.push_back(t);
+    j["themes"] = tArr;
 
-            j["prop_overlays"] = nlohmann::json::array(
-                {"none", "muf", "voacap", "reliability", "toa", "heatmap",
-                 "drap", "aurora"});
+    j["prop_overlays"] =
+        nlohmann::json::array({"none", "muf", "voacap", "reliability", "toa",
+                               "heatmap", "drap", "aurora"});
 
-            j["wx_overlays"] =
-                nlohmann::json::array({"none", "wxmb", "clouds_grib"});
+    j["wx_overlays"] = nlohmann::json::array({"none", "wxmb", "clouds_grib"});
 
-            res.set_content(j.dump(), "application/json");
-          });
+    res.set_content(j.dump(), "application/json");
+  });
 
   svr.Get("/set_displayTimes", [this](const httplib::Request &req,
                                       httplib::Response &res) {
@@ -2385,12 +2468,13 @@ void WebServer::registerRoutes(httplib::Server &svr) {
     res.set_content(j.dump(), "application/json");
   });
 
-  svr.Get("/get_build.txt", [](const httplib::Request &, httplib::Response &res) {
-    SDL_version sdlLinked;
-    SDL_GetVersion(&sdlLinked);
-    std::ostringstream oss;
+  svr.Get("/get_build.txt",
+          [](const httplib::Request &, httplib::Response &res) {
+            SDL_version sdlLinked;
+            SDL_GetVersion(&sdlLinked);
+            std::ostringstream oss;
 #if defined(__EMSCRIPTEN__)
-    oss << "Platform   WASM\n";
+            oss << "Platform   WASM\n";
 #elif defined(_WIN32)
     oss << "Platform   Windows\n";
 #elif defined(__APPLE__)
@@ -2399,15 +2483,15 @@ void WebServer::registerRoutes(httplib::Server &svr) {
     oss << "Platform   Linux\n";
 #endif
 #ifdef NDEBUG
-    oss << "Build      release\n";
+            oss << "Build      release\n";
 #else
     oss << "Build      debug\n";
 #endif
-    oss << "SDL_version " << static_cast<int>(sdlLinked.major) << "."
-        << static_cast<int>(sdlLinked.minor) << "."
-        << static_cast<int>(sdlLinked.patch) << "\n";
-    res.set_content(oss.str(), "text/plain");
-  });
+            oss << "SDL_version " << static_cast<int>(sdlLinked.major) << "."
+                << static_cast<int>(sdlLinked.minor) << "."
+                << static_cast<int>(sdlLinked.patch) << "\n";
+            res.set_content(oss.str(), "text/plain");
+          });
 
 #ifdef ENABLE_DEBUG_API
   svr.Get("/debug/widgets",
@@ -2585,5 +2669,4 @@ void WebServer::registerRoutes(httplib::Server &svr) {
             }
             res.set_content(arr.dump(2), "application/json");
           });
-
 }
