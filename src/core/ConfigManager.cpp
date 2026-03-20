@@ -329,6 +329,7 @@ bool ConfigManager::load(AppConfig &config) {
     config.dimMinute = br.value("dim_minute", 0);
     config.brightHour = br.value("bright_hour", 6);
     config.brightMinute = br.value("bright_minute", 0);
+    config.ltr329AutoDim = br.value("ltr329_auto_dim", false);
   }
 
   // Pane widget selection
@@ -610,6 +611,7 @@ bool ConfigManager::save(const AppConfig &config) {
   json["brightness"]["dim_minute"] = config.dimMinute;
   json["brightness"]["bright_hour"] = config.brightHour;
   json["brightness"]["bright_minute"] = config.brightMinute;
+  json["brightness"]["ltr329_auto_dim"] = config.ltr329AutoDim;
 
   json["power"]["prevent_sleep"] = config.preventSleep;
   json["power"]["gps_enabled"] = config.gpsEnabled;

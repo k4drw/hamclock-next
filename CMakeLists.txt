@@ -503,6 +503,7 @@ set(HAMCLOCK_SOURCES
     src/services/NOAAProvider.cpp
     src/services/RSSProvider.cpp
     src/services/BME280Provider.cpp
+    src/services/LTR329Provider.cpp
     src/services/ADIFProvider.cpp
     src/services/ActivityProvider.cpp
     src/services/DRAPProvider.cpp

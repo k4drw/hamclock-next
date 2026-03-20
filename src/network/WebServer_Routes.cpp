@@ -33,6 +33,7 @@
 #include "../core/SatelliteManager.h"
 #include "../network/FrameCapture.h"
 #include "../services/ADIFProvider.h"
+#include "../services/BME280Provider.h"
 #ifdef ENABLE_DEBUG_API
 #include "../core/UIRegistry.h"
 #endif
@@ -1520,6 +1521,35 @@ void WebServer::registerRoutes(httplib::Server &svr) {
               std::lock_guard<std::mutex> lk(state_->locationMutex);
               oss << "FPS         " << state_->fps << "\n";
             }
+            res.set_content(oss.str(), "text/plain");
+          });
+
+  svr.Get("/get_sensors.txt",
+          [this](const httplib::Request &, httplib::Response &res) {
+            if (!bmeProvider_ || !bmeProvider_->isAvailable() || !weatherStore_) {
+              res.status = 503;
+              res.set_content("BME280 sensor not available\n", "text/plain");
+              return;
+            }
+            WeatherData wd = weatherStore_->get();
+            // Compute dewpoint via Magnus formula
+            double T = wd.temp;
+            double H = wd.humidity;
+            double gamma = std::log(H / 100.0) + (17.625 * T / (243.04 + T));
+            double dewpoint = 243.04 * gamma / (17.625 - gamma);
+
+            std::time_t now = std::time(nullptr);
+            char timebuf[32];
+            std::strftime(timebuf, sizeof(timebuf), "%Y-%m-%dT%H:%M:%SZ",
+                          std::gmtime(&now));
+            std::ostringstream oss;
+            oss << "UTC                   Epoch_s   I2C  Temp,C   P,hPa    Hum,%   DewP,C\n";
+            oss << std::fixed << std::setprecision(1);
+            oss << timebuf << "  " << now << "  0x76"
+                << "  " << wd.temp
+                << "  " << wd.pressure
+                << "  " << wd.humidity
+                << "  " << dewpoint << "\n";
             res.set_content(oss.str(), "text/plain");
           });
 

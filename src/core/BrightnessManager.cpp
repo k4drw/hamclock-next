@@ -1,5 +1,6 @@
 #include "BrightnessManager.h"
 #include "Logger.h"
+#include "../services/LTR329Provider.h"
 
 #include <chrono>
 #include <ctime>
@@ -148,12 +149,24 @@ void BrightnessManager::setBrightTime(int hour, int minute) {
 
 void BrightnessManager::update() {
 #if !defined(__EMSCRIPTEN__)
-  if (!available_ || !scheduleEnabled_) {
+  if (!available_) {
     return;
   }
 
-  bool shouldDim = shouldBeDimmed();
-  int targetPercent = shouldDim ? dimLevel_ : 100;
+  int targetPercent = 100;
+
+  // LTR329 auto-dim takes priority over schedule when enabled and sensor is ready
+  if (ltr329AutoDim_ && ltr329_ && ltr329_->isAvailable()) {
+    float lux = ltr329_->getLux();
+    // Linear map: 0 lux -> dimLevel_%, 20000+ lux -> 100%
+    static constexpr float kMaxLux = 20000.0f;
+    float ratio = lux / kMaxLux;
+    if (ratio > 1.0f) ratio = 1.0f;
+    targetPercent = dimLevel_ + static_cast<int>((100 - dimLevel_) * ratio);
+  } else if (scheduleEnabled_) {
+    bool shouldDim = shouldBeDimmed();
+    targetPercent = shouldDim ? dimLevel_ : 100;
+  }
 
   // Only change if different from current
   if (targetPercent != currentPercent_) {

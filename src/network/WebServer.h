@@ -31,6 +31,8 @@ class RotatorService;
 class PaneContainer;
 class WeatherStore;
 class BrightnessManager;
+class BME280Provider;
+class LTR329Provider;
 class ADIFProvider;
 class StopwatchPanel;
 class CalendarStore;
@@ -83,6 +85,7 @@ public:
   }
   void setTimePanel(TimePanel *tp) { std::lock_guard<std::mutex> lk(dataMutex_); timePanel_ = tp; }
   void setPaneExpandControl(std::atomic<int> *cmd) { std::lock_guard<std::mutex> lk(dataMutex_); paneExpandCmd_ = cmd; }
+  void setBMEProvider(BME280Provider *bme) { bmeProvider_ = bme; }
 
 private:
   void run();
@@ -113,6 +116,7 @@ private:
   std::vector<std::unique_ptr<PaneContainer>> *panes_ = nullptr;
   std::shared_ptr<WeatherStore> weatherStore_;
   std::shared_ptr<BrightnessManager> brightnessMgr_;
+  BME280Provider *bmeProvider_ = nullptr;
   ADIFProvider *adifProvider_ = nullptr;
   StopwatchPanel *stopwatch_ = nullptr;
   std::shared_ptr<CalendarStore> calendarStore_;

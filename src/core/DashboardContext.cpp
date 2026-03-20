@@ -31,6 +31,7 @@
 #include "services/AsteroidProvider.h"
 #include "services/AuroraProvider.h"
 #include "services/BME280Provider.h"
+#include "services/LTR329Provider.h"
 #include "services/BandConditionsProvider.h"
 #include "services/BeaconProvider.h"
 #include "services/CallbookProvider.h"

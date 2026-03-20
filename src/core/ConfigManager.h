@@ -180,6 +180,7 @@ struct AppConfig {
   int brightHour = 6;
   int brightMinute = 0;
   int idleMinutes = 0; // 0 = no idle blanking
+  bool ltr329AutoDim = false;
 
   // Map view
   double mapCenterLon = 0.0;

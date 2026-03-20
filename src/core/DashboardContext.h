@@ -66,6 +66,7 @@ class FrameCapture;
 class UpdateChecker;
 class BMEProvider;
 class BME280Provider;
+class LTR329Provider;
 namespace HamClock { class GPSProvider; }
 
 // --------------------------------------------------------------------------
@@ -310,6 +311,7 @@ struct AppContext {
   std::unique_ptr<HamClock::GPSProvider> gpsProvider;
 #endif
   std::unique_ptr<BME280Provider> bmeProvider;
+  std::unique_ptr<LTR329Provider> ltr329Provider;
 
   // Setup State
   enum class SetupMode { None, Loading, Main, DXCluster };

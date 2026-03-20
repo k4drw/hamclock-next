@@ -28,6 +28,7 @@
 #include "services/AsteroidProvider.h"
 #include "services/AuroraProvider.h"
 #include "services/BME280Provider.h"
+#include "services/LTR329Provider.h"
 #include "services/BandConditionsProvider.h"
 #include "services/BeaconProvider.h"
 #include "services/CallbookProvider.h"
@@ -618,6 +619,13 @@ int main(int argc, char *argv[]) {
 
   ctx.bmeProvider = std::make_unique<BME280Provider>(ctx.deWeatherStore);
   ctx.bmeProvider->start();
+
+  ctx.ltr329Provider = std::make_unique<LTR329Provider>();
+  ctx.ltr329Provider->start();
+  if (ctx.appCfg.ltr329AutoDim && ctx.brightnessMgr) {
+    ctx.brightnessMgr->setLtr329Provider(ctx.ltr329Provider.get());
+    ctx.brightnessMgr->setLtr329AutoDim(true);
+  }
 #endif
 
   // Audio device is opened lazily on first playAlarm() call.
@@ -924,6 +932,7 @@ void main_tick() {
         ctx.webServer->setTimePanel(ctx.dashboard->timePanel.get());
         ctx.webServer->setPaneExpandControl(&ctx.paneExpandCmd);
         ctx.webServer->setWeatherStore(ctx.deWeatherStore);
+        ctx.webServer->setBMEProvider(ctx.bmeProvider.get());
         ctx.webServer->setBrightnessManager(ctx.brightnessMgr);
         ctx.webServer->setStopwatch(static_cast<StopwatchPanel *>(
             ctx.dashboard->widgetFactory_(WidgetType::STOPWATCH)));
