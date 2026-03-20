@@ -10,6 +10,48 @@ bool SetupScreen::onMouseDown(int mx, int my, Uint16 mod, int clicks) {
     return themeCustomizer_->onMouseDown(mx, my, mod, clicks);
   }
 
+#ifndef __EMSCRIPTEN__
+  if (fontModalOpen_) {
+    if (fontModalOkRect_.w > 0 &&
+        mx >= fontModalOkRect_.x && mx < fontModalOkRect_.x + fontModalOkRect_.w &&
+        my >= fontModalOkRect_.y && my < fontModalOkRect_.y + fontModalOkRect_.h) {
+      fontListSelected_ = fontModalSelected_;
+      fontPath_ = (fontListSelected_ == 0) ? "" : systemFonts_[fontListSelected_ - 1].second;
+      fontModalOpen_ = false;
+      return true;
+    }
+    if (fontModalCancelRect_.w > 0 &&
+        mx >= fontModalCancelRect_.x && mx < fontModalCancelRect_.x + fontModalCancelRect_.w &&
+        my >= fontModalCancelRect_.y && my < fontModalCancelRect_.y + fontModalCancelRect_.h) {
+      fontModalOpen_ = false;
+      return true;
+    }
+    if (fontModalListRect_.w > 0 &&
+        mx >= fontModalListRect_.x && mx < fontModalListRect_.x + fontModalListRect_.w &&
+        my >= fontModalListRect_.y && my < fontModalListRect_.y + fontModalListRect_.h) {
+      auto *lcat = fontMgr_.catalog();
+      int rowH = lcat->ptSize(FontStyle::SmallRegular) + 10;
+      int row = (my - fontModalListRect_.y) / rowH;
+      int idx = fontModalScroll_ + row;
+      if (idx >= 0 && idx < (int)fontModalFiltered_.size()) {
+        int fontIdx = fontModalFiltered_[idx];
+        fontModalSelected_ = (fontIdx == -1) ? 0 : fontIdx + 1;
+        if (clicks == 2) {
+          fontListSelected_ = fontModalSelected_;
+          fontPath_ = (fontListSelected_ == 0) ? "" : systemFonts_[fontListSelected_ - 1].second;
+          fontModalOpen_ = false;
+        }
+      }
+      return true;
+    }
+    if (mx < fontModalRect_.x || mx >= fontModalRect_.x + fontModalRect_.w ||
+        my < fontModalRect_.y || my >= fontModalRect_.y + fontModalRect_.h) {
+      fontModalOpen_ = false;
+    }
+    return true;
+  }
+#endif
+
   auto *cat = fontMgr_.catalog();
   int pad = 20;
   int fieldW = modalRect_.w - 2 * pad;
@@ -270,6 +312,11 @@ bool SetupScreen::onMouseDown(int mx, int my, Uint16 mod, int clicks) {
       gpsEnabled_ = !gpsEnabled_;
       return true;
     }
+    if (mx >= audioMuteToggleRect_.x && mx <= audioMuteToggleRect_.x + audioMuteToggleRect_.w &&
+        my >= audioMuteToggleRect_.y && my <= audioMuteToggleRect_.y + audioMuteToggleRect_.h) {
+      audioMuted_ = !audioMuted_;
+      return true;
+    }
   } else if (activeTab_ == Tab::Spotting) {
     if (mx >= clusterToggleRect_.x &&
         mx <= clusterToggleRect_.x + clusterToggleRect_.w &&
@@ -364,6 +411,17 @@ bool SetupScreen::onMouseDown(int mx, int my, Uint16 mod, int clicks) {
       displayPowerMethod_ = DisplayPower::methodToString(methods[idx]);
       return true;
     }
+#ifndef __EMSCRIPTEN__
+    if (fontListRect_.w > 0 &&
+        mx >= fontListRect_.x && mx < fontListRect_.x + fontListRect_.w &&
+        my >= fontListRect_.y && my < fontListRect_.y + fontListRect_.h) {
+      fontModalSelected_ = fontListSelected_;
+      fontModalFilter_.clear();
+      fontModalScroll_ = std::max(0, fontListSelected_ - 4);
+      fontModalOpen_ = true;
+      return true;
+    }
+#endif
   } else if (activeTab_ == Tab::Rig) {
     if (mx >= toggleRect_.x && mx < toggleRect_.x + toggleRect_.w &&
         my >= toggleRect_.y && my < toggleRect_.y + toggleRect_.h) {
@@ -430,6 +488,16 @@ bool SetupScreen::onMouseWheel(int scrollY) {
         0, std::min(widgetListScrollOffset_ - scrollY, widgetListMaxScroll_));
     return true;
   }
+#ifndef __EMSCRIPTEN__
+  if (fontModalOpen_ && fontModalListRect_.h > 0) {
+    auto *cat = fontMgr_.catalog();
+    int rowH = cat->ptSize(FontStyle::SmallRegular) + 10;
+    int visibleRows = std::max(1, fontModalListRect_.h / rowH);
+    int maxScroll = std::max(0, (int)fontModalFiltered_.size() - visibleRows);
+    fontModalScroll_ = std::max(0, std::min(fontModalScroll_ - scrollY, maxScroll));
+    return true;
+  }
+#endif
   return false;
 }
 
@@ -478,6 +546,84 @@ void SetupScreen::onMouseMove(int mx, int /*my*/) {
 }
 
 bool SetupScreen::onKeyDown(SDL_Keycode key, Uint16 mod) {
+#ifndef __EMSCRIPTEN__
+  if (fontModalOpen_) {
+    auto *cat = fontMgr_.catalog();
+    int rowH = cat->ptSize(FontStyle::SmallRegular) + 10;
+    int visibleRows = (fontModalListRect_.h > 0) ? fontModalListRect_.h / rowH : 8;
+    int maxScroll = std::max(0, (int)fontModalFiltered_.size() - visibleRows);
+    switch (key) {
+    case SDLK_ESCAPE:
+      fontModalOpen_ = false;
+      return true;
+    case SDLK_RETURN:
+    case SDLK_KP_ENTER:
+      fontListSelected_ = fontModalSelected_;
+      fontPath_ = (fontListSelected_ == 0) ? "" : systemFonts_[fontListSelected_ - 1].second;
+      fontModalOpen_ = false;
+      return true;
+    case SDLK_UP: {
+      int pos = -1;
+      for (int i = 0; i < (int)fontModalFiltered_.size(); ++i) {
+        int s = (fontModalFiltered_[i] == -1) ? 0 : fontModalFiltered_[i] + 1;
+        if (s == fontModalSelected_) { pos = i; break; }
+      }
+      if (pos > 0) {
+        --pos;
+        int fi = fontModalFiltered_[pos];
+        fontModalSelected_ = (fi == -1) ? 0 : fi + 1;
+        if (pos < fontModalScroll_) fontModalScroll_ = pos;
+      }
+      return true;
+    }
+    case SDLK_DOWN: {
+      int pos = -1;
+      for (int i = 0; i < (int)fontModalFiltered_.size(); ++i) {
+        int s = (fontModalFiltered_[i] == -1) ? 0 : fontModalFiltered_[i] + 1;
+        if (s == fontModalSelected_) { pos = i; break; }
+      }
+      if (pos >= 0 && pos < (int)fontModalFiltered_.size() - 1) {
+        ++pos;
+        int fi = fontModalFiltered_[pos];
+        fontModalSelected_ = (fi == -1) ? 0 : fi + 1;
+        if (pos >= fontModalScroll_ + visibleRows)
+          fontModalScroll_ = pos - visibleRows + 1;
+      }
+      return true;
+    }
+    case SDLK_HOME:
+      if (!fontModalFiltered_.empty()) {
+        int fi = fontModalFiltered_[0];
+        fontModalSelected_ = (fi == -1) ? 0 : fi + 1;
+        fontModalScroll_ = 0;
+      }
+      return true;
+    case SDLK_END:
+      if (!fontModalFiltered_.empty()) {
+        int last = (int)fontModalFiltered_.size() - 1;
+        int fi = fontModalFiltered_[last];
+        fontModalSelected_ = (fi == -1) ? 0 : fi + 1;
+        fontModalScroll_ = std::max(0, last - visibleRows + 1);
+      }
+      return true;
+    case SDLK_PAGEUP:
+      fontModalScroll_ = std::max(0, fontModalScroll_ - visibleRows);
+      return true;
+    case SDLK_PAGEDOWN:
+      fontModalScroll_ = std::min(maxScroll, fontModalScroll_ + visibleRows);
+      return true;
+    case SDLK_BACKSPACE:
+      if (!fontModalFilter_.empty()) {
+        fontModalFilter_.pop_back();
+        fontModalScroll_ = 0;
+      }
+      return true;
+    default:
+      return true;
+    }
+  }
+#endif
+
   int nFields = 1;
 
   if (activeTab_ == Tab::Identity) {
@@ -578,6 +724,17 @@ bool SetupScreen::onKeyDown(SDL_Keycode key, Uint16 mod) {
 }
 
 bool SetupScreen::onTextInput(const char *inputText) {
+#ifndef __EMSCRIPTEN__
+  if (fontModalOpen_) {
+    for (const char *p = inputText; *p; ++p) {
+      if ((unsigned char)*p >= 0x20 && (unsigned char)*p < 0x7f)
+        fontModalFilter_ += *p;
+    }
+    fontModalScroll_ = 0;
+    return true;
+  }
+#endif
+
   if (activeTab_ == Tab::Widgets) {
     if (activeField_ == 0) {
       // Rotation interval: numeric only

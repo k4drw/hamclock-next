@@ -24,6 +24,7 @@ void SetupScreen::setConfig(const AppConfig &cfg) {
   watchlistInputField_.setMaxLength(12);
 
   gpsEnabled_ = cfg.gpsEnabled;
+  audioMuted_ = cfg.audioMuted;
   callsignInput_.setValue(cfg.callsign);
   gridInput_.setValue(cfg.grid);
   frnText_ = cfg.callsignFrn;
@@ -105,12 +106,27 @@ void SetupScreen::setConfig(const AppConfig &cfg) {
 
   colorOverrides_ = cfg.colorOverrides;
 
+  fontPath_ = cfg.fontPath;
+  fontListSelected_ = 0;
+#ifndef __EMSCRIPTEN__
+  systemFonts_ = enumerateSystemFonts();
+  if (!fontPath_.empty()) {
+    for (int i = 0; i < (int)systemFonts_.size(); ++i) {
+      if (systemFonts_[i].second == fontPath_) {
+        fontListSelected_ = i + 1; // +1 for built-in entry at index 0
+        break;
+      }
+    }
+  }
+#endif
+
   callsignInput_.setCursorToEnd();
 }
 
 AppConfig SetupScreen::getConfig(const AppConfig& base) const {
   AppConfig cfg = base;
   cfg.gpsEnabled = gpsEnabled_;
+  cfg.audioMuted = audioMuted_;
   cfg.callsign = callsignInput_.getValue();
   cfg.grid = gridInput_.getValue();
   cfg.callsignFrn = frnText_;
@@ -195,6 +211,7 @@ AppConfig SetupScreen::getConfig(const AppConfig& base) const {
     cfg.hubPort = 8080;
 
   cfg.colorOverrides = colorOverrides_;
+  cfg.fontPath = fontPath_;
 
   return cfg;
 }

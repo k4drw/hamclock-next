@@ -33,6 +33,10 @@ public:
   void setScreenOn(bool on) { screenOn_.store(on, std::memory_order_relaxed); }
   bool isScreenOn() const { return screenOn_.load(std::memory_order_relaxed); }
 
+  // Runtime mute toggle (persisted in config). Silences TTS and alarm chime.
+  void setMuted(bool m) { muted_.store(m, std::memory_order_relaxed); }
+  bool isMuted() const { return muted_.load(std::memory_order_relaxed); }
+
 private:
   SoundManager() = default;
   ~SoundManager();
@@ -40,6 +44,7 @@ private:
   bool initialized_ = false;
   bool disabled_ = false;
   std::atomic<bool> screenOn_{true};
+  std::atomic<bool> muted_{false};
   Mix_Chunk *alarmChunk_ = nullptr;
   std::mutex mutex_;
 

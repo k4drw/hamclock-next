@@ -83,6 +83,9 @@
 #include "ui/EMEToolPanel.h"
 #include "ui/ENVPanel.h"
 #include "ui/EmbeddedFont.h"
+#ifndef __EMSCRIPTEN__
+#include "ui/EmbeddedGlyphFont.h"
+#endif
 #include "ui/FontCatalog.h"
 #include "ui/FontManager.h"
 #include "ui/ForecastPanel.h"
@@ -235,6 +238,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void hamclock_after_idbfs() {
     ctx.netManager->setHubConfig(ctx.appCfg.hubMode, ctx.appCfg.hubIp,
                                  ctx.appCfg.hubPort);
     ctx.displayPower->setMethodByName(ctx.appCfg.displayPowerMethod);
+    SoundManager::getInstance().setMuted(ctx.appCfg.audioMuted);
     ctx.activeSetup = AppContext::SetupMode::None;
   } else {
     LOG_I("Main", "No saved config found — showing setup screen");
@@ -509,6 +513,9 @@ int main(int argc, char *argv[]) {
     LOG_ERROR("TTF_Init failed");
     return EXIT_FAILURE;
   }
+#ifndef __EMSCRIPTEN__
+  FontManager::setGlyphFont(glyphs_subset_ttf, glyphs_subset_ttf_len);
+#endif
 
   // --- Initialize Persistent State ---
   ctx.updateLayoutMetrics();
@@ -682,6 +689,13 @@ void main_tick() {
       auto setupFontMgr = std::make_unique<FontManager>();
       setupFontMgr->loadFromMemory(assets_font_ttf, assets_font_ttf_len,
                                    DEFAULT_FONT_SIZE);
+#ifndef __EMSCRIPTEN__
+      if (!ctx.appCfg.fontPath.empty()) {
+        if (!setupFontMgr->loadFromFile(ctx.appCfg.fontPath, DEFAULT_FONT_SIZE))
+          setupFontMgr->loadFromMemory(assets_font_ttf, assets_font_ttf_len,
+                                       DEFAULT_FONT_SIZE);
+      }
+#endif
       if (FIDELITY_MODE)
         setupFontMgr->setRenderScale(ctx.layScale);
 
@@ -849,6 +863,7 @@ void main_tick() {
           // overwrites the fields SetupScreen manages, so all other fields
           // (asteroid prefs, live spots, alarms, etc.) survive untouched.
           ctx.appCfg = s->getConfig(ctx.appCfg);
+          SoundManager::getInstance().setMuted(ctx.appCfg.audioMuted);
 
           // Sync watchlist store from updated config
           auto oldW = ctx.watchlistStore->getAll();
@@ -893,6 +908,15 @@ void main_tick() {
     if (!ctx.dashboard) {
       ctx.dashboard = std::make_unique<DashboardContext>(ctx);
 #ifndef __EMSCRIPTEN__
+      // Apply custom font if configured (embedded font used by default)
+      if (!ctx.appCfg.fontPath.empty()) {
+        if (!ctx.dashboard->fontMgr.loadFromFile(ctx.appCfg.fontPath,
+                                                 DEFAULT_FONT_SIZE))
+          ctx.dashboard->fontMgr.loadFromMemory(assets_font_ttf,
+                                                assets_font_ttf_len,
+                                                DEFAULT_FONT_SIZE);
+        ctx.dashboard->fontCatalog.recalculate(LOGICAL_WIDTH, LOGICAL_HEIGHT);
+      }
       if (ctx.webServer) {
         ctx.webServer->setSatelliteManager(ctx.dashboard->satMgr.get());
         ctx.webServer->setRotatorService(ctx.dashboard->rotatorService.get());

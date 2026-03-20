@@ -201,6 +201,12 @@ struct AppConfig {
   // Security
   bool gpsEnabled = false;
 
+  // Font
+  std::string fontPath = ""; // Empty = use embedded font
+
+  // Audio
+  bool audioMuted = false;
+
   // Aux Clock timezone
   int auxClockTzOffset = 0;            // Hours from UTC (-12 to +14)
   std::string auxClockTzLabel = "UTC"; // Display label

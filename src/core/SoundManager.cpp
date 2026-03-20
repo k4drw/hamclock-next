@@ -107,6 +107,7 @@ void SoundManager::speak(std::string text) {
 #ifdef HAMCLOCK_AUDIO_TTS
   if (disabled_) return;
   if (!screenOn_.load(std::memory_order_relaxed)) return;
+  if (muted_.load(std::memory_order_relaxed)) return;
   {
     std::lock_guard<std::mutex> lk(ttsMutex_);
     if (!ttsThreadStarted_) {
@@ -177,6 +178,7 @@ void SoundManager::ttsWorkerFunc() {
 #endif
 
 void SoundManager::playAlarm() {
+  if (muted_.load(std::memory_order_relaxed)) return;
   // Lazy init: open audio device only when a sound is actually needed.
   // This prevents Mix_OpenAudio() from activating HDMI audio hardware at
   // startup, which causes noise on displays with built-in buzzer speakers.

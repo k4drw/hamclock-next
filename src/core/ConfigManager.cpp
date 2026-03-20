@@ -215,6 +215,7 @@ bool ConfigManager::load(AppConfig &config) {
     config.displayPowerMethod = ap.value("display_power_method", "auto");
     config.qrzUsername = ap.value("qrz_username", "");
     config.qrzPassword = ap.value("qrz_password", "");
+    config.fontPath = ap.value("font_path", "");
   }
 
   // Countdown (new dedicated section; falls back to legacy appearance keys)
@@ -455,6 +456,7 @@ bool ConfigManager::load(AppConfig &config) {
     auto &p = json["power"];
     config.preventSleep = p.value("prevent_sleep", true);
     config.gpsEnabled = p.value("gps_enabled", false);
+    config.audioMuted = p.value("audio_muted", false);
     config.skippedVersion = p.value("skipped_version", "");
   }
 
@@ -580,6 +582,8 @@ bool ConfigManager::save(const AppConfig &config) {
   json["appearance"]["display_power_method"] = config.displayPowerMethod;
   json["appearance"]["qrz_username"] = config.qrzUsername;
   json["appearance"]["qrz_password"] = config.qrzPassword;
+  if (!config.fontPath.empty())
+    json["appearance"]["font_path"] = config.fontPath;
 
   json["countdown"]["label"] = config.countdownLabel;
   json["countdown"]["time"] = config.countdownTime;
@@ -609,6 +613,7 @@ bool ConfigManager::save(const AppConfig &config) {
 
   json["power"]["prevent_sleep"] = config.preventSleep;
   json["power"]["gps_enabled"] = config.gpsEnabled;
+  json["power"]["audio_muted"] = config.audioMuted;
   json["power"]["skipped_version"] = config.skippedVersion;
 
   json["network"]["cors_proxy_url"] = config.corsProxyUrl;

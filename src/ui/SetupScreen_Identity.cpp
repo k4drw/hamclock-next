@@ -79,4 +79,18 @@ void SetupScreen::renderTabIdentity(SDL_Renderer *renderer, int cx, int pad,
   }
   cat->drawText(renderer, "Synchronize with GPS (gpsd)", fieldX + 30, y + 10,
                 themes.text, FontStyle::SmallRegular, false, false, true);
+  y += 28;
+
+  audioMuteToggleRect_ = {fieldX, y, 20, 20};
+  SDL_SetRenderDrawColor(renderer, themes.rowStripe1.r, themes.rowStripe1.g, themes.rowStripe1.b, 255);
+  SDL_RenderFillRect(renderer, &audioMuteToggleRect_);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
+  SDL_RenderDrawRect(renderer, &audioMuteToggleRect_);
+  if (audioMuted_) {
+    SDL_SetRenderDrawColor(renderer, themes.success.r, themes.success.g, themes.success.b, 255);
+    SDL_Rect check = {fieldX + 4, y + 4, 12, 12};
+    SDL_RenderFillRect(renderer, &check);
+  }
+  cat->drawText(renderer, "Mute all audio (TTS + alarm)", fieldX + 30, y + 10,
+                themes.text, FontStyle::SmallRegular, false, false, true);
 }

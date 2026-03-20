@@ -315,6 +315,10 @@ void SetupScreen::render(SDL_Renderer *renderer) {
   cat->drawText(renderer, "Done", okBtn.x + btnW / 2, okBtn.y + btnH / 2,
                 themes.bg, FontStyle::SmallRegular, true, false, true);
   okBtnRect_ = okBtn;
+
+#ifndef __EMSCRIPTEN__
+  renderFontModal(renderer);
+#endif
 }
 
 // renderTabIdentity — defined in SetupScreen_Identity.cpp
