@@ -9,6 +9,7 @@
 #include "../core/HamClockState.h"
 #include "../core/Logger.h"
 #include "../core/PrefixManager.h"
+#include "../core/SoundManager.h"
 #include <httplib.h>
 #include <nlohmann/json.hpp>
 #ifdef _WIN32
@@ -90,6 +91,7 @@ void DXClusterProvider::start(const AppConfig &config) {
 
 void DXClusterProvider::stop() {
   stopClicked_ = true;
+  sleepCv_.notify_one();
   if (thread_.joinable()) {
     thread_.join();
   }
@@ -124,7 +126,12 @@ void DXClusterProvider::run() {
       break;
 
     // Retry delay (increased to 60s to avoid hammering and IP bans)
-    std::this_thread::sleep_for(std::chrono::seconds(60));
+    // Interruptible: stop() will wake this immediately via sleepCv_.notify_one()
+    {
+      std::unique_lock<std::mutex> lk(sleepMutex_);
+      sleepCv_.wait_for(lk, std::chrono::seconds(60),
+                        [this] { return stopClicked_.load(); });
+    }
   }
 }
 
@@ -558,6 +565,7 @@ void DXClusterProvider::processWSJTX(const uint8_t *packet, size_t len) {
       hit.source = "WSJT-X";
       hit.time = spot.spottedAt;
       hits_->addHit(hit);
+      SoundManager::getInstance().speak("Watchlist: " + hit.call);
     }
   }
 }
@@ -565,8 +573,6 @@ void DXClusterProvider::processWSJTX(const uint8_t *packet, size_t len) {
 void DXClusterProvider::processLine(const std::string &line) {
   if (line.empty())
     return;
-
-  // std::fprintf(stderr, "DXCluster: data: %s\n", line.c_str());
 
   // Example: DX de KD0AA:     18100.0  JR1FYS       FT8 LOUD in FL! 2156Z
   if (line.find("DX de ") != std::string::npos) {
@@ -627,6 +633,7 @@ void DXClusterProvider::processLine(const std::string &line) {
           hit.source = "Cluster";
           hit.time = spot.spottedAt;
           hits_->addHit(hit);
+          SoundManager::getInstance().speak("Watchlist: " + hit.call);
         }
       }
     }

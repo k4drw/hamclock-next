@@ -1,6 +1,7 @@
 #include "WinlinkProvider.h"
 #include "../core/Constants.h"
 #include "../core/WorkerService.h"
+#include <SDL.h>
 #include <SDL_events.h>
 #include <algorithm>
 #include <chrono>
@@ -28,6 +29,7 @@ double WinlinkProvider::haversineKm(double lat1, double lon1, double lat2,
 }
 
 void WinlinkProvider::fetch(double lat, double lon, int radiusKm, bool force) {
+  lastFetchMs_ = SDL_GetTicks();
   // Winlink API gateway listing endpoint.
   auto &cfg = ConfigManager::instance().getConfig();
   std::string key = cfg.winlinkKey;

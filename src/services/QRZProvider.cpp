@@ -1,6 +1,7 @@
 #include "QRZProvider.h"
 #include "../core/Logger.h"
 #include "../core/StringUtils.h"
+#include <SDL.h>
 
 #include <sstream>
 
@@ -17,6 +18,7 @@ void QRZProvider::setCredentials(const std::string &username,
 
 void QRZProvider::lookup(const std::string &callsign,
                          std::function<void(const QRZLookupResult &)> callback) {
+  lastFetchMs_ = SDL_GetTicks();
   if (!hasCredentials()) {
     LOG_W("QRZ", "No credentials configured");
     QRZLookupResult result;

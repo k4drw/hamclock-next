@@ -17,11 +17,21 @@ public:
   FontManager() = default;
   ~FontManager() {
     closeAll();
+    closeGlyphAll();
     clearCache();
   }
 
   void setCatalog(FontCatalog *cat) { catalog_ = cat; }
   FontCatalog *catalog() const { return catalog_; }
+
+  // Set the glyph fallback font shared across all instances.
+  // Call once at startup after TTF_Init(). Data must remain valid for
+  // program lifetime. Used to render symbol codepoints (U+0370-03FF,
+  // U+2000-2BFF) when the user has selected a custom text font.
+  static void setGlyphFont(const unsigned char *data, unsigned int size) {
+    glyphData_ = data;
+    glyphSize_ = size;
+  }
 
   // Render scale: physicalOutputHeight / logicalHeight (e.g., 1080/480 = 2.25).
   // When > 1.0, text is super-sampled at physical resolution for crispness.
@@ -38,13 +48,25 @@ public:
   bool loadFromMemory(const unsigned char *data, unsigned int size,
                       int defaultPtSize) {
     closeAll();
+    clearCache();
+    filePath_.clear();
     data_ = data;
     size_ = size;
     defaultSize_ = defaultPtSize;
     return getFont(defaultPtSize) != nullptr;
   }
 
-  bool ready() const { return data_ != nullptr; }
+  bool loadFromFile(const std::string &path, int defaultPtSize) {
+    closeAll();
+    clearCache();
+    data_ = nullptr;
+    size_ = 0;
+    filePath_ = path;
+    defaultSize_ = defaultPtSize;
+    return getFont(defaultPtSize) != nullptr;
+  }
+
+  bool ready() const { return data_ != nullptr || !filePath_.empty(); }
 
   // Get a font at the requested point size (cached).
   TTF_Font *getFont(int ptSize) {
@@ -53,19 +75,28 @@ public:
     if (it != cache_.end())
       return it->second;
 
-    if (!data_)
-      return nullptr;
-
-    SDL_RWops *rw = SDL_RWFromConstMem(data_, size_);
-    if (!rw)
-      return nullptr;
-
-    TTF_Font *font = TTF_OpenFontRW(rw, 1, ptSize); // 1 = auto-close rw
-    if (!font) {
-      std::fprintf(stderr,
-                   "FontManager: failed to open embedded font at %dpt: %s\n",
-                   ptSize, TTF_GetError());
-      return nullptr;
+    TTF_Font *font = nullptr;
+    if (!filePath_.empty()) {
+      font = TTF_OpenFont(filePath_.c_str(), ptSize);
+      if (!font) {
+        std::fprintf(stderr,
+                     "FontManager: failed to open font '%s' at %dpt: %s\n",
+                     filePath_.c_str(), ptSize, TTF_GetError());
+        return nullptr;
+      }
+    } else {
+      if (!data_)
+        return nullptr;
+      SDL_RWops *rw = SDL_RWFromConstMem(data_, size_);
+      if (!rw)
+        return nullptr;
+      font = TTF_OpenFontRW(rw, 1, ptSize); // 1 = auto-close rw
+      if (!font) {
+        std::fprintf(stderr,
+                     "FontManager: failed to open embedded font at %dpt: %s\n",
+                     ptSize, TTF_GetError());
+        return nullptr;
+      }
     }
     cache_[ptSize] = font;
     return font;
@@ -95,13 +126,15 @@ public:
       renderPt = std::clamp(static_cast<int>(basePt * renderScale_), 8, 600);
     }
 
-    TTF_Font *font = getFont(renderPt);
+    bool useGlyph =
+        !filePath_.empty() && glyphData_ && hasSymbolCodepoint(text);
+    TTF_Font *font = useGlyph ? getGlyphFont(renderPt) : getFont(renderPt);
     if (!font)
       return nullptr;
 
-    // Apply bold style if requested
+    // Apply bold style if requested (not applicable to glyph font)
     int prevStyle = TTF_GetFontStyle(font);
-    if (bold) {
+    if (bold && !useGlyph) {
       TTF_SetFontStyle(font, prevStyle | TTF_STYLE_BOLD);
     }
 
@@ -125,7 +158,7 @@ public:
     }
 
     // Restore previous style
-    if (bold) {
+    if (bold && !useGlyph) {
       TTF_SetFontStyle(font, prevStyle);
     }
 
@@ -293,12 +326,14 @@ public:
     if (renderScale_ > 1.01f) {
       renderPt = std::clamp(static_cast<int>(basePt * renderScale_), 8, 600);
     }
-    TTF_Font *font = getFont(renderPt);
+    bool useGlyph =
+        !filePath_.empty() && glyphData_ && hasSymbolCodepoint(text);
+    TTF_Font *font = useGlyph ? getGlyphFont(renderPt) : getFont(renderPt);
     if (!font)
       return 0;
 
     int prevStyle = TTF_GetFontStyle(font);
-    if (bold) {
+    if (bold && !useGlyph) {
       TTF_SetFontStyle(font, prevStyle | TTF_STYLE_BOLD);
     }
     int maxW = 0;
@@ -317,7 +352,7 @@ public:
       start = end + 1;
     }
 
-    if (bold) {
+    if (bold && !useGlyph) {
       TTF_SetFontStyle(font, prevStyle);
     }
 
@@ -465,8 +500,65 @@ private:
     cache_.clear();
   }
 
+  void closeGlyphAll() {
+    for (auto &[size, font] : glyphCache_) {
+      TTF_CloseFont(font);
+    }
+    glyphCache_.clear();
+  }
+
+  TTF_Font *getGlyphFont(int ptSize) {
+    ptSize = std::clamp(ptSize, 8, 600);
+    auto it = glyphCache_.find(ptSize);
+    if (it != glyphCache_.end())
+      return it->second;
+    if (!glyphData_)
+      return nullptr;
+    SDL_RWops *rw = SDL_RWFromConstMem(glyphData_, glyphSize_);
+    if (!rw)
+      return nullptr;
+    TTF_Font *font = TTF_OpenFontRW(rw, 1, ptSize);
+    if (!font)
+      return nullptr;
+    glyphCache_[ptSize] = font;
+    return font;
+  }
+
+  // Returns true if text contains any codepoint in the glyph font's covered
+  // ranges: Greek (U+0370-03FF) and Symbols/Dingbats (U+2000-2BFF).
+  static bool hasSymbolCodepoint(const std::string &text) {
+    const unsigned char *p =
+        reinterpret_cast<const unsigned char *>(text.c_str());
+    const unsigned char *end = p + text.size();
+    while (p < end) {
+      uint32_t cp = 0;
+      if (*p < 0x80) {
+        cp = *p++;
+      } else if ((*p & 0xE0) == 0xC0 && p + 1 < end) {
+        cp = uint32_t(*p++ & 0x1F) << 6;
+        cp |= uint32_t(*p++ & 0x3F);
+      } else if ((*p & 0xF0) == 0xE0 && p + 2 < end) {
+        cp = uint32_t(*p++ & 0x0F) << 12;
+        cp |= uint32_t(*p++ & 0x3F) << 6;
+        cp |= uint32_t(*p++ & 0x3F);
+      } else if ((*p & 0xF8) == 0xF0 && p + 3 < end) {
+        cp = uint32_t(*p++ & 0x07) << 18;
+        cp |= uint32_t(*p++ & 0x3F) << 12;
+        cp |= uint32_t(*p++ & 0x3F) << 6;
+        cp |= uint32_t(*p++ & 0x3F);
+      } else {
+        p++;
+        continue;
+      }
+      if ((cp >= 0x0370 && cp <= 0x03FF) || (cp >= 0x2000 && cp <= 0x2BFF))
+        return true;
+    }
+    return false;
+  }
+
   const unsigned char *data_ = nullptr;
   unsigned int size_ = 0;
+  std::string filePath_;
   int defaultSize_ = 24;
   float renderScale_ = 1.0f;
   size_t textCacheLimit_ = 300;
@@ -476,4 +568,7 @@ private:
   FontCatalog *catalog_ = nullptr;
   int maxW_ = 0;
   int maxH_ = 0;
+  std::map<int, TTF_Font *> glyphCache_;
+  static inline const unsigned char *glyphData_ = nullptr;
+  static inline unsigned int glyphSize_ = 0;
 };

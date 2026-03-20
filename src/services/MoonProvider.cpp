@@ -1,6 +1,7 @@
 #include "MoonProvider.h"
 #include "../core/Astronomy.h"
 #include "../core/Logger.h"
+#include <SDL.h>
 #include <ctime>
 #include <iomanip>
 #include <nlohmann/json.hpp>
@@ -17,6 +18,7 @@ MoonProvider::MoonProvider(NetworkManager &net,
     : net_(net), store_(std::move(store)) {}
 
 void MoonProvider::update(double lat, double lon) {
+  lastFetchMs_ = SDL_GetTicks();
   auto now = std::chrono::system_clock::now();
   std::time_t now_c = std::chrono::system_clock::to_time_t(now);
   std::tm utc{};

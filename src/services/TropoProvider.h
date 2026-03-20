@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ProviderBase.h"
 #include "../core/TropoData.h"
 #include "../network/NetworkManager.h"
 #include <functional>
@@ -9,7 +10,7 @@
 
 namespace HamClock {
 
-class TropoProvider {
+class TropoProvider : public ::ProviderBase {
 public:
   using Callback = std::function<void(const TropoData&)>;
 

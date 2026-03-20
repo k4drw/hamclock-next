@@ -1,9 +1,10 @@
 #include "SolarStormPanel.h"
 #include "../core/Theme.h"
 #include "FontCatalog.h"
-#include "RenderUtils.h"
+#include "GraphHelper.h"
 #include <algorithm>
 #include <cmath>
+#include <ctime>
 
 namespace HamClock {
 
@@ -23,19 +24,8 @@ void SolarStormPanel::render(SDL_Renderer *renderer) {
   ThemeColors themes = getThemeColors(theme_);
   auto *cat = fontMgr_.catalog();
 
-  // Background
-  SDL_SetRenderDrawBlendMode(
-      renderer, (theme_ == "glass") ? SDL_BLENDMODE_BLEND : SDL_BLENDMODE_NONE);
-  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b,
-                         themes.bg.a);
-  SDL_Rect rect = {x_, y_, width_, height_};
-  SDL_RenderFillRect(renderer, &rect);
-  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
-                         themes.border.b, themes.border.a);
-  SDL_RenderDrawRect(renderer, &rect);
-
-  cat->drawText(renderer, "Solar Storm Ops", x_ + 10, y_ + 5, themes.accent,
-                FontStyle::MicroBold);
+  renderChrome(renderer);
+  renderTitle(renderer, fontMgr_, "Solar Storm Ops");
 
   SolarStormData d;
   {
@@ -67,9 +57,22 @@ void SolarStormPanel::render(SDL_Renderer *renderer) {
                            : themes.text;
   cat->drawText(renderer, sClass, x_ + pad, curY, flareCol, FontStyle::Micro);
 
-  // Alert if CME impact predicted
+  // CME alert with arrival countdown when time is available
   if (d.cmeImpactPredicted) {
-    cat->drawText(renderer, "!! CME ALERT !!", x_ + width_ - pad, curY,
+    char cmeBuf[24];
+    if (d.cmeArrivalUtc > 0) {
+      int64_t diff = static_cast<int64_t>(d.cmeArrivalUtc) - static_cast<int64_t>(time(nullptr));
+      if (diff > 0) {
+        int h = static_cast<int>(diff / 3600);
+        int m = static_cast<int>((diff % 3600) / 60);
+        std::snprintf(cmeBuf, sizeof(cmeBuf), "CME ~%dh%02dm", h, m);
+      } else {
+        std::snprintf(cmeBuf, sizeof(cmeBuf), "CME ARRIVED");
+      }
+    } else {
+      std::snprintf(cmeBuf, sizeof(cmeBuf), "!! CME ALERT !!");
+    }
+    cat->drawText(renderer, cmeBuf, x_ + width_ - pad, curY,
                   themes.danger, FontStyle::Micro, false, true);
   }
 
@@ -150,21 +153,18 @@ void SolarStormPanel::drawBadge(SDL_Renderer *renderer, int x, int y,
   SDL_RenderDrawRect(renderer, &r);
 
   auto *cat = fontMgr_.catalog();
+  SDL_Color textColor = (scale == SolarStormScale::None) ? themes.text : themes.bg;
   // Label R/S/G
-  cat->drawText(renderer, label, r.x + bw / 2, r.y + 4, themes.bg,
+  cat->drawText(renderer, label, r.x + bw / 2, r.y + 4, textColor,
                 FontStyle::MicroBold, true);
   // Value 0-5
   cat->drawText(renderer, std::to_string((int)scale), r.x + bw / 2, r.y + 18,
-                themes.bg, FontStyle::Fast, true);
+                textColor, FontStyle::Fast, true);
 }
 
 void SolarStormPanel::drawSparkline(SDL_Renderer *renderer, int x, int y, int w,
                                     int h, const float *values) {
   ThemeColors themes = getThemeColors(theme_);
-  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 150);
-  SDL_Rect frame = {x, y, w, h};
-  SDL_RenderDrawRect(renderer, &frame);
-
   SDL_Texture *lineTex = texMgr_.get("line_aa");
   std::vector<SDL_FPoint> pts;
   pts.reserve(60);
@@ -183,13 +183,8 @@ void SolarStormPanel::drawSparkline(SDL_Renderer *renderer, int x, int y, int w,
     pts.push_back({px, py});
   }
 
-  if (lineTex) {
-    RenderUtils::drawPolylineTextured(renderer, lineTex, pts.data(), 60, 1.5f,
-                                      themes.warning);
-  } else {
-    RenderUtils::drawPolyline(renderer, pts.data(), 60, 1.5f,
-                              themes.warning);
-  }
+  GraphHelper::drawTimeSeries(renderer, lineTex, x, y, w, h,
+                              pts.data(), 60, themes.warning, themes.border, 1.5f);
 }
 
 

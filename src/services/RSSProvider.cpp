@@ -2,6 +2,7 @@
 #include "../core/Constants.h"
 #include "../core/Logger.h"
 #include "../core/WorkerService.h"
+#include <SDL.h>
 #include "SDL_events.h"
 
 #include <string>
@@ -188,6 +189,7 @@ RSSProvider::RSSProvider(NetworkManager &net,
 void RSSProvider::fetch() {
   if (!enabled_)
     return;
+  lastFetchMs_ = SDL_GetTicks();
 
   for (int i = 0; i < kNumFeeds; ++i) {
     const auto &feed = kFeeds[i];

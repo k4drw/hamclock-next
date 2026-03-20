@@ -1,6 +1,7 @@
 #include "HistoryPanel.h"
 #include "../core/Theme.h"
 #include "FontCatalog.h"
+#include "GraphHelper.h"
 #include "RenderUtils.h"
 #include <SDL.h>
 #include <algorithm>
@@ -26,18 +27,7 @@ void HistoryPanel::render(SDL_Renderer *renderer) {
   if (!cat)
     return;
 
-  // Background
-  SDL_SetRenderDrawBlendMode(
-      renderer, (theme_ == "glass") ? SDL_BLENDMODE_BLEND : SDL_BLENDMODE_NONE);
-  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b,
-                         themes.bg.a);
-  SDL_Rect rect = {x_, y_, width_, height_};
-  SDL_RenderFillRect(renderer, &rect);
-
-  // Draw pane border
-  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
-                         themes.border.b, themes.border.a);
-  SDL_RenderDrawRect(renderer, &rect);
+  renderChrome(renderer);
 
   int pad = 10;
   int axisLabelH = 14; // reserve space for X-axis time labels
@@ -126,13 +116,7 @@ void HistoryPanel::render(SDL_Renderer *renderer) {
       pts.push_back({graphX + i * stepX, py});
     }
 
-    if (lineTex) {
-      RenderUtils::drawPolylineTextured(renderer, lineTex, pts.data(), n, 2.0f,
-                                        themes.accent);
-    } else {
-      RenderUtils::drawPolyline(renderer, pts.data(), n, 1.5f,
-                                themes.accent);
-    }
+    GraphHelper::drawPolyline(renderer, lineTex, pts.data(), n, themes.accent);
 
     // Current value as large overlay (matching Kp style)
     {

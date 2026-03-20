@@ -16,16 +16,7 @@ void WinlinkPanel::render(SDL_Renderer *renderer) {
 
   ThemeColors themes = getThemeColors(theme_);
 
-  SDL_SetRenderDrawBlendMode(
-      renderer, (theme_ == "glass") ? SDL_BLENDMODE_BLEND : SDL_BLENDMODE_NONE);
-  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b,
-                         themes.bg.a);
-  SDL_Rect rect = {x_, y_, width_, height_};
-  SDL_RenderFillRect(renderer, &rect);
-
-  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
-                         themes.border.b, themes.border.a);
-  SDL_RenderDrawRect(renderer, &rect);
+  renderChrome(renderer);
 
   int titleH = 20;
   int pad = 6;

@@ -41,9 +41,19 @@ public:
   // Set initial filter from persisted config value ("all", "pota", "sota").
   void setFilter(const std::string &f);
 
+  // Set DE location for geofence filtering (lat/lon in degrees).
+  void setDeLocation(double lat, double lon) { deLat_ = lat; deLon_ = lon; }
+
+  // Set max distance filter in km (0 = no filter).
+  void setMaxDistKm(int km) { maxDistKm_ = km; pendingMaxDistKm_ = km; }
+
   // Called when the user changes the filter; arg is the new string value.
   void setOnFilterChanged(std::function<void(const std::string &)> cb) {
     onFilterChanged_ = std::move(cb);
+  }
+
+  void setOnMaxDistChanged(std::function<void(int)> cb) {
+    onMaxDistChanged_ = std::move(cb);
   }
 
   void setOnSpotActivated(std::function<void(const ONTASpot &)> cb) {
@@ -81,6 +91,14 @@ private:
   SDL_Rect potaBtnRect_ = {0, 0, 0, 0};
   SDL_Rect sotaBtnRect_ = {0, 0, 0, 0};
   SDL_Rect doneBtnRect_ = {0, 0, 0, 0};
+  SDL_Rect distDecBtn_ = {0, 0, 0, 0};
+  SDL_Rect distIncBtn_ = {0, 0, 0, 0};
+
+  // Geofence state
+  double deLat_ = 0;
+  double deLon_ = 0;
+  int maxDistKm_ = 0;
+  int pendingMaxDistKm_ = 0;
   
   // Footer for setup button
   SDL_Texture *footerTex_ = nullptr;
@@ -88,6 +106,7 @@ private:
   SDL_Rect footerRect_ = {0, 0, 0, 0};
 
   std::function<void(const std::string &)> onFilterChanged_;
+  std::function<void(int)> onMaxDistChanged_;
   std::function<void(const ONTASpot &)> onSpotActivated_;
   std::function<void()> onSpotDeactivated_;
   std::vector<ONTASpot> currentSpots_;

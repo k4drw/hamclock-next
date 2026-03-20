@@ -1,6 +1,7 @@
 #include "MeteorPanel.h"
 #include "../core/Theme.h"
 #include "FontCatalog.h"
+#include "GraphHelper.h"
 #include "RenderUtils.h"
 #include <algorithm>
 
@@ -20,13 +21,7 @@ void MeteorPanel::render(SDL_Renderer *renderer) {
   ThemeColors themes = getThemeColors(theme_);
   auto *cat = fontMgr_.catalog();
 
-  // Background
-  SDL_SetRenderDrawBlendMode(renderer, (theme_ == "glass") ? SDL_BLENDMODE_BLEND : SDL_BLENDMODE_NONE);
-  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, themes.bg.a);
-  SDL_Rect rect = {x_, y_, width_, height_};
-  SDL_RenderFillRect(renderer, &rect);
-  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, themes.border.a);
-  SDL_RenderDrawRect(renderer, &rect);
+  renderChrome(renderer);
 
   cat->drawText(renderer, "Meteor Scatter", x_ + 10, y_ + 5, themes.accent, FontStyle::MicroBold);
 
@@ -111,9 +106,6 @@ void MeteorPanel::onMouseMove(int mx, int my) {
 
 void MeteorPanel::drawGraph(SDL_Renderer *renderer, int x, int y, int w, int h, const float* values) {
   ThemeColors themes = getThemeColors(theme_);
-  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 150);
-  SDL_Rect frame = {x, y, w, h};
-  SDL_RenderDrawRect(renderer, &frame);
 
   float maxVal = 0.1f;
   for(int i=0; i<24; ++i) if(values[i] > maxVal) maxVal = values[i];
@@ -128,11 +120,8 @@ void MeteorPanel::drawGraph(SDL_Renderer *renderer, int x, int y, int w, int h, 
     pts.push_back({px, py});
   }
 
-  if (lineTex) {
-    RenderUtils::drawPolylineTextured(renderer, lineTex, pts.data(), 24, 2.0f, themes.info);
-  } else {
-    RenderUtils::drawPolyline(renderer, pts.data(), 24, 1.5f, themes.info);
-  }
+  GraphHelper::drawTimeSeries(renderer, lineTex, x, y, w, h, pts.data(), 24,
+                              themes.info, themes.border);
 }
 
 

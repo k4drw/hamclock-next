@@ -180,6 +180,7 @@ struct AppConfig {
   int brightHour = 6;
   int brightMinute = 0;
   int idleMinutes = 0; // 0 = no idle blanking
+  bool ltr329AutoDim = false;
 
   // Map view
   double mapCenterLon = 0.0;
@@ -192,6 +193,7 @@ struct AppConfig {
 
   // Activity panels
   std::string ontaFilter = "all"; // "all", "pota", or "sota"
+  int ontaMaxDistKm = 0;          // 0 = no distance filter
 
   // Asteroid widget
   std::string asteroidIcon = "☄";
@@ -199,6 +201,12 @@ struct AppConfig {
 
   // Security
   bool gpsEnabled = false;
+
+  // Font
+  std::string fontPath = ""; // Empty = use embedded font
+
+  // Audio
+  bool audioMuted = false;
 
   // Aux Clock timezone
   int auxClockTzOffset = 0;            // Hours from UTC (-12 to +14)
@@ -223,6 +231,14 @@ struct AppConfig {
   std::string corsProxyUrl = "";
 #endif
   std::map<std::string, SDL_Color> colorOverrides;
+
+  // Contest Mode
+  bool contestModeActive = false; // true while contest preset is active
+
+  // Calendar notifications
+  int calendarNotifyMinutes = 10;       // minutes before event to show alert
+  int calendarAllDayNotifyHour = 8;     // hour (UTC) to alert for all-day events
+  int calendarDismissMinutes = 10;      // minutes before auto-dismissing the alert overlay
 
   // Presets
   std::vector<ConfigPreset> presets;

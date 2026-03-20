@@ -1,7 +1,8 @@
 #include "MarineProvider.h"
 #include "../core/Constants.h"
+#include "../core/StringUtils.h"
 #include "../core/WorkerService.h"
-#include <SDL_events.h>
+#include <SDL.h>
 #include <chrono>
 #include <cstdio>
 #include <nlohmann/json.hpp>
@@ -15,6 +16,7 @@ MarineProvider::MarineProvider(NetworkManager &net,
 
 void MarineProvider::fetch(const std::string &tideStation,
                            const std::string &buoyStation, bool force) {
+  lastFetchMs_ = SDL_GetTicks();
   if (tideStation.empty() && buoyStation.empty())
     return;
 
@@ -58,10 +60,7 @@ void MarineProvider::fetch(const std::string &tideStation,
                   if (p.contains("type") && p["type"].is_string())
                     tp.type = p["type"].get<std::string>();
                   if (p.contains("v") && p["v"].is_string()) {
-                    try {
-                      tp.heightFt = std::stod(p["v"].get<std::string>());
-                    } catch (...) {
-                    }
+                    tp.heightFt = StringUtils::safe_stod(p["v"].get<std::string>());
                   }
                   update.tides.push_back(tp);
                   if ((int)update.tides.size() >= 6)
@@ -149,11 +148,7 @@ void MarineProvider::fetchBuoy(const std::string &buoyStation, bool force) {
             auto toDouble = [](const std::string &s, double missing) -> double {
               if (s == "MM" || s == "9999" || s == "999.0")
                 return missing;
-              try {
-                return std::stod(s);
-              } catch (...) {
-                return missing;
-              }
+              return StringUtils::safe_stod(s);
             };
 
             b.waveHeightM = toDouble(colVal("WVHT"), -1.0);
@@ -162,10 +157,7 @@ void MarineProvider::fetchBuoy(const std::string &buoyStation, bool force) {
             b.windSpeedMps = toDouble(colVal("WSPD"), -1.0);
             auto wdStr = colVal("WDIR");
             if (wdStr != "MM")
-              try {
-                b.windDirDeg = std::stoi(wdStr);
-              } catch (...) {
-              }
+              b.windDirDeg = StringUtils::safe_stoi(wdStr);
 
             update.buoyValid = true;
             update.lastUpdate = std::chrono::system_clock::now();

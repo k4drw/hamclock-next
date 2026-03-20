@@ -57,7 +57,7 @@ void DXSatPane::restoreState(const std::string &panelMode,
   selectedSatName_ = satName;
   if (panelMode == "sat" && !satName.empty()) {
     // Try to load satellite now; if data isn't available yet, defer
-    const SatelliteTLE *tle = satMgr_.findByName(satName);
+    auto tle = satMgr_.findByName(satName);
     if (tle && predictor_.loadTLE(*tle)) {
       selectedSatName_ = tle->name;
       satPanel_.setPredictor(&predictor_);
@@ -80,7 +80,7 @@ void DXSatPane::notifyModeChanged() {
 void DXSatPane::update() {
   // Deferred satellite restore: retry once data arrives
   if (!pendingSatRestore_.empty() && satMgr_.hasData()) {
-    const SatelliteTLE *tle = satMgr_.findByName(pendingSatRestore_);
+    auto tle = satMgr_.findByName(pendingSatRestore_);
     if (tle && predictor_.loadTLE(*tle)) {
       selectedSatName_ = tle->name;
       satPanel_.setPredictor(&predictor_);
@@ -110,8 +110,11 @@ void DXSatPane::render(SDL_Renderer *renderer) {
     ThemeColors themes = getThemeColors(theme_);
     int headerH = std::max(1, height_ / 10);
 
-    // Rotator "Trk" button (top-right corner)
-    trackButtonRect_ = {x_ + width_ - headerH, y_, headerH, headerH};
+    // Reserve space for PaneContainer's maximize button (mirrors its btnSz formula)
+    int maxBtnReserve = std::max(8, std::min(14, std::min(width_, height_) / 6)) + 4;
+
+    // Rotator "Trk" button (offset left to clear maximize button)
+    trackButtonRect_ = {x_ + width_ - headerH - maxBtnReserve, y_, headerH, headerH};
     bool isTracking = (satMgr_.getTrackedSatellite() == selectedSatName_);
     SDL_Color rotBg = isTracking ? themes.success : themes.rowStripe1;
 
@@ -125,7 +128,7 @@ void DXSatPane::render(SDL_Renderer *renderer) {
                                  isTracking ? themes.bg : themes.text, FontStyle::Tiny, true, false, true);
 
     // Map "Pth" button (to the left of Trk): toggles satellite ground track
-    mapTrackBtnRect_ = {x_ + width_ - 2 * headerH - 2, y_, headerH, headerH};
+    mapTrackBtnRect_ = {x_ + width_ - 2 * headerH - 2 - maxBtnReserve, y_, headerH, headerH};
     SDL_Color pathBg = mapTrackVisible_ ? themes.accent : themes.rowStripe1;
 
     SDL_SetRenderDrawColor(renderer, pathBg.r, pathBg.g, pathBg.b, 255);

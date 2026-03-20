@@ -1,73 +1,738 @@
 #!/bin/bash
+# HamClock-Next Wiki Screenshot Automation
+#
+# Queries /get_capabilities from the running server to dynamically discover
+# all widget types, projections, themes, and overlays — no hardcoded lists.
+#
+# Usage:
+#   ./capture_wiki_screenshots.sh               # defaults: localhost:8080
+#   HC_IP=192.168.1.10 ./capture_wiki_screenshots.sh
+#   DELAY=5 OUTPUT_DIR=/tmp/hc_shots ./capture_wiki_screenshots.sh
+#   FORCE=1 ./capture_wiki_screenshots.sh       # overwrite existing images
+#   PARTS=widgets,maximized ./capture_wiki_screenshots.sh  # run specific parts
+#   PARTS=wiki ./capture_wiki_screenshots.sh    # only regenerate wiki MD files
+#
+# Output:
+#   docs/wiki/images/widgets/<widget_name>.png      — one per widget, dark theme
+#   docs/wiki/images/widgets/<widget>_maximized.png — widgets expanded over map
+#   docs/wiki/images/widgets/time_panel.png         — TimePanel fixed element
+#   docs/wiki/images/widgets/rss_banner.png         — RSS scrolling banner
+#   docs/wiki/images/map_looks/<label>.png          — curated map combinations
+#   docs/wiki/images/themes/<theme>.png             — theme gallery shots
+#
+# Parts (for PARTS env var):
+#   fixed_ui   — TimePanel + RSS banner (Part 0)
+#   widgets    — widget gallery (Part 1+2)
+#   maximized  — maximized pane screenshots (Part 3)
+#   map_looks  — map look gallery (Part 4)
+#   themes     — theme gallery (Part 5)
+#   wiki       — regenerate wiki MD files (Part 6)
+#   all        — all of the above (default)
+#
+# Requirements: curl, jq, ImageMagick v7 (magick)
 
-# Configuration
-HC_IP="127.0.0.1"
-HC_PORT="8080"
+WINDOW_W="${WINDOW_W:-1280}"
+WINDOW_H="${WINDOW_H:-800}"
+
+if command -v wmctrl >/dev/null 2>&1; then
+  if wmctrl -i -r $(wmctrl -l | grep HamClock-Next | awk '{print $1}') -e 0,-1,-1,"${WINDOW_W}","${WINDOW_H}" 2>/dev/null; then
+    echo "Window resized to ${WINDOW_W}×${WINDOW_H}"
+    sleep 1  # let SDL repaint at new size
+  else
+    echo "WARN: wmctrl could not find 'HamClock-Next' window — screenshots use current size"
+  fi
+else
+  echo "WARN: wmctrl not installed — screenshots use current window size (apt install wmctrl)"
+fi
+
+HC_IP="${HC_IP:-127.0.0.1}"
+HC_PORT="${HC_PORT:-8080}"
 BASE_URL="http://${HC_IP}:${HC_PORT}"
-NUM_ROTATIONS=6
-DELAY=5 # Increased for RPi 3B mesh/data processing
+DELAY="${DELAY:-3}"
+OUTPUT_DIR="${OUTPUT_DIR:-docs/wiki/images}"
+FORCE="${FORCE:-0}"
+PARTS="${PARTS:-all}"
 
-echo "--- HamClock-Next v1.0 Wiki Screenshot Tool ---"
+# ---------------------------------------------------------------------------
+FAILED=()
+die()    { echo "ERROR: $*" >&2; exit 1; }
+hc_get() {
+  if ! curl -sf "${BASE_URL}/$1" > /dev/null; then
+    echo "  WARN: API call failed: /$1" >&2
+    FAILED+=("API:/$1")
+  fi
+}
+capture() {
+  local path="$1"
+  mkdir -p "$(dirname "$path")"
+  if ! curl -sf "${BASE_URL}/get_capture" -o "$path"; then
+    echo "  WARN: Capture failed → $path" >&2
+    FAILED+=("capture:$path")
+    return 1
+  fi
+  echo "  ✓ $path"
+}
+skip_or_capture() {
+  local path="$1"
+  if [ "$FORCE" = "0" ] && [ -f "$path" ]; then
+    echo "  SKIP (exists) $path"
+    return 0
+  fi
+  capture "$path"
+}
+has_value() {
+  # has_value <jq_key> <value> — returns 0 if value is in capabilities array
+  echo "$CAPS" | jq -e --arg v "$2" ".${1}[] | select(. == \$v)" > /dev/null 2>&1
+}
+part_enabled() {
+  [ "$PARTS" = "all" ] || echo "$PARTS" | tr ',' '\n' | grep -qx "$1"
+}
+# ---------------------------------------------------------------------------
 
-# Define the "looks" we want to showcase for the v1.0 release
-# Format: "projection|prop_overlay|wx_overlay|theme|label"
-# Available Themes: dark, glass, midnight, amber, paper, matrix
-LOOKS=(
-    "robinson|muf|none|dark|v1_dark_robinson_muf"
-    "azimuthal|aurora|none|midnight|v1_midnight_azimuthal_aurora"
-    "mercator|drap|wx_mb|paper|v1_paper_mercator_drap_isobars"
-    "dual_azimuthal|none|clouds_grib|glass|v1_glass_dual_az_clouds"
-    "robinson|none|clouds_grib|dark|v1_dark_robinson_clouds_layered"
-    "azimuthal|none|none|amber|v1_amber_clean"
-    "robinson|none|none|matrix|v1_matrix_robinson"
-)
+command -v jq      >/dev/null 2>&1 || die "jq required (apt install jq / brew install jq)"
+command -v curl    >/dev/null 2>&1 || die "curl required"
+command -v magick  >/dev/null 2>&1 || die "ImageMagick v7 required (apt install imagemagick)"
 
-# 1. Pause rotation
-echo "Pausing rotation..."
-curl -s "${BASE_URL}/api/panes/pause_all?paused=1" > /dev/null
+echo "=== HamClock-Next Wiki Screenshot Tool ==="
+echo "Server: ${BASE_URL}"
+echo "FORCE=${FORCE}  PARTS=${PARTS}"
+echo ""
 
-# 2. Looks Loop
-for LOOK in "${LOOKS[@]}"
-do
-    IFS='|' read -r PROJ PROP WX THEME LABEL <<< "$LOOK"
+curl -sfL "${BASE_URL}/get_config.json" > /dev/null || \
+  die "Server not reachable at ${BASE_URL} — start hamclock-next first"
 
-    echo "--- Setting Look: $LABEL ($PROJ, $PROP, $WX, $THEME) ---"
-    
-    # Apply visuals
-    curl -s "${BASE_URL}/set_projection?type=${PROJ}" > /dev/null
-    curl -s "${BASE_URL}/set_prop_overlay?type=${PROP}" > /dev/null
-    curl -s "${BASE_URL}/set_wx_overlay?type=${WX}" > /dev/null
-    curl -s "${BASE_URL}/set_theme?theme=${THEME}" > /dev/null
-    
-    echo "  Waiting ${DELAY}s for mesh/data/theme update..."
-    sleep $DELAY
-
-    # 3. Rotation Loop
-    for ((i=1; i<=NUM_ROTATIONS; i++))
-    do
-        # Get active widgets for the filename to make sorting easier
-        RAW_WIDGETS=$(curl -s "${BASE_URL}/get_active_pane.txt")
-        
-        # Process into a filename-safe string (e.g. "sat_muf_dx_de")
-        CLEAN_NAMES=$(echo "$RAW_WIDGETS" | sed 's/Pane[0-9]  //g' | tr '\n' '_' | sed 's/__/_/g' | sed 's/_$//' | tr '[:upper:]' '[:lower:]' | sed 's/ /_/g')
-        
-        TIMESTAMP=$(date +"%H%M%S")
-        FILENAME="docs/wiki/images/v1_0/hc_${LABEL}_rot${i}_${CLEAN_NAMES}.png"
-        
-        echo "    Capturing Rotation $i: $FILENAME"
-        mkdir -p docs/wiki/images/v1_0
-        curl -s "${BASE_URL}/get_capture" -o "$FILENAME"
-        
-        if [ $i -lt $NUM_ROTATIONS ]; then
-            echo "    Advancing to next rotation..."
-            curl -s "${BASE_URL}/api/panes/rotate_all" > /dev/null
-            sleep $DELAY
-        fi
-    done
+# Wait for the dashboard to finish initializing (pane geometry available).
+# The server responds to get_config.json immediately but panes aren't wired until
+# the dashboard is created (~1-2 s after startup). Poll for up to 30 s.
+echo -n "Waiting for dashboard ready..."
+for i in $(seq 1 30); do
+  if curl -sf "${BASE_URL}/get_pane_rect?pane=1" > /dev/null 2>&1; then
+    echo " ok (${i}s)"
+    break
+  fi
+  if [ "$i" = "30" ]; then
+    die "Dashboard not ready after 30 s — is the server fully started?"
+  fi
+  echo -n "."
+  sleep 1
 done
 
-# 4. Resume rotation
-echo "Resuming rotation..."
-curl -s "${BASE_URL}/api/panes/pause_all?paused=0" > /dev/null
+CAPS=$(curl -sf "${BASE_URL}/get_capabilities") || \
+  die "/get_capabilities unavailable — rebuild server first (WebServer_Routes.cpp)"
 
-echo "--- Done! All v1.0 looks and rotations captured to docs/wiki/images/v1_0/ ---"
+echo "Capabilities discovered:"
+echo "  $(echo "$CAPS" | jq '.widgets      | length') widgets"
+echo "  $(echo "$CAPS" | jq '.projections  | length') projections"
+echo "  $(echo "$CAPS" | jq '.themes       | length') themes"
+echo "  $(echo "$CAPS" | jq '.prop_overlays| length') prop overlays"
+echo "  $(echo "$CAPS" | jq '.wx_overlays  | length') wx overlays"
+echo ""
+
+# Save current visual state for restore on exit
+SAVED_THEME=$(curl -sfL "${BASE_URL}/get_config.json" | jq -r '.theme      // "dark"')         || SAVED_THEME="dark"
+SAVED_PROJ=$(curl -sf  "${BASE_URL}/get_config.json" | jq -r '.projection // "equirectangular"') || SAVED_PROJ="equirectangular"
+SAVED_RSS=$(curl -sf   "${BASE_URL}/get_config.json" | jq -r '.rssEnabled // true')             || SAVED_RSS="true"
+SAVED_RSS_PARAM=$( [ "$SAVED_RSS" = "true" ] && echo "1" || echo "0" )
+
+restore_state() {
+  echo ""
+  echo "--- Restoring state ---"
+  curl -sf "${BASE_URL}/set_theme?theme=${SAVED_THEME}"         > /dev/null || true
+  curl -sf "${BASE_URL}/set_projection?type=${SAVED_PROJ}"      > /dev/null || true
+  curl -sf "${BASE_URL}/set_prop_overlay?type=none"             > /dev/null || true
+  curl -sf "${BASE_URL}/set_wx_overlay?type=none"               > /dev/null || true
+  curl -sf "${BASE_URL}/api/panes/pause_all?paused=0"           > /dev/null || true
+  curl -sf "${BASE_URL}/api/panes/collapse"                     > /dev/null || true
+  curl -sf "${BASE_URL}/set_rss?enabled=${SAVED_RSS_PARAM}"     > /dev/null || true
+  echo "  Done."
+}
+trap restore_state EXIT
+
+if ! part_enabled wiki; then
+  # Pause only when actually capturing images (not in wiki-only mode)
+  hc_get "api/panes/pause_all?paused=1"
+  sleep 1  # ensure pause takes effect before first solo
+fi
+
+# Query pane 1 geometry once (reused by several parts)
+compute_scale() {
+  PANE1_RECT=$(curl -sf "${BASE_URL}/get_pane_rect?pane=1") || { echo "  WARN: Could not fetch pane 1 rect — scale defaults to 1.0" >&2; SCALE=1; return; }
+  REND_W=$(echo "$PANE1_RECT" | jq -r '.renderer_w')
+  REND_H=$(echo "$PANE1_RECT" | jq -r '.renderer_h')
+  LOG_W=$(echo  "$PANE1_RECT" | jq -r '.logical_w')
+  LOG_H=$(echo  "$PANE1_RECT" | jq -r '.logical_h')
+  SCALE=$(awk "BEGIN { print ($REND_W/$LOG_W < $REND_H/$LOG_H) ? $REND_W/$LOG_W : $REND_H/$LOG_H }")
+  echo "  Scale: ${SCALE}x"
+}
+
+get_phys_rect() {
+  local PANE="$1"
+  local RECT
+  RECT=$(curl -sf "${BASE_URL}/get_pane_rect?pane=${PANE}") || { echo "  WARN: Could not fetch pane ${PANE} rect" >&2; echo "0x0+0+0"; return; }
+  local X; X=$(echo "$RECT" | jq -r '.x')
+  local Y; Y=$(echo "$RECT" | jq -r '.y')
+  local W; W=$(echo "$RECT" | jq -r '.w')
+  local H; H=$(echo "$RECT" | jq -r '.h')
+  local PX; PX=$(awk "BEGIN { printf \"%d\", $X * $SCALE }")
+  local PY; PY=$(awk "BEGIN { printf \"%d\", $Y * $SCALE }")
+  local PW; PW=$(awk "BEGIN { printf \"%d\", $W * $SCALE }")
+  local PH; PH=$(awk "BEGIN { printf \"%d\", $H * $SCALE }")
+  echo "${PW}x${PH}+${PX}+${PY}"
+}
+
+# ============================================================================
+# Part 0 — Fixed UI Elements (TimePanel + RSS Banner)
+# ============================================================================
+if part_enabled fixed_ui; then
+  echo "--- Part 0: Fixed UI Elements ---"
+  hc_get "set_theme?theme=dark"
+  hc_get "set_projection?type=equirectangular"
+  hc_get "set_prop_overlay?type=none"
+  hc_get "set_wx_overlay?type=none"
+  compute_scale
+
+  # TimePanel
+  TP_RECT=$(curl -sf "${BASE_URL}/get_timepanel_rect") || { echo "  WARN: get_timepanel_rect unavailable — skip TimePanel"; TP_RECT=""; }
+  if [ -n "$TP_RECT" ]; then
+    TP_X=$(echo "$TP_RECT" | jq -r '.x')
+    TP_Y=$(echo "$TP_RECT" | jq -r '.y')
+    TP_W=$(echo "$TP_RECT" | jq -r '.w')
+    TP_H=$(echo "$TP_RECT" | jq -r '.h')
+    TP_PX=$(awk "BEGIN { printf \"%d\", $TP_X * $SCALE }")
+    TP_PY=$(awk "BEGIN { printf \"%d\", $TP_Y * $SCALE }")
+    TP_PW=$(awk "BEGIN { printf \"%d\", $TP_W * $SCALE }")
+    TP_PH=$(awk "BEGIN { printf \"%d\", $TP_H * $SCALE }")
+    if [ "$FORCE" = "1" ] || [ ! -f "${OUTPUT_DIR}/widgets/time_panel.png" ]; then
+      echo "  time_panel"
+      sleep "${DELAY}"
+      FULL="${OUTPUT_DIR}/widgets/.full_timepanel.png"
+      if capture "${FULL}"; then
+        magick "${FULL}" -crop "${TP_PW}x${TP_PH}+${TP_PX}+${TP_PY}" +repage "${OUTPUT_DIR}/widgets/time_panel.png" \
+          && echo "  ✓ ${OUTPUT_DIR}/widgets/time_panel.png"
+        rm -f "${FULL}"
+      fi
+    else
+      echo "  SKIP (exists) ${OUTPUT_DIR}/widgets/time_panel.png"
+    fi
+  fi
+
+  # RSS Banner (logical coords: x=139, y=412, w=660, h=68 — fixed in DashboardContext)
+  RSS_PX=$(awk "BEGIN { printf \"%d\", 139 * $SCALE }")
+  RSS_PY=$(awk "BEGIN { printf \"%d\", 412 * $SCALE }")
+  RSS_PW=$(awk "BEGIN { printf \"%d\", 660 * $SCALE }")
+  RSS_PH=$(awk "BEGIN { printf \"%d\", 68  * $SCALE }")
+  if [ "$FORCE" = "1" ] || [ ! -f "${OUTPUT_DIR}/widgets/rss_banner.png" ]; then
+    echo "  rss_banner"
+    hc_get "set_rss?enabled=1"
+    sleep "${DELAY}"
+    FULL="${OUTPUT_DIR}/widgets/.full_rss.png"
+    if capture "${FULL}"; then
+      magick "${FULL}" -crop "${RSS_PW}x${RSS_PH}+${RSS_PX}+${RSS_PY}" +repage "${OUTPUT_DIR}/widgets/rss_banner.png" \
+        && echo "  ✓ ${OUTPUT_DIR}/widgets/rss_banner.png"
+      rm -f "${FULL}"
+    fi
+    hc_get "set_rss?enabled=${SAVED_RSS_PARAM}"
+  else
+    echo "  SKIP (exists) ${OUTPUT_DIR}/widgets/rss_banner.png"
+  fi
+fi
+
+# ============================================================================
+# Part 1 — Widget Gallery
+# Solo each widget on pane 1 with a neutral dark/equirectangular backdrop.
+# ============================================================================
+if part_enabled widgets; then
+  echo ""
+  echo "--- Part 1: Widget Gallery ---"
+  hc_get "set_theme?theme=dark"
+  hc_get "set_projection?type=equirectangular"
+  hc_get "set_prop_overlay?type=none"
+  hc_get "set_wx_overlay?type=none"
+  sleep "${DELAY}"
+
+  compute_scale
+
+  PHYS_RECT_1=$(get_phys_rect 1)
+  PHYS_RECT_2=$(get_phys_rect 2)
+  PHYS_RECT_3=$(get_phys_rect 3)
+
+  TOPBAR_WIDGETS=()
+  while IFS= read -r WIDGET; do
+    case "$WIDGET" in
+      de_info|dx_info|dx_cluster|live_spots|on_the_air)
+        # Handled specifically later
+        ;;
+      *)
+        TOPBAR_WIDGETS+=("$WIDGET")
+        ;;
+    esac
+  done < <(echo "$CAPS" | jq -r '.widgets[]')
+
+  WIDGET_COUNT=0
+
+  # Process TopBar widgets in batches of 3
+  for ((i=0; i<${#TOPBAR_WIDGETS[@]}; i+=3)); do
+    W1="${TOPBAR_WIDGETS[i]}"
+    W2="${TOPBAR_WIDGETS[i+1]:-}"
+    W3="${TOPBAR_WIDGETS[i+2]:-}"
+
+    # Check if all outputs already exist (skip whole batch if FORCE=0)
+    ALL_EXIST=1
+    for W in "$W1" ${W2:+"$W2"} ${W3:+"$W3"}; do
+      [ -f "${OUTPUT_DIR}/widgets/${W}.png" ] || ALL_EXIST=0
+    done
+    if [ "$FORCE" = "0" ] && [ "$ALL_EXIST" = "1" ]; then
+      echo "  SKIP (exists) batch: $W1${W2:+, $W2}${W3:+, $W3}"
+      WIDGET_COUNT=$((WIDGET_COUNT + 1 + ${#W2} + ${#W3}))
+      continue
+    fi
+
+    echo "  TopBar Batch: $W1${W2:+, $W2}${W3:+, $W3}"
+
+    hc_get "set_pane?pane=1&action=solo&widget=${W1}"
+    if [ -n "$W2" ]; then hc_get "set_pane?pane=2&action=solo&widget=${W2}"; fi
+    if [ -n "$W3" ]; then hc_get "set_pane?pane=3&action=solo&widget=${W3}"; fi
+
+    sleep "${DELAY}"
+    FULL="${OUTPUT_DIR}/widgets/.full_topbar_${i}.png"
+    capture "${FULL}" || continue
+
+    if [ "$FORCE" = "1" ] || [ ! -f "${OUTPUT_DIR}/widgets/${W1}.png" ]; then
+      magick "${FULL}" -crop "${PHYS_RECT_1}" +repage "${OUTPUT_DIR}/widgets/${W1}.png"
+      echo "  ✓ ${OUTPUT_DIR}/widgets/${W1}.png"
+    fi
+    WIDGET_COUNT=$((WIDGET_COUNT + 1))
+
+    if [ -n "$W2" ]; then
+      if [ "$FORCE" = "1" ] || [ ! -f "${OUTPUT_DIR}/widgets/${W2}.png" ]; then
+        magick "${FULL}" -crop "${PHYS_RECT_2}" +repage "${OUTPUT_DIR}/widgets/${W2}.png"
+        echo "  ✓ ${OUTPUT_DIR}/widgets/${W2}.png"
+      fi
+      WIDGET_COUNT=$((WIDGET_COUNT + 1))
+    fi
+
+    if [ -n "$W3" ]; then
+      if [ "$FORCE" = "1" ] || [ ! -f "${OUTPUT_DIR}/widgets/${W3}.png" ]; then
+        magick "${FULL}" -crop "${PHYS_RECT_3}" +repage "${OUTPUT_DIR}/widgets/${W3}.png"
+        echo "  ✓ ${OUTPUT_DIR}/widgets/${W3}.png"
+      fi
+      WIDGET_COUNT=$((WIDGET_COUNT + 1))
+    fi
+
+    rm -f "${FULL}"
+  done
+
+  # Part 2 — Standard SidePanel Widgets
+  echo ""
+  echo "--- Part 2: SidePanel Widgets ---"
+  echo "  Standard SidePanel (de_info, dx_info)"
+  hc_get "set_config?side_panel_mode=default"
+  sleep 1 # Wait for UI to rebuild panes!
+  hc_get "set_satname?name=none"
+
+  PHYS_RECT_5=$(get_phys_rect 5)
+  PHYS_RECT_6=$(get_phys_rect 6)
+
+  sleep "${DELAY}"
+  FULL="${OUTPUT_DIR}/widgets/.full_sidepanel.png"
+  capture "${FULL}" || true
+  if [ -f "$FULL" ]; then
+    if [ "$FORCE" = "1" ] || [ ! -f "${OUTPUT_DIR}/widgets/de_info.png" ]; then
+      magick "${FULL}" -crop "${PHYS_RECT_5}" +repage "${OUTPUT_DIR}/widgets/de_info.png"
+      echo "  ✓ ${OUTPUT_DIR}/widgets/de_info.png"
+    else echo "  SKIP (exists) ${OUTPUT_DIR}/widgets/de_info.png"; fi
+    WIDGET_COUNT=$((WIDGET_COUNT + 1))
+    if [ "$FORCE" = "1" ] || [ ! -f "${OUTPUT_DIR}/widgets/dx_info.png" ]; then
+      magick "${FULL}" -crop "${PHYS_RECT_6}" +repage "${OUTPUT_DIR}/widgets/dx_info.png"
+      echo "  ✓ ${OUTPUT_DIR}/widgets/dx_info.png"
+    else echo "  SKIP (exists) ${OUTPUT_DIR}/widgets/dx_info.png"; fi
+    WIDGET_COUNT=$((WIDGET_COUNT + 1))
+    rm -f "${FULL}"
+  fi
+
+  # Satellite
+  echo "  satellite (in DXSatPane)"
+  hc_get "set_satname?name=ISS"
+  sleep "${DELAY}"
+  FULL="${OUTPUT_DIR}/widgets/.full_satellite.png"
+  capture "${FULL}" || true
+  if [ -f "$FULL" ]; then
+    if [ "$FORCE" = "1" ] || [ ! -f "${OUTPUT_DIR}/widgets/satellite.png" ]; then
+      magick "${FULL}" -crop "${PHYS_RECT_6}" +repage "${OUTPUT_DIR}/widgets/satellite.png"
+      echo "  ✓ ${OUTPUT_DIR}/widgets/satellite.png"
+    else echo "  SKIP (exists) ${OUTPUT_DIR}/widgets/satellite.png"; fi
+    WIDGET_COUNT=$((WIDGET_COUNT + 1))
+    rm -f "${FULL}"
+  fi
+  hc_get "set_satname?name=none"
+
+  # Double Tall SidePanel Widgets
+  for W in dx_cluster live_spots on_the_air; do
+    echo "  ${W} (double-tall SidePanel)"
+    hc_get "set_config?side_panel_mode=${W}"
+    sleep 1
+    PHYS_RECT_5_DOUBLE=$(get_phys_rect 5)
+    sleep "${DELAY}"
+    FULL="${OUTPUT_DIR}/widgets/.full_${W}.png"
+    capture "${FULL}" || continue
+    if [ "$FORCE" = "1" ] || [ ! -f "${OUTPUT_DIR}/widgets/${W}.png" ]; then
+      magick "${FULL}" -crop "${PHYS_RECT_5_DOUBLE}" +repage "${OUTPUT_DIR}/widgets/${W}.png"
+      echo "  ✓ ${OUTPUT_DIR}/widgets/${W}.png"
+    else echo "  SKIP (exists) ${OUTPUT_DIR}/widgets/${W}.png"; fi
+    WIDGET_COUNT=$((WIDGET_COUNT + 1))
+    rm -f "${FULL}"
+  done
+  hc_get "set_config?side_panel_mode=default"
+
+  echo "  Widget gallery: ${WIDGET_COUNT} images captured/checked"
+fi
+
+# ============================================================================
+# Part 3 — Maximized Widget Screenshots
+# Shows widgets expanded over the map area using /api/panes/expand
+# ============================================================================
+if part_enabled maximized; then
+  echo ""
+  echo "--- Part 3: Maximized Widgets ---"
+  hc_get "set_theme?theme=dark"
+  hc_get "set_projection?type=robinson"
+  hc_get "set_prop_overlay?type=none"
+  hc_get "set_wx_overlay?type=none"
+  [ -z "${SCALE:-}" ] && compute_scale
+
+  MAXIMIZED_WIDGETS=(solar aurora live_spots aurora_graph band_conditions dx_cluster)
+  MAX_COUNT=0
+
+  for W in "${MAXIMIZED_WIDGETS[@]}"; do
+    OUT="${OUTPUT_DIR}/widgets/${W}_maximized.png"
+    if [ "$FORCE" = "0" ] && [ -f "$OUT" ]; then
+      echo "  SKIP (exists) $OUT"
+      MAX_COUNT=$((MAX_COUNT + 1))
+      continue
+    fi
+    echo "  ${W} (maximized)"
+    hc_get "set_pane?pane=1&action=solo&widget=${W}"
+    sleep 1
+    hc_get "api/panes/expand?pane=1"
+    sleep "${DELAY}"
+    if capture "$OUT"; then
+      MAX_COUNT=$((MAX_COUNT + 1))
+    fi
+    hc_get "api/panes/collapse"
+    sleep 1
+  done
+  echo "  Maximized: ${MAX_COUNT} images captured/checked"
+fi
+
+# ============================================================================
+# Part 4 — Map Looks
+# Curated visual combinations. Values are validated against /get_capabilities
+# at runtime — unsupported values in this build are skipped with a warning.
+#
+# Format: "projection|prop_overlay|wx_overlay|theme|output_label"
+# ============================================================================
+if part_enabled map_looks; then
+  echo ""
+  echo "--- Part 4: Map Looks ---"
+
+  LOOKS=(
+    "robinson|muf|none|dark|robinson_muf_dark"
+    "azimuthal|aurora|none|midnight|azimuthal_aurora_midnight"
+    "mercator|drap|wxmb|paper|mercator_drap_wxmb_paper"
+    "dual_azimuthal|none|clouds_grib|glass|dual_az_clouds_glass"
+    "robinson|none|clouds_grib|dark|robinson_clouds_dark"
+    "azimuthal|none|none|amber|azimuthal_clean_amber"
+    "robinson|none|none|matrix|robinson_matrix"
+  )
+
+  LOOK_COUNT=0
+  LOOK_SKIPPED=0
+  for LOOK in "${LOOKS[@]}"; do
+    IFS='|' read -r PROJ PROP WX THEME LABEL <<< "${LOOK}"
+
+    SKIP=0
+    has_value projections  "$PROJ"  || { echo "  SKIP ${LABEL}: projection '${PROJ}' not available";   SKIP=1; }
+    has_value prop_overlays "$PROP" || { echo "  SKIP ${LABEL}: prop_overlay '${PROP}' not available"; SKIP=1; }
+    has_value wx_overlays  "$WX"    || { echo "  SKIP ${LABEL}: wx_overlay '${WX}' not available";     SKIP=1; }
+    has_value themes       "$THEME" || { echo "  SKIP ${LABEL}: theme '${THEME}' not available";       SKIP=1; }
+    if [ "$SKIP" -eq 1 ]; then
+      LOOK_SKIPPED=$((LOOK_SKIPPED + 1))
+      continue
+    fi
+
+    OUT="${OUTPUT_DIR}/map_looks/${LABEL}.png"
+    if [ "$FORCE" = "0" ] && [ -f "$OUT" ]; then
+      echo "  SKIP (exists) $OUT"
+      LOOK_COUNT=$((LOOK_COUNT + 1))
+      continue
+    fi
+
+    echo "  ${LABEL}"
+    hc_get "set_projection?type=${PROJ}"
+    hc_get "set_prop_overlay?type=${PROP}"
+    hc_get "set_wx_overlay?type=${WX}"
+    hc_get "set_theme?theme=${THEME}"
+    sleep "${DELAY}"
+    capture "$OUT" && LOOK_COUNT=$((LOOK_COUNT + 1))
+  done
+fi
+
+# ============================================================================
+# Part 5 — Theme Gallery
+# One clean robinson/no-overlays shot per theme, fully dynamic.
+# ============================================================================
+if part_enabled themes; then
+  echo ""
+  echo "--- Part 5: Theme Gallery ---"
+  hc_get "set_projection?type=robinson"
+  hc_get "set_prop_overlay?type=none"
+  hc_get "set_wx_overlay?type=none"
+  # Restore a multi-widget pane so the shot shows a representative layout
+  hc_get "set_pane?pane=1&action=solo&widget=solar"
+
+  THEME_COUNT=0
+  while IFS= read -r THEME; do
+    OUT="${OUTPUT_DIR}/themes/${THEME}.png"
+    if [ "$FORCE" = "0" ] && [ -f "$OUT" ]; then
+      echo "  SKIP (exists) $OUT"
+      THEME_COUNT=$((THEME_COUNT + 1))
+      continue
+    fi
+    echo "  ${THEME}"
+    hc_get "set_theme?theme=${THEME}"
+    sleep "${DELAY}"
+    capture "$OUT" && THEME_COUNT=$((THEME_COUNT + 1))
+  done < <(echo "$CAPS" | jq -r '.themes[]')
+fi
+
+# ============================================================================
+# Part 6 — Wiki MD Generation
+# Regenerate Widget-Gallery.md, Map-and-Overlays.md (theme section),
+# and Widgets.md (map looks section) inline from captured images.
+# ============================================================================
+if part_enabled wiki; then
+  echo ""
+  echo "--- Part 6: Wiki MD Generation ---"
+  WIKI_DIR="docs/wiki"
+
+  # ---- 6a: Widget-Gallery.md ----
+  WIDGET_IMG_DIR="${OUTPUT_DIR}/widgets"
+  WIDGET_GALLERY="${WIKI_DIR}/Widget-Gallery.md"
+  WIDGET_TYPE_H="src/core/WidgetType.h"
+
+  if [ ! -f "${WIDGET_TYPE_H}" ]; then
+    echo "  WARN: ${WIDGET_TYPE_H} not found — skipping Widget-Gallery.md"
+  elif [ ! -d "${WIDGET_IMG_DIR}" ]; then
+    echo "  WARN: ${WIDGET_IMG_DIR} not found — skipping Widget-Gallery.md"
+  else
+    echo "  Generating ${WIDGET_GALLERY} ..."
+
+    # Parse slug→display_name from WidgetType.h widgetTypeDisplayName()
+    # Format: "case WidgetType::FOO: return "Foo Name";"
+    declare -A WIDGET_NAMES
+    declare -a WIDGET_SLUGS
+    while IFS= read -r LINE; do
+      SLUG=$(echo "$LINE" | sed -n 's/.*widgetTypeToString.*"\([^"]*\)".*/\1/p')
+      [ -n "$SLUG" ] && WIDGET_SLUGS+=("$SLUG")
+    done < <(grep 'return "' "${WIDGET_TYPE_H}" | grep -v '//' | head -80)
+
+    # Get display names: look for widgetTypeDisplayName() section
+    IN_DISPLAY=0
+    while IFS= read -r LINE; do
+      if echo "$LINE" | grep -q "widgetTypeDisplayName"; then IN_DISPLAY=1; fi
+      if [ "$IN_DISPLAY" = "1" ]; then
+        SLUG=$(echo "$LINE" | sed -n 's/.*WidgetType::\([A-Z_]*\).*/\1/p' | tr '[:upper:]' '[:lower:]' | tr '_' '_')
+        NAME=$(echo "$LINE" | sed -n 's/.*return "\([^"]*\)".*/\1/p')
+        if [ -n "$SLUG" ] && [ -n "$NAME" ]; then
+          WIDGET_NAMES["$SLUG"]="$NAME"
+        fi
+        # Stop at closing brace of function
+        if echo "$LINE" | grep -q "^}" && [ "$IN_DISPLAY" = "1" ]; then IN_DISPLAY=0; fi
+      fi
+    done < "${WIDGET_TYPE_H}"
+
+    # Build gallery sections
+    GALLERY_ROWS=""
+    MISSING_LIST=""
+    ROW_BUF=""
+    ROW_IDX=0
+    for SLUG in "${WIDGET_SLUGS[@]}"; do
+      IMG="${WIDGET_IMG_DIR}/${SLUG}.png"
+      DNAME="${WIDGET_NAMES[$SLUG]:-$SLUG}"
+      if [ -f "$IMG" ]; then
+        CELL="**${DNAME}**<br>![${SLUG}](images/widgets/${SLUG}.png)"
+        if [ "$ROW_IDX" = "0" ]; then
+          ROW_BUF="| ${CELL}"
+          ROW_IDX=1
+        else
+          GALLERY_ROWS+="| | |"$'\n'"|---|---|"$'\n'"${ROW_BUF} | ${CELL} |"$'\n'
+          ROW_BUF=""
+          ROW_IDX=0
+        fi
+      else
+        MISSING_LIST+="- \`${SLUG}\` — ${DNAME}"$'\n'
+      fi
+    done
+    # Flush odd row
+    if [ "$ROW_IDX" = "1" ]; then
+      GALLERY_ROWS+="| | |"$'\n'"|---|---|"$'\n'"${ROW_BUF} |  |"$'\n'
+    fi
+
+    # Maximized section
+    MAX_ROWS=""
+    MAX_BUF=""
+    MAX_IDX=0
+    for IMG in "${WIDGET_IMG_DIR}"/*_maximized.png; do
+      [ -f "$IMG" ] || continue
+      BASENAME=$(basename "$IMG" .png)
+      SLUG="${BASENAME%_maximized}"
+      DNAME="${WIDGET_NAMES[$SLUG]:-$SLUG}"
+      CELL="**${DNAME} (maximized)**<br>![${SLUG}](images/widgets/${BASENAME}.png)"
+      if [ "$MAX_IDX" = "0" ]; then
+        MAX_BUF="| ${CELL}"
+        MAX_IDX=1
+      else
+        MAX_ROWS+="| | |"$'\n'"|---|---|"$'\n'"${MAX_BUF} | ${CELL} |"$'\n'
+        MAX_BUF=""
+        MAX_IDX=0
+      fi
+    done
+    if [ "$MAX_IDX" = "1" ]; then
+      MAX_ROWS+="| | |"$'\n'"|---|---|"$'\n'"${MAX_BUF} |  |"$'\n'
+    fi
+
+    # Write Widget-Gallery.md
+    {
+      echo "# Widget Gallery"
+      echo ""
+      echo "Visual reference for all HamClock-Next widgets. Run \`capture_wiki_screenshots.sh\` to populate or refresh screenshots."
+      echo ""
+      echo "## All Widgets"
+      echo ""
+      if [ -n "$GALLERY_ROWS" ]; then
+        echo "$GALLERY_ROWS"
+      else
+        echo "_No widget screenshots captured yet. Run \`capture_wiki_screenshots.sh\`._"
+      fi
+      if [ -n "$MAX_ROWS" ]; then
+        echo ""
+        echo "## Maximized Widgets"
+        echo ""
+        echo "Widgets expanded to fill the map area (via the maximize button on each pane)."
+        echo ""
+        echo "$MAX_ROWS"
+      fi
+      # Fixed UI
+      if [ -f "${WIDGET_IMG_DIR}/time_panel.png" ] || [ -f "${WIDGET_IMG_DIR}/rss_banner.png" ]; then
+        echo ""
+        echo "## Fixed UI Elements"
+        echo ""
+        echo "| | |"
+        echo "|---|---|"
+        TP_CELL=""
+        RSS_CELL=""
+        [ -f "${WIDGET_IMG_DIR}/time_panel.png" ] && TP_CELL="**Time Panel**<br>![time_panel](images/widgets/time_panel.png)"
+        [ -f "${WIDGET_IMG_DIR}/rss_banner.png" ] && RSS_CELL="**RSS Banner**<br>![rss_banner](images/widgets/rss_banner.png)"
+        echo "| ${TP_CELL} | ${RSS_CELL} |"
+      fi
+      if [ -n "$MISSING_LIST" ]; then
+        echo ""
+        echo "## Not Yet Captured"
+        echo ""
+        echo "$MISSING_LIST"
+      fi
+    } > "${WIDGET_GALLERY}"
+    echo "  ✓ ${WIDGET_GALLERY}"
+  fi
+
+  # ---- 6b: Map-and-Overlays.md theme section ----
+  MAP_MD="${WIKI_DIR}/Map-and-Overlays.md"
+  THEMES_DIR="${OUTPUT_DIR}/themes"
+  if [ -f "${MAP_MD}" ]; then
+    THEME_TABLE=""
+    if [ -d "${THEMES_DIR}" ]; then
+      T_BUF=""
+      T_IDX=0
+      for IMG in "${THEMES_DIR}"/*.png; do
+        [ -f "$IMG" ] || continue
+        STEM=$(basename "$IMG" .png)
+        LABEL=$(echo "$STEM" | sed 's/_/ /g' | awk '{for(i=1;i<=NF;i++) $i=toupper(substr($i,1,1)) substr($i,2); print}')
+        CELL="**${LABEL}**<br>![${STEM}](images/themes/${STEM}.png)"
+        if [ "$T_IDX" = "0" ]; then
+          T_BUF="| ${CELL}"
+          T_IDX=1
+        else
+          THEME_TABLE+="| | |"$'\n'"|---|---|"$'\n'"${T_BUF} | ${CELL} |"$'\n'
+          T_BUF=""
+          T_IDX=0
+        fi
+      done
+      if [ "$T_IDX" = "1" ]; then
+        THEME_TABLE+="| | |"$'\n'"|---|---|"$'\n'"${T_BUF} |  |"$'\n'
+      fi
+    fi
+    if [ -z "$THEME_TABLE" ]; then
+      THEME_TABLE="_No theme screenshots yet. Run \`capture_wiki_screenshots.sh\`._"$'\n'
+    fi
+
+    # Replace bounded block using awk
+    awk -v replacement="${THEME_TABLE}" '
+      /<!-- BEGIN THEME GALLERY -->/ { print; print replacement; inside=1; next }
+      /<!-- END THEME GALLERY -->/   { inside=0 }
+      !inside                        { print }
+    ' "${MAP_MD}" > "${MAP_MD}.tmp" && mv "${MAP_MD}.tmp" "${MAP_MD}"
+    echo "  ✓ ${MAP_MD} (theme gallery updated)"
+  else
+    echo "  WARN: ${MAP_MD} not found — skip theme gallery update"
+  fi
+
+  # ---- 6c: Widgets.md map looks section ----
+  WIDGETS_MD="${WIKI_DIR}/Widgets.md"
+  MAP_LOOKS_DIR="${OUTPUT_DIR}/map_looks"
+  if [ -f "${WIDGETS_MD}" ]; then
+    ML_TABLE=""
+    if [ -d "${MAP_LOOKS_DIR}" ]; then
+      ML_BUF=""
+      ML_IDX=0
+      for IMG in "${MAP_LOOKS_DIR}"/*.png; do
+        [ -f "$IMG" ] || continue
+        STEM=$(basename "$IMG" .png)
+        CELL="![${STEM}](images/map_looks/${STEM}.png)"
+        if [ "$ML_IDX" = "0" ]; then
+          ML_BUF="| ${CELL}"
+          ML_IDX=1
+        else
+          ML_TABLE+="| | |"$'\n'"|---|---|"$'\n'"${ML_BUF} | ${CELL} |"$'\n'
+          ML_BUF=""
+          ML_IDX=0
+        fi
+      done
+      if [ "$ML_IDX" = "1" ]; then
+        ML_TABLE+="| | |"$'\n'"|---|---|"$'\n'"${ML_BUF} |  |"$'\n'
+      fi
+    fi
+    if [ -z "$ML_TABLE" ]; then
+      ML_TABLE="_No map look screenshots yet. Run \`capture_wiki_screenshots.sh\`._"$'\n'
+    fi
+
+    awk -v replacement="${ML_TABLE}" '
+      /<!-- BEGIN MAP LOOKS -->/ { print; print replacement; inside=1; next }
+      /<!-- END MAP LOOKS -->/   { inside=0 }
+      !inside                    { print }
+    ' "${WIDGETS_MD}" > "${WIDGETS_MD}.tmp" && mv "${WIDGETS_MD}.tmp" "${WIDGETS_MD}"
+    echo "  ✓ ${WIDGETS_MD} (map looks updated)"
+  else
+    echo "  WARN: ${WIDGETS_MD} not found — skip map looks update"
+  fi
+fi
+
+# ============================================================================
+echo ""
+echo "=== Complete ==="
+if [ ${#FAILED[@]} -gt 0 ]; then
+  echo "  WARNINGS — ${#FAILED[@]} failure(s):"
+  for F in "${FAILED[@]}"; do echo "    - $F"; done
+else
+  echo "  No failures."
+fi
+echo ""

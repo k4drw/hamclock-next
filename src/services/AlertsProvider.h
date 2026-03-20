@@ -1,10 +1,11 @@
 #pragma once
 
+#include "ProviderBase.h"
 #include "../core/AlertsData.h"
 #include "../network/NetworkManager.h"
 #include <memory>
 
-class AlertsProvider {
+class AlertsProvider : public ProviderBase {
 public:
   AlertsProvider(NetworkManager &net, std::shared_ptr<AlertsStore> store);
 

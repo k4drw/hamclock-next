@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ProviderBase.h"
 #include "../core/AuroraHistoryStore.h"
 #include "../core/AuroraMapData.h"
 #include "../core/DRAPData.h"
@@ -11,7 +12,7 @@
 
 struct HamClockState;
 
-class NOAAProvider {
+class NOAAProvider : public ProviderBase {
 public:
   enum class UpdateType {
     KIndex,

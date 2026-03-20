@@ -19,6 +19,7 @@
 
 #include <SDL.h>
 
+#include <ctime>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -116,6 +117,11 @@ public:
   void onSatTrackReady(const std::vector<GroundTrackPoint> &track);
   void onPropDataReady(PropOverlayType type, const std::vector<float> &grid);
   void onMapImageReady(bool night, std::string &&data);
+
+  // Show a calendar event alert overlay. dismissMinutes controls auto-dismiss.
+  // Safe to call from the main thread.
+  void showCalendarAlert(const std::string &summary, const std::string &source,
+                         time_t startTime, int dismissMinutes);
 
 private:
   SDL_FPoint latLonToScreen(double lat, double lon) const;
@@ -256,6 +262,7 @@ private:
   SDL_Texture *nightOverlayTexture_ = nullptr;
   SDL_Texture *mufRtTexture_ = nullptr;
   SDL_Texture *propTexture_ = nullptr;
+  SDL_Renderer *cachedRenderer_ = nullptr;
   uint32_t lastMufUpdateMs_ = 0;
   uint64_t wxLastCheckMs_ = 0;
   uint64_t gribCloudLastCheckMs_ = 0;
@@ -273,6 +280,16 @@ private:
   void renderOverlayInfo(SDL_Renderer *renderer);
   void renderRssButton(SDL_Renderer *renderer);
   void renderAsteroidOverlay(SDL_Renderer *renderer);
+  void renderCalendarAlert(SDL_Renderer *renderer);
+
+  struct CalendarAlertState {
+    bool active = false;
+    std::string summary;
+    std::string source;
+    time_t startTime = 0;
+    uint32_t shownAtMs = 0;
+    uint32_t durationMs = 30000;
+  } calendarAlert_;
 
   SDL_Rect rssRect_ = {};
 };

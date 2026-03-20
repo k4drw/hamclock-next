@@ -1,12 +1,13 @@
 #pragma once
 
+#include "ProviderBase.h"
 #include "../core/CallbookData.h"
 #include "../network/NetworkManager.h"
 #include <functional>
 #include <memory>
 #include <string>
 
-class CallbookProvider {
+class CallbookProvider : public ProviderBase {
 public:
   using DataCb = std::function<void(const CallbookData &data)>;
 

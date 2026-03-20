@@ -4,6 +4,7 @@
 MufRtProvider::MufRtProvider(NetworkManager &netMgr) : netMgr_(netMgr) {}
 
 void MufRtProvider::update() {
+  lastFetchMs_ = SDL_GetTicks();
   // MUF-RT is now handled internally by PropEngine using data
   // from IonosondeProvider (https://prop.kc2g.com/api/stations.json).
   // No external image fetch is required.

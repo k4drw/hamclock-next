@@ -57,10 +57,10 @@ DEPENDS="libc6, libcurl4, libstdc++6"
 if [ "$VARIANT" == "unified" ] || [ "$VARIANT" == "universal" ]; then
     # Full desktop dependencies (X11 + Wayland + DRM)
     VARIANT="unified"
-    DEPENDS="$DEPENDS, libx11-6, libxext6, libxcursor1, libxi6, libxrandr2, libxss1, libxxf86vm1, libxinerama1, libwayland-client0, libwayland-cursor0, libwayland-egl1, libxkbcommon0, libgl1, libdrm2, libgbm1, libegl1, libgles2"
+    DEPENDS="$DEPENDS, libx11-6, libxext6, libxcursor1, libxi6, libxrandr2, libxss1, libxxf86vm1, libxinerama1, libwayland-client0, libwayland-cursor0, libwayland-egl1, libxkbcommon0, libgl1, libdrm2, libgbm1, libegl1, libgles2, libflite1"
 else
     # Lean headless/kiosk dependencies (DRM/GBM only - no X11/Wayland)
-    DEPENDS="$DEPENDS, libdrm2, libgbm1, libegl1, libgles2"
+    DEPENDS="$DEPENDS, libdrm2, libgbm1, libegl1, libgles2, libflite1"
     VARIANT="fb0"
 fi
 

@@ -69,6 +69,13 @@ public:
     onConfigRequested_ = cb;
   }
 
+  void setExpanded(bool expanded) { expanded_ = expanded; }
+  bool isExpanded() const { return expanded_; }
+  void setOnMaximizeRequested(std::function<void(int)> cb) {
+    onMaximizeRequested_ = cb;
+  }
+  void setLineAATexture(SDL_Texture *tex) { lineAATex_ = tex; }
+
 private:
   WidgetType currentType_;
   Widget *activeWidget_ = nullptr;
@@ -84,6 +91,11 @@ private:
   int paneIndex_ = 0;
   std::function<void(int, int, int)> onSelectionRequested_;
   std::function<void(WidgetType)> onConfigRequested_;
+
+  bool expanded_ = false;
+  SDL_Rect maxBtnRect_ = {0, 0, 0, 0};
+  std::function<void(int)> onMaximizeRequested_;
+  SDL_Texture *lineAATex_ = nullptr;
 
   void activateRotationIndex(size_t idx);
 };

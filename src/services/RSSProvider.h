@@ -1,11 +1,12 @@
 #pragma once
 
+#include "ProviderBase.h"
 #include "../core/RSSData.h"
 #include "../network/NetworkManager.h"
 
 #include <memory>
 
-class RSSProvider {
+class RSSProvider : public ProviderBase {
 public:
     RSSProvider(NetworkManager& net, std::shared_ptr<RSSDataStore> store);
 

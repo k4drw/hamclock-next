@@ -225,16 +225,9 @@ PropEngine::generateGrid(const PropPathParams &params, const SolarData &sw,
   std::tm *ptm = std::gmtime(&t);
   double utcHour = ptm->tm_hour + ptm->tm_min / 60.0;
 
-  // Pre-calculate ionosonde interpolation for the whole globe?
-  // No, do it per point (lazy) or maybe coarse grid?
-  // Per-point (660x330 = 217k) calls to interpolate() might be slow if
-  // interpolate loops 100 stations. IonosondeProvider::interpolate checks
-  // distances. Optimization: Cache standard ionosphere or use a coarse grid and
-  // lerp. For Phase 2, let's try direct per-pixel and see performance. If slow,
-  // we optimize.
-
-  // To speed up, we can skip ionosonde for points > 3000km from any station?
-  // Or just rely on the fallback in calculateMUF.
+  // Per-point ionosonde interpolation (660x330 = 217k calls).
+  // IonosondeProvider::interpolate checks distances and falls back to
+  // calculateMUF for points > 3000km from any station.
 
   for (int y = 0; y < MAP_H; ++y) {
     double lat = 90.0 - (y * 180.0 / MAP_H);

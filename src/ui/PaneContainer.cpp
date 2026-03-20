@@ -1,5 +1,6 @@
 #include "PaneContainer.h"
 #include "FontCatalog.h"
+#include "RenderUtils.h"
 
 PaneContainer::PaneContainer(int x, int y, int w, int h, WidgetType initialType,
                              FontManager &fontMgr)
@@ -129,6 +130,49 @@ void PaneContainer::render(SDL_Renderer *renderer) {
   SDL_Rect border = {x_, y_, width_, height_};
   SDL_RenderDrawRect(renderer, &border);
 
+  // Draw maximize / restore button in top-right corner
+  if (!(activeWidget_ && activeWidget_->isConfiguring())) {
+    int btnSz = std::min(14, std::min(width_, height_) / 6);
+    btnSz = std::max(btnSz, 8);
+    int bx = x_ + width_ - btnSz - 2;
+    int by = y_ + 2;
+    maxBtnRect_ = {bx, by, btnSz, btnSz};
+
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+    SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, 140);
+    SDL_RenderFillRect(renderer, &maxBtnRect_);
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+
+    int m = 2;
+    SDL_SetRenderDrawColor(renderer, themes.text.r, themes.text.g, themes.text.b, 255);
+
+    if (!expanded_) {
+      // Maximize icon: 4 outward corner L-shapes
+      SDL_RenderDrawLine(renderer, bx+m,         by+m+3,       bx+m,         by+m);
+      SDL_RenderDrawLine(renderer, bx+m,         by+m,         bx+m+3,       by+m);
+      SDL_RenderDrawLine(renderer, bx+btnSz-m-3, by+m,         bx+btnSz-m,   by+m);
+      SDL_RenderDrawLine(renderer, bx+btnSz-m,   by+m,         bx+btnSz-m,   by+m+3);
+      SDL_RenderDrawLine(renderer, bx+m,         by+btnSz-m-3, bx+m,         by+btnSz-m);
+      SDL_RenderDrawLine(renderer, bx+m,         by+btnSz-m,   bx+m+3,       by+btnSz-m);
+      SDL_RenderDrawLine(renderer, bx+btnSz-m-3, by+btnSz-m,   bx+btnSz-m,   by+btnSz-m);
+      SDL_RenderDrawLine(renderer, bx+btnSz-m,   by+btnSz-m,   bx+btnSz-m,   by+btnSz-m-3);
+    } else {
+      // Restore icon: AA X using preferred line_aa texture method
+      SDL_Color col = {themes.text.r, themes.text.g, themes.text.b, 255};
+      float fx1 = (float)(bx + m), fy1 = (float)(by + m);
+      float fx2 = (float)(bx + btnSz - m), fy2 = (float)(by + btnSz - m);
+      if (lineAATex_) {
+        RenderUtils::drawThickLineTextured(renderer, lineAATex_, fx1, fy1, fx2, fy2, 1.5f, col);
+        RenderUtils::drawThickLineTextured(renderer, lineAATex_, fx2, fy1, fx1, fy2, 1.5f, col);
+      } else {
+        RenderUtils::drawThickLine(renderer, fx1, fy1, fx2, fy2, 1.5f, col);
+        RenderUtils::drawThickLine(renderer, fx2, fy1, fx1, fy2, 1.5f, col);
+      }
+    }
+  } else {
+    maxBtnRect_ = {0, 0, 0, 0};
+  }
+
   // Draw manual navigation arrows when rotation has multiple widgets
   // Hide if widget is configuring
   if (rotation_.size() > 1 &&
@@ -199,6 +243,17 @@ bool PaneContainer::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
     if (mx >= rArr.x && mx < rArr.x + rArr.w && my >= rArr.y &&
         my < rArr.y + rArr.h) {
       activateRotationIndex((rotationIdx_ + 1) % rotation_.size());
+      return true;
+    }
+  }
+
+  // 2b. Check maximize/restore button
+  if (maxBtnRect_.w > 0) {
+    if (mx >= maxBtnRect_.x && mx < maxBtnRect_.x + maxBtnRect_.w &&
+        my >= maxBtnRect_.y && my < maxBtnRect_.y + maxBtnRect_.h) {
+      if (onMaximizeRequested_) {
+        onMaximizeRequested_(paneIndex_);
+      }
       return true;
     }
   }

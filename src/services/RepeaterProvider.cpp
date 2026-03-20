@@ -1,6 +1,8 @@
 #include "RepeaterProvider.h"
 #include "../core/Constants.h"
+#include "../core/StringUtils.h"
 #include "../core/WorkerService.h"
+#include <SDL.h>
 #include <SDL_events.h>
 #include <algorithm>
 #include <chrono>
@@ -29,6 +31,7 @@ double RepeaterProvider::haversineKm(double lat1, double lon1, double lat2,
 
 void RepeaterProvider::fetch(double lat, double lon, const std::string &state,
                               bool force) {
+  lastFetchMs_ = SDL_GetTicks();
   // RepeaterBook API. Use key if configured in AppConfig.
   auto &cfg = ConfigManager::instance().getConfig();
   std::string key = cfg.repeaterBookKey;
@@ -92,16 +95,10 @@ void RepeaterProvider::fetch(double lat, double lon, const std::string &state,
                 re.callsign = strVal("Callsign");
                 std::string freqStr = strVal("Frequency");
                 if (!freqStr.empty())
-                  try {
-                    re.freqMHz = std::stod(freqStr);
-                  } catch (...) {
-                  }
+                  re.freqMHz = StringUtils::safe_stod(freqStr);
                 std::string offStr = strVal("Offset");
                 if (!offStr.empty())
-                  try {
-                    re.offsetMHz = std::stod(offStr);
-                  } catch (...) {
-                  }
+                  re.offsetMHz = StringUtils::safe_stod(offStr);
                 re.tone = strVal("PL");
                 re.mode = strVal("Use"); // Note: RepeaterBook "Use" = mode type
                 re.use = strVal("Operational Status");
@@ -112,15 +109,9 @@ void RepeaterProvider::fetch(double lat, double lon, const std::string &state,
                 std::string latStr = strVal("Lat");
                 std::string lonStr = strVal("Long");
                 if (!latStr.empty())
-                  try {
-                    rLat = std::stod(latStr);
-                  } catch (...) {
-                  }
+                  rLat = StringUtils::safe_stod(latStr);
                 if (!lonStr.empty())
-                  try {
-                    rLon = std::stod(lonStr);
-                  } catch (...) {
-                  }
+                  rLon = StringUtils::safe_stod(lonStr);
                 if (rLat != 0 && rLon != 0)
                   re.distanceKm =
                       haversineKm(deLat, deLon, rLat, rLon);

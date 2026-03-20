@@ -119,17 +119,7 @@ void SDOPanel::render(SDL_Renderer *renderer) {
 
   ThemeColors themes = getThemeColors(theme_);
 
-  // 2. Background and Border
-  SDL_SetRenderDrawBlendMode(
-      renderer, (theme_ == "glass") ? SDL_BLENDMODE_BLEND : SDL_BLENDMODE_NONE);
-  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b,
-                         themes.bg.a);
-  SDL_Rect rect = {x_, y_, width_, height_};
-  SDL_RenderFillRect(renderer, &rect);
-
-  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
-                         themes.border.b, themes.border.a);
-  SDL_RenderDrawRect(renderer, &rect);
+  renderChrome(renderer);
 
   // 3. Draw Image
   SDL_Texture *tex = texMgr_.get("sdo_latest");
@@ -139,6 +129,11 @@ void SDOPanel::render(SDL_Renderer *renderer) {
     SDL_Rect dst = {x_ + (width_ - drawSz) / 2,
                     y_ + titleH + (height_ - titleH - drawSz) / 2, drawSz,
                     drawSz};
+    // Fill space background black before rendering the SDO image.
+    // The image uses alpha=0 for the black space background; without this
+    // backing rect it shows the panel background color on light themes.
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+    SDL_RenderFillRect(renderer, &dst);
     SDL_RenderCopy(renderer, tex, nullptr, &dst);
 
     fontMgr_.catalog()->drawText(renderer, "SDO Solar", x_ + 10, y_ + 5,

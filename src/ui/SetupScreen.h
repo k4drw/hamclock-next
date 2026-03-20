@@ -84,6 +84,7 @@ private:
   // there)
   Tab activeTab_ = Tab::Identity;
   bool gpsEnabled_ = false;
+  bool audioMuted_ = false;
   TextInput callsignInput_;
   TextInput gridInput_;
   TextInput latInput_;
@@ -150,6 +151,11 @@ private:
   bool syncRotation_ = false;
   SDL_Rect syncRotationRect_ = {0, 0, 0, 0};
 
+  // Contest Mode state
+  bool contestModeActive_ = false;
+  std::vector<WidgetType> contestSavedRotations_[6];
+  SDL_Rect contestModeBtn_ = {0, 0, 0, 0};
+
   // Watchlist tab
   std::vector<std::string> watchlistEntries_;
   TextInput watchlistInputField_;
@@ -177,6 +183,7 @@ private:
   SDL_Rect clusterToggleRect_ = {0, 0, 0, 0};
   SDL_Rect rbnToggleRect_ = {0, 0, 0, 0};
   SDL_Rect gpsToggleRect_ = {0, 0, 0, 0};
+  SDL_Rect audioMuteToggleRect_ = {0, 0, 0, 0};
   SDL_Rect themeRect_ = {0, 0, 0, 0};
   SDL_Rect nightLightsRect_ = {0, 0, 0, 0};
   SDL_Rect metricToggleRect_ = {0, 0, 0, 0};
@@ -215,6 +222,28 @@ private:
   SDL_Rect rotatorAutoTrackRect_ = {0, 0, 0, 0};
   SDL_Rect rotatorUpoverRect_ = {0, 0, 0, 0};
   std::map<std::string, SDL_Color> colorOverrides_;
+
+  // Font selection (Appearance tab, native only)
+  std::string fontPath_;
+#ifndef __EMSCRIPTEN__
+  std::vector<std::pair<std::string, std::string>> systemFonts_; // {name, path}
+  static std::vector<std::pair<std::string, std::string>> enumerateSystemFonts();
+  void renderFontModal(SDL_Renderer *renderer);
+#endif
+  int fontListSelected_ = 0;
+  SDL_Rect fontListRect_ = {};         // "Change..." button rect
+#ifndef __EMSCRIPTEN__
+  bool fontModalOpen_ = false;
+  std::string fontModalFilter_;
+  int fontModalScroll_ = 0;
+  int fontModalSelected_ = 0;
+  std::vector<int> fontModalFiltered_;
+  SDL_Rect fontModalRect_ = {};
+  SDL_Rect fontModalFilterRect_ = {};
+  SDL_Rect fontModalListRect_ = {};
+  SDL_Rect fontModalOkRect_ = {};
+  SDL_Rect fontModalCancelRect_ = {};
+#endif
 
   // Track dimensions to detect size changes
   int lastRenderWidth_ = 0;

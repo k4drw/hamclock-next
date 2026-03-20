@@ -1,5 +1,7 @@
 #include "CallbookProvider.h"
 #include "../core/StringUtils.h"
+#include "../core/TimeUtils.h"
+#include <SDL.h>
 #include <nlohmann/json.hpp>
 
 using json = nlohmann::json;
@@ -8,9 +10,7 @@ static std::string normalizeDate(const std::string &dateStr) {
   // Try MM/DD/YYYY -> YYYY-MM-DD
   int m, d, y;
   if (std::sscanf(dateStr.c_str(), "%d/%d/%d", &m, &d, &y) == 3) {
-    char buf[16];
-    std::snprintf(buf, sizeof(buf), "%04d-%02d-%02d", y, m, d);
-    return buf;
+    return TimeUtils::dateISO(y, m, d);
   }
   return dateStr;
 }
@@ -95,6 +95,7 @@ CallbookProvider::CallbookProvider(NetworkManager &net,
     : net_(net), store_(store) {}
 
 void CallbookProvider::lookup(const std::string &callsign) {
+  lastFetchMs_ = SDL_GetTicks();
   if (callsign.empty())
     return;
 

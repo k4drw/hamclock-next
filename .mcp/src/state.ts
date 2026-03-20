@@ -49,11 +49,21 @@ export async function reindex(): Promise<{ original: RepoIndex; next: RepoIndex 
   return { original: originalIndex, next: nextIndex };
 }
 
+export async function reindexOne(repo: "original" | "next"): Promise<RepoIndex> {
+  if (repo === "original") {
+    originalIndex = await indexRepo(ORIGINAL_PATH, "hamclock-original");
+    return originalIndex;
+  } else {
+    nextIndex = await indexRepo(NEXT_PATH, "hamclock-next");
+    return nextIndex;
+  }
+}
+
 export async function loadParityData(): Promise<ParityData> {
   try {
     const fileContent = await readFile(PARITY_JSON_PATH, 'utf-8');
     return JSON.parse(fileContent);
   } catch (e) {
-    throw new Error('Parity data not found. Please run `parity_load_report` first.');
+    throw new Error('Parity data not found. Please run `parity_sync` first.');
   }
 }

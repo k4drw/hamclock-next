@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ProviderBase.h"
 #include "../core/LightningData.h"
 #include "../network/NetworkManager.h"
 #include <functional>
@@ -9,7 +10,7 @@
 
 namespace HamClock {
 
-class LightningProvider : public std::enable_shared_from_this<LightningProvider> {
+class LightningProvider : public ::ProviderBase, public std::enable_shared_from_this<LightningProvider> {
 public:
   using Callback = std::function<void(const LightningData&)>;
 

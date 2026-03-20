@@ -2,6 +2,7 @@
 #include "../core/Astronomy.h"
 #include "../core/Theme.h"
 #include "FontCatalog.h"
+#include "GraphHelper.h"
 #include "RenderUtils.h"
 #include <cstdio>
 #include <ctime>
@@ -56,15 +57,7 @@ void EMEToolPanel::onMouseMove(int mx, int my) {
 void EMEToolPanel::render(SDL_Renderer *renderer) {
   ThemeColors themes = getThemeColors(theme_);
   auto *cat = fontMgr_.catalog();
-  SDL_SetRenderDrawBlendMode(
-      renderer, (theme_ == "glass") ? SDL_BLENDMODE_BLEND : SDL_BLENDMODE_NONE);
-  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b,
-                         themes.bg.a);
-  SDL_Rect rect = {x_, y_, width_, height_};
-  SDL_RenderFillRect(renderer, &rect);
-  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
-                         themes.border.b, themes.border.a);
-  SDL_RenderDrawRect(renderer, &rect);
+  renderChrome(renderer);
 
   if (!fontMgr_.ready())
     return;
@@ -130,14 +123,12 @@ void EMEToolPanel::render(SDL_Renderer *renderer) {
   }
 
   // Draw DE curve (green)
-  RenderUtils::drawPolylineTextured(renderer, lineTex, dePoints.data(),
-                                    (int)dePoints.size(), 2.0f,
-                                    themes.success);
+  GraphHelper::drawPolyline(renderer, lineTex, dePoints.data(),
+                            (int)dePoints.size(), themes.success);
 
   // Draw DX curve (blue)
-  RenderUtils::drawPolylineTextured(renderer, lineTex, dxPoints.data(),
-                                    (int)dxPoints.size(), 2.0f,
-                                    themes.accent);
+  GraphHelper::drawPolyline(renderer, lineTex, dxPoints.data(),
+                            (int)dxPoints.size(), themes.accent);
 
   // Mark current time (vertical red tick at x=0)
   SDL_SetRenderDrawColor(renderer, themes.danger.r, themes.danger.g, themes.danger.b, themes.danger.a);

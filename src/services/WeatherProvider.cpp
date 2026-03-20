@@ -1,7 +1,7 @@
 #include "WeatherProvider.h"
 #include "../core/Constants.h"
 #include "../core/WorkerService.h"
-#include <SDL_events.h>
+#include <SDL.h>
 #include <chrono>
 #include <nlohmann/json.hpp>
 
@@ -62,6 +62,7 @@ static std::string weatherCodeToDescription(int code) {
 }
 
 void WeatherProvider::fetch(double lat, double lon) {
+  lastFetchMs_ = SDL_GetTicks();
   char url[256];
   std::snprintf(url, sizeof(url),
                 "https://api.open-meteo.com/v1/"

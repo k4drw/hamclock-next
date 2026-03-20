@@ -66,7 +66,14 @@ public:
       return;
     int w, h;
     if (SDL_QueryTexture(tex, nullptr, nullptr, &w, &h) == 0) {
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdangling-pointer"
+#endif
       markVramDestroyed(static_cast<int64_t>(w) * h * 4);
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
     }
     SDL_DestroyTexture(tex);
     tex = nullptr;

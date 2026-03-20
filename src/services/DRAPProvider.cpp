@@ -1,5 +1,6 @@
 #include "DRAPProvider.h"
 #include "../core/Logger.h"
+#include <SDL.h>
 #include <sstream>
 
 DRAPProvider::DRAPProvider(NetworkManager &net,
@@ -7,6 +8,7 @@ DRAPProvider::DRAPProvider(NetworkManager &net,
     : net_(net), gridStore_(std::move(gridStore)) {}
 
 void DRAPProvider::fetch(DataCb cb) {
+  lastFetchMs_ = SDL_GetTicks();
   const char *url =
       "https://services.swpc.noaa.gov/text/drap_global_frequencies.txt";
 

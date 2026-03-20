@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { ensureIndexed, reindex } from "../state.js";
+import { ensureIndexed, reindexOne } from "../state.js";
 import { findFiles, findSymbols } from "../indexer.js";
 import { formatRepoMap } from "../helpers.js";
 
@@ -11,6 +11,7 @@ export function registerRepoTools(server: McpServer) {
     {
       repo: z.enum(["original", "next"]).describe("Which repository to map"),
     },
+    { readOnlyHint: true },
     async ({ repo }) => {
       const { original, next } = await ensureIndexed();
       const index = repo === "original" ? original : next;
@@ -25,6 +26,7 @@ export function registerRepoTools(server: McpServer) {
       repo: z.enum(["original", "next"]).describe("Repository to search"),
       pattern: z.string().describe("Glob pattern (e.g. '*.cpp', 'src/ui/*')"),
     },
+    { readOnlyHint: true },
     async ({ repo, pattern }) => {
       const { original, next } = await ensureIndexed();
       const index = repo === "original" ? original : next;
@@ -49,6 +51,7 @@ export function registerRepoTools(server: McpServer) {
       repo: z.enum(["original", "next"]).describe("Repository to search"),
       pattern: z.string().describe("Regex pattern for symbol name"),
     },
+    { readOnlyHint: true },
     async ({ repo, pattern }) => {
       const { original, next } = await ensureIndexed();
       const index = repo === "original" ? original : next;
@@ -79,8 +82,9 @@ export function registerRepoTools(server: McpServer) {
     {
       repo: z.enum(["original", "next"]).describe("Repository to re-index"),
     },
+    { readOnlyHint: false, idempotentHint: true },
     async ({ repo }) => {
-      await reindex();
+      await reindexOne(repo);
       return { content: [{ type: "text", text: `Successfully re-indexed ${repo} repository.` }] };
     }
   );

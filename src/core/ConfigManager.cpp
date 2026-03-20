@@ -19,6 +19,7 @@ static std::string propOverlayToStr(PropOverlayType t) {
   case PropOverlayType::Toa:         return "toa";
   case PropOverlayType::Heatmap:     return "heatmap";
   case PropOverlayType::Drap:        return "drap";
+  case PropOverlayType::Aurora:      return "aurora";
   default:                           return "none";
   }
 }
@@ -30,6 +31,7 @@ static PropOverlayType propOverlayFromStr(const std::string &s) {
   if (s == "toa")         return PropOverlayType::Toa;
   if (s == "heatmap")     return PropOverlayType::Heatmap;
   if (s == "drap")        return PropOverlayType::Drap;
+  if (s == "aurora")      return PropOverlayType::Aurora;
   return PropOverlayType::None;
 }
 
@@ -191,13 +193,7 @@ bool ConfigManager::load(AppConfig &config) {
 
     // Legacy migration: if show_muf_rt is present and true, defaulting to Muf
     if (ap.contains("prop_overlay")) {
-      std::string po = ap.value("prop_overlay", "none");
-      if (po == "muf")
-        config.propOverlay = PropOverlayType::Muf;
-      else if (po == "voacap")
-        config.propOverlay = PropOverlayType::Voacap;
-      else
-        config.propOverlay = PropOverlayType::None;
+      config.propOverlay = propOverlayFromStr(ap.value("prop_overlay", "none"));
     } else if (ap.contains("show_muf_rt")) {
       bool showMuf = ap.value("show_muf_rt", false);
       config.propOverlay =
@@ -219,6 +215,7 @@ bool ConfigManager::load(AppConfig &config) {
     config.displayPowerMethod = ap.value("display_power_method", "auto");
     config.qrzUsername = ap.value("qrz_username", "");
     config.qrzPassword = ap.value("qrz_password", "");
+    config.fontPath = ap.value("font_path", "");
   }
 
   // Countdown (new dedicated section; falls back to legacy appearance keys)
@@ -268,6 +265,17 @@ bool ConfigManager::load(AppConfig &config) {
   // Activity panels
   if (json.contains("activity")) {
     config.ontaFilter = json["activity"].value("onta_filter", "all");
+    config.ontaMaxDistKm = json["activity"].value("onta_max_dist_km", 0);
+  }
+
+  // Calendar notifications
+  if (json.contains("calendar")) {
+    config.calendarNotifyMinutes =
+        json["calendar"].value("notify_minutes", 10);
+    config.calendarAllDayNotifyHour =
+        json["calendar"].value("allday_notify_hour", 8);
+    config.calendarDismissMinutes =
+        json["calendar"].value("dismiss_minutes", 10);
   }
 
   if (json.contains("asteroid")) {
@@ -321,6 +329,7 @@ bool ConfigManager::load(AppConfig &config) {
     config.dimMinute = br.value("dim_minute", 0);
     config.brightHour = br.value("bright_hour", 6);
     config.brightMinute = br.value("bright_minute", 0);
+    config.ltr329AutoDim = br.value("ltr329_auto_dim", false);
   }
 
   // Pane widget selection
@@ -448,6 +457,7 @@ bool ConfigManager::load(AppConfig &config) {
     auto &p = json["power"];
     config.preventSleep = p.value("prevent_sleep", true);
     config.gpsEnabled = p.value("gps_enabled", false);
+    config.audioMuted = p.value("audio_muted", false);
     config.skippedVersion = p.value("skipped_version", "");
   }
 
@@ -558,12 +568,7 @@ bool ConfigManager::save(const AppConfig &config) {
   json["appearance"]["map_style"] = config.mapStyle;
   json["appearance"]["show_grid"] = config.showGrid;
   json["appearance"]["grid_type"] = config.gridType;
-  std::string po = "none";
-  if (config.propOverlay == PropOverlayType::Muf)
-    po = "muf";
-  else if (config.propOverlay == PropOverlayType::Voacap)
-    po = "voacap";
-  json["appearance"]["prop_overlay"] = po;
+  json["appearance"]["prop_overlay"] = propOverlayToStr(config.propOverlay);
   json["appearance"]["weather_overlay"] = weatherOverlayToStr(config.weatherOverlay);
   json["appearance"]["prop_band"] = config.propBand;
   json["appearance"]["prop_mode"] = config.propMode;
@@ -578,6 +583,8 @@ bool ConfigManager::save(const AppConfig &config) {
   json["appearance"]["display_power_method"] = config.displayPowerMethod;
   json["appearance"]["qrz_username"] = config.qrzUsername;
   json["appearance"]["qrz_password"] = config.qrzPassword;
+  if (!config.fontPath.empty())
+    json["appearance"]["font_path"] = config.fontPath;
 
   json["countdown"]["label"] = config.countdownLabel;
   json["countdown"]["time"] = config.countdownTime;
@@ -604,9 +611,11 @@ bool ConfigManager::save(const AppConfig &config) {
   json["brightness"]["dim_minute"] = config.dimMinute;
   json["brightness"]["bright_hour"] = config.brightHour;
   json["brightness"]["bright_minute"] = config.brightMinute;
+  json["brightness"]["ltr329_auto_dim"] = config.ltr329AutoDim;
 
   json["power"]["prevent_sleep"] = config.preventSleep;
   json["power"]["gps_enabled"] = config.gpsEnabled;
+  json["power"]["audio_muted"] = config.audioMuted;
   json["power"]["skipped_version"] = config.skippedVersion;
 
   json["network"]["cors_proxy_url"] = config.corsProxyUrl;
@@ -694,6 +703,11 @@ bool ConfigManager::save(const AppConfig &config) {
 
   json["rss"]["enabled"] = config.rssEnabled;
   json["activity"]["onta_filter"] = config.ontaFilter;
+  json["activity"]["onta_max_dist_km"] = config.ontaMaxDistKm;
+
+  json["calendar"]["notify_minutes"] = config.calendarNotifyMinutes;
+  json["calendar"]["allday_notify_hour"] = config.calendarAllDayNotifyHour;
+  json["calendar"]["dismiss_minutes"] = config.calendarDismissMinutes;
   json["asteroid"]["icon"] = config.asteroidIcon;
   json["asteroid"]["color"]["r"] = config.asteroidColor.r;
   json["asteroid"]["color"]["g"] = config.asteroidColor.g;

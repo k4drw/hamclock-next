@@ -2,6 +2,7 @@
 
 #include <cstdio>
 #include <string>
+#include <vector>
 
 enum class WidgetType {
   SOLAR,
@@ -48,217 +49,232 @@ enum class WidgetType {
   SOLAR_STORM,
   DE_INFO,
   DX_INFO,
-  ENV_TEMP,      // BME280 temperature
+  ENV_TEMP,  // BME280 temperature
   ENV_PRESSURE,  // BME280 pressure (hPa)
   ENV_HUMIDITY,  // BME280 humidity (%)
   ENV_DEWPOINT,  // Derived dewpoint (C)
-  GREYLINE_DX,   // Entities currently in greyline
+  GREYLINE_DX,  // Entities currently in greyline
+  RIG_CONTROL,  // Hamlib rigctld read-only display
+  SOLAR_TIMELINE,  // Kp forecast timeline (NOAA 3-day)
+  CALENDAR,  // External calendar feed (POST /set_calendar.json)
 };
 
 inline const char *widgetTypeToString(WidgetType t) {
   switch (t) {
-  case WidgetType::SOLAR:
-    return "solar";
-  case WidgetType::DX_CLUSTER:
-    return "dx_cluster";
-  case WidgetType::LIVE_SPOTS:
-    return "live_spots";
-  case WidgetType::BAND_CONDITIONS:
-    return "band_conditions";
-  case WidgetType::CONTESTS:
-    return "contests";
-  case WidgetType::ON_THE_AIR:
-    return "on_the_air";
-  case WidgetType::GIMBAL:
-    return "gimbal";
-  case WidgetType::MOON:
-    return "moon";
-  case WidgetType::CLOCK_AUX:
-    return "clock_aux";
-  case WidgetType::DX_PEDITIONS:
-    return "dx_peditions";
-  case WidgetType::DE_WEATHER:
-    return "de_weather";
-  case WidgetType::DX_WEATHER:
-    return "dx_weather";
-  case WidgetType::NCDXF:
-    return "ncdxf";
-  case WidgetType::SDO:
-    return "sdo";
-  case WidgetType::HISTORY_FLUX:
-    return "history_flux";
-  case WidgetType::HISTORY_KP:
-    return "history_kp";
-  case WidgetType::HISTORY_SSN:
-    return "history_ssn";
-  case WidgetType::DRAP:
-    return "drap";
-  case WidgetType::AURORA:
-    return "aurora";
-  case WidgetType::AURORA_GRAPH:
-    return "aurora_graph";
-  case WidgetType::ADIF:
-    return "adif";
-  case WidgetType::COUNTDOWN:
-    return "countdown";
-  case WidgetType::CALLBOOK:
-    return "callbook";
-  case WidgetType::DST_INDEX:
-    return "dst_index";
-  case WidgetType::WATCHLIST:
-    return "watchlist";
-  case WidgetType::EME_TOOL:
-    return "eme_tool";
-  case WidgetType::SANTA_TRACKER:
-    return "santa_tracker";
-  case WidgetType::SYS_INFO:
-    return "sys_info";
-  case WidgetType::ASTEROID:
-    return "asteroid";
-  case WidgetType::ALERTS:
-    return "alerts";
-  case WidgetType::FORECAST:
-    return "forecast";
-  case WidgetType::REPEATER_DIR:
-    return "repeater_dir";
-  case WidgetType::HURRICANE:
-    return "hurricane";
-  case WidgetType::MARINE:
-    return "marine";
-  case WidgetType::WINLINK:
-    return "winlink";
-  case WidgetType::STOPWATCH:
-    return "stopwatch";
-  case WidgetType::REMINDER:
-    return "reminders";
-  case WidgetType::TROPO:
-    return "tropo";
-  case WidgetType::LIGHTNING:
-    return "lightning";
-  case WidgetType::METEOR:
-    return "meteor";
-  case WidgetType::IONOSONDE:
-    return "ionosonde";
-  case WidgetType::SOLAR_STORM:
-    return "solar_storm";
-  case WidgetType::DE_INFO:
-    return "de_info";
-  case WidgetType::DX_INFO:
-    return "dx_info";
-  case WidgetType::ENV_TEMP:
-    return "env_temp";
-  case WidgetType::ENV_PRESSURE:
-    return "env_pressure";
-  case WidgetType::ENV_HUMIDITY:
-    return "env_humidity";
-  case WidgetType::ENV_DEWPOINT:
-    return "env_dewpoint";
-  case WidgetType::GREYLINE_DX:
-    return "greyline_dx";
+    case WidgetType::SOLAR:
+      return "solar";
+    case WidgetType::DX_CLUSTER:
+      return "dx_cluster";
+    case WidgetType::LIVE_SPOTS:
+      return "live_spots";
+    case WidgetType::BAND_CONDITIONS:
+      return "band_conditions";
+    case WidgetType::CONTESTS:
+      return "contests";
+    case WidgetType::ON_THE_AIR:
+      return "on_the_air";
+    case WidgetType::GIMBAL:
+      return "gimbal";
+    case WidgetType::MOON:
+      return "moon";
+    case WidgetType::CLOCK_AUX:
+      return "clock_aux";
+    case WidgetType::DX_PEDITIONS:
+      return "dx_peditions";
+    case WidgetType::DE_WEATHER:
+      return "de_weather";
+    case WidgetType::DX_WEATHER:
+      return "dx_weather";
+    case WidgetType::NCDXF:
+      return "ncdxf";
+    case WidgetType::SDO:
+      return "sdo";
+    case WidgetType::HISTORY_FLUX:
+      return "history_flux";
+    case WidgetType::HISTORY_KP:
+      return "history_kp";
+    case WidgetType::HISTORY_SSN:
+      return "history_ssn";
+    case WidgetType::DRAP:
+      return "drap";
+    case WidgetType::AURORA:
+      return "aurora";
+    case WidgetType::AURORA_GRAPH:
+      return "aurora_graph";
+    case WidgetType::ADIF:
+      return "adif";
+    case WidgetType::COUNTDOWN:
+      return "countdown";
+    case WidgetType::CALLBOOK:
+      return "callbook";
+    case WidgetType::DST_INDEX:
+      return "dst_index";
+    case WidgetType::WATCHLIST:
+      return "watchlist";
+    case WidgetType::EME_TOOL:
+      return "eme_tool";
+    case WidgetType::SANTA_TRACKER:
+      return "santa_tracker";
+    case WidgetType::SYS_INFO:
+      return "sys_info";
+    case WidgetType::ASTEROID:
+      return "asteroid";
+    case WidgetType::ALERTS:
+      return "alerts";
+    case WidgetType::FORECAST:
+      return "forecast";
+    case WidgetType::REPEATER_DIR:
+      return "repeater_dir";
+    case WidgetType::HURRICANE:
+      return "hurricane";
+    case WidgetType::MARINE:
+      return "marine";
+    case WidgetType::WINLINK:
+      return "winlink";
+    case WidgetType::STOPWATCH:
+      return "stopwatch";
+    case WidgetType::REMINDER:
+      return "reminders";
+    case WidgetType::TROPO:
+      return "tropo";
+    case WidgetType::LIGHTNING:
+      return "lightning";
+    case WidgetType::METEOR:
+      return "meteor";
+    case WidgetType::IONOSONDE:
+      return "ionosonde";
+    case WidgetType::SOLAR_STORM:
+      return "solar_storm";
+    case WidgetType::DE_INFO:
+      return "de_info";
+    case WidgetType::DX_INFO:
+      return "dx_info";
+    case WidgetType::ENV_TEMP:
+      return "env_temp";
+    case WidgetType::ENV_PRESSURE:
+      return "env_pressure";
+    case WidgetType::ENV_HUMIDITY:
+      return "env_humidity";
+    case WidgetType::ENV_DEWPOINT:
+      return "env_dewpoint";
+    case WidgetType::GREYLINE_DX:
+      return "greyline_dx";
+    case WidgetType::RIG_CONTROL:
+      return "rig_control";
+    case WidgetType::SOLAR_TIMELINE:
+      return "solar_timeline";
+    case WidgetType::CALENDAR:
+      return "calendar";
   }
   return "solar";
 }
 
 inline const char *widgetTypeDisplayName(WidgetType t) {
   switch (t) {
-  case WidgetType::SOLAR:
-    return "Solar";
-  case WidgetType::DX_CLUSTER:
-    return "DX Cluster";
-  case WidgetType::LIVE_SPOTS:
-    return "Live Spots";
-  case WidgetType::BAND_CONDITIONS:
-    return "Band Cond";
-  case WidgetType::CONTESTS:
-    return "Contests";
-  case WidgetType::ON_THE_AIR:
-    return "On The Air";
-  case WidgetType::GIMBAL:
-    return "Gimbal";
-  case WidgetType::MOON:
-    return "Moon";
-  case WidgetType::CLOCK_AUX:
-    return "Clock Aux";
-  case WidgetType::DX_PEDITIONS:
-    return "DX Peditions";
-  case WidgetType::DE_WEATHER:
-    return "DE Weather";
-  case WidgetType::DX_WEATHER:
-    return "DX Weather";
-  case WidgetType::NCDXF:
-    return "NCDXF";
-  case WidgetType::SDO:
-    return "SDO";
-  case WidgetType::HISTORY_FLUX:
-    return "Solar Flux";
-  case WidgetType::HISTORY_KP:
-    return "K-Index";
-  case WidgetType::HISTORY_SSN:
-    return "Sunspots";
-  case WidgetType::DRAP:
-    return "DRAP";
-  case WidgetType::AURORA:
-    return "Aurora";
-  case WidgetType::AURORA_GRAPH:
-    return "Aurora Graph";
-  case WidgetType::ADIF:
-    return "ADIF Log";
-  case WidgetType::COUNTDOWN:
-    return "Countdown";
-  case WidgetType::CALLBOOK:
-    return "Callbook";
-  case WidgetType::DST_INDEX:
-    return "Dst Index";
-  case WidgetType::WATCHLIST:
-    return "Watchlist";
-  case WidgetType::EME_TOOL:
-    return "EME Tool";
-  case WidgetType::SANTA_TRACKER:
-    return "Santa Tracker";
-  case WidgetType::SYS_INFO:
-    return "System Info";
-  case WidgetType::ASTEROID:
-    return "Asteroids";
-  case WidgetType::ALERTS:
-    return "WX Alerts";
-  case WidgetType::FORECAST:
-    return "Forecast";
-  case WidgetType::REPEATER_DIR:
-    return "Repeaters";
-  case WidgetType::HURRICANE:
-    return "Tropics";
-  case WidgetType::MARINE:
-    return "Marine";
-  case WidgetType::WINLINK:
-    return "Winlink";
-  case WidgetType::STOPWATCH:
-    return "Stopwatch";
-  case WidgetType::REMINDER:
-    return "Reminders";
-  case WidgetType::TROPO:
-    return "Tropo Cond";
-  case WidgetType::LIGHTNING:
-    return "Lightning";
-  case WidgetType::METEOR:
-    return "Meteor Scat";
-  case WidgetType::IONOSONDE:
-    return "Ionosonde";
-  case WidgetType::SOLAR_STORM:
-    return "Solar Storm";
-  case WidgetType::DE_INFO:
-    return "DE Info";
-  case WidgetType::DX_INFO:
-    return "DX Info";
-  case WidgetType::ENV_TEMP:
-    return "ENV Temp";
-  case WidgetType::ENV_PRESSURE:
-    return "ENV Pressure";
-  case WidgetType::ENV_HUMIDITY:
-    return "ENV Humidity";
-  case WidgetType::ENV_DEWPOINT:
-    return "ENV Dewpoint";
-  case WidgetType::GREYLINE_DX:
-    return "Greyline DX";
+    case WidgetType::SOLAR:
+      return "Solar";
+    case WidgetType::DX_CLUSTER:
+      return "DX Cluster";
+    case WidgetType::LIVE_SPOTS:
+      return "Live Spots";
+    case WidgetType::BAND_CONDITIONS:
+      return "Band Cond";
+    case WidgetType::CONTESTS:
+      return "Contests";
+    case WidgetType::ON_THE_AIR:
+      return "On The Air";
+    case WidgetType::GIMBAL:
+      return "Gimbal";
+    case WidgetType::MOON:
+      return "Moon";
+    case WidgetType::CLOCK_AUX:
+      return "Clock Aux";
+    case WidgetType::DX_PEDITIONS:
+      return "DX Peditions";
+    case WidgetType::DE_WEATHER:
+      return "DE Weather";
+    case WidgetType::DX_WEATHER:
+      return "DX Weather";
+    case WidgetType::NCDXF:
+      return "NCDXF";
+    case WidgetType::SDO:
+      return "SDO";
+    case WidgetType::HISTORY_FLUX:
+      return "Solar Flux";
+    case WidgetType::HISTORY_KP:
+      return "K-Index";
+    case WidgetType::HISTORY_SSN:
+      return "Sunspots";
+    case WidgetType::DRAP:
+      return "DRAP";
+    case WidgetType::AURORA:
+      return "Aurora";
+    case WidgetType::AURORA_GRAPH:
+      return "Aurora Graph";
+    case WidgetType::ADIF:
+      return "ADIF Log";
+    case WidgetType::COUNTDOWN:
+      return "Countdown";
+    case WidgetType::CALLBOOK:
+      return "Callbook";
+    case WidgetType::DST_INDEX:
+      return "Dst Index";
+    case WidgetType::WATCHLIST:
+      return "Watchlist";
+    case WidgetType::EME_TOOL:
+      return "EME Tool";
+    case WidgetType::SANTA_TRACKER:
+      return "Santa Tracker";
+    case WidgetType::SYS_INFO:
+      return "System Info";
+    case WidgetType::ASTEROID:
+      return "Asteroids";
+    case WidgetType::ALERTS:
+      return "WX Alerts";
+    case WidgetType::FORECAST:
+      return "Forecast";
+    case WidgetType::REPEATER_DIR:
+      return "Repeaters";
+    case WidgetType::HURRICANE:
+      return "Tropics";
+    case WidgetType::MARINE:
+      return "Marine";
+    case WidgetType::WINLINK:
+      return "Winlink";
+    case WidgetType::STOPWATCH:
+      return "Stopwatch";
+    case WidgetType::REMINDER:
+      return "Reminders";
+    case WidgetType::TROPO:
+      return "Tropo Cond";
+    case WidgetType::LIGHTNING:
+      return "Lightning";
+    case WidgetType::METEOR:
+      return "Meteor Scat";
+    case WidgetType::IONOSONDE:
+      return "Ionosonde";
+    case WidgetType::SOLAR_STORM:
+      return "Solar Storm";
+    case WidgetType::DE_INFO:
+      return "DE Info";
+    case WidgetType::DX_INFO:
+      return "DX Info";
+    case WidgetType::ENV_TEMP:
+      return "ENV Temp";
+    case WidgetType::ENV_PRESSURE:
+      return "ENV Pressure";
+    case WidgetType::ENV_HUMIDITY:
+      return "ENV Humidity";
+    case WidgetType::ENV_DEWPOINT:
+      return "ENV Dewpoint";
+    case WidgetType::GREYLINE_DX:
+      return "Greyline DX";
+    case WidgetType::RIG_CONTROL:
+      return "Rig Control";
+    case WidgetType::SOLAR_TIMELINE:
+      return "Solar Impact";
+    case WidgetType::CALENDAR:
+      return "Calendar";
   }
   return "Solar";
 }
@@ -363,6 +379,44 @@ inline WidgetType widgetTypeFromString(const std::string &s,
     return WidgetType::ENV_DEWPOINT;
   if (s == "greyline_dx")
     return WidgetType::GREYLINE_DX;
+  if (s == "rig_control")
+    return WidgetType::RIG_CONTROL;
+  if (s == "solar_timeline")
+    return WidgetType::SOLAR_TIMELINE;
+  if (s == "calendar")
+    return WidgetType::CALENDAR;
   std::fprintf(stderr, "WidgetType: unknown '%s', using fallback\n", s.c_str());
   return fallback;
+}
+
+inline std::vector<WidgetType> getAllBaseWidgetTypes() {
+  return {
+      WidgetType::ADIF,         WidgetType::ALERTS,
+      WidgetType::ASTEROID,     WidgetType::AURORA,
+      WidgetType::AURORA_GRAPH, WidgetType::BAND_CONDITIONS,
+      WidgetType::CALLBOOK,     WidgetType::CLOCK_AUX,
+      WidgetType::CONTESTS,     WidgetType::COUNTDOWN,
+      WidgetType::DE_INFO,      WidgetType::DE_WEATHER,
+      WidgetType::DRAP,         WidgetType::DST_INDEX,
+      WidgetType::DX_CLUSTER,   WidgetType::DX_INFO,
+      WidgetType::DX_PEDITIONS, WidgetType::DX_WEATHER,
+      WidgetType::EME_TOOL,     WidgetType::ENV_DEWPOINT,
+      WidgetType::ENV_HUMIDITY, WidgetType::ENV_PRESSURE,
+      WidgetType::ENV_TEMP,     WidgetType::FORECAST,
+      WidgetType::GIMBAL,       WidgetType::GREYLINE_DX,
+      WidgetType::HISTORY_FLUX, WidgetType::HISTORY_KP,
+      WidgetType::HISTORY_SSN,  WidgetType::HURRICANE,
+      WidgetType::IONOSONDE,    WidgetType::LIGHTNING,
+      WidgetType::LIVE_SPOTS,   WidgetType::MARINE,
+      WidgetType::METEOR,       WidgetType::MOON,
+      WidgetType::NCDXF,        WidgetType::ON_THE_AIR,
+      WidgetType::REMINDER,     WidgetType::SANTA_TRACKER,
+      WidgetType::SDO,          WidgetType::SOLAR,
+      WidgetType::SOLAR_STORM,  WidgetType::SOLAR_TIMELINE,
+      WidgetType::STOPWATCH,    WidgetType::SYS_INFO,
+      WidgetType::TROPO,        WidgetType::WATCHLIST,
+      WidgetType::CALENDAR,
+  };
+  // Note: REPEATER_DIR, WINLINK, RIG_CONTROL are excluded —
+  // they require config keys and are conditionally added by callers.
 }

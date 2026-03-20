@@ -476,6 +476,7 @@ endif()
 
 set(HAMCLOCK_SOURCES
     src/main.cpp
+    src/core/DashboardContext.cpp
     src/core/Theme.cpp
     src/core/Logger.cpp
     src/core/ConfigManager.cpp
@@ -497,10 +498,12 @@ set(HAMCLOCK_SOURCES
     src/network/FrameCapture.cpp
     src/network/NetworkManager.cpp
     src/network/WebServer.cpp
+    src/network/WebServer_Routes.cpp
     src/services/UpdateChecker.cpp
     src/services/NOAAProvider.cpp
     src/services/RSSProvider.cpp
     src/services/BME280Provider.cpp
+    src/services/LTR329Provider.cpp
     src/services/ADIFProvider.cpp
     src/services/ActivityProvider.cpp
     src/services/DRAPProvider.cpp
@@ -571,12 +574,15 @@ set(HAMCLOCK_SOURCES
     src/ui/WeatherPanel.cpp
     src/ui/ClockAuxPanel.cpp
     src/ui/ENVPanel.cpp
+    src/ui/RigControlPanel.cpp
     src/ui/DXPanel.cpp
     src/ui/DXSatPane.cpp
     src/ui/ListPanel.cpp
     src/ui/LiveSpotPanel.cpp
     src/ui/LocalPanel.cpp
     src/ui/MapWidget.cpp
+    src/ui/MapWidget_Input.cpp
+    src/ui/MapWidget_Overlays.cpp
     src/ui/MapViewMenu.cpp
     src/ui/PaneContainer.cpp
     src/ui/PlaceholderWidget.cpp
@@ -586,6 +592,17 @@ set(HAMCLOCK_SOURCES
     src/ui/SatelliteSetup.cpp
     src/ui/SatPanel.cpp
     src/ui/SetupScreen.cpp
+    src/ui/SetupScreen_Appearance.cpp
+    src/ui/SetupScreen_Config.cpp
+    src/ui/SetupScreen_Events.cpp
+    src/ui/SetupScreen_Identity.cpp
+    src/ui/SetupScreen_Network.cpp
+    src/ui/SetupScreen_Rig.cpp
+    src/ui/SetupScreen_Services.cpp
+    src/ui/SetupScreen_Spotting.cpp
+    src/ui/SetupScreen_Update.cpp
+    src/ui/SetupScreen_Watchlist.cpp
+    src/ui/SetupScreen_Widgets.cpp
     src/ui/TextInput.cpp
     src/ui/SpaceWeatherPanel.cpp
     src/ui/ThemeCustomizer.cpp
@@ -595,6 +612,8 @@ set(HAMCLOCK_SOURCES
     src/ui/MeteorPanel.cpp
     src/ui/IonosondePanel.cpp
     src/ui/SolarStormPanel.cpp
+    src/ui/SolarTimelinePanel.cpp
+    src/ui/CalendarPanel.cpp
     src/ui/StopwatchPanel.cpp
     src/ui/ReminderPanel.cpp
     src/ui/UpdateOverlay.cpp
@@ -636,6 +655,7 @@ if(EMSCRIPTEN)
 
     target_include_directories(hamclock-wasm PRIVATE
         ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/src
         ${libpredict_BINARY_DIR}/include
     )
 
@@ -666,6 +686,7 @@ else()
 
     target_include_directories(hamclock-next PRIVATE
         ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/src
     )
     target_include_directories(hamclock-next SYSTEM PRIVATE
         ${libpredict_BINARY_DIR}/include
@@ -689,6 +710,30 @@ else()
         spdlog::spdlog
         ${LIBDRM_LIBRARIES}
     )
+
+    # TTS: platform-native voice alerts
+    if(APPLE)
+        message(STATUS "TTS: macOS 'say' — voice alerts enabled")
+        target_compile_definitions(hamclock-next PRIVATE HAMCLOCK_AUDIO_TTS)
+    elseif(WIN32)
+        message(STATUS "TTS: Windows SAPI — voice alerts enabled")
+        target_compile_definitions(hamclock-next PRIVATE HAMCLOCK_AUDIO_TTS)
+        target_link_libraries(hamclock-next PRIVATE ole32 oleaut32)
+    else()
+        # Linux: flite (optional)
+        find_library(FLITE_LIB flite)
+        find_library(FLITE_VOICE_LIB flite_cmu_us_kal16)
+        find_path(FLITE_INCLUDE_DIR flite/flite.h)
+        if(FLITE_LIB AND FLITE_VOICE_LIB AND FLITE_INCLUDE_DIR)
+            message(STATUS "TTS: flite found — voice alerts enabled")
+            target_compile_definitions(hamclock-next PRIVATE HAMCLOCK_AUDIO_TTS)
+            target_link_libraries(hamclock-next PRIVATE
+                ${FLITE_LIB} ${FLITE_VOICE_LIB} flite_usenglish flite_cmulex)
+            target_include_directories(hamclock-next PRIVATE ${FLITE_INCLUDE_DIR})
+        else()
+            message(STATUS "TTS: flite not found — voice alerts disabled (install flite1-dev)")
+        endif()
+    endif()
 
     if(WIN32)
         add_definitions(-D_WIN32_WINNT=0x0601) # Target Windows 7+

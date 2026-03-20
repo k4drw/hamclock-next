@@ -1,6 +1,6 @@
 %define _unpackaged_files_terminate_build 0
 Name:           hamclock-next
-Version:        1.0.1
+Version:        1.1.0
 Release:        1%{?dist}
 Summary:        Amateur Radio Clock and Solar/Space Weather Dashboard
 
@@ -33,12 +33,14 @@ BuildRequires:  libgbm-devel
 BuildRequires:  Mesa-libEGL-devel
 BuildRequires:  Mesa-libGLESv2-devel
 BuildRequires:  alsa-devel
+BuildRequires:  flite1-dev
 BuildRequires:  update-desktop-files
 %else
 BuildRequires:  mesa-libgbm-devel
 BuildRequires:  mesa-libEGL-devel
 BuildRequires:  mesa-libGLES-devel
 BuildRequires:  alsa-lib-devel
+BuildRequires:  flite-devel
 %endif
 BuildRequires:  desktop-file-utils
 

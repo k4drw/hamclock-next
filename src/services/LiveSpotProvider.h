@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ProviderBase.h"
 #include "../core/ConfigManager.h"
 #include "../core/DXClusterData.h"
 #include "../core/LiveSpotData.h"
@@ -11,7 +12,7 @@
 
 struct HamClockState;
 
-class LiveSpotProvider {
+class LiveSpotProvider : public ProviderBase {
 public:
   LiveSpotProvider(NetworkManager &net,
                    std::shared_ptr<LiveSpotDataStore> store,

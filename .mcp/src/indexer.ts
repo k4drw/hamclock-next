@@ -47,7 +47,6 @@ async function walkDir(dir: string, root: string): Promise<string[]> {
     return results;
   }
   for (const entry of entries) {
-    if (entry.name.startsWith(".") && SKIP_DIRS.has(entry.name)) continue;
     if (SKIP_DIRS.has(entry.name)) continue;
     const fullPath = join(dir, entry.name);
     if (entry.isDirectory()) {

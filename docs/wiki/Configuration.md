@@ -4,8 +4,7 @@ All configuration is stored as JSON. On first launch, HamClock-Next creates a de
 
 To access the Setup screen, click the **gear icon (⚙)** in the Time Panel.
 
-![Setup modal](images/modal-setup.png)
-<!-- TODO: screenshot needed -->
+![Setup modal](images/map_looks/robinson_clouds_dark.png)
 
 ---
 
@@ -24,22 +23,22 @@ If `lat`/`lon` are omitted, they are derived from the center of your grid square
 
 ## Appearance & Map
 
-| Field            | Type   | Default             | Description                                                 |
-| ---------------- | ------ | ------------------- | ----------------------------------------------------------- |
-| `mapStyle`       | string | `"nasa"`            | Map tile style: `nasa`, `terrain`, `countries`              |
-| `mapNightLights` | bool   | `true`              | Show city lights on the nightside of the map                |
-| `projection`     | string | `"equirectangular"` | Map projection: `equirectangular` (Mercator) or `azimuthal` |
-| `showGrid`       | bool   | `false`             | Show grid lines on map                                      |
-| `gridType`       | string | `"latlon"`          | Grid type: `latlon` or `maidenhead`                         |
-| `showBeacons`    | bool   | `true`              | Show NCDXF/IBP beacon markers on map                        |
-| `showSatTrack`   | bool   | `true`              | Show satellite ground track on map                          |
-| `theme`          | string | `"default"`         | UI color theme                                              |
-| `useMetric`      | bool   | `true`              | Use metric units for weather and distance                   |
-| `callsignColor`  | color  | orange              | Display color for your callsign                             |
-| `showBorders`    | bool   | `false`             | Show country borders on map                                 |
-| `mapCenterLon`   | number | `0.0`               | Center longitude of the map view                            |
-| `mapZoom`        | number | `1.0`               | Map zoom level (1.0 = full world)                           |
-| `displayPowerMethod` | string | `"auto"`        | Method to control display (`auto`, `vcgencmd`, `bl_power`) |
+| Field                | Type   | Default             | Description                                                 |
+| -------------------- | ------ | ------------------- | ----------------------------------------------------------- |
+| `mapStyle`           | string | `"nasa"`            | Map tile style: `nasa`, `terrain`, `countries`              |
+| `mapNightLights`     | bool   | `true`              | Show city lights on the nightside of the map                |
+| `projection`         | string | `"equirectangular"` | Map projection: `equirectangular` (Mercator) or `azimuthal` |
+| `showGrid`           | bool   | `false`             | Show grid lines on map                                      |
+| `gridType`           | string | `"latlon"`          | Grid type: `latlon` or `maidenhead`                         |
+| `showBeacons`        | bool   | `true`              | Show NCDXF/IBP beacon markers on map                        |
+| `showSatTrack`       | bool   | `true`              | Show satellite ground track on map                          |
+| `theme`              | string | `"default"`         | UI color theme                                              |
+| `useMetric`          | bool   | `true`              | Use metric units for weather and distance                   |
+| `callsignColor`      | color  | orange              | Display color for your callsign                             |
+| `showBorders`        | bool   | `false`             | Show country borders on map                                 |
+| `mapCenterLon`       | number | `0.0`               | Center longitude of the map view                            |
+| `mapZoom`            | number | `1.0`               | Map zoom level (1.0 = full world)                           |
+| `displayPowerMethod` | string | `"auto"`            | Method to control display (`auto`, `vcgencmd`, `bl_power`)  |
 
 ---
 
@@ -111,12 +110,12 @@ If `lat`/`lon` are omitted, they are derived from the center of your grid square
 
 ## SDO Widget
 
-| Field           | Type   | Default  | Description                                                                                              |
-| --------------- | ------ | -------- | -------------------------------------------------------------------------------------------------------- |
-| `sdoWavelength` | string | `"0193"` | SDO wavelength (e.g., `211193171`, `HMIB`, `HMIIC`, `0131`, `0193`, `0211`, `0304`, `1600`, `1700`)      |
-| `sdoRotating`   | bool   | `false`  | Automatically rotate through available wavelengths every 30 seconds                                      |
-| `sdoPfss`       | bool   | `false`  | Overlay solar magnetic field lines (PFSS) on supported wavelengths                                       |
-| `sdoShowMovie`  | bool   | `false`  | Show SDO image as a time-lapse movie loop (currently inactive)                                           |
+| Field           | Type   | Default  | Description                                                                                         |
+| --------------- | ------ | -------- | --------------------------------------------------------------------------------------------------- |
+| `sdoWavelength` | string | `"0193"` | SDO wavelength (e.g., `211193171`, `HMIB`, `HMIIC`, `0131`, `0193`, `0211`, `0304`, `1600`, `1700`) |
+| `sdoRotating`   | bool   | `false`  | Automatically rotate through available wavelengths every 30 seconds                                 |
+| `sdoPfss`       | bool   | `false`  | Overlay solar magnetic field lines (PFSS) on supported wavelengths                                  |
+| `sdoShowMovie`  | bool   | `false`  | Show SDO image as a time-lapse movie loop (currently inactive)                                      |
 
 ---
 
@@ -151,36 +150,36 @@ If `lat`/`lon` are omitted, they are derived from the center of your grid square
 
 ## Brightness Schedule
 
-| Field                | Type    | Default | Description                          |
-| -------------------- | ------- | ------- | ------------------------------------ |
-| `brightness`         | integer | `100`   | Display brightness (0–100)           |
-| `brightnessSchedule` | bool    | `false` | Enable automatic dim/bright schedule |
-| `dimHour`            | integer | `22`    | Hour (local) to dim the display      |
-| `dimMinute`          | integer | `0`     | Minute to dim                        |
-| `brightHour`         | integer | `6`     | Hour (local) to restore brightness   |
-| `brightMinute`       | integer | `0`     | Minute to restore                    |
-| `idleMinutes`         | integer | `0`     | Minutes of inactivity before screen blank (0=disabled) |
+| Field                | Type    | Default | Description                                            |
+| -------------------- | ------- | ------- | ------------------------------------------------------ |
+| `brightness`         | integer | `100`   | Display brightness (0–100)                             |
+| `brightnessSchedule` | bool    | `false` | Enable automatic dim/bright schedule                   |
+| `dimHour`            | integer | `22`    | Hour (local) to dim the display                        |
+| `dimMinute`          | integer | `0`     | Minute to dim                                          |
+| `brightHour`         | integer | `6`     | Hour (local) to restore brightness                     |
+| `brightMinute`       | integer | `0`     | Minute to restore                                      |
+| `idleMinutes`        | integer | `0`     | Minutes of inactivity before screen blank (0=disabled) |
 
 ---
 
 ## Alarms
 
-| Field                | Type    | Default | Description                                 |
-| -------------------- | ------- | ------- | ------------------------------------------- |
-| `alarmArmed`         | bool    | `false` | Enable daily alarm                          |
-| `alarmTimeHH`        | integer | `7`     | Alarm hour (0-23)                           |
-| `alarmTimeMM`        | integer | `0`     | Alarm minute                                |
-| `alarmUtc`           | bool    | `true`  | Alarm time is in UTC (vs local)             |
-| `onceAlarmArmed`     | bool    | `false` | Enable one-time alarm                       |
-| `onceAlarmTime`      | string  | `""`    | One-time alarm date (ISO: YYYY-MM-DDTHH:MM) |
+| Field            | Type    | Default | Description                                 |
+| ---------------- | ------- | ------- | ------------------------------------------- |
+| `alarmArmed`     | bool    | `false` | Enable daily alarm                          |
+| `alarmTimeHH`    | integer | `7`     | Alarm hour (0-23)                           |
+| `alarmTimeMM`    | integer | `0`     | Alarm minute                                |
+| `alarmUtc`       | bool    | `true`  | Alarm time is in UTC (vs local)             |
+| `onceAlarmArmed` | bool    | `false` | Enable one-time alarm                       |
+| `onceAlarmTime`  | string  | `""`    | One-time alarm date (ISO: YYYY-MM-DDTHH:MM) |
 
 ---
 
 ## Aux Clock
 
-| Field              | Type   | Default | Description                                                                                                     |
-| ------------------ | ------ | ------- | --------------------------------------------------------------------------------------------------------------- |
-| `auxClockTzOffset` | int    | `0`     | Hours offset from UTC (-12 to +14). Controlled by clicking the widget or via `/set_config?aux_tz_offset={n}`   |
+| Field              | Type   | Default | Description                                                                                                                                |
+| ------------------ | ------ | ------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `auxClockTzOffset` | int    | `0`     | Hours offset from UTC (-12 to +14). Controlled by clicking the widget or via `/set_config?aux_tz_offset={n}`                               |
 | `auxClockTzLabel`  | string | `"UTC"` | Display label shown in the widget title. Set via `/set_config?aux_tz_label={label}`. Preset cycle: UTC, EST, CST, MST, PST, CET, JST, AEST |
 
 **API control**: `GET /set_config?aux_tz_offset=-5&aux_tz_label=EST`

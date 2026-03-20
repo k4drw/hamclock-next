@@ -1,0 +1,2266 @@
+// DashboardContext.cpp — implementations for AppContext and DashboardContext methods.
+// All method bodies extracted from main.cpp; struct definitions are in DashboardContext.h.
+
+#include "core/ActivityLocationManager.h"
+#include "core/AuroraHistoryStore.h"
+#include "core/BrightnessManager.h"
+#include "core/CPUMonitor.h"
+#include "core/CitiesManager.h"
+#include "core/ConfigManager.h"
+#include "core/DXClusterData.h"
+#include "core/DatabaseManager.h"
+#include "core/DisplayPower.h"
+#include "core/HamClockState.h"
+#include "core/LiveSpotData.h"
+#include "core/PrefixManager.h"
+#include "core/RSSData.h"
+#include "core/RigData.h"
+#include "core/RotatorData.h"
+#include "core/SatelliteManager.h"
+#include "core/SolarData.h"
+#include "core/SoundManager.h"
+#include "core/WidgetType.h"
+#include "core/WorkerService.h"
+
+#include "network/FrameCapture.h"
+#include "network/NetworkManager.h"
+#include "network/WebServer.h"
+#include "services/ADIFProvider.h"
+#include "services/ActivityProvider.h"
+#include "services/AlertsProvider.h"
+#include "services/AsteroidProvider.h"
+#include "services/AuroraProvider.h"
+#include "services/BME280Provider.h"
+#include "services/LTR329Provider.h"
+#include "services/BandConditionsProvider.h"
+#include "services/BeaconProvider.h"
+#include "services/CallbookProvider.h"
+#include "services/ContestProvider.h"
+#include "services/DRAPProvider.h"
+#include "services/DXClusterProvider.h"
+#include "services/DstProvider.h"
+#include "services/FccProvider.h"
+#include "services/ForecastProvider.h"
+#include "services/GPSProvider.h"
+#include "services/HistoryProvider.h"
+#include "services/HurricaneProvider.h"
+#include "services/IonosondeProvider.h"
+#include "services/LightningProvider.h"
+#include "services/LiveSpotProvider.h"
+#include "services/MarineProvider.h"
+#include "services/MeteorProvider.h"
+#include "services/MoonProvider.h"
+#include "services/MufRtProvider.h"
+#include "services/NOAAProvider.h"
+#include "services/RBNProvider.h"
+#include "services/QRZProvider.h"
+#include "services/RSSProvider.h"
+#include "services/ReachProvider.h"
+#include "services/RepeaterProvider.h"
+#include "services/RigService.h"
+#include "services/RotatorService.h"
+#include "services/SDOProvider.h"
+#include "services/SantaProvider.h"
+#include "services/SolarStormProvider.h"
+#include "services/TropoProvider.h"
+#include "services/UpdateChecker.h"
+#include "services/WeatherProvider.h"
+#include "services/WinlinkProvider.h"
+#include "ui/ADIFPanel.h"
+#include "ui/ActivityPanels.h"
+#include "ui/AlertsPanel.h"
+#include "ui/AsteroidPanel.h"
+#include "ui/AuroraGraphPanel.h"
+#include "ui/AuroraPanel.h"
+#include "ui/BandConditionsPanel.h"
+#include "ui/BeaconPanel.h"
+#include "ui/CallbookPanel.h"
+#include "ui/ClockAuxPanel.h"
+#include "ui/ContestPanel.h"
+#include "ui/CountdownPanel.h"
+#include "ui/DRAPPanel.h"
+#include "ui/DXClusterPanel.h"
+#include "ui/DXClusterSetup.h"
+#include "ui/DXSatPane.h"
+#include "ui/DebugOverlay.h"
+#include "ui/DstPanel.h"
+#include "ui/EMEToolPanel.h"
+#include "ui/ENVPanel.h"
+#include "ui/EmbeddedFont.h"
+#include "ui/FontCatalog.h"
+#include "ui/FontManager.h"
+#include "ui/ForecastPanel.h"
+#include "ui/GimbalPanel.h"
+#include "ui/HistoryPanel.h"
+#include "ui/HurricanePanel.h"
+#include "ui/IonosondePanel.h"
+#include "ui/LayoutManager.h"
+#include "ui/LightningPanel.h"
+#include "ui/LiveSpotPanel.h"
+#include "ui/LocalPanel.h"
+#include "ui/MapWidget.h"
+#include "ui/MarinePanel.h"
+#include "ui/MeteorPanel.h"
+#include "ui/MoonPanel.h"
+#include "ui/PaneContainer.h"
+#include "ui/PlaceholderWidget.h"
+#include "ui/RSSBanner.h"
+#include "ui/ReminderPanel.h"
+#include "ui/RepeaterPanel.h"
+#include "ui/SDOPanel.h"
+#include "ui/SantaPanel.h"
+#include "ui/SetupScreen.h"
+#include "ui/SolarStormPanel.h"
+#include "ui/SpaceWeatherPanel.h"
+#include "ui/StopwatchPanel.h"
+#include "ui/SysInfoPanel.h"
+#include "ui/TextureManager.h"
+#include "ui/TimePanel.h"
+#include "ui/TropoPanel.h"
+#include "ui/UpdateOverlay.h"
+#include "ui/WatchlistPanel.h"
+#include "ui/WeatherPanel.h"
+#include "ui/WidgetSelector.h"
+#include "ui/WinlinkPanel.h"
+#include "ui/icon_png.h"
+
+#include "core/Constants.h"
+#include "core/GreylineDXData.h"
+#include "core/Logger.h"
+#include "services/GreylineDXProvider.h"
+#include "ui/GreylineDXPanel.h"
+#include "ui/RigControlPanel.h"
+#include "ui/SolarTimelinePanel.h"
+#include "core/CalendarData.h"
+#include "ui/CalendarPanel.h"
+#include <SDL.h>
+#include <SDL_image.h>
+#include <SDL_syswm.h>
+// SDL_syswm.h pulls in X11 headers on Linux which define None, Success, etc.
+// Undefine them before any other headers that use those identifiers as names.
+#ifdef None
+#undef None
+#endif
+#ifdef Success
+#undef Success
+#endif
+#include <SDL_ttf.h>
+#ifndef __EMSCRIPTEN__
+#include <curl/curl.h>
+#endif
+#include <fcntl.h>
+#include <nlohmann/json.hpp>
+
+#include <cmath>
+#include <cstdio>
+#include <cstdlib>
+#include <filesystem>
+#ifdef _WIN32
+#include <winsock2.h>
+#endif
+#include <memory>
+#ifdef __linux__
+#include <unistd.h>
+#endif
+
+#ifdef _WIN32
+#include <io.h>
+#define access _access
+#define F_OK 0
+#endif
+#include <vector>
+
+using namespace HamClock;
+
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#include <emscripten/html5.h>
+#endif
+
+#include "DashboardContext.h"
+
+using namespace HamClock;
+
+// Forward declaration — defined in main.cpp (non-static, shared across TUs)
+class DisplayPower;
+void preventRPiSleep(bool prevent, DisplayPower *dp = nullptr);
+
+AppContext::~AppContext() = default;
+
+void AppContext::updateLayoutMetrics() {
+  SDL_GetWindowSize(window, &globalWinW, &globalWinH);
+  SDL_GetRendererOutputSize(renderer, &globalDrawW, &globalDrawH);
+
+  if (FIDELITY_MODE) {
+    float sw = static_cast<float>(globalDrawW) / LOGICAL_WIDTH;
+    float sh = static_cast<float>(globalDrawH) / LOGICAL_HEIGHT;
+    layScale = std::min(sw, sh);
+    int logicalW = static_cast<int>(globalDrawW / layScale);
+    int logicalH = static_cast<int>(globalDrawH / layScale);
+    int xSpace = logicalW - LOGICAL_WIDTH;
+    int ySpace = logicalH - LOGICAL_HEIGHT;
+
+    switch (alignMode) {
+    case AlignMode::Center:
+      layLogicalOffX = xSpace / 2;
+      layLogicalOffY = ySpace / 2;
+      break;
+    case AlignMode::Left:
+      layLogicalOffX = 0;
+      layLogicalOffY = 0;
+      break;
+    case AlignMode::Right:
+      layLogicalOffX = xSpace;
+      layLogicalOffY = ySpace / 2;
+    }
+  } else {
+    layScale = 1.0f;
+    layLogicalOffX = 0;
+    layLogicalOffY = 0;
+  }
+}
+
+DashboardContext::DashboardContext(AppContext &ctx)
+    : fontMgr(), texMgr(), fontCatalog(fontMgr), debugOverlay(fontMgr),
+      satMgr(std::make_unique<SatelliteManager>(*ctx.netManager)) {
+  // Reset idle timer to now so the cursor-hide logic doesn't fire immediately
+  lastMouseMotionMs = SDL_GetTicks();
+  // Load font
+  if (!fontMgr.loadFromMemory(assets_font_ttf, assets_font_ttf_len,
+                              DEFAULT_FONT_SIZE)) {
+    std::fprintf(stderr, "Warning: text rendering disabled\n");
+  }
+  fontMgr.setCatalog(&fontCatalog);
+
+  // Compute render scale
+  int drawW, drawH;
+  SDL_GetRendererOutputSize(ctx.renderer, &drawW, &drawH);
+  float rs = static_cast<float>(drawH) / LOGICAL_HEIGHT;
+  fontMgr.setRenderScale(rs);
+
+  // Generate procedural textures
+  texMgr.generateLineTexture(ctx.renderer, "line_aa");
+  texMgr.generateMarkerTextures(ctx.renderer);
+  texMgr.generateWhiteTexture(ctx.renderer);
+  texMgr.generateBlackTexture(ctx.renderer);
+
+  // Initializers
+  auto solarStore = ctx.solarStore;
+  auto watchlistStore = ctx.watchlistStore;
+  auto rssStore = ctx.rssStore;
+  auto watchlistHitStore = ctx.watchlistHitStore;
+  auto spotStore = ctx.spotStore;
+  auto activityStore = ctx.activityStore;
+  auto dxcStore = ctx.dxcStore;
+  auto bandStore = ctx.bandStore;
+  auto contestStore = ctx.contestStore;
+  auto moonStore = ctx.moonStore;
+  auto historyStore = ctx.historyStore;
+  auto auroraHistoryStore = ctx.auroraHistoryStore;
+  auto auroraMapStore = ctx.auroraMapStore;
+  auto deWeatherStore = ctx.deWeatherStore;
+  auto dxWeatherStore = ctx.dxWeatherStore;
+  auto callbookStore = ctx.callbookStore;
+  auto dstStore = ctx.dstStore;
+  auto adifStore = ctx.adifStore;
+  auto santaStore = ctx.santaStore;
+  auto rotatorStore = ctx.rotatorStore;
+  auto rigStore = ctx.rigStore;
+  auto state = ctx.state;
+  auto &netManager = *ctx.netManager;
+  auto &appCfg = ctx.appCfg;
+
+  // Returns true if the widget appears in any pane rotation.
+  // AURORA_GRAPH is always treated as configured: its history store
+  // needs continuous sampling even when the pane is off-screen.
+  auto isWidgetConfigured = [&](WidgetType type) -> bool {
+    if (type == WidgetType::AURORA_GRAPH)
+      return true;
+    for (auto t : appCfg.pane1Rotation)
+      if (t == type)
+        return true;
+    for (auto t : appCfg.pane2Rotation)
+      if (t == type)
+        return true;
+    for (auto t : appCfg.pane3Rotation)
+      if (t == type)
+        return true;
+    for (auto t : appCfg.pane4Rotation)
+      if (t == type)
+        return true;
+    for (auto t : appCfg.pane5Rotation)
+      if (t == type)
+        return true;
+    for (auto t : appCfg.pane6Rotation)
+      if (t == type)
+        return true;
+    return false;
+  };
+  const bool isMasterMode = (appCfg.hubMode == HubMode::Master);
+
+  ctx.xrayHistoryStore = std::make_shared<XRayHistoryStore>();
+  ctx.drapDataStore = std::make_shared<DRAPDataStore>();
+  noaaProvider =
+      std::make_unique<NOAAProvider>(netManager, solarStore, auroraHistoryStore,
+                                     ctx.xrayHistoryStore, state.get());
+  noaaProvider->setDrapStore(ctx.drapDataStore);
+  noaaProvider->setAuroraMapStore(ctx.auroraMapStore);
+  if (isMasterMode || isWidgetConfigured(WidgetType::SOLAR) ||
+      isWidgetConfigured(WidgetType::AURORA) ||
+      isWidgetConfigured(WidgetType::AURORA_GRAPH) ||
+      isWidgetConfigured(WidgetType::DRAP) ||
+      appCfg.propOverlay == PropOverlayType::Aurora)
+    noaaProvider->fetch();
+  if (appCfg.propOverlay == PropOverlayType::Drap)
+    noaaProvider->fetchDRAP();
+  if (appCfg.propOverlay == PropOverlayType::Aurora)
+    noaaProvider->fetchAuroraMap();
+
+  rssProvider = std::make_unique<RSSProvider>(netManager, rssStore);
+  rssProvider->fetch();
+
+  spotProvider = std::make_unique<LiveSpotProvider>(
+      netManager, spotStore, appCfg, state.get(), dxcStore);
+  if (isMasterMode || isWidgetConfigured(WidgetType::LIVE_SPOTS) ||
+      appCfg.propOverlay != PropOverlayType::None)
+    spotProvider->fetch();
+
+#ifndef __EMSCRIPTEN__
+  rotatorService =
+      std::make_unique<RotatorService>(rotatorStore, appCfg, state.get());
+  rotatorService->start();
+  rigService = std::make_unique<RigService>(rigStore, appCfg, state.get());
+  rigService->start();
+#endif
+
+  satMgr->fetch();
+#ifndef __EMSCRIPTEN__
+  satMgr->setRotatorService(rotatorService.get());
+#endif
+  satMgr->setObserver(appCfg.lat, appCfg.lon);
+
+  activityProvider =
+      std::make_unique<ActivityProvider>(netManager, activityStore);
+  activityProvider->fetch();
+
+  // Re-fetch POTA spots once the parks CSV is parsed so spots get coordinates.
+  // The CSV is read/parsed in a background thread; spots often arrive first.
+  ActivityLocationManager::getInstance().setOnParksReady([&ctx, self = this]() {
+    if (ctx.dashboard.get() == self && self->activityProvider)
+      self->activityProvider->fetch();
+  });
+
+  dxcProvider = std::make_unique<DXClusterProvider>(
+      dxcStore, ctx.prefixMgr, watchlistStore, watchlistHitStore, state.get());
+#ifndef __EMSCRIPTEN__
+  if (isMasterMode || isWidgetConfigured(WidgetType::DX_CLUSTER))
+    dxcProvider->start(appCfg);
+#endif
+
+  rbnProvider =
+      std::make_unique<RBNProvider>(dxcStore, ctx.prefixMgr, state.get());
+#ifndef __EMSCRIPTEN__
+  if ((isMasterMode || isWidgetConfigured(WidgetType::DX_CLUSTER)) &&
+      appCfg.rbnEnabled)
+    rbnProvider->start(appCfg);
+#endif
+
+  bandProvider =
+      std::make_unique<BandConditionsProvider>(solarStore, bandStore);
+  bandProvider->update();
+
+  contestProvider = std::make_unique<ContestProvider>(netManager, contestStore);
+  contestProvider->fetch();
+
+  moonProvider = std::make_unique<MoonProvider>(netManager, moonStore);
+  moonProvider->update(appCfg.lat, appCfg.lon);
+
+  historyProvider = std::make_unique<HistoryProvider>(netManager, historyStore);
+  if (isMasterMode || isWidgetConfigured(WidgetType::HISTORY_FLUX))
+    historyProvider->fetchFlux();
+  if (isMasterMode || isWidgetConfigured(WidgetType::HISTORY_SSN))
+    historyProvider->fetchSSN();
+  if (isMasterMode || isWidgetConfigured(WidgetType::HISTORY_KP))
+    historyProvider->fetchKp();
+
+  deWeatherProvider =
+      std::make_unique<WeatherProvider>(netManager, deWeatherStore, 0);
+  deWeatherProvider->fetch(state->deLocation.lat, state->deLocation.lon);
+
+  dxWeatherProvider =
+      std::make_unique<WeatherProvider>(netManager, dxWeatherStore, 1);
+  dxWeatherProvider->fetch(state->dxLocation.lat, state->dxLocation.lon);
+
+  sdoProvider = std::make_shared<SDOProvider>(netManager);
+  drapProvider = std::make_unique<DRAPProvider>(netManager, ctx.drapDataStore);
+  auroraProvider = std::make_shared<AuroraProvider>(netManager);
+
+  callbookProvider =
+      std::make_shared<CallbookProvider>(netManager, callbookStore);
+
+  dstProvider = std::make_shared<DstProvider>(netManager, dstStore);
+  if (isMasterMode || isWidgetConfigured(WidgetType::DST_INDEX))
+    dstProvider->fetch();
+
+  adifProvider = std::make_unique<ADIFProvider>(adifStore, ctx.prefixMgr);
+  adifProvider->fetch(ctx.cfgMgr.configDir() / "logs.adif");
+#ifndef __EMSCRIPTEN__
+  if (ctx.webServer)
+    ctx.webServer->setADIFProvider(adifProvider.get());
+#endif
+
+  mufRtProvider = std::make_shared<MufRtProvider>(netManager);
+  mufRtProvider->update();
+
+
+
+  asteroidProvider = std::make_shared<AsteroidProvider>(netManager);
+  asteroidProvider->update();
+
+  beaconProvider = std::make_unique<BeaconProvider>();
+
+  alertsProvider =
+      std::make_unique<AlertsProvider>(netManager, ctx.alertsStore);
+  if (isMasterMode || isWidgetConfigured(WidgetType::ALERTS))
+    alertsProvider->fetch(appCfg.lat, appCfg.lon);
+
+  forecastProvider =
+      std::make_shared<ForecastProvider>(netManager, ctx.forecastStore);
+  if (isMasterMode || isWidgetConfigured(WidgetType::FORECAST))
+    forecastProvider->fetch(appCfg.lat, appCfg.lon);
+
+  repeaterProvider =
+      std::make_unique<RepeaterProvider>(netManager, ctx.repeaterStore);
+  // RepeaterBook API requires auth key — fetch disabled until configured.
+  // repeaterProvider->fetch(appCfg.lat, appCfg.lon);
+
+  hurricaneProvider =
+      std::make_unique<HurricaneProvider>(netManager, ctx.hurricaneStore);
+  if (isMasterMode || isWidgetConfigured(WidgetType::HURRICANE))
+    hurricaneProvider->fetch();
+
+  marineProvider =
+      std::make_unique<MarineProvider>(netManager, ctx.marineStore);
+  if (isMasterMode || isWidgetConfigured(WidgetType::MARINE))
+    marineProvider->fetch(appCfg.marineStation, appCfg.marineBuoy);
+
+  winlinkProvider =
+      std::make_unique<WinlinkProvider>(netManager, ctx.winlinkStore);
+  // Winlink API requires access key — fetch disabled until configured.
+  // winlinkProvider->fetch(appCfg.lat, appCfg.lon);
+
+  greylineDXProvider =
+      std::make_unique<GreylineDXProvider>(ctx.prefixMgr, ctx.greylineDXStore);
+  greylineDXProvider->update();
+
+  santaProvider = std::make_unique<SantaProvider>(santaStore);
+  santaProvider->update();
+
+  tropoProvider = std::make_unique<TropoProvider>(netManager);
+  tropoProvider->setCallback([&ctx, self = this](const TropoData &d) {
+    if (ctx.dashboard.get() == self &&
+        self->widgetPool.count(WidgetType::TROPO)) {
+      static_cast<TropoPanel *>(self->widgetPool[WidgetType::TROPO].get())
+          ->updateData(d);
+    }
+  });
+
+  lightningProvider = std::make_shared<LightningProvider>(netManager);
+  lightningProvider->setCallback([&ctx, self = this](const LightningData &d) {
+    if (ctx.dashboard.get() == self &&
+        self->widgetPool.count(WidgetType::LIGHTNING)) {
+      static_cast<LightningPanel *>(
+          self->widgetPool[WidgetType::LIGHTNING].get())
+          ->updateData(d);
+    }
+  });
+
+  meteorProvider = std::make_unique<MeteorProvider>();
+  meteorProvider->setCallback([&ctx, self = this](const MeteorData &d) {
+    if (ctx.dashboard.get() == self &&
+        self->widgetPool.count(WidgetType::METEOR)) {
+      static_cast<MeteorPanel *>(self->widgetPool[WidgetType::METEOR].get())
+          ->updateData(d);
+    }
+  });
+
+  solarStormProvider = std::make_shared<SolarStormProvider>(netManager);
+  solarStormProvider->setCallback(
+      [&ctx, self = this](const SolarStormData &d) {
+        if (ctx.dashboard.get() == self &&
+            self->widgetPool.count(WidgetType::SOLAR_STORM)) {
+          static_cast<SolarStormPanel *>(
+              self->widgetPool[WidgetType::SOLAR_STORM].get())
+              ->updateData(d);
+        }
+      });
+
+  ionosondeProvider = std::make_shared<IonosondeProvider>(netManager);
+  ionosondeProvider->setCallback([&ctx, self = this](const IonosondeData &d) {
+    if (ctx.dashboard.get() == self &&
+        self->widgetPool.count(WidgetType::IONOSONDE)) {
+      static_cast<IonosondePanel *>(
+          self->widgetPool[WidgetType::IONOSONDE].get())
+          ->updateData(d);
+    }
+  });
+
+  reachProvider = std::make_shared<ReachProvider>(netManager, state, spotStore);
+  reachProvider->setCallback([&ctx, self = this](const ReachData &d) {
+    // Push SDL event so onPropDataReady runs on the main/render thread,
+    // not the network worker thread where SDL_GL_GetCurrentWindow() is NULL.
+    if (ctx.dashboard.get() == self && self->mapArea) {
+      auto *result = new std::vector<float>(d.grid);
+      SDL_Event event;
+      SDL_zero(event);
+      event.type = HamClock::AE_BASE_EVENT + HamClock::AE_PROP_DATA_READY;
+      event.user.code = static_cast<int>(PropOverlayType::Heatmap);
+      event.user.data1 = result;
+      SDL_PushEvent(&event);
+    }
+  });
+
+  timePanel =
+      std::make_unique<TimePanel>(0, 0, 0, 0, fontMgr, texMgr, appCfg.callsign);
+  timePanel->setCallColor(appCfg.callsignColor);
+  timePanel->setCallBgColor(appCfg.callsignBgColor);
+  timePanel->setOnConfigChanged(
+      [&ctx](const std::string &call, SDL_Color fgColor, SDL_Color bgColor) {
+        ctx.appCfg.callsign = call;
+        ctx.appCfg.callsignColor = fgColor;
+        ctx.appCfg.callsignBgColor = bgColor;
+        ctx.cfgMgr.save(ctx.appCfg);
+      });
+
+  timePanel->setOnPauseRotation([this, &tp = *timePanel]() {
+    bool nowPaused = !panes[0]->isPaused();
+    for (auto &p : panes)
+      p->setPaused(nowPaused);
+    tp.setRotationPaused(nowPaused);
+  });
+
+  timePanel->setOnNextRotation([this]() {
+    for (auto &p : panes)
+      p->forceAdvance();
+  });
+
+  timePanel->initPresets(&appCfg, [this, &ctx]() {
+    panes[0]->setRotation(ctx.appCfg.pane1Rotation,
+                          ctx.appCfg.rotationIntervalS,
+                          ctx.appCfg.syncRotation);
+    panes[1]->setRotation(ctx.appCfg.pane2Rotation,
+                          ctx.appCfg.rotationIntervalS,
+                          ctx.appCfg.syncRotation);
+    panes[2]->setRotation(ctx.appCfg.pane3Rotation,
+                          ctx.appCfg.rotationIntervalS,
+                          ctx.appCfg.syncRotation);
+    panes[3]->setRotation(ctx.appCfg.pane4Rotation,
+                          ctx.appCfg.rotationIntervalS,
+                          ctx.appCfg.syncRotation);
+    panes[4]->setRotation(ctx.appCfg.pane5Rotation,
+                          ctx.appCfg.rotationIntervalS,
+                          ctx.appCfg.syncRotation);
+    panes[5]->setRotation(ctx.appCfg.pane6Rotation,
+                          ctx.appCfg.rotationIntervalS,
+                          ctx.appCfg.syncRotation);
+    ctx.cfgMgr.save(ctx.appCfg);
+  });
+
+  widgetSelector = std::make_unique<WidgetSelector>(fontMgr);
+
+  // Helper for pool (Lazy loading) — assigned to a member so pane-container
+  // factory lambdas (captured by [this]) don't dangle after construction.
+  widgetFactory_ = [this, &ctx](WidgetType type) -> Widget * {
+    auto &appCfg = ctx.appCfg;
+    auto &netManager = *ctx.netManager;
+    auto solarStore = ctx.solarStore;
+    auto watchlistStore = ctx.watchlistStore;
+    auto rssStore = ctx.rssStore;
+    auto watchlistHitStore = ctx.watchlistHitStore;
+    auto spotStore = ctx.spotStore;
+    auto activityStore = ctx.activityStore;
+    auto dxcStore = ctx.dxcStore;
+    auto bandStore = ctx.bandStore;
+    auto contestStore = ctx.contestStore;
+    auto moonStore = ctx.moonStore;
+    auto historyStore = ctx.historyStore;
+    auto deWeatherStore = ctx.deWeatherStore;
+    auto dxWeatherStore = ctx.dxWeatherStore;
+    auto callbookStore = ctx.callbookStore;
+    auto dstStore = ctx.dstStore;
+    auto adifStore = ctx.adifStore;
+    auto santaStore = ctx.santaStore;
+    auto rotatorStore = ctx.rotatorStore;
+    auto state = ctx.state;
+    auto auroraHistoryStore = ctx.auroraHistoryStore;
+    if (widgetPool.count(type) && widgetPool[type])
+      return widgetPool[type].get();
+
+    switch (type) {
+    case WidgetType::SOLAR:
+      widgetPool[type] = std::make_unique<SpaceWeatherPanel>(
+          0, 0, 0, 0, fontMgr, texMgr, solarStore, ctx.xrayHistoryStore);
+      break;
+    case WidgetType::DX_CLUSTER:
+#ifndef __EMSCRIPTEN__
+      widgetPool[type] = std::make_unique<DXClusterPanel>(
+          0, 0, 0, 0, fontMgr, dxcStore, rigService.get(), &appCfg);
+#else
+      widgetPool[type] = std::make_unique<DXClusterPanel>(
+          0, 0, 0, 0, fontMgr, dxcStore, nullptr, &appCfg);
+#endif
+      break;
+    case WidgetType::LIVE_SPOTS:
+      widgetPool[type] = std::make_unique<LiveSpotPanel>(
+          0, 0, 0, 0, fontMgr, *spotProvider, spotStore, appCfg, ctx.cfgMgr);
+      break;
+    case WidgetType::BAND_CONDITIONS:
+      widgetPool[type] =
+          std::make_unique<BandConditionsPanel>(0, 0, 0, 0, fontMgr, bandStore);
+      break;
+    case WidgetType::CONTESTS:
+      widgetPool[type] =
+          std::make_unique<ContestPanel>(0, 0, 0, 0, fontMgr, contestStore);
+      break;
+    case WidgetType::CALLBOOK:
+      widgetPool[type] =
+          std::make_unique<CallbookPanel>(0, 0, 0, 0, fontMgr, callbookStore);
+      break;
+    case WidgetType::DST_INDEX:
+      widgetPool[type] =
+          std::make_unique<DstPanel>(0, 0, 0, 0, fontMgr, texMgr, dstStore);
+      break;
+    case WidgetType::WATCHLIST:
+      widgetPool[type] = std::make_unique<WatchlistPanel>(
+          0, 0, 0, 0, fontMgr, watchlistStore, watchlistHitStore);
+      break;
+    case WidgetType::EME_TOOL:
+      widgetPool[type] = std::make_unique<EMEToolPanel>(0, 0, 0, 0, fontMgr,
+                                                        texMgr, moonStore);
+      break;
+    case WidgetType::SANTA_TRACKER:
+      widgetPool[type] =
+          std::make_unique<SantaPanel>(0, 0, 0, 0, fontMgr, santaStore);
+      break;
+    case WidgetType::ON_THE_AIR: {
+      auto ontaPanel = std::make_unique<ONTAPanel>(
+          0, 0, 0, 0, fontMgr, *activityProvider, activityStore);
+      ontaPanel->setFilter(appCfg.ontaFilter);
+      ontaPanel->setDeLocation(appCfg.lat, appCfg.lon);
+      ontaPanel->setMaxDistKm(appCfg.ontaMaxDistKm);
+      ontaPanel->setOnFilterChanged([&ctx](const std::string &f) {
+        ctx.appCfg.ontaFilter = f;
+        ctx.cfgMgr.save(ctx.appCfg);
+      });
+      ontaPanel->setOnMaxDistChanged([&ctx](int km) {
+        ctx.appCfg.ontaMaxDistKm = km;
+        ctx.cfgMgr.save(ctx.appCfg);
+      });
+      widgetPool[type] = std::move(ontaPanel);
+      break;
+    }
+    case WidgetType::DX_PEDITIONS:
+      widgetPool[type] = std::make_unique<DXPedPanel>(
+          0, 0, 0, 0, fontMgr, *activityProvider, activityStore);
+      break;
+    case WidgetType::GIMBAL:
+      widgetPool[type] = std::make_unique<GimbalPanel>(0, 0, 0, 0, fontMgr,
+                                                       texMgr, rotatorStore);
+      break;
+    case WidgetType::MOON:
+      widgetPool[type] = std::make_unique<MoonPanel>(
+          0, 0, 0, 0, fontMgr, texMgr, netManager, moonStore);
+      break;
+    case WidgetType::CLOCK_AUX:
+      widgetPool[type] = std::make_unique<ClockAuxPanel>(0, 0, 0, 0, fontMgr,
+                                                         appCfg, ctx.cfgMgr);
+      break;
+    case WidgetType::HISTORY_FLUX:
+      widgetPool[type] = std::make_unique<HistoryPanel>(
+          0, 0, 0, 0, fontMgr, texMgr, historyStore, "flux");
+      break;
+    case WidgetType::HISTORY_SSN:
+      widgetPool[type] = std::make_unique<HistoryPanel>(
+          0, 0, 0, 0, fontMgr, texMgr, historyStore, "ssn");
+      break;
+    case WidgetType::HISTORY_KP:
+      widgetPool[type] = std::make_unique<HistoryPanel>(
+          0, 0, 0, 0, fontMgr, texMgr, historyStore, "kp");
+      break;
+    case WidgetType::DRAP:
+      widgetPool[type] = std::make_unique<DRAPPanel>(0, 0, 0, 0, fontMgr,
+                                                     texMgr, *drapProvider);
+      break;
+    case WidgetType::AURORA:
+      widgetPool[type] = std::make_unique<AuroraPanel>(0, 0, 0, 0, fontMgr,
+                                                       texMgr, *auroraProvider);
+      break;
+    case WidgetType::AURORA_GRAPH:
+      widgetPool[type] = std::make_unique<AuroraGraphPanel>(
+          0, 0, 0, 0, fontMgr, texMgr, auroraHistoryStore);
+      break;
+    case WidgetType::ADIF:
+      widgetPool[type] =
+          std::make_unique<ADIFPanel>(0, 0, 0, 0, fontMgr, adifStore);
+      break;
+    case WidgetType::COUNTDOWN:
+      widgetPool[type] = std::make_unique<CountdownPanel>(
+          0, 0, 0, 0, fontMgr, ctx.appCfg,
+          [&ctx]() { ctx.cfgMgr.save(ctx.appCfg); });
+      break;
+    case WidgetType::DE_WEATHER:
+      widgetPool[type] = std::make_unique<WeatherPanel>(
+          0, 0, 0, 0, fontMgr, deWeatherStore, "DE Weather");
+      break;
+    case WidgetType::DX_WEATHER:
+      widgetPool[type] = std::make_unique<WeatherPanel>(
+          0, 0, 0, 0, fontMgr, dxWeatherStore, "DX Weather");
+      break;
+    case WidgetType::NCDXF:
+      widgetPool[type] =
+          std::make_unique<BeaconPanel>(0, 0, 0, 0, fontMgr, *beaconProvider);
+      break;
+    case WidgetType::SDO:
+      widgetPool[type] =
+          std::make_unique<SDOPanel>(0, 0, 0, 0, fontMgr, texMgr, *sdoProvider);
+      break;
+    case WidgetType::SYS_INFO:
+      widgetPool[type] = std::make_unique<SysInfoPanel>(
+          0, 0, 0, 0, fontMgr, ctx.cpuMonitor, ctx.state, appCfg.useMetric);
+      break;
+    case WidgetType::ASTEROID:
+      widgetPool[type] = std::make_unique<AsteroidPanel>(
+          0, 0, 0, 0, fontMgr, texMgr, *asteroidProvider, state, &appCfg,
+          [&ctx]() { ctx.cfgMgr.save(ctx.appCfg); });
+      break;
+    case WidgetType::ALERTS:
+      widgetPool[type] =
+          std::make_unique<AlertsPanel>(0, 0, 0, 0, fontMgr, ctx.alertsStore);
+      break;
+    case WidgetType::FORECAST:
+      widgetPool[type] = std::make_unique<ForecastPanel>(0, 0, 0, 0, fontMgr,
+                                                         ctx.forecastStore);
+      break;
+    case WidgetType::REPEATER_DIR:
+      widgetPool[type] = std::make_unique<RepeaterPanel>(0, 0, 0, 0, fontMgr,
+                                                         ctx.repeaterStore);
+      break;
+    case WidgetType::HURRICANE:
+      widgetPool[type] = std::make_unique<HurricanePanel>(0, 0, 0, 0, fontMgr,
+                                                          ctx.hurricaneStore);
+      break;
+    case WidgetType::MARINE:
+      widgetPool[type] =
+          std::make_unique<MarinePanel>(0, 0, 0, 0, fontMgr, ctx.marineStore);
+      break;
+    case WidgetType::WINLINK:
+      widgetPool[type] =
+          std::make_unique<WinlinkPanel>(0, 0, 0, 0, fontMgr, ctx.winlinkStore);
+      break;
+    case WidgetType::GREYLINE_DX:
+      widgetPool[type] = std::make_unique<GreylineDXPanel>(0, 0, 0, 0, fontMgr,
+                                                           ctx.greylineDXStore);
+      break;
+    case WidgetType::STOPWATCH:
+      widgetPool[type] = std::make_unique<StopwatchPanel>(0, 0, 0, 0, fontMgr);
+      break;
+    case WidgetType::RIG_CONTROL:
+#ifndef __EMSCRIPTEN__
+      widgetPool[type] = std::make_unique<RigControlPanel>(
+          0, 0, 0, 0, fontMgr, rigService.get());
+#else
+      widgetPool[type] = std::make_unique<RigControlPanel>(
+          0, 0, 0, 0, fontMgr, nullptr);
+#endif
+      break;
+    case WidgetType::SOLAR_TIMELINE:
+      widgetPool[type] = std::make_unique<SolarTimelinePanel>(
+          0, 0, 0, 0, fontMgr, netManager);
+      break;
+    case WidgetType::CALENDAR: {
+      auto *calPanel = new CalendarPanel(0, 0, 0, 0, fontMgr, ctx.calendarStore);
+      calPanel->setNotifyMinutes(appCfg.calendarNotifyMinutes);
+      calPanel->setAllDayNotifyHour(appCfg.calendarAllDayNotifyHour);
+      calPanel->setDismissMinutes(appCfg.calendarDismissMinutes);
+      calPanel->setOnConfigChanged([&ctx](int mins, int hour, int dismiss) {
+        ctx.appCfg.calendarNotifyMinutes = mins;
+        ctx.appCfg.calendarAllDayNotifyHour = hour;
+        ctx.appCfg.calendarDismissMinutes = dismiss;
+        ctx.cfgMgr.save(ctx.appCfg);
+      });
+      widgetPool[type] = std::unique_ptr<CalendarPanel>(calPanel);
+      break;
+    }
+    case WidgetType::REMINDER:
+      widgetPool[type] = std::make_unique<ReminderPanel>(
+          0, 0, 0, 0, fontMgr, ctx.appCfg, ctx.cfgMgr, *callbookProvider,
+          callbookStore, fccProvider);
+      break;
+    case WidgetType::TROPO:
+      widgetPool[type] = std::make_unique<TropoPanel>(0, 0, 0, 0, fontMgr);
+      break;
+    case WidgetType::LIGHTNING:
+      widgetPool[type] = std::make_unique<LightningPanel>(0, 0, 0, 0, fontMgr);
+      break;
+    case WidgetType::METEOR:
+      widgetPool[type] =
+          std::make_unique<MeteorPanel>(0, 0, 0, 0, fontMgr, texMgr);
+      break;
+    case WidgetType::IONOSONDE:
+      widgetPool[type] =
+          std::make_unique<IonosondePanel>(0, 0, 0, 0, fontMgr, texMgr);
+      break;
+    case WidgetType::SOLAR_STORM:
+      widgetPool[type] =
+          std::make_unique<SolarStormPanel>(0, 0, 0, 0, fontMgr, texMgr);
+      break;
+    case WidgetType::DE_INFO:
+      widgetPool[type] = std::make_unique<LocalPanel>(0, 0, 0, 0, fontMgr,
+                                                      state, deWeatherStore);
+      break;
+    case WidgetType::DX_INFO: {
+      auto p = std::make_unique<DXSatPane>(0, 0, 0, 0, fontMgr, texMgr, state,
+                                           *satMgr, dxWeatherStore);
+      p->setObserver(appCfg.lat, appCfg.lon);
+      p->restoreState(appCfg.panelMode, appCfg.selectedSatellite);
+      p->setMapTrackVisible(appCfg.showSatTrack);
+      p->setOnModeChanged(
+          [&ctx](const std::string &mode, const std::string &satName) {
+            ctx.appCfg.panelMode = mode;
+            ctx.appCfg.selectedSatellite = satName;
+            ctx.cfgMgr.save(ctx.appCfg);
+          });
+      p->setOnMapTrackToggle([&ctx](bool enabled) {
+        ctx.appCfg.showSatTrack = enabled;
+        ctx.cfgMgr.save(ctx.appCfg);
+      });
+      widgetPool[type] = std::move(p);
+      break;
+    }
+    case WidgetType::ENV_TEMP:
+      widgetPool[type] = std::make_unique<ENVPanel>(
+          0, 0, 0, 0, fontMgr, deWeatherStore, WidgetType::ENV_TEMP);
+      break;
+    case WidgetType::ENV_PRESSURE:
+      widgetPool[type] = std::make_unique<ENVPanel>(
+          0, 0, 0, 0, fontMgr, deWeatherStore, WidgetType::ENV_PRESSURE);
+      break;
+    case WidgetType::ENV_HUMIDITY:
+      widgetPool[type] = std::make_unique<ENVPanel>(
+          0, 0, 0, 0, fontMgr, deWeatherStore, WidgetType::ENV_HUMIDITY);
+      break;
+    case WidgetType::ENV_DEWPOINT:
+      widgetPool[type] = std::make_unique<ENVPanel>(
+          0, 0, 0, 0, fontMgr, deWeatherStore, WidgetType::ENV_DEWPOINT);
+      break;
+    default:
+      widgetPool[type] = std::make_unique<PlaceholderWidget>(
+          0, 0, 0, 0, fontMgr, widgetTypeDisplayName(type),
+          SDL_Color{0, 200, 255, 255});
+      break;
+    }
+
+    // Wire callbacks for newly created widgets
+    if (type == WidgetType::DX_CLUSTER) {
+      auto *dxcPanel = dynamic_cast<DXClusterPanel *>(widgetPool[type].get());
+      if (dxcPanel) {
+        dxcPanel->setOnSpotActivated(
+            [state, activityStore](const DXClusterSpot &spot) {
+              state->dxCallsign = spot.txCall;
+              state->dxLocation = {spot.txLat, spot.txLon};
+              state->dxGrid = spot.txGrid;
+              state->dxActive = (spot.txLat != 0.0 || spot.txLon != 0.0);
+              auto ad = activityStore->get();
+              ad.hasSelection = false;
+              activityStore->set(ad);
+            });
+        dxcPanel->setOnSpotDeactivated([state]() {
+          if (state->mapDxActive) {
+            state->dxLocation = state->mapDxLocation;
+            state->dxGrid = state->mapDxGrid;
+            state->dxActive = true;
+          } else {
+            state->dxActive = false;
+          }
+          state->dxCallsign.clear();
+        });
+      }
+    } else if (type == WidgetType::ON_THE_AIR) {
+      auto *ontaPanel = dynamic_cast<ONTAPanel *>(widgetPool[type].get());
+      if (ontaPanel) {
+        ontaPanel->setOnSpotActivated([state, dxcStore](const ONTASpot &spot) {
+          state->dxCallsign = spot.call;
+          state->dxLocation = {spot.lat, spot.lon};
+          state->dxGrid = (spot.lat != 0.0 || spot.lon != 0.0)
+                              ? Astronomy::latLonToGrid(spot.lat, spot.lon)
+                              : "";
+          state->dxActive = (spot.lat != 0.0 || spot.lon != 0.0);
+          dxcStore->clearSelection();
+        });
+        ontaPanel->setOnSpotDeactivated([state]() {
+          if (state->mapDxActive) {
+            state->dxLocation = state->mapDxLocation;
+            state->dxGrid = state->mapDxGrid;
+            state->dxActive = true;
+          } else {
+            state->dxActive = false;
+          }
+          state->dxCallsign.clear();
+        });
+      }
+    }
+
+    if (widgetPool[type]) {
+      widgetPool[type]->setTheme(appCfg.theme);
+      widgetPool[type]->setMetric(appCfg.useMetric);
+    }
+
+    return widgetPool[type].get();
+  };
+
+  std::vector<WidgetType> allTypes = getAllBaseWidgetTypes();
+
+  if (!appCfg.repeaterBookKey.empty()) {
+    allTypes.push_back(WidgetType::REPEATER_DIR);
+  }
+  if (!appCfg.winlinkKey.empty()) {
+    allTypes.push_back(WidgetType::WINLINK);
+  }
+  if (!appCfg.rigHost.empty() && appCfg.rigPort != 0) {
+    allTypes.push_back(WidgetType::RIG_CONTROL);
+  }
+
+  // Callback wiring moved to getOrAddWidget for lazy compatibility
+
+  for (int i = 0; i < 6; ++i) {
+    panes.push_back(std::make_unique<PaneContainer>(
+        0, 0, 0, 0, WidgetType::SOLAR, fontMgr));
+    // Capture [this] — widgetFactory_ is a member, so this is safe post-ctor.
+    panes.back()->setWidgetFactory(
+        [this](WidgetType t) { return widgetFactory_(t); });
+  }
+
+  panes[0]->setRotation(appCfg.pane1Rotation, appCfg.rotationIntervalS,
+                        appCfg.syncRotation);
+  panes[1]->setRotation(appCfg.pane2Rotation, appCfg.rotationIntervalS,
+                        appCfg.syncRotation);
+  panes[2]->setRotation(appCfg.pane3Rotation, appCfg.rotationIntervalS,
+                        appCfg.syncRotation);
+  panes[3]->setRotation(appCfg.pane4Rotation, appCfg.rotationIntervalS,
+                        appCfg.syncRotation);
+  panes[4]->setRotation(appCfg.pane5Rotation, appCfg.rotationIntervalS,
+                        appCfg.syncRotation);
+  panes[5]->setRotation(appCfg.pane6Rotation, appCfg.rotationIntervalS,
+                        appCfg.syncRotation);
+
+  auto onPaneSelectionRequested = [&, allTypes](int paneIdx, int mx, int my) {
+    (void)mx;
+    (void)my;
+    if (paneIdx == 4 || paneIdx == 5) {
+      // Side-panel mode picker: choose among the 4 supported modes
+      static const std::vector<WidgetType> sideAvail = {
+          WidgetType::DE_INFO, WidgetType::DX_CLUSTER, WidgetType::ON_THE_AIR,
+          WidgetType::LIVE_SPOTS};
+      auto rot4 = panes[4]->getRotation();
+      WidgetType cur4 = rot4.empty() ? WidgetType::DE_INFO : rot4[0];
+      // Normalize: DX_INFO in pane5 → show DE_INFO as current selection
+      std::vector<WidgetType> sideCurrent = {cur4};
+      widgetSelector->show(
+          4, sideAvail, sideCurrent, {},
+          [this, &ctx](int /*idx*/, const std::vector<WidgetType> &sel) {
+            if (!sel.empty())
+              this->applySidePanelMode(sel[0], ctx);
+          },
+          /*singleSelect=*/true);
+      return;
+    }
+    std::vector<WidgetType> available = allTypes;
+    if (!ctx.bmeProvider->isAvailable()) {
+      available.erase(std::remove_if(available.begin(), available.end(),
+                                     [](WidgetType t) {
+                                       return t == WidgetType::ENV_TEMP ||
+                                              t == WidgetType::ENV_PRESSURE ||
+                                              t == WidgetType::ENV_HUMIDITY ||
+                                              t == WidgetType::ENV_DEWPOINT;
+                                     }),
+                      available.end());
+    }
+    if (paneIdx == 3) { // Pane 4 (top-right small pane)
+      available = {WidgetType::NCDXF, WidgetType::SOLAR, WidgetType::DX_WEATHER,
+                   WidgetType::DE_WEATHER};
+    }
+    std::vector<WidgetType> current = panes[paneIdx]->getRotation();
+    std::vector<WidgetType> forbidden;
+    for (int i = 0; i < 6; ++i) {
+      if (i == paneIdx)
+        continue;
+      auto rot = panes[i]->getRotation();
+      forbidden.insert(forbidden.end(), rot.begin(), rot.end());
+    }
+    widgetSelector->show(
+        paneIdx, available, current, forbidden,
+        [&ctx, this](int idx, const std::vector<WidgetType> &finalSelection) {
+          panes[idx]->setRotation(finalSelection, ctx.appCfg.rotationIntervalS,
+                                  ctx.appCfg.syncRotation);
+          ctx.appCfg.pane1Rotation = panes[0]->getRotation();
+          ctx.appCfg.pane2Rotation = panes[1]->getRotation();
+          ctx.appCfg.pane3Rotation = panes[2]->getRotation();
+          ctx.appCfg.pane4Rotation = panes[3]->getRotation();
+          ctx.appCfg.pane5Rotation = panes[4]->getRotation();
+          ctx.appCfg.pane6Rotation = panes[5]->getRotation();
+          ctx.cfgMgr.save(ctx.appCfg);
+        });
+  };
+  for (int i = 0; i < 6; ++i) {
+    panes[i]->setOnSelectionRequested(onPaneSelectionRequested, i);
+    panes[i]->setOnConfigRequested([&ctx](WidgetType type) {
+      if (type == WidgetType::DX_CLUSTER) {
+        ctx.activeSetup = AppContext::SetupMode::DXCluster;
+      } else {
+        // Most widgets handle internal setup or don't have one.
+        // Don't open global setup generically.
+      }
+    });
+    panes[i]->setOnMaximizeRequested([this, &ctx](int idx) {
+      if (expandedPaneIdx_ == idx)
+        restorePane(ctx);
+      else
+        expandPane(idx, ctx);
+    });
+    panes[i]->setLineAATexture(texMgr.get("line_aa"));
+  }
+
+  mapArea = std::make_unique<MapWidget>(0, 0, 0, 0, texMgr, fontMgr, netManager,
+                                        state, appCfg);
+  // Share ownership of WxMbProvider so its async callbacks are safe if
+  // dashboard resets.
+  wxMbProvider = mapArea->getWxMbProvider();
+
+  qrzProvider = std::make_shared<QRZProvider>(netManager);
+  qrzProvider->setCredentials(appCfg.qrzUsername, appCfg.qrzPassword);
+  mapArea->setOnConfigChanged([&ctx] { ctx.cfgMgr.save(ctx.appCfg); });
+  mapArea->setSpotStore(spotStore);
+  mapArea->setDXClusterStore(dxcStore);
+  mapArea->setADIFStore(adifStore);
+  mapArea->setMufRtProvider(mufRtProvider.get());
+  mapArea->setBeaconProvider(beaconProvider.get());
+  mapArea->setAuroraStore(auroraHistoryStore);
+  mapArea->setAuroraMapStore(auroraMapStore);
+  mapArea->setDrapStore(ctx.drapDataStore);
+  mapArea->setIonosondeProvider(ionosondeProvider);
+  mapArea->setSolarDataStore(ctx.solarStore.get());
+  mapArea->setActivityStore(ctx.activityStore);
+
+  std::vector<PaneContainer *> panePtrs;
+  for (const auto &p : panes)
+    panePtrs.push_back(p.get());
+  mapArea->setPanes(panePtrs);
+
+  // Wire predictor from DX_INFO widget to map and gimbal
+  auto *dxSatWidget =
+      dynamic_cast<DXSatPane *>(widgetFactory_(WidgetType::DX_INFO));
+  if (dxSatWidget) {
+    mapArea->setPredictor(dxSatWidget->activePredictor());
+  }
+
+  // NOAAProvider seems to populate solar data?  // Let's check main.cpp
+  // earlier.
+
+  rssBanner = std::make_unique<RSSBanner>(139, 412, 660, 68, fontMgr, rssStore);
+  rssBanner->setEnabled(appCfg.rssEnabled);
+  if (!appCfg.rssEnabled)
+    rssProvider->setEnabled(false);
+
+  // Now that rssBanner and rssProvider exist, extend the MapWidget config
+  // callback to propagate rssEnabled changes to both.
+  mapArea->setOnConfigChanged([&ctx, &dash = *this]() {
+    ctx.cfgMgr.save(ctx.appCfg);
+    if (dash.rssBanner)
+      dash.rssBanner->setEnabled(ctx.appCfg.rssEnabled);
+    if (dash.rssProvider)
+      dash.rssProvider->setEnabled(ctx.appCfg.rssEnabled);
+  });
+
+  // Layout
+  if (FIDELITY_MODE)
+    layout.setFidelityMode(true);
+  layout.addWidget(Zone::TopBar, timePanel.get(), 2.0f);
+  layout.addWidget(Zone::TopBar, panes[0].get(), 1.5f);
+  layout.addWidget(Zone::TopBar, panes[1].get(), 1.5f);
+  layout.addWidget(Zone::TopBar, panes[2].get(), 1.5f);
+  layout.addWidget(Zone::TopBar, panes[3].get(), 0.6f);
+  layout.addWidget(Zone::SidePanel, panes[4].get());
+  if (!appCfg.pane6Rotation.empty()) {
+    layout.addWidget(Zone::SidePanel, panes[5].get());
+  } else {
+    panes[5]->onResize(0, 0, 0, 0); // hide when not in layout
+  }
+  layout.addWidget(Zone::MainStage, mapArea.get());
+
+  // Apply Theme
+
+  // Apply Theme to existing widgets
+  for (auto const &[type, widget] : widgetPool) {
+    if (widget) {
+      widget->setTheme(appCfg.theme);
+      widget->setMetric(appCfg.useMetric);
+    }
+  }
+  timePanel->setTheme(appCfg.theme);
+  timePanel->setMetric(appCfg.useMetric);
+  mapArea->setTheme(appCfg.theme);
+  mapArea->setMetric(appCfg.useMetric);
+  rssBanner->setTheme(appCfg.theme);
+  rssBanner->setMetric(appCfg.useMetric);
+  widgetSelector->setTheme(appCfg.theme);
+  widgetSelector->setMetric(appCfg.useMetric);
+  for (auto &p : panes) {
+    p->setTheme(appCfg.theme);
+    p->setMetric(appCfg.useMetric);
+  }
+
+  texMgr.setLowMemCallback([this]() {
+    LOG_W("Main", "Low memory signal: flushing FontManager cache");
+    fontMgr.clearCache();
+  });
+
+  {
+    auto &memMon = MemoryMonitor::getInstance();
+    LOG_I("Main", "System RAM: {:.0f} MB, low-memory mode: {}",
+          memMon.getTotalRAM() / 1024.0 / 1024.0,
+          memMon.isLowMemoryDevice() ? "YES" : "NO");
+    if (memMon.isLowMemoryDevice()) {
+      texMgr.setMaxCacheSize(15);
+      LOG_I("Main", "Low-memory device: capping texture cache to 15");
+      fontMgr.setTextCacheLimit(100);
+      LOG_I("Main", "Low-memory device: capping font text cache to 100");
+    } else {
+      texMgr.setMaxCacheSize(50);
+    }
+  }
+
+  // Populate widgets/eventWidgets vector
+  widgets = {timePanel.get(),     panes[0].get(), panes[1].get(),
+             panes[2].get(),      panes[3].get(), panes[4].get(),
+             panes[5].get(),      mapArea.get(),  rssBanner.get(),
+             widgetSelector.get()};
+
+  eventWidgets = {widgetSelector.get(), timePanel.get(), panes[0].get(),
+                  panes[1].get(),       panes[2].get(),  panes[3].get(),
+                  panes[4].get(),       panes[5].get(),  mapArea.get(),
+                  rssBanner.get()};
+
+  lastFetchMs = SDL_GetTicks();
+  lastFpsUpdate = SDL_GetTicks();
+  frames = 0;
+
+  // Propagate theme and metric to all dashboard widgets
+  for (auto *w : widgets) {
+    if (w) {
+      w->setTheme(appCfg.theme);
+      w->setMetric(appCfg.useMetric);
+    }
+  }
+
+  // Initial layout calculation
+  fontCatalog.recalculate(LOGICAL_WIDTH, LOGICAL_HEIGHT);
+  layout.recalculate(LOGICAL_WIDTH, LOGICAL_HEIGHT, ctx.layLogicalOffX,
+                     ctx.layLogicalOffY);
+  rssBanner->onResize(139 + ctx.layLogicalOffX, 412 + ctx.layLogicalOffY, 660,
+                      68);
+}
+
+DashboardContext::~DashboardContext() {
+#ifndef __EMSCRIPTEN__
+  if (dxcProvider)
+    dxcProvider->stop();
+  if (rbnProvider)
+    rbnProvider->stop();
+  if (rigService)
+    rigService->stop();
+  if (satMgr)
+    satMgr->setRotatorService(nullptr); // prevent UAF: satMgr callbacks must not call rotator_ after stop
+  if (rotatorService)
+    rotatorService->stop();
+#endif
+}
+
+void DashboardContext::applySidePanelMode(WidgetType chosen, AppContext &ctx) {
+  std::vector<WidgetType> p5 = {chosen};
+  std::vector<WidgetType> p6 =
+      (chosen == WidgetType::DE_INFO)
+          ? std::vector<WidgetType>{WidgetType::DX_INFO}
+          : std::vector<WidgetType>{};
+  panes[4]->setRotation(p5, ctx.appCfg.rotationIntervalS,
+                        ctx.appCfg.syncRotation);
+  panes[5]->setRotation(p6, ctx.appCfg.rotationIntervalS,
+                        ctx.appCfg.syncRotation);
+  layout.removeWidget(panes[5].get());
+  if (!p6.empty()) {
+    layout.addWidget(Zone::SidePanel, panes[5].get());
+  } else {
+    panes[5]->onResize(0, 0, 0, 0); // hide phantom pane when not in layout
+  }
+  if (FIDELITY_MODE)
+    layout.recalculate(LOGICAL_WIDTH, LOGICAL_HEIGHT, ctx.layLogicalOffX,
+                       ctx.layLogicalOffY);
+  else
+    layout.recalculate(ctx.globalWinW, ctx.globalWinH);
+  ctx.appCfg.pane5Rotation = p5;
+  ctx.appCfg.pane6Rotation = p6;
+  ctx.cfgMgr.save(ctx.appCfg);
+}
+
+void DashboardContext::expandPane(int idx, AppContext &ctx) {
+  if (expandedPaneIdx_ >= 0 || idx < 0 || idx >= (int)panes.size())
+    return;
+  expandedPaneIdx_ = idx;
+  SDL_Rect mr = mapArea->getRect();
+  panes[idx]->onResize(mr.x, mr.y, mr.w, mr.h);
+  panes[idx]->setExpanded(true);
+  panes[idx]->setPaused(true);
+}
+
+void DashboardContext::restorePane(AppContext &ctx) {
+  if (expandedPaneIdx_ < 0)
+    return;
+  panes[expandedPaneIdx_]->setExpanded(false);
+  panes[expandedPaneIdx_]->setPaused(false);
+  expandedPaneIdx_ = -1;
+  if (FIDELITY_MODE)
+    layout.recalculate(LOGICAL_WIDTH, LOGICAL_HEIGHT, ctx.layLogicalOffX,
+                       ctx.layLogicalOffY);
+  else
+    layout.recalculate(ctx.globalWinW, ctx.globalWinH);
+}
+
+void DashboardContext::update(AppContext &ctx) {
+  auto &appCfg = ctx.appCfg;
+
+  ctx.updateLayoutMetrics();
+
+  Uint32 now = SDL_GetTicks();
+
+  // If display is off (software sleep), skip updates and logic
+  bool isPowerOn = ctx.displayPower->getPower();
+
+  // Background refresh every 15 minutes, but only if power is on
+  auto isWidgetActive = [&](WidgetType type) {
+    for (auto &p : panes) {
+      if (p->getActiveType() == type)
+        return true;
+    }
+    return false;
+  };
+  auto isWidgetConfigured = [&](WidgetType type) -> bool {
+    if (type == WidgetType::AURORA_GRAPH)
+      return true;
+    for (auto t : appCfg.pane1Rotation)
+      if (t == type)
+        return true;
+    for (auto t : appCfg.pane2Rotation)
+      if (t == type)
+        return true;
+    for (auto t : appCfg.pane3Rotation)
+      if (t == type)
+        return true;
+    for (auto t : appCfg.pane4Rotation)
+      if (t == type)
+        return true;
+    for (auto t : appCfg.pane5Rotation)
+      if (t == type)
+        return true;
+    for (auto t : appCfg.pane6Rotation)
+      if (t == type)
+        return true;
+    return false;
+  };
+  const bool isMaster = (appCfg.hubMode == HubMode::Master);
+
+  if (isPowerOn && (now - lastFetchMs > 15 * 60 * 1000)) {
+    // Map overlay helper: true if the MUF/RT propagation overlay is active
+    // (mufRtProvider and ionosondeProvider only feed PropOverlayType::Muf)
+    const bool mufOverlayActive = appCfg.propOverlay == PropOverlayType::Muf;
+
+    // --- NOAA space-weather data ---
+    // Gate per consumer group to avoid unnecessary sub-feed fetches.
+    // Solar/SpaceWX panel consumers: KIndex, SFI, SN, Plasma, Mag, DST,
+    //   XRay, ProtonFlux
+    // Aurora/AuroraGraph consumers: Aurora sub-feed
+    // DRAP panel consumers: DRAP sub-feed
+    const bool needsNoaa = isMaster || isWidgetActive(WidgetType::SOLAR) ||
+                           isWidgetActive(WidgetType::AURORA) ||
+                           isWidgetConfigured(WidgetType::AURORA_GRAPH) ||
+                           isWidgetActive(WidgetType::DRAP) ||
+                           appCfg.propOverlay == PropOverlayType::Drap;
+    if (needsNoaa)
+      noaaProvider->fetch();
+
+    // --- RSS news banner ---
+    if (appCfg.rssEnabled)
+      rssProvider->fetch();
+
+    // --- Satellite manager ---
+    // Feeds: SatPanel (in DXSatPane), EME planning tool, map track overlay
+    if (isMaster || isWidgetActive(WidgetType::EME_TOOL) || appCfg.showSatTrack)
+      satMgr->fetch();
+
+    // --- Weather providers ---
+    if (isMaster || isWidgetActive(WidgetType::DE_WEATHER))
+      deWeatherProvider->fetch(ctx.state->deLocation.lat,
+                               ctx.state->deLocation.lon);
+    if (isMaster || isWidgetActive(WidgetType::DX_WEATHER))
+      dxWeatherProvider->fetch(ctx.state->dxLocation.lat,
+                               ctx.state->dxLocation.lon);
+
+    // --- Context-sensitive fetches (existing gating preserved/unchanged) ---
+    if (isMaster || isWidgetActive(WidgetType::LIVE_SPOTS) ||
+        appCfg.propOverlay != PropOverlayType::None)
+      spotProvider->fetch();
+
+    if (isMaster || isWidgetActive(WidgetType::ON_THE_AIR) ||
+        isWidgetActive(WidgetType::DX_PEDITIONS) || appCfg.ontaFilter != "Off")
+      activityProvider->fetch();
+
+    if (isMaster || isWidgetActive(WidgetType::BAND_CONDITIONS))
+      bandProvider->update();
+
+    if (isMaster || isWidgetActive(WidgetType::CONTESTS))
+      contestProvider->fetch();
+
+    if (isMaster || isWidgetActive(WidgetType::MOON))
+      moonProvider->update(appCfg.lat, appCfg.lon);
+
+    if (isWidgetActive(WidgetType::EME_TOOL)) {
+      auto it = widgetPool.find(WidgetType::EME_TOOL);
+      if (it != widgetPool.end()) {
+        auto *eme = static_cast<EMEToolPanel *>(it->second.get());
+        eme->setDeLocation(appCfg.lat, appCfg.lon);
+        eme->setDxLocation(ctx.state->dxLocation.lat,
+                           ctx.state->dxLocation.lon);
+      }
+    }
+
+    if (isMaster || isWidgetActive(WidgetType::HISTORY_FLUX))
+      historyProvider->fetchFlux();
+    if (isMaster || isWidgetActive(WidgetType::HISTORY_SSN))
+      historyProvider->fetchSSN();
+    if (isMaster || isWidgetActive(WidgetType::HISTORY_KP))
+      historyProvider->fetchKp();
+
+    if (dstProvider && (isMaster || isWidgetActive(WidgetType::DST_INDEX)))
+      dstProvider->fetch();
+
+    // --- ADIF log viewer ---
+    if (isMaster || isWidgetActive(WidgetType::ADIF))
+      adifProvider->fetch(ctx.cfgMgr.configDir() / "logs.adif");
+
+    // --- Propagation map overlays ---
+    if (mufOverlayActive)
+      mufRtProvider->update();
+    if (mufOverlayActive)
+      ionosondeProvider->update();
+
+    // --- Asteroid widget + map pin ---
+    if (isMaster || isWidgetActive(WidgetType::ASTEROID))
+      asteroidProvider->update();
+
+#ifndef __EMSCRIPTEN__
+    if (ctx.updateChecker)
+      ctx.updateChecker->fetch();
+#endif
+    lastFetchMs = now;
+  }
+
+  // --- DRAP fetch: immediate when overlay active and store empty (60s
+  // cooldown) ---
+  if (isPowerOn && appCfg.propOverlay == PropOverlayType::Drap &&
+      !ctx.drapDataStore->get().valid &&
+      (lastDrapFetchMs == 0 || now - lastDrapFetchMs > 60000u)) {
+    noaaProvider->fetchDRAP();
+    lastDrapFetchMs = now;
+  }
+
+  // --- Tropo fetch (immediate upon widget activation, internal cache 1hr) ---
+  if (isWidgetActive(WidgetType::TROPO)) {
+    tropoProvider->fetch(appCfg.lat, appCfg.lon);
+  }
+
+  // --- Lightning fetch (immediate upon widget activation, internal cache 2m)
+  // ---
+  if (isWidgetActive(WidgetType::LIGHTNING)) {
+    lightningProvider->fetch(appCfg.lat, appCfg.lon);
+  }
+
+  // --- Meteor fetch (immediate upon widget activation, internal cache 10m) ---
+  if (isWidgetActive(WidgetType::METEOR)) {
+    meteorProvider->update(appCfg.lat, appCfg.lon);
+  }
+
+  // --- Ionosonde fetch (immediate upon widget activation, internal cache 15m)
+  // ---
+  if (isWidgetActive(WidgetType::IONOSONDE)) {
+    ionosondeProvider->fetch(appCfg.lat, appCfg.lon);
+  }
+
+  // --- Solar Storm fetch (immediate upon widget activation, internal cache
+  // 1m/5m) ---
+  if (isWidgetActive(WidgetType::SOLAR_STORM)) {
+    solarStormProvider->update();
+  }
+
+  if (isWidgetActive(WidgetType::GREYLINE_DX) &&
+      now - lastGreylineFetchMs > 60000) {
+    greylineDXProvider->update();
+    lastGreylineFetchMs = now;
+  }
+
+  // Reset fetch timer when switching away from Heatmap so re-selecting it
+  // triggers an immediate refresh rather than waiting out the 5-min interval.
+  if (prevPropOverlayForReach_ == PropOverlayType::Heatmap &&
+      appCfg.propOverlay != PropOverlayType::Heatmap) {
+    lastReachFetchMs = 0;
+  }
+  prevPropOverlayForReach_ = appCfg.propOverlay;
+
+  if (appCfg.propOverlay == PropOverlayType::Heatmap &&
+      (lastReachFetchMs == 0 || now - lastReachFetchMs > 5 * 60 * 1000)) {
+    reachProvider->fetch(appCfg.propBand, appCfg.propMode);
+    lastReachFetchMs = now;
+  }
+
+  // Calendar notification check — runs once per minute
+  if (ctx.calendarStore && mapArea &&
+      (lastCalendarCheckMs == 0 || now - lastCalendarCheckMs >= 60000)) {
+    lastCalendarCheckMs = now;
+    auto events = ctx.calendarStore->snapshot();
+    time_t nowT = std::time(nullptr);
+    for (const auto &ev : events) {
+      time_t triggerAt;
+      if (ev.allDay) {
+        // All-day: notify at configured hour on the event day (UTC)
+        struct tm evDay{};
+        Astronomy::portable_gmtime(&ev.start, &evDay);
+        evDay.tm_hour = appCfg.calendarAllDayNotifyHour;
+        evDay.tm_min  = 0;
+        evDay.tm_sec  = 0;
+        triggerAt = Astronomy::portable_timegm(&evDay);
+      } else {
+        triggerAt = ev.start - (time_t)(appCfg.calendarNotifyMinutes * 60);
+      }
+      // Fire within a 60-second window around the trigger time
+      if (nowT >= triggerAt && nowT < triggerAt + 60) {
+        if (ctx.calendarStore->markNotified(ev.start)) {
+          mapArea->showCalendarAlert(ev.summary, ev.source, ev.start,
+                                     appCfg.calendarDismissMinutes);
+          break; // Show one alert at a time
+        }
+      }
+    }
+  }
+
+#ifndef __EMSCRIPTEN__
+  // Propagate update-available state to TimePanel.
+  // Respect user's choice to skip a specific version.
+  if (ctx.updateChecker && timePanel) {
+    bool available = ctx.updateChecker->updateAvailable();
+    if (available &&
+        ctx.updateChecker->latestVersion() == appCfg.skippedVersion) {
+      available = false;
+    }
+    timePanel->setUpdateInfo(available, ctx.updateChecker->latestVersion());
+  }
+#endif
+
+#ifndef __EMSCRIPTEN__
+  // Handle UpdateOverlay trigger from TimePanel version click
+  if (timePanel && timePanel->isUpdateRequested()) {
+    timePanel->clearUpdateRequest();
+    if (!updateOverlay) {
+      int w = 760;
+      int h = 440;
+      int x = (LOGICAL_WIDTH - w) / 2;
+      int y = (LOGICAL_HEIGHT - h) / 2;
+      updateOverlay = std::make_unique<UpdateOverlay>(x, y, w, h, fontMgr,
+                                                      *ctx.updateChecker);
+    }
+  }
+
+  if (updateOverlay) {
+    updateOverlay->update();
+  }
+#endif
+
+  SDL_Event event;
+  while (SDL_PollEvent(&event)) {
+    // Single modal/focus scan shared across all event-type branches below
+    Widget *focusedWidget = nullptr;
+    for (auto *w : eventWidgets) {
+      if (w->isModalActive()) {
+        focusedWidget = w;
+        break;
+      }
+    }
+    // Also check inline-configuring widgets (e.g. SatelliteSetup,
+    // ReminderPanel)
+    if (!focusedWidget) {
+      for (auto *w : eventWidgets) {
+        if (w->isConfiguring()) {
+          focusedWidget = w;
+          break;
+        }
+      }
+    }
+
+    if (event.type == SDL_MOUSEMOTION || event.type == SDL_MOUSEBUTTONDOWN ||
+        event.type == SDL_MOUSEBUTTONUP || event.type == SDL_FINGERDOWN ||
+        event.type == SDL_FINGERMOTION) {
+      lastMouseMotionMs = SDL_GetTicks();
+      if (!cursorVisible) {
+        SDL_ShowCursor(SDL_ENABLE);
+        cursorVisible = true;
+      }
+      // Wake up if screen is off
+      if (!isPowerOn) {
+        ctx.displayPower->setPower(true);
+        isPowerOn = true;
+      }
+    }
+
+    switch (event.type) {
+    case SDL_QUIT:
+      ctx.appRunning = false;
+      return;
+    case SDL_KEYDOWN: {
+      bool consumed = false;
+      if (focusedWidget) {
+        consumed = focusedWidget->onKeyDown(event.key.keysym.sym,
+                                            event.key.keysym.mod);
+      } else {
+        if (event.key.keysym.sym == SDLK_k) {
+          ctx.showActionHighlights = !ctx.showActionHighlights;
+          consumed = true;
+        } else if (event.key.keysym.sym == SDLK_o && ctx.dashboard) {
+          ctx.dashboard->debugOverlay.toggle();
+          consumed = true;
+        } else if (event.key.keysym.sym == SDLK_F11) {
+
+          Uint32 flags = SDL_GetWindowFlags(ctx.window);
+          if (flags & SDL_WINDOW_FULLSCREEN_DESKTOP)
+            SDL_SetWindowFullscreen(ctx.window, 0);
+          else
+            SDL_SetWindowFullscreen(ctx.window, SDL_WINDOW_FULLSCREEN_DESKTOP);
+          consumed = true;
+        }
+
+        if (!consumed) {
+
+          for (auto *w : eventWidgets) {
+            if (w->onKeyDown(event.key.keysym.sym, event.key.keysym.mod)) {
+              consumed = true;
+              break;
+            }
+          }
+        }
+      }
+      if (!consumed) {
+        if (event.key.keysym.sym == SDLK_q &&
+            (event.key.keysym.mod & KMOD_CTRL)) {
+          ctx.appRunning = false;
+        }
+      }
+      break;
+    }
+    case SDL_TEXTINPUT: {
+      if (focusedWidget) {
+        focusedWidget->onTextInput(event.text.text);
+      } else {
+        for (auto *w : eventWidgets) {
+          if (w->onTextInput(event.text.text)) {
+            break;
+          }
+        }
+      }
+      break;
+    }
+    case SDL_FINGERDOWN:
+      if (appCfg.preventSleep)
+        preventRPiSleep(true, ctx.displayPower.get());
+      break;
+    case SDL_MOUSEBUTTONDOWN: {
+      int smx = event.button.x, smy = event.button.y;
+      if (FIDELITY_MODE && event.button.windowID != 0) {
+        float pixX = event.button.x * static_cast<float>(ctx.globalDrawW) /
+                     ctx.globalWinW;
+        float pixY = event.button.y * static_cast<float>(ctx.globalDrawH) /
+                     ctx.globalWinH;
+        smx = static_cast<int>(pixX / ctx.layScale);
+        smy = static_cast<int>(pixY / ctx.layScale);
+      }
+      if (focusedWidget)
+        focusedWidget->onMouseDown(smx, smy, SDL_GetModState(),
+                                   event.button.clicks);
+      else
+        for (auto *w : eventWidgets)
+          if (w->onMouseDown(smx, smy, SDL_GetModState(), event.button.clicks))
+            break;
+    } break;
+    case SDL_WINDOWEVENT:
+      if (event.window.event == SDL_WINDOWEVENT_SIZE_CHANGED) {
+        ctx.updateLayoutMetrics();
+        {
+          float ns = static_cast<float>(ctx.globalDrawH) / LOGICAL_HEIGHT;
+          float old = fontMgr.renderScale();
+          if (ns > 0.5f && std::fabs(ns - old) / old > 0.05f) {
+            fontMgr.setRenderScale(ns);
+            // Recalculate UI
+            fontMgr.clearCache();
+            fontCatalog.recalculate(LOGICAL_WIDTH, LOGICAL_HEIGHT);
+            layout.recalculate(LOGICAL_WIDTH, LOGICAL_HEIGHT,
+                               ctx.layLogicalOffX, ctx.layLogicalOffY);
+            rssBanner->onResize(139 + ctx.layLogicalOffX,
+                                412 + ctx.layLogicalOffY, 660, 68);
+          }
+          lastResizeMs = SDL_GetTicks();
+        }
+        if (!FIDELITY_MODE) {
+          fontCatalog.recalculate(event.window.data1, event.window.data2);
+          layout.recalculate(event.window.data1, event.window.data2);
+        }
+        render(ctx); // renderFrame
+      } else if (event.window.event == SDL_WINDOWEVENT_EXPOSED) {
+        render(ctx);
+      }
+      break;
+#ifndef __EMSCRIPTEN__
+    case SDL_MOUSEWHEEL:
+      if (updateOverlay) {
+        updateOverlay->onMouseWheel(event.wheel.y);
+      }
+      break;
+#endif
+#ifndef __EMSCRIPTEN__
+    case SDL_MOUSEBUTTONUP:
+      if (updateOverlay) {
+        int smx = event.button.x, smy = event.button.y;
+        if (FIDELITY_MODE && event.button.windowID != 0) {
+          float pixX = event.button.x * static_cast<float>(ctx.globalDrawW) /
+                       ctx.globalWinW;
+          float pixY = event.button.y * static_cast<float>(ctx.globalDrawH) /
+                       ctx.globalWinH;
+          smx = static_cast<int>(pixX / ctx.layScale);
+          smy = static_cast<int>(pixY / ctx.layScale);
+        }
+        if (updateOverlay->onMouseUp(smx, smy, SDL_GetModState(),
+                                     event.button.clicks)) {
+          auto res = updateOverlay->getResult();
+          if (res == UpdateOverlay::Result::Skip) {
+            ctx.appCfg.skippedVersion = ctx.updateChecker->latestVersion();
+            ctx.cfgMgr.save(ctx.appCfg);
+            updateOverlay.reset();
+          } else if (res == UpdateOverlay::Result::NotNow) {
+            updateOverlay.reset();
+          } else if (res == UpdateOverlay::Result::Update) {
+            updateOverlay.reset();
+            ctx.activeSetup = AppContext::SetupMode::Main;
+            ctx.startOnUpdateTab = true;
+          }
+          continue; // Event consumed, don't pass to other widgets
+        }
+      }
+      break;
+#endif
+    default:
+      // Handle custom application events
+      if (event.type >= AE_BASE_EVENT) {
+        switch (event.type - AE_BASE_EVENT) {
+        case AE_SATELLITE_TRACK_READY: {
+          auto *track =
+              static_cast<std::vector<GroundTrackPoint> *>(event.user.data1);
+          if (track && ctx.dashboard && ctx.dashboard->mapArea) {
+            ctx.dashboard->mapArea->onSatTrackReady(*track);
+          }
+          delete track; // Free the memory allocated by the worker thread
+          break;
+        }
+        case AE_SATELLITE_DATA_READY: {
+          auto *raw = static_cast<std::string *>(event.user.data1);
+          if (raw && ctx.dashboard && ctx.dashboard->satMgr) {
+            ctx.dashboard->satMgr->onDataReady(*raw);
+          }
+          delete raw;
+          break;
+        }
+#ifndef __EMSCRIPTEN__
+        case AE_UPDATE_DATA_READY: {
+          auto *raw = static_cast<std::string *>(event.user.data1);
+          if (raw && ctx.updateChecker) {
+            ctx.updateChecker->onDataReady(*raw);
+          }
+          delete raw;
+          break;
+        }
+#endif
+        case AE_RSS_DATA_READY: {
+          int feed_idx = event.user.code;
+          auto *headlines =
+              static_cast<std::vector<std::string> *>(event.user.data1);
+          if (headlines && feed_idx >= 0 && feed_idx < 3) {
+            rssHeadlines[feed_idx] = std::move(*headlines);
+            rssDataDirty = true;
+          }
+          delete headlines;
+          break;
+        }
+        case AE_SOLAR_DATA_READY: {
+          auto *update = static_cast<SolarData *>(event.user.data1);
+          if (update && ctx.solarStore) {
+            auto data = ctx.solarStore->get();
+            switch (static_cast<NOAAProvider::UpdateType>(event.user.code)) {
+            case NOAAProvider::UpdateType::KIndex:
+              data.k_index = update->k_index;
+              data.a_index = update->a_index;
+              data.noaa_g_scale = update->noaa_g_scale;
+              data.last_updated = update->last_updated;
+              data.valid = true;
+              break;
+            case NOAAProvider::UpdateType::SFI:
+              data.sfi = update->sfi;
+              data.valid = true;
+              break;
+            case NOAAProvider::UpdateType::SN:
+              data.sunspot_number = update->sunspot_number;
+              data.valid = true;
+              break;
+            case NOAAProvider::UpdateType::Plasma:
+              data.solar_wind_speed = update->solar_wind_speed;
+              data.solar_wind_density = update->solar_wind_density;
+              break;
+            case NOAAProvider::UpdateType::Mag:
+              data.bt = update->bt;
+              data.bz = update->bz;
+              break;
+            case NOAAProvider::UpdateType::DST:
+              data.dst = update->dst;
+              break;
+            case NOAAProvider::UpdateType::Aurora:
+              data.aurora = update->aurora;
+              break;
+            case NOAAProvider::UpdateType::DRAP:
+              data.drap = update->drap;
+              break;
+            case NOAAProvider::UpdateType::XRay:
+              data.xray_flux = update->xray_flux;
+              data.noaa_r_scale = update->noaa_r_scale;
+              break;
+            case NOAAProvider::UpdateType::ProtonFlux:
+              data.proton_flux = update->proton_flux;
+              data.noaa_s_scale = update->noaa_s_scale;
+              break;
+            }
+            ctx.solarStore->set(data);
+          }
+          delete update;
+          break;
+        }
+        case AE_AURORA_DATA_READY: {
+          float percent = *(static_cast<float *>(event.user.data1));
+          if (ctx.auroraHistoryStore) {
+            ctx.auroraHistoryStore->addPoint(percent);
+          }
+          delete static_cast<float *>(event.user.data1);
+          break;
+        }
+        case AE_ACTIVITY_DATA_READY: {
+          auto *update = static_cast<ActivityData *>(event.user.data1);
+          if (update && ctx.activityStore) {
+            auto data = ctx.activityStore->get();
+            switch (
+                static_cast<ActivityProvider::UpdateType>(event.user.code)) {
+            case ActivityProvider::UpdateType::DXPeds:
+              data.dxpeds = std::move(update->dxpeds);
+              break;
+            case ActivityProvider::UpdateType::POTA: {
+              auto it = std::remove_if(
+                  data.ontaSpots.begin(), data.ontaSpots.end(),
+                  [](const ONTASpot &s) { return s.program == "POTA"; });
+              data.ontaSpots.erase(it, data.ontaSpots.end());
+              data.ontaSpots.insert(data.ontaSpots.end(),
+                                    update->ontaSpots.begin(),
+                                    update->ontaSpots.end());
+              break;
+            }
+            case ActivityProvider::UpdateType::SOTA: {
+              auto it = std::remove_if(
+                  data.ontaSpots.begin(), data.ontaSpots.end(),
+                  [](const ONTASpot &s) { return s.program == "SOTA"; });
+              data.ontaSpots.erase(it, data.ontaSpots.end());
+              data.ontaSpots.insert(data.ontaSpots.end(),
+                                    update->ontaSpots.begin(),
+                                    update->ontaSpots.end());
+              break;
+            }
+            }
+            data.lastUpdated = std::chrono::system_clock::now();
+            data.valid = true;
+            ctx.activityStore->set(data);
+          }
+          delete update;
+          break;
+        }
+        case AE_WEATHER_DATA_READY: {
+          auto *update = static_cast<WeatherData *>(event.user.data1);
+          int id = event.user.code;
+          if (update) {
+            if (id == 0 && ctx.deWeatherStore) {
+              ctx.deWeatherStore->update(*update);
+            } else if (id == 1 && ctx.dxWeatherStore) {
+              ctx.dxWeatherStore->update(*update);
+            }
+          }
+          delete update;
+          break;
+        }
+        case AE_CONTEST_DATA_READY: {
+          auto *update = static_cast<ContestData *>(event.user.data1);
+          if (update && ctx.contestStore) {
+            ctx.contestStore->update(*update);
+          }
+          delete update;
+          break;
+        }
+        case AE_HISTORY_DATA_READY: {
+          auto *update = static_cast<HistorySeries *>(event.user.data1);
+          if (update && ctx.historyStore) {
+            ctx.historyStore->update(update->name, *update);
+          }
+          delete update;
+          break;
+        }
+        case AE_PROP_DATA_READY: {
+          auto *grid = static_cast<std::vector<float> *>(event.user.data1);
+          if (grid && ctx.dashboard && ctx.dashboard->mapArea) {
+            ctx.dashboard->mapArea->onPropDataReady(
+                static_cast<PropOverlayType>(event.user.code), *grid);
+          }
+          delete grid;
+          break;
+        }
+        case AE_ASTEROID_ELEMENTS_READY: {
+          auto *payload =
+              static_cast<std::pair<std::string, OrbitalElements> *>(
+                  event.user.data1);
+          if (payload && ctx.dashboard && ctx.dashboard->mapArea) {
+            ctx.dashboard->mapArea->onAsteroidElementsReady(payload->first,
+                                                            payload->second);
+          }
+          delete payload;
+          break;
+        }
+        case AE_ALERTS_DATA_READY: {
+          auto *update = static_cast<AlertsData *>(event.user.data1);
+          if (update && ctx.alertsStore)
+            ctx.alertsStore->update(*update);
+          delete update;
+          break;
+        }
+        case AE_FORECAST_DATA_READY: {
+          auto *update = static_cast<ForecastData *>(event.user.data1);
+          if (update && ctx.forecastStore)
+            ctx.forecastStore->update(*update);
+          delete update;
+          break;
+        }
+        case AE_REPEATER_DATA_READY: {
+          auto *update = static_cast<RepeaterData *>(event.user.data1);
+          if (update && ctx.repeaterStore)
+            ctx.repeaterStore->update(*update);
+          delete update;
+          break;
+        }
+        case AE_HURRICANE_DATA_READY: {
+          auto *update = static_cast<HurricaneData *>(event.user.data1);
+          if (update && ctx.hurricaneStore)
+            ctx.hurricaneStore->update(*update);
+          delete update;
+          break;
+        }
+        case AE_MARINE_DATA_READY: {
+          auto *update = static_cast<MarineData *>(event.user.data1);
+          if (update && ctx.marineStore)
+            ctx.marineStore->update(*update);
+          delete update;
+          break;
+        }
+        case AE_WINLINK_DATA_READY: {
+          auto *update = static_cast<WinlinkData *>(event.user.data1);
+          if (update && ctx.winlinkStore)
+            ctx.winlinkStore->update(*update);
+          delete update;
+          break;
+        }
+        case AE_MAP_IMAGE_READY: {
+          auto *data = static_cast<std::string *>(event.user.data1);
+          bool isNight = (event.user.code == 1);
+          if (data && ctx.dashboard && ctx.dashboard->mapArea) {
+            ctx.dashboard->mapArea->onMapImageReady(isNight, std::move(*data));
+          }
+          delete data;
+          break;
+        }
+        case AE_MOON_IMAGE_READY: {
+          auto *surf = static_cast<SDL_Surface *>(event.user.data1);
+          if (surf && ctx.dashboard) {
+            if (ctx.dashboard->widgetPool.count(WidgetType::MOON)) {
+              static_cast<MoonPanel *>(
+                  ctx.dashboard->widgetPool[WidgetType::MOON].get())
+                  ->onImageReady(surf);
+            } else {
+              SDL_FreeSurface(surf);
+            }
+          } else if (surf) {
+            SDL_FreeSurface(surf);
+          }
+          break;
+        }
+        case AE_TOUCH: {
+          int mx =
+              static_cast<int>(reinterpret_cast<intptr_t>(event.user.data1));
+          int my =
+              static_cast<int>(reinterpret_cast<intptr_t>(event.user.data2));
+          // If setup active, send to setup widget
+          if (ctx.activeSetup != AppContext::SetupMode::None &&
+              ctx.setupWidget) {
+            ctx.setupWidget->onMouseDown(mx, my, 0, 1);
+            ctx.setupWidget->onMouseUp(mx, my, 0, 1);
+          } else {
+            // Scan all eventWidgets for an active modal/config, mirroring
+            // the SDL_MOUSEBUTTONUP focusedWidget logic so every modal
+            // (not just mapArea's MapViewMenu) receives web touch events.
+            Widget *focused = nullptr;
+            for (auto *w : ctx.dashboard->eventWidgets) {
+              if (w->isModalActive() || w->isConfiguring()) {
+                focused = w;
+                break;
+              }
+            }
+            if (focused) {
+              focused->onMouseUp(mx, my, 0, 1);
+            } else {
+              for (auto *w : ctx.dashboard->eventWidgets)
+                if (w->onMouseUp(mx, my, 0, 1))
+                  break;
+            }
+          }
+          break;
+        }
+        case AE_WHEEL: {
+          int dy =
+              static_cast<int>(reinterpret_cast<intptr_t>(event.user.data1));
+          if (ctx.activeSetup != AppContext::SetupMode::None &&
+              ctx.setupWidget) {
+            ctx.setupWidget->onMouseWheel(dy);
+          } else {
+            // Same fix: scan all eventWidgets for active modal/config.
+            Widget *focused = nullptr;
+            for (auto *w : ctx.dashboard->eventWidgets) {
+              if (w->isModalActive() || w->isConfiguring()) {
+                focused = w;
+                break;
+              }
+            }
+            if (focused) {
+              focused->onMouseWheel(dy);
+            } else {
+              for (auto *w : ctx.dashboard->eventWidgets)
+                if (w->onMouseWheel(dy))
+                  break;
+            }
+          }
+          break;
+        }
+        }
+      }
+      break;
+    }
+
+    // Dispatch other events
+    if (!updateOverlay &&
+        (event.type == SDL_MOUSEMOTION || event.type == SDL_MOUSEBUTTONUP ||
+         event.type == SDL_MOUSEWHEEL)) {
+      // ... logic from main ...
+      // MOUSEMOTION
+      if (event.type == SDL_MOUSEMOTION) {
+        int mx = event.motion.x, my = event.motion.y;
+        if (FIDELITY_MODE && event.motion.windowID != 0) {
+          float pixX = event.motion.x * static_cast<float>(ctx.globalDrawW) /
+                       ctx.globalWinW;
+          float pixY = event.motion.y * static_cast<float>(ctx.globalDrawH) /
+                       ctx.globalWinH;
+          mx = static_cast<int>(pixX / ctx.layScale);
+          my = static_cast<int>(pixY / ctx.layScale);
+        }
+        if (focusedWidget)
+          focusedWidget->onMouseMove(mx, my);
+        else
+          for (auto *w : eventWidgets)
+            w->onMouseMove(mx, my);
+      }
+      // MOUSEBUTTONUP
+      else if (event.type == SDL_MOUSEBUTTONUP) {
+        if (event.button.button == SDL_BUTTON_LEFT) {
+          int mx = event.button.x, my = event.button.y;
+          if (FIDELITY_MODE && event.button.windowID != 0) {
+            float pixX = event.button.x * static_cast<float>(ctx.globalDrawW) /
+                         ctx.globalWinW;
+            float pixY = event.button.y * static_cast<float>(ctx.globalDrawH) /
+                         ctx.globalWinH;
+            mx = static_cast<int>(pixX / ctx.layScale);
+            my = static_cast<int>(pixY / ctx.layScale);
+          }
+          if (focusedWidget)
+            focusedWidget->onMouseUp(mx, my, SDL_GetModState(),
+                                     event.button.clicks);
+          else
+            for (auto *w : eventWidgets)
+              if (w->onMouseUp(mx, my, SDL_GetModState(), event.button.clicks))
+                break;
+        }
+      }
+      // MOUSEWHEEL
+      else if (event.type == SDL_MOUSEWHEEL) {
+        int scrollY = event.wheel.y;
+#if SDL_VERSION_ATLEAST(2, 0, 18)
+        if (event.wheel.direction == SDL_MOUSEWHEEL_FLIPPED)
+          scrollY = -scrollY;
+#endif
+        if (ctx.dashboard->mapArea->isModalActive()) {
+          ctx.dashboard->mapArea->onMouseWheel(scrollY);
+        } else {
+          for (auto *w : eventWidgets)
+            if (w->onMouseWheel(scrollY))
+              break;
+        }
+      }
+    }
+  }
+
+  // After event loop, process any aggregated data
+  if (rssDataDirty) {
+    RSSData data;
+    for (int i = 0; i < 3; ++i) {
+      data.headlines.insert(data.headlines.end(), rssHeadlines[i].begin(),
+                            rssHeadlines[i].end());
+    }
+    if (data.headlines.empty()) {
+      data.headlines = {
+          "HamClock-Next: A modern amateur radio dashboard",
+          "Welcome to HamClock -- real-time propagation and space weather",
+      };
+    }
+    data.lastUpdated = std::chrono::system_clock::now();
+    data.valid = true;
+    ctx.rssStore->set(data);
+    rssDataDirty = false;
+  }
+
+  if (timePanel->isSetupRequested()) {
+    timePanel->clearSetupRequest();
+    ctx.activeSetup = AppContext::SetupMode::Main;
+    return; // Next main_tick will switch
+  }
+
+  // Check DXCluster setup
+  DXClusterPanel *dxc =
+      dynamic_cast<DXClusterPanel *>(widgetPool[WidgetType::DX_CLUSTER].get());
+  if (dxc && dxc->isSetupRequested()) {
+    dxc->clearSetupRequest();
+    ctx.activeSetup = AppContext::SetupMode::DXCluster;
+    return;
+  }
+
+  // Sync predictor from DXSatPane if it exists in the pool
+  auto *dxSatWidget =
+      dynamic_cast<DXSatPane *>(widgetPool[WidgetType::DX_INFO].get());
+  mapArea->setPredictor(dxSatWidget ? dxSatWidget->activePredictor() : nullptr);
+  auto *gimbal =
+      dynamic_cast<GimbalPanel *>(widgetPool[WidgetType::GIMBAL].get());
+  if (gimbal) {
+    gimbal->setPredictor(dxSatWidget ? dxSatWidget->activePredictor()
+                                     : nullptr);
+    gimbal->setObserver(appCfg.lat, appCfg.lon);
+  }
+
+  mapArea->setAsteroidProvider(asteroidProvider.get());
+
+  // Recalculate UI call logic
+  if (lastResizeMs && (SDL_GetTicks() - lastResizeMs > 200)) {
+    lastResizeMs = 0;
+    int dw, dh;
+    SDL_GetRendererOutputSize(ctx.renderer, &dw, &dh);
+    float ns = static_cast<float>(dh) / LOGICAL_HEIGHT;
+    if (ns > 0.5f && std::fabs(ns - fontMgr.renderScale()) > 0.01f) {
+      fontMgr.setRenderScale(ns);
+      fontMgr.clearCache();
+      fontCatalog.recalculate(LOGICAL_WIDTH, LOGICAL_HEIGHT);
+      layout.recalculate(LOGICAL_WIDTH, LOGICAL_HEIGHT, ctx.layLogicalOffX,
+                         ctx.layLogicalOffY);
+      rssBanner->onResize(139 + ctx.layLogicalOffX, 412 + ctx.layLogicalOffY,
+                          660, 68);
+    }
+  }
+
+#ifndef __EMSCRIPTEN__
+  if (cursorVisible && (SDL_GetTicks() - lastMouseMotionMs > 10000)) {
+    SDL_ShowCursor(SDL_DISABLE);
+    cursorVisible = false;
+  }
+#endif
+
+  if (appCfg.preventSleep && (now - lastSleepAssert > 30000)) {
+    preventRPiSleep(true);
+    lastSleepAssert = now;
+  }
+
+  // 60-second RSS/VRAM heartbeat — helps diagnose memory growth on RPi
+  if (now - lastMemLogMs > 60000) {
+    auto &mm = MemoryMonitor::getInstance();
+    mm.logStats("heartbeat");
+    if (mm.isLowMemoryDevice()) {
+      size_t rss = mm.getRSS();
+      const size_t kFlushThresholdBytes = 650ULL * 1024 * 1024;
+      if (rss > kFlushThresholdBytes) {
+        LOG_W("Main", "RSS {:.1f} MB exceeds threshold on low-mem device — flushing caches",
+              rss / 1024.0 / 1024.0);
+        texMgr.clearCache();
+        texMgr.setMaxCacheSize(10);
+      }
+    }
+    lastMemLogMs = now;
+  }
+
+  if (isPowerOn) {
+    for (auto *w : widgets)
+      w->update();
+    // satMgr->update(); // Deprecated: Auto-tracking handled by RotatorService
+    ctx.brightnessMgr->update();
+  }
+}
+
+void DashboardContext::render(AppContext &ctx) {
+  SDL_SetRenderDrawColor(ctx.renderer, 0, 0, 0, 255);
+  SDL_RenderClear(ctx.renderer);
+
+  if (FIDELITY_MODE) {
+    SDL_RenderSetViewport(ctx.renderer, nullptr);
+    SDL_RenderSetScale(ctx.renderer, ctx.layScale, ctx.layScale);
+  }
+
+  if (!ctx.displayPower->getPower()) {
+    if (ctx.displayPower->consumeBlackFrame())
+      SDL_RenderPresent(ctx.renderer); // one black frame to clear the display
+    return; // subsequent ticks: don't present — let KMSDRM pipeline go idle
+  }
+
+  Widget *activeModal = nullptr;
+  for (auto *w : widgets) {
+    if (expandedPaneIdx_ >= 0 && w == mapArea.get())
+      continue;  // hide map behind expanded pane
+    if (w->isModalActive())
+      activeModal = w;
+    SDL_Rect clip = w->getRect();
+    SDL_RenderSetClipRect(ctx.renderer, &clip);
+    w->render(ctx.renderer);
+  }
+  SDL_RenderSetClipRect(ctx.renderer, nullptr);
+
+  if (activeModal) {
+    if (FIDELITY_MODE)
+      SDL_RenderSetScale(ctx.renderer, 1.0f, 1.0f);
+
+    SDL_SetRenderDrawBlendMode(ctx.renderer, SDL_BLENDMODE_BLEND);
+    SDL_SetRenderDrawColor(ctx.renderer, 0, 0, 0, 150);
+    // Draw over entire window by bypassing logical scaling
+    int dw, dh;
+    SDL_GetRendererOutputSize(ctx.renderer, &dw, &dh);
+    SDL_Rect full = {0, 0, dw, dh};
+    SDL_RenderFillRect(ctx.renderer, &full);
+
+    if (FIDELITY_MODE)
+      SDL_RenderSetScale(ctx.renderer, ctx.layScale, ctx.layScale);
+
+    activeModal->renderModal(ctx.renderer);
+  }
+
+  if (updateOverlay) {
+    updateOverlay->render(ctx.renderer);
+  }
+
+  if (ctx.showActionHighlights) {
+    int mx, my;
+    SDL_GetMouseState(&mx, &my);
+    if (FIDELITY_MODE) {
+      float pixX = mx * static_cast<float>(ctx.globalDrawW) / ctx.globalWinW;
+      float pixY = my * static_cast<float>(ctx.globalDrawH) / ctx.globalWinH;
+      mx = static_cast<int>(pixX / ctx.layScale);
+      my = static_cast<int>(pixY / ctx.layScale);
+    }
+
+    SDL_SetRenderDrawBlendMode(ctx.renderer, SDL_BLENDMODE_BLEND);
+    std::string hoverTooltip;
+
+    for (auto *w : widgets) {
+      auto actions = w->getActions();
+      for (const auto &action : actions) {
+        SDL_Rect r = w->getActionRect(action);
+        if (r.w > 0 && r.h > 0) {
+          bool hovered =
+              (mx >= r.x && mx < r.x + r.w && my >= r.y && my < r.y + r.h);
+          if (hovered) {
+            SDL_SetRenderDrawColor(ctx.renderer, 255, 255, 0,
+                                   120); // yellow highlight
+            hoverTooltip = action;
+          } else {
+            SDL_SetRenderDrawColor(ctx.renderer, 0, 255, 255,
+                                   60); // cyan highlight
+          }
+          SDL_RenderFillRect(ctx.renderer, &r);
+          SDL_SetRenderDrawColor(ctx.renderer, 255, 255, 255, 100);
+          SDL_RenderDrawRect(ctx.renderer, &r);
+        }
+      }
+    }
+
+    if (!hoverTooltip.empty()) {
+      auto *cat = &fontCatalog;
+      if (cat) {
+        int tw, th;
+        cat->renderText(ctx.renderer, hoverTooltip, {255, 255, 255, 255},
+                        FontStyle::Micro, &tw, &th);
+        int pad = 4;
+        SDL_Rect box = {mx + 12, my + 12, tw + pad * 2, th + pad * 2};
+        // Keep tooltip on screen
+        if (box.x + box.w > LOGICAL_WIDTH)
+          box.x = mx - box.w - 4;
+        if (box.y + box.h > LOGICAL_HEIGHT)
+          box.y = my - box.h - 4;
+
+        SDL_SetRenderDrawColor(ctx.renderer, 20, 20, 20, 220);
+        SDL_RenderFillRect(ctx.renderer, &box);
+        SDL_SetRenderDrawColor(ctx.renderer, 255, 255, 255, 180);
+        SDL_RenderDrawRect(ctx.renderer, &box);
+        cat->drawText(ctx.renderer, hoverTooltip, box.x + pad, box.y + pad,
+                      {255, 255, 255, 255}, FontStyle::Micro);
+      }
+    }
+  }
+
+#ifndef __EMSCRIPTEN__
+  if (ctx.frameCapture)
+    ctx.frameCapture->capture(ctx.renderer);
+#endif
+  SDL_RenderPresent(ctx.renderer);
+  if (FIDELITY_MODE) {
+    SDL_RenderSetScale(ctx.renderer, 1.0f, 1.0f);
+  }
+}

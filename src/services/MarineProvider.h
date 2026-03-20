@@ -1,11 +1,12 @@
 #pragma once
 
+#include "ProviderBase.h"
 #include "../core/MarineData.h"
 #include "../network/NetworkManager.h"
 #include <memory>
 #include <string>
 
-class MarineProvider {
+class MarineProvider : public ProviderBase {
 public:
   MarineProvider(NetworkManager &net, std::shared_ptr<MarineStore> store);
 

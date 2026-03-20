@@ -10,7 +10,8 @@ namespace HamClock {
 LightningProvider::LightningProvider(NetworkManager &net) : net_(net) {}
 
 void LightningProvider::fetch(double lat, double lon, bool force) {
-  uint32_t nowMs = SDL_GetTicks();
+  lastFetchMs_ = SDL_GetTicks();
+  uint32_t nowMs = lastFetchMs_;
   if (!force && lastFetch_ > 0 && (nowMs - lastFetch_) < kFetchIntervalMs) {
     return;
   }

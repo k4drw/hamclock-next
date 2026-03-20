@@ -9,6 +9,7 @@ namespace HamClock {
 TropoProvider::TropoProvider(NetworkManager& net) : net_(net) {}
 
 void TropoProvider::fetch(double lat, double lon, bool force) {
+  lastFetchMs_ = SDL_GetTicks();
   uint32_t now = SDL_GetTicks();
   if (!force && lastFetch_ > 0 && (now - lastFetch_) < kFetchIntervalMs) {
     return;

@@ -91,10 +91,8 @@ float CPUMonitor::readTemperature() const {
   return millidegrees / 1000.0f;
 }
 
-// ---------------------------------------------------------------------------
 // getCpuPercent() — cross-platform CPU utilisation (0–100%)
 // All branches compute an idle-vs-total delta since the previous call.
-// ---------------------------------------------------------------------------
 float CPUMonitor::getCpuPercent() {
 #if defined(__linux__)
   // /proc/stat aggregate "cpu" line:

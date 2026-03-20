@@ -1,6 +1,7 @@
 #include "AlertsProvider.h"
 #include "../core/Constants.h"
 #include "../core/WorkerService.h"
+#include <SDL.h>
 #include <SDL_events.h>
 #include <chrono>
 #include <nlohmann/json.hpp>
@@ -12,6 +13,7 @@ AlertsProvider::AlertsProvider(NetworkManager &net,
     : net_(net), store_(std::move(store)) {}
 
 void AlertsProvider::fetch(double lat, double lon, bool force) {
+  lastFetchMs_ = SDL_GetTicks();
   char url[256];
   // NWS Alerts API: free, no key required.
   // Point format: lat,lon (comma-separated, not URL-encoded).

@@ -1,11 +1,12 @@
 #pragma once
 
+#include "ProviderBase.h"
 #include "../core/WeatherData.h"
 #include "../network/NetworkManager.h"
 #include <memory>
 #include <string>
 
-class WeatherProvider {
+class WeatherProvider : public ProviderBase {
 public:
   WeatherProvider(NetworkManager &net, std::shared_ptr<WeatherStore> store,
                   int id = 0);

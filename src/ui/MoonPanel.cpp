@@ -73,6 +73,12 @@ void MoonPanel::drawMoon(SDL_Renderer *renderer, int cx, int cy, int r) {
   if (tex) {
     SDL_Rect dst = {cx - r, cy - r, 2 * r, 2 * r};
 
+    // Draw dark moon body first so the unlit side is visible on light themes.
+    // The NASA image uses alpha=0 for the dark background, so without this
+    // backing circle the unlit portion blends into a light panel background.
+    RenderUtils::drawCircle(renderer, (float)cx, (float)cy, (float)r,
+                            {30, 30, 45, 255});
+
     // "Flip it for north up": Dial-a-Moon is usually upright,
     // but the user might want explicitly flipped or rotated based on posangle.
     // NASA's posangle is rotation from celestial north.
@@ -108,16 +114,7 @@ void MoonPanel::render(SDL_Renderer *renderer) {
 
   ThemeColors themes = getThemeColors(theme_);
 
-  // Background
-  SDL_SetRenderDrawBlendMode(
-      renderer, (theme_ == "glass") ? SDL_BLENDMODE_BLEND : SDL_BLENDMODE_NONE);
-  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b,
-                         themes.bg.a);
-  SDL_Rect rect = {x_, y_, width_, height_};
-  SDL_RenderFillRect(renderer, &rect);
-  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
-                         themes.border.b, themes.border.a);
-  SDL_RenderDrawRect(renderer, &rect);
+  renderChrome(renderer);
 
   int titleH = 20;
   fontMgr_.catalog()->drawText(renderer, "Moon", x_ + 10, y_ + 5, themes.accent,

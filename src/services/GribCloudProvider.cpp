@@ -7,9 +7,7 @@
 #include <cstring>
 #include <ctime>
 
-// ---------------------------------------------------------------------------
 // GRIB2 binary helpers (big-endian)
-// ---------------------------------------------------------------------------
 
 static inline uint16_t u16be(const uint8_t *p) {
   return ((uint16_t)p[0] << 8) | p[1];
@@ -42,10 +40,8 @@ static uint32_t readBits(const uint8_t *data, size_t bitOffset, int n) {
   return (uint32_t)buf;
 }
 
-// ---------------------------------------------------------------------------
 // GRIB2 decoder — Template 5.0 (simple packing) for TCDC only
 // discipline=0, parameterCategory=6, parameterNumber=1
-// ---------------------------------------------------------------------------
 
 SDL_Surface *GribCloudProvider::decodeGrib(const std::vector<uint8_t> &data) {
   size_t pos = 0;
@@ -345,9 +341,7 @@ SDL_Surface *GribCloudProvider::decodeGrib(const std::vector<uint8_t> &data) {
   return surf;
 }
 
-// ---------------------------------------------------------------------------
 // GFS cycle URL construction (same pattern as WxMbProvider)
-// ---------------------------------------------------------------------------
 
 std::string GribCloudProvider::buildUrl() {
   // Step back 4 hours so we only request a cycle that has been published.
@@ -371,9 +365,7 @@ std::string GribCloudProvider::buildUrl() {
   return buf;
 }
 
-// ---------------------------------------------------------------------------
 // Public interface
-// ---------------------------------------------------------------------------
 
 GribCloudProvider::GribCloudProvider(NetworkManager &net) : net_(net) {}
 
@@ -383,6 +375,7 @@ GribCloudProvider::~GribCloudProvider() {
 }
 
 void GribCloudProvider::update() {
+  lastFetchMs_ = SDL_GetTicks();
   std::string url = buildUrl();
   {
     std::lock_guard<std::mutex> lk(mutex_);

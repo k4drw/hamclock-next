@@ -3,6 +3,8 @@
 #include <chrono>
 #include <string>
 
+class LTR329Provider;
+
 // Manages display brightness via sysfs and scheduled dimming
 // Ported from original HamClock brightness.cpp
 class BrightnessManager {
@@ -45,6 +47,11 @@ public:
   // Get sysfs path being used
   std::string getPath() const { return brightnessPath_; }
 
+  // Set LTR329 photosensor for auto-dim (optional; call before update())
+  void setLtr329Provider(LTR329Provider *ltr) { ltr329_ = ltr; }
+  void setLtr329AutoDim(bool enabled) { ltr329AutoDim_ = enabled; }
+  bool isLtr329AutoDimEnabled() const { return ltr329AutoDim_; }
+
 private:
   bool detectBrightnessPath();
   bool writeBrightness(int value);
@@ -64,4 +71,8 @@ private:
   int brightHour_ = 6;    // Default: brighten at 6 AM
   int brightMinute_ = 0;
   int dimLevel_ = 20;     // Default: 20% when dimmed
+
+  // LTR329 photosensor auto-dim
+  LTR329Provider *ltr329_ = nullptr;
+  bool ltr329AutoDim_ = false;
 };

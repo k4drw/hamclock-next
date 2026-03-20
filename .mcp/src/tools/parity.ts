@@ -12,6 +12,7 @@ export function registerParityTools(server: McpServer) {
     {
       source_path: z.string().describe("Path to the Markdown report file."),
     },
+    { readOnlyHint: false },
     async ({ source_path }) => {
       const data = await loadReport(source_path);
       await saveReport(PARITY_JSON_PATH, data);
@@ -23,6 +24,7 @@ export function registerParityTools(server: McpServer) {
     "parity_summary",
     "Show a summary of the feature parity.",
     {},
+    { readOnlyHint: true },
     async () => {
       const parityData = await loadParityData();
       const summary = getSummary(parityData);
@@ -47,6 +49,7 @@ ${summary.gaps.map(item => `- ${item}`).join('\n')}`;
       status_filter: z.array(z.string()).optional().describe("Filter by status (e.g. ['PARTIAL', 'MISSING'])"),
       q: z.string().optional().describe("Search by name or ID"),
     },
+    { readOnlyHint: true },
     async ({ status_filter, q }) => {
       const parityData = await loadParityData();
       const features = listFeatures(parityData, status_filter, q);
@@ -61,6 +64,7 @@ ${summary.gaps.map(item => `- ${item}`).join('\n')}`;
     {
       feature_id: z.string().describe("The ID of the feature to get."),
     },
+    { readOnlyHint: true },
     async ({ feature_id }) => {
       const parityData = await loadParityData();
       const feature = getFeature(parityData, feature_id);
@@ -77,6 +81,7 @@ ${summary.gaps.map(item => `- ${item}`).join('\n')}`;
     {
       feature_id: z.string().describe("The ID of the feature to create a ticket for."),
     },
+    { readOnlyHint: true },
     async ({ feature_id }) => {
       const parityData = await loadParityData();
       const feature = getFeature(parityData, feature_id);
@@ -94,6 +99,7 @@ ${summary.gaps.map(item => `- ${item}`).join('\n')}`;
       statuses: z.array(z.string()).default(['PARTIAL', 'STUB', 'MISSING']),
       limit: z.number().default(10),
     },
+    { readOnlyHint: true },
     async ({ statuses, limit }) => {
       const parityData = await loadParityData();
       const tickets = createBatchTickets(parityData, statuses, limit);
@@ -108,6 +114,7 @@ ${summary.gaps.map(item => `- ${item}`).join('\n')}`;
       feature_id: z.string().describe("The ID of the feature to verify."),
       base_url: z.string().default("http://localhost:8080").describe("Base URL of the hamclock-next instance"),
     },
+    { readOnlyHint: true, openWorldHint: true },
     async ({ feature_id, base_url }) => {
       const parityData = await loadParityData();
       const feature = getFeature(parityData, feature_id);

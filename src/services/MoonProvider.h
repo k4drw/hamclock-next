@@ -1,10 +1,11 @@
 #pragma once
 
 #include "../core/MoonData.h"
+#include "ProviderBase.h"
 #include "../network/NetworkManager.h"
 #include <memory>
 
-class MoonProvider {
+class MoonProvider : public ProviderBase {
 public:
   MoonProvider(NetworkManager &net, std::shared_ptr<MoonStore> store);
 

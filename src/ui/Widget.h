@@ -5,6 +5,7 @@
 #include "../core/Theme.h"
 #include <SDL.h>
 #include <nlohmann/json.hpp>
+#include <algorithm>
 #include <string>
 #include <vector>
 
@@ -100,6 +101,7 @@ protected:
   struct Tooltip {
     bool visible = false;
     std::string text;
+    std::string text2; // optional second line (dimmer, same font)
     int x = 0;
     int y = 0;
     uint32_t timestamp = 0;
@@ -109,22 +111,55 @@ protected:
     int cachedH = 0;
   } tooltip_;
 
+  // Draw the standard background fill + border rect for this widget.
+  // Panels opt-in by calling this at the top of their render() method.
+  void renderChrome(SDL_Renderer *renderer) {
+    ThemeColors themes = getThemeColors(theme_);
+    SDL_SetRenderDrawBlendMode(
+        renderer,
+        (theme_ == "glass") ? SDL_BLENDMODE_BLEND : SDL_BLENDMODE_NONE);
+    SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b,
+                           themes.bg.a);
+    SDL_Rect rect = {x_, y_, width_, height_};
+    SDL_RenderFillRect(renderer, &rect);
+    SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
+                           themes.border.b, themes.border.a);
+    SDL_RenderDrawRect(renderer, &rect);
+  }
+
+  // Draw the standard panel title at (x_+10, y_+5) in accent/MicroBold.
+  // Panels opt-in by calling this after renderChrome() in their render() method.
+  void renderTitle(SDL_Renderer *renderer, FontManager &fontMgr,
+                   const std::string &title) {
+    ThemeColors themes = getThemeColors(theme_);
+    auto *cat = fontMgr.catalog();
+    if (cat)
+      cat->drawText(renderer, title, x_ + 10, y_ + 5, themes.accent,
+                    FontStyle::MicroBold);
+  }
+
   // Default tooltip renderer — shared by all panels with simple tooltips.
   // Panels with custom tooltip logic (e.g. MapWidget) override this.
+  // If tooltip_.text2 is set, it is drawn as a second dimmer line below text.
   void renderTooltip(SDL_Renderer *renderer, FontManager &fontMgr) {
     if (tooltip_.text.empty())
       return;
 
     ThemeColors themes = getThemeColors(theme_);
     auto *cat = fontMgr.catalog();
-    int tw, th;
-    cat->renderText(renderer, tooltip_.text, themes.text, FontStyle::Micro, &tw,
-                    &th);
+    int tw1, th1, tw2 = 0, th2 = 0;
+    cat->renderText(renderer, tooltip_.text, themes.text, FontStyle::Micro,
+                    &tw1, &th1);
+    if (!tooltip_.text2.empty())
+      cat->renderText(renderer, tooltip_.text2, themes.textDim, FontStyle::Micro,
+                      &tw2, &th2);
 
     int padX = 8;
     int padY = 4;
-    int boxW = tw + padX * 2;
-    int boxH = th + padY * 2;
+    int lineGap = 2;
+    int innerH = th1 + (th2 > 0 ? lineGap + th2 : 0);
+    int boxW = std::max(tw1, tw2) + padX * 2;
+    int boxH = innerH + padY * 2;
 
     int bx = tooltip_.x - boxW / 2;
     int by = tooltip_.y - boxH - 12;
@@ -146,5 +181,8 @@ protected:
 
     cat->drawText(renderer, tooltip_.text, bx + padX, by + padY, themes.text,
                   FontStyle::Micro);
+    if (!tooltip_.text2.empty())
+      cat->drawText(renderer, tooltip_.text2, bx + padX,
+                    by + padY + th1 + lineGap, themes.textDim, FontStyle::Micro);
   }
 };

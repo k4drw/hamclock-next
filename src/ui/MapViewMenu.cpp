@@ -1,5 +1,6 @@
 #include "MapViewMenu.h"
 #include "../core/Constants.h"
+#include "../core/StringUtils.h"
 #include "../core/Theme.h"
 #include "FontCatalog.h"
 #include <string>
@@ -456,11 +457,9 @@ bool MapViewMenu::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
 
     if (handleCombo(powerRec_, COMBO_POWER, powerOpts_, [&](int idx) {
           // parse "100W" -> 100
-          try {
-            propPower_ = std::stoi(powerOpts_[idx]);
-          } catch (...) {
+          propPower_ = StringUtils::safe_stoi(powerOpts_[idx]);
+          if (propPower_ <= 0)
             propPower_ = 100;
-          }
         }))
       return true;
   }

@@ -3,11 +3,15 @@
 #include "../core/Constants.h"
 #include <atomic>
 #include <memory>
+#include <mutex>
 #include <thread>
 #include <vector>
 
 // Forward declaration to avoid pulling SDL into the header
 struct SDL_Renderer;
+
+// Forward declaration for httplib::Server (full definition in WebServer.cpp via httplib.h)
+namespace httplib { class Server; }
 
 struct AppConfig;
 struct HamClockState;
@@ -27,7 +31,12 @@ class RotatorService;
 class PaneContainer;
 class WeatherStore;
 class BrightnessManager;
+class BME280Provider;
+class LTR329Provider;
 class ADIFProvider;
+class StopwatchPanel;
+class CalendarStore;
+class TimePanel;
 
 class WebServer {
 public:
@@ -46,32 +55,43 @@ public:
   void start();
   void stop();
 
-  void setFrameCapture(FrameCapture *fc) { frameCapture_ = fc; }
+  void setFrameCapture(FrameCapture *fc) { std::lock_guard<std::mutex> lk(dataMutex_); frameCapture_ = fc; }
   void setLiveWebEnabled(bool enabled) { liveWebEnabled_ = enabled; }
   bool isLiveWebEnabled() const { return liveWebEnabled_; }
-  void setNetworkManager(NetworkManager *nm) { netMgr_ = nm; }
-  void setActivityStore(ActivityDataStore *a) { activityStore_ = a; }
-  void setSatelliteManager(SatelliteManager *s) { satMgr_ = s; }
-  void setRotatorService(RotatorService *r) { rotatorSvc_ = r; }
+  void setNetworkManager(NetworkManager *nm) { std::lock_guard<std::mutex> lk(dataMutex_); netMgr_ = nm; }
+  void setActivityStore(ActivityDataStore *a) { std::lock_guard<std::mutex> lk(dataMutex_); activityStore_ = a; }
+  void setSatelliteManager(SatelliteManager *s) { std::lock_guard<std::mutex> lk(dataMutex_); satMgr_ = s; }
+  void setRotatorService(RotatorService *r) { std::lock_guard<std::mutex> lk(dataMutex_); rotatorSvc_ = r; }
   void setRotationControl(std::atomic<int> *cmd, std::atomic<int> *pane,
                           std::atomic<int> *widget) {
+    std::lock_guard<std::mutex> lk(dataMutex_);
     rotationCmd_ = cmd;
     rotationCmdPane_ = pane;
     rotationCmdWidget_ = widget;
   }
   void setPanes(std::vector<std::unique_ptr<PaneContainer>> *panes) {
+    std::lock_guard<std::mutex> lk(dataMutex_);
     panes_ = panes;
   }
   void setWeatherStore(std::shared_ptr<WeatherStore> ws) { weatherStore_ = ws; }
   void setBrightnessManager(std::shared_ptr<BrightnessManager> bm) {
     brightnessMgr_ = bm;
   }
-  void setADIFProvider(ADIFProvider *p) { adifProvider_ = p; }
-  void setMapReloadFlag(std::atomic<bool> *flag) { mapReloadFlag_ = flag; }
+  void setADIFProvider(ADIFProvider *p) { std::lock_guard<std::mutex> lk(dataMutex_); adifProvider_ = p; }
+  void setMapReloadFlag(std::atomic<bool> *flag) { std::lock_guard<std::mutex> lk(dataMutex_); mapReloadFlag_ = flag; }
+  void setStopwatch(StopwatchPanel *s) { std::lock_guard<std::mutex> lk(dataMutex_); stopwatch_ = s; }
+  void setCalendarStore(std::shared_ptr<CalendarStore> s) {
+    calendarStore_ = std::move(s);
+  }
+  void setTimePanel(TimePanel *tp) { std::lock_guard<std::mutex> lk(dataMutex_); timePanel_ = tp; }
+  void setPaneExpandControl(std::atomic<int> *cmd) { std::lock_guard<std::mutex> lk(dataMutex_); paneExpandCmd_ = cmd; }
+  void setBMEProvider(BME280Provider *bme) { bmeProvider_ = bme; }
 
 private:
   void run();
+  void registerRoutes(httplib::Server &svr);
 
+  std::mutex dataMutex_;
   SDL_Renderer *renderer_;
   AppConfig *cfg_;
   HamClockState *state_;
@@ -96,7 +116,12 @@ private:
   std::vector<std::unique_ptr<PaneContainer>> *panes_ = nullptr;
   std::shared_ptr<WeatherStore> weatherStore_;
   std::shared_ptr<BrightnessManager> brightnessMgr_;
+  BME280Provider *bmeProvider_ = nullptr;
   ADIFProvider *adifProvider_ = nullptr;
+  StopwatchPanel *stopwatch_ = nullptr;
+  std::shared_ptr<CalendarStore> calendarStore_;
+  TimePanel *timePanel_ = nullptr;
+  std::atomic<int> *paneExpandCmd_ = nullptr;
   bool screenLocked_ = false;
   bool liveWebEnabled_ = false;
   int port_;

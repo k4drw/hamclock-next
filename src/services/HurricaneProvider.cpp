@@ -1,5 +1,6 @@
 #include "HurricaneProvider.h"
 #include "../core/Constants.h"
+#include <SDL.h>
 #include "../core/WorkerService.h"
 #include <SDL_events.h>
 #include <chrono>
@@ -12,6 +13,7 @@ HurricaneProvider::HurricaneProvider(NetworkManager &net,
     : net_(net), store_(std::move(store)) {}
 
 void HurricaneProvider::fetch(bool force) {
+  lastFetchMs_ = SDL_GetTicks();
   // NHC CurrentStorms.json — free, no key, updated ~every 3-6 hours.
   static const char *kUrl =
       "https://www.nhc.noaa.gov/CurrentStorms.json";

@@ -2,6 +2,7 @@
 #include "../core/Astronomy.h"
 #include "../core/StringUtils.h"
 #include "../core/Theme.h"
+#include "../core/TimeUtils.h"
 #include "FontCatalog.h"
 #include "RenderUtils.h"
 #include "TextureManager.h"
@@ -126,8 +127,7 @@ void TimePanel::update() {
   Astronomy::portable_gmtime(&t, &utc);
 
   char buf[32];
-  std::snprintf(buf, sizeof(buf), "%02d:%02d", utc.tm_hour, utc.tm_min);
-  currentHM_ = buf;
+  currentHM_ = TimeUtils::hm(utc.tm_hour, utc.tm_min);
 
   std::snprintf(buf, sizeof(buf), "%02d", utc.tm_sec);
   currentSec_ = buf;
@@ -166,18 +166,7 @@ void TimePanel::render(SDL_Renderer *renderer) {
 
   ThemeColors themes = getThemeColors(theme_);
 
-  // Background
-  SDL_SetRenderDrawBlendMode(
-      renderer, (theme_ == "glass") ? SDL_BLENDMODE_BLEND : SDL_BLENDMODE_NONE);
-  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b,
-                         themes.bg.a);
-  SDL_Rect rect = {x_, y_, width_, height_};
-  SDL_RenderFillRect(renderer, &rect);
-
-  // Draw pane border
-  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
-                         themes.border.b, themes.border.a);
-  SDL_RenderDrawRect(renderer, &rect);
+  renderChrome(renderer);
 
   int pad = std::max(4, static_cast<int>(width_ * 0.03f));
 

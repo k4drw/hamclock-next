@@ -1,6 +1,7 @@
 #include "DstProvider.h"
 #include "../core/Astronomy.h"
 #include "../core/StringUtils.h"
+#include <SDL.h>
 #include <algorithm>
 #include <chrono>
 #include <ctime>
@@ -12,6 +13,7 @@ DstProvider::DstProvider(NetworkManager &net, std::shared_ptr<DstStore> store)
     : net_(net), store_(store) {}
 
 void DstProvider::fetch() {
+  lastFetchMs_ = SDL_GetTicks();
   const char *url = "https://services.swpc.noaa.gov/products/kyoto-dst.json";
 
   std::weak_ptr<DstProvider> self = shared_from_this();

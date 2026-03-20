@@ -11,6 +11,7 @@
 #endif
 
 std::shared_ptr<spdlog::logger> Log::s_Logger;
+std::shared_ptr<RingBufferSink> Log::s_RingSink;
 
 void Log::init(const std::string &fallbackDir) {
   std::fprintf(stderr, "Initializing spdlog...\n");
@@ -20,6 +21,10 @@ void Log::init(const std::string &fallbackDir) {
 
   // 1. Stderr Color Sink (Standard for journalctl/console)
   sinks.push_back(std::make_shared<spdlog::sinks::stderr_color_sink_mt>());
+
+  // 2. In-memory ring buffer sink (last 200 lines for /debug/logs endpoint)
+  s_RingSink = std::make_shared<RingBufferSink>();
+  sinks.push_back(s_RingSink);
 
   // 2. Rotating File Sink
   std::filesystem::path primaryPath = "/var/log/hamclock";
