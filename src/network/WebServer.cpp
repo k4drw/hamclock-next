@@ -982,7 +982,7 @@ void WebServer::run() {
         document.getElementById('sync-rot').checked = !!c.syncRotation;
 
         // Pane 4 (index 3) is a small pane restricted to 4 widget types
-        const pane4Allowed = new Set(['NCDXF', 'Solar', 'DX Weather', 'DE Weather']);
+        const pane4Allowed = new Set(['NCDXF', 'Solar', 'DX Weather', 'DE Weather', 'Band Cond']);
 
         // Build Pane 1-4 lists
         for (let i = 0; i < 4; i++) {

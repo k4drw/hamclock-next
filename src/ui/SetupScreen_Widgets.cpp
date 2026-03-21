@@ -131,7 +131,8 @@ void SetupScreen::renderTabWidgets(SDL_Renderer *renderer, int cx, int pad,
       bool allowed = true;
       if (activePane_ == 3) {
         allowed = (t == WidgetType::NCDXF || t == WidgetType::SOLAR ||
-                   t == WidgetType::DX_WEATHER || t == WidgetType::DE_WEATHER);
+                   t == WidgetType::DX_WEATHER || t == WidgetType::DE_WEATHER ||
+                   t == WidgetType::BAND_CONDITIONS);
       }
 
       int drawX = fieldX + col * colW;

@@ -2,6 +2,7 @@
 #include "../core/Theme.h"
 #include "FontCatalog.h"
 #include <algorithm>
+#include <sstream>
 
 UpdateOverlay::UpdateOverlay(int x, int y, int w, int h, FontManager &fontMgr,
                              UpdateChecker &updateChecker)

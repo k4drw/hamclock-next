@@ -223,6 +223,8 @@ struct DashboardContext {
   bool cursorVisible = true;
   Uint32 lastSleepAssert = 0;
   Uint32 lastMemLogMs = 0;
+  float fingerScrollAccum_ = 0.0f;  // accumulated normalized finger-Y for swipe-to-scroll
+  bool fingerWasScrolling_ = false;  // true if current touch gesture crossed scroll threshold
 
   // State for background data aggregation
   std::vector<std::string> rssHeadlines[3];

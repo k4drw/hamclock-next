@@ -365,7 +365,7 @@ bool DisplayPower::runWlrRandr(bool on) {
 }
 
 bool DisplayPower::runDrmDpms(bool on) {
-#if defined(__linux__) && !defined(__EMSCRIPTEN__)
+#if defined(HAS_LIBDRM) && !defined(__EMSCRIPTEN__)
   bool ownedFd = false;
   int fd = drmFd_;
   if (fd < 0) {

@@ -65,6 +65,12 @@ private:
   void fetchDirect(const std::string &url,
                    std::function<void(std::string)> callback,
                    bool hasCache, const CacheEntry &cached);
+#ifdef __ANDROID__
+  // Concatenates Android's per-file system CA store into a single PEM bundle
+  // that mbedTLS can use via CURLOPT_CAINFO. Called once from the constructor.
+  void buildAndroidCaBundle();
+  std::string androidCaBundlePath_;
+#endif
 
 public:
   // Get the server-reported last modified time for a cached URL

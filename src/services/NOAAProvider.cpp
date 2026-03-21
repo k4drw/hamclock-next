@@ -12,6 +12,7 @@
 #include <cmath>
 #include <cstdio>
 #include <memory>
+#include <sstream>
 #include <nlohmann/json.hpp>
 #include <unordered_map>
 

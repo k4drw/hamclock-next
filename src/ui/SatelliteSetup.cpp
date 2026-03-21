@@ -5,6 +5,7 @@
 #include "FontCatalog.h"
 #include <algorithm>
 #include <cctype>
+#include <sstream>
 
 namespace HamClock {
 

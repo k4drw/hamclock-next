@@ -81,9 +81,11 @@ if(NOT EMSCRIPTEN)
         set(SDL2_STATIC ON CACHE BOOL "Build static SDL library" FORCE)
         # ...
         set(SDL_TEST OFF CACHE BOOL "Disable SDL tests")
-        set(SDL_JOYSTICK OFF CACHE BOOL "Disable SDL joystick")
-        set(SDL_HAPTIC OFF CACHE BOOL "Disable SDL haptic")
-        set(SDL_SENSOR OFF CACHE BOOL "Disable SDL sensor")
+        if(NOT ANDROID)
+            set(SDL_JOYSTICK OFF CACHE BOOL "Disable SDL joystick")
+            set(SDL_HAPTIC OFF CACHE BOOL "Disable SDL haptic")
+            set(SDL_SENSOR OFF CACHE BOOL "Disable SDL sensor")
+        endif()
 
         set(SDL_PIPEWIRE OFF CACHE BOOL "Disable SDL PipeWire audio")
 
@@ -151,7 +153,7 @@ if(NOT EMSCRIPTEN)
     endif()
 endif()
 
-# 4. mbedtls (for static SSL on Linux/RPi)
+# 4. mbedtls (for static SSL on Linux/RPi/Android — cross-compiles cleanly with NDK)
 if(NOT WIN32 AND NOT EMSCRIPTEN)
     set(ENABLE_TESTING OFF CACHE BOOL "Disable mbedtls tests")
     set(ENABLE_PROGRAMS OFF CACHE BOOL "Disable mbedtls programs")
@@ -334,15 +336,7 @@ else()
     endif()
 endif()
 
-# libpredict is special because it forces -Werror and adds tests unconditionally.
-# We use Populate + add_subdirectory with EXCLUDE_FROM_ALL to isolate it.
-if(NOT libpredict_FOUND)
-    FetchContent_GetProperties(libpredict)
-    if(NOT libpredict_POPULATED)
-        FetchContent_Populate(libpredict)
-        add_subdirectory(${libpredict_SOURCE_DIR} ${libpredict_BINARY_DIR} EXCLUDE_FROM_ALL)
-    endif()
-endif()
+
 
 if(NOT USE_SYSTEM_CURL AND NOT EMSCRIPTEN)
     if(ENABLE_DEBUG_API)
@@ -654,8 +648,8 @@ if(EMSCRIPTEN)
     )
 
     target_include_directories(hamclock-wasm PRIVATE
-        ${CMAKE_SOURCE_DIR}/include
-        ${CMAKE_SOURCE_DIR}/src
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
         ${libpredict_BINARY_DIR}/include
     )
 
@@ -682,11 +676,15 @@ else()
         set(HC_WIN32_FLAG WIN32)
     endif()
 
-    add_executable(hamclock-next ${HC_WIN32_FLAG} ${HAMCLOCK_SOURCES})
+    if(ANDROID)
+        add_library(hamclock-next SHARED ${HAMCLOCK_SOURCES})
+    else()
+        add_executable(hamclock-next ${HC_WIN32_FLAG} ${HAMCLOCK_SOURCES})
+    endif()
 
     target_include_directories(hamclock-next PRIVATE
-        ${CMAKE_SOURCE_DIR}/include
-        ${CMAKE_SOURCE_DIR}/src
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
     )
     target_include_directories(hamclock-next SYSTEM PRIVATE
         ${libpredict_BINARY_DIR}/include

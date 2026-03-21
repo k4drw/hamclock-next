@@ -89,6 +89,9 @@ bool SetupScreen::onMouseDown(int mx, int my, Uint16 mod, int clicks) {
         ti->setActive(true);
         ti->onMouseDown(mx, my, clicks, fontMgr_, r.x, r.y, r.w, r.h,
                         FontStyle::SmallRegular, textPad);
+#ifdef __ANDROID__
+        SDL_StartTextInput();
+#endif
       }
       return true;
     }
@@ -471,9 +474,15 @@ bool SetupScreen::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
   if (TextInput *ti = getActiveInput())
     ti->onMouseUp();
 
-  // If clicked outside modal, cancel
+  // If clicked outside modal, cancel (or just dismiss keyboard on Android)
   if (mx < modalRect_.x || mx >= modalRect_.x + modalRect_.w ||
       my < modalRect_.y || my >= modalRect_.y + modalRect_.h) {
+#ifdef __ANDROID__
+    if (SDL_IsTextInputActive()) {
+      SDL_StopTextInput();
+      return true; // consume tap — dismiss keyboard, don't close settings
+    }
+#endif
     cancelled_ = true;
     complete_ = true;
     return true;

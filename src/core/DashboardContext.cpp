@@ -720,10 +720,12 @@ DashboardContext::DashboardContext(AppContext &ctx)
       widgetPool[type] =
           std::make_unique<BeaconPanel>(0, 0, 0, 0, fontMgr, *beaconProvider);
       break;
-    case WidgetType::SDO:
-      widgetPool[type] =
-          std::make_unique<SDOPanel>(0, 0, 0, 0, fontMgr, texMgr, *sdoProvider);
+    case WidgetType::SDO: {
+      auto sdoP = std::make_unique<SDOPanel>(0, 0, 0, 0, fontMgr, texMgr, *sdoProvider);
+      sdoP->setObserver(appCfg.lat, appCfg.lon);
+      widgetPool[type] = std::move(sdoP);
       break;
+    }
     case WidgetType::SYS_INFO:
       widgetPool[type] = std::make_unique<SysInfoPanel>(
           0, 0, 0, 0, fontMgr, ctx.cpuMonitor, ctx.state, appCfg.useMetric);
@@ -987,7 +989,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
     }
     if (paneIdx == 3) { // Pane 4 (top-right small pane)
       available = {WidgetType::NCDXF, WidgetType::SOLAR, WidgetType::DX_WEATHER,
-                   WidgetType::DE_WEATHER};
+                   WidgetType::DE_WEATHER, WidgetType::BAND_CONDITIONS};
     }
     std::vector<WidgetType> current = panes[paneIdx]->getRotation();
     std::vector<WidgetType> forbidden;
@@ -1586,8 +1588,55 @@ void DashboardContext::update(AppContext &ctx) {
     case SDL_FINGERDOWN:
       if (appCfg.preventSleep)
         preventRPiSleep(true, ctx.displayPower.get());
+      fingerScrollAccum_ = 0.0f;
+      fingerWasScrolling_ = false;
       break;
+    case SDL_FINGERMOTION: {
+      // Convert vertical swipe to discrete scroll steps for dropdowns and lists.
+      // tfinger.dy is normalized 0..1 relative to window height.
+      // 0.04 ≈ one step per ~40px on a 1080p screen — adjust if too sensitive.
+      static constexpr float kScrollStep = 0.04f;
+      fingerScrollAccum_ += event.tfinger.dy;
+      // Convert normalised finger position to logical coords — same pipeline
+      // as the SDL_MOUSEWHEEL handler so hit-testing uses identical geometry.
+      int fmx = static_cast<int>(event.tfinger.x * ctx.globalWinW);
+      int fmy = static_cast<int>(event.tfinger.y * ctx.globalWinH);
+      if (FIDELITY_MODE) {
+        float pixX = fmx * static_cast<float>(ctx.globalDrawW) / ctx.globalWinW;
+        float pixY = fmy * static_cast<float>(ctx.globalDrawH) / ctx.globalWinH;
+        fmx = static_cast<int>(pixX / ctx.layScale);
+        fmy = static_cast<int>(pixY / ctx.layScale);
+      }
+      auto dispatchScroll = [&](int dy) {
+        if (updateOverlay) {
+          updateOverlay->onMouseWheel(dy);
+        } else if (mapArea->isModalActive()) {
+          mapArea->onMouseWheel(dy);
+        } else {
+          for (auto *w : eventWidgets) {
+            SDL_Rect r = w->getRect();
+            if (fmx >= r.x && fmx < r.x + r.w && fmy >= r.y && fmy < r.y + r.h) {
+              if (w->onMouseWheel(dy)) break;
+            }
+          }
+        }
+      };
+      while (fingerScrollAccum_ <= -kScrollStep) {
+        fingerScrollAccum_ += kScrollStep;
+        fingerWasScrolling_ = true;
+        dispatchScroll(-1); // finger moved up → list scrolls down
+      }
+      while (fingerScrollAccum_ >= kScrollStep) {
+        fingerScrollAccum_ -= kScrollStep;
+        fingerWasScrolling_ = true;
+        dispatchScroll(1);  // finger moved down → list scrolls up
+      }
+      break;
+    }
     case SDL_MOUSEBUTTONDOWN: {
+      // Suppress touch-emulated click if the touch gesture was a scroll.
+      if (event.button.which == SDL_TOUCH_MOUSEID && fingerWasScrolling_)
+        break;
       int smx = event.button.x, smy = event.button.y;
       if (FIDELITY_MODE && event.button.windowID != 0) {
         float pixX = event.button.x * static_cast<float>(ctx.globalDrawW) /
@@ -2008,7 +2057,9 @@ void DashboardContext::update(AppContext &ctx) {
       }
       // MOUSEBUTTONUP
       else if (event.type == SDL_MOUSEBUTTONUP) {
-        if (event.button.button == SDL_BUTTON_LEFT) {
+        // Suppress touch-emulated click if the touch gesture was a scroll.
+        if (event.button.button == SDL_BUTTON_LEFT &&
+            !(event.button.which == SDL_TOUCH_MOUSEID && fingerWasScrolling_)) {
           int mx = event.button.x, my = event.button.y;
           if (FIDELITY_MODE && event.button.windowID != 0) {
             float pixX = event.button.x * static_cast<float>(ctx.globalDrawW) /
@@ -2037,9 +2088,23 @@ void DashboardContext::update(AppContext &ctx) {
         if (ctx.dashboard->mapArea->isModalActive()) {
           ctx.dashboard->mapArea->onMouseWheel(scrollY);
         } else {
-          for (auto *w : eventWidgets)
-            if (w->onMouseWheel(scrollY))
-              break;
+          int mx, my;
+          SDL_GetMouseState(&mx, &my);
+          if (FIDELITY_MODE) {
+            float pixX = mx * static_cast<float>(ctx.globalDrawW) /
+                         ctx.globalWinW;
+            float pixY = my * static_cast<float>(ctx.globalDrawH) /
+                         ctx.globalWinH;
+            mx = static_cast<int>(pixX / ctx.layScale);
+            my = static_cast<int>(pixY / ctx.layScale);
+          }
+          for (auto *w : eventWidgets) {
+            SDL_Rect r = w->getRect();
+            if (mx >= r.x && mx < r.x + r.w && my >= r.y && my < r.y + r.h) {
+              if (w->onMouseWheel(scrollY))
+                break;
+            }
+          }
         }
       }
     }
@@ -2090,6 +2155,10 @@ void DashboardContext::update(AppContext &ctx) {
                                      : nullptr);
     gimbal->setObserver(appCfg.lat, appCfg.lon);
   }
+  auto *sdoWidget =
+      dynamic_cast<SDOPanel *>(widgetPool[WidgetType::SDO].get());
+  if (sdoWidget)
+    sdoWidget->setObserver(appCfg.lat, appCfg.lon);
 
   mapArea->setAsteroidProvider(asteroidProvider.get());
 

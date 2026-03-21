@@ -454,7 +454,7 @@ int main(int argc, char *argv[]) {
     return EXIT_FAILURE;
   }
 
-#if defined(__linux__) && !defined(__EMSCRIPTEN__)
+#if defined(__linux__) && !defined(__EMSCRIPTEN__) && defined(SDL_VIDEO_DRIVER_KMSDRM)
   {
     SDL_SysWMinfo wmInfo;
     SDL_VERSION(&wmInfo.version);
@@ -738,11 +738,15 @@ void main_tick() {
         s->setConfig(ctx.appCfg);
         ctx.setupWidget = std::move(s);
       }
+#ifndef __ANDROID__
       SDL_StartTextInput();
+#endif
     }
 
     // Logic
     bool setupDone = false;
+    static float setupFingerScrollAccum = 0.0f;
+    static bool setupFingerWasScrolling = false;
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
       if (event.type == SDL_QUIT) {
@@ -761,29 +765,35 @@ void main_tick() {
         else if (event.type == SDL_TEXTINPUT)
           ctx.setupWidget->onTextInput(event.text.text);
         else if (event.type == SDL_MOUSEBUTTONDOWN) {
-          int smx = event.button.x, smy = event.button.y;
-          if (FIDELITY_MODE && event.button.windowID != 0) {
-            float pixX = event.button.x * static_cast<float>(ctx.globalDrawW) /
-                         ctx.globalWinW;
-            float pixY = event.button.y * static_cast<float>(ctx.globalDrawH) /
-                         ctx.globalWinH;
-            smx = static_cast<int>(pixX / ctx.layScale);
-            smy = static_cast<int>(pixY / ctx.layScale);
+          if (event.button.which == SDL_TOUCH_MOUSEID && setupFingerWasScrolling)
+            ; // suppress: touch gesture was a scroll, not a tap
+          else {
+            int smx = event.button.x, smy = event.button.y;
+            if (FIDELITY_MODE && event.button.windowID != 0) {
+              float pixX = event.button.x * static_cast<float>(ctx.globalDrawW) /
+                           ctx.globalWinW;
+              float pixY = event.button.y * static_cast<float>(ctx.globalDrawH) /
+                           ctx.globalWinH;
+              smx = static_cast<int>(pixX / ctx.layScale);
+              smy = static_cast<int>(pixY / ctx.layScale);
+            }
+            ctx.setupWidget->onMouseDown(smx, smy, SDL_GetModState(),
+                                         event.button.clicks);
           }
-          ctx.setupWidget->onMouseDown(smx, smy, SDL_GetModState(),
-                                       event.button.clicks);
         } else if (event.type == SDL_MOUSEBUTTONUP) {
-          int smx = event.button.x, smy = event.button.y;
-          if (FIDELITY_MODE && event.button.windowID != 0) {
-            float pixX = event.button.x * static_cast<float>(ctx.globalDrawW) /
-                         ctx.globalWinW;
-            float pixY = event.button.y * static_cast<float>(ctx.globalDrawH) /
-                         ctx.globalWinH;
-            smx = static_cast<int>(pixX / ctx.layScale);
-            smy = static_cast<int>(pixY / ctx.layScale);
+          if (!(event.button.which == SDL_TOUCH_MOUSEID && setupFingerWasScrolling)) {
+            int smx = event.button.x, smy = event.button.y;
+            if (FIDELITY_MODE && event.button.windowID != 0) {
+              float pixX = event.button.x * static_cast<float>(ctx.globalDrawW) /
+                           ctx.globalWinW;
+              float pixY = event.button.y * static_cast<float>(ctx.globalDrawH) /
+                           ctx.globalWinH;
+              smx = static_cast<int>(pixX / ctx.layScale);
+              smy = static_cast<int>(pixY / ctx.layScale);
+            }
+            ctx.setupWidget->onMouseUp(smx, smy, SDL_GetModState(),
+                                       event.button.clicks);
           }
-          ctx.setupWidget->onMouseUp(smx, smy, SDL_GetModState(),
-                                     event.button.clicks);
         } else if (event.type == SDL_MOUSEMOTION) {
           int smx = event.motion.x, smy = event.motion.y;
           if (FIDELITY_MODE && event.motion.windowID != 0) {
@@ -802,6 +812,22 @@ void main_tick() {
             scrollY = -scrollY;
 #endif
           ctx.setupWidget->onMouseWheel(scrollY);
+        } else if (event.type == SDL_FINGERDOWN) {
+          setupFingerScrollAccum = 0.0f;
+          setupFingerWasScrolling = false;
+        } else if (event.type == SDL_FINGERMOTION) {
+          static constexpr float kScrollStep = 0.04f;
+          setupFingerScrollAccum += event.tfinger.dy;
+          while (setupFingerScrollAccum <= -kScrollStep) {
+            setupFingerScrollAccum += kScrollStep;
+            setupFingerWasScrolling = true;
+            ctx.setupWidget->onMouseWheel(-1);
+          }
+          while (setupFingerScrollAccum >= kScrollStep) {
+            setupFingerScrollAccum -= kScrollStep;
+            setupFingerWasScrolling = true;
+            ctx.setupWidget->onMouseWheel(1);
+          }
         } else if (event.type == SDL_WINDOWEVENT &&
                    event.window.event == SDL_WINDOWEVENT_SIZE_CHANGED) {
           ctx.updateLayoutMetrics();
@@ -886,6 +912,8 @@ void main_tick() {
                            ->updateConfig(ctx.appCfg);
       }
       ctx.cfgMgr.save(ctx.appCfg);
+      if (ctx.dashboard && ctx.dashboard->spotProvider)
+        ctx.dashboard->spotProvider->updateConfig(ctx.appCfg);
       ctx.setupWidget.reset();
       ctx.setupFontMgr.reset();
       ctx.setupCatalog.reset();

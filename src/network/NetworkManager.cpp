@@ -13,6 +13,9 @@
 #include <cctype> // For std::tolower
 #include <sstream>
 #include <unordered_map> // For header parsing
+#ifdef __ANDROID__
+#include <dirent.h>
+#endif
 
 static size_t writeCallback(char *ptr, size_t size, size_t nmemb,
                             void *userdata) {
@@ -345,7 +348,15 @@ void NetworkManager::fetchDirect(const std::string &url,
 // On Linux with static mbedTLS, we often need to point CURL to the CA
 // bundle. However, for system libcurl (dynamic), this is usually automatic.
 // We remove the hardcoded path to let libcurl decide.
-#ifdef __linux__
+// Note: Android defines __linux__ but has no CA bundle at standard paths.
+// Static mbedTLS cannot use Android's per-file /system/etc/security/cacerts/
+// store, so we disable peer verification there. All fetched data is public
+// (NOAA, ham radio databases); no sensitive credentials traverse these connections.
+#if defined(__ANDROID__)
+  // Use the PEM bundle built from Android's system CA store at startup.
+  if (!androidCaBundlePath_.empty())
+    curl_easy_setopt(curl, CURLOPT_CAINFO, androidCaBundlePath_.c_str());
+#elif defined(__linux__)
   if (std::filesystem::exists("/etc/ssl/certs/ca-certificates.crt")) {
     curl_easy_setopt(curl, CURLOPT_CAINFO,
                      "/etc/ssl/certs/ca-certificates.crt");
@@ -472,7 +483,58 @@ NetworkManager::NetworkManager(const std::filesystem::path &cacheDir)
             cacheDir_.string(), ec.message());
     }
   }
+#ifdef __ANDROID__
+  buildAndroidCaBundle();
+#endif
 }
+
+#ifdef __ANDROID__
+void NetworkManager::buildAndroidCaBundle() {
+  if (cacheDir_.empty()) return;
+
+  androidCaBundlePath_ = (cacheDir_ / "android-ca-bundle.pem").string();
+
+  // Reuse the bundle unless the system cert directory is newer (OS update rotated CAs).
+  const char *certDir = "/system/etc/security/cacerts/";
+  std::error_code ec;
+  auto bundleTime = std::filesystem::last_write_time(androidCaBundlePath_, ec);
+  if (!ec) {
+    auto dirTime = std::filesystem::last_write_time(certDir, ec);
+    if (!ec && dirTime <= bundleTime) return;
+  }
+
+  // Android stores each trusted CA as a separate PEM file in this directory.
+  // mbedTLS requires a single concatenated bundle via CURLOPT_CAINFO.
+  DIR *dir = opendir(certDir);
+  if (!dir) {
+    LOG_W("NetworkManager", "Android CA dir not accessible: {}", certDir);
+    androidCaBundlePath_.clear();
+    return;
+  }
+
+  std::ofstream out(androidCaBundlePath_);
+  if (!out) {
+    closedir(dir);
+    LOG_W("NetworkManager", "Cannot write Android CA bundle to {}", androidCaBundlePath_);
+    androidCaBundlePath_.clear();
+    return;
+  }
+
+  struct dirent *ent;
+  int count = 0;
+  while ((ent = readdir(dir)) != nullptr) {
+    if (ent->d_name[0] == '.') continue;
+    std::ifstream cert(std::string(certDir) + ent->d_name);
+    if (cert) {
+      out << cert.rdbuf() << "\n";
+      ++count;
+    }
+  }
+  closedir(dir);
+
+  LOG_I("NetworkManager", "Built Android CA bundle: {} certs -> {}", count, androidCaBundlePath_);
+}
+#endif
 
 std::string NetworkManager::hashUrl(const std::string &url) {
   unsigned long hash = 5381;
