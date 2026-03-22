@@ -126,9 +126,20 @@ ${name}::${name}(NetworkManager &netMgr, std::shared_ptr<HamClockState> state)
 }
 
 void ${name}::fetch() {
-  std::cout << "${name}: Fetching data..." << std::endl;
-  // netMgr_.fetchAsync("https://api.example.com", [this](std::string data) {
-  //   // Parse data
+  // SAFETY: Never capture raw 'this' in a fetchAsync lambda — the service may
+  // be destroyed before the callback fires. Use the shared_ptr<AsyncState> pattern:
+  //
+  // struct AsyncState {
+  //   std::mutex mutex;
+  //   ${name}Data data;
+  //   std::atomic<bool> ready{false};
+  // };
+  // std::shared_ptr<AsyncState> async_ = std::make_shared<AsyncState>();
+  //
+  // netMgr_.fetchAsync("https://api.example.com", [async = async_](std::string body) {
+  //   std::lock_guard<std::mutex> lk(async->mutex);
+  //   // parse body into async->data
+  //   async->ready.store(true);
   // });
 }
 

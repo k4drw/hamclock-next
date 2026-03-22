@@ -73,7 +73,9 @@
       "All render() calls happen on the main thread. Providers run on a background thread. Use the SDL Event Queue (AE_... constants) to deliver results to the main thread.",
       "The WebServer debug endpoint /debug/widgets calls getDebugData() on all registered panels \u2014 always implement it.",
       "ASYNCHRONOUS SAFETY (CRITICAL):",
-      "- DASHBOARD LIFECYCLE: DashboardContext is transient. When capturing 'this' in a lambda, you MUST use the Self-Validation Pattern: capture 'DashboardContext* self = this' and 'AppContext& ctx', then check 'ctx.dashboard.get() == self' before execution.",
+      "- NEVER capture raw 'this' in a lambda passed to fetchAsync, a detached thread, or WorkerService. The widget may be destroyed before the callback fires.",
+      "- PATTERN 1 — shared_ptr<AsyncState>: Extract mutable fetch state (data, mutex, ready flag) into a heap struct. Widget and lambda both hold a shared_ptr to it. Lambda captures by value ([async = async_]). Destructor need not change. Use this when the callback's data is self-contained (e.g. SolarTimelinePanel, ReminderPanel).",
+      "- PATTERN 2 — alive flag: Add 'std::shared_ptr<std::atomic<bool>> alive_ = std::make_shared<std::atomic<bool>>(true)' as a member. Destructor sets alive_->store(false, memory_order_release). Lambda captures alive by value and checks if (!alive->load(memory_order_acquire)) return before touching any members. Use this for non-copyable dependencies (OrbitPredictor, WorkerService tasks) or multi-member access that can't be cleanly extracted (e.g. MapWidget, NetworkManager).",
       "- EVENT-DRIVEN RESULTS: For transient objects (owned by DashboardContext), preferred delivery is via SDL_PushEvent. The main thread handler (main.cpp) validates the dashboard exists before applying results.",
       "- MEMORY OWNERSHIP: Heap-allocated event data (std::string*, SDL_Surface*, etc.) passed via user.data1 MUST be deleted/freed in the main thread handler to prevent leaks.",
       "If a provider's API may be unavailable or require auth, add a `bool fetched` flag to the data struct (default false). The provider pushes event on completion with `fetched=true, valid=false` on error \u2014 panel shows meaningful status (e.g. 'API key required') rather than indefinite 'Loading...' state.",
@@ -499,7 +501,7 @@
     "missing": 0,
     "not_needed": 5,
     "percent_done": "100% (88/88 parity features)",
-    "notes": "v1.0 Release Candidate. Updated 2026-03-13: Final parity achieved with GRIB2 cloud overhaul (layered H/M/L GFS data at 1440x721) and MapWidget seam stitching for gap-free Date Line viewing. All 88 parity features now implemented. Comprehensive stability hardening complete \u2014 implemented Self-Validation Pattern for async callbacks, NetworkManager request deduplication, and event-driven UI updates via SDL queue. ThemeColors standardization complete (11+ files). Documentation and screenshot automation updated for v1.0 release."
+    "notes": "v1.0 Release Candidate. Updated 2026-03-22: All 88 parity features implemented. Comprehensive stability hardening complete \u2014 dangling-pointer audit applied shared_ptr<AsyncState> and alive-flag patterns across SolarTimelinePanel, ReminderPanel, MapWidget, DashboardContext, and NetworkManager; NetworkManager request deduplication; event-driven UI updates via SDL queue. ThemeColors standardization complete (11+ files). Documentation and screenshot automation updated for v1.0 release."
   },
   "implemented_features": [
     {

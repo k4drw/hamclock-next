@@ -1,6 +1,6 @@
 {
   "schema_version": "2.0",
-  "audit_date": "2026-03-07",
+  "audit_date": "2026-03-22",
   "audit_method": "ground-truth code review against hamclock-original/",
   "features": [
     {
@@ -275,7 +275,7 @@
     }
   ],
   "top_gaps": [],
-  "parity_score": 82,
+  "parity_score": 100,
   "parity_denominator": 82,
   "parity_percent": 100,
   "note": "Score excludes 5 NOT_NEEDED items (wifi_meter, gpio_control, 7-seg renderer, RBN-separate, photosensor_autodim). Updated 2026-03-07 (v1.0B04): Parity remains 100% (82/82). B04 adds polish and one new feature (Aux Clock timezone cycling) beyond parity scope. No parity score change."
