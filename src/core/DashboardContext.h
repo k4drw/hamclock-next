@@ -104,6 +104,10 @@ class LightningProvider;
 class SolarStormProvider;
 }
 
+// New widget providers (forward declarations)
+class SpaceWeatherAlertStore;
+class SpaceWeatherAlertProvider;
+
 // Providers (shared_ptr)
 class SDOProvider;
 class AuroraProvider;
@@ -183,6 +187,10 @@ struct DashboardContext {
   std::unique_ptr<GreylineDXProvider> greylineDXProvider;
   std::shared_ptr<WxMbProvider> wxMbProvider;
   std::shared_ptr<QRZProvider> qrzProvider;
+
+  // New widget providers
+  std::shared_ptr<SpaceWeatherAlertStore> spaceWxAlertStore;
+  std::unique_ptr<SpaceWeatherAlertProvider> spaceWxAlertProvider;
 
   // Services
 #ifndef __EMSCRIPTEN__

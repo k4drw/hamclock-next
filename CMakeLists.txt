@@ -545,9 +545,14 @@ set(HAMCLOCK_SOURCES
     src/services/MarineProvider.cpp
     src/services/WinlinkProvider.cpp
     src/services/GreylineDXProvider.cpp
+    src/services/SpaceWeatherAlertProvider.cpp
     src/ui/ActivityPanels.cpp
     src/ui/ADIFPanel.cpp
     src/ui/AlertsPanel.cpp
+    src/ui/SolarCyclePanel.cpp
+    src/ui/GreylineWindowsPanel.cpp
+    src/ui/DXCCProgressPanel.cpp
+    src/ui/SpaceWeatherAlertsPanel.cpp
     src/ui/AsteroidPanel.cpp
     src/ui/ForecastPanel.cpp
     src/ui/HurricanePanel.cpp

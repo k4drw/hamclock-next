@@ -133,6 +133,12 @@
 #include "ui/SolarTimelinePanel.h"
 #include "core/CalendarData.h"
 #include "ui/CalendarPanel.h"
+#include "core/SpaceWeatherAlertData.h"
+#include "services/SpaceWeatherAlertProvider.h"
+#include "ui/SolarCyclePanel.h"
+#include "ui/GreylineWindowsPanel.h"
+#include "ui/DXCCProgressPanel.h"
+#include "ui/SpaceWeatherAlertsPanel.h"
 #include <SDL.h>
 #include <SDL_image.h>
 #include <SDL_syswm.h>
@@ -383,7 +389,8 @@ DashboardContext::DashboardContext(AppContext &ctx)
   historyProvider = std::make_unique<HistoryProvider>(netManager, historyStore);
   if (isMasterMode || isWidgetConfigured(WidgetType::HISTORY_FLUX))
     historyProvider->fetchFlux();
-  if (isMasterMode || isWidgetConfigured(WidgetType::HISTORY_SSN))
+  if (isMasterMode || isWidgetConfigured(WidgetType::HISTORY_SSN) ||
+      isWidgetConfigured(WidgetType::SOLAR_CYCLE))
     historyProvider->fetchSSN();
   if (isMasterMode || isWidgetConfigured(WidgetType::HISTORY_KP))
     historyProvider->fetchKp();
@@ -457,6 +464,12 @@ DashboardContext::DashboardContext(AppContext &ctx)
   greylineDXProvider =
       std::make_unique<GreylineDXProvider>(ctx.prefixMgr, ctx.greylineDXStore);
   greylineDXProvider->update();
+
+  spaceWxAlertStore = std::make_shared<SpaceWeatherAlertStore>();
+  spaceWxAlertProvider =
+      std::make_unique<SpaceWeatherAlertProvider>(netManager, spaceWxAlertStore);
+  if (isMasterMode || isWidgetConfigured(WidgetType::SPACEWX_ALERTS))
+    spaceWxAlertProvider->fetch();
 
   santaProvider = std::make_unique<SantaProvider>(santaStore);
   santaProvider->update();
@@ -862,6 +875,22 @@ DashboardContext::DashboardContext(AppContext &ctx)
     case WidgetType::ENV_DEWPOINT:
       widgetPool[type] = std::make_unique<ENVPanel>(
           0, 0, 0, 0, fontMgr, deWeatherStore, WidgetType::ENV_DEWPOINT);
+      break;
+    case WidgetType::SOLAR_CYCLE:
+      widgetPool[type] = std::make_unique<SolarCyclePanel>(
+          0, 0, 0, 0, fontMgr, texMgr, historyStore);
+      break;
+    case WidgetType::GREYLINE_WINDOWS:
+      widgetPool[type] = std::make_unique<GreylineWindowsPanel>(
+          0, 0, 0, 0, fontMgr, state);
+      break;
+    case WidgetType::DXCC_PROGRESS:
+      widgetPool[type] = std::make_unique<DXCCProgressPanel>(
+          0, 0, 0, 0, fontMgr, adifStore, ctx.prefixMgr);
+      break;
+    case WidgetType::SPACEWX_ALERTS:
+      widgetPool[type] = std::make_unique<SpaceWeatherAlertsPanel>(
+          0, 0, 0, 0, fontMgr, spaceWxAlertStore);
       break;
     default:
       widgetPool[type] = std::make_unique<PlaceholderWidget>(
@@ -1356,10 +1385,14 @@ void DashboardContext::update(AppContext &ctx) {
 
     if (isMaster || isWidgetActive(WidgetType::HISTORY_FLUX))
       historyProvider->fetchFlux();
-    if (isMaster || isWidgetActive(WidgetType::HISTORY_SSN))
+    if (isMaster || isWidgetActive(WidgetType::HISTORY_SSN) ||
+        isWidgetActive(WidgetType::SOLAR_CYCLE))
       historyProvider->fetchSSN();
     if (isMaster || isWidgetActive(WidgetType::HISTORY_KP))
       historyProvider->fetchKp();
+
+    if (isMaster || isWidgetActive(WidgetType::SPACEWX_ALERTS))
+      spaceWxAlertProvider->fetch();
 
     if (dstProvider && (isMaster || isWidgetActive(WidgetType::DST_INDEX)))
       dstProvider->fetch();
@@ -1928,6 +1961,13 @@ void DashboardContext::update(AppContext &ctx) {
           auto *update = static_cast<ForecastData *>(event.user.data1);
           if (update && ctx.forecastStore)
             ctx.forecastStore->update(*update);
+          delete update;
+          break;
+        }
+        case AE_SPACEWX_ALERT_READY: {
+          auto *update = static_cast<SpaceWxAlertData *>(event.user.data1);
+          if (update && ctx.dashboard && ctx.dashboard->spaceWxAlertStore)
+            ctx.dashboard->spaceWxAlertStore->update(*update);
           delete update;
           break;
         }

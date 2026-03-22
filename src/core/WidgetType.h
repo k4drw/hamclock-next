@@ -56,7 +56,11 @@ enum class WidgetType {
   GREYLINE_DX,  // Entities currently in greyline
   RIG_CONTROL,  // Hamlib rigctld read-only display
   SOLAR_TIMELINE,  // Kp forecast timeline (NOAA 3-day)
-  CALENDAR,  // External calendar feed (POST /set_calendar.json)
+  CALENDAR,        // External calendar feed (POST /set_calendar.json)
+  SOLAR_CYCLE,     // Solar Cycle 25 position and recent SSN trend
+  GREYLINE_WINDOWS, // Grey-line propagation windows for DE→DX path
+  DXCC_PROGRESS,   // DXCC entity progress from ADIF log
+  SPACEWX_ALERTS,  // NOAA SWPC space weather alert timeline
 };
 
 inline const char *widgetTypeToString(WidgetType t) {
@@ -165,6 +169,14 @@ inline const char *widgetTypeToString(WidgetType t) {
       return "solar_timeline";
     case WidgetType::CALENDAR:
       return "calendar";
+    case WidgetType::SOLAR_CYCLE:
+      return "solar_cycle";
+    case WidgetType::GREYLINE_WINDOWS:
+      return "greyline_windows";
+    case WidgetType::DXCC_PROGRESS:
+      return "dxcc_progress";
+    case WidgetType::SPACEWX_ALERTS:
+      return "spacewx_alerts";
   }
   return "solar";
 }
@@ -275,6 +287,14 @@ inline const char *widgetTypeDisplayName(WidgetType t) {
       return "Solar Impact";
     case WidgetType::CALENDAR:
       return "Calendar";
+    case WidgetType::SOLAR_CYCLE:
+      return "Solar Cycle";
+    case WidgetType::GREYLINE_WINDOWS:
+      return "Greyline Win.";
+    case WidgetType::DXCC_PROGRESS:
+      return "DXCC Progress";
+    case WidgetType::SPACEWX_ALERTS:
+      return "SpaceWx Alerts";
   }
   return "Solar";
 }
@@ -385,6 +405,14 @@ inline WidgetType widgetTypeFromString(const std::string &s,
     return WidgetType::SOLAR_TIMELINE;
   if (s == "calendar")
     return WidgetType::CALENDAR;
+  if (s == "solar_cycle")
+    return WidgetType::SOLAR_CYCLE;
+  if (s == "greyline_windows")
+    return WidgetType::GREYLINE_WINDOWS;
+  if (s == "dxcc_progress")
+    return WidgetType::DXCC_PROGRESS;
+  if (s == "spacewx_alerts")
+    return WidgetType::SPACEWX_ALERTS;
   std::fprintf(stderr, "WidgetType: unknown '%s', using fallback\n", s.c_str());
   return fallback;
 }
@@ -413,9 +441,11 @@ inline std::vector<WidgetType> getAllBaseWidgetTypes() {
       WidgetType::REMINDER,     WidgetType::SANTA_TRACKER,
       WidgetType::SDO,          WidgetType::SOLAR,
       WidgetType::SOLAR_STORM,  WidgetType::SOLAR_TIMELINE,
-      WidgetType::STOPWATCH,    WidgetType::SYS_INFO,
-      WidgetType::TROPO,        WidgetType::WATCHLIST,
+      WidgetType::STOPWATCH,        WidgetType::SYS_INFO,
+      WidgetType::TROPO,            WidgetType::WATCHLIST,
       WidgetType::CALENDAR,
+      WidgetType::SOLAR_CYCLE,      WidgetType::GREYLINE_WINDOWS,
+      WidgetType::DXCC_PROGRESS,    WidgetType::SPACEWX_ALERTS,
   };
   // Note: REPEATER_DIR, WINLINK, RIG_CONTROL are excluded —
   // they require config keys and are conditionally added by callers.
