@@ -553,6 +553,7 @@ set(HAMCLOCK_SOURCES
     src/ui/GreylineWindowsPanel.cpp
     src/ui/DXCCProgressPanel.cpp
     src/ui/SpaceWeatherAlertsPanel.cpp
+    src/ui/VoacapDeDxPanel.cpp
     src/ui/AsteroidPanel.cpp
     src/ui/ForecastPanel.cpp
     src/ui/HurricanePanel.cpp

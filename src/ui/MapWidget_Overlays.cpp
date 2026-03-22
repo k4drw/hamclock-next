@@ -1990,50 +1990,96 @@ void MapWidget::renderAuroraOverlay(SDL_Renderer *renderer) {
     return;
 
   SDL_RenderSetClipRect(renderer, &mapRect_);
-  SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
 
-  // We use a 2-degree grid for rendering.
-  const int step = 2;
-  const int gridW = 360 / step;
-  const int gridH = 180 / step;
-
-  bool needsUpdate = auroraVerts_.empty() ||
+  bool needsUpdate = !auroraTexture_ ||
+                     auroraVerts_.empty() ||
                      (lastAuroraProjection_ != config_.projection) ||
                      (data.lastUpdate > lastAuroraUpdateTime_);
 
   if (needsUpdate) {
+    // Step 1: Build auroraTexture_ (360x181 RGBA) from aurora grid data.
+    // texRow=0 → lat=90 (north), texRow=180 → lat=-90 (south).
+    // texCol=0 → lon=-180, texCol=359 → lon=179.
+    if (!auroraTexture_) {
+      auroraTexture_ = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32,
+                                         SDL_TEXTUREACCESS_STATIC, 360, 181);
+      if (!auroraTexture_) {
+        SDL_RenderSetClipRect(renderer, nullptr);
+        return;
+      }
+      SDL_SetTextureBlendMode(auroraTexture_, SDL_BLENDMODE_BLEND);
+    }
+
+    std::vector<uint32_t> pixels(360 * 181);
+    for (int texRow = 0; texRow <= 180; ++texRow) {
+      int dataRow = 180 - texRow;
+      for (int texCol = 0; texCol < 360; ++texCol) {
+        int dataCol = (texCol + 180) % 360;
+        uint8_t val = data.grid[dataRow * 360 + dataCol];
+        // Exclude equatorial latitudes — the NOAA OVATION model produces
+        // background noise (val 1–8) near lat=0 with a gap to lat=±46 where
+        // the real aurora ovals begin.  |lat| < 20 is physically aurora-free
+        // under all but the most extreme (G5+) conditions.
+        int ilat = dataRow - 90; // geographic latitude of this texture row
+        uint8_t alpha = 0;
+        if (val >= 5 && std::abs(ilat) >= 20)
+          alpha = static_cast<uint8_t>(std::clamp(40 + val * 160 / 100, 0, 200));
+        // RGBA32 little-endian: R=byte0, G=byte1, B=byte2, A=byte3
+        // Aurora is green: R=0, G=255, B=0
+        pixels[texRow * 360 + texCol] =
+            ((uint32_t)alpha << 24) | (0u << 16) | (255u << 8) | 0u;
+      }
+    }
+    SDL_UpdateTexture(auroraTexture_, nullptr, pixels.data(),
+                      360 * sizeof(uint32_t));
+
+    // Step 2: Build UV-mapped mesh — same pattern as renderPropagationOverlay.
+    const bool isAz = (config_.projection == "azimuthal" ||
+                       config_.projection == "dual_azimuthal");
+    const int gridW = isAz ? 192 : 96;
+    const int gridH = isAz ? 96  : 48;
+
     auroraVerts_.clear();
     auroraIndices_.clear();
+    auroraVerts_.resize((gridW + 1) * (gridH + 1));
 
-    for (int j = 0; j <= gridH; ++j) {
-      double lat = 90.0 - j * step;
-      // Grid row is 0..180 matching Lat -90..90
-      int dataRow = static_cast<int>(std::round(lat + 90.0));
-      dataRow = std::clamp(dataRow, 0, 180);
-
-      for (int i = 0; i <= gridW; ++i) {
-        // worldLon is -180 to 180
-        double worldLon = -180.0 + i * step;
-
-        // Map worldLon (-180..180) to data grid column (0..359)
-        int dataCol = static_cast<int>(std::round(worldLon));
-        while (dataCol < 0) dataCol += 360;
-        while (dataCol >= 360) dataCol -= 360;
-
-        uint8_t val = data.grid[dataRow * 360 + dataCol];
-        SDL_FPoint pt = latLonToScreen(lat, worldLon);
-
-        SDL_Color color = {0, 255, 0, 0};
-        if (val >= 5) {
-          // Green with alpha based on probability
-          color.a =
-              static_cast<uint8_t>(std::clamp(40 + (val * 160 / 100), 0, 200));
+    if (config_.projection == "dual_azimuthal") {
+      // Screen-space sampling: iterate pixels, invert to lat/lon, compute UV.
+      for (int j = 0; j <= gridH; ++j) {
+        float sy = mapRect_.y + (float)j * mapRect_.h / gridH;
+        for (int i = 0; i <= gridW; ++i) {
+          float sx = mapRect_.x + (float)i * mapRect_.w / gridW;
+          int idx = j * (gridW + 1) + i;
+          double lat, lon;
+          if (screenToLatLon((int)sx, (int)sy, lat, lon)) {
+            float u = static_cast<float>((lon + 180.0) / 360.0);
+            float v = static_cast<float>((90.0 - lat) / 180.0);
+            auroraVerts_[idx].position = {sx, sy};
+            auroraVerts_[idx].color = {255, 255, 255, 255};
+            auroraVerts_[idx].tex_coord = {u, v};
+          } else {
+            auroraVerts_[idx].position = {sx, sy};
+            auroraVerts_[idx].color = {0, 0, 0, 0};
+            auroraVerts_[idx].tex_coord = {0, 0};
+          }
         }
-
-        auroraVerts_.push_back({pt, color, {0, 0}});
+      }
+    } else {
+      for (int j = 0; j <= gridH; ++j) {
+        for (int i = 0; i <= gridW; ++i) {
+          double lat = 90.0 - (double)j * 180.0 / gridH;
+          double lon = -180.0 + (double)i * 360.0 / gridW;
+          SDL_FPoint pt = latLonToScreen(lat, lon);
+          int idx = j * (gridW + 1) + i;
+          auroraVerts_[idx].position = {pt.x, pt.y};
+          auroraVerts_[idx].color = {255, 255, 255, 255};
+          auroraVerts_[idx].tex_coord = {(float)i / gridW, (float)j / gridH};
+        }
       }
     }
 
+    // Step 3: Build index buffer with UV-based wrap detection.
+    auroraIndices_.reserve(gridW * gridH * 6);
     for (int j = 0; j < gridH; ++j) {
       for (int i = 0; i < gridW; ++i) {
         int p0 = j * (gridW + 1) + i;
@@ -2041,25 +2087,15 @@ void MapWidget::renderAuroraOverlay(SDL_Renderer *renderer) {
         int p2 = (j + 1) * (gridW + 1) + i;
         int p3 = p2 + 1;
 
-        if (auroraVerts_[p0].color.a < 5 && auroraVerts_[p1].color.a < 5 &&
-            auroraVerts_[p2].color.a < 5 && auroraVerts_[p3].color.a < 5) {
-          continue;
-        }
-
         bool wrap = false;
-        // Check for date-line wrap in longitude
-        float lon0 = -180.0f + i * step;
-        float lon1 = -180.0f + (i + 1) * step;
-        if (std::abs(lon0 - lon1) > 180.0f)
-          wrap = true;
-
-        // Also check screen-space jump for projections that warp significantly
-        if (!wrap && (config_.projection == "azimuthal" ||
-                      config_.projection == "dual_azimuthal" ||
-                      config_.projection == "robinson")) {
-          float d1 = std::abs(auroraVerts_[p0].position.x -
-                              auroraVerts_[p1].position.x);
-          if (d1 > mapRect_.w * 0.5f)
+        if (config_.projection == "azimuthal" ||
+            config_.projection == "dual_azimuthal") {
+          float u0 = auroraVerts_[p0].tex_coord.x;
+          float u1 = auroraVerts_[p1].tex_coord.x;
+          float u2 = auroraVerts_[p2].tex_coord.x;
+          float u3 = auroraVerts_[p3].tex_coord.x;
+          if (std::abs(u0 - u1) > 0.5f || std::abs(u0 - u2) > 0.5f ||
+              std::abs(u1 - u3) > 0.5f)
             wrap = true;
         }
 
@@ -2073,14 +2109,13 @@ void MapWidget::renderAuroraOverlay(SDL_Renderer *renderer) {
         }
       }
     }
+
     lastAuroraUpdateTime_ = data.lastUpdate;
     lastAuroraProjection_ = config_.projection;
   }
 
-  if (!auroraVerts_.empty()) {
-    texMgr_.generateWhiteTexture(renderer);
-    SDL_Texture *whiteTex = texMgr_.get("white");
-    SDL_RenderGeometry(renderer, whiteTex, auroraVerts_.data(),
+  if (auroraTexture_ && !auroraVerts_.empty()) {
+    SDL_RenderGeometry(renderer, auroraTexture_, auroraVerts_.data(),
                        (int)auroraVerts_.size(), auroraIndices_.data(),
                        (int)auroraIndices_.size());
   }

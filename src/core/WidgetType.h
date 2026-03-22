@@ -61,6 +61,7 @@ enum class WidgetType {
   GREYLINE_WINDOWS, // Grey-line propagation windows for DE→DX path
   DXCC_PROGRESS,   // DXCC entity progress from ADIF log
   SPACEWX_ALERTS,  // NOAA SWPC space weather alert timeline
+  VOACAP_DEDX,     // 24-hour hour-by-hour path reliability matrix
 };
 
 inline const char *widgetTypeToString(WidgetType t) {
@@ -177,6 +178,8 @@ inline const char *widgetTypeToString(WidgetType t) {
       return "dxcc_progress";
     case WidgetType::SPACEWX_ALERTS:
       return "spacewx_alerts";
+    case WidgetType::VOACAP_DEDX:
+      return "voacap_dedx";
   }
   return "solar";
 }
@@ -295,6 +298,8 @@ inline const char *widgetTypeDisplayName(WidgetType t) {
       return "DXCC Progress";
     case WidgetType::SPACEWX_ALERTS:
       return "SpaceWx Alerts";
+    case WidgetType::VOACAP_DEDX:
+      return "Voacap DE-DX";
   }
   return "Solar";
 }
@@ -413,6 +418,8 @@ inline WidgetType widgetTypeFromString(const std::string &s,
     return WidgetType::DXCC_PROGRESS;
   if (s == "spacewx_alerts")
     return WidgetType::SPACEWX_ALERTS;
+  if (s == "voacap_dedx")
+    return WidgetType::VOACAP_DEDX;
   std::fprintf(stderr, "WidgetType: unknown '%s', using fallback\n", s.c_str());
   return fallback;
 }
@@ -446,6 +453,7 @@ inline std::vector<WidgetType> getAllBaseWidgetTypes() {
       WidgetType::CALENDAR,
       WidgetType::SOLAR_CYCLE,      WidgetType::GREYLINE_WINDOWS,
       WidgetType::DXCC_PROGRESS,    WidgetType::SPACEWX_ALERTS,
+      WidgetType::VOACAP_DEDX,
   };
   // Note: REPEATER_DIR, WINLINK, RIG_CONTROL are excluded —
   // they require config keys and are conditionally added by callers.

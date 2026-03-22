@@ -139,6 +139,7 @@
 #include "ui/GreylineWindowsPanel.h"
 #include "ui/DXCCProgressPanel.h"
 #include "ui/SpaceWeatherAlertsPanel.h"
+#include "ui/VoacapDeDxPanel.h"
 #include <SDL.h>
 #include <SDL_image.h>
 #include <SDL_syswm.h>
@@ -795,6 +796,10 @@ DashboardContext::DashboardContext(AppContext &ctx)
       widgetPool[type] = std::make_unique<RigControlPanel>(
           0, 0, 0, 0, fontMgr, nullptr);
 #endif
+      break;
+    case WidgetType::VOACAP_DEDX:
+      widgetPool[type] = std::make_unique<VoacapDeDxPanel>(
+          0, 0, 0, 0, fontMgr, state, solarStore, ionosondeProvider);
       break;
     case WidgetType::SOLAR_TIMELINE:
       widgetPool[type] = std::make_unique<SolarTimelinePanel>(

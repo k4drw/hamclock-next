@@ -1157,6 +1157,7 @@ void MapWidget::onResize(int x, int y, int w, int h) {
   greatCircleDirty_ = true;
   satTrackDirty_ = true;
   mapVerts_.clear();  // Also force map mesh regen
+  auroraVerts_.clear();  // Force aurora mesh regen (positions depend on mapRect_)
 }
 
 // --- Tooltip Rendering ---
