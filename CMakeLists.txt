@@ -61,6 +61,12 @@ set(SDL2IMAGE_BUILD_SHARED_LIBS OFF CACHE BOOL "Build shared SDL2_image library"
 # --- Build Options ---
 option(ENABLE_DEBUG_API "Enable debug API endpoints and live view (increases CPU usage)" OFF)
 option(ENABLE_ASAN "Enable AddressSanitizer + UBSan (Debug only)" OFF)
+set(HC_LOG_LEVEL "" CACHE STRING "Override compiled-in default log level (trace/debug/info/warn/error). Empty = warn.")
+
+if(HC_LOG_LEVEL)
+    add_compile_definitions(HC_LOG_LEVEL="${HC_LOG_LEVEL}")
+    message(STATUS "Log level override: ${HC_LOG_LEVEL}")
+endif()
 
 if(ENABLE_DEBUG_API)
     add_compile_definitions(ENABLE_DEBUG_API)

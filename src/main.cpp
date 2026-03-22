@@ -231,6 +231,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void hamclock_after_idbfs() {
         ctx.cfgMgr.configDir().string());
 
   if (ctx.cfgMgr.load(ctx.appCfg)) {
+    if (logLevel == "warn") applyLogLevel(ctx.appCfg.logLevel); // config overrides default only
     LOG_I("Main", "Config loaded: callsign={}", ctx.appCfg.callsign);
     ctx.state->deCallsign = ctx.appCfg.callsign;
     ctx.state->deGrid = ctx.appCfg.grid;
@@ -307,6 +308,15 @@ int main(int argc, char *argv[]) {
     }
   }
 
+  auto applyLogLevel = [](const std::string &level) {
+    if (level == "trace")       Log::setLevel(spdlog::level::trace);
+    else if (level == "debug")  Log::setLevel(spdlog::level::debug);
+    else if (level == "info")   Log::setLevel(spdlog::level::info);
+    else if (level == "warn")   Log::setLevel(spdlog::level::warn);
+    else if (level == "error")  Log::setLevel(spdlog::level::err);
+  };
+  applyLogLevel(logLevel);
+
   // Headless detection: offscreen/dummy SDL driver or Docker environment
   bool headlessMode = false;
   {
@@ -356,6 +366,7 @@ int main(int argc, char *argv[]) {
   } else if (!ctx.cfgMgr.load(ctx.appCfg)) {
     ctx.activeSetup = AppContext::SetupMode::Main;
   } else {
+    if (logLevel == "warn") applyLogLevel(ctx.appCfg.logLevel); // config overrides default only
     ctx.displayPower->setMethodByName(ctx.appCfg.displayPowerMethod);
   }
 #endif
@@ -435,6 +446,11 @@ int main(int argc, char *argv[]) {
   if (forceFullscreen) {
     windowFlags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
   }
+
+#ifdef __ANDROID__
+  // Always fullscreen on Android
+  windowFlags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
+#endif
 
   ctx.window = SDL_CreateWindow("HamClock-Next", SDL_WINDOWPOS_CENTERED,
                                 SDL_WINDOWPOS_CENTERED, ctx.globalWinW,

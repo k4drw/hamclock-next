@@ -52,9 +52,16 @@ void Log::init(const std::string &fallbackDir) {
 
   s_Logger =
       std::make_shared<spdlog::logger>("HAMCLOCK", sinks.begin(), sinks.end());
-  // Default to WARN level - use --log-level to change
+
+#if defined(HC_LOG_LEVEL)
+  // Compiled-in level override (set via -DHC_LOG_LEVEL=debug at build time)
+  s_Logger->set_level(spdlog::level::from_str(HC_LOG_LEVEL));
+  spdlog::flush_on(spdlog::level::from_str(HC_LOG_LEVEL));
+#else
+  // Default to WARN level - use --log-level arg or log_level config field to change
   s_Logger->set_level(spdlog::level::warn);
   spdlog::flush_on(spdlog::level::warn);
+#endif
 
   // This will only show if log level is set to INFO or DEBUG via --log-level
   LOG_INFO("Logger initialized with {} sinks", sinks.size());
