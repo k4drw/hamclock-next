@@ -28,12 +28,18 @@ public:
   void render(SDL_Renderer *renderer) override;
 
 private:
+  // Async state shared with the background HTTP callback lambda.
+  // Using shared_ptr means the lambda safely outlives this widget.
+  struct AsyncState {
+    SolarTimelineData data;
+    std::mutex mutex;
+    std::atomic<bool> fetching{false};
+  };
+
   FontManager &fontMgr_;
   NetworkManager &net_;
-  SolarTimelineData data_;
-  mutable std::mutex mutex_;
+  std::shared_ptr<AsyncState> async_ = std::make_shared<AsyncState>();
   uint32_t lastFetch_ = 0;
-  bool fetching_ = false;
 
   SDL_Color kpColor(float kp) const;
 };

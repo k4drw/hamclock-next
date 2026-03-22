@@ -2,9 +2,11 @@
 
 #include "../core/ConfigManager.h"
 
+#include <atomic>
 #include <ctime>
 #include <filesystem>
 #include <functional>
+#include <memory>
 #include <mutex>
 #include <string>
 #include <unordered_map>
@@ -13,7 +15,9 @@
 class NetworkManager {
 public:
   explicit NetworkManager(const std::filesystem::path &cacheDir = "");
-  ~NetworkManager() = default;
+  // Sets alive_ to false so any detached threads that have not yet started
+  // their body exit cleanly rather than touching destroyed members.
+  ~NetworkManager() { alive_->store(false, std::memory_order_release); }
 
   NetworkManager(const NetworkManager &) = delete;
   NetworkManager &operator=(const NetworkManager &) = delete;
@@ -55,6 +59,11 @@ private:
   // When a fetch completes, the primary callback plus all queued callbacks are called.
   std::unordered_map<std::string, std::vector<std::function<void(std::string)>>> activeFetches_;
   std::mutex fetchMutex_;
+
+  // Shared with all detached fetch threads. Set to false in the destructor so
+  // threads that haven't started their body yet skip accessing destroyed state.
+  std::shared_ptr<std::atomic<bool>> alive_ =
+      std::make_shared<std::atomic<bool>>(true);
 
   // Helper to compute safe filename for a URL (e.g. simple hash)
   std::string hashUrl(const std::string &url);

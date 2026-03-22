@@ -15,17 +15,17 @@ ReminderPanel::ReminderPanel(int x, int y, int w, int h, FontManager &fontMgr,
                              FccProvider &fccProvider)
     : Widget(x, y, w, h), fontMgr_(fontMgr), config_(config), cfgMgr_(cfgMgr),
       callbookProvider_(callbookProvider), callbookStore_(callbookStore),
-      fccProvider_(fccProvider), fccResultReady_(false) {
-} // Initialize new member
+      fccProvider_(fccProvider) {
+}
 
 void ReminderPanel::update() {
   // Drain FCC lookup results from the background thread
-  if (fccResultReady_.load()) {
+  if (fccState_->ready.load()) {
     std::vector<FccLicense> results;
     {
-      std::lock_guard<std::mutex> lk(fccMutex_);
-      results = std::move(fccResults_);
-      fccResultReady_.store(false);
+      std::lock_guard<std::mutex> lk(fccState_->mutex);
+      results = std::move(fccState_->results);
+      fccState_->ready.store(false);
     }
     fetching_ = false;
     // Add a pending reminder for each *active* license found under the FRN.
@@ -632,11 +632,12 @@ void ReminderPanel::autoPopulateLicenses() {
   fetching_ = true;
   std::string frn = config_.callsignFrn;
 
-  fccProvider_.lookupFrn(frn, [this](std::vector<FccLicense> results) {
-    // This callback runs on a background thread — store via mutex
-    std::lock_guard<std::mutex> lk(fccMutex_);
-    fccResults_ = std::move(results);
-    fccResultReady_.store(true);
+  fccProvider_.lookupFrn(frn, [state = fccState_](std::vector<FccLicense> results) {
+    // Callback runs on a detached thread — use shared_ptr so it's safe even
+    // if ReminderPanel is destroyed before the FCC lookup completes.
+    std::lock_guard<std::mutex> lk(state->mutex);
+    state->results = std::move(results);
+    state->ready.store(true);
   });
 }
 

@@ -69,9 +69,13 @@ private:
   SDL_Rect notifyAckRect_ = {0, 0, 0, 0};
 
   // ── Thread-safe FCC result hand-off ──────────────────────────────────────
-  std::mutex fccMutex_;
-  std::vector<FccLicense> fccResults_;
-  std::atomic<bool> fccResultReady_{false};
+  // Shared with the detached FCC callback thread; outlives widget destruction.
+  struct FccState {
+    std::mutex mutex;
+    std::vector<FccLicense> results;
+    std::atomic<bool> ready{false};
+  };
+  std::shared_ptr<FccState> fccState_ = std::make_shared<FccState>();
 
   // ── Button rects (inline setup) ──────────────────────────────────────────
   SDL_Rect saveRect_ = {0, 0, 0, 0};

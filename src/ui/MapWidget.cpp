@@ -207,6 +207,9 @@ void MapWidget::setTheme(const std::string &theme) {
 void MapWidget::setMetric(bool metric) { Widget::setMetric(metric); }
 
 MapWidget::~MapWidget() {
+  // Signal any in-flight WorkerService ground-track task to exit early rather
+  // than dereference the now-dangling predictor_.
+  trackAlive_->store(false, std::memory_order_release);
   MemoryMonitor::getInstance().destroyTexture(nightOverlayTexture_);
   MemoryMonitor::getInstance().destroyTexture(propTexture_);
   MemoryMonitor::getInstance().destroyTexture(auroraTexture_);
@@ -386,49 +389,11 @@ void MapWidget::update() {
     if (nowMs - lastSatTrackUpdateMs_ > 5000) {
       lastSatTrackUpdateMs_ = nowMs;
 
-      // Extract necessary state for thread-safe calculation
-      // Note: We use a local OrbitPredictor in the worker thread to avoid
-      // accessing predictor_ which is owned by SatelliteManager.
-      // SatelliteManager is app-lifetime, but its currentSat_ (and thus the
-      // predictor) can be reassigned on the main thread.
-      // So we capture the TLE and observer by value.
-      SatelliteTLE tle;
-      tle.name = predictor_->satName();
-      // We don't have easy access to the raw TLE strings here without
-      // refactoring predictor, but we can assume predictor is stable
-      // for this call as it's triggered from the main thread.
-      // However, to be 100% safe against predictor being deleted,
-      // we'd need to capture the TLE.
-      // Since SatelliteManager is app-lifetime, we can safely access its
-      // current TLE if we capture it.
-      // In this codebase, the simplest safe way is to push the work
-      // but ensure we don't access 'this' or 'predictor_' in the callback.
-
-      // Actually, let's just capture the predictor's ground track results
-      // directly if we want to be simple, but the goal is to offload the math.
-      // The risk is predictor_ being deleted.
-
-      // Better: Capturing 'this' is only safe if we check it in main.cpp.
-      // MapWidget's AE_SATELLITE_TRACK_READY handler does exactly that.
-      // The only remaining risk is the background thread accessing
-      // 'predictor_' while 'this' is being destroyed.
-
-      // Fix: Capture only what's needed and use a local predictor.
-      // We need to find the TLE.
-      // ... (TLE lookup omitted for brevity, assuming predictor_ is valid for
-      // the duration of submitTask as we are on main thread now)
-
-      WorkerService::getInstance().submitTask([this] {
-        // We still capture 'this' to get to predictor_, but we ONLY
-        // use it to perform the calculation. The RESULT is pushed via event.
-        // If 'this' is destroyed during predictor_->groundTrack, we still
-        // have a race.
-
-        // To truly fix this, we'd need OrbitPredictor to be thread-safe or
-        // shared.
-        // For this audit fix, we will keep it as is but ensure the CALLBACK
-        // is safe. The calculation race is a separate (lower) risk than the
-        // callback segfault.
+      WorkerService::getInstance().submitTask([this, alive = trackAlive_] {
+        // alive_ is set to false in ~MapWidget() before predictor_ is freed.
+        // If this task fires after destruction, exit before touching predictor_.
+        if (!alive->load(std::memory_order_acquire))
+          return;
         auto *track_ptr = new std::vector<GroundTrackPoint>();
         *track_ptr =
             predictor_->groundTrack(std::chrono::system_clock::to_time_t(

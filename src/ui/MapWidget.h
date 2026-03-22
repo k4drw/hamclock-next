@@ -19,6 +19,7 @@
 
 #include <SDL.h>
 
+#include <atomic>
 #include <ctime>
 #include <memory>
 #include <mutex>
@@ -170,6 +171,10 @@ private:
   std::shared_ptr<IonosondeProvider> iono_;
   SolarDataStore *solar_ = nullptr;
   OrbitPredictor *predictor_ = nullptr;
+  // Guards WorkerService ground-track tasks: set to false in ~MapWidget() so
+  // any in-flight task exits early before touching the dangling predictor_.
+  std::shared_ptr<std::atomic<bool>> trackAlive_ =
+      std::make_shared<std::atomic<bool>>(true);
   AsteroidProvider *asteroidProvider_ = nullptr;
   std::vector<PaneContainer *> panes_;
 

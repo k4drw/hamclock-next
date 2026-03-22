@@ -151,7 +151,9 @@ void NetworkManager::fetchAsync(const std::string &url,
               "Memory record found but no data (too large), loading from disk "
               "for {}",
               url);
-        std::thread([this, url, callback = std::move(callback)]() {
+        std::thread([this, url, callback = std::move(callback),
+                     alive = alive_]() {
+          if (!alive->load(std::memory_order_acquire)) return;
           std::filesystem::path p = cacheDir_ / hashUrl(url);
           std::ifstream ifs(p, std::ios::binary);
           std::string data;
@@ -271,7 +273,8 @@ void NetworkManager::fetchAsync(const std::string &url,
       LOG_D("NetworkManager", "Hub client: Proxying request for {} to Hub at {}", url, hubUrl);
 
       std::thread([this, hubUrl, url, callback = std::move(safeCallback), hasCache,
-                   cached]() mutable {
+                   cached, alive = alive_]() mutable {
+        if (!alive->load(std::memory_order_acquire)) return;
         std::string body = fetchFromHubSync(hubUrl);
         if (!body.empty()) {
           LOG_D("NetworkManager", "Hub client: Received {} bytes from Hub for {}", body.size(), url);
@@ -296,7 +299,8 @@ void NetworkManager::fetchAsync(const std::string &url,
   }
   // --- Direct fetch ---
   std::thread([this, url, callback = std::move(safeCallback), hasCache,
-               cached]() mutable {
+               cached, alive = alive_]() mutable {
+    if (!alive->load(std::memory_order_acquire)) return;
     fetchDirect(url, std::move(callback), hasCache, cached);
   }).detach();
 #endif

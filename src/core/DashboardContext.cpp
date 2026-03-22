@@ -345,10 +345,15 @@ DashboardContext::DashboardContext(AppContext &ctx)
 
   // Re-fetch POTA spots once the parks CSV is parsed so spots get coordinates.
   // The CSV is read/parsed in a background thread; spots often arrive first.
-  ActivityLocationManager::getInstance().setOnParksReady([&ctx, self = this]() {
-    if (ctx.dashboard.get() == self && self->activityProvider)
-      self->activityProvider->fetch();
-  });
+  ActivityLocationManager::getInstance().setOnParksReady(
+      [&ctx, self = this, liveFlag = parksReadyLive_]() {
+        // Check the atomic flag first (set in ~DashboardContext) to avoid
+        // racing on ctx.dashboard.get() from this background thread.
+        if (!liveFlag->load(std::memory_order_acquire))
+          return;
+        if (ctx.dashboard.get() == self && self->activityProvider)
+          self->activityProvider->fetch();
+      });
 
   dxcProvider = std::make_unique<DXClusterProvider>(
       dxcStore, ctx.prefixMgr, watchlistStore, watchlistHitStore, state.get());
@@ -1176,6 +1181,9 @@ DashboardContext::DashboardContext(AppContext &ctx)
 }
 
 DashboardContext::~DashboardContext() {
+  // Signal the setOnParksReady callback (runs on a background thread) to exit
+  // early rather than race on ctx.dashboard.get() after this object is freed.
+  parksReadyLive_->store(false, std::memory_order_release);
 #ifndef __EMSCRIPTEN__
   if (dxcProvider)
     dxcProvider->stop();
