@@ -938,6 +938,8 @@ void main_tick() {
       ctx.state->deCallsign = ctx.appCfg.callsign;
       ctx.state->deGrid = ctx.appCfg.grid;
       ctx.state->deLocation = {ctx.appCfg.lat, ctx.appCfg.lon};
+      if (ctx.dashboard && ctx.dashboard->satMgr)
+        ctx.dashboard->satMgr->setObserver(ctx.appCfg.lat, ctx.appCfg.lon);
 
       // Re-apply theme, rotations and layout immediately
       if (ctx.dashboard) {

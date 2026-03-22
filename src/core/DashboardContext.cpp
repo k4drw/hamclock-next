@@ -663,10 +663,13 @@ DashboardContext::DashboardContext(AppContext &ctx)
       widgetPool[type] = std::make_unique<DXPedPanel>(
           0, 0, 0, 0, fontMgr, *activityProvider, activityStore);
       break;
-    case WidgetType::GIMBAL:
-      widgetPool[type] = std::make_unique<GimbalPanel>(0, 0, 0, 0, fontMgr,
-                                                       texMgr, rotatorStore);
+    case WidgetType::GIMBAL: {
+      auto gp = std::make_unique<GimbalPanel>(0, 0, 0, 0, fontMgr, texMgr,
+                                              rotatorStore);
+      gp->setObserver(appCfg.lat, appCfg.lon);
+      widgetPool[type] = std::move(gp);
       break;
+    }
     case WidgetType::MOON:
       widgetPool[type] = std::make_unique<MoonPanel>(
           0, 0, 0, 0, fontMgr, texMgr, netManager, moonStore);
@@ -2155,6 +2158,8 @@ void DashboardContext::update(AppContext &ctx) {
                                      : nullptr);
     gimbal->setObserver(appCfg.lat, appCfg.lon);
   }
+  if (dxSatWidget)
+    dxSatWidget->setObserver(appCfg.lat, appCfg.lon);
   auto *sdoWidget =
       dynamic_cast<SDOPanel *>(widgetPool[WidgetType::SDO].get());
   if (sdoWidget)

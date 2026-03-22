@@ -18,6 +18,23 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Cache Docker image
+        uses: actions/cache@v4
+        with:
+          path: /tmp/docker-cache
+          key: docker-fedora-${{ runner.os }}-${{ hashFiles('scripts/build-rpm-fedora.sh') }}
+          restore-keys: docker-fedora-${{ runner.os }}-
+
+      - name: Load or pull Docker image
+        run: |
+          if [ -f /tmp/docker-cache/image.tar ]; then
+            docker load -i /tmp/docker-cache/image.tar
+          else
+            docker pull fedora:latest
+            mkdir -p /tmp/docker-cache
+            docker save fedora:latest -o /tmp/docker-cache/image.tar
+          fi
+
       - name: Build Fedora RPM
         run: |
           chmod +x scripts/build-rpm-fedora.sh
@@ -46,6 +63,23 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+
+      - name: Cache Docker image
+        uses: actions/cache@v4
+        with:
+          path: /tmp/docker-cache
+          key: docker-tumbleweed-${{ runner.os }}-${{ hashFiles('scripts/build-rpm-suse.sh') }}
+          restore-keys: docker-tumbleweed-${{ runner.os }}-
+
+      - name: Load or pull Docker image
+        run: |
+          if [ -f /tmp/docker-cache/image.tar ]; then
+            docker load -i /tmp/docker-cache/image.tar
+          else
+            docker pull registry.opensuse.org/opensuse/tumbleweed:latest
+            mkdir -p /tmp/docker-cache
+            docker save registry.opensuse.org/opensuse/tumbleweed:latest -o /tmp/docker-cache/image.tar
+          fi
 
       - name: Build OpenSUSE RPM
         run: |

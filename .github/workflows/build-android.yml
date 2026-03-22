@@ -29,6 +29,23 @@ jobs:
             echo "No ANDROID_KEYSTORE_BASE64 secret — build script will generate a dev keystore"
           fi
 
+      - name: Cache Docker image
+        uses: actions/cache@v4
+        with:
+          path: /tmp/docker-cache
+          key: docker-android-${{ runner.os }}-${{ hashFiles('scripts/build-android-docker.sh') }}
+          restore-keys: docker-android-${{ runner.os }}-
+
+      - name: Load or pull Docker image
+        run: |
+          if [ -f /tmp/docker-cache/image.tar ]; then
+            docker load -i /tmp/docker-cache/image.tar
+          else
+            docker pull mingc/android-build-box:latest
+            mkdir -p /tmp/docker-cache
+            docker save mingc/android-build-box:latest -o /tmp/docker-cache/image.tar
+          fi
+
       - name: Build Android APK
         run: |
           chmod +x scripts/build-android-docker.sh

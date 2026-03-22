@@ -18,6 +18,23 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Cache Docker image
+        uses: actions/cache@v4
+        with:
+          path: /tmp/docker-cache
+          key: docker-win64-${{ runner.os }}-${{ hashFiles('scripts/build-win64.sh') }}
+          restore-keys: docker-win64-${{ runner.os }}-
+
+      - name: Load or pull Docker image
+        run: |
+          if [ -f /tmp/docker-cache/image.tar ]; then
+            docker load -i /tmp/docker-cache/image.tar
+          else
+            docker pull dockcross/windows-static-x64
+            mkdir -p /tmp/docker-cache
+            docker save dockcross/windows-static-x64 -o /tmp/docker-cache/image.tar
+          fi
+
       - name: Build Windows Executable
         run: |
           chmod +x scripts/build-win64.sh
