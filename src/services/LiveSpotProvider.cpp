@@ -148,7 +148,7 @@ void LiveSpotProvider::fetchPSK() {
   std::string url = fmt::format("{}/query?{}{}&flowStartSeconds={}&rronly=1",
                                 baseUrl, param, target, windowStart);
 
-  LOG_D("LiveSpot", "Fetching PSK {}", url);
+  LOG_I("LiveSpot", "Fetching PSK {}", url);
   if (state_) {
     std::lock_guard<std::mutex> lk(state_->servicesMutex);
     state_->services["LiveSpot"].lastError = "Fetching...";

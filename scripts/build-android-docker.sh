@@ -110,6 +110,9 @@ NSC_EOF
 # Wire the network security config into the <application> element
 sed -i 's|android:label="@string/app_name"|android:networkSecurityConfig="@xml/network_security_config" android:label="@string/app_name"|' app/src/main/AndroidManifest.xml
 
+# Force landscape orientation on the SDL activity
+sed -i 's/android:exported="true"/android:exported="true"\n        android:screenOrientation="sensorLandscape"/' app/src/main/AndroidManifest.xml
+
 # Add permissions before </manifest> — this anchor is guaranteed to exist regardless of template formatting.
 # INTERNET/ACCESS_NETWORK_STATE/ACCESS_WIFI_STATE are normal permissions (granted silently at install).
 # ACCESS_FINE_LOCATION/ACCESS_COARSE_LOCATION are dangerous permissions that trigger a runtime dialog.
@@ -123,6 +126,13 @@ project(hamclock_android)
 
 # Disable unsupported features for this build
 set(ENABLE_DEBUG_API OFF CACHE BOOL "Disable debug API")
+
+# Default to info-level logging on Android so PSK/WSPR fetches appear in logcat
+# without requiring a rooted device. Override by passing HC_LOG_LEVEL=debug to this script.
+set(HC_LOG_LEVEL "$ENV{HC_LOG_LEVEL}" CACHE STRING "Log level override")
+if(NOT HC_LOG_LEVEL)
+    set(HC_LOG_LEVEL "info" CACHE STRING "Log level override" FORCE)
+endif()
 
 # Fix Ninja / Android NDK 'multiple rules generate resolve' collisions
 # by aggressively disabling all tests and tools in third-party libraries (Curl, mbedtls, etc.)

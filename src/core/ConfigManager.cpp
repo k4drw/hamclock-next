@@ -213,6 +213,7 @@ bool ConfigManager::load(AppConfig &config) {
     config.showBeacons = ap.value("show_beacons", true);
     config.showBorders = ap.value("show_borders", false);
     config.displayPowerMethod = ap.value("display_power_method", "auto");
+    config.logLevel = ap.value("log_level", "warn");
     config.qrzUsername = ap.value("qrz_username", "");
     config.qrzPassword = ap.value("qrz_password", "");
     config.fontPath = ap.value("font_path", "");
@@ -581,6 +582,8 @@ bool ConfigManager::save(const AppConfig &config) {
   json["appearance"]["show_beacons"] = config.showBeacons;
   json["appearance"]["show_borders"] = config.showBorders;
   json["appearance"]["display_power_method"] = config.displayPowerMethod;
+  if (config.logLevel != "warn")
+    json["appearance"]["log_level"] = config.logLevel;
   json["appearance"]["qrz_username"] = config.qrzUsername;
   json["appearance"]["qrz_password"] = config.qrzPassword;
   if (!config.fontPath.empty())

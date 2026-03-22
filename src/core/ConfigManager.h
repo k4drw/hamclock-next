@@ -78,6 +78,7 @@ struct AppConfig {
   bool showBorders = false; // Show Natural Earth country borders
   std::string displayPowerMethod =
       "auto"; // "auto", "vcgencmd", "bl_power", etc.
+  std::string logLevel = "warn"; // "trace","debug","info","warn","error"
 
   // Pane widget selection (top bar panes 1–3)  // Pane widget selection
   // (rotation sets)

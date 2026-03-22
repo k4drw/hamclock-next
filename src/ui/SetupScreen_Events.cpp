@@ -90,6 +90,7 @@ bool SetupScreen::onMouseDown(int mx, int my, Uint16 mod, int clicks) {
         ti->onMouseDown(mx, my, clicks, fontMgr_, r.x, r.y, r.w, r.h,
                         FontStyle::SmallRegular, textPad);
 #ifdef __ANDROID__
+        SDL_StopTextInput();  // reset IME composition buffer before activating new field
         SDL_StartTextInput();
 #endif
       }
