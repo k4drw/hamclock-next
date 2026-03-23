@@ -58,7 +58,6 @@
 
 using namespace HamClock;
 
-
 static bool isHostOnPrivateNetwork() {
 #if defined(__linux__) || defined(__APPLE__)
   struct ifaddrs *ifap = nullptr;
@@ -84,7 +83,6 @@ static bool isHostOnPrivateNetwork() {
   return true;
 #endif
 }
-
 
 WebServer::WebServer(SDL_Renderer *renderer, AppConfig &cfg,
                      HamClockState &state, ConfigManager &cfgMgr,
@@ -496,11 +494,11 @@ void WebServer::run() {
         <label>Label (max 8 chars)</label>
         <input type="text" id="aux-tz-label" maxlength="8">
       </div>
-      <label>Star Date Mode</label>
+      <label>Mode</label>
       <select id="aux-star-mode">
-        <option value="0">K (Klingon Stardates)</option>
-        <option value="1">P (Pavel Stardates)</option>
-        <option value="2">C (Countdown to Warp 1)</option>
+        <option value="0">K</option>
+        <option value="1">P</option>
+        <option value="2">C</option>
       </select>
 
       <button onclick="saveWidgets()" style="margin-top:16px">Save Widgets</button>

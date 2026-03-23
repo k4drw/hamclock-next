@@ -18,6 +18,7 @@ public:
   void render(SDL_Renderer *renderer) override;
   void onResize(int x, int y, int w, int h) override;
   bool onMouseWheel(int scrollY) override;
+  void onMouseMove(int mx, int my) override;
 
 private:
   SDL_Color alertColor(SpaceWxAlertType type) const;

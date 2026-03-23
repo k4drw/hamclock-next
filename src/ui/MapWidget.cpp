@@ -866,7 +866,6 @@ void MapWidget::render(SDL_Renderer *renderer) {
   renderWxMbLegend(renderer);
   renderCloudLegend(renderer);
 
-  renderTooltip(renderer);
   renderCalendarAlert(renderer);
 
   // Note: MapViewMenu is rendered via renderModal() in the centralized modal
@@ -878,7 +877,9 @@ void MapWidget::render(SDL_Renderer *renderer) {
   SDL_RenderDrawRect(renderer, &border);
 }
 
-
+void MapWidget::renderTooltipLayer(SDL_Renderer *renderer) {
+  renderTooltip(renderer);
+}
 
 // DRAP absorption color: SDL_PIXELFORMAT_RGBA32 little-endian packing
 // pixels[i] = (a << 24) | (b << 16) | (g << 8) | r

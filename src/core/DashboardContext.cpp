@@ -2301,6 +2301,13 @@ void DashboardContext::render(AppContext &ctx) {
   }
   SDL_RenderSetClipRect(ctx.renderer, nullptr);
 
+  // Deferred tooltip pass — renders after all widget content so tooltips
+  // always appear on top regardless of widget rendering order.
+  Widget::flushPendingTooltip(ctx.renderer);
+  for (auto *w : widgets) {
+    w->renderTooltipLayer(ctx.renderer);
+  }
+
   if (activeModal) {
     if (FIDELITY_MODE)
       SDL_RenderSetScale(ctx.renderer, 1.0f, 1.0f);

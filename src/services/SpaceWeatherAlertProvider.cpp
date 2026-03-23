@@ -64,11 +64,8 @@ static std::string extractContentLine(const std::string &msg) {
       if (line.empty())
         pastBlank = true;
     } else {
-      if (!line.empty()) {
-        if (line.size() > 50)
-          line = line.substr(0, 49) + "~";
+      if (!line.empty())
         return line;
-      }
     }
   }
   return "";
