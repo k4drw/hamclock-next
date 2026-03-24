@@ -208,6 +208,15 @@ void preventRPiSleep(bool prevent, DisplayPower *dp = nullptr) {
 // Global pointer for Emscripten
 static AppContext *g_app = nullptr;
 
+static std::string s_logLevel = "warn";
+static void applyLogLevel(const std::string &level) {
+  if (level == "trace" || level == "TRACE")       Log::setLevel(spdlog::level::trace);
+  else if (level == "debug" || level == "DEBUG")  Log::setLevel(spdlog::level::debug);
+  else if (level == "info" || level == "INFO")    Log::setLevel(spdlog::level::info);
+  else if (level == "warn" || level == "WARN")    Log::setLevel(spdlog::level::warn);
+  else if (level == "error" || level == "ERROR")  Log::setLevel(spdlog::level::err);
+}
+
 #ifdef __EMSCRIPTEN__
 // Called from JavaScript (via Module._hamclock_after_idbfs) once IDBFS has
 // synced from IndexedDB.  Only then is it safe to open files in the config
@@ -231,7 +240,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void hamclock_after_idbfs() {
         ctx.cfgMgr.configDir().string());
 
   if (ctx.cfgMgr.load(ctx.appCfg)) {
-    if (logLevel == "warn") applyLogLevel(ctx.appCfg.logLevel); // config overrides default only
+    if (s_logLevel == "warn") applyLogLevel(ctx.appCfg.logLevel); // config overrides default only
     LOG_I("Main", "Config loaded: callsign={}", ctx.appCfg.callsign);
     ctx.state->deCallsign = ctx.appCfg.callsign;
     ctx.state->deGrid = ctx.appCfg.grid;
@@ -288,7 +297,6 @@ int main(int argc, char *argv[]) {
   bool forceFullscreen = false;
   bool forceSoftware = false;
   bool forceLiveWeb = false;
-  std::string logLevel = "warn";
 
   for (int i = 1; i < argc; ++i) {
     std::string arg = argv[i];
@@ -301,21 +309,14 @@ int main(int argc, char *argv[]) {
     } else if (arg == "--no-audio") {
       SoundManager::getInstance().disable();
     } else if (arg == "--log-level" && i + 1 < argc) {
-      logLevel = argv[++i];
+      s_logLevel = argv[++i];
     } else if (arg == "-h" || arg == "--help") {
       std::printf("Usage: hamclock-next [options]\n");
       return EXIT_SUCCESS;
     }
   }
 
-  auto applyLogLevel = [](const std::string &level) {
-    if (level == "trace")       Log::setLevel(spdlog::level::trace);
-    else if (level == "debug")  Log::setLevel(spdlog::level::debug);
-    else if (level == "info")   Log::setLevel(spdlog::level::info);
-    else if (level == "warn")   Log::setLevel(spdlog::level::warn);
-    else if (level == "error")  Log::setLevel(spdlog::level::err);
-  };
-  applyLogLevel(logLevel);
+  applyLogLevel(s_logLevel);
 
   // Headless detection: offscreen/dummy SDL driver or Docker environment
   bool headlessMode = false;
@@ -338,19 +339,6 @@ int main(int argc, char *argv[]) {
     LOG_I("Main", "Headless mode: using offscreen SDL driver");
   }
 
-  // Set log level
-  if (logLevel == "debug" || logLevel == "DEBUG") {
-    Log::setLevel(spdlog::level::debug);
-  } else if (logLevel == "info" || logLevel == "INFO") {
-    Log::setLevel(spdlog::level::info);
-  } else if (logLevel == "warn" || logLevel == "WARN") {
-    Log::setLevel(spdlog::level::warn);
-  } else if (logLevel == "error" || logLevel == "ERROR") {
-    Log::setLevel(spdlog::level::err);
-  } else {
-    Log::setLevel(spdlog::level::warn);
-  }
-
   ctx.displayPower = std::make_shared<DisplayPower>();
 
   LOG_INFO("Starting HamClock-Next {}...", HAMCLOCK_VERSION);
@@ -366,7 +354,7 @@ int main(int argc, char *argv[]) {
   } else if (!ctx.cfgMgr.load(ctx.appCfg)) {
     ctx.activeSetup = AppContext::SetupMode::Main;
   } else {
-    if (logLevel == "warn") applyLogLevel(ctx.appCfg.logLevel); // config overrides default only
+    if (s_logLevel == "warn") applyLogLevel(ctx.appCfg.logLevel); // config overrides default only
     ctx.displayPower->setMethodByName(ctx.appCfg.displayPowerMethod);
   }
 #endif
