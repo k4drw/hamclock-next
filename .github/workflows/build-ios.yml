@@ -1,0 +1,46 @@
+name: Build iOS
+
+on:
+  push:
+    branches: [master, 'v1.*']
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-ios-simulator:
+    name: iOS App (arm64)
+    runs-on: macos-14
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Build iOS App
+        run: |
+          # Prepend link options to CMakeLists.txt so they apply to all targets,
+          # including missing iOS frameworks stripped from the Mac-only ApplicationServices
+          cat << 'EOF' > patch.cmake
+          add_link_options("-Wl,-no_warn_duplicate_libraries")
+          link_libraries("-framework CoreGraphics" "-framework CoreText" "-framework Security" "-framework GameController")
+          EOF
+          cat CMakeLists.txt >> patch.cmake
+          mv patch.cmake CMakeLists.txt
+          
+          # Intercept macOS ApplicationServices linking
+          sed -i '' 's/"" CACHE FILEPATH "Disabled on iOS"/"-framework Foundation" CACHE FILEPATH "Disabled on iOS"/g' CMakeLists.txt
+          
+          # Force CMake to use the iOS Simulator SDK for all find_* commands
+          perl -pi -e 's/-DCMAKE_SYSTEM_NAME=iOS \\/-DCMAKE_SYSTEM_NAME=iOS \\\n    -DCMAKE_OSX_SYSROOT=iphonesimulator \\/g' scripts/build-ios.sh
+          
+          chmod +x scripts/build-ios.sh
+          
+          # Run the build (xcpretty removed to expose raw linker symbols if it fails again)
+          ./scripts/build-ios.sh
+
+      - name: Upload iOS App Bundle
+        uses: actions/upload-artifact@v7
+        with:
+          name: hamclock-next-ios-simulator
+          path: build-ios/Release-iphonesimulator/hamclock-next.app
+          retention-days: 7

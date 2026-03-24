@@ -14,7 +14,7 @@ jobs:
     name: ARMhf Universal DEB
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
 
@@ -24,13 +24,13 @@ jobs:
           ./scripts/build-linux-armhf-universal.sh
 
       - name: Upload Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: hamclock-linux-armhf
           path: build-linux-armhf-universal/*.deb
 
       - name: Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/v')
         with:
           files: build-linux-armhf-universal/*.deb
