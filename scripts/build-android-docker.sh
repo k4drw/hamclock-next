@@ -46,6 +46,20 @@ sed -i 's/org.libsdl.app/com.hamclock.next/g' app/src/main/AndroidManifest.xml
 sed -i 's/minSdkVersion 16/minSdkVersion 24/g' app/build.gradle
 sed -i 's/minSdkVersion 19/minSdkVersion 24/g' app/build.gradle
 
+# Update app version from the repository VERSION file
+PROJECT_VERSION=$(cat "$REPO_ROOT/VERSION" | tr -d '[:space:]' | sed 's/^v//')
+V1=$(echo "$PROJECT_VERSION" | cut -d. -f1)
+V2=$(echo "$PROJECT_VERSION" | cut -d. -f2)
+V3=$(echo "$PROJECT_VERSION" | cut -d. -f3)
+# Fallback to zero if fields are empty
+V1=${V1:-1}
+V2=${V2:-0}
+V3=${V3:-0}
+VERSION_CODE=$((V1 * 10000 + V2 * 100 + V3))
+
+sed -i "s/versionName \"1.0\"/versionName \"$PROJECT_VERSION\"/g" app/build.gradle
+sed -i "s/versionCode 1/versionCode $VERSION_CODE/g" app/build.gradle
+
 # Fix the app name from default SDL "Game"
 sed -i 's/<string name="app_name">Game<\/string>/<string name="app_name">HamClock-Next<\/string>/g' app/src/main/res/values/strings.xml
 

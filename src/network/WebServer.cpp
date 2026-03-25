@@ -1123,16 +1123,16 @@ void WebServer::run() {
         let instr = '', cmd = '';
         const type = c.installType;
         if (type === 'RPM') {
-          instr = 'An update is available via DNF.';
+          instr = 'To update via DNF, run:';
           cmd = 'sudo dnf update hamclock-next';
         } else if (type === 'DEB') {
-          instr = 'Download the latest .deb and install it.';
+          instr = 'To update, download the latest .deb and install it:';
           cmd = 'sudo apt install ./hamclock-next.deb';
         } else if (type === 'WASM') {
-          instr = 'A new version of HamClock-Next is available.';
+          instr = 'To update HamClock-Next in the browser:';
           cmd = 'Please reload the page to update.';
         } else {
-          instr = 'Binary update available.';
+          instr = 'To update the binary installation:';
           cmd = 'Download the latest release from GitHub.';
         }
         document.getElementById('update-instr').textContent = instr;

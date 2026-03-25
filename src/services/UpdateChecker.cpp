@@ -10,86 +10,69 @@ static constexpr const char *kApiUrl =
 // Cache the GitHub response for 6 hours to avoid hammering the API.
 static constexpr int kCacheSeconds = 6 * 3600;
 
-// Helper to compare version strings (X.Y.Z[Suffix])
+// Helper to pack version strings (X.Y.Z[Suffix]) into a 32-bit integer for
+// comparison. Top 3 bytes hold up to 3 numeric parts. Lowest byte holds the
+// suffix code (255 for final release).
+static uint32_t versionToUint32(std::string v) {
+  if (!v.empty() && (v[0] == 'v' || v[0] == 'V')) {
+    v = v.substr(1);
+  }
+
+  uint32_t result = 0;
+  int shift = 24;
+
+  size_t start = 0;
+  std::string suffix = "";
+
+  for (int i = 0; i < 3; ++i) {
+    if (start >= v.length())
+      break;
+
+    size_t end = v.find('.', start);
+    std::string part = (end == std::string::npos)
+                           ? v.substr(start)
+                           : v.substr(start, end - start);
+
+    size_t pos = 0;
+    uint32_t num = 0;
+    try {
+      num = std::stoul(part, &pos);
+    } catch (...) {
+    }
+
+    result |= ((num & 0xFF) << shift);
+    shift -= 8;
+
+    if (pos < part.length()) {
+      suffix = part.substr(pos);
+    }
+
+    if (end == std::string::npos)
+      break;
+    start = end + 1;
+  }
+
+  uint32_t suffixVal = 255;
+  if (!suffix.empty()) {
+    size_t firstDigit = suffix.find_first_of("0123456789");
+    if (firstDigit != std::string::npos) {
+      try {
+        suffixVal = std::stoul(suffix.substr(firstDigit));
+      } catch (...) {
+        suffixVal = 0;
+      }
+    } else {
+      suffixVal = 0;
+    }
+  }
+
+  result |= (suffixVal & 0xFF);
+  return result;
+}
+
 // Returns true if remote is strictly NEWER than local.
 static bool isVersionNewer(std::string remote, std::string local) {
-  // First, normalize by removing dots and 'v' prefix to check for equivalence
-  // (e.g., v0.9.5 internal vs v0.95 release)
-  auto normalize = [](std::string v) {
-    v.erase(std::remove(v.begin(), v.end(), '.'), v.end());
-    if (!v.empty() && (v[0] == 'v' || v[0] == 'V')) {
-      v = v.substr(1);
-    }
-    return v;
-  };
-  if (normalize(remote) == normalize(local)) {
-    return false;
-  }
-
-  auto stripVOwn = [](std::string v) {
-    if (!v.empty() && (v[0] == 'v' || v[0] == 'V')) {
-      return v.substr(1);
-    }
-    return v;
-  };
-  remote = stripVOwn(remote);
-  local = stripVOwn(local);
-
-  auto split = [](const std::string &v) {
-    std::vector<std::string> parts;
-    std::string current;
-    for (char c : v) {
-      if (c == '.') {
-        parts.push_back(current);
-        current = "";
-      } else {
-        current += c;
-      }
-    }
-    parts.push_back(current);
-    return parts;
-  };
-
-  auto r_parts = split(remote);
-  auto l_parts = split(local);
-
-  size_t n = std::max(r_parts.size(), l_parts.size());
-  for (size_t i = 0; i < n; ++i) {
-    std::string r_s = (i < r_parts.size()) ? r_parts[i] : "0";
-    std::string l_s = (i < l_parts.size()) ? l_parts[i] : "0";
-
-    // Extract numeric part
-    size_t r_pos = 0, l_pos = 0;
-    int r_n = 0, l_n = 0;
-    try {
-      r_n = std::stoi(r_s, &r_pos);
-    } catch (...) {
-    }
-    try {
-      l_n = std::stoi(l_s, &l_pos);
-    } catch (...) {
-    }
-
-    if (r_n > l_n)
-      return true;
-    if (r_n < l_n)
-      return false;
-
-    // Numbers are equal, compare suffixes (e.g. "6B" vs "60")
-    // Simple string comparison for suffixes if present
-    std::string r_suffix = r_s.substr(r_pos);
-    std::string l_suffix = l_s.substr(l_pos);
-    if (r_suffix != l_suffix) {
-      // "B" (beta) is usually considered older than "" (release)
-      if (r_suffix.empty())
-        return true; // Remote is release, local is beta/suffix
-      if (l_suffix.empty())
-        return false; // Local is release, remote is beta/suffix
-      return r_suffix > l_suffix;
-    }
-  }
-
-  return false;
+  return versionToUint32(remote) > versionToUint32(local);
 }
 
 UpdateChecker::UpdateChecker(NetworkManager &net) : net_(net) {}
@@ -100,7 +83,7 @@ void UpdateChecker::fetch() {
       [](std::string data) {
         if (data.empty())
           return;
-        
+
         SDL_Event ev;
         SDL_zero(ev);
         ev.type = HamClock::AE_BASE_EVENT + HamClock::AE_UPDATE_DATA_READY;
