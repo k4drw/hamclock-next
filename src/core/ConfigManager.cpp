@@ -217,6 +217,7 @@ bool ConfigManager::load(AppConfig &config) {
     config.qrzUsername = ap.value("qrz_username", "");
     config.qrzPassword = ap.value("qrz_password", "");
     config.fontPath = ap.value("font_path", "");
+    config.showPaneCallsigns = ap.value("show_pane_callsigns", false);
   }
 
   // Countdown (new dedicated section; falls back to legacy appearance keys)
@@ -588,6 +589,7 @@ bool ConfigManager::save(const AppConfig &config) {
   json["appearance"]["qrz_password"] = config.qrzPassword;
   if (!config.fontPath.empty())
     json["appearance"]["font_path"] = config.fontPath;
+  json["appearance"]["show_pane_callsigns"] = config.showPaneCallsigns;
 
   json["countdown"]["label"] = config.countdownLabel;
   json["countdown"]["time"] = config.countdownTime;

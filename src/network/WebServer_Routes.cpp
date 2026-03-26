@@ -472,6 +472,7 @@ void WebServer::registerRoutes(httplib::Server &svr) {
     j["lat"] = cfg_->lat;
     j["lon"] = cfg_->lon;
     j["audioMuted"] = cfg_->audioMuted;
+    j["showPaneCallsigns"] = cfg_->showPaneCallsigns;
     j["fontPath"] = cfg_->fontPath;
     j["version"] = HAMCLOCK_VERSION;
     j["arch"] = HAMCLOCK_ARCH;
@@ -724,6 +725,8 @@ void WebServer::registerRoutes(httplib::Server &svr) {
       cfg_->lon = StringUtils::safe_stod(req.get_param_value("lon"));
     if (req.has_param("audio_muted"))
       cfg_->audioMuted = req.get_param_value("audio_muted") == "1";
+    if (req.has_param("show_pane_callsigns"))
+      cfg_->showPaneCallsigns = req.get_param_value("show_pane_callsigns") == "1";
     if (req.has_param("font_path"))
       cfg_->fontPath = req.get_param_value("font_path");
 
@@ -1045,19 +1048,28 @@ void WebServer::registerRoutes(httplib::Server &svr) {
   // /api/live/vectors — spot + projection data for canvas overlay
   svr.Get("/api/live/vectors", [this](const httplib::Request &,
                                       httplib::Response &res) {
-    std::lock_guard<std::mutex> lk(dataMutex_);
-    if (!cfg_ || !state_) {
-      res.status = 503;
-      return;
+    // Snapshot pointers under dataMutex_, then release before acquiring
+    // locationMutex to avoid ABBA deadlock with the main thread which holds
+    // locationMutex while calling setXxx(nullptr) under dataMutex_.
+    AppConfig *cfg = nullptr;
+    HamClockState *state = nullptr;
+    {
+      std::lock_guard<std::mutex> lk(dataMutex_);
+      if (!cfg_ || !state_) {
+        res.status = 503;
+        return;
+      }
+      cfg = cfg_;
+      state = state_;
     }
     nlohmann::json j;
-    j["projection"] = cfg_->projection;
+    j["projection"] = cfg->projection;
     {
-      std::lock_guard<std::mutex> lk_state(state_->locationMutex);
-      j["deLat"] = state_->deLocation.lat;
-      j["deLon"] = state_->deLocation.lon;
-      j["dxLat"] = state_->dxLocation.lat;
-      j["dxLon"] = state_->dxLocation.lon;
+      std::lock_guard<std::mutex> lk_state(state->locationMutex);
+      j["deLat"] = state->deLocation.lat;
+      j["deLon"] = state->deLocation.lon;
+      j["dxLat"] = state->dxLocation.lat;
+      j["dxLon"] = state->dxLocation.lon;
     }
     // Logical dimensions so the browser can compute the pixel scale factor.
     j["logicalW"] = 800;
@@ -1068,7 +1080,7 @@ void WebServer::registerRoutes(httplib::Server &svr) {
     {
       constexpr int wx = 139, wy = 149, ww = 660, wh = 330;
       int mx, my, mw, mh;
-      const std::string &proj = cfg_->projection;
+      const std::string &proj = cfg->projection;
       if (proj == "azimuthal") {
         int side = std::min(ww, wh);
         mx = wx + (ww - side) / 2;
@@ -2095,26 +2107,34 @@ void WebServer::registerRoutes(httplib::Server &svr) {
 
   svr.Get("/get_satellite.txt",
           [this](const httplib::Request &, httplib::Response &res) {
-            std::lock_guard<std::mutex> lk(dataMutex_);
-            if (!satMgr_) {
-              res.status = 503;
-              return;
+            // Snapshot pointers under dataMutex_, then release before acquiring
+            // locationMutex to avoid ABBA deadlock with the main thread.
+            SatelliteManager *satMgr = nullptr;
+            HamClockState *state = nullptr;
+            {
+              std::lock_guard<std::mutex> lk(dataMutex_);
+              if (!satMgr_) {
+                res.status = 503;
+                return;
+              }
+              satMgr = satMgr_;
+              state = state_;
             }
-            std::string name = satMgr_->getTrackedSatellite();
+            std::string name = satMgr->getTrackedSatellite();
             if (name.empty()) {
               res.set_content("Satellite  none\n", "text/plain");
               return;
             }
             std::ostringstream oss;
             oss << "Satellite  " << name << "\n";
-            auto tle = satMgr_->findByName(name);
+            auto tle = satMgr->findByName(name);
             if (tle) {
               Satellite sat(*tle);
               double deLat, deLon;
               {
-                std::lock_guard<std::mutex> lk_state(state_->locationMutex);
-                deLat = state_->deLocation.lat;
-                deLon = state_->deLocation.lon;
+                std::lock_guard<std::mutex> lk_state(state->locationMutex);
+                deLat = state->deLocation.lat;
+                deLon = state->deLocation.lon;
               }
               sat.setObserver(deLat, deLon);
               SatObservation obs = sat.predict();

@@ -23,6 +23,7 @@
 #include "FontCatalog.h"
 #include "PaneContainer.h"
 #include "RenderUtils.h"
+#include "../core/CountryGrid.h"
 #include <fmt/core.h>
 
 #include <algorithm>
@@ -277,10 +278,21 @@ void MapWidget::onMouseMove(int mx, int my) {
     }
   }
 
+  // 8. Fallback to Country lookup
+  if (tip.empty()) {
+    int row = std::clamp((int)((lat + 90.0) * 2.0), 0, 359);
+    int col = std::clamp((int)((lon + 180.0) * 2.0), 0, 719);
+    uint16_t cId = COUNTRY_GRID[row][col];
+    if (cId > 0 && cId < NUM_COUNTRIES) {
+      tip = COUNTRY_NAMES[cId];
+    }
+  }
+
   if (tip.empty()) {
     tooltip_.visible = false;
     return;
   }
+
 
   // Trim trailing whitespace (common in TLE names)
   size_t last = tip.find_last_not_of(" \r\n\t");

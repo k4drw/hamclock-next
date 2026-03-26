@@ -205,6 +205,7 @@ void WebServer::run() {
       <label>Longitude</label>
       <input type="number" id="lon" step="0.0001" min="-180" max="180">
       <label style="margin-top:4px"><input type="checkbox" id="audio-muted"> Mute Audio / TTS</label>
+      <label style="margin-top:4px"><input type="checkbox" id="show-pane-callsigns"> Show callsigns instead of DE/DX</label>
       <button onclick="saveConfig()" style="margin-top:8px">Save</button>
       <div id="msg"></div>
     </div>
@@ -576,6 +577,7 @@ void WebServer::run() {
         document.getElementById('lat').value = (c.lat !== undefined) ? c.lat : '';
         document.getElementById('lon').value = (c.lon !== undefined) ? c.lon : '';
         document.getElementById('audio-muted').checked = !!c.audioMuted;
+        document.getElementById('show-pane-callsigns').checked = !!c.showPaneCallsigns;
       } catch(e) { setMsg('Failed to load config: ' + e, true); }
     }
 
@@ -691,7 +693,8 @@ void WebServer::run() {
       const lat  = document.getElementById('lat').value;
       const lon  = document.getElementById('lon').value;
       const audioMuted = document.getElementById('audio-muted').checked ? '1' : '0';
-      const params = new URLSearchParams({call, grid, lat, lon, audio_muted: audioMuted});
+      const showPaneCallsigns = document.getElementById('show-pane-callsigns').checked ? '1' : '0';
+      const params = new URLSearchParams({call, grid, lat, lon, audio_muted: audioMuted, show_pane_callsigns: showPaneCallsigns});
       try {
         const r = await fetch('/set_config?' + params);
         const t = await r.text();

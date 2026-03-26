@@ -56,6 +56,7 @@ struct AppConfig {
   std::string grid;
   double lat = 0.0;
   double lon = 0.0;
+  bool showPaneCallsigns = false;
 
   // Appearance
   SDL_Color callsignColor = {255, 165, 0, 255}; // default orange

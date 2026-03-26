@@ -8,6 +8,10 @@ namespace HamClock {
 
 TropoProvider::TropoProvider(NetworkManager& net) : net_(net) {}
 
+TropoProvider::~TropoProvider() {
+  alive_->store(false, std::memory_order_release);
+}
+
 void TropoProvider::fetch(double lat, double lon, bool force) {
   lastFetchMs_ = SDL_GetTicks();
   uint32_t now = SDL_GetTicks();
@@ -26,7 +30,9 @@ void TropoProvider::fetch(double lat, double lon, bool force) {
 
   net_.fetchAsync(
       url,
-      [this](std::string response) {
+      [this, alive = alive_](std::string response) {
+        if (!alive->load(std::memory_order_acquire))
+          return;
         if (response.empty()) {
           LOG_W("TropoProvider", "Empty response from Open-Meteo");
           return;

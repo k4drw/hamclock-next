@@ -689,6 +689,7 @@ void main_tick() {
         ctx.webServer->setSatelliteManager(nullptr);
         ctx.webServer->setRotatorService(nullptr);
         ctx.webServer->setStopwatch(nullptr);
+        ctx.webServer->setADIFProvider(nullptr);
       }
 #endif
       ctx.dashboard.reset();
@@ -1015,6 +1016,7 @@ void main_tick() {
           ctx.webServer->setSatelliteManager(nullptr);
           ctx.webServer->setRotatorService(nullptr);
           ctx.webServer->setStopwatch(nullptr);
+          ctx.webServer->setADIFProvider(nullptr);
         }
 #endif
         ctx.dashboard.reset();

@@ -321,6 +321,11 @@ bool SetupScreen::onMouseDown(int mx, int my, Uint16 mod, int clicks) {
       audioMuted_ = !audioMuted_;
       return true;
     }
+    if (mx >= paneCallsignsToggleRect_.x && mx <= paneCallsignsToggleRect_.x + paneCallsignsToggleRect_.w &&
+        my >= paneCallsignsToggleRect_.y && my <= paneCallsignsToggleRect_.y + paneCallsignsToggleRect_.h) {
+      showPaneCallsigns_ = !showPaneCallsigns_;
+      return true;
+    }
   } else if (activeTab_ == Tab::Spotting) {
     if (mx >= clusterToggleRect_.x &&
         mx <= clusterToggleRect_.x + clusterToggleRect_.w &&

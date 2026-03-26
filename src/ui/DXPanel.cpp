@@ -1,7 +1,9 @@
 #include "DXPanel.h"
 #include "../core/Astronomy.h"
 #include "../core/Theme.h"
+#include "../core/ConfigManager.h"
 #include "FontCatalog.h"
+#include "../core/CountryGrid.h"
 
 #include <cmath>
 #include <cstdio>
@@ -31,15 +33,16 @@ void DXPanel::update() {
     lineText_[5].clear();
     lineText_[6].clear();
     lineText_[7].clear();
+    lineText_[8].clear();
     return;
   }
 
   if (!state_->dxCallsign.empty()) {
     lineText_[1] = state_->dxCallsign;
-    lineText_[5] = state_->dxGrid;
+    lineText_[6] = state_->dxGrid;
   } else {
     lineText_[1] = state_->dxGrid;
-    lineText_[5].clear();
+    lineText_[6].clear();
   }
 
   char buf[64];
@@ -73,6 +76,15 @@ void DXPanel::update() {
   }
   lineText_[4] = buf;
 
+  int row = std::clamp((int)((state_->dxLocation.lat + 90.0) * 2.0), 0, 359);
+  int col = std::clamp((int)((state_->dxLocation.lon + 180.0) * 2.0), 0, 719);
+  uint16_t cId = COUNTRY_GRID[row][col];
+  if (cId > 0 && cId < NUM_COUNTRIES) {
+    lineText_[5] = COUNTRY_NAMES[cId];
+  } else {
+    lineText_[5].clear();
+  }
+
   // Weather
   if (weatherStore_) {
     auto wd = weatherStore_->get();
@@ -82,17 +94,17 @@ void DXPanel::update() {
       const char *tempUnit = useMetric_ ? "C" : "F";
       std::snprintf(wBuf, sizeof(wBuf), "%.0f %s  %d%%", temp, tempUnit,
                     wd.humidity);
-      lineText_[6] = wBuf;
+      lineText_[7] = wBuf;
 
       std::snprintf(wBuf, sizeof(wBuf), "%.0f hPa", wd.pressure);
-      lineText_[7] = wBuf;
+      lineText_[8] = wBuf;
     } else {
-      lineText_[6].clear();
       lineText_[7].clear();
+      lineText_[8].clear();
     }
   } else {
-    lineText_[6].clear();
     lineText_[7].clear();
+    lineText_[8].clear();
   }
 }
 
@@ -101,6 +113,7 @@ void DXPanel::render(SDL_Renderer *renderer) {
     return;
 
   ThemeColors themes = getThemeColors(theme_);
+  AppConfig cfg = ConfigManager::instance().getConfig();
 
   renderChrome(renderer);
 
@@ -113,13 +126,15 @@ void DXPanel::render(SDL_Renderer *renderer) {
       {180, 180, 180, 255}, // Coords gray
       {255, 255, 0, 255},   // Bearing yellow
       {0, 200, 255, 255},   // Distance cyan
+      {255, 128, 0, 255},   // Country orange
       {0, 255, 128, 255},   // Grid (panel-driven) green
       {0, 255, 0, 255},     // Weather 1 (Green)
       {0, 255, 0, 255},     // Weather 2 (Green)
   };
 
   int titleH = 20;
-  fontMgr_.catalog()->drawText(renderer, "DX", x_ + 10, y_ + 5, themes.accent,
+  std::string dxCall = (cfg.showPaneCallsigns && state_->dxActive && !state_->dxCallsign.empty()) ? state_->dxCallsign : "DX";
+  fontMgr_.catalog()->drawText(renderer, dxCall, x_ + 10, y_ + 5, themes.accent,
                                FontStyle::MicroBold);
 
   // Greyline Button
@@ -177,10 +192,10 @@ void DXPanel::onResize(int x, int y, int w, int h) {
   lineFontSize_[2] = cat->ptSize(FontStyle::Fast); // Coords
   lineFontSize_[3] = cat->ptSize(FontStyle::Fast); // Bearing
   lineFontSize_[4] = cat->ptSize(FontStyle::Fast); // Distance
-  lineFontSize_[5] = cat->ptSize(FontStyle::Fast); // Miles
-  lineFontSize_[6] = cat->ptSize(FontStyle::Fast); // Weather 1
-  lineFontSize_[7] = cat->ptSize(FontStyle::Fast); // Weather 2
-  lineFontSize_[7] = cat->ptSize(FontStyle::Fast); // Weather 2
+  lineFontSize_[5] = cat->ptSize(FontStyle::Fast); // Country
+  lineFontSize_[6] = cat->ptSize(FontStyle::Fast); // Miles
+  lineFontSize_[7] = cat->ptSize(FontStyle::Fast); // Weather 1
+  lineFontSize_[8] = cat->ptSize(FontStyle::Fast); // Weather 2
   destroyCache();
 }
 
