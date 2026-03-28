@@ -33,7 +33,7 @@ private:
   void deletePreset(int index);
 
   static constexpr int kModalW    = 420;
-  static constexpr int kModalH    = 300;
+  static constexpr int kModalH    = 330;  // +30 for built-in Contest row
   static constexpr int kRowH      = 30;
   static constexpr int kVisibleRows = 5;
   static constexpr int kLogicalW  = 800;
@@ -60,6 +60,9 @@ private:
   SDL_Rect nameOkRect_   = {};
   SDL_Rect listRect_     = {};
   SDL_Rect doneBtnRect_  = {};
+
+  // Built-in Contest Mode row
+  SDL_Rect contestApplyRect_ = {};
 
   // Populated each render call — bounding rects for each visible row's buttons
   struct RowRects { SDL_Rect apply; SDL_Rect del; };

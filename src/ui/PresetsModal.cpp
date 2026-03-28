@@ -1,6 +1,7 @@
 #include "PresetsModal.h"
 #include "FontCatalog.h"
 #include "../core/Theme.h"
+#include "../core/WidgetType.h"
 
 #include <algorithm>
 
@@ -39,8 +40,12 @@ void PresetsModal::computeLayout() {
   nameFieldRect_ = {mx + 8, saveY, kModalW - 16 - okW - 6, 28};
   nameOkRect_ = {nameFieldRect_.x + nameFieldRect_.w + 6, saveY, okW, 28};
 
-  // List area
-  int listY = my + 68;
+  // Built-in Contest row (sits between save area and user preset list)
+  int contestRowY = my + 66;
+  contestApplyRect_ = {mx + kModalW - 138, contestRowY + 3, 60, 24};
+
+  // List area (pushed down by kRowH to make room for Contest row)
+  int listY = my + 100;
   int listH = kVisibleRows * kRowH;
   listRect_ = {mx + 8, listY, kModalW - 16, listH};
 
@@ -164,6 +169,21 @@ void PresetsModal::render(SDL_Renderer *renderer) {
                   true, false, true);
   }
 
+  // ── Built-in Contest Mode row ────────────────────────────────────────────
+  {
+    int rowY = contestApplyRect_.y - 3;
+    SDL_Rect rowBg = {listRect_.x, rowY, listRect_.w, kRowH};
+    fillRect(renderer, rowBg, themes.rowStripe2);
+    drawRect(renderer, rowBg, themes.border);
+    cat->drawText(renderer, "\xe2\x98\x86 Contest Mode", listRect_.x + 8, rowY + 7,
+                  accent, FontStyle::Fast);
+    fillRect(renderer, contestApplyRect_, btnFill);
+    drawRect(renderer, contestApplyRect_, btnBorder);
+    cat->drawText(renderer, "Apply", contestApplyRect_.x + contestApplyRect_.w / 2,
+                  contestApplyRect_.y + contestApplyRect_.h / 2, greenColor,
+                  FontStyle::Caption, true, false, true);
+  }
+
   // ── Separator ────────────────────────────────────────────────────────────
   SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, themes.border.a);
   SDL_RenderDrawLine(renderer, dialogRect_.x + 4, listRect_.y - 2,
@@ -279,6 +299,20 @@ bool PresetsModal::onMouseUp(int mx, int my, Uint16 /*mod*/) {
       cancelSave();
     else
       active_ = false;
+    return true;
+  }
+
+  // Contest Mode built-in apply
+  if (ptInRect(mx, my, contestApplyRect_)) {
+    cfg_->pane1Rotation = {WidgetType::DX_CLUSTER};
+    cfg_->pane2Rotation = {WidgetType::LIVE_SPOTS};
+    cfg_->pane3Rotation = {WidgetType::BAND_CONDITIONS};
+    cfg_->pane4Rotation = {WidgetType::SOLAR};
+    cfg_->pane5Rotation = {WidgetType::DE_INFO};
+    cfg_->pane6Rotation = {WidgetType::DX_INFO};
+    if (onApply_)
+      onApply_();
+    active_ = false;
     return true;
   }
 

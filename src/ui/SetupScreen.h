@@ -158,6 +158,8 @@ private:
 
   // Watchlist tab
   std::vector<std::string> watchlistEntries_;
+  std::string ontaFilter_;
+  SDL_Rect ontaFilterRects_[3] = {};  // 0=ALL, 1=POTA, 2=SOTA
   TextInput watchlistInputField_;
   SDL_Rect watchlistInputRect_ = {0, 0, 0, 0};
   SDL_Rect watchlistAddRect_ = {0, 0, 0, 0};

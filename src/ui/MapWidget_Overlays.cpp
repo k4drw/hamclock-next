@@ -2184,7 +2184,7 @@ void MapWidget::renderOverlayInfo(SDL_Renderer *renderer) {
     text = fmt::format("Reliability ({} / {} / {}W)", config_.propBand,
                        config_.propMode, config_.propPower);
   } else if (config_.propOverlay == PropOverlayType::Toa) {
-    text = "TOA Overlay";
+    text = fmt::format("TOA ({} / {})", config_.propBand, config_.propMode);
   } else if (config_.propOverlay == PropOverlayType::Drap) {
     text = "DRAP Absorption";
   } else if (config_.propOverlay == PropOverlayType::Heatmap) {

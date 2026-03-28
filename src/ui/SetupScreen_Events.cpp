@@ -304,6 +304,16 @@ bool SetupScreen::onMouseDown(int mx, int my, Uint16 mod, int clicks) {
         ++watchlistScrollOffset_;
       return true;
     }
+
+    // On The Air filter buttons (ALL / POTA / SOTA)
+    static const char *kOntaFilterValues[] = {"all", "pota", "sota"};
+    for (int i = 0; i < 3; ++i) {
+      const SDL_Rect &r = ontaFilterRects_[i];
+      if (r.w > 0 && mx >= r.x && mx < r.x + r.w && my >= r.y && my < r.y + r.h) {
+        ontaFilter_ = kOntaFilterValues[i];
+        return true;
+      }
+    }
   }
 
   // 3. Toggles and Buttons (Non-text fields)

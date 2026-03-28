@@ -147,6 +147,57 @@ bool ConfigManager::init() {
   return true;
 }
 
+static void addFactoryPresets(AppConfig &config) {
+  // DX preset
+  {
+    ConfigPreset p;
+    p.name = "DX";
+    p.pane1Rotation = {WidgetType::DX_CLUSTER};
+    p.pane2Rotation = {WidgetType::DX_PEDITIONS};
+    p.pane3Rotation = {WidgetType::LIVE_SPOTS};
+    p.pane4Rotation = {WidgetType::BAND_CONDITIONS};
+    p.pane5Rotation = {WidgetType::DE_INFO};
+    p.pane6Rotation = {WidgetType::DX_INFO};
+    config.presets.push_back(std::move(p));
+  }
+  // Contest preset
+  {
+    ConfigPreset p;
+    p.name = "Contest";
+    p.pane1Rotation = {WidgetType::DX_CLUSTER};
+    p.pane2Rotation = {WidgetType::LIVE_SPOTS};
+    p.pane3Rotation = {WidgetType::BAND_CONDITIONS};
+    p.pane4Rotation = {WidgetType::SOLAR};
+    p.pane5Rotation = {WidgetType::DE_INFO};
+    p.pane6Rotation = {WidgetType::DX_INFO};
+    config.presets.push_back(std::move(p));
+  }
+  // Satellite preset
+  {
+    ConfigPreset p;
+    p.name = "Satellite";
+    p.pane1Rotation = {WidgetType::MOON};
+    p.pane2Rotation = {WidgetType::EME_TOOL};
+    p.pane3Rotation = {WidgetType::GIMBAL};
+    p.pane4Rotation = {WidgetType::SOLAR};
+    p.pane5Rotation = {WidgetType::DE_INFO};
+    p.pane6Rotation = {WidgetType::DX_INFO};
+    config.presets.push_back(std::move(p));
+  }
+  // Environment/WX preset
+  {
+    ConfigPreset p;
+    p.name = "Environment/WX";
+    p.pane1Rotation = {WidgetType::DE_WEATHER};
+    p.pane2Rotation = {WidgetType::DX_WEATHER};
+    p.pane3Rotation = {WidgetType::FORECAST};
+    p.pane4Rotation = {WidgetType::ENV_TEMP};
+    p.pane5Rotation = {WidgetType::ENV_HUMIDITY};
+    p.pane6Rotation = {WidgetType::ENV_PRESSURE};
+    config.presets.push_back(std::move(p));
+  }
+}
+
 bool ConfigManager::load(AppConfig &config) {
   if (configPath_.empty())
     return false;
@@ -529,6 +580,10 @@ bool ConfigManager::load(AppConfig &config) {
       config.presets.push_back(std::move(p));
     }
   }
+
+  // Seed factory presets on first use
+  if (config.presets.empty())
+    addFactoryPresets(config);
 
   // Sync internal state
   config_ = config;
