@@ -12,13 +12,27 @@
 std::vector<std::pair<std::string, std::string>>
 SetupScreen::enumerateSystemFonts() {
   std::vector<std::pair<std::string, std::string>> result;
-  std::vector<std::string> searchDirs = {"/usr/share/fonts/",
-                                         "/usr/local/share/fonts/"};
+  std::vector<std::string> searchDirs;
+#if defined(_WIN32)
+  // Windows system fonts
+  const char *sysRoot = std::getenv("SystemRoot");
+  if (sysRoot)
+    searchDirs.push_back(std::string(sysRoot) + "\\Fonts\\");
+  else
+    searchDirs.push_back("C:\\Windows\\Fonts\\");
+  // User-installed fonts (Windows 10+)
+  const char *localAppData = std::getenv("LOCALAPPDATA");
+  if (localAppData)
+    searchDirs.push_back(std::string(localAppData) + "\\Microsoft\\Windows\\Fonts\\");
+#else
+  searchDirs.push_back("/usr/share/fonts/");
+  searchDirs.push_back("/usr/local/share/fonts/");
   const char *home = std::getenv("HOME");
   if (home) {
     searchDirs.push_back(std::string(home) + "/.local/share/fonts/");
     searchDirs.push_back(std::string(home) + "/.fonts/");
   }
+#endif
   for (const auto &dir : searchDirs) {
     std::error_code ec;
     std::filesystem::recursive_directory_iterator it(

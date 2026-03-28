@@ -208,9 +208,20 @@ bool DXSatPane::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
       return true;
   }
 
-  // 2. Upper 10% title bar → open selection menu
+  // 2. Upper 10% title bar — SAT mode opens satellite options menu;
+  // DX mode returns false so PaneContainer handles widget selection.
   int headerH = std::max(1, height_ / 10);
   if (my < y_ + headerH) {
+    if (mode_ == Mode::SAT) {
+      openMenu();
+      return true;
+    }
+    return false;
+  }
+
+  // 3. DX mode body click (lower 90%) not consumed by DXPanel — open satellite
+  // list so the user can switch this pane to satellite mode.
+  if (mode_ == Mode::DX) {
     openMenu();
     return true;
   }

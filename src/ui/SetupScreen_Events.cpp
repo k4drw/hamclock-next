@@ -170,14 +170,10 @@ bool SetupScreen::onMouseDown(int mx, int my, Uint16 mod, int clicks) {
     if (hitField(brightTimeRect_, 1, &brightTimeInput_))
       return true;
   } else if (activeTab_ == Tab::Widgets) {
-    // 1. Pane Switching (4 top-bar panes, 1 row)
-    int yW = modalRect_.y + cat->ptSize(FontStyle::MediumBold) + 2 * pad +
-             fieldH + cat->ptSize(FontStyle::SmallBold) + pad / 2;
-    const int btnH = 22;
-    int paneW = fieldW / 4;
+    // 1. Pane Switching via layout diagram (top panes 1-4)
     for (int i = 0; i < 4; ++i) {
-      SDL_Rect pr = {fieldX + i * paneW, yW, paneW - 4, btnH};
-      if (mx >= pr.x && mx < pr.x + pr.w && my >= pr.y && my < pr.y + pr.h) {
+      const auto &pr = paneDiagramRects_[i];
+      if (pr.w > 0 && mx >= pr.x && mx < pr.x + pr.w && my >= pr.y && my < pr.y + pr.h) {
         if (activePane_ != i) {
           activePane_ = i;
           widgetListScrollOffset_ = 0;
@@ -218,7 +214,8 @@ bool SetupScreen::onMouseDown(int mx, int my, Uint16 mod, int clicks) {
         mx < rotationToggleRect_.x + rotationToggleRect_.w &&
         my >= rotationToggleRect_.y &&
         my < rotationToggleRect_.y + rotationToggleRect_.h) {
-      activeField_ = 0; // Focus rotation interval input
+      activeField_ = 0;
+      rotationInterval_ = 0;  // Clear for fresh input
       return true;
     }
 
@@ -319,11 +316,6 @@ bool SetupScreen::onMouseDown(int mx, int my, Uint16 mod, int clicks) {
     if (mx >= audioMuteToggleRect_.x && mx <= audioMuteToggleRect_.x + audioMuteToggleRect_.w &&
         my >= audioMuteToggleRect_.y && my <= audioMuteToggleRect_.y + audioMuteToggleRect_.h) {
       audioMuted_ = !audioMuted_;
-      return true;
-    }
-    if (mx >= paneCallsignsToggleRect_.x && mx <= paneCallsignsToggleRect_.x + paneCallsignsToggleRect_.w &&
-        my >= paneCallsignsToggleRect_.y && my <= paneCallsignsToggleRect_.y + paneCallsignsToggleRect_.h) {
-      showPaneCallsigns_ = !showPaneCallsigns_;
       return true;
     }
   } else if (activeTab_ == Tab::Spotting) {
@@ -672,6 +664,24 @@ bool SetupScreen::onKeyDown(SDL_Keycode key, Uint16 mod) {
     return true;
   }
 
+  // Rotation interval: handle digit keys directly from KEYDOWN so this works on
+  // framebuffer builds where SDL_TEXTINPUT events may not be generated.
+  if (activeTab_ == Tab::Widgets && activeField_ == 0) {
+    int digit = -1;
+    if (key >= SDLK_0 && key <= SDLK_9)
+      digit = key - SDLK_0;
+    else if (key >= SDLK_KP_1 && key <= SDLK_KP_9)
+      digit = key - SDLK_KP_1 + 1;
+    else if (key == SDLK_KP_0)
+      digit = 0;
+    if (digit >= 0) {
+      rotationInterval_ = rotationInterval_ * 10 + digit;
+      if (rotationInterval_ > 3600)
+        rotationInterval_ = 3600;
+      return true;
+    }
+  }
+
   switch (key) {
   case SDLK_ESCAPE:
     complete_ = true;
@@ -752,12 +762,8 @@ bool SetupScreen::onTextInput(const char *inputText) {
 
   if (activeTab_ == Tab::Widgets) {
     if (activeField_ == 0) {
-      // Rotation interval: numeric only
-      if (inputText[0] >= '0' && inputText[0] <= '9') {
-        rotationInterval_ = rotationInterval_ * 10 + (inputText[0] - '0');
-        if (rotationInterval_ > 3600)
-          rotationInterval_ = 3600;
-      }
+      // Digits are handled in onKeyDown to support framebuffer builds.
+      // Consume TEXTINPUT here to prevent double-counting.
       return true;
     }
   }

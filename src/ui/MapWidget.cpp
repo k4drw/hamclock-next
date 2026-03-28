@@ -820,6 +820,11 @@ void MapWidget::render(SDL_Renderer *renderer) {
     }
   }
 
+  // Star field: drawn AFTER the map so stars are visible in the black corner
+  // areas of Azimuthal and Robinson projections rather than underneath the map
+  // blit (which overwrites anything drawn before it in those corners).
+  renderStarField(renderer);
+
   renderWxMbOverlay(renderer);
   renderGribCloudOverlay(renderer);
   renderPropagationOverlay(renderer);

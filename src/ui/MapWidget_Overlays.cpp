@@ -6,6 +6,7 @@
 #include "MapWidget.h"
 #include "../core/AsteroidPropagator.h"
 #include "../core/Astronomy.h"
+#include "../core/StarCatalog.h"
 #include "../core/BeaconData.h"
 #include "../core/Constants.h"
 #include "../core/LiveSpotData.h"
@@ -2521,4 +2522,104 @@ void MapWidget::renderCalendarAlert(SDL_Renderer *renderer) {
   // Dismiss hint
   cat->drawText(renderer, "tap to dismiss", panX + panW / 2, panY + panH - 20,
                 themes.textDim, FontStyle::Micro, true);
+}
+
+// ---------------------------------------------------------------------------
+// Star field — real star positions from Yale BSC subset, rendered in the
+// non-projection area for Azimuthal and Robinson projections.
+// Stars are positioned using an equirectangular celestial mapping that rotates
+// with Greenwich Mean Sidereal Time (GMST), giving a slowly moving sky.
+// Only stars outside the Earth projection mask are drawn.
+// ---------------------------------------------------------------------------
+void MapWidget::renderStarField(SDL_Renderer *renderer) {
+  const std::string &proj = config_.projection;
+  if (proj != "azimuthal" && proj != "robinson")
+    return;
+
+  // GMST in degrees: determines which RA is currently at the Greenwich meridian.
+  double GMST_deg = Astronomy::calculateGST(std::chrono::system_clock::now()) * 15.0;
+
+  // For azimuthal: precompute circle exclusion test parameters.
+  float az_cx = 0, az_cy = 0, az_R2 = 0;
+  if (proj == "azimuthal") {
+    az_cx = mapRect_.x + mapRect_.w * 0.5f;
+    az_cy = mapRect_.y + mapRect_.h * 0.5f;
+    float R = std::min(mapRect_.w, mapRect_.h) * 0.5f;
+    az_R2 = R * R;
+  }
+
+  // Synthetic background stars — generated once, cached.
+  // 600 stars uniformly distributed on the celestial sphere (LCG seeded).
+  // These are unnamed (no tooltip) and fill in coverage where the named catalog
+  // is sparse, especially in Robinson's narrow corner areas.
+  struct BgStar { float ra_deg, dec_deg, mag; };
+  static std::vector<BgStar> s_bgStars;
+  if (s_bgStars.empty()) {
+    s_bgStars.reserve(600);
+    uint32_t lcg = 0xDEADBEEFu;
+    auto next = [&]() -> uint32_t {
+      lcg = lcg * 1664525u + 1013904223u;
+      return lcg;
+    };
+    for (int i = 0; i < 600; ++i) {
+      float ra = (next() & 0xFFFF) * (360.0f / 65535.0f);
+      float v  = (next() & 0xFFFF) / 65535.0f * 2.0f - 1.0f;  // −1..1 → uniform sphere
+      float dec = std::asin(v) * (180.0f / static_cast<float>(M_PI));
+      float mag = 4.0f + (next() & 0xFF) * (2.0f / 255.0f);  // 4.0–6.0
+      s_bgStars.push_back({ra, dec, mag});
+    }
+  }
+
+  SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+
+  // Helper: render one star (named or background). Returns without drawing if
+  // the star falls inside the visible map projection area.
+  auto drawStar = [&](float ra_deg, float dec_deg, float mag) {
+    double ra_frac = std::fmod((ra_deg - GMST_deg) / 360.0 + 10.0, 1.0);
+    int sx = x_ + static_cast<int>(ra_frac * width_);
+    int sy = y_ + static_cast<int>((90.0f - dec_deg) / 180.0f * height_);
+
+    if (sx < x_ || sx >= x_ + width_ || sy < y_ || sy >= y_ + height_)
+      return;
+
+    bool inMap = false;
+    if (proj == "azimuthal") {
+      float dx = sx - az_cx, dy = sy - az_cy;
+      inMap = (dx * dx + dy * dy) <= az_R2;
+    } else {
+      // Robinson: use round-trip to detect visible-oval vs black corner.
+      double lat, lon;
+      if (!screenToLatLon(sx, sy, lat, lon)) {
+        inMap = false;
+      } else {
+        SDL_FPoint fwd = latLonToScreen(lat, lon);
+        inMap = (std::abs(fwd.x - sx) <= 2.0f && std::abs(fwd.y - sy) <= 2.0f);
+      }
+    }
+    if (inMap)
+      return;
+
+    // Magnitude-based brightness: brightest (-1.5) → 255, faintest (6.0) → 55.
+    float brightness = std::max(0.0f, std::min(1.0f, (6.0f - mag) / 7.5f));
+    auto lum = static_cast<uint8_t>(55 + static_cast<int>(brightness * 200));
+
+    SDL_SetRenderDrawColor(renderer, lum, lum, lum, 255);
+    SDL_RenderDrawPoint(renderer, sx, sy);
+
+    if (mag < 1.5f) {
+      SDL_RenderDrawPoint(renderer, sx - 1, sy);
+      SDL_RenderDrawPoint(renderer, sx + 1, sy);
+      SDL_RenderDrawPoint(renderer, sx, sy - 1);
+      SDL_RenderDrawPoint(renderer, sx, sy + 1);
+    } else if (mag < 2.5f) {
+      SDL_RenderDrawPoint(renderer, sx + 1, sy);
+      SDL_RenderDrawPoint(renderer, sx, sy + 1);
+    }
+  };
+
+  for (std::size_t i = 0; i < kBrightStarsCount; ++i)
+    drawStar(kBrightStars[i].ra_deg, kBrightStars[i].dec_deg, kBrightStars[i].mag);
+
+  for (const BgStar &bg : s_bgStars)
+    drawStar(bg.ra_deg, bg.dec_deg, bg.mag);
 }

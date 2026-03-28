@@ -23,6 +23,11 @@ struct SolarData {
   int noaa_s_scale = 0;          // S0-S5: Solar Radiation Storm scale
   int noaa_g_scale = 0;          // G0-G5: Geomagnetic Storm scale
 
+  // NOAA 4-day forecast table from noaa-scales.json
+  // [cat: 0=R, 1=S, 2=G][day: 0=Now, 1=D+1, 2=D+2, 3=D+3]
+  int noaa_scales[3][4] = {};
+  bool noaa_scales_valid = false;
+
   std::chrono::system_clock::time_point last_updated{};
   bool valid = false;
 };

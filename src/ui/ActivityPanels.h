@@ -17,6 +17,10 @@ public:
 
   void update() override;
 
+protected:
+  void renderRowText(SDL_Renderer *renderer, int index, int rx, int ry,
+                     int rw, int rh, SDL_Color color) override;
+
 private:
   ActivityProvider &provider_;
   std::shared_ptr<ActivityDataStore> store_;

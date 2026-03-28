@@ -133,7 +133,7 @@ void DXPanel::render(SDL_Renderer *renderer) {
   };
 
   int titleH = 20;
-  std::string dxCall = (cfg.showPaneCallsigns && state_->dxActive && !state_->dxCallsign.empty()) ? state_->dxCallsign : "DX";
+  std::string dxCall = "DX";
   fontMgr_.catalog()->drawText(renderer, dxCall, x_ + 10, y_ + 5, themes.accent,
                                FontStyle::MicroBold);
 

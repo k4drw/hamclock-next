@@ -178,21 +178,20 @@ void SysInfoPanel::render(SDL_Renderer *renderer) {
 
   renderChrome(renderer);
 
-  if (!monitor_ || !monitor_->isAvailable()) {
-    cat->drawText(renderer, "No CPU Temp", x_ + width_ / 2, y_ + height_ / 2,
-                  themes.textDim, FontStyle::Fast, true);
-    return;
-  }
+  bool tempAvail = monitor_ && monitor_->isAvailable();
 
   // Build common strings
   const char *tempUnit = useMetric_ ? "C" : "F";
   float tempC =
       useMetric_ ? currentTemp_ : (currentTemp_ - 32.0f) * 5.0f / 9.0f;
-  SDL_Color tempColor = colorForTemp(tempC, themes);
+  SDL_Color tempColor = tempAvail ? colorForTemp(tempC, themes) : themes.textDim;
   SDL_Color cpuColor = colorForCpu(cpuPercent_, themes);
 
   char tempBuf[32], cpuBuf[32], ramBuf[48], vramBuf[32];
-  std::snprintf(tempBuf, sizeof(tempBuf), "%.1f°%s", currentTemp_, tempUnit);
+  if (tempAvail)
+    std::snprintf(tempBuf, sizeof(tempBuf), "%.1f°%s", currentTemp_, tempUnit);
+  else
+    std::snprintf(tempBuf, sizeof(tempBuf), "--°%s", tempUnit);
   std::snprintf(cpuBuf, sizeof(cpuBuf), "CPU %.0f%%", cpuPercent_);
 
   // ---- Minimum layout (h < 70): just temperature -------------------------

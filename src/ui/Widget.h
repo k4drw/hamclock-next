@@ -225,6 +225,14 @@ protected:
     (void)renderer;
     if (tooltip_.text.empty())
       return;
+    // Auto-expire: if the stored mouse position is outside this widget's bounds,
+    // the mouse has moved away — clear the tooltip rather than drawing it stale.
+    if (tooltip_.x < x_ || tooltip_.x >= x_ + width_ ||
+        tooltip_.y < y_ || tooltip_.y >= y_ + height_) {
+      tooltip_.visible = false;
+      tooltip_.text.clear();
+      return;
+    }
     ThemeColors themes = getThemeColors(theme_);
     s_pendingTooltip_ = {true,
                          tooltip_.text,

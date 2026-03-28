@@ -260,6 +260,7 @@ private:
   void renderTooltip(SDL_Renderer *renderer);
   void renderTooltipLayer(SDL_Renderer *renderer) override;
   void renderProjectionSelect(SDL_Renderer *renderer);
+  void renderStarField(SDL_Renderer *renderer);
 
   AppConfig &config_;
   std::function<void()> onConfigChanged_;

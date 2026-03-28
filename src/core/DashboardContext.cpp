@@ -139,6 +139,7 @@
 #include "ui/GreylineWindowsPanel.h"
 #include "ui/DXCCProgressPanel.h"
 #include "ui/SpaceWeatherAlertsPanel.h"
+#include "ui/NOAASpaceWxPanel.h"
 #include "ui/VoacapDeDxPanel.h"
 #include <SDL.h>
 #include <SDL_image.h>
@@ -897,6 +898,10 @@ DashboardContext::DashboardContext(AppContext &ctx)
       widgetPool[type] = std::make_unique<SpaceWeatherAlertsPanel>(
           0, 0, 0, 0, fontMgr, spaceWxAlertStore);
       break;
+    case WidgetType::NOAA_SPACEWX:
+      widgetPool[type] = std::make_unique<NOAASpaceWxPanel>(
+          0, 0, 0, 0, fontMgr, ctx.solarStore);
+      break;
     default:
       widgetPool[type] = std::make_unique<PlaceholderWidget>(
           0, 0, 0, 0, fontMgr, widgetTypeDisplayName(type),
@@ -1038,8 +1043,11 @@ DashboardContext::DashboardContext(AppContext &ctx)
     for (int i = 0; i < 6; ++i) {
       if (i == paneIdx)
         continue;
-      auto rot = panes[i]->getRotation();
-      forbidden.insert(forbidden.end(), rot.begin(), rot.end());
+      for (auto t : panes[i]->getRotation()) {
+        // DX_CLUSTER may appear in multiple panes simultaneously
+        if (t != WidgetType::DX_CLUSTER)
+          forbidden.push_back(t);
+      }
     }
     widgetSelector->show(
         paneIdx, available, current, forbidden,
@@ -1339,6 +1347,7 @@ void DashboardContext::update(AppContext &ctx) {
                            isWidgetActive(WidgetType::AURORA) ||
                            isWidgetConfigured(WidgetType::AURORA_GRAPH) ||
                            isWidgetActive(WidgetType::DRAP) ||
+                           isWidgetActive(WidgetType::NOAA_SPACEWX) ||
                            appCfg.propOverlay == PropOverlayType::Drap;
     if (needsNoaa)
       noaaProvider->fetch();
@@ -1855,6 +1864,12 @@ void DashboardContext::update(AppContext &ctx) {
               data.proton_flux = update->proton_flux;
               data.noaa_s_scale = update->noaa_s_scale;
               break;
+            case NOAAProvider::UpdateType::NOAAScales:
+              for (int c = 0; c < 3; ++c)
+                for (int d = 0; d < 4; ++d)
+                  data.noaa_scales[c][d] = update->noaa_scales[c][d];
+              data.noaa_scales_valid = true;
+              break;
             }
             ctx.solarStore->set(data);
           }
@@ -2238,9 +2253,15 @@ void DashboardContext::update(AppContext &ctx) {
   }
 
 #ifndef __EMSCRIPTEN__
-  if (cursorVisible && (SDL_GetTicks() - lastMouseMotionMs > 10000)) {
-    SDL_ShowCursor(SDL_DISABLE);
-    cursorVisible = false;
+  {
+    Uint32 winFlags = ctx.window ? SDL_GetWindowFlags(ctx.window) : 0;
+    bool isFullscreen = (winFlags & (SDL_WINDOW_FULLSCREEN |
+                                     SDL_WINDOW_FULLSCREEN_DESKTOP)) != 0;
+    if (isFullscreen && cursorVisible &&
+        (SDL_GetTicks() - lastMouseMotionMs > 10000)) {
+      SDL_ShowCursor(SDL_DISABLE);
+      cursorVisible = false;
+    }
   }
 #endif
 

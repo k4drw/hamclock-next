@@ -472,7 +472,6 @@ void WebServer::registerRoutes(httplib::Server &svr) {
     j["lat"] = cfg_->lat;
     j["lon"] = cfg_->lon;
     j["audioMuted"] = cfg_->audioMuted;
-    j["showPaneCallsigns"] = cfg_->showPaneCallsigns;
     j["fontPath"] = cfg_->fontPath;
     j["version"] = HAMCLOCK_VERSION;
     j["arch"] = HAMCLOCK_ARCH;
@@ -725,8 +724,6 @@ void WebServer::registerRoutes(httplib::Server &svr) {
       cfg_->lon = StringUtils::safe_stod(req.get_param_value("lon"));
     if (req.has_param("audio_muted"))
       cfg_->audioMuted = req.get_param_value("audio_muted") == "1";
-    if (req.has_param("show_pane_callsigns"))
-      cfg_->showPaneCallsigns = req.get_param_value("show_pane_callsigns") == "1";
     if (req.has_param("font_path"))
       cfg_->fontPath = req.get_param_value("font_path");
 

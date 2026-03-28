@@ -19,26 +19,75 @@ void SetupScreen::renderTabWidgets(SDL_Renderer *renderer, int cx, int pad,
                 themes.text, FontStyle::SmallBold);
   y += cat->ptSize(FontStyle::SmallBold) + pad / 2;
 
-  // 4 top-bar pane buttons in one compact row
-  const int btnH = 22;
-  const int btnGap = 4;
-  int paneW = fieldW / 4;
-  static const char *kTopLabels[] = {"Top 1", "Top 2", "Top 3", "Top 4"};
-  for (int i = 0; i < 4; ++i) {
-    SDL_Rect pr = {fieldX + i * paneW, y, paneW - btnGap, btnH};
-    bool active = activePane_ == i;
-    if (active) {
-      SDL_SetRenderDrawColor(renderer, themes.accent.r, themes.accent.g, themes.accent.b, 255);
-    } else {
+  // --- Miniature pane layout diagram ---
+  // Reflects actual layout: Time + Panes 1-4 across top; Side panes 5/6 on the
+  // LEFT; Map on the RIGHT. Click a top pane (1-4) to configure its widgets.
+  const int diagH    = 56;
+  const int topH     = 20;
+  const int leftW    = fieldW * 20 / 100;  // left column: Time (top) + Pane 5/6 (bottom)
+  const int rightW   = fieldW - leftW - 1; // right area: panes 1-4 (top) + Map (bottom)
+  const int botH     = diagH - topH - 2;
+  const int topPaneW = rightW / 4;
+  const int sidePaneH = botH / 2;
+
+  // Time panel slot (top-left, decorative)
+  {
+    SDL_Rect timeRect = {fieldX, y, leftW - 1, topH};
+    SDL_SetRenderDrawColor(renderer, themes.rowStripe1.r, themes.rowStripe1.g, themes.rowStripe1.b, 255);
+    SDL_RenderFillRect(renderer, &timeRect);
+    SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
+    SDL_RenderDrawRect(renderer, &timeRect);
+    cat->drawText(renderer, "Time", timeRect.x + timeRect.w / 2, timeRect.y + timeRect.h / 2,
+                  themes.textDim, FontStyle::Micro, true, false, true);
+  }
+
+  // Side panes 5 and 6 (bottom-left, decorative)
+  {
+    SDL_Rect sp5 = {fieldX, y + topH + 1, leftW - 1, sidePaneH};
+    SDL_Rect sp6 = {fieldX, y + topH + 2 + sidePaneH, leftW - 1, botH - sidePaneH - 1};
+    SDL_Rect sidePanes[2] = {sp5, sp6};
+    const char *kSideNums[2] = {"5", "6"};
+    for (int i = 0; i < 2; ++i) {
       SDL_SetRenderDrawColor(renderer, themes.rowStripe1.r, themes.rowStripe1.g, themes.rowStripe1.b, 255);
+      SDL_RenderFillRect(renderer, &sidePanes[i]);
+      SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
+      SDL_RenderDrawRect(renderer, &sidePanes[i]);
+      cat->drawText(renderer, kSideNums[i],
+                    sidePanes[i].x + sidePanes[i].w / 2,
+                    sidePanes[i].y + sidePanes[i].h / 2,
+                    themes.textDim, FontStyle::Micro, true, false, true);
     }
+  }
+
+  // Map placeholder (bottom-right, decorative)
+  {
+    SDL_Rect mapRect = {fieldX + leftW, y + topH + 1, rightW, botH};
+    SDL_SetRenderDrawColor(renderer, 10, 30, 60, 255);
+    SDL_RenderFillRect(renderer, &mapRect);
+    SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
+    SDL_RenderDrawRect(renderer, &mapRect);
+    cat->drawText(renderer, "Map", mapRect.x + mapRect.w / 2, mapRect.y + mapRect.h / 2,
+                  themes.textDim, FontStyle::Micro, true, false, true);
+  }
+
+  // Top panes 1-4 (clickable, top-right area)
+  static const char *kPaneNums[] = {"1", "2", "3", "4"};
+  for (int i = 0; i < 4; ++i) {
+    bool active = (activePane_ == i);
+    SDL_Rect pr = {fieldX + leftW + i * topPaneW, y, topPaneW - 1, topH};
+    paneDiagramRects_[i] = pr;
+    SDL_SetRenderDrawColor(renderer,
+      active ? themes.accent.r : themes.rowStripe1.r,
+      active ? themes.accent.g : themes.rowStripe1.g,
+      active ? themes.accent.b : themes.rowStripe1.b, 255);
     SDL_RenderFillRect(renderer, &pr);
     SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
     SDL_RenderDrawRect(renderer, &pr);
-    cat->drawText(renderer, kTopLabels[i], pr.x + pr.w / 2, pr.y + pr.h / 2,
+    cat->drawText(renderer, kPaneNums[i], pr.x + pr.w / 2, pr.y + pr.h / 2,
                   active ? themes.bg : themes.textDim, FontStyle::Fast, true, false, true);
   }
-  y += btnH + btnGap;
+
+  y += diagH + 4;
 
   // Sync rotation checkbox and Interval
   syncRotationRect_ = {fieldX, y, 16, 16};

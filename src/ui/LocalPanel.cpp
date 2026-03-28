@@ -124,7 +124,7 @@ void LocalPanel::render(SDL_Renderer *renderer) {
       themes.warning, // Weather 2
   };
 
-  std::string myCall = (cfg.showPaneCallsigns && !cfg.callsign.empty()) ? cfg.callsign : "DE";
+  std::string myCall = "DE";
   fontMgr_.catalog()->drawText(renderer, myCall, x_ + 10, y_ + 5, themes.accent,
                                FontStyle::MicroBold);
 

@@ -939,6 +939,17 @@ void main_tick() {
             w->setMetric(ctx.appCfg.useMetric);
           }
         }
+        // Re-apply rotation interval and widget lists to top-bar panes (0-3).
+        // applySidePanelMode handles panes 4-5; panes 0-3 must be updated here
+        // so that changes to rotationIntervalS take effect without restart.
+        auto &panes = ctx.dashboard->panes;
+        const auto &cfg = ctx.appCfg;
+        if (panes.size() >= 4) {
+          panes[0]->setRotation(cfg.pane1Rotation, cfg.rotationIntervalS, cfg.syncRotation);
+          panes[1]->setRotation(cfg.pane2Rotation, cfg.rotationIntervalS, cfg.syncRotation);
+          panes[2]->setRotation(cfg.pane3Rotation, cfg.rotationIntervalS, cfg.syncRotation);
+          panes[3]->setRotation(cfg.pane4Rotation, cfg.rotationIntervalS, cfg.syncRotation);
+        }
         ctx.dashboard->applySidePanelMode(ctx.appCfg.pane5Rotation.empty()
                                               ? WidgetType::DE_INFO
                                               : ctx.appCfg.pane5Rotation[0],
