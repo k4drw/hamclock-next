@@ -170,8 +170,8 @@ bool SetupScreen::onMouseDown(int mx, int my, Uint16 mod, int clicks) {
     if (hitField(brightTimeRect_, 1, &brightTimeInput_))
       return true;
   } else if (activeTab_ == Tab::Widgets) {
-    // 1. Pane Switching via layout diagram (top panes 1-4)
-    for (int i = 0; i < 4; ++i) {
+    // 1. Pane Switching via layout diagram (panes 1-4 top bar + 5-6 side panel)
+    for (int i = 0; i < 6; ++i) {
       const auto &pr = paneDiagramRects_[i];
       if (pr.w > 0 && mx >= pr.x && mx < pr.x + pr.w && my >= pr.y && my < pr.y + pr.h) {
         if (activePane_ != i) {
@@ -180,6 +180,14 @@ bool SetupScreen::onMouseDown(int mx, int my, Uint16 mod, int clicks) {
         }
         return true;
       }
+    }
+
+    // 1b. "None" option for pane 6 (clears pane6 rotation → pane5 fills full height)
+    if (noneOptionRect_.w > 0 &&
+        mx >= noneOptionRect_.x && mx < noneOptionRect_.x + noneOptionRect_.w &&
+        my >= noneOptionRect_.y && my < noneOptionRect_.y + noneOptionRect_.h) {
+      paneRotations_[5].clear();
+      return true;
     }
 
     // 2. Sync Rotation Toggle
@@ -233,7 +241,7 @@ bool SetupScreen::onMouseDown(int mx, int my, Uint16 mod, int clicks) {
       return true;
     }
 
-    // 6. Side Panel Mode
+    // 6. Side Panel Presets (entries 0-3 are actionable; entry 4 "Custom" is read-only)
     static const WidgetType kMode5[] = {
         WidgetType::DE_INFO, WidgetType::DX_CLUSTER, WidgetType::ON_THE_AIR,
         WidgetType::LIVE_SPOTS};
@@ -248,6 +256,7 @@ bool SetupScreen::onMouseDown(int mx, int my, Uint16 mod, int clicks) {
         return true;
       }
     }
+    // sidePanelModeRects_[4] = "Custom" — clicking it is a no-op (visual indicator only)
   } else if (activeTab_ == Tab::Watchlist) {
     // Input field focus
     if (hitField(watchlistInputRect_, 0, &watchlistInputField_))

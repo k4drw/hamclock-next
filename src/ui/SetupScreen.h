@@ -171,7 +171,8 @@ private:
   int widgetListStartY_ = 0;
   int widgetListEndY_ = 0;
   int widgetListMaxScroll_ = 0;
-  SDL_Rect sidePanelModeRects_[4] = {};
+  SDL_Rect sidePanelModeRects_[5] = {};  // 0-3 actionable; 4 = read-only "Custom"
+  SDL_Rect noneOptionRect_ = {0, 0, 0, 0};  // pane6 "None / full height" click target
   int activePane_ = 0;
   int activeField_ = 0;
   bool complete_ = false;
@@ -195,7 +196,7 @@ private:
   SDL_Rect weatherOverlayRect_ = {0, 0, 0, 0};  SDL_Rect mapStyleRect_ = {0, 0, 0, 0};
   SDL_Rect projectionRect_ = {0, 0, 0, 0};
   SDL_Rect rotationToggleRect_ = {0, 0, 0, 0};
-  SDL_Rect paneDiagramRects_[4] = {};
+  SDL_Rect paneDiagramRects_[6] = {};  // [0-3] top panes, [4-5] side panes
   SDL_Rect okBtnRect_ = {0, 0, 0, 0};
   SDL_Rect cancelBtnRect_ = {0, 0, 0, 0};
   SDL_Rect brightnessSliderRect_ = {0, 0, 0, 0};

@@ -82,6 +82,7 @@
 #include "ui/DXClusterPanel.h"
 #include "ui/DXClusterSetup.h"
 #include "ui/DXSatPane.h"
+#include "ui/SatWidget.h"
 #include "ui/DebugOverlay.h"
 #include "ui/DstPanel.h"
 #include "ui/EMEToolPanel.h"
@@ -864,6 +865,23 @@ DashboardContext::DashboardContext(AppContext &ctx)
         ctx.cfgMgr.save(ctx.appCfg);
       });
       widgetPool[type] = std::move(p);
+      break;
+    }
+    case WidgetType::SATELLITE: {
+      auto sw = std::make_unique<SatWidget>(0, 0, 0, 0, fontMgr, texMgr,
+                                            *satMgr);
+      sw->setObserver(appCfg.lat, appCfg.lon);
+      sw->restoreState(appCfg.satWidgetSatellite);
+      sw->setMapTrackVisible(appCfg.showSatTrack);
+      sw->setOnSatChanged([&ctx](const std::string &satName) {
+        ctx.appCfg.satWidgetSatellite = satName;
+        ctx.cfgMgr.save(ctx.appCfg);
+      });
+      sw->setOnMapTrackToggle([&ctx](bool enabled) {
+        ctx.appCfg.showSatTrack = enabled;
+        ctx.cfgMgr.save(ctx.appCfg);
+      });
+      widgetPool[type] = std::move(sw);
       break;
     }
     case WidgetType::ENV_TEMP:
@@ -2215,19 +2233,26 @@ void DashboardContext::update(AppContext &ctx) {
     return;
   }
 
-  // Sync predictor from DXSatPane if it exists in the pool
+  // Sync predictor from DXSatPane (or SatWidget fallback) if in pool
   auto *dxSatWidget =
       dynamic_cast<DXSatPane *>(widgetPool[WidgetType::DX_INFO].get());
-  mapArea->setPredictor(dxSatWidget ? dxSatWidget->activePredictor() : nullptr);
+  auto *satWidget =
+      dynamic_cast<SatWidget *>(widgetPool[WidgetType::SATELLITE].get());
+  OrbitPredictor *activePredictor =
+      dxSatWidget ? dxSatWidget->activePredictor()
+      : satWidget ? satWidget->activePredictor()
+                  : nullptr;
+  mapArea->setPredictor(activePredictor);
   auto *gimbal =
       dynamic_cast<GimbalPanel *>(widgetPool[WidgetType::GIMBAL].get());
   if (gimbal) {
-    gimbal->setPredictor(dxSatWidget ? dxSatWidget->activePredictor()
-                                     : nullptr);
+    gimbal->setPredictor(activePredictor);
     gimbal->setObserver(appCfg.lat, appCfg.lon);
   }
   if (dxSatWidget)
     dxSatWidget->setObserver(appCfg.lat, appCfg.lon);
+  if (satWidget)
+    satWidget->setObserver(appCfg.lat, appCfg.lon);
   auto *sdoWidget =
       dynamic_cast<SDOPanel *>(widgetPool[WidgetType::SDO].get());
   if (sdoWidget)

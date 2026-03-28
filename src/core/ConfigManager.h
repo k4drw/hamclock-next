@@ -93,8 +93,9 @@ struct AppConfig {
   std::vector<std::string> watchlist; // persisted callsign watchlist
 
   // Panel state
-  std::string panelMode = "dx";  // "dx" or "sat"
-  std::string selectedSatellite; // satellite name (empty = none)
+  std::string panelMode = "dx";        // "dx" or "sat" (for DX_INFO widget)
+  std::string selectedSatellite;       // satellite name for DX_INFO widget
+  std::string satWidgetSatellite;      // satellite name for standalone SATELLITE widget
   std::vector<int> customSatelliteSCCs;
 
   // DX Cluster

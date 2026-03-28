@@ -7,9 +7,8 @@ void SetupScreen::renderTabWidgets(SDL_Renderer *renderer, int cx, int pad,
                                    int fieldW, int fieldH, int fieldX,
                                    int /*textPad*/) {
   auto *cat = fontMgr_.catalog();
-  // Clamp activePane_ to top-bar panes only (0-3)
-  if (activePane_ > 3)
-    activePane_ = 0;
+  // Reset click targets that are conditionally rendered
+  noneOptionRect_ = {0, 0, 0, 0};
 
   int y =
       (modalRect_.y + cat->ptSize(FontStyle::MediumBold) + 2 * pad + fieldH);
@@ -41,21 +40,27 @@ void SetupScreen::renderTabWidgets(SDL_Renderer *renderer, int cx, int pad,
                   themes.textDim, FontStyle::Micro, true, false, true);
   }
 
-  // Side panes 5 and 6 (bottom-left, decorative)
+  // Side panes 5 and 6 (bottom-left, now clickable)
   {
     SDL_Rect sp5 = {fieldX, y + topH + 1, leftW - 1, sidePaneH};
     SDL_Rect sp6 = {fieldX, y + topH + 2 + sidePaneH, leftW - 1, botH - sidePaneH - 1};
     SDL_Rect sidePanes[2] = {sp5, sp6};
+    paneDiagramRects_[4] = sp5;
+    paneDiagramRects_[5] = sp6;
     const char *kSideNums[2] = {"5", "6"};
     for (int i = 0; i < 2; ++i) {
-      SDL_SetRenderDrawColor(renderer, themes.rowStripe1.r, themes.rowStripe1.g, themes.rowStripe1.b, 255);
+      bool active = (activePane_ == (i + 4));
+      SDL_SetRenderDrawColor(renderer,
+        active ? themes.accent.r : themes.rowStripe1.r,
+        active ? themes.accent.g : themes.rowStripe1.g,
+        active ? themes.accent.b : themes.rowStripe1.b, 255);
       SDL_RenderFillRect(renderer, &sidePanes[i]);
       SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
       SDL_RenderDrawRect(renderer, &sidePanes[i]);
       cat->drawText(renderer, kSideNums[i],
                     sidePanes[i].x + sidePanes[i].w / 2,
                     sidePanes[i].y + sidePanes[i].h / 2,
-                    themes.textDim, FontStyle::Micro, true, false, true);
+                    active ? themes.bg : themes.textDim, FontStyle::Micro, true, false, true);
     }
   }
 
@@ -143,8 +148,8 @@ void SetupScreen::renderTabWidgets(SDL_Renderer *renderer, int cx, int pad,
   widgetRects_.clear();
   int rowH = cat->ptSize(FontStyle::Fast) + 4;
 
-  // Side panel section height: header + 4 radio options
-  int sideSecH = cat->ptSize(FontStyle::SmallBold) + 4 + 4 * (rowH + 2) + 4;
+  // Side panel section height: header + 5 radio options (4 presets + "Custom")
+  int sideSecH = cat->ptSize(FontStyle::SmallBold) + 4 + 5 * (rowH + 2) + 4;
   int footerY = modalRect_.y + modalRect_.h - 52;
   int sideSecY = footerY - sideSecH;
   int listEndY = sideSecY - pad / 2;
@@ -154,10 +159,38 @@ void SetupScreen::renderTabWidgets(SDL_Renderer *renderer, int cx, int pad,
   const int kNWidgets = static_cast<int>(kAllTypesVec.size());
   const int kColItems = (kNWidgets + 2) / 3;
 
+  // When pane 6 is active, reserve one row above the list for the "None" option
+  if (activePane_ == 5)
+    listAvailH = std::max(rowH, listAvailH - rowH);
+
   int visRows = std::max(1, listAvailH / rowH);
   widgetListMaxScroll_ = std::max(0, kColItems - visRows);
   widgetListScrollOffset_ =
       std::max(0, std::min(widgetListScrollOffset_, widgetListMaxScroll_));
+
+  // "None" option for pane 6: clears pane 6 so pane 5 takes full side-panel height
+  if (activePane_ == 5) {
+    bool isNone = paneRotations_[5].empty();
+    SDL_Rect cb = {fieldX, y, 16, 16};
+    SDL_SetRenderDrawColor(renderer, themes.rowStripe1.r, themes.rowStripe1.g,
+                           themes.rowStripe1.b, 255);
+    SDL_RenderFillRect(renderer, &cb);
+    SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
+                           themes.border.b, 255);
+    SDL_RenderDrawRect(renderer, &cb);
+    if (isNone) {
+      SDL_SetRenderDrawColor(renderer, themes.accent.r, themes.accent.g,
+                             themes.accent.b, 255);
+      SDL_Rect inner = {cb.x + 3, cb.y + 3, 10, 10};
+      SDL_RenderFillRect(renderer, &inner);
+    }
+    cat->drawText(renderer, "[ None - Pane 5 fills full height ]", cb.x + 22,
+                  cb.y + 8, isNone ? themes.text : themes.textDim,
+                  FontStyle::Fast, false, false, true);
+    noneOptionRect_ = {fieldX, y, fieldW, rowH};
+    y += rowH;
+  }
+
   widgetListStartY_ = y;
   widgetListEndY_ = y + visRows * rowH;
 
@@ -226,46 +259,52 @@ void SetupScreen::renderTabWidgets(SDL_Renderer *renderer, int cx, int pad,
                     FontStyle::Fast, true);
   }
 
-  // --- Side Panel section ---
+  // --- Side Panel Presets ---
   y = sideSecY;
-  cat->drawText(renderer, "--- Side Panel ---", cx, y, themes.accent,
+  cat->drawText(renderer, "--- Side Panel Presets ---", cx, y, themes.accent,
                 FontStyle::SmallBold, true);
   y += cat->ptSize(FontStyle::SmallBold) + 4;
 
-  // Determine current side-panel mode from paneRotations_[4/5]
-  int curMode = 0;
-  if (!paneRotations_[4].empty()) {
-    WidgetType t5 = paneRotations_[4][0];
-    if (t5 == WidgetType::DX_CLUSTER)
-      curMode = 1;
-    else if (t5 == WidgetType::ON_THE_AIR)
-      curMode = 2;
-    else if (t5 == WidgetType::LIVE_SPOTS)
-      curMode = 3;
-    // else curMode = 0 (DE_INFO + DX_INFO or default)
-  }
+  // Detect which preset (if any) matches the current pane5/pane6 state
+  const auto &p5 = paneRotations_[4];
+  const auto &p6 = paneRotations_[5];
+  int curMode = -1;  // -1 = Custom
+  if (p5.size() == 1 && p5[0] == WidgetType::DE_INFO &&
+      p6.size() == 1 && p6[0] == WidgetType::DX_INFO)
+    curMode = 0;
+  else if (p5.size() == 1 && p5[0] == WidgetType::DX_CLUSTER && p6.empty())
+    curMode = 1;
+  else if (p5.size() == 1 && p5[0] == WidgetType::ON_THE_AIR && p6.empty())
+    curMode = 2;
+  else if (p5.size() == 1 && p5[0] == WidgetType::LIVE_SPOTS && p6.empty())
+    curMode = 3;
 
   static const char *kSideLabels[] = {
       "DE Info + DX/Sat (2 panes, original)",
       "DX Cluster (full height)",
       "On The Air (full height)",
       "Live Spots (full height)",
+      "Custom (configure panes 5-6 above)",  // read-only indicator
   };
-  for (int i = 0; i < 4; ++i) {
+  for (int i = 0; i < 5; ++i) {
     SDL_Rect rr = {fieldX, y, 14, 14};
     sidePanelModeRects_[i] = {fieldX, y, fieldW, rowH};
-    SDL_SetRenderDrawColor(renderer, themes.rowStripe1.r, themes.rowStripe1.g, themes.rowStripe1.b, 255);
+    SDL_SetRenderDrawColor(renderer, themes.rowStripe1.r, themes.rowStripe1.g,
+                           themes.rowStripe1.b, 255);
     SDL_RenderFillRect(renderer, &rr);
-    SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
+    SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
+                           themes.border.b, 255);
     SDL_RenderDrawRect(renderer, &rr);
-    if (curMode == i) {
-      SDL_SetRenderDrawColor(renderer, themes.accent.r, themes.accent.g, themes.accent.b, 255);
+    bool selected = (i < 4) ? (curMode == i) : (curMode == -1);
+    if (selected) {
+      SDL_SetRenderDrawColor(renderer, themes.accent.r, themes.accent.g,
+                             themes.accent.b, 255);
       SDL_Rect inner = {rr.x + 3, rr.y + 3, 8, 8};
       SDL_RenderFillRect(renderer, &inner);
     }
     cat->drawText(renderer, kSideLabels[i], rr.x + 22, rr.y + 7,
-                  curMode == i ? themes.text : themes.textDim, FontStyle::Fast, false, false,
-                  true);
+                  selected ? themes.text : themes.textDim,
+                  FontStyle::Fast, false, false, true);
     y += rowH + 2;
   }
 }

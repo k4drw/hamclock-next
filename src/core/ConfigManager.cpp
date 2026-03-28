@@ -180,20 +180,20 @@ static void addFactoryPresets(AppConfig &config) {
     p.pane2Rotation = {WidgetType::EME_TOOL};
     p.pane3Rotation = {WidgetType::GIMBAL};
     p.pane4Rotation = {WidgetType::SOLAR};
-    p.pane5Rotation = {WidgetType::DE_INFO};
-    p.pane6Rotation = {WidgetType::DX_INFO};
+    p.pane5Rotation = {WidgetType::SATELLITE};
+    p.pane6Rotation = {WidgetType::DE_INFO};
     config.presets.push_back(std::move(p));
   }
-  // Environment/WX preset
+  // Environment/WX preset — uses unlocked panes 5-6 for ENV sensors
   {
     ConfigPreset p;
     p.name = "Environment/WX";
     p.pane1Rotation = {WidgetType::DE_WEATHER};
     p.pane2Rotation = {WidgetType::DX_WEATHER};
     p.pane3Rotation = {WidgetType::FORECAST};
-    p.pane4Rotation = {WidgetType::ENV_TEMP};
-    p.pane5Rotation = {WidgetType::ENV_HUMIDITY};
-    p.pane6Rotation = {WidgetType::ENV_PRESSURE};
+    p.pane4Rotation = {WidgetType::DE_WEATHER};
+    p.pane5Rotation = {WidgetType::ENV_TEMP};
+    p.pane6Rotation = {WidgetType::ENV_HUMIDITY};
     config.presets.push_back(std::move(p));
   }
 }
@@ -433,6 +433,7 @@ bool ConfigManager::load(AppConfig &config) {
     auto &pn = json["panel"];
     config.panelMode = pn.value("mode", "dx");
     config.selectedSatellite = pn.value("satellite", "");
+    config.satWidgetSatellite = pn.value("sat_widget_satellite", "");
     if (pn.contains("custom_sccs") && pn["custom_sccs"].is_array()) {
       config.customSatelliteSCCs.clear();
       for (auto &item : pn["custom_sccs"]) {
@@ -729,6 +730,7 @@ bool ConfigManager::save(const AppConfig &config) {
 
   json["panel"]["mode"] = config.panelMode;
   json["panel"]["satellite"] = config.selectedSatellite;
+  json["panel"]["sat_widget_satellite"] = config.satWidgetSatellite;
 
   auto sccArr = nlohmann::json::array();
   for (int scc : config.customSatelliteSCCs) {
