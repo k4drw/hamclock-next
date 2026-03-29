@@ -1,4 +1,5 @@
 #include "LightningPanel.h"
+#include "WidgetRegistry.h"
 #include "../core/Theme.h"
 #include "FontCatalog.h"
 
@@ -78,3 +79,7 @@ void LightningPanel::render(SDL_Renderer *renderer) {
 }
 
 } // namespace HamClock
+
+REGISTER_WIDGET("lightning", "Lightning", false, false, {
+  return std::make_unique<HamClock::LightningPanel>(0, 0, 0, 0, deps.fontMgr);
+})

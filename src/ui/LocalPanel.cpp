@@ -1,4 +1,5 @@
 #include "LocalPanel.h"
+#include "WidgetRegistry.h"
 #include "../core/Astronomy.h"
 #include "../core/MemoryMonitor.h"
 #include "../core/Theme.h"
@@ -210,3 +211,7 @@ nlohmann::json LocalPanel::getDebugData() const {
   }
   return json;
 }
+
+REGISTER_WIDGET("de_info", "DE Info", false, false, {
+  return std::make_unique<LocalPanel>(0, 0, 0, 0, deps.fontMgr, deps.state, deps.deWeatherStore);
+})

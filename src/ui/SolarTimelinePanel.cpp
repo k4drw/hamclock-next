@@ -1,4 +1,5 @@
 #include "SolarTimelinePanel.h"
+#include "WidgetRegistry.h"
 #include "../core/Astronomy.h"
 #include "../core/Logger.h"
 #include "../core/StringUtils.h"
@@ -171,3 +172,7 @@ void SolarTimelinePanel::render(SDL_Renderer *renderer) {
     cat->drawText(renderer, lbl.label, px, labelY, col, FontStyle::Micro, true);
   }
 }
+
+REGISTER_WIDGET("solar_timeline", "Solar Impact", false, false, {
+  return std::make_unique<SolarTimelinePanel>(0, 0, 0, 0, deps.fontMgr, deps.netManager);
+})

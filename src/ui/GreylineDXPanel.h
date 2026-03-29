@@ -16,6 +16,10 @@ public:
   bool onMouseWheel(int scrollY) override;
 
   std::string getName() const override { return "Greyline DX"; }
+  const char *typeId() const override { return "greyline_dx"; }
+  std::string getDisplayName() const override { return "Greyline DX"; }
+  bool isScrollable() const override { return true; }
+  bool requiresConfigKey() const override { return false; }
 
 private:
   FontManager &fontMgr_;

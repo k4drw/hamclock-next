@@ -12,6 +12,10 @@ public:
   TropoPanel(int x, int y, int w, int h, FontManager &fontMgr);
 
   std::string getName() const override { return "Tropo"; }
+  const char *typeId() const override { return "tropo"; }
+  std::string getDisplayName() const override { return "Tropo"; }
+  bool isScrollable() const override { return false; }
+  bool requiresConfigKey() const override { return false; }
   void updateData(const TropoData &data);
   void update() override {}
   void render(SDL_Renderer *renderer) override;

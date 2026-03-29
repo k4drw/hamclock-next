@@ -1,4 +1,5 @@
 #include "DXCCProgressPanel.h"
+#include "WidgetRegistry.h"
 #include "../core/Theme.h"
 #include "FontCatalog.h"
 #include <SDL.h>
@@ -183,3 +184,8 @@ bool DXCCProgressPanel::onMouseWheel(int scrollY) {
   scrollOffset_ = std::clamp(scrollOffset_ - scrollY, 0, maxScroll_);
   return true;
 }
+
+REGISTER_WIDGET("dxcc_progress", "DXCC Progress", false, false, {
+  return std::make_unique<DXCCProgressPanel>(
+      0, 0, 0, 0, deps.fontMgr, deps.adifStore, deps.prefixMgr);
+})

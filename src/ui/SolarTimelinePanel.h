@@ -24,6 +24,10 @@ public:
                      NetworkManager &net);
 
   std::string getName() const override { return "Solar Impact"; }
+  const char *typeId() const override { return "solar_timeline"; }
+  std::string getDisplayName() const override { return "Solar Impact"; }
+  bool isScrollable() const override { return false; }
+  bool requiresConfigKey() const override { return false; }
   void update() override;
   void render(SDL_Renderer *renderer) override;
 

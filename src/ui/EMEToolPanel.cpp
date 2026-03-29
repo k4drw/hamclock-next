@@ -1,4 +1,5 @@
 #include "EMEToolPanel.h"
+#include "WidgetRegistry.h"
 #include "../core/Astronomy.h"
 #include "../core/Theme.h"
 #include "FontCatalog.h"
@@ -221,3 +222,7 @@ nlohmann::json EMEToolPanel::getDebugData() const {
   }
   return j;
 }
+
+REGISTER_WIDGET("eme_tool", "EME Tool", false, false, {
+  return std::make_unique<EMEToolPanel>(0, 0, 0, 0, deps.fontMgr, deps.texMgr, deps.moonStore);
+})

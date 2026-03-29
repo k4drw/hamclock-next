@@ -21,6 +21,10 @@ public:
 
   void setTheme(const std::string &theme) override { theme_ = theme; }
   std::string getName() const override { return "BeaconPanel"; }
+  const char *typeId() const override { return "ncdxf"; }
+  std::string getDisplayName() const override { return "NCDXF"; }
+  bool isScrollable() const override { return false; }
+  bool requiresConfigKey() const override { return false; }
 
 private:
   // Texture cache to prevent per-frame texture creation/destruction

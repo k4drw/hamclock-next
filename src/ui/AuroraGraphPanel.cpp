@@ -228,3 +228,9 @@ void AuroraGraphPanel::onMouseMove(int mx, int my) {
   }
 }
 
+#include "WidgetRegistry.h"
+REGISTER_WIDGET("aurora_graph", "Aurora Graph", false, false, {
+  return std::make_unique<AuroraGraphPanel>(
+      0, 0, 0, 0, deps.fontMgr, deps.texMgr, deps.auroraHistoryStore);
+})
+

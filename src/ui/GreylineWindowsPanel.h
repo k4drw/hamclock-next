@@ -15,6 +15,10 @@ public:
                        std::shared_ptr<HamClockState> state);
 
   std::string getName() const override { return "GreylineWindows"; }
+  const char *typeId() const override { return "greyline_windows"; }
+  std::string getDisplayName() const override { return "Greyline Win."; }
+  bool isScrollable() const override { return false; }
+  bool requiresConfigKey() const override { return false; }
   void update() override;
   void render(SDL_Renderer *renderer) override;
   void onResize(int x, int y, int w, int h) override;

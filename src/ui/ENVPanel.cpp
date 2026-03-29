@@ -1,4 +1,5 @@
 #include "ENVPanel.h"
+#include "WidgetRegistry.h"
 #include "FontCatalog.h"
 #include <cmath>
 #include <cstdio>
@@ -88,3 +89,19 @@ void ENVPanel::render(SDL_Renderer *renderer) {
 void ENVPanel::onResize(int x, int y, int w, int h) {
   Widget::onResize(x, y, w, h);
 }
+
+REGISTER_WIDGET("env_temp", "ENV Temp", false, false, {
+  return std::make_unique<ENVPanel>(0, 0, 0, 0, deps.fontMgr, deps.deWeatherStore, WidgetType::ENV_TEMP);
+})
+
+REGISTER_WIDGET("env_pressure", "ENV Pressure", false, false, {
+  return std::make_unique<ENVPanel>(0, 0, 0, 0, deps.fontMgr, deps.deWeatherStore, WidgetType::ENV_PRESSURE);
+})
+
+REGISTER_WIDGET("env_humidity", "ENV Humidity", false, false, {
+  return std::make_unique<ENVPanel>(0, 0, 0, 0, deps.fontMgr, deps.deWeatherStore, WidgetType::ENV_HUMIDITY);
+})
+
+REGISTER_WIDGET("env_dewpoint", "ENV Dewpoint", false, false, {
+  return std::make_unique<ENVPanel>(0, 0, 0, 0, deps.fontMgr, deps.deWeatherStore, WidgetType::ENV_DEWPOINT);
+})

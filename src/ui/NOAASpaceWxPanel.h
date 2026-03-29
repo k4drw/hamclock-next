@@ -16,6 +16,10 @@ public:
   void update() override;
   void render(SDL_Renderer *renderer) override;
   std::string getName() const override { return "NOAA SpaceWx"; }
+  const char *typeId() const override { return "noaa_spacewx"; }
+  std::string getDisplayName() const override { return "NOAA SpaceWx"; }
+  bool isScrollable() const override { return false; }
+  bool requiresConfigKey() const override { return false; }
 
 private:
   static SDL_Color colorForScale(int scale, const ThemeColors &themes);

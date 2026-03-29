@@ -1,4 +1,5 @@
 #include "CalendarPanel.h"
+#include "WidgetRegistry.h"
 #include "../core/Astronomy.h"
 #include "../core/SoundManager.h"
 #include "../core/Theme.h"
@@ -403,3 +404,18 @@ void CalendarPanel::onMouseMove(int mx, int my) {
   tooltip_.y = my;
   tooltip_.visible = true;
 }
+
+REGISTER_WIDGET("calendar", "Calendar", true, false, {
+  auto *p = new CalendarPanel(0, 0, 0, 0, deps.fontMgr, deps.calendarStore);
+  p->setNotifyMinutes(deps.appCfg.calendarNotifyMinutes);
+  p->setAllDayNotifyHour(deps.appCfg.calendarAllDayNotifyHour);
+  p->setDismissMinutes(deps.appCfg.calendarDismissMinutes);
+  p->setOnConfigChanged(
+      [&appCfg = deps.appCfg, &cfgMgr = deps.cfgMgr](int mins, int hour, int dismiss) {
+        appCfg.calendarNotifyMinutes = mins;
+        appCfg.calendarAllDayNotifyHour = hour;
+        appCfg.calendarDismissMinutes = dismiss;
+        cfgMgr.save(appCfg);
+      });
+  return std::unique_ptr<CalendarPanel>(p);
+})

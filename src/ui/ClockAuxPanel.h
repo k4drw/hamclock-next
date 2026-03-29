@@ -25,6 +25,8 @@ public:
   bool isModalActive() const override { return menuVisible_; }
   void renderModal(SDL_Renderer *renderer) override;
   std::string getName() const override { return "Clock Aux"; }
+  const char *typeId() const override { return "clock_aux"; }
+  std::string getDisplayName() const override { return "Clock Aux"; }
 
 private:
   FontManager &fontMgr_;

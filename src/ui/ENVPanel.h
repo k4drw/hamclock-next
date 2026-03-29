@@ -16,6 +16,26 @@ public:
            std::shared_ptr<WeatherStore> store, WidgetType mode);
 
   std::string getName() const override { return "Environment"; }
+  const char *typeId() const override {
+    switch (mode_) {
+      case WidgetType::ENV_TEMP:     return "env_temp";
+      case WidgetType::ENV_PRESSURE: return "env_pressure";
+      case WidgetType::ENV_HUMIDITY: return "env_humidity";
+      case WidgetType::ENV_DEWPOINT: return "env_dewpoint";
+      default:                       return "env_temp";
+    }
+  }
+  std::string getDisplayName() const override {
+    switch (mode_) {
+      case WidgetType::ENV_TEMP:     return "ENV Temp";
+      case WidgetType::ENV_PRESSURE: return "ENV Pressure";
+      case WidgetType::ENV_HUMIDITY: return "ENV Humidity";
+      case WidgetType::ENV_DEWPOINT: return "ENV Dewpoint";
+      default:                       return "ENV Temp";
+    }
+  }
+  bool isScrollable() const override { return false; }
+  bool requiresConfigKey() const override { return false; }
   void update() override;
   void render(SDL_Renderer *renderer) override;
   void onResize(int x, int y, int w, int h) override;

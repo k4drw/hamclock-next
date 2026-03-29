@@ -1,4 +1,5 @@
 #include "VoacapDeDxPanel.h"
+#include "WidgetRegistry.h"
 #include "../core/Astronomy.h"
 #include "../core/Theme.h"
 #include <cmath>
@@ -240,3 +241,9 @@ nlohmann::json VoacapDeDxPanel::getDebugData() const {
   j["has_target"] = hasTarget_;
   return j;
 }
+
+REGISTER_WIDGET("voacap_dedx", "Voacap DE-DX", false, false, {
+  return std::make_unique<VoacapDeDxPanel>(
+      0, 0, 0, 0, deps.fontMgr, deps.state, deps.solarStore,
+      deps.ionosondeProvider);
+})

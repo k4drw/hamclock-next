@@ -13,6 +13,10 @@ public:
   MeteorPanel(int x, int y, int w, int h, FontManager &fontMgr, TextureManager &texMgr);
 
   std::string getName() const override { return "Meteor Scatter"; }
+  const char *typeId() const override { return "meteor"; }
+  std::string getDisplayName() const override { return "Meteor Scatter"; }
+  bool isScrollable() const override { return false; }
+  bool requiresConfigKey() const override { return false; }
   void updateData(const MeteorData &data);
   void update() override {}
   void render(SDL_Renderer *renderer) override;

@@ -1,4 +1,5 @@
 #include "GreylineDXPanel.h"
+#include "WidgetRegistry.h"
 #include "../core/Theme.h"
 #include "FontCatalog.h"
 #include <SDL.h>
@@ -135,3 +136,7 @@ bool GreylineDXPanel::onMouseWheel(int scrollY) {
 void GreylineDXPanel::onResize(int x, int y, int w, int h) {
   Widget::onResize(x, y, w, h);
 }
+
+REGISTER_WIDGET("greyline_dx", "Greyline DX", true, false, {
+  return std::make_unique<GreylineDXPanel>(0, 0, 0, 0, deps.fontMgr, deps.greylineDXStore);
+})

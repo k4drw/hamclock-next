@@ -1,4 +1,5 @@
 #include "GreylineWindowsPanel.h"
+#include "WidgetRegistry.h"
 #include "../core/Theme.h"
 #include "FontCatalog.h"
 #include <SDL.h>
@@ -248,3 +249,7 @@ void GreylineWindowsPanel::render(SDL_Renderer *renderer) {
 void GreylineWindowsPanel::onResize(int x, int y, int w, int h) {
   Widget::onResize(x, y, w, h);
 }
+
+REGISTER_WIDGET("greyline_windows", "Greyline Win.", false, false, {
+  return std::make_unique<GreylineWindowsPanel>(0, 0, 0, 0, deps.fontMgr, deps.state);
+})

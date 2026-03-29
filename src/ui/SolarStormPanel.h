@@ -13,6 +13,10 @@ public:
   SolarStormPanel(int x, int y, int w, int h, FontManager &fontMgr, TextureManager &texMgr);
 
   std::string getName() const override { return "Solar Storm"; }
+  const char *typeId() const override { return "solar_storm"; }
+  std::string getDisplayName() const override { return "Solar Storm"; }
+  bool isScrollable() const override { return false; }
+  bool requiresConfigKey() const override { return false; }
   void updateData(const SolarStormData &data);
   void update() override {}
   void render(SDL_Renderer *renderer) override;

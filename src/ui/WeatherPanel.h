@@ -14,6 +14,14 @@ public:
                std::shared_ptr<WeatherStore> store, const std::string &title);
 
   std::string getName() const override { return "Weather"; }
+  const char *typeId() const override {
+    return (title_ == "DE Weather") ? "de_weather" : "dx_weather";
+  }
+  std::string getDisplayName() const override {
+    return (title_ == "DE Weather") ? "DE Weather" : "DX Weather";
+  }
+  bool isScrollable() const override { return false; }
+  bool requiresConfigKey() const override { return false; }
   void update() override;
   void render(SDL_Renderer *renderer) override;
   void onResize(int x, int y, int w, int h) override;

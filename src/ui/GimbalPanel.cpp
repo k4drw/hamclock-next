@@ -227,3 +227,10 @@ void GimbalPanel::onResize(int x, int y, int w, int h) {
     valueFontSize_ = cat->ptSize(FontStyle::SmallRegular);
   }
 }
+
+#include "WidgetRegistry.h"
+REGISTER_WIDGET("gimbal", "Gimbal", false, false, {
+  auto p = std::make_unique<GimbalPanel>(0, 0, 0, 0, deps.fontMgr, deps.texMgr, deps.rotatorStore);
+  p->setObserver(deps.appCfg.lat, deps.appCfg.lon);
+  return p;
+})

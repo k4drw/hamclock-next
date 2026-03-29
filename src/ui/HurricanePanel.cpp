@@ -129,3 +129,8 @@ bool HurricanePanel::onMouseWheel(int scrollY) {
   scrollOffset_ = std::clamp(scrollOffset_ - scrollY, 0, maxScroll_);
   return true;
 }
+
+#include "WidgetRegistry.h"
+REGISTER_WIDGET("hurricane", "Tropics", false, false, {
+  return std::make_unique<HurricanePanel>(0, 0, 0, 0, deps.fontMgr, deps.hurricaneStore);
+})

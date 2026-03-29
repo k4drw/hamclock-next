@@ -1,4 +1,5 @@
 #include "RigControlPanel.h"
+#include "WidgetRegistry.h"
 #include "../core/Theme.h"
 #include "../services/RigService.h"
 #include "FontCatalog.h"
@@ -446,3 +447,13 @@ bool RigControlPanel::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
 
   return true; // consume all clicks in expanded area
 }
+
+#ifndef __EMSCRIPTEN__
+REGISTER_WIDGET("rig_control", "Rig Control", false, true, {
+  return std::make_unique<RigControlPanel>(0, 0, 0, 0, deps.fontMgr, deps.rigService);
+})
+#else
+REGISTER_WIDGET("rig_control", "Rig Control", false, true, {
+  return std::make_unique<RigControlPanel>(0, 0, 0, 0, deps.fontMgr, nullptr);
+})
+#endif

@@ -1,4 +1,5 @@
 #include "SantaPanel.h"
+#include "WidgetRegistry.h"
 #include "../core/Theme.h"
 #include "FontCatalog.h"
 #include <cstdio>
@@ -41,3 +42,7 @@ void SantaPanel::render(SDL_Renderer *renderer) {
   cat->drawText(renderer, "Status: Delivering!", centerX, curY,
                 {0, 255, 100, 255}, FontStyle::MicroBold, true);
 }
+
+REGISTER_WIDGET("santa_tracker", "Santa Tracker", false, false, {
+  return std::make_unique<SantaPanel>(0, 0, 0, 0, deps.fontMgr, deps.santaStore);
+})

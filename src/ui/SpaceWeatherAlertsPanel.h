@@ -14,6 +14,8 @@ public:
                           std::shared_ptr<SpaceWeatherAlertStore> store);
 
   std::string getName() const override { return "SpaceWxAlerts"; }
+  const char *typeId() const override { return "spacewx_alerts"; }
+  std::string getDisplayName() const override { return "SpaceWx Alerts"; }
   void update() override;
   void render(SDL_Renderer *renderer) override;
   void onResize(int x, int y, int w, int h) override;

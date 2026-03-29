@@ -1,4 +1,5 @@
 #include "HistoryPanel.h"
+#include "WidgetRegistry.h"
 #include "../core/Theme.h"
 #include "FontCatalog.h"
 #include "GraphHelper.h"
@@ -246,4 +247,16 @@ void HistoryPanel::onMouseMove(int mx, int my) {
     tooltip_.visible = false;
   }
 }
+
+REGISTER_WIDGET("history_flux", "Solar Flux", false, false, {
+  return std::make_unique<HistoryPanel>(0, 0, 0, 0, deps.fontMgr, deps.texMgr, deps.historyStore, "flux");
+})
+
+REGISTER_WIDGET("history_ssn", "Sunspots", false, false, {
+  return std::make_unique<HistoryPanel>(0, 0, 0, 0, deps.fontMgr, deps.texMgr, deps.historyStore, "ssn");
+})
+
+REGISTER_WIDGET("history_kp", "K-Index", false, false, {
+  return std::make_unique<HistoryPanel>(0, 0, 0, 0, deps.fontMgr, deps.texMgr, deps.historyStore, "kp");
+})
 

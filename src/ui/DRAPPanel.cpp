@@ -89,3 +89,9 @@ void DRAPPanel::render(SDL_Renderer *renderer) {
 void DRAPPanel::onResize(int x, int y, int w, int h) {
   Widget::onResize(x, y, w, h);
 }
+
+#include "WidgetRegistry.h"
+REGISTER_WIDGET("drap", "DRAP", false, false, {
+  return std::make_unique<DRAPPanel>(
+      0, 0, 0, 0, deps.fontMgr, deps.texMgr, *deps.drapProvider);
+})

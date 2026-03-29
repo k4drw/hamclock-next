@@ -1,4 +1,5 @@
 #include "ActivityPanels.h"
+#include "WidgetRegistry.h"
 #include "../core/LiveSpotData.h" // For kBands and freqToBandIndex
 #include "../core/MemoryMonitor.h"
 #include "../core/StringUtils.h"
@@ -628,3 +629,13 @@ bool ONTAPanel::handleSetupClick(int mx, int my) {
   }
   return false;
 }
+
+REGISTER_WIDGET("dx_peditions", "DX Peditions", true, false, {
+  return std::make_unique<DXPedPanel>(
+      0, 0, 0, 0, deps.fontMgr, *deps.activityProvider, deps.activityStore);
+})
+
+REGISTER_WIDGET("on_the_air", "On The Air", true, false, {
+  return std::make_unique<ONTAPanel>(
+      0, 0, 0, 0, deps.fontMgr, *deps.activityProvider, deps.activityStore);
+})

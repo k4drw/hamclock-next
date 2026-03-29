@@ -22,6 +22,10 @@ public:
   void onResize(int x, int y, int w, int h) override;
 
   std::string getName() const override { return "VoacapDeDx"; }
+  const char *typeId() const override { return "voacap_dedx"; }
+  std::string getDisplayName() const override { return "Voacap DE-DX"; }
+  bool isScrollable() const override { return false; }
+  bool requiresConfigKey() const override { return false; }
   std::vector<std::string> getActions() const override { return {}; }
   SDL_Rect getActionRect(const std::string &action) const override;
   nlohmann::json getDebugData() const override;

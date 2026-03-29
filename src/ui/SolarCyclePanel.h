@@ -16,6 +16,10 @@ public:
                   TextureManager &texMgr, std::shared_ptr<HistoryStore> store);
 
   std::string getName() const override { return "SolarCycle"; }
+  const char *typeId() const override { return "solar_cycle"; }
+  std::string getDisplayName() const override { return "Solar Cycle"; }
+  bool isScrollable() const override { return false; }
+  bool requiresConfigKey() const override { return false; }
   void update() override;
   void render(SDL_Renderer *renderer) override;
   void onResize(int x, int y, int w, int h) override;

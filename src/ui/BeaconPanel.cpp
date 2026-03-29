@@ -1,4 +1,5 @@
 #include "BeaconPanel.h"
+#include "WidgetRegistry.h"
 #include "../core/BeaconData.h"
 #include "../core/Logger.h"
 #include "../core/MemoryMonitor.h"
@@ -220,3 +221,7 @@ void BeaconPanel::onResize(int x, int y, int w, int h) {
     callfontSize_ = cat->ptSize(FontStyle::Micro);
   }
 }
+
+REGISTER_WIDGET("ncdxf", "NCDXF", false, false, {
+  return std::make_unique<BeaconPanel>(0, 0, 0, 0, deps.fontMgr, *deps.beaconProvider);
+})

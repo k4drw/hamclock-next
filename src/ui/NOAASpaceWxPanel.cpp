@@ -1,4 +1,5 @@
 #include "NOAASpaceWxPanel.h"
+#include "WidgetRegistry.h"
 #include "FontCatalog.h"
 
 #include <cstdio>
@@ -104,3 +105,7 @@ void NOAASpaceWxPanel::render(SDL_Renderer *renderer) {
     }
   }
 }
+
+REGISTER_WIDGET("noaa_spacewx", "NOAA SpaceWx", false, false, {
+  return std::make_unique<NOAASpaceWxPanel>(0, 0, 0, 0, deps.fontMgr, deps.solarStore);
+})

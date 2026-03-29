@@ -15,6 +15,7 @@
 #include "../core/Theme.h"
 #include "FontCatalog.h"
 #include "SysInfoPanel.h"
+#include "WidgetRegistry.h"
 
 #include <SDL.h>
 #include <algorithm>
@@ -319,3 +320,8 @@ SDL_Rect SysInfoPanel::getActionRect(const std::string &action) const {
   (void)action;
   return {x_, y_, width_, height_};
 }
+
+REGISTER_WIDGET("sys_info", "System Info", false, false, {
+  return std::make_unique<SysInfoPanel>(
+      0, 0, 0, 0, deps.fontMgr, deps.cpuMonitor, deps.state, deps.appCfg.useMetric);
+})

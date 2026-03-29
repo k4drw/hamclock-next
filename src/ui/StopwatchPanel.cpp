@@ -318,3 +318,8 @@ StopwatchPanel::formatTimeMini(std::chrono::steady_clock::duration d) const {
                 (int)s.count(), (int)(ms.count() / 100));
   return buf;
 }
+
+#include "WidgetRegistry.h"
+REGISTER_WIDGET("stopwatch", "Stopwatch", false, false, {
+  return std::make_unique<StopwatchPanel>(0, 0, 0, 0, deps.fontMgr);
+})

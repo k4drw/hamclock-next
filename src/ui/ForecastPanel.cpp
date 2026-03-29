@@ -123,3 +123,8 @@ bool ForecastPanel::onMouseWheel(int scrollY) {
   scrollOffset_ = std::clamp(scrollOffset_ - scrollY, 0, maxScroll_);
   return true;
 }
+
+#include "WidgetRegistry.h"
+REGISTER_WIDGET("forecast", "Forecast", true, false, {
+  return std::make_unique<ForecastPanel>(0, 0, 0, 0, deps.fontMgr, deps.forecastStore);
+})

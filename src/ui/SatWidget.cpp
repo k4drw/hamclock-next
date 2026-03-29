@@ -1,4 +1,5 @@
 #include "SatWidget.h"
+#include "WidgetRegistry.h"
 #include "../core/Constants.h"
 #include "../core/MemoryMonitor.h"
 #include "../core/Theme.h"
@@ -405,3 +406,21 @@ SDL_Rect SatWidget::getActionRect(const std::string &action) const {
     return trackButtonRect_;
   return {0, 0, 0, 0};
 }
+
+REGISTER_WIDGET("satellite", "Satellite", false, false, {
+  auto sw = std::make_unique<SatWidget>(0, 0, 0, 0, deps.fontMgr, deps.texMgr, *deps.satMgr);
+  sw->setObserver(deps.appCfg.lat, deps.appCfg.lon);
+  sw->restoreState(deps.appCfg.satWidgetSatellite);
+  sw->setMapTrackVisible(deps.appCfg.showSatTrack);
+  sw->setOnSatChanged(
+      [&appCfg = deps.appCfg, &cfgMgr = deps.cfgMgr](const std::string &satName) {
+        appCfg.satWidgetSatellite = satName;
+        cfgMgr.save(appCfg);
+      });
+  sw->setOnMapTrackToggle(
+      [&appCfg = deps.appCfg, &cfgMgr = deps.cfgMgr](bool enabled) {
+        appCfg.showSatTrack = enabled;
+        cfgMgr.save(appCfg);
+      });
+  return sw;
+})

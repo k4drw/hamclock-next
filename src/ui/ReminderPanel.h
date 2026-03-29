@@ -34,6 +34,8 @@ public:
   void renderModal(SDL_Renderer *renderer) override;
 
   std::string getName() const override { return "Reminders"; }
+  const char *typeId() const override { return "reminders"; }
+  std::string getDisplayName() const override { return "Reminders"; }
 
 private:
   FontManager &fontMgr_;

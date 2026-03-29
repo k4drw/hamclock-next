@@ -1,4 +1,5 @@
 #include "IonosondePanel.h"
+#include "WidgetRegistry.h"
 #include "../core/Theme.h"
 #include "FontCatalog.h"
 #include "GraphHelper.h"
@@ -144,3 +145,7 @@ void IonosondePanel::drawGraph(SDL_Renderer *renderer, int x, int y, int w, int 
 
 
 } // namespace HamClock
+
+REGISTER_WIDGET("ionosonde", "Ionosonde", false, false, {
+  return std::make_unique<HamClock::IonosondePanel>(0, 0, 0, 0, deps.fontMgr, deps.texMgr);
+})

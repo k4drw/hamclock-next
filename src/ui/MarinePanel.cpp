@@ -1,4 +1,5 @@
 #include "MarinePanel.h"
+#include "WidgetRegistry.h"
 #include "../core/ConfigManager.h"
 #include "../core/Theme.h"
 #include "FontCatalog.h"
@@ -313,3 +314,7 @@ void MarinePanel::saveSettings() {
   // The next update() loop or rotation will naturally pick up the new ID in main.cpp if we were to change how fetch is called,
   // but main.cpp usually handles the periodic fetch.
 }
+
+REGISTER_WIDGET("marine", "Marine", false, false, {
+  return std::make_unique<MarinePanel>(0, 0, 0, 0, deps.fontMgr, deps.marineStore);
+})

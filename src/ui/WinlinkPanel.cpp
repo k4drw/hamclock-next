@@ -1,4 +1,5 @@
 #include "WinlinkPanel.h"
+#include "WidgetRegistry.h"
 #include "../core/Theme.h"
 #include "FontCatalog.h"
 #include <algorithm>
@@ -112,3 +113,7 @@ bool WinlinkPanel::onMouseWheel(int scrollY) {
   scrollOffset_ = std::clamp(scrollOffset_ - scrollY, 0, maxScroll_);
   return true;
 }
+
+REGISTER_WIDGET("winlink", "Winlink", false, true, {
+  return std::make_unique<WinlinkPanel>(0, 0, 0, 0, deps.fontMgr, deps.winlinkStore);
+})

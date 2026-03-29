@@ -30,6 +30,8 @@ public:
   void renderModal(SDL_Renderer *renderer) override;
 
   std::string getName() const override { return "Marine"; }
+  const char *typeId() const override { return "marine"; }
+  std::string getDisplayName() const override { return "Marine"; }
 
 private:
   void renderMenu(SDL_Renderer *renderer, const struct ThemeColors &themes);

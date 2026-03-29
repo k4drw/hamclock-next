@@ -12,6 +12,12 @@ public:
                  std::shared_ptr<WatchlistStore> watchlist,
                  std::shared_ptr<WatchlistHitStore> hits);
 
+  std::string getName() const override { return "Watchlist"; }
+  const char *typeId() const override { return "watchlist"; }
+  std::string getDisplayName() const override { return "Watchlist"; }
+  bool isScrollable() const override { return false; }
+  bool requiresConfigKey() const override { return false; }
+
   void update() override;
 
 private:

@@ -1,4 +1,5 @@
 #include "ReminderPanel.h"
+#include "WidgetRegistry.h"
 #include "../core/Theme.h"
 #include "FontCatalog.h"
 #include <ctime>
@@ -790,4 +791,9 @@ void ReminderPanel::onMouseMove(int mx, int my) {
     }
   }
 }
+
+REGISTER_WIDGET("reminders", "Reminders", false, false, {
+  return std::make_unique<ReminderPanel>(0, 0, 0, 0, deps.fontMgr, deps.appCfg,
+      deps.cfgMgr, *deps.callbookProvider, deps.callbookStore, *deps.fccProvider);
+})
 

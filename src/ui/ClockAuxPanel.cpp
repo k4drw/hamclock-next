@@ -1,4 +1,5 @@
 #include "ClockAuxPanel.h"
+#include "WidgetRegistry.h"
 
 #include "../core/Constants.h"
 #include "../core/StringUtils.h"
@@ -516,3 +517,7 @@ bool ClockAuxPanel::onTextInput(const char *text) {
     return customOffsetInput_.onTextInput(text);
   return customLabelInput_.onTextInput(text);
 }
+
+REGISTER_WIDGET("clock_aux", "Clock Aux", false, false, {
+  return std::make_unique<ClockAuxPanel>(0, 0, 0, 0, deps.fontMgr, deps.appCfg, deps.cfgMgr);
+})

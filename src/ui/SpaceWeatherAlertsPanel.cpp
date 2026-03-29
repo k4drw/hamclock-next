@@ -1,4 +1,5 @@
 #include "SpaceWeatherAlertsPanel.h"
+#include "WidgetRegistry.h"
 #include "../core/Theme.h"
 #include "FontCatalog.h"
 #include <SDL.h>
@@ -181,3 +182,7 @@ void SpaceWeatherAlertsPanel::onMouseMove(int mx, int my) {
   tooltip_.visible = true;
   tooltip_.timestamp = SDL_GetTicks();
 }
+
+REGISTER_WIDGET("spacewx_alerts", "SpaceWx Alerts", false, false, {
+  return std::make_unique<SpaceWeatherAlertsPanel>(0, 0, 0, 0, deps.fontMgr, deps.spaceWxAlertStore);
+})

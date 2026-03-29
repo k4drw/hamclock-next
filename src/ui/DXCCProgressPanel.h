@@ -17,6 +17,8 @@ public:
                     std::shared_ptr<ADIFStore> store, PrefixManager &prefixMgr);
 
   std::string getName() const override { return "DXCCProgress"; }
+  const char *typeId() const override { return "dxcc_progress"; }
+  std::string getDisplayName() const override { return "DXCC Progress"; }
   void update() override;
   void render(SDL_Renderer *renderer) override;
   void onResize(int x, int y, int w, int h) override;
