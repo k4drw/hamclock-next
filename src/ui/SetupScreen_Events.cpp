@@ -183,12 +183,13 @@ bool SetupScreen::onMouseDown(int mx, int my, Uint16 mod, int clicks) {
       }
     }
 
-    // 1b. "Full Height" checkbox for pane 5
-    if (activePane_ == 4 && fullHeightCheckRect_.w > 0 &&
+    // 1b. "Full Height" checkbox for pane 5 and 6
+    if ((activePane_ == 4 || activePane_ == 5) && fullHeightCheckRect_.w > 0 &&
         mx >= fullHeightCheckRect_.x && mx < fullHeightCheckRect_.x + fullHeightCheckRect_.w &&
         my >= fullHeightCheckRect_.y && my < fullHeightCheckRect_.y + fullHeightCheckRect_.h) {
       pane5FullHeight_ = !pane5FullHeight_;
       if (pane5FullHeight_) {
+        activePane_ = 4; // switch to pane 5 since full height widgets reside there
         paneRotations_[5].clear();
         auto &p5 = paneRotations_[4];
         p5.erase(std::remove_if(p5.begin(), p5.end(),

@@ -969,26 +969,45 @@ DashboardContext::DashboardContext(AppContext &ctx)
           forbidden.push_back(t);
       }
     }
+    bool isFullHeight = false;
+    if (paneIdx == 4 || paneIdx == 5) {
+      isFullHeight = panes[5]->getRotation().empty();
+      if (isFullHeight && !panes[4]->getRotation().empty()) {
+        for (const auto &t : panes[4]->getRotation()) {
+          auto *d = WidgetRegistry::instance().find(t);
+          if (!d || !d->isScrollable) {
+            isFullHeight = false;
+            break;
+          }
+        }
+      }
+    }
+
     widgetSelector->show(
         paneIdx, available, current, forbidden,
-        [&ctx, this](int idx, const std::vector<std::string> &finalSelection) {
-          panes[idx]->setRotation(finalSelection, ctx.appCfg.rotationIntervalS,
-                                  ctx.appCfg.syncRotation);
-          // When pane 6 occupancy changes, update side-panel layout
-          if (idx == 5) {
-            bool pane6Empty = panes[5]->getRotation().empty();
-            layout.removeWidget(panes[5].get());
-            if (!pane6Empty) {
-              layout.addWidget(Zone::SidePanel, panes[5].get());
-            } else {
-              panes[5]->onResize(0, 0, 0, 0);
-            }
-            if (FIDELITY_MODE)
-              layout.recalculate(LOGICAL_WIDTH, LOGICAL_HEIGHT,
-                                 ctx.layLogicalOffX, ctx.layLogicalOffY);
-            else
-              layout.recalculate(ctx.globalWinW, ctx.globalWinH);
+        [&ctx, this](int idx, const std::vector<std::string> &finalSelection, bool fullHeightSelected) {
+          int targetIdx = idx;
+          if (fullHeightSelected) {
+            targetIdx = 4; // Always use pane 5 for full height widgets
+            panes[5]->setRotation({}, ctx.appCfg.rotationIntervalS, ctx.appCfg.syncRotation);
           }
+          panes[targetIdx]->setRotation(finalSelection, ctx.appCfg.rotationIntervalS,
+                                  ctx.appCfg.syncRotation);
+                                  
+          // When pane 6 occupancy changes, update side-panel layout
+          bool pane6Empty = panes[5]->getRotation().empty();
+          layout.removeWidget(panes[5].get());
+          if (!pane6Empty) {
+            layout.addWidget(Zone::SidePanel, panes[5].get());
+          } else {
+            panes[5]->onResize(0, 0, 0, 0);
+          }
+          if (FIDELITY_MODE)
+            layout.recalculate(LOGICAL_WIDTH, LOGICAL_HEIGHT,
+                                ctx.layLogicalOffX, ctx.layLogicalOffY);
+          else
+            layout.recalculate(ctx.globalWinW, ctx.globalWinH);
+
           ctx.appCfg.pane1Rotation = panes[0]->getRotation();
           ctx.appCfg.pane2Rotation = panes[1]->getRotation();
           ctx.appCfg.pane3Rotation = panes[2]->getRotation();
@@ -996,7 +1015,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
           ctx.appCfg.pane5Rotation = panes[4]->getRotation();
           ctx.appCfg.pane6Rotation = panes[5]->getRotation();
           ctx.cfgMgr.save(ctx.appCfg);
-        });
+        }, false, isFullHeight);
   };
   for (int i = 0; i < 6; ++i) {
     panes[i]->setOnSelectionRequested(onPaneSelectionRequested, i);

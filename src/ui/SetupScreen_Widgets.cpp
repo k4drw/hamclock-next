@@ -158,12 +158,12 @@ void SetupScreen::renderTabWidgets(SDL_Renderer *renderer, int cx, int pad,
   for (auto *d : WidgetRegistry::instance().getAll(false))
     kAllTypesVec.push_back(d->typeId);
 
-  // When pane 5 is active, reserve one row above the list for the Full Height checkbox
-  if (activePane_ == 4)
+  // When pane 5 or 6 is active, reserve one row above the list for the Full Height checkbox
+  if (activePane_ == 4 || activePane_ == 5)
     listAvailH = std::max(rowH, listAvailH - rowH);
 
-  // Full height checkbox for pane 5: limits widget selection to scrollable widgets only
-  if (activePane_ == 4) {
+  // Full height checkbox for pane 5 & 6: limits widget selection to scrollable widgets only
+  if (activePane_ == 4 || activePane_ == 5) {
     SDL_Rect cb = {fieldX, y, 16, 16};
     SDL_SetRenderDrawColor(renderer, themes.rowStripe1.r, themes.rowStripe1.g,
                            themes.rowStripe1.b, 255);
@@ -185,9 +185,9 @@ void SetupScreen::renderTabWidgets(SDL_Renderer *renderer, int cx, int pad,
     y += rowH;
   }
 
-  // When full height active, only show scrollable widgets
+  // When full height active, only show scrollable widgets for both side panes
   std::vector<std::string> filteredTypes;
-  if (activePane_ == 4 && pane5FullHeight_) {
+  if ((activePane_ == 4 || activePane_ == 5) && pane5FullHeight_) {
     for (const auto &t : kAllTypesVec) {
       auto *d = WidgetRegistry::instance().find(t);
       if (d && d->isScrollable)

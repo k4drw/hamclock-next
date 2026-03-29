@@ -13,11 +13,21 @@ void WidgetSelector::show(
     int paneIndex, const std::vector<std::string> &available,
     const std::vector<std::string> &currentSelection,
     const std::vector<std::string> &forbidden,
-    std::function<void(int, const std::vector<std::string> &)> onDone,
-    bool singleSelect) {
+    std::function<void(int, const std::vector<std::string> &, bool)> onDone,
+    bool singleSelect, bool startFullHeight) {
   singleSelect_ = singleSelect;
   paneIndex_ = paneIndex;
+  fullHeightMode_ = startFullHeight;
+  
   available_ = available;
+  if (fullHeightMode_) {
+    available_.erase(std::remove_if(available_.begin(), available_.end(),
+                                    [](const std::string &t) {
+                                      auto *d = WidgetRegistry::instance().find(t);
+                                      return !d || !d->isScrollable;
+                                    }),
+                     available_.end());
+  }
 
   // Alphabetize by display name
   std::sort(available_.begin(), available_.end(),
@@ -69,6 +79,12 @@ void WidgetSelector::show(
   int btnY = menuRect_.y + menuRect_.h - btnH - 12;
   cancelRect_ = {menuRect_.x + menuW / 2 - btnW - 10, btnY, btnW, btnH};
   okRect_ = {menuRect_.x + menuW / 2 + 10, btnY, btnW, btnH};
+
+  if (paneIndex_ == 4 || paneIndex_ == 5) {
+    fullHeightRect_ = {menuRect_.x + 20, btnY + 8, 110, 20};
+  } else {
+    fullHeightRect_ = {0, 0, 0, 0};
+  }
 }
 
 void WidgetSelector::hide() { visible_ = false; }
@@ -152,6 +168,30 @@ void WidgetSelector::render(SDL_Renderer *renderer) {
   SDL_RenderDrawLine(renderer, menuRect_.x + 5, okRect_.y - 8,
                      menuRect_.x + menuRect_.w - 5, okRect_.y - 8);
 
+  if (fullHeightRect_.w > 0) {
+    // Checkbox box
+    SDL_Rect cb = {fullHeightRect_.x, fullHeightRect_.y, 16, 16};
+    SDL_SetRenderDrawColor(renderer, themes.rowStripe1.r, themes.rowStripe1.g,
+                           themes.rowStripe1.b, 255);
+    SDL_RenderFillRect(renderer, &cb);
+    SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
+                           themes.border.b, 255);
+    SDL_RenderDrawRect(renderer, &cb);
+
+    // Inner tick mark
+    if (fullHeightMode_) {
+      SDL_SetRenderDrawColor(renderer, themes.accent.r, themes.accent.g,
+                             themes.accent.b, 255);
+      SDL_Rect inner = {cb.x + 3, cb.y + 3, 10, 10};
+      SDL_RenderFillRect(renderer, &inner);
+    }
+
+    // Checkbox text
+    cat->drawText(renderer, "Full height", cb.x + 22, cb.y + 8,
+                  fullHeightMode_ ? themes.text : themes.textDim,
+                  FontStyle::Fast, false, false, true);
+  }
+
   // Buttons
   SDL_SetRenderDrawColor(renderer, themes.danger.r, themes.danger.g,
                          themes.danger.b, 255);
@@ -186,9 +226,89 @@ bool WidgetSelector::onMouseUp(int mx, int my, Uint16 /*mod*/, int clicks) {
   if (mx >= okRect_.x && mx < okRect_.x + okRect_.w && my >= okRect_.y &&
       my < okRect_.y + okRect_.h) {
     if (onDone_) {
-      onDone_(paneIndex_, selection_);
+      onDone_(paneIndex_, selection_, fullHeightMode_);
     }
     hide();
+    return true;
+  }
+
+  // Check full height checkbox
+  if (fullHeightRect_.w > 0 && mx >= fullHeightRect_.x &&
+      mx < fullHeightRect_.x + fullHeightRect_.w &&
+      my >= fullHeightRect_.y && my < fullHeightRect_.y + fullHeightRect_.h) {
+    fullHeightMode_ = !fullHeightMode_;
+
+    // Re-filter the available list based on new mode
+    std::vector<std::string> newAvailable;
+    for (auto *d : WidgetRegistry::instance().getAll(false)) {
+      if (!fullHeightMode_ || d->isScrollable) {
+        newAvailable.push_back(d->typeId);
+      }
+    }
+    std::sort(newAvailable.begin(), newAvailable.end(),
+              [](const std::string &a, const std::string &b) {
+                auto *da = WidgetRegistry::instance().find(a);
+                auto *db = WidgetRegistry::instance().find(b);
+                const char *na = da ? da->displayName : a.c_str();
+                const char *nb = db ? db->displayName : b.c_str();
+                return std::string(na) < std::string(nb);
+              });
+    available_ = newAvailable;
+
+    // Prune invalid selections
+    auto it = std::remove_if(selection_.begin(), selection_.end(),
+                             [&](const std::string &t) {
+                               return std::find(available_.begin(),
+                                                available_.end(),
+                                                t) == available_.end();
+                             });
+    selection_.erase(it, selection_.end());
+    
+    // Focus clamps
+    if (focusedIdx_ >= static_cast<int>(available_.size())) {
+      focusedIdx_ = std::max(0, static_cast<int>(available_.size()) - 1);
+    }
+
+    // Re-calculate layout geometry
+    int numCols = 4;
+    int itemH = 28;
+    int baseW = 180;
+    int menuW = baseW * numCols;
+    int footerH = 50;
+
+    int numRows = (static_cast<int>(available_.size()) + numCols - 1) / numCols;
+    int menuH =
+        numRows * itemH + footerH + 25; // Increased padding to prevent overlap
+
+    if (menuH > HamClock::LOGICAL_HEIGHT - 20) {
+      menuH = HamClock::LOGICAL_HEIGHT - 20;
+    }
+
+    menuRect_ = {HamClock::LOGICAL_WIDTH / 2 - menuW / 2,
+                 HamClock::LOGICAL_HEIGHT / 2 - menuH / 2, menuW, menuH};
+
+    int btnW = 100;
+    int btnH = 34;
+    int btnY = menuRect_.y + menuRect_.h - btnH - 12;
+    cancelRect_ = {menuRect_.x + menuW / 2 - btnW - 10, btnY, btnW, btnH};
+    okRect_ = {menuRect_.x + menuW / 2 + 10, btnY, btnW, btnH};
+
+    if (paneIndex_ == 4 || paneIndex_ == 5) {
+      fullHeightRect_ = {menuRect_.x + 20, btnY + 8, 110, 20};
+    } else {
+      fullHeightRect_ = {0, 0, 0, 0};
+    }
+
+    // Re-build itemRects_
+    int colW = menuRect_.w / numCols;
+    itemRects_.clear();
+    for (size_t i = 0; i < available_.size(); ++i) {
+      int row = static_cast<int>(i) / numCols;
+      int col = static_cast<int>(i) % numCols;
+      itemRects_.push_back({menuRect_.x + col * colW,
+                            menuRect_.y + row * itemH + 10, colW, itemH});
+    }
+
     return true;
   }
 
@@ -236,7 +356,7 @@ bool WidgetSelector::onKeyDown(SDL_Keycode key, Uint16 /*mod*/) {
   }
   if (key == SDLK_RETURN || key == SDLK_KP_ENTER) {
     if (onDone_) {
-      onDone_(paneIndex_, selection_);
+      onDone_(paneIndex_, selection_, fullHeightMode_);
     }
     hide();
     return true;
