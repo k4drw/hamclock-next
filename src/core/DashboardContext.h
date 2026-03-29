@@ -208,13 +208,13 @@ struct DashboardContext {
   LayoutManager layout;
 
   // Collections
-  std::map<WidgetType, std::unique_ptr<Widget>> widgetPool;
+  std::map<std::string, std::unique_ptr<Widget>> widgetPool;
   std::vector<Widget *> widgets;
   std::vector<Widget *> eventWidgets;
 
   // Widget factory — stored as a member so pane containers hold a valid [this]
   // capture rather than a dangling reference to a constructor-local lambda.
-  std::function<Widget *(WidgetType)> widgetFactory_;
+  std::function<Widget *(const std::string &)> widgetFactory_;
 
   // State
   Uint32 lastFetchMs = 0;
@@ -246,7 +246,7 @@ struct DashboardContext {
   DashboardContext(AppContext &ctx);
   ~DashboardContext();
 
-  void applySidePanelMode(WidgetType chosen, AppContext &ctx);
+  void applySidePanelMode(const std::string &chosen, AppContext &ctx);
   void expandPane(int idx, AppContext &ctx);
   void restorePane(AppContext &ctx);
   void update(AppContext &ctx);
@@ -344,7 +344,7 @@ struct AppContext {
   // Rotation control commands written by WebServer thread, consumed on main
   // thread. rotationCmd: 0=none, 1=pause, 2=resume, 3=next, 4=jump-to-widget
   // rotationCmdPane: -1=all panes, 0-5=specific pane
-  // rotationCmdWidget: WidgetType as int (used with cmd=4)
+  // rotationCmdWidget: registry index (used with cmd=4)
   std::atomic<int> rotationCmd{0};
   std::atomic<int> rotationCmdPane{-1};
   std::atomic<int> rotationCmdWidget{-1};

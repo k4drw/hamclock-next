@@ -20,6 +20,8 @@ public:
   bool onMouseUp(int mx, int my, Uint16 mod, int clicks) override;
 
   std::string getName() const override { return "ADIFLog"; }
+  const char *typeId() const override { return "adif"; }
+  std::string getDisplayName() const override { return "ADIF Log"; }
 
 private:
   void renderStatsView(SDL_Renderer *renderer);

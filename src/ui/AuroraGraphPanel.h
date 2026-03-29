@@ -20,6 +20,8 @@ public:
   void onResize(int x, int y, int w, int h) override;
   void onMouseMove(int mx, int my) override;
   std::string getName() const override { return "Aurora Graph"; }
+  const char *typeId() const override { return "aurora_graph"; }
+  std::string getDisplayName() const override { return "Aurora Graph"; }
 
 private:
   FontManager &fontMgr_;

@@ -1,7 +1,5 @@
 #pragma once
 
-#include "WidgetType.h"
-
 #include <filesystem>
 #include <map>
 #include <string>
@@ -32,12 +30,12 @@ struct ReminderEntry {
 
 struct ConfigPreset {
   std::string name;
-  std::vector<WidgetType> pane1Rotation;
-  std::vector<WidgetType> pane2Rotation;
-  std::vector<WidgetType> pane3Rotation;
-  std::vector<WidgetType> pane4Rotation;
-  std::vector<WidgetType> pane5Rotation;
-  std::vector<WidgetType> pane6Rotation;
+  std::vector<std::string> pane1Rotation;
+  std::vector<std::string> pane2Rotation;
+  std::vector<std::string> pane3Rotation;
+  std::vector<std::string> pane4Rotation;
+  std::vector<std::string> pane5Rotation;
+  std::vector<std::string> pane6Rotation;
   int rotationIntervalS = 30;
   PropOverlayType propOverlay = PropOverlayType::None;
   WeatherOverlayType weatherOverlay = WeatherOverlayType::None;
@@ -79,14 +77,13 @@ struct AppConfig {
       "auto"; // "auto", "vcgencmd", "bl_power", etc.
   std::string logLevel = "warn"; // "trace","debug","info","warn","error"
 
-  // Pane widget selection (top bar panes 1–3)  // Pane widget selection
-  // (rotation sets)
-  std::vector<WidgetType> pane1Rotation = {WidgetType::SOLAR};
-  std::vector<WidgetType> pane2Rotation = {WidgetType::DX_CLUSTER};
-  std::vector<WidgetType> pane3Rotation = {WidgetType::LIVE_SPOTS};
-  std::vector<WidgetType> pane4Rotation = {WidgetType::BAND_CONDITIONS};
-  std::vector<WidgetType> pane5Rotation = {WidgetType::DE_INFO};
-  std::vector<WidgetType> pane6Rotation = {WidgetType::DX_INFO};
+  // Pane widget selection (rotation sets, stored as typeId strings)
+  std::vector<std::string> pane1Rotation = {"solar"};
+  std::vector<std::string> pane2Rotation = {"dx_cluster"};
+  std::vector<std::string> pane3Rotation = {"live_spots"};
+  std::vector<std::string> pane4Rotation = {"band_conditions"};
+  std::vector<std::string> pane5Rotation = {"de_info"};
+  std::vector<std::string> pane6Rotation = {"dx_info"};
   int rotationIntervalS = 30;
   bool syncRotation =
       false; // true = all panes advance on the same wall-clock tick

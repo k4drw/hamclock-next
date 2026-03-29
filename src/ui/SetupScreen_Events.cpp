@@ -1,4 +1,5 @@
 #include "SetupScreen.h"
+#include "WidgetRegistry.h"
 #include "../core/ContestModeManager.h"
 #include "../core/DisplayPower.h"
 #include "../core/StringUtils.h"
@@ -191,7 +192,10 @@ bool SetupScreen::onMouseDown(int mx, int my, Uint16 mod, int clicks) {
         paneRotations_[5].clear();
         auto &p5 = paneRotations_[4];
         p5.erase(std::remove_if(p5.begin(), p5.end(),
-                                [](WidgetType t) { return !widgetTypeIsScrollable(t); }),
+                                [](const std::string &t) {
+                                  auto *d = WidgetRegistry::instance().find(t);
+                                  return !d || !d->isScrollable;
+                                }),
                  p5.end());
       }
       widgetListScrollOffset_ = 0;

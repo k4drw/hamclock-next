@@ -147,13 +147,13 @@ private:
   bool rotatorAutoTrack_ = false;
   bool rotatorUpover_ = false;
 
-  std::vector<WidgetType> paneRotations_[6];
+  std::vector<std::string> paneRotations_[6];
   bool syncRotation_ = false;
   SDL_Rect syncRotationRect_ = {0, 0, 0, 0};
 
   // Contest Mode state
   bool contestModeActive_ = false;
-  std::vector<WidgetType> contestSavedRotations_[6];
+  std::vector<std::string> contestSavedRotations_[6];
   SDL_Rect contestModeBtn_ = {0, 0, 0, 0};
 
   // Watchlist tab
@@ -207,7 +207,7 @@ private:
   std::unique_ptr<HamClock::ThemeCustomizer> themeCustomizer_;
 
   struct WidgetClickRect {
-    WidgetType type;
+    std::string type;
     SDL_Rect rect;
   };
   std::vector<WidgetClickRect> widgetRects_;

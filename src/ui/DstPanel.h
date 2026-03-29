@@ -19,6 +19,8 @@ public:
   void onMouseMove(int mx, int my) override;
 
   std::string getName() const override { return "DstPanel"; }
+  const char *typeId() const override { return "dst_index"; }
+  std::string getDisplayName() const override { return "Dst Index"; }
   nlohmann::json getDebugData() const override;
 
 private:

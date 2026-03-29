@@ -701,7 +701,7 @@ void MapWidget::renderSpotOverlay(SDL_Renderer *renderer) {
   for (auto *pane : panes_) {
     if (pane) {
       const auto &rotation = pane->getRotation();
-      if (std::find(rotation.begin(), rotation.end(), WidgetType::LIVE_SPOTS) !=
+      if (std::find(rotation.begin(), rotation.end(), std::string("live_spots")) !=
           rotation.end()) {
         widgetEnabled = true;
         break;
@@ -1074,7 +1074,7 @@ void MapWidget::renderBeacons(SDL_Renderer *renderer) {
   for (auto *pane : panes_) {
     if (pane) {
       const auto &rotation = pane->getRotation();
-      if (std::find(rotation.begin(), rotation.end(), WidgetType::NCDXF) !=
+      if (std::find(rotation.begin(), rotation.end(), std::string("ncdxf")) !=
           rotation.end()) {
         widgetEnabled = true;
         break;

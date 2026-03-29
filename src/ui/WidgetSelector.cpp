@@ -1,4 +1,5 @@
 #include "WidgetSelector.h"
+#include "WidgetRegistry.h"
 #include "../core/Constants.h"
 #include "../core/Theme.h"
 #include "FontCatalog.h"
@@ -9,20 +10,23 @@ WidgetSelector::WidgetSelector(FontManager &fontMgr)
       fontMgr_(fontMgr) {}
 
 void WidgetSelector::show(
-    int paneIndex, const std::vector<WidgetType> &available,
-    const std::vector<WidgetType> &currentSelection,
-    const std::vector<WidgetType> &forbidden,
-    std::function<void(int, const std::vector<WidgetType> &)> onDone,
+    int paneIndex, const std::vector<std::string> &available,
+    const std::vector<std::string> &currentSelection,
+    const std::vector<std::string> &forbidden,
+    std::function<void(int, const std::vector<std::string> &)> onDone,
     bool singleSelect) {
   singleSelect_ = singleSelect;
   paneIndex_ = paneIndex;
   available_ = available;
 
-  // Alphabetize
+  // Alphabetize by display name
   std::sort(available_.begin(), available_.end(),
-            [](WidgetType a, WidgetType b) {
-              return std::string(widgetTypeDisplayName(a)) <
-                     std::string(widgetTypeDisplayName(b));
+            [](const std::string &a, const std::string &b) {
+              auto *da = WidgetRegistry::instance().find(a);
+              auto *db = WidgetRegistry::instance().find(b);
+              const char *na = da ? da->displayName : a.c_str();
+              const char *nb = db ? db->displayName : b.c_str();
+              return std::string(na) < std::string(nb);
             });
 
   selection_ = currentSelection;
@@ -98,7 +102,7 @@ void WidgetSelector::render(SDL_Renderer *renderer) {
   auto *cat = fontMgr_.catalog();
 
   for (size_t i = 0; i < available_.size(); ++i) {
-    WidgetType t = available_[i];
+    const std::string &t = available_[i];
     bool isForbidden =
         std::find(forbidden_.begin(), forbidden_.end(), t) != forbidden_.end();
     bool isSelected =
@@ -121,7 +125,9 @@ void WidgetSelector::render(SDL_Renderer *renderer) {
       textColor = themes.textDim;
     }
 
-    cat->drawText(renderer, widgetTypeDisplayName(t),
+    auto *desc = WidgetRegistry::instance().find(t);
+    const char *label = desc ? desc->displayName : t.c_str();
+    cat->drawText(renderer, label,
                   itemRects_[i].x + itemRects_[i].w / 2,
                   itemRects_[i].y + itemRects_[i].h / 2, textColor,
                   FontStyle::SmallRegular, true, false, true);
@@ -189,7 +195,7 @@ bool WidgetSelector::onMouseUp(int mx, int my, Uint16 /*mod*/, int clicks) {
   for (size_t i = 0; i < itemRects_.size(); ++i) {
     if (mx >= itemRects_[i].x && mx < itemRects_[i].x + itemRects_[i].w &&
         my >= itemRects_[i].y && my < itemRects_[i].y + itemRects_[i].h) {
-      WidgetType t = available_[i];
+      const std::string &t = available_[i];
 
       // Note: Forbidden check disabled here to allow selecting duplicates
       // if the user specifically requests them.
@@ -269,7 +275,7 @@ bool WidgetSelector::onKeyDown(SDL_Keycode key, Uint16 /*mod*/) {
   }
   if (key == SDLK_SPACE) {
     if (focusedIdx_ >= 0 && focusedIdx_ < static_cast<int>(available_.size())) {
-      WidgetType t = available_[focusedIdx_];
+      const std::string &t = available_[focusedIdx_];
       bool isForbidden = std::find(forbidden_.begin(), forbidden_.end(), t) !=
                          forbidden_.end();
       if (!isForbidden) {

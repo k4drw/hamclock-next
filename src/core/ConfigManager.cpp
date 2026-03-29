@@ -152,48 +152,48 @@ static void addFactoryPresets(AppConfig &config) {
   {
     ConfigPreset p;
     p.name = "DX";
-    p.pane1Rotation = {WidgetType::DX_CLUSTER};
-    p.pane2Rotation = {WidgetType::DX_PEDITIONS};
-    p.pane3Rotation = {WidgetType::LIVE_SPOTS};
-    p.pane4Rotation = {WidgetType::BAND_CONDITIONS};
-    p.pane5Rotation = {WidgetType::DE_INFO};
-    p.pane6Rotation = {WidgetType::DX_INFO};
+    p.pane1Rotation = {"dx_cluster"};
+    p.pane2Rotation = {"dx_peditions"};
+    p.pane3Rotation = {"live_spots"};
+    p.pane4Rotation = {"band_conditions"};
+    p.pane5Rotation = {"de_info"};
+    p.pane6Rotation = {"dx_info"};
     config.presets.push_back(std::move(p));
   }
   // Contest preset
   {
     ConfigPreset p;
     p.name = "Contest";
-    p.pane1Rotation = {WidgetType::DX_CLUSTER};
-    p.pane2Rotation = {WidgetType::LIVE_SPOTS};
-    p.pane3Rotation = {WidgetType::BAND_CONDITIONS};
-    p.pane4Rotation = {WidgetType::SOLAR};
-    p.pane5Rotation = {WidgetType::DE_INFO};
-    p.pane6Rotation = {WidgetType::DX_INFO};
+    p.pane1Rotation = {"dx_cluster"};
+    p.pane2Rotation = {"live_spots"};
+    p.pane3Rotation = {"band_conditions"};
+    p.pane4Rotation = {"solar"};
+    p.pane5Rotation = {"de_info"};
+    p.pane6Rotation = {"dx_info"};
     config.presets.push_back(std::move(p));
   }
   // Satellite preset
   {
     ConfigPreset p;
     p.name = "Satellite";
-    p.pane1Rotation = {WidgetType::MOON};
-    p.pane2Rotation = {WidgetType::EME_TOOL};
-    p.pane3Rotation = {WidgetType::GIMBAL};
-    p.pane4Rotation = {WidgetType::SOLAR};
-    p.pane5Rotation = {WidgetType::SATELLITE};
-    p.pane6Rotation = {WidgetType::DE_INFO};
+    p.pane1Rotation = {"moon"};
+    p.pane2Rotation = {"eme_tool"};
+    p.pane3Rotation = {"gimbal"};
+    p.pane4Rotation = {"solar"};
+    p.pane5Rotation = {"satellite"};
+    p.pane6Rotation = {"de_info"};
     config.presets.push_back(std::move(p));
   }
   // Environment/WX preset — uses unlocked panes 5-6 for ENV sensors
   {
     ConfigPreset p;
     p.name = "Environment/WX";
-    p.pane1Rotation = {WidgetType::DE_WEATHER};
-    p.pane2Rotation = {WidgetType::DX_WEATHER};
-    p.pane3Rotation = {WidgetType::FORECAST};
-    p.pane4Rotation = {WidgetType::DE_WEATHER};
-    p.pane5Rotation = {WidgetType::ENV_TEMP};
-    p.pane6Rotation = {WidgetType::ENV_HUMIDITY};
+    p.pane1Rotation = {"de_weather"};
+    p.pane2Rotation = {"dx_weather"};
+    p.pane3Rotation = {"forecast"};
+    p.pane4Rotation = {"de_weather"};
+    p.pane5Rotation = {"env_temp"};
+    p.pane6Rotation = {"env_humidity"};
     config.presets.push_back(std::move(p));
   }
 }
@@ -389,35 +389,30 @@ bool ConfigManager::load(AppConfig &config) {
     auto &pa = json["panes"];
     auto loadRotation = [&](const std::string &key,
                             const std::string &legacyKey,
-                            std::vector<WidgetType> &vec, WidgetType fallback,
+                            std::vector<std::string> &vec,
+                            const std::string &fallback,
                             bool allowEmpty = false) {
       if (pa.contains(key) && pa[key].is_array()) {
         vec.clear();
         for (auto &item : pa[key]) {
-          if (item.is_string()) {
-            vec.push_back(
-                widgetTypeFromString(item.get<std::string>(), fallback));
-          }
+          if (item.is_string())
+            vec.push_back(item.get<std::string>());
         }
       } else if (pa.contains(legacyKey)) {
-        vec = {widgetTypeFromString(pa.value(legacyKey, ""), fallback)};
+        std::string v = pa.value(legacyKey, "");
+        if (!v.empty())
+          vec = {v};
       }
       if (vec.empty() && !allowEmpty)
         vec = {fallback};
     };
 
-    loadRotation("pane1_rotation", "pane1_widget", config.pane1Rotation,
-                 WidgetType::SOLAR);
-    loadRotation("pane2_rotation", "pane2_widget", config.pane2Rotation,
-                 WidgetType::DX_CLUSTER);
-    loadRotation("pane3_rotation", "pane3_widget", config.pane3Rotation,
-                 WidgetType::LIVE_SPOTS);
-    loadRotation("pane4_rotation", "pane4_widget", config.pane4Rotation,
-                 WidgetType::BAND_CONDITIONS);
-    loadRotation("pane5_rotation", "pane5_widget", config.pane5Rotation,
-                 WidgetType::DE_INFO);
-    loadRotation("pane6_rotation", "pane6_widget", config.pane6Rotation,
-                 WidgetType::DX_INFO, /*allowEmpty=*/true);
+    loadRotation("pane1_rotation", "pane1_widget", config.pane1Rotation, "solar");
+    loadRotation("pane2_rotation", "pane2_widget", config.pane2Rotation, "dx_cluster");
+    loadRotation("pane3_rotation", "pane3_widget", config.pane3Rotation, "live_spots");
+    loadRotation("pane4_rotation", "pane4_widget", config.pane4Rotation, "band_conditions");
+    loadRotation("pane5_rotation", "pane5_widget", config.pane5Rotation, "de_info");
+    loadRotation("pane6_rotation", "pane6_widget", config.pane6Rotation, "dx_info", /*allowEmpty=*/true);
     config.rotationIntervalS = pa.value("rotation_interval_s", 30);
     config.syncRotation = pa.value("sync_rotation", false);
     if (pa.contains("watchlist") && pa["watchlist"].is_array()) {
@@ -541,33 +536,23 @@ bool ConfigManager::load(AppConfig &config) {
   // Presets
   if (json.contains("presets") && json["presets"].is_array()) {
     config.presets.clear();
+    auto loadPresetRotation = [](const nlohmann::json &jp,
+                                 const std::string &key,
+                                 std::vector<std::string> &vec) {
+      if (jp.contains(key) && jp[key].is_array())
+        for (auto &e : jp[key])
+          if (e.is_string())
+            vec.push_back(e.get<std::string>());
+    };
     for (auto &jp : json["presets"]) {
       ConfigPreset p;
       p.name = jp.value("name", "");
-      if (jp.contains("pane1_rotation") && jp["pane1_rotation"].is_array())
-        for (auto &e : jp["pane1_rotation"])
-          if (e.is_string())
-            p.pane1Rotation.push_back(widgetTypeFromString(e.get<std::string>(), WidgetType::SOLAR));
-      if (jp.contains("pane2_rotation") && jp["pane2_rotation"].is_array())
-        for (auto &e : jp["pane2_rotation"])
-          if (e.is_string())
-            p.pane2Rotation.push_back(widgetTypeFromString(e.get<std::string>(), WidgetType::DX_CLUSTER));
-      if (jp.contains("pane3_rotation") && jp["pane3_rotation"].is_array())
-        for (auto &e : jp["pane3_rotation"])
-          if (e.is_string())
-            p.pane3Rotation.push_back(widgetTypeFromString(e.get<std::string>(), WidgetType::LIVE_SPOTS));
-      if (jp.contains("pane4_rotation") && jp["pane4_rotation"].is_array())
-        for (auto &e : jp["pane4_rotation"])
-          if (e.is_string())
-            p.pane4Rotation.push_back(widgetTypeFromString(e.get<std::string>(), WidgetType::BAND_CONDITIONS));
-      if (jp.contains("pane5_rotation") && jp["pane5_rotation"].is_array())
-        for (auto &e : jp["pane5_rotation"])
-          if (e.is_string())
-            p.pane5Rotation.push_back(widgetTypeFromString(e.get<std::string>(), WidgetType::DE_INFO));
-      if (jp.contains("pane6_rotation") && jp["pane6_rotation"].is_array())
-        for (auto &e : jp["pane6_rotation"])
-          if (e.is_string())
-            p.pane6Rotation.push_back(widgetTypeFromString(e.get<std::string>(), WidgetType::DX_INFO));
+      loadPresetRotation(jp, "pane1_rotation", p.pane1Rotation);
+      loadPresetRotation(jp, "pane2_rotation", p.pane2Rotation);
+      loadPresetRotation(jp, "pane3_rotation", p.pane3Rotation);
+      loadPresetRotation(jp, "pane4_rotation", p.pane4Rotation);
+      loadPresetRotation(jp, "pane5_rotation", p.pane5Rotation);
+      loadPresetRotation(jp, "pane6_rotation", p.pane6Rotation);
       p.rotationIntervalS = jp.value("rotation_interval_s", 30);
       p.propOverlay  = propOverlayFromStr(jp.value("prop_overlay", "none"));
       p.weatherOverlay = weatherOverlayFromStr(jp.value("weather_overlay", "none"));
@@ -705,11 +690,10 @@ bool ConfigManager::save(const AppConfig &config) {
   json["api_keys"]["winlink"] = config.winlinkKey;
 
   auto saveRotation = [&](const std::string &key,
-                          const std::vector<WidgetType> &vec) {
+                          const std::vector<std::string> &vec) {
     auto arr = nlohmann::json::array();
-    for (auto t : vec) {
-      arr.push_back(widgetTypeToString(t));
-    }
+    for (const auto &t : vec)
+      arr.push_back(t);
     json["panes"][key] = arr;
   };
 
@@ -781,9 +765,9 @@ bool ConfigManager::save(const AppConfig &config) {
 
   // Presets
   {
-    auto savePresetRotation = [](const std::vector<WidgetType> &vec) {
+    auto savePresetRotation = [](const std::vector<std::string> &vec) {
       auto arr = nlohmann::json::array();
-      for (auto t : vec) arr.push_back(widgetTypeToString(t));
+      for (const auto &t : vec) arr.push_back(t);
       return arr;
     };
     auto presetsArr = nlohmann::json::array();

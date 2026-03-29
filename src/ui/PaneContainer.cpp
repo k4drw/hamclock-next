@@ -1,12 +1,14 @@
 #include "PaneContainer.h"
 #include "FontCatalog.h"
 #include "RenderUtils.h"
+#include "WidgetRegistry.h"
 
-PaneContainer::PaneContainer(int x, int y, int w, int h, WidgetType initialType,
+PaneContainer::PaneContainer(int x, int y, int w, int h,
+                             const std::string &initialType,
                              FontManager &fontMgr)
     : Widget(x, y, w, h), currentType_(initialType), fontMgr_(fontMgr) {}
 
-void PaneContainer::setRotation(const std::vector<WidgetType> &types,
+void PaneContainer::setRotation(const std::vector<std::string> &types,
                                 int intervalS, bool syncRotation) {
   rotation_ = types;
   intervalS_ = intervalS;
@@ -38,9 +40,9 @@ void PaneContainer::setPaused(bool paused) {
 
 bool PaneContainer::isPaused() const { return paused_; }
 
-void PaneContainer::jumpToType(WidgetType type) {
+void PaneContainer::jumpToType(const std::string &typeId) {
   for (size_t i = 0; i < rotation_.size(); ++i) {
-    if (rotation_[i] == type) {
+    if (rotation_[i] == typeId) {
       activateRotationIndex(i);
       return;
     }
@@ -119,7 +121,9 @@ void PaneContainer::render(SDL_Renderer *renderer) {
     SDL_Rect r = {x_, y_, width_, height_};
     SDL_RenderFillRect(renderer, &r);
 
-    fontMgr_.catalog()->drawText(renderer, widgetTypeDisplayName(currentType_),
+    auto *desc = WidgetRegistry::instance().find(currentType_);
+    const char *label = desc ? desc->displayName : currentType_.c_str();
+    fontMgr_.catalog()->drawText(renderer, label,
                                  x_ + width_ / 2, y_ + height_ / 2,
                                  themes.textDim, FontStyle::UI, true);
   }
@@ -338,7 +342,8 @@ std::string PaneContainer::getDisplayName() const {
     if (!name.empty())
       return name;
   }
-  return widgetTypeDisplayName(currentType_);
+  auto *desc = WidgetRegistry::instance().find(currentType_);
+  return desc ? std::string(desc->displayName) : currentType_;
 }
 
 SDL_Rect PaneContainer::getActionRect(const std::string &action) const {

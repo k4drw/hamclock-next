@@ -16,7 +16,7 @@
 #include "core/SatelliteManager.h"
 #include "core/SolarData.h"
 #include "core/SoundManager.h"
-#include "core/WidgetType.h"
+#include "ui/WidgetRegistry.h"
 #include "core/WorkerService.h"
 
 #include "network/FrameCapture.h"
@@ -951,7 +951,7 @@ void main_tick() {
           panes[3]->setRotation(cfg.pane4Rotation, cfg.rotationIntervalS, cfg.syncRotation);
         }
         ctx.dashboard->applySidePanelMode(ctx.appCfg.pane5Rotation.empty()
-                                              ? WidgetType::DE_INFO
+                                              ? "de_info"
                                               : ctx.appCfg.pane5Rotation[0],
                                           ctx);
       }
@@ -981,7 +981,7 @@ void main_tick() {
         ctx.webServer->setBMEProvider(ctx.bmeProvider.get());
         ctx.webServer->setBrightnessManager(ctx.brightnessMgr);
         ctx.webServer->setStopwatch(static_cast<StopwatchPanel *>(
-            ctx.dashboard->widgetFactory_(WidgetType::STOPWATCH)));
+            ctx.dashboard->widgetFactory_("stopwatch")));
         ctx.webServer->setCalendarStore(ctx.calendarStore);
       }
       if (!ctx.startupAnnounceDone) {
@@ -1058,7 +1058,7 @@ void main_tick() {
         else if (rcmd == 3)
           p.forceAdvance();
         else if (rcmd == 4 && rwidget >= 0)
-          p.jumpToType(static_cast<WidgetType>(rwidget));
+        { auto all = WidgetRegistry::instance().getAll(true); if (rwidget < (int)all.size()) p.jumpToType(all[rwidget]->typeId); }
       };
       if (rpane >= 0 && rpane < (int)ctx.dashboard->panes.size()) {
         applyPane(*ctx.dashboard->panes[rpane]);

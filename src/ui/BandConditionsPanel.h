@@ -18,6 +18,8 @@ public:
 
   // Semantic Debug API
   std::string getName() const override { return "BandConditions"; }
+  const char *typeId() const override { return "band_conditions"; }
+  std::string getDisplayName() const override { return "Band Cond"; }
   std::vector<std::string> getActions() const override { return {}; }
   SDL_Rect getActionRect(const std::string &action) const override;
   nlohmann::json getDebugData() const override;

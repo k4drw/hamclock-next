@@ -1,4 +1,5 @@
 #include "SetupScreen.h"
+#include "WidgetRegistry.h"
 #include "../core/Theme.h"
 #include <SDL.h>
 #include <algorithm>
@@ -152,7 +153,10 @@ void SetupScreen::renderTabWidgets(SDL_Renderer *renderer, int cx, int pad,
   int listEndY = footerY - pad / 2;
   int listAvailH = listEndY - y;
 
-  auto kAllTypesVec = getAllBaseWidgetTypes();
+  // Build full type list from registry
+  std::vector<std::string> kAllTypesVec;
+  for (auto *d : WidgetRegistry::instance().getAll(false))
+    kAllTypesVec.push_back(d->typeId);
 
   // When pane 5 is active, reserve one row above the list for the Full Height checkbox
   if (activePane_ == 4)
@@ -182,11 +186,13 @@ void SetupScreen::renderTabWidgets(SDL_Renderer *renderer, int cx, int pad,
   }
 
   // When full height active, only show scrollable widgets
-  std::vector<WidgetType> filteredTypes;
+  std::vector<std::string> filteredTypes;
   if (activePane_ == 4 && pane5FullHeight_) {
-    for (auto t : kAllTypesVec)
-      if (widgetTypeIsScrollable(t))
+    for (const auto &t : kAllTypesVec) {
+      auto *d = WidgetRegistry::instance().find(t);
+      if (d && d->isScrollable)
         filteredTypes.push_back(t);
+    }
   } else {
     filteredTypes = kAllTypesVec;
   }
@@ -215,13 +221,15 @@ void SetupScreen::renderTabWidgets(SDL_Renderer *renderer, int cx, int pad,
       int idx = col * kColItems + widgetListScrollOffset_ + row;
       if (idx >= kFilteredWidgets)
         break;
-      WidgetType t = filteredTypes[idx];
+      const std::string &t = filteredTypes[idx];
+      auto *desc = WidgetRegistry::instance().find(t);
+      const char *label = desc ? desc->displayName : t.c_str();
 
       bool allowed = true;
       if (activePane_ == 3) {
-        allowed = (t == WidgetType::NCDXF || t == WidgetType::SOLAR ||
-                   t == WidgetType::DX_WEATHER || t == WidgetType::DE_WEATHER ||
-                   t == WidgetType::BAND_CONDITIONS);
+        allowed = (t == "ncdxf" || t == "solar" ||
+                   t == "dx_weather" || t == "de_weather" ||
+                   t == "band_conditions");
       }
 
       int drawX = fieldX + col * colW;
@@ -240,11 +248,11 @@ void SetupScreen::renderTabWidgets(SDL_Renderer *renderer, int cx, int pad,
           SDL_Rect check = {r.x + 3, r.y + 3, 10, 10};
           SDL_RenderFillRect(renderer, &check);
         }
-        cat->drawText(renderer, widgetTypeDisplayName(t), r.x + 22, r.y + 8,
+        cat->drawText(renderer, label, r.x + 22, r.y + 8,
                       themes.text, FontStyle::Fast, false, false, true);
         widgetRects_.push_back({t, r});
       } else {
-        cat->drawText(renderer, widgetTypeDisplayName(t), r.x + 22, r.y + 8,
+        cat->drawText(renderer, label, r.x + 22, r.y + 8,
                       themes.textDim, FontStyle::Fast, false, false, true);
       }
     }

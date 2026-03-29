@@ -1,7 +1,6 @@
 #include "PresetsModal.h"
 #include "FontCatalog.h"
 #include "../core/Theme.h"
-#include "../core/WidgetType.h"
 
 #include <algorithm>
 
@@ -304,12 +303,12 @@ bool PresetsModal::onMouseUp(int mx, int my, Uint16 /*mod*/) {
 
   // Contest Mode built-in apply
   if (ptInRect(mx, my, contestApplyRect_)) {
-    cfg_->pane1Rotation = {WidgetType::DX_CLUSTER};
-    cfg_->pane2Rotation = {WidgetType::LIVE_SPOTS};
-    cfg_->pane3Rotation = {WidgetType::BAND_CONDITIONS};
-    cfg_->pane4Rotation = {WidgetType::SOLAR};
-    cfg_->pane5Rotation = {WidgetType::DE_INFO};
-    cfg_->pane6Rotation = {WidgetType::DX_INFO};
+    cfg_->pane1Rotation = {"dx_cluster"};
+    cfg_->pane2Rotation = {"live_spots"};
+    cfg_->pane3Rotation = {"band_conditions"};
+    cfg_->pane4Rotation = {"solar"};
+    cfg_->pane5Rotation = {"de_info"};
+    cfg_->pane6Rotation = {"dx_info"};
     if (onApply_)
       onApply_();
     active_ = false;

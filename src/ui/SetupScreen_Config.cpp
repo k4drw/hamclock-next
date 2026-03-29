@@ -1,4 +1,5 @@
 #include "SetupScreen.h"
+#include "WidgetRegistry.h"
 #include "../core/StringUtils.h"
 #include <SDL.h>
 #include <string>
@@ -107,7 +108,7 @@ void SetupScreen::setConfig(const AppConfig &cfg) {
   {
     bool allScrollable = !cfg.pane5Rotation.empty();
     for (auto t : cfg.pane5Rotation)
-      if (!widgetTypeIsScrollable(t)) { allScrollable = false; break; }
+      { auto *d = WidgetRegistry::instance().find(t); if (!d || !d->isScrollable) { allScrollable = false; break; } }
     pane5FullHeight_ = cfg.pane6Rotation.empty() && allScrollable;
   }
 

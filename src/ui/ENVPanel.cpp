@@ -5,7 +5,7 @@
 #include <cstdio>
 
 ENVPanel::ENVPanel(int x, int y, int w, int h, FontManager &fontMgr,
-                   std::shared_ptr<WeatherStore> store, WidgetType mode)
+                   std::shared_ptr<WeatherStore> store, ENVMode mode)
     : Widget(x, y, w, h), fontMgr_(fontMgr), store_(store), mode_(mode) {}
 
 void ENVPanel::update() {}
@@ -32,16 +32,16 @@ void ENVPanel::render(SDL_Renderer *renderer) {
   const char *title = "ENV";
   SDL_Color titleColor = themes.accent;
   switch (mode_) {
-  case WidgetType::ENV_TEMP:
+  case ENVMode::Temp:
     title = "Temperature";
     break;
-  case WidgetType::ENV_PRESSURE:
+  case ENVMode::Pressure:
     title = "Pressure";
     break;
-  case WidgetType::ENV_HUMIDITY:
+  case ENVMode::Humidity:
     title = "Humidity";
     break;
-  case WidgetType::ENV_DEWPOINT:
+  case ENVMode::Dewpoint:
     title = "Dewpoint";
     break;
   default:
@@ -63,16 +63,16 @@ void ENVPanel::render(SDL_Renderer *renderer) {
 
   char valueBuf[32];
   switch (mode_) {
-  case WidgetType::ENV_TEMP:
+  case ENVMode::Temp:
     std::snprintf(valueBuf, sizeof(valueBuf), "%.1f\xc2\xb0" "C", wd.temp);
     break;
-  case WidgetType::ENV_PRESSURE:
+  case ENVMode::Pressure:
     std::snprintf(valueBuf, sizeof(valueBuf), "%.1f hPa", wd.pressure);
     break;
-  case WidgetType::ENV_HUMIDITY:
+  case ENVMode::Humidity:
     std::snprintf(valueBuf, sizeof(valueBuf), "%d%%", wd.humidity);
     break;
-  case WidgetType::ENV_DEWPOINT: {
+  case ENVMode::Dewpoint: {
     float dp = dewpoint(wd.temp, (float)wd.humidity);
     std::snprintf(valueBuf, sizeof(valueBuf), "%.1f\xc2\xb0" "C", dp);
     break;
@@ -91,17 +91,17 @@ void ENVPanel::onResize(int x, int y, int w, int h) {
 }
 
 REGISTER_WIDGET("env_temp", "ENV Temp", false, false, {
-  return std::make_unique<ENVPanel>(0, 0, 0, 0, deps.fontMgr, deps.deWeatherStore, WidgetType::ENV_TEMP);
+  return std::make_unique<ENVPanel>(0, 0, 0, 0, deps.fontMgr, deps.deWeatherStore, ENVPanel::ENVMode::Temp);
 })
 
 REGISTER_WIDGET("env_pressure", "ENV Pressure", false, false, {
-  return std::make_unique<ENVPanel>(0, 0, 0, 0, deps.fontMgr, deps.deWeatherStore, WidgetType::ENV_PRESSURE);
+  return std::make_unique<ENVPanel>(0, 0, 0, 0, deps.fontMgr, deps.deWeatherStore, ENVPanel::ENVMode::Pressure);
 })
 
 REGISTER_WIDGET("env_humidity", "ENV Humidity", false, false, {
-  return std::make_unique<ENVPanel>(0, 0, 0, 0, deps.fontMgr, deps.deWeatherStore, WidgetType::ENV_HUMIDITY);
+  return std::make_unique<ENVPanel>(0, 0, 0, 0, deps.fontMgr, deps.deWeatherStore, ENVPanel::ENVMode::Humidity);
 })
 
 REGISTER_WIDGET("env_dewpoint", "ENV Dewpoint", false, false, {
-  return std::make_unique<ENVPanel>(0, 0, 0, 0, deps.fontMgr, deps.deWeatherStore, WidgetType::ENV_DEWPOINT);
+  return std::make_unique<ENVPanel>(0, 0, 0, 0, deps.fontMgr, deps.deWeatherStore, ENVPanel::ENVMode::Dewpoint);
 })

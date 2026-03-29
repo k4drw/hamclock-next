@@ -6,7 +6,7 @@
 
 #include <memory>
 
-// ConfigManager.h gives us AppConfig, ConfigManager, and WidgetType in one pull.
+// ConfigManager.h gives us AppConfig and ConfigManager.
 // All factory lambdas need to access deps.appCfg fields, so include fully here.
 #include "../core/ConfigManager.h"
 

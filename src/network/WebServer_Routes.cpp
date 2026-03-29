@@ -31,6 +31,7 @@
 #include "../core/DXClusterData.h"
 #include "../core/LiveSpotData.h"
 #include "../core/SatelliteManager.h"
+#include "../ui/WidgetRegistry.h"
 #include "../network/FrameCapture.h"
 #include "../services/ADIFProvider.h"
 #include "../services/BME280Provider.h"
@@ -169,11 +170,10 @@ void WebServer::registerRoutes(httplib::Server &svr) {
   svr.Get("/api/widgets/available",
           [](const httplib::Request &, httplib::Response &res) {
             nlohmann::json j = nlohmann::json::array();
-            auto all = getAllBaseWidgetTypes();
-            for (auto t : all) {
+            for (auto *d : WidgetRegistry::instance().getAll(false)) {
               nlohmann::json w;
-              w["id"] = widgetTypeToString(t);
-              w["display"] = widgetTypeDisplayName(t);
+              w["id"] = d->typeId;
+              w["display"] = d->displayName;
               j.push_back(w);
             }
             res.set_content(j.dump(), "application/json");
@@ -186,11 +186,13 @@ void WebServer::registerRoutes(httplib::Server &svr) {
             if (panes_) {
               for (const auto &p : *panes_) {
                 nlohmann::json pj;
-                pj["current"] = widgetTypeDisplayName(p->getActiveType());
+                { auto *d = WidgetRegistry::instance().find(p->getActiveType()); pj["current"] = d ? d->displayName : p->getActiveType().c_str(); }
                 pj["paused"] = p->isPaused();
                 nlohmann::json rot = nlohmann::json::array();
-                for (auto t : p->getRotation())
-                  rot.push_back(widgetTypeDisplayName(t));
+                for (const auto &t : p->getRotation()) {
+                  auto *d = WidgetRegistry::instance().find(t);
+                  rot.push_back(d ? d->displayName : t.c_str());
+                }
                 pj["rotation"] = rot;
                 j.push_back(pj);
               }
@@ -330,15 +332,14 @@ void WebServer::registerRoutes(httplib::Server &svr) {
     std::lock_guard<std::mutex> lk(dataMutex_);
     if (panes_ && pIdx >= 0 && pIdx < (int)panes_->size()) {
       auto &pane = (*panes_)[pIdx];
-      std::vector<WidgetType> rot = pane->getRotation();
-      WidgetType target = widgetTypeFromString(wId, WidgetType::SOLAR);
-      auto it = std::find(rot.begin(), rot.end(), target);
+      std::vector<std::string> rot = pane->getRotation();
+      auto it = std::find(rot.begin(), rot.end(), wId);
       if (it != rot.end())
         rot.erase(it);
       else
-        rot.push_back(target);
+        rot.push_back(wId);
       if (rot.empty())
-        rot.push_back(WidgetType::SOLAR);
+        rot.push_back("solar");
       pane->setRotation(rot, cfg_->rotationIntervalS, cfg_->syncRotation);
       if (pIdx == 0)
         cfg_->pane1Rotation = rot;
@@ -478,10 +479,13 @@ void WebServer::registerRoutes(httplib::Server &svr) {
     j["installType"] = HAMCLOCK_INSTALL_TYPE;
 
     nlohmann::json panes = nlohmann::json::array();
-    auto addPane = [&](const std::vector<WidgetType> &rot) {
+    auto addPane = [&](const std::vector<std::string> &rot) {
       nlohmann::json pj;
       nlohmann::json r = nlohmann::json::array();
-      for (auto t : rot) r.push_back(widgetTypeDisplayName(t));
+      for (const auto &t : rot) {
+        auto *d = WidgetRegistry::instance().find(t);
+        r.push_back(d ? d->displayName : t.c_str());
+      }
       pj["rotation"] = r;
       panes.push_back(pj);
     };
@@ -662,17 +666,18 @@ void WebServer::registerRoutes(httplib::Server &svr) {
       }
     }
 
-    auto parsePane = [&](const std::string &val, std::vector<WidgetType> &rot) {
+    auto parsePane = [&](const std::string &val, std::vector<std::string> &rot) {
       if (val.empty())
         return;
       rot.clear();
       std::stringstream ss(val);
       std::string id;
       while (std::getline(ss, id, ',')) {
-        rot.push_back(widgetTypeFromString(id, WidgetType::SOLAR));
+        if (!id.empty())
+          rot.push_back(id);
       }
       if (rot.empty())
-        rot.push_back(WidgetType::SOLAR);
+        rot.push_back("solar");
     };
     if (req.has_param("pane0"))
       parsePane(req.get_param_value("pane0"), cfg_->pane1Rotation);
@@ -699,17 +704,17 @@ void WebServer::registerRoutes(httplib::Server &svr) {
     if (req.has_param("side_panel_mode")) {
       std::string m = req.get_param_value("side_panel_mode");
       if (m == "dx_cluster") {
-        cfg_->pane5Rotation = {WidgetType::DX_CLUSTER};
+        cfg_->pane5Rotation = {"dx_cluster"};
         cfg_->pane6Rotation = {};
       } else if (m == "on_the_air") {
-        cfg_->pane5Rotation = {WidgetType::ON_THE_AIR};
+        cfg_->pane5Rotation = {"on_the_air"};
         cfg_->pane6Rotation = {};
       } else if (m == "live_spots") {
-        cfg_->pane5Rotation = {WidgetType::LIVE_SPOTS};
+        cfg_->pane5Rotation = {"live_spots"};
         cfg_->pane6Rotation = {};
       } else {
-        cfg_->pane5Rotation = {WidgetType::DE_INFO};
-        cfg_->pane6Rotation = {WidgetType::DX_INFO};
+        cfg_->pane5Rotation = {"de_info"};
+        cfg_->pane6Rotation = {"dx_info"};
       }
     }
     if (req.has_param("panel_mode"))
@@ -2203,8 +2208,10 @@ void WebServer::registerRoutes(httplib::Server &svr) {
             auto &pane = (*panes_)[idx];
             std::ostringstream oss;
             oss << "Active  " << pane->getDisplayName() << "\n";
-            for (auto t : pane->getRotation())
-              oss << "Widget  " << widgetTypeDisplayName(t) << "\n";
+            for (const auto &t : pane->getRotation()) {
+              auto *d = WidgetRegistry::instance().find(t);
+              oss << "Widget  " << (d ? d->displayName : t.c_str()) << "\n";
+            }
             res.set_content(oss.str(), "text/plain");
           });
 
@@ -2262,20 +2269,17 @@ void WebServer::registerRoutes(httplib::Server &svr) {
           pane->forceAdvance();
         } else if (action == "add" && !widget.empty()) {
           auto rot = pane->getRotation();
-          WidgetType wt = widgetTypeFromString(widget, WidgetType::SOLAR);
-          if (std::find(rot.begin(), rot.end(), wt) == rot.end()) {
-            rot.push_back(wt);
+          if (std::find(rot.begin(), rot.end(), widget) == rot.end()) {
+            rot.push_back(widget);
             pane->setRotation(rot, cfg_->rotationIntervalS, cfg_->syncRotation);
           }
         } else if (action == "remove" && !widget.empty()) {
           auto rot = pane->getRotation();
-          WidgetType wt = widgetTypeFromString(widget, WidgetType::SOLAR);
-          rot.erase(std::remove(rot.begin(), rot.end(), wt), rot.end());
+          rot.erase(std::remove(rot.begin(), rot.end(), widget), rot.end());
           if (!rot.empty())
             pane->setRotation(rot, cfg_->rotationIntervalS, cfg_->syncRotation);
         } else if (action == "solo" && !widget.empty()) {
-          WidgetType wt = widgetTypeFromString(widget, WidgetType::SOLAR);
-          pane->setRotation({wt}, cfg_->rotationIntervalS, cfg_->syncRotation);
+          pane->setRotation({widget}, cfg_->rotationIntervalS, cfg_->syncRotation);
           pane->forceAdvance();
         }
         res.set_content("ok", "text/plain");
@@ -2286,8 +2290,8 @@ void WebServer::registerRoutes(httplib::Server &svr) {
     nlohmann::json j;
 
     nlohmann::json wArr = nlohmann::json::array();
-    for (WidgetType wt : getAllBaseWidgetTypes())
-      wArr.push_back(widgetTypeToString(wt));
+    for (auto *d : WidgetRegistry::instance().getAll(false))
+      wArr.push_back(d->typeId);
     j["widgets"] = wArr;
 
     j["projections"] =

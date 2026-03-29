@@ -19,6 +19,8 @@ public:
   bool onMouseWheel(int scrollY) override;
 
   std::string getName() const override { return "WeatherAlerts"; }
+  const char *typeId() const override { return "alerts"; }
+  std::string getDisplayName() const override { return "WX Alerts"; }
 
 private:
   SDL_Color severityColor(const std::string &severity) const;

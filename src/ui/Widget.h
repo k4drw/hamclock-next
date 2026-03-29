@@ -77,6 +77,9 @@ public:
   // Semantic Debug API
   virtual std::string getName() const { return "Widget"; }
   virtual std::string getDisplayName() const { return ""; }
+  virtual const char *typeId() const { return ""; }
+  virtual bool isScrollable() const { return false; }
+  virtual bool requiresConfigKey() const { return false; }
   virtual std::vector<std::string> getActions() const { return {}; }
   virtual bool performAction(const std::string &action) {
     (void)action;
