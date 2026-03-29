@@ -87,6 +87,17 @@ void SatWidget::render(SDL_Renderer *renderer) {
                                  trackButtonRect_.y + trackButtonRect_.h / 2,
                                  isTracking ? themes.bg : themes.text, FontStyle::Tiny, true, false, true);
 
+    // "Sel" button (to the left of Pth): opens satellite selection menu
+    selBtnRect_ = {x_ + width_ - 3 * headerH - 4 - maxBtnReserve, y_, headerH, headerH};
+    SDL_SetRenderDrawColor(renderer, themes.rowStripe1.r, themes.rowStripe1.g, themes.rowStripe1.b, 255);
+    SDL_RenderFillRect(renderer, &selBtnRect_);
+    SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
+    SDL_RenderDrawRect(renderer, &selBtnRect_);
+    fontMgr_.catalog()->drawText(renderer, "Sel",
+                                 selBtnRect_.x + selBtnRect_.w / 2,
+                                 selBtnRect_.y + selBtnRect_.h / 2,
+                                 themes.text, FontStyle::Tiny, true, false, true);
+
     // Map "Pth" button (to the left of Trk): toggles satellite ground track
     mapTrackBtnRect_ = {x_ + width_ - 2 * headerH - 2 - maxBtnReserve, y_, headerH, headerH};
     SDL_Color pathBg = mapTrackVisible_ ? themes.accent : themes.rowStripe1;
@@ -158,18 +169,17 @@ bool SatWidget::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
     return true;
   }
 
-  // Forward to satPanel first (catches internal buttons)
-  if (satPanel_.onMouseUp(mx, my, mod, clicks))
-    return true;
-
-  // Upper 10% header — open satellite list
-  int headerH = std::max(1, height_ / 10);
-  if (my < y_ + headerH) {
+  // Sel button: opens satellite selection menu
+  if (selBtnRect_.w > 0 &&
+      mx >= selBtnRect_.x && mx <= selBtnRect_.x + selBtnRect_.w &&
+      my >= selBtnRect_.y && my <= selBtnRect_.y + selBtnRect_.h) {
     openMenu();
     return true;
   }
 
-  return false;
+  // Forward to satPanel (catches internal buttons); return false for unhandled
+  // clicks so PaneContainer title-bar logic (widget selection) can fire
+  return satPanel_.onMouseUp(mx, my, mod, clicks);
 }
 
 bool SatWidget::onMouseDown(int mx, int my, Uint16 mod, int clicks) {
@@ -389,10 +399,8 @@ std::vector<std::string> SatWidget::getActions() const {
 }
 
 SDL_Rect SatWidget::getActionRect(const std::string &action) const {
-  if (action == "open_menu") {
-    int headerH = std::max(1, height_ / 10);
-    return {x_, y_, width_, headerH};
-  }
+  if (action == "open_menu")
+    return selBtnRect_;
   if (action == "track")
     return trackButtonRect_;
   return {0, 0, 0, 0};

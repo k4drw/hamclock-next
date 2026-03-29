@@ -113,6 +113,7 @@ private:
 
   SDL_Rect trackButtonRect_ = {0, 0, 0, 0};
   SDL_Rect mapTrackBtnRect_ = {0, 0, 0, 0};
+  SDL_Rect selBtnRect_      = {0, 0, 0, 0};
   bool mapTrackVisible_ = true;
 
   SatChangedCb onSatChanged_;

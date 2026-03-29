@@ -1023,24 +1023,6 @@ DashboardContext::DashboardContext(AppContext &ctx)
   auto onPaneSelectionRequested = [&, allTypes](int paneIdx, int mx, int my) {
     (void)mx;
     (void)my;
-    if (paneIdx == 4 || paneIdx == 5) {
-      // Side-panel mode picker: choose among the 4 supported modes
-      static const std::vector<WidgetType> sideAvail = {
-          WidgetType::DE_INFO, WidgetType::DX_CLUSTER, WidgetType::ON_THE_AIR,
-          WidgetType::LIVE_SPOTS};
-      auto rot4 = panes[4]->getRotation();
-      WidgetType cur4 = rot4.empty() ? WidgetType::DE_INFO : rot4[0];
-      // Normalize: DX_INFO in pane5 → show DE_INFO as current selection
-      std::vector<WidgetType> sideCurrent = {cur4};
-      widgetSelector->show(
-          4, sideAvail, sideCurrent, {},
-          [this, &ctx](int /*idx*/, const std::vector<WidgetType> &sel) {
-            if (!sel.empty())
-              this->applySidePanelMode(sel[0], ctx);
-          },
-          /*singleSelect=*/true);
-      return;
-    }
     std::vector<WidgetType> available = allTypes;
     if (!ctx.bmeProvider->isAvailable()) {
       available.erase(std::remove_if(available.begin(), available.end(),
@@ -1072,6 +1054,21 @@ DashboardContext::DashboardContext(AppContext &ctx)
         [&ctx, this](int idx, const std::vector<WidgetType> &finalSelection) {
           panes[idx]->setRotation(finalSelection, ctx.appCfg.rotationIntervalS,
                                   ctx.appCfg.syncRotation);
+          // When pane 6 occupancy changes, update side-panel layout
+          if (idx == 5) {
+            bool pane6Empty = panes[5]->getRotation().empty();
+            layout.removeWidget(panes[5].get());
+            if (!pane6Empty) {
+              layout.addWidget(Zone::SidePanel, panes[5].get());
+            } else {
+              panes[5]->onResize(0, 0, 0, 0);
+            }
+            if (FIDELITY_MODE)
+              layout.recalculate(LOGICAL_WIDTH, LOGICAL_HEIGHT,
+                                 ctx.layLogicalOffX, ctx.layLogicalOffY);
+            else
+              layout.recalculate(ctx.globalWinW, ctx.globalWinH);
+          }
           ctx.appCfg.pane1Rotation = panes[0]->getRotation();
           ctx.appCfg.pane2Rotation = panes[1]->getRotation();
           ctx.appCfg.pane3Rotation = panes[2]->getRotation();

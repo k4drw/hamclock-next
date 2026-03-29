@@ -182,11 +182,19 @@ bool SetupScreen::onMouseDown(int mx, int my, Uint16 mod, int clicks) {
       }
     }
 
-    // 1b. "None" option for pane 6 (clears pane6 rotation → pane5 fills full height)
-    if (noneOptionRect_.w > 0 &&
-        mx >= noneOptionRect_.x && mx < noneOptionRect_.x + noneOptionRect_.w &&
-        my >= noneOptionRect_.y && my < noneOptionRect_.y + noneOptionRect_.h) {
-      paneRotations_[5].clear();
+    // 1b. "Full Height" checkbox for pane 5
+    if (activePane_ == 4 && fullHeightCheckRect_.w > 0 &&
+        mx >= fullHeightCheckRect_.x && mx < fullHeightCheckRect_.x + fullHeightCheckRect_.w &&
+        my >= fullHeightCheckRect_.y && my < fullHeightCheckRect_.y + fullHeightCheckRect_.h) {
+      pane5FullHeight_ = !pane5FullHeight_;
+      if (pane5FullHeight_) {
+        paneRotations_[5].clear();
+        auto &p5 = paneRotations_[4];
+        p5.erase(std::remove_if(p5.begin(), p5.end(),
+                                [](WidgetType t) { return !widgetTypeIsScrollable(t); }),
+                 p5.end());
+      }
+      widgetListScrollOffset_ = 0;
       return true;
     }
 
@@ -241,22 +249,6 @@ bool SetupScreen::onMouseDown(int mx, int my, Uint16 mod, int clicks) {
       return true;
     }
 
-    // 6. Side Panel Presets (entries 0-3 are actionable; entry 4 "Custom" is read-only)
-    static const WidgetType kMode5[] = {
-        WidgetType::DE_INFO, WidgetType::DX_CLUSTER, WidgetType::ON_THE_AIR,
-        WidgetType::LIVE_SPOTS};
-    for (int i = 0; i < 4; ++i) {
-      auto &sr = sidePanelModeRects_[i];
-      if (sr.w > 0 && mx >= sr.x && mx < sr.x + sr.w && my >= sr.y &&
-          my < sr.y + sr.h) {
-        paneRotations_[4] = {kMode5[i]};
-        paneRotations_[5] = (i == 0)
-                                ? std::vector<WidgetType>{WidgetType::DX_INFO}
-                                : std::vector<WidgetType>{};
-        return true;
-      }
-    }
-    // sidePanelModeRects_[4] = "Custom" — clicking it is a no-op (visual indicator only)
   } else if (activeTab_ == Tab::Watchlist) {
     // Input field focus
     if (hitField(watchlistInputRect_, 0, &watchlistInputField_))

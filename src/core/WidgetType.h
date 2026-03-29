@@ -438,6 +438,22 @@ inline WidgetType widgetTypeFromString(const std::string &s,
   return fallback;
 }
 
+inline bool widgetTypeIsScrollable(WidgetType t) {
+  switch (t) {
+    case WidgetType::CALENDAR:
+    case WidgetType::CONTESTS:
+    case WidgetType::DX_CLUSTER:
+    case WidgetType::DX_PEDITIONS:
+    case WidgetType::FORECAST:
+    case WidgetType::GREYLINE_DX:
+    case WidgetType::LIVE_SPOTS:
+    case WidgetType::ON_THE_AIR:
+      return true;
+    default:
+      return false;
+  }
+}
+
 inline std::vector<WidgetType> getAllBaseWidgetTypes() {
   return {
       WidgetType::ADIF,         WidgetType::ALERTS,

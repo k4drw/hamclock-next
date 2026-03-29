@@ -171,8 +171,8 @@ private:
   int widgetListStartY_ = 0;
   int widgetListEndY_ = 0;
   int widgetListMaxScroll_ = 0;
-  SDL_Rect sidePanelModeRects_[5] = {};  // 0-3 actionable; 4 = read-only "Custom"
-  SDL_Rect noneOptionRect_ = {0, 0, 0, 0};  // pane6 "None / full height" click target
+  SDL_Rect fullHeightCheckRect_ = {0, 0, 0, 0};  // pane 5 "Full Height" checkbox
+  bool pane5FullHeight_ = false;
   int activePane_ = 0;
   int activeField_ = 0;
   bool complete_ = false;

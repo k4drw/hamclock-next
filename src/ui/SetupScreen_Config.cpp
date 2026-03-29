@@ -104,6 +104,12 @@ void SetupScreen::setConfig(const AppConfig &cfg) {
   paneRotations_[3] = cfg.pane4Rotation;
   paneRotations_[4] = cfg.pane5Rotation;
   paneRotations_[5] = cfg.pane6Rotation;
+  {
+    bool allScrollable = !cfg.pane5Rotation.empty();
+    for (auto t : cfg.pane5Rotation)
+      if (!widgetTypeIsScrollable(t)) { allScrollable = false; break; }
+    pane5FullHeight_ = cfg.pane6Rotation.empty() && allScrollable;
+  }
 
   colorOverrides_ = cfg.colorOverrides;
 
