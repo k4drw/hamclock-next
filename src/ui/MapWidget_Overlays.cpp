@@ -57,26 +57,54 @@ void MapWidget::renderMarker(SDL_Renderer *renderer, double lat, double lon,
     radius = std::max(4.0f, std::min(mapRect_.w, mapRect_.h) / 60.0f);
   } else if (shape == MarkerShape::Circle) {
     radius = std::max(3.0f, std::min(mapRect_.w, mapRect_.h) / 80.0f);
+  } else if (shape == MarkerShape::Triangle) {
+    radius = std::max(5.0f, std::min(mapRect_.w, mapRect_.h) / 50.0f);
+    if (r == 255 && g == 255 && b == 0) radius *= 1.25f;
   } else {
     radius = 2.0f;
   }
 
-  SDL_Texture *tex = texMgr_.get(
-      shape == MarkerShape::Circle ? "marker_circle" : "marker_square");
-  if (tex) {
-    if (outline) {
-      // Draw a slightly larger black version as outline
-      float oRad = radius + 1.0f;
-      SDL_FRect oDst = {pt.x - oRad, pt.y - oRad, oRad * 2, oRad * 2};
-      SDL_SetTextureColorMod(tex, 0, 0, 0);
-      SDL_SetTextureAlphaMod(tex, 255);
-      SDL_RenderCopyF(renderer, tex, nullptr, &oDst);
-    }
+  if (shape == MarkerShape::Triangle) {
+    texMgr_.generateWhiteTexture(renderer);
+    SDL_Texture *whiteTex = texMgr_.get("white");
+    if (!whiteTex) return;
 
-    SDL_FRect dst = {pt.x - radius, pt.y - radius, radius * 2, radius * 2};
-    SDL_SetTextureColorMod(tex, r, g, b);
-    SDL_SetTextureAlphaMod(tex, 255);
-    SDL_RenderCopyF(renderer, tex, nullptr, &dst);
+    if (outline) {
+      float oRad = radius + 1.2f;
+      SDL_Vertex verts[3] = {
+        {{pt.x, pt.y - oRad}, {0, 0, 0, 255}, {0,0}},
+        {{pt.x - 0.9f * oRad, pt.y + 0.5f * oRad}, {0, 0, 0, 255}, {0,0}},
+        {{pt.x + 0.9f * oRad, pt.y + 0.5f * oRad}, {0, 0, 0, 255}, {0,0}}
+      };
+      int indices[3] = {0, 1, 2};
+      SDL_RenderGeometry(renderer, whiteTex, verts, 3, indices, 3);
+    }
+    SDL_Vertex verts[3] = {
+      {{pt.x, pt.y - radius}, {r, g, b, 255}, {0,0}},
+      {{pt.x - 0.9f * radius, pt.y + 0.5f * radius}, {r, g, b, 255}, {0,0}},
+      {{pt.x + 0.9f * radius, pt.y + 0.5f * radius}, {r, g, b, 255}, {0,0}}
+    };
+    int indices[3] = {0, 1, 2};
+    SDL_RenderGeometry(renderer, whiteTex, verts, 3, indices, 3);
+
+  } else {
+    SDL_Texture *tex = texMgr_.get(
+        shape == MarkerShape::Circle ? "marker_circle" : "marker_square");
+    if (tex) {
+      if (outline) {
+        // Draw a slightly larger black version as outline
+        float oRad = radius + 1.0f;
+        SDL_FRect oDst = {pt.x - oRad, pt.y - oRad, oRad * 2, oRad * 2};
+        SDL_SetTextureColorMod(tex, 0, 0, 0);
+        SDL_SetTextureAlphaMod(tex, 255);
+        SDL_RenderCopyF(renderer, tex, nullptr, &oDst);
+      }
+
+      SDL_FRect dst = {pt.x - radius, pt.y - radius, radius * 2, radius * 2};
+      SDL_SetTextureColorMod(tex, r, g, b);
+      SDL_SetTextureAlphaMod(tex, 255);
+      SDL_RenderCopyF(renderer, tex, nullptr, &dst);
+    }
   }
 }
 
@@ -1102,11 +1130,11 @@ void MapWidget::renderBeacons(SDL_Renderer *renderer) {
 
     if (isTransmitting) {
       // Bright Yellow for transmitting
-      renderMarker(renderer, b.lat, b.lon, 255, 255, 0, MarkerShape::Circle,
+      renderMarker(renderer, b.lat, b.lon, 255, 255, 0, MarkerShape::Triangle,
                    true);
     } else {
       // Dim Gray for idle
-      renderMarker(renderer, b.lat, b.lon, 100, 100, 100, MarkerShape::Circle,
+      renderMarker(renderer, b.lat, b.lon, 100, 100, 100, MarkerShape::Triangle,
                    true);
     }
   }

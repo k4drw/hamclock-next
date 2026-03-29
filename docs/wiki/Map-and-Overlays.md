@@ -114,7 +114,7 @@ Weather overlays can be displayed independently of propagation overlays.
 
 ## Beacon Markers
 
-When enabled (`showBeacons: true`), the NCDXF/IBP international beacon network transmitter sites are shown as markers on the map. The currently transmitting beacon is highlighted.
+When the NCDXF widget is active in any pane, the NCDXF/IBP international beacon network transmitter sites are shown as triangle markers on the map. The currently transmitting beacon is highlighted in bright yellow, while idle beacons are shown in dim gray.
 
 ---
 
