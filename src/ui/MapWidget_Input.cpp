@@ -334,7 +334,48 @@ void MapWidget::onMouseMove(int mx, int my) {
     }
   }
 
-  // 8. Fallback to Country lookup
+  // 8. Check Live Spots (generic ones on map)
+  if (tip.empty() && spotStore_) {
+    auto data = spotStore_->snapshot();
+    bool ofDe = config_.liveSpotsOfDe;
+    bool useCall = config_.liveSpotsUseCall;
+    std::string myLabel = useCall ? config_.callsign : config_.grid;
+    if (myLabel.empty()) myLabel = "DE";
+
+    for (const auto &spot : data->spots) {
+      double rLat, rLon;
+      if (Astronomy::gridToLatLon(spot.receiverGrid, rLat, rLon)) {
+        if (screenDist(rLat, rLon) < kHitRadius) {
+          if (ofDe) {
+            // I (or my grid) spot THEM
+            tip = spot.senderCallsign + " de " + myLabel;
+          } else {
+            // THEY spot ME (or my grid)
+            tip = myLabel + " de " + spot.senderCallsign;
+          }
+
+          int bi = freqToBandIndex(spot.freqKhz);
+          char buf[64];
+          std::snprintf(buf, sizeof(buf), "\n%.1f kHz", spot.freqKhz);
+          tip += buf;
+          if (bi >= 0)
+            tip += std::string(" (") + kBands[bi].name + ")";
+
+          // Add Country name
+          int row = std::clamp((int)((rLat + 90.0) * 2.0), 0, 359);
+          int col = std::clamp((int)((rLon + 180.0) * 2.0), 0, 719);
+          uint16_t cId = COUNTRY_GRID[row][col];
+          if (cId > 0 && cId < NUM_COUNTRIES) {
+            tip += "\n" + std::string(COUNTRY_NAMES[cId]);
+          }
+
+          break;
+        }
+      }
+    }
+  }
+
+  // 9. Fallback to Country lookup
   if (tip.empty()) {
     int row = std::clamp((int)((lat + 90.0) * 2.0), 0, 359);
     int col = std::clamp((int)((lon + 180.0) * 2.0), 0, 719);
