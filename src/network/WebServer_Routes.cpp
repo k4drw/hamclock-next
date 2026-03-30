@@ -845,7 +845,7 @@ void WebServer::registerRoutes(httplib::Server &svr) {
     j["uptime"] =
         std::to_string(std::chrono::duration_cast<std::chrono::seconds>(
                            std::chrono::system_clock::now() - startTime_)
-                           .count())
+                           .count()) +
         "s";
     j["power"] =
         displayPower_ ? (displayPower_->getPower() ? "on" : "off") : "unknown";
@@ -1199,7 +1199,7 @@ void WebServer::registerRoutes(httplib::Server &svr) {
       fetch('/live/wheel?y=' + (e.deltaY > 0 ? -1 : 1));
     }, {passive: false});
     document.addEventListener('keydown', e => {
-      fetch('/live/key?key=' + encodeURIComponent(e.key)
+      fetch('/live/key?key=' + encodeURIComponent(e.key) +
             '&ctrl=' + (e.ctrlKey ? 1 : 0) + '&shift=' + (e.shiftKey ? 1 : 0));
     });
     img.addEventListener('mousemove', e => {
@@ -1386,7 +1386,7 @@ void WebServer::registerRoutes(httplib::Server &svr) {
               return sink.is_writable();
             seq = outSeq;
             std::string hdr =
-                "--hamclock\r\nContent-Type: image/jpeg\r\nContent-Length: "
+                "--hamclock\r\nContent-Type: image/jpeg\r\nContent-Length: " +
                 std::to_string(frame.size()) + "\r\n\r\n";
             if (!sink.write(hdr.data(), hdr.size()))
               return false;
@@ -1426,7 +1426,7 @@ void WebServer::registerRoutes(httplib::Server &svr) {
               return sink.is_writable();
             seq = outSeq;
             std::string hdr =
-                "--hamclock\r\nContent-Type: image/jpeg\r\nContent-Length: "
+                "--hamclock\r\nContent-Type: image/jpeg\r\nContent-Length: " +
                 std::to_string(frame.size()) + "\r\n\r\n";
             if (!sink.write(hdr.data(), hdr.size()))
               return false;
