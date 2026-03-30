@@ -71,70 +71,113 @@ void CalendarPanel::render(SDL_Renderer *renderer) {
                   FontStyle::Caption, true);
     numRows_ = 0;
   } else {
-    int n = static_cast<int>(upcoming_.size());
-    int rowH = std::max(20, availH / n);
+    // Generate rows (headers + events)
+    rows_.clear();
+    int lastY = -1, lastM = -1, lastD = -1;
+    time_t nowT = std::time(nullptr);
+    struct tm nowTm {};
+    Astronomy::portable_gmtime(&nowT, &nowTm);
+
+    for (size_t i = 0; i < upcoming_.size(); ++i) {
+      const CalendarEvent &ev = upcoming_[i];
+      struct tm startTm {};
+      Astronomy::portable_gmtime(&ev.start, &startTm);
+
+      if (startTm.tm_year != lastY || startTm.tm_mon != lastM ||
+          startTm.tm_mday != lastD) {
+        lastY = startTm.tm_year;
+        lastM = startTm.tm_mon;
+        lastD = startTm.tm_mday;
+
+        char buf[32];
+        if (lastY == nowTm.tm_year && lastM == nowTm.tm_mon &&
+            lastD == nowTm.tm_mday) {
+          std::snprintf(buf, sizeof(buf), "Today");
+        } else {
+          time_t tomorrow = nowT + 24 * 3600;
+          struct tm tomTm {};
+          Astronomy::portable_gmtime(&tomorrow, &tomTm);
+          if (lastY == tomTm.tm_year && lastM == tomTm.tm_mon &&
+              lastD == tomTm.tm_mday) {
+            std::snprintf(buf, sizeof(buf), "Tomorrow");
+          } else {
+            static const char *months[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                                            "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+            std::snprintf(buf, sizeof(buf), "%s %d", months[lastM % 12], lastD);
+          }
+        }
+        rows_.push_back({true, -1, buf});
+      }
+      rows_.push_back({false, static_cast<int>(i), ""});
+    }
+
+    int nRows = static_cast<int>(rows_.size());
+    int rowH = std::max(18, availH / nRows);
     int maxRows = availH / rowH;
-    int drawn = std::min(n, maxRows);
+    int drawnRows = std::min(nRows, maxRows);
 
     // Store geometry for onMouseMove
     firstRowY_ = y_ + titleH + pad;
     lastRowH_ = rowH;
-    numRows_ = drawn;
+    numRows_ = drawnRows;
 
     int rowY = firstRowY_;
-    for (int i = 0; i < drawn; ++i) {
-      const CalendarEvent &ev = upcoming_[i];
-
-      bool alreadyStarted = (ev.start <= nowT && ev.end > nowT);
-      bool active = alreadyStarted;
-      bool soon = (!active && ev.start > nowT && ev.start - nowT < 15 * 60);
-
-      // Voice alert when event first enters the "soon" window (dedup by start time)
-      if (soon && spokenEventStarts_.find(ev.start) == spokenEventStarts_.end()) {
-        spokenEventStarts_.insert(ev.start);
-        SoundManager::getInstance().speak("Upcoming: " + ev.summary);
-      }
-
-      // Time label
-      char timeBuf[16];
-      if (alreadyStarted && !ev.allDay) {
-        std::snprintf(timeBuf, sizeof(timeBuf), "Active");
-      } else if (ev.allDay) {
-        struct tm evDay{};
-        struct tm todayTm{};
-        Astronomy::portable_gmtime(&ev.start, &evDay);
-        Astronomy::portable_gmtime(&nowT, &todayTm);
-        bool isToday = (evDay.tm_year == todayTm.tm_year &&
-                        evDay.tm_mon == todayTm.tm_mon &&
-                        evDay.tm_mday == todayTm.tm_mday);
-        if (isToday) {
-          std::snprintf(timeBuf, sizeof(timeBuf), "All day");
-        } else {
-          std::snprintf(timeBuf, sizeof(timeBuf), "%d/%d", evDay.tm_mon + 1,
-                        evDay.tm_mday);
-        }
-      } else {
-        struct tm t{};
-        Astronomy::portable_gmtime(&ev.start, &t);
-        std::snprintf(timeBuf, sizeof(timeBuf), "%02d:%02dZ", t.tm_hour,
-                      t.tm_min);
-      }
-
-      SDL_Color rowCol = active ? themes.accent
-                         : soon ? SDL_Color{255, 200, 0, 255}
-                                : themes.text;
-
+    for (int i = 0; i < drawnRows; ++i) {
+      const RenderedRow &row = rows_[i];
       int textY = rowY + rowH / 2 - 6;
-      cat->drawText(renderer, timeBuf, x_ + pad, textY, themes.textDim,
-                    FontStyle::Micro);
 
-      // Summary (truncated to fit remaining width)
-      std::string summary = ev.summary;
-      if (summary.size() > 28)
-        summary = summary.substr(0, 27) + "\xe2\x80\xa6";
-      cat->drawText(renderer, summary.c_str(), x_ + pad + 54, textY, rowCol,
-                    FontStyle::Caption);
+      if (row.isHeader) {
+        cat->drawText(renderer, row.label.c_str(), x_ + pad, textY, themes.accent,
+                      FontStyle::MicroBold);
+      } else {
+        const CalendarEvent &ev = upcoming_[row.eventIdx];
 
+        bool alreadyStarted = (ev.start <= nowT && ev.end > nowT);
+        bool active = alreadyStarted;
+        bool soon = (!active && ev.start > nowT && ev.start - nowT < 15 * 60);
+
+        // Voice alert when event first enters the "soon" window (dedup by start time)
+        if (soon && spokenEventStarts_.find(ev.start) == spokenEventStarts_.end()) {
+          spokenEventStarts_.insert(ev.start);
+          SoundManager::getInstance().speak("Upcoming: " + ev.summary);
+        }
+
+        // Time label
+        char timeBuf[16];
+        if (alreadyStarted && !ev.allDay) {
+          std::snprintf(timeBuf, sizeof(timeBuf), "Active");
+        } else if (ev.allDay) {
+          struct tm evDay {};
+          Astronomy::portable_gmtime(&ev.start, &evDay);
+          bool isToday = (evDay.tm_year == nowTm.tm_year &&
+                          evDay.tm_mon == nowTm.tm_mon &&
+                          evDay.tm_mday == nowTm.tm_mday);
+          if (isToday) {
+            std::snprintf(timeBuf, sizeof(timeBuf), "All day");
+          } else {
+            std::snprintf(timeBuf, sizeof(timeBuf), "%d/%d", evDay.tm_mon + 1,
+                          evDay.tm_mday);
+          }
+        } else {
+          struct tm t {};
+          Astronomy::portable_gmtime(&ev.start, &t);
+          std::snprintf(timeBuf, sizeof(timeBuf), "%02d:%02dZ", t.tm_hour, t.tm_min);
+        }
+
+        SDL_Color rowCol = active ? themes.accent
+                                  : soon ? SDL_Color{255, 200, 0, 255}
+                                         : themes.text;
+
+        cat->drawText(renderer, timeBuf, x_ + pad, textY, themes.textDim,
+                      FontStyle::Micro);
+
+        // Summary (truncated to fit)
+        std::string summary = ev.summary;
+        if (summary.size() > 28)
+          summary = summary.substr(0, 27) + "\xe2\x80\xa6";
+        cat->drawText(renderer, summary.c_str(), x_ + pad + 54, textY, rowCol,
+                      FontStyle::Caption);
+      }
       rowY += rowH;
     }
   }
@@ -358,11 +401,11 @@ void CalendarPanel::onMouseMove(int mx, int my) {
     return;
   }
   int idx = (my - firstRowY_) / lastRowH_;
-  if (idx < 0 || idx >= numRows_) {
+  if (idx < 0 || idx >= numRows_ || rows_[idx].isHeader) {
     tooltip_.visible = false;
     return;
   }
-  const CalendarEvent &ev = upcoming_[idx];
+  const CalendarEvent &ev = upcoming_[rows_[idx].eventIdx];
 
   // Line 1: full summary
   tooltip_.text = ev.summary.substr(0, 22) + "\xe2\x80\xa6";

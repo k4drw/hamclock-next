@@ -174,6 +174,7 @@ void WebServer::registerRoutes(httplib::Server &svr) {
               nlohmann::json w;
               w["id"] = d->typeId;
               w["display"] = d->displayName;
+              w["isScrollable"] = d->isScrollable;
               j.push_back(w);
             }
             res.set_content(j.dump(), "application/json");
@@ -701,22 +702,6 @@ void WebServer::registerRoutes(httplib::Server &svr) {
       cfg_->auxClockStarMode =
           StringUtils::safe_stoi(req.get_param_value("aux_star_mode"));
 
-    if (req.has_param("side_panel_mode")) {
-      std::string m = req.get_param_value("side_panel_mode");
-      if (m == "dx_cluster") {
-        cfg_->pane5Rotation = {"dx_cluster"};
-        cfg_->pane6Rotation = {};
-      } else if (m == "on_the_air") {
-        cfg_->pane5Rotation = {"on_the_air"};
-        cfg_->pane6Rotation = {};
-      } else if (m == "live_spots") {
-        cfg_->pane5Rotation = {"live_spots"};
-        cfg_->pane6Rotation = {};
-      } else {
-        cfg_->pane5Rotation = {"de_info"};
-        cfg_->pane6Rotation = {"dx_info"};
-      }
-    }
     if (req.has_param("panel_mode"))
       cfg_->panelMode = req.get_param_value("panel_mode");
     if (req.has_param("selected_satellite"))
@@ -860,7 +845,7 @@ void WebServer::registerRoutes(httplib::Server &svr) {
     j["uptime"] =
         std::to_string(std::chrono::duration_cast<std::chrono::seconds>(
                            std::chrono::system_clock::now() - startTime_)
-                           .count()) +
+                           .count())
         "s";
     j["power"] =
         displayPower_ ? (displayPower_->getPower() ? "on" : "off") : "unknown";
@@ -1214,7 +1199,7 @@ void WebServer::registerRoutes(httplib::Server &svr) {
       fetch('/live/wheel?y=' + (e.deltaY > 0 ? -1 : 1));
     }, {passive: false});
     document.addEventListener('keydown', e => {
-      fetch('/live/key?key=' + encodeURIComponent(e.key) +
+      fetch('/live/key?key=' + encodeURIComponent(e.key)
             '&ctrl=' + (e.ctrlKey ? 1 : 0) + '&shift=' + (e.shiftKey ? 1 : 0));
     });
     img.addEventListener('mousemove', e => {
@@ -1401,7 +1386,7 @@ void WebServer::registerRoutes(httplib::Server &svr) {
               return sink.is_writable();
             seq = outSeq;
             std::string hdr =
-                "--hamclock\r\nContent-Type: image/jpeg\r\nContent-Length: " +
+                "--hamclock\r\nContent-Type: image/jpeg\r\nContent-Length: "
                 std::to_string(frame.size()) + "\r\n\r\n";
             if (!sink.write(hdr.data(), hdr.size()))
               return false;
@@ -1441,7 +1426,7 @@ void WebServer::registerRoutes(httplib::Server &svr) {
               return sink.is_writable();
             seq = outSeq;
             std::string hdr =
-                "--hamclock\r\nContent-Type: image/jpeg\r\nContent-Length: " +
+                "--hamclock\r\nContent-Type: image/jpeg\r\nContent-Length: "
                 std::to_string(frame.size()) + "\r\n\r\n";
             if (!sink.write(hdr.data(), hdr.size()))
               return false;

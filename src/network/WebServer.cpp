@@ -453,24 +453,29 @@ void WebServer::run() {
           <div id="pane3-list" class="widget-list"></div>
         </div>
       </div>
-      
-      <div class="section-hdr" style="margin-top:16px">Side Panels (Panes 5 & 6)</div>
-      <label>Mode</label>
-      <select id="side-panel-mode" onchange="toggleSidePanelSettings()">
-        <option value="de_info">DE Info + DX/Sat (2 panes, original)</option>
-        <option value="dx_cluster">DX Cluster (full height)</option>
-        <option value="on_the_air">On The Air (full height)</option>
-        <option value="live_spots">Live Spots (full height)</option>
-      </select>
-      <div id="dx-sat-settings" style="display:none; margin-top:10px; padding:10px; background:#222; border:1px solid var(--dim)">
-        <label>Pane 6 Target</label>
-        <select id="panel-mode" onchange="toggleSatSelect()">
+
+      <div class="section-hdr" style="margin-top:16px">Side Panels</div>
+      <label style="margin-bottom:10px"><input type="checkbox" id="full-height" onchange="toggleFullHeight()"> Full Height (Pane 5 takes both slots)</label>
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px">
+        <div>
+          <label>Pane 5 (Side L)</label>
+          <div id="pane4-list" class="widget-list"></div>
+        </div>
+        <div id="pane5-container">
+          <label>Pane 6 (Side R)</label>
+          <div id="pane5-list" class="widget-list"></div>
+        </div>
+      </div>
+
+      <div id="dx-sat-settings" style="margin-top:12px; padding:10px; background:#222; border:1px solid var(--dim)">
+        <label>Identity Panel Mode</label>
+        <select id="panel-mode" onchange="toggleSatSelect()" style="margin-bottom:0">
           <option value="dx">DX Info</option>
           <option value="sat">Satellite Tracking</option>
         </select>
         <div id="sat-select-container" style="display:none; margin-top:10px;">
           <label>Tracking Satellite</label>
-          <select id="selected-satellite"></select>
+          <select id="selected-satellite" style="margin-bottom:0"></select>
         </div>
       </div>
       
@@ -535,6 +540,7 @@ void WebServer::run() {
     .widget-item { font-size: 0.8em; padding: 2px 4px; cursor: pointer; border-bottom: 1px solid #333; }
     .widget-item:hover { background: #333; }
     .widget-item.active { color: var(--green); font-weight: bold; }
+    .widget-item.disabled { color: #555; cursor: not-allowed; text-decoration: line-through; }
   </style>
 
   <script>
@@ -966,6 +972,9 @@ void WebServer::run() {
         const r3 = await fetch('/api/satellites');
         availableSatellites = await r3.json();
 
+        // Pane 4 (index 3) is a small pane restricted to fixed set of widgets
+        const pane4Allowed = new Set(['NCDXF', 'Solar', 'DX Weather', 'DE Weather', 'Band Cond']);
+
         // Populate satellites
         const satSel = document.getElementById('selected-satellite');
         satSel.innerHTML = '';
@@ -979,39 +988,37 @@ void WebServer::run() {
         document.getElementById('rot-interval').value = c.rotationInterval || 30;
         document.getElementById('sync-rot').checked = !!c.syncRotation;
 
-        // Pane 4 (index 3) is a small pane restricted to 4 widget types
-        const pane4Allowed = new Set(['NCDXF', 'Solar', 'DX Weather', 'DE Weather', 'Band Cond']);
-
-        // Build Pane 1-4 lists
-        for (let i = 0; i < 4; i++) {
+        // Populate Panels 1-6
+        for (let i = 0; i < 6; i++) {
           const list = document.getElementById(`pane${i}-list`);
           list.innerHTML = '';
           const activeRot = c.panes ? (c.panes[i] ? c.panes[i].rotation : []) : [];
-          const widgets = (i === 3) ? availableWidgets.filter(w => pane4Allowed.has(w.display)) : availableWidgets;
+
+          let widgets = availableWidgets;
+          if (i === 3) widgets = availableWidgets.filter(w => pane4Allowed.has(w.display));
+
           widgets.forEach(w => {
             const div = document.createElement('div');
             div.className = 'widget-item' + (activeRot.includes(w.display) ? ' active' : '');
             div.textContent = w.display;
+            div.dataset.id = w.id;
+            div.dataset.scrollable = w.isScrollable ? '1' : '0';
             div.onclick = () => {
+              if (div.classList.contains('disabled')) return;
               div.classList.toggle('active');
             };
-            div.dataset.id = w.id;
             list.appendChild(div);
           });
         }
 
-        // Parse Pane 5/6 config to set "Side Panel Mode"
-        const p4 = (c.panes && c.panes[4] && c.panes[4].rotation.length > 0) ? c.panes[4].rotation[0] : 'DE Info';
-        let spMode = 'de_info';
-        if (p4 === 'DX Cluster') spMode = 'dx_cluster';
-        else if (p4 === 'On The Air') spMode = 'on_the_air';
-        else if (p4 === 'Live Spots') spMode = 'live_spots';
-        document.getElementById('side-panel-mode').value = spMode;
+        // Full Height state
+        const p6Rot = (c.panes && c.panes[5]) ? c.panes[5].rotation : [];
+        document.getElementById('full-height').checked = (p6Rot.length === 0);
+        toggleFullHeight();
 
         document.getElementById('panel-mode').value = c.panelMode || 'dx';
         document.getElementById('selected-satellite').value = c.selectedSatellite || '';
-
-        toggleSidePanelSettings();
+        toggleSatSelect();
 
         // Aux Clock
         const tzOff = c.auxClockTzOffset !== undefined ? c.auxClockTzOffset : 0;
@@ -1031,11 +1038,24 @@ void WebServer::run() {
       } catch(e) {}
     }
 
-    function toggleSidePanelSettings() {
-      const mode = document.getElementById('side-panel-mode').value;
-      const dxSatDiv = document.getElementById('dx-sat-settings');
-      dxSatDiv.style.display = (mode === 'de_info') ? 'block' : 'none';
-      toggleSatSelect();
+    function toggleFullHeight() {
+      const isFull = document.getElementById('full-height').checked;
+      const pane4List = document.getElementById('pane4-list');
+      const pane5List = document.getElementById('pane5-list');
+      const p5Container = document.getElementById('pane5-container');
+
+      p5Container.style.opacity = isFull ? '0.3' : '1';
+      p5Container.style.pointerEvents = isFull ? 'none' : 'auto';
+
+      pane4List.querySelectorAll('.widget-item').forEach(el => {
+        const scrollable = el.dataset.scrollable === '1';
+        el.classList.toggle('disabled', isFull && !scrollable);
+        if (isFull && !scrollable) el.classList.remove('active');
+      });
+
+      if (isFull) {
+        pane5List.querySelectorAll('.widget-item').forEach(el => el.classList.remove('active'));
+      }
     }
 
     function toggleSatSelect() {
@@ -1049,46 +1069,32 @@ void WebServer::run() {
     }
 
     async function saveWidgets() {
-      const panes = [];
-      for (let i = 0; i < 4; i++) {
+      const params = new URLSearchParams({
+        rotation_interval: document.getElementById('rot-interval').value,
+        sync_rotation: document.getElementById('sync-rot').checked ? '1' : '0',
+        panel_mode: document.getElementById('panel-mode').value,
+        selected_satellite: document.getElementById('selected-satellite').value
+      });
+
+      for (let i = 0; i < 6; i++) {
         const active = [];
         document.querySelectorAll(`#pane${i}-list .widget-item.active`).forEach(el => {
           active.push(el.dataset.id);
         });
-        panes.push(active.join(','));
+        params.set(`pane${i}`, active.join(','));
       }
-
-      // Encode side panel mode back to panes 4 & 5
-      const spMode = document.getElementById('side-panel-mode').value;
-      panes[4] = spMode;
-      panes[5] = (spMode === 'de_info') ? 'dx_info' : '';
-
-      const pm = document.getElementById('panel-mode').value;
-      const sat = document.getElementById('selected-satellite').value;
 
       const auxPreset = document.getElementById('aux-tz-preset').value;
-      let auxOffset, auxLabel;
       if (auxPreset.startsWith('custom')) {
-        auxOffset = document.getElementById('aux-tz-offset').value;
-        auxLabel  = document.getElementById('aux-tz-label').value || 'UTC';
+        params.set('aux_tz_offset', document.getElementById('aux-tz-offset').value);
+        params.set('aux_tz_label', document.getElementById('aux-tz-label').value || 'UTC');
       } else {
         const parts = auxPreset.split('|');
-        auxOffset = parts[0];
-        auxLabel  = parts[1];
+        params.set('aux_tz_offset', parts[0]);
+        params.set('aux_tz_label', parts[1]);
       }
-      const auxStarMode = document.getElementById('aux-star-mode').value;
+      params.set('aux_star_mode', document.getElementById('aux-star-mode').value);
 
-      const params = new URLSearchParams({
-        rotation_interval: document.getElementById('rot-interval').value,
-        sync_rotation: document.getElementById('sync-rot').checked ? '1' : '0',
-        pane0: panes[0], pane1: panes[1], pane2: panes[2], pane3: panes[3],
-        side_panel_mode: spMode,
-        panel_mode: pm,
-        selected_satellite: sat,
-        aux_tz_offset: auxOffset,
-        aux_tz_label: auxLabel,
-        aux_star_mode: auxStarMode
-      });
       try {
         const r = await fetch('/set_config?' + params);
         showTabMsg('widgets-msg', await r.text() === 'ok');

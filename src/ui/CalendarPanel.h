@@ -66,8 +66,16 @@ private:
   SDL_Rect dismissIncBtn_ = {};
   SDL_Rect doneBtn_ = {};
 
-  // Cached event list from last render — used by onMouseMove for tooltip
+  struct RenderedRow {
+    bool isHeader;
+    int eventIdx; // -1 if header
+    std::string label;
+  };
+
+  // Cached event list and row map from last render — used by onMouseMove for tooltip
   std::vector<CalendarEvent> upcoming_;
+  std::vector<RenderedRow> rows_;
+
   int firstRowY_ = 0;
   int lastRowH_ = 0;
   int numRows_ = 0;

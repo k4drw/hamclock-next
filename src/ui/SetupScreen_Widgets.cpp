@@ -158,6 +158,16 @@ void SetupScreen::renderTabWidgets(SDL_Renderer *renderer, int cx, int pad,
   for (auto *d : WidgetRegistry::instance().getAll(false))
     kAllTypesVec.push_back(d->typeId);
 
+  // Alphabetize by display name
+  std::sort(kAllTypesVec.begin(), kAllTypesVec.end(),
+            [](const std::string &a, const std::string &b) {
+              auto *da = WidgetRegistry::instance().find(a);
+              auto *db = WidgetRegistry::instance().find(b);
+              const char *na = da ? da->displayName : a.c_str();
+              const char *nb = db ? db->displayName : b.c_str();
+              return std::string(na) < std::string(nb);
+            });
+
   // When pane 5 or 6 is active, reserve one row above the list for the Full Height checkbox
   if (activePane_ == 4 || activePane_ == 5)
     listAvailH = std::max(rowH, listAvailH - rowH);
