@@ -1,35 +1,30 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { ensureIndexed, reindexOne } from "../state.js";
+import { ensureIndexed, reindex } from "../state.js";
 import { findFiles, findSymbols } from "../indexer.js";
 import { formatRepoMap } from "../helpers.js";
 
 export function registerRepoTools(server: McpServer) {
   server.tool(
     "repo_map",
-    "Generate a high-level map/summary of a repository structure.",
-    {
-      repo: z.enum(["original", "next"]).describe("Which repository to map"),
-    },
+    "Generate a high-level map/summary of the hamclock-next repository structure.",
+    {},
     { readOnlyHint: true },
-    async ({ repo }) => {
-      const { original, next } = await ensureIndexed();
-      const index = repo === "original" ? original : next;
+    async () => {
+      const index = await ensureIndexed();
       return { content: [{ type: "text", text: formatRepoMap(index) }] };
     }
   );
 
   server.tool(
     "find_files",
-    "Find files in the repository matching a glob pattern.",
+    "Find files in the hamclock-next repository matching a glob pattern.",
     {
-      repo: z.enum(["original", "next"]).describe("Repository to search"),
       pattern: z.string().describe("Glob pattern (e.g. '*.cpp', 'src/ui/*')"),
     },
     { readOnlyHint: true },
-    async ({ repo, pattern }) => {
-      const { original, next } = await ensureIndexed();
-      const index = repo === "original" ? original : next;
+    async ({ pattern }) => {
+      const index = await ensureIndexed();
       const results = findFiles(index, pattern);
       return {
         content: [
@@ -48,13 +43,11 @@ export function registerRepoTools(server: McpServer) {
     "find_symbols",
     "Find symbols (functions, classes, structs) matching a regex pattern.",
     {
-      repo: z.enum(["original", "next"]).describe("Repository to search"),
       pattern: z.string().describe("Regex pattern for symbol name"),
     },
     { readOnlyHint: true },
-    async ({ repo, pattern }) => {
-      const { original, next } = await ensureIndexed();
-      const index = repo === "original" ? original : next;
+    async ({ pattern }) => {
+      const index = await ensureIndexed();
       const results = findSymbols(index, pattern);
       return {
         content: [
@@ -78,14 +71,12 @@ export function registerRepoTools(server: McpServer) {
 
   server.tool(
     "reindex_repo",
-    "Force re-indexing of a repository.",
-    {
-      repo: z.enum(["original", "next"]).describe("Repository to re-index"),
-    },
+    "Force re-indexing of the hamclock-next repository.",
+    {},
     { readOnlyHint: false, idempotentHint: true },
-    async ({ repo }) => {
-      await reindexOne(repo);
-      return { content: [{ type: "text", text: `Successfully re-indexed ${repo} repository.` }] };
+    async () => {
+      await reindex();
+      return { content: [{ type: "text", text: "Successfully re-indexed hamclock-next repository." }] };
     }
   );
 }

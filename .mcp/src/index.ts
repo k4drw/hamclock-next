@@ -1,11 +1,10 @@
 #!/usr/bin/env node
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { loadParityData, ensureProjectContext } from "./state.js";
+import { ensureProjectContext } from "./state.js";
 
 // Import tool registration functions
 import { registerRepoTools } from "./tools/repo.js";
-import { registerParityTools } from "./tools/parity.js";
 import { registerContributorTools } from "./tools/contributor.js";
 import { registerPropagationTools } from "./tools/propagation.js";
 import { registerScaffoldTools } from "./tools/scaffold.js";
@@ -19,7 +18,6 @@ const server = new McpServer(
 
 // Register all tools
 registerRepoTools(server);
-registerParityTools(server);
 registerContributorTools(server);
 registerPropagationTools(server);
 registerScaffoldTools(server);
@@ -28,21 +26,6 @@ registerDiagnosticTools(server);
 // ---------------------------------------------------------------------------
 // Resources
 // ---------------------------------------------------------------------------
-
-server.resource(
-  "parity_report",
-  "hamclock://parity/report",
-  async (uri) => {
-    const parityData = await loadParityData();
-    return {
-      contents: [{
-        uri: uri.href,
-        text: JSON.stringify(parityData, null, 2),
-        mimeType: "application/json"
-      }]
-    };
-  }
-);
 
 server.resource(
   "project_architecture",

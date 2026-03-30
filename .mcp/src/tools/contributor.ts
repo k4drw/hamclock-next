@@ -2,7 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { existsSync } from "fs";
 import { resolve } from "path";
-import { ensureProjectContext, PROJECT_CONTEXT_PATH, loadParityData, NEXT_PATH } from "../state.js";
+import { ensureProjectContext, PROJECT_CONTEXT_PATH, NEXT_PATH } from "../state.js";
 
 export function registerContributorTools(server: McpServer) {
   server.tool(
@@ -197,7 +197,6 @@ ${pc.philosophy}`);
         "",
         "## Where to Start",
         "Run: `open_issues`                      → see what needs doing",
-        "Run: `parity_list` with status_filter=[\"PARTIAL\",\"MISSING\"]  → see parity gaps",
         "Run: `get_scaffolding_template SolarFlux` → get boilerplate for a new widget",
         "Run: `new_feature_checklist SolarFlux`    → registration checklist for a widget",
         "",
@@ -209,7 +208,6 @@ ${pc.philosophy}`);
       }
       lines.push(
         "- No more than 5 files modified per task (Scope Lock)",
-        "- State parity impact before changing any code",
         "- No refactoring unrelated systems",
         "- No autonomous initiative — implement only what was asked",
         "- After task completion: stop and wait for next instruction",
@@ -258,22 +256,6 @@ ${pc.philosophy}`);
       }
       if (difficulty === "all" || difficulty === "hard") {
         renderGroup("Hard (architectural or multi-system)", "hard");
-      }
-
-      // Also surface PARTIAL/MISSING from parity_v2
-      if (difficulty === "all") {
-        try {
-          const parityData = await loadParityData();
-          const gaps = parityData.features.filter((f: any) => f.status === "PARTIAL" || f.status === "MISSING");
-          if (gaps.length) {
-            lines.push("## Parity Gaps (from parity_v2.json)");
-            for (const f of gaps) {
-              lines.push(`- [ ] **${f.name}** [${f.status}] — ${f.notes}`);
-            }
-          }
-        } catch {
-          // parity data optional
-        }
       }
 
       return { content: [{ type: "text", text: lines.join("\n") }] };
