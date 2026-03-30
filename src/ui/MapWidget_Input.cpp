@@ -98,6 +98,7 @@ bool MapWidget::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
     state_->mapDxGrid = state_->dxGrid;
     state_->mapDxActive = true;
     state_->dxCallsign.clear();
+    state_->dxFreqKhz = 0.0;
 
     // Clear both panel selections so they don't conflict
     if (dxcStore_)

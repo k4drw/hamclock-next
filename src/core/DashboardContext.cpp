@@ -858,6 +858,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
               state->dxCallsign = spot.txCall;
               state->dxLocation = {spot.txLat, spot.txLon};
               state->dxGrid = spot.txGrid;
+              state->dxFreqKhz = spot.freqKhz;
               state->dxActive = (spot.txLat != 0.0 || spot.txLon != 0.0);
               auto ad = activityStore->get();
               ad.hasSelection = false;
@@ -872,6 +873,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
             state->dxActive = false;
           }
           state->dxCallsign.clear();
+          state->dxFreqKhz = 0.0;
         });
       }
     } else if (type == "on_the_air") {
@@ -883,6 +885,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
           state->dxGrid = (spot.lat != 0.0 || spot.lon != 0.0)
                               ? Astronomy::latLonToGrid(spot.lat, spot.lon)
                               : "";
+          state->dxFreqKhz = spot.freqKhz;
           state->dxActive = (spot.lat != 0.0 || spot.lon != 0.0);
           dxcStore->clearSelection();
         });
@@ -895,6 +898,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
             state->dxActive = false;
           }
           state->dxCallsign.clear();
+          state->dxFreqKhz = 0.0;
         });
       }
     }

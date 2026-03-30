@@ -840,12 +840,7 @@ void MapWidget::render(SDL_Renderer *renderer) {
   // Render paths and dynamic markers
   renderGreatCircle(renderer);
 
-  renderMarker(renderer, state_->deLocation.lat, state_->deLocation.lon,
-               themes.accent.r, themes.accent.g, themes.accent.b);
-  if (state_->dxActive) {
-    renderMarker(renderer, state_->dxLocation.lat, state_->dxLocation.lon,
-                 themes.success.r, themes.success.g, themes.success.b);
-  }
+  renderGreatCircle(renderer);
 
   renderSatellite(renderer);
   renderAsteroidOverlay(renderer);
@@ -854,6 +849,26 @@ void MapWidget::render(SDL_Renderer *renderer) {
   renderADIFPins(renderer);
   renderONTASpots(renderer);
   renderBeacons(renderer);
+
+  renderMarker(renderer, state_->deLocation.lat, state_->deLocation.lon,
+               themes.accent.r, themes.accent.g, themes.accent.b);
+  if (state_->dxActive) {
+    uint8_t r = themes.success.r;
+    uint8_t g = themes.success.g;
+    uint8_t b = themes.success.b;
+
+    if (state_->dxFreqKhz > 0) {
+      int bi = freqToBandIndex(state_->dxFreqKhz);
+      if (bi >= 0) {
+        r = kBands[bi].color.r;
+        g = kBands[bi].color.g;
+        b = kBands[bi].color.b;
+      }
+    }
+
+    renderMarker(renderer, state_->dxLocation.lat, state_->dxLocation.lon,
+                 r, g, b, MarkerShape::CircleWithDot);
+  }
 
   renderMarker(renderer, sunLat_, sunLon_, themes.warning.r, themes.warning.g,
                0, MarkerShape::Circle, true);

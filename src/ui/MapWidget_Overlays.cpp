@@ -55,6 +55,8 @@ void MapWidget::renderMarker(SDL_Renderer *renderer, double lat, double lon,
 
   if (shape == MarkerShape::Circle && r == 255 && g == 255 && b == 0) {
     radius = std::max(4.0f, std::min(mapRect_.w, mapRect_.h) / 60.0f);
+  } else if (shape == MarkerShape::CircleWithDot) {
+    radius = std::max(4.0f, std::min(mapRect_.w, mapRect_.h) / 65.0f);
   } else if (shape == MarkerShape::Circle) {
     radius = std::max(3.0f, std::min(mapRect_.w, mapRect_.h) / 80.0f);
   } else if (shape == MarkerShape::Triangle) {
@@ -89,11 +91,11 @@ void MapWidget::renderMarker(SDL_Renderer *renderer, double lat, double lon,
 
   } else {
     SDL_Texture *tex = texMgr_.get(
-        shape == MarkerShape::Circle ? "marker_circle" : "marker_square");
+        (shape == MarkerShape::Circle || shape == MarkerShape::CircleWithDot) ? "marker_circle" : "marker_square");
     if (tex) {
       if (outline) {
         // Draw a slightly larger black version as outline
-        float oRad = radius + 1.0f;
+        float oRad = radius + 1.2f;
         SDL_FRect oDst = {pt.x - oRad, pt.y - oRad, oRad * 2, oRad * 2};
         SDL_SetTextureColorMod(tex, 0, 0, 0);
         SDL_SetTextureAlphaMod(tex, 255);
@@ -104,6 +106,14 @@ void MapWidget::renderMarker(SDL_Renderer *renderer, double lat, double lon,
       SDL_SetTextureColorMod(tex, r, g, b);
       SDL_SetTextureAlphaMod(tex, 255);
       SDL_RenderCopyF(renderer, tex, nullptr, &dst);
+
+      if (shape == MarkerShape::CircleWithDot) {
+        // Draw black center dot
+        float dotRad = radius * 0.4f;
+        SDL_FRect dDst = {pt.x - dotRad, pt.y - dotRad, dotRad * 2, dotRad * 2};
+        SDL_SetTextureColorMod(tex, 0, 0, 0);
+        SDL_RenderCopyF(renderer, tex, nullptr, &dDst);
+      }
     }
   }
 }
@@ -948,9 +958,8 @@ void MapWidget::renderDXClusterSpots(SDL_Renderer *renderer) {
       }
     }
 
-    // Plot transmitter as a small circle with band color
-    renderMarker(renderer, spot.txLat, spot.txLon, color.r, color.g, color.b,
-                 MarkerShape::Circle, true);
+    // Marker is now handled by the main render() loop using state_->dxLocation
+    // to provide visual consistency (bullseye style).
 
     // Always show spot label next to selected spot (no hover required)
     SDL_FPoint sp = latLonToScreen(spot.txLat, spot.txLon);
@@ -1086,9 +1095,7 @@ void MapWidget::renderONTASpots(SDL_Renderer *renderer) {
                                       lineColor);
   }
 
-  // Use Square markers for ONTA to differentiate from DX Cluster (Circle)
-  renderMarker(renderer, spotLat, spotLon, color.r, color.g, color.b,
-               MarkerShape::Square, true);
+  // Marker is now handled by the main render() loop using state_->dxLocation.
 
   SDL_RenderSetClipRect(renderer, nullptr);
 }

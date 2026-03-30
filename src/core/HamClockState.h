@@ -23,6 +23,7 @@ struct HamClockState {
   LatLon dxLocation = {0, 0};
   std::string dxGrid;
   bool dxActive = false;
+  double dxFreqKhz = 0.0;
 
   // Panel-driven spot selection (DX Cluster / ONTA)
   // Non-empty when a panel spot is selected; overrides map-click display.

@@ -131,7 +131,7 @@ private:
   void renderNightOverlay(SDL_Renderer *renderer);
   void renderGridOverlay(SDL_Renderer *renderer);
   void renderGreatCircle(SDL_Renderer *renderer);
-  enum class MarkerShape { Circle, Square, Triangle };
+  enum class MarkerShape { Circle, Square, Triangle, CircleWithDot };
   void renderMarker(SDL_Renderer *renderer, double lat, double lon, Uint8 r,
                     Uint8 g, Uint8 b, MarkerShape shape = MarkerShape::Circle,
                     bool outline = true);
