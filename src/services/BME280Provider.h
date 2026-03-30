@@ -4,6 +4,7 @@
 #include <memory>
 #include <mutex>
 #include <atomic>
+#include <condition_variable>
 #include <thread>
 
 class BME280Provider {
@@ -25,6 +26,8 @@ private:
   std::shared_ptr<WeatherStore> store_;
   std::atomic<bool> running_{false};
   std::atomic<bool> available_{false};
+  std::mutex stopMutex_;
+  std::condition_variable stopCv_;
   std::thread thread_;
   int fd_ = -1;
   uint8_t addr_ = 0x76; // Default BME280 address

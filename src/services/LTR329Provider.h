@@ -1,6 +1,8 @@
 #pragma once
 
 #include <atomic>
+#include <condition_variable>
+#include <mutex>
 #include <thread>
 
 // Reads ambient light level from an LTR329 I2C sensor (address 0x29).
@@ -27,6 +29,8 @@ private:
   std::atomic<bool> running_{false};
   std::atomic<bool> available_{false};
   std::atomic<float> lux_{0.0f};
+  std::mutex stopMutex_;
+  std::condition_variable stopCv_;
   std::thread thread_;
   int fd_ = -1;
 };

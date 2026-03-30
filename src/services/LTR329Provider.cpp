@@ -27,7 +27,11 @@ void LTR329Provider::start() {
 }
 
 void LTR329Provider::stop() {
-  running_ = false;
+  {
+    std::lock_guard<std::mutex> lk(stopMutex_);
+    running_ = false;
+  }
+  stopCv_.notify_all();
   if (thread_.joinable())
     thread_.join();
 #if defined(__linux__) && !defined(__EMSCRIPTEN__)
@@ -53,7 +57,8 @@ void LTR329Provider::worker() {
     float lux = readLux();
     if (lux >= 0.0f)
       lux_.store(lux);
-    std::this_thread::sleep_for(std::chrono::seconds(1));
+    std::unique_lock<std::mutex> lk(stopMutex_);
+    stopCv_.wait_for(lk, std::chrono::seconds(1), [this] { return !running_.load(); });
   }
 }
 
