@@ -153,7 +153,11 @@ void NetworkManager::fetchAsync(const std::string &url,
               url);
         std::thread([this, url, callback = std::move(callback),
                      alive = alive_]() {
-          if (!alive->load(std::memory_order_acquire)) return;
+          {
+            std::lock_guard<std::mutex> lk(inflightMutex_);
+            if (!alive->load(std::memory_order_relaxed)) return;
+            ++inflight_;
+          }
           std::filesystem::path p = cacheDir_ / hashUrl(url);
           std::ifstream ifs(p, std::ios::binary);
           std::string data;
@@ -176,6 +180,10 @@ void NetworkManager::fetchAsync(const std::string &url,
           }
           callback(data);
           for (auto &cb : pending) cb(data);
+          {
+            std::lock_guard<std::mutex> lk(inflightMutex_);
+            if (--inflight_ == 0) inflightCv_.notify_all();
+          }
         }).detach();
         return;
       }
@@ -274,7 +282,11 @@ void NetworkManager::fetchAsync(const std::string &url,
 
       std::thread([this, hubUrl, url, callback = std::move(safeCallback), hasCache,
                    cached, alive = alive_]() mutable {
-        if (!alive->load(std::memory_order_acquire)) return;
+        {
+          std::lock_guard<std::mutex> lk(inflightMutex_);
+          if (!alive->load(std::memory_order_relaxed)) return;
+          ++inflight_;
+        }
         std::string body = fetchFromHubSync(hubUrl);
         if (!body.empty()) {
           LOG_D("NetworkManager", "Hub client: Received {} bytes from Hub for {}", body.size(), url);
@@ -289,10 +301,14 @@ void NetworkManager::fetchAsync(const std::string &url,
               saveToDisk(url, entry, body);
           }
           callback(std::move(body));
-          return;
+        } else {
+          LOG_D("NetworkManager", "Hub client: Hub miss or error for {}, falling back to direct", url);
+          fetchDirect(url, std::move(callback), hasCache, cached);
         }
-        LOG_D("NetworkManager", "Hub client: Hub miss or error for {}, falling back to direct", url);
-        fetchDirect(url, std::move(callback), hasCache, cached);
+        {
+          std::lock_guard<std::mutex> lk(inflightMutex_);
+          if (--inflight_ == 0) inflightCv_.notify_all();
+        }
       }).detach();
       return;
     }
@@ -300,8 +316,16 @@ void NetworkManager::fetchAsync(const std::string &url,
   // --- Direct fetch ---
   std::thread([this, url, callback = std::move(safeCallback), hasCache,
                cached, alive = alive_]() mutable {
-    if (!alive->load(std::memory_order_acquire)) return;
+    {
+      std::lock_guard<std::mutex> lk(inflightMutex_);
+      if (!alive->load(std::memory_order_relaxed)) return;
+      ++inflight_;
+    }
     fetchDirect(url, std::move(callback), hasCache, cached);
+    {
+      std::lock_guard<std::mutex> lk(inflightMutex_);
+      if (--inflight_ == 0) inflightCv_.notify_all();
+    }
   }).detach();
 #endif
 }

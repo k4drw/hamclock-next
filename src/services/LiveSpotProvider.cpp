@@ -447,8 +447,20 @@ void LiveSpotProvider::fetchRBN() {
                  spot.rxGrid.substr(0, 4) == myGrid4);
     }
 
-    if (!match)
+    if (!match) {
+      // Diagnostic logging only for relevant role's missing grid
+      if (!useCall) {
+        const std::string &g = ofDe ? spot.txGrid : spot.rxGrid;
+        if (g.empty()) {
+          LOG_D("LiveSpot", "Rejected RBN spot ({} -> {}): {} grid empty", 
+                spot.txCall, spot.rxCall, ofDe ? "tx" : "rx");
+        } else if (g.substr(0, 4) != myGrid4) {
+          // Too many results for D level, but useful for debugging
+          // LOG_V("LiveSpot", "Grid mismatch: {} vs {}", g.substr(0, 4), myGrid4);
+        }
+      }
       continue;
+    }
 
     int idx = freqToBandIndex(spot.freqKhz);
     if (idx >= 0) {

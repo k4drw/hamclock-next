@@ -3,6 +3,7 @@
 #include "../core/ConfigManager.h"
 
 #include <atomic>
+#include <condition_variable>
 #include <ctime>
 #include <filesystem>
 #include <functional>
@@ -15,9 +16,18 @@
 class NetworkManager {
 public:
   explicit NetworkManager(const std::filesystem::path &cacheDir = "");
-  // Sets alive_ to false so any detached threads that have not yet started
-  // their body exit cleanly rather than touching destroyed members.
-  ~NetworkManager() { alive_->store(false, std::memory_order_release); }
+  // Signal shutdown and block until every detached fetch thread that already
+  // passed the alive_ check has finished touching our members.  This closes
+  // the TOCTOU window: the alive_ write and the inflight_ check are both done
+  // under inflightMutex_, so a thread cannot slip in between.
+  ~NetworkManager() {
+    {
+      std::lock_guard<std::mutex> lk(inflightMutex_);
+      alive_->store(false, std::memory_order_release);
+    }
+    std::unique_lock<std::mutex> lk(inflightMutex_);
+    inflightCv_.wait(lk, [this] { return inflight_ == 0; });
+  }
 
   NetworkManager(const NetworkManager &) = delete;
   NetworkManager &operator=(const NetworkManager &) = delete;
@@ -60,10 +70,14 @@ private:
   std::unordered_map<std::string, std::vector<std::function<void(std::string)>>> activeFetches_;
   std::mutex fetchMutex_;
 
-  // Shared with all detached fetch threads. Set to false in the destructor so
-  // threads that haven't started their body yet skip accessing destroyed state.
+  // Shared with all detached fetch threads. alive_ is set to false and the
+  // destructor waits for all in-flight threads to finish before returning,
+  // preventing use-after-free on destroyed members.
   std::shared_ptr<std::atomic<bool>> alive_ =
       std::make_shared<std::atomic<bool>>(true);
+  std::mutex inflightMutex_;
+  std::condition_variable inflightCv_;
+  int inflight_ = 0;
 
   // Helper to compute safe filename for a URL (e.g. simple hash)
   std::string hashUrl(const std::string &url);

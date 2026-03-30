@@ -1540,7 +1540,12 @@ void WebServer::registerRoutes(httplib::Server &svr) {
 
   svr.Get("/get_sensors.txt",
           [this](const httplib::Request &, httplib::Response &res) {
-            if (!bmeProvider_ || !bmeProvider_->isAvailable() || !weatherStore_) {
+            BME280Provider *bme;
+            {
+              std::lock_guard<std::mutex> lk(dataMutex_);
+              bme = bmeProvider_;
+            }
+            if (!bme || !bme->isAvailable() || !weatherStore_) {
               res.status = 503;
               res.set_content("BME280 sensor not available\n", "text/plain");
               return;
