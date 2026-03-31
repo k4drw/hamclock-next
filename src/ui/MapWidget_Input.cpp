@@ -360,7 +360,40 @@ void MapWidget::onMouseMove(int mx, int my) {
     }
   }
 
-  // 7. Check DX Cluster selected spot only (mirrors renderDXClusterSpots logic)
+  // 7. Check NCDXF beacons
+  if (tip.empty() && config_.showBeacons && beacons_) {
+    // Only show if NCDXF widget is enabled in any pane's rotation (matching renderBeacons)
+    bool widgetEnabled = false;
+    for (auto *pane : panes_) {
+      if (pane) {
+        const auto &rotation = pane->getRotation();
+        if (std::find(rotation.begin(), rotation.end(), std::string("ncdxf")) !=
+            rotation.end()) {
+          widgetEnabled = true;
+          break;
+        }
+      }
+    }
+    if (widgetEnabled) {
+      auto active = beacons_->getActiveBeacons();
+      for (size_t i = 0; i < NCDXF_BEACONS.size(); ++i) {
+        const auto &b = NCDXF_BEACONS[i];
+        if (screenDist(b.lat, b.lon) < kHitRadius) {
+          tip = "Beacon: " + b.callsign + "\n" + b.location;
+          for (const auto &ab : active) {
+            if (ab.index == (int)i) {
+              tip += "\nTransmitting: " +
+                     std::string(kBands[ab.bandIndex + 5].name);
+              break;
+            }
+          }
+          break;
+        }
+      }
+    }
+  }
+
+  // 8. Check DX Cluster selected spot only (mirrors renderDXClusterSpots logic)
   if (tip.empty() && dxcStore_) {
     auto data = dxcStore_->snapshot();
     if (data->hasSelection && data->selectedSpot.txLat != 0.0) {
@@ -379,7 +412,7 @@ void MapWidget::onMouseMove(int mx, int my) {
     }
   }
 
-  // 8. Check Live Spots (generic ones on map)
+  // 9. Check Live Spots (generic ones on map)
   if (tip.empty() && spotStore_) {
     auto data = spotStore_->snapshot();
     bool ofDe = config_.liveSpotsOfDe;
@@ -420,7 +453,7 @@ void MapWidget::onMouseMove(int mx, int my) {
     }
   }
 
-  // 9. Fallback to Country lookup
+  // 10. Fallback to Country lookup
   if (tip.empty()) {
     int row = std::clamp((int)((lat + 90.0) * 2.0), 0, 359);
     int col = std::clamp((int)((lon + 180.0) * 2.0), 0, 719);

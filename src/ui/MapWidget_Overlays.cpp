@@ -1126,23 +1126,24 @@ void MapWidget::renderBeacons(SDL_Renderer *renderer) {
   for (size_t i = 0; i < NCDXF_BEACONS.size(); ++i) {
     const auto &b = NCDXF_BEACONS[i];
 
-    // Check if this beacon is in the active list
-    bool isTransmitting = false;
+    int activeBandIndex = -1;
     for (const auto &ab : active) {
       if (ab.index == (int)i) {
-        isTransmitting = true;
+        activeBandIndex = ab.bandIndex;
         break;
       }
     }
 
-    if (isTransmitting) {
-      // Bright Yellow for transmitting
-      renderMarker(renderer, b.lat, b.lon, 255, 255, 0, MarkerShape::Triangle,
+    if (activeBandIndex >= 0) {
+      // Color by band: ActiveBeacon::bandIndex (0-4) maps to kBands (5-9)
+      const auto &bc = kBands[activeBandIndex + 5].color;
+      renderMarker(renderer, b.lat, b.lon, bc.r, bc.g, bc.b, MarkerShape::Triangle,
                    true);
     } else {
-      // Dim Gray for idle
-      renderMarker(renderer, b.lat, b.lon, 100, 100, 100, MarkerShape::Triangle,
-                   true);
+      // Muted Gray for idle beacons
+      ThemeColors themes = getThemeColors(theme_);
+      renderMarker(renderer, b.lat, b.lon, themes.textDim.r, themes.textDim.g,
+                   themes.textDim.b, MarkerShape::Triangle, true);
     }
   }
 
