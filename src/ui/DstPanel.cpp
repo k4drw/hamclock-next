@@ -160,3 +160,8 @@ nlohmann::json DstPanel::getDebugData() const {
   j["points_count"] = currentData_.points.size();
   return j;
 }
+
+#include "WidgetRegistry.h"
+REGISTER_WIDGET("dst_index", "Dst Index", false, false, {
+  return std::make_unique<DstPanel>(0, 0, 0, 0, deps.fontMgr, deps.texMgr, deps.dstStore);
+})

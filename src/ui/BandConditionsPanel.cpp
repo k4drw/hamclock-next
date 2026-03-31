@@ -174,3 +174,8 @@ nlohmann::json BandConditionsPanel::getDebugData() const {
 
   return data;
 }
+
+#include "WidgetRegistry.h"
+REGISTER_WIDGET("band_conditions", "Band Cond", false, false, {
+  return std::make_unique<BandConditionsPanel>(0, 0, 0, 0, deps.fontMgr, deps.bandStore);
+})

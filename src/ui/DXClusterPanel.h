@@ -35,6 +35,10 @@ public:
   }
 
   std::string getName() const override { return "DXCluster"; }
+  const char *typeId() const override { return "dx_cluster"; }
+  std::string getDisplayName() const override { return "DX Cluster"; }
+  bool isScrollable() const override { return true; }
+  bool requiresConfigKey() const override { return false; }
   std::vector<std::string> getActions() const override;
   bool performAction(const std::string &action) override;
   SDL_Rect getActionRect(const std::string &action) const override;

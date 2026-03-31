@@ -37,6 +37,7 @@ void RBNProvider::start(const AppConfig &config) {
 
 void RBNProvider::stop() {
   stopRequested_ = true;
+  stopCv_.notify_all();
   if (thread_.joinable())
     thread_.join();
   running_ = false;
@@ -54,7 +55,9 @@ void RBNProvider::run() {
       break;
 
     LOG_W("RBN", "Disconnected, retrying in 30s...");
-    std::this_thread::sleep_for(std::chrono::seconds(30));
+    std::unique_lock<std::mutex> lk(stopMutex_);
+    stopCv_.wait_for(lk, std::chrono::seconds(30),
+                     [this] { return stopRequested_.load(); });
   }
   running_ = false;
 }
@@ -194,6 +197,31 @@ void RBNProvider::runTelnet(const std::string &host, int port,
                 s.lastError = "";
               }
               LOG_I("RBN", "Logged in as {}", login);
+
+              // Send RBN filter command based on current configuration.
+              // This is a "set dx filter" command that tells the server what spots to send.
+              std::string filterCmd;
+              if (config_.liveSpotsUseCall) {
+                // Filter by callsign: "set dx filter call [call]" or "set dx filter spotter [call]"
+                filterCmd = config_.liveSpotsOfDe ? "set dx filter call "
+                                                  : "set dx filter spotter ";
+                filterCmd += config_.callsign;
+              } else if (!config_.grid.empty()) {
+                // Filter by grid: "set dx filter dxgrid [grid]" or "set dx filter spottergrid [grid]"
+                // Grid filter usually accepts first 4 or 6 characters.
+                std::string grid4 = config_.grid.substr(0, 4);
+                filterCmd = config_.liveSpotsOfDe ? "set dx filter dxgrid "
+                                                  : "set dx filter spottergrid ";
+                filterCmd += grid4;
+              }
+
+              if (!filterCmd.empty()) {
+                filterCmd += "\r\n";
+                send(sock, filterCmd.c_str(), filterCmd.length(), 0);
+                LOG_I("RBN", "Sent filter: {} (UseCall={}, OfDe={})",
+                      filterCmd.substr(0, filterCmd.length() - 2),
+                      config_.liveSpotsUseCall, config_.liveSpotsOfDe);
+              }
             }
           }
         }
@@ -228,6 +256,32 @@ void RBNProvider::runTelnet(const std::string &host, int port,
 #endif
 }
 
+namespace {
+// Strips ANSI escape sequences and non-printable characters from RBN callsigns.
+// RBN telnet feeds frequently use ANSI colors for highlighting.
+std::string sanitizeCall(const char *raw) {
+  std::string clean;
+  bool inEscape = false;
+  for (const char *p = raw; *p; ++p) {
+    if (*p == '\x1B') {
+      inEscape = true;
+      continue;
+    }
+    if (inEscape) {
+      if (std::isalpha(static_cast<unsigned char>(*p)))
+        inEscape = false;
+      continue;
+    }
+    // Keep alphanumeric and common ham delimiters
+    if (std::isalnum(static_cast<unsigned char>(*p)) || *p == '/' || *p == '-' ||
+        *p == '@' || *p == '#') {
+      clean += static_cast<char>(std::toupper(static_cast<unsigned char>(*p)));
+    }
+  }
+  return clean;
+}
+} // namespace
+
 void RBNProvider::processLine(const std::string &line) {
   if (line.empty())
     return;
@@ -245,8 +299,8 @@ void RBNProvider::processLine(const std::string &line) {
   if (sscanf(dxde, "DX de %31[^ :]: %f %31s", rxCall, &freq, txCall) != 3)
     return;
 
-  spot.rxCall = rxCall;
-  spot.txCall = txCall;
+  spot.rxCall = sanitizeCall(rxCall);
+  spot.txCall = sanitizeCall(txCall);
   spot.freqKhz = freq;
   spot.spottedAt = std::chrono::system_clock::now();
 
@@ -317,10 +371,12 @@ void RBNProvider::processLine(const std::string &line) {
   if (pm_.findLocation(spot.txCall, ll)) {
     spot.txLat = ll.lat;
     spot.txLon = ll.lon;
+    spot.txGrid = Astronomy::latLonToGrid(ll.lat, ll.lon);
   }
   if (pm_.findLocation(spot.rxCall, ll)) {
     spot.rxLat = ll.lat;
     spot.rxLon = ll.lon;
+    spot.rxGrid = Astronomy::latLonToGrid(ll.lat, ll.lon);
   }
 
   LOG_D("RBN", "Spot: {} on {:.1f} kHz {} {:.0f}dB", spot.txCall,

@@ -12,6 +12,7 @@
 #include <cmath>
 #include <cstdio>
 #include <memory>
+#include <sstream>
 #include <nlohmann/json.hpp>
 #include <unordered_map>
 
@@ -87,6 +88,7 @@ void NOAAProvider::fetch() {
   fetchDRAP();
   fetchXRay();
   fetchProtonFlux();
+  fetchNOAAScales();
 }
 
 void NOAAProvider::fetchKIndex() {
@@ -830,6 +832,81 @@ void NOAAProvider::fetchProtonFlux() {
           auto &s = state->services["NOAA:ProtonFlux"];
           s.ok = false;
           s.lastError = e.what();
+        }
+      }
+    });
+  });
+}
+
+void NOAAProvider::fetchNOAAScales() {
+  auto state = state_;
+  net_.fetchAsync(NOAA_SCALES_URL, [state](std::string body) {
+    if (body.empty()) {
+      if (state) {
+        std::lock_guard<std::mutex> lk(state->servicesMutex);
+        state->services["NOAA:Scales"].ok = false;
+        state->services["NOAA:Scales"].lastError = "Empty response";
+      }
+      return;
+    }
+
+    WorkerService::getInstance().submitTask([body, state]() {
+      try {
+        auto j = nlohmann::json::parse(body, nullptr, false);
+        if (j.is_discarded() || !j.is_object()) {
+          if (state) {
+            std::lock_guard<std::mutex> lk(state->servicesMutex);
+            state->services["NOAA:Scales"].ok = false;
+            state->services["NOAA:Scales"].lastError = "Invalid JSON";
+          }
+          return;
+        }
+
+        auto *update = new SolarData();
+        // JSON keys are "0"=Now, "1"=D+1, "2"=D+2, "3"=D+3
+        // Categories: R=row0, S=row1, G=row2
+        static const char *catKeys[3] = {"R", "S", "G"};
+        for (int day = 0; day < 4; ++day) {
+          char key[2];
+          std::snprintf(key, sizeof(key), "%d", day);
+          if (!j.contains(key) || !j[key].is_object())
+            continue;
+          const auto &dayObj = j[key];
+          for (int cat = 0; cat < 3; ++cat) {
+            if (dayObj.contains(catKeys[cat]) &&
+                dayObj[catKeys[cat]].contains("Scale")) {
+              const auto &sv = dayObj[catKeys[cat]]["Scale"];
+              if (sv.is_number())
+                update->noaa_scales[cat][day] = sv.get<int>();
+              else if (sv.is_string())
+                update->noaa_scales[cat][day] =
+                    StringUtils::safe_stoi(sv.get<std::string>());
+              // null → leave as 0 (initialised by = {})
+            }
+          }
+        }
+        update->noaa_scales_valid = true;
+
+        SDL_Event event;
+        SDL_zero(event);
+        event.type = HamClock::AE_BASE_EVENT + HamClock::AE_SOLAR_DATA_READY;
+        event.user.code = static_cast<int>(UpdateType::NOAAScales);
+        event.user.data1 = update;
+        SDL_PushEvent(&event);
+
+        if (state) {
+          std::lock_guard<std::mutex> lk(state->servicesMutex);
+          auto &s = state->services["NOAA:Scales"];
+          s.ok = true;
+          s.lastSuccess = std::chrono::system_clock::now();
+        }
+        LOG_I("NOAAProvider", "Fetched NOAA scales table");
+      } catch (const std::exception &e) {
+        LOG_E("NOAAProvider", "NOAA scales parse error: {}", e.what());
+        if (state) {
+          std::lock_guard<std::mutex> lk(state->servicesMutex);
+          state->services["NOAA:Scales"].ok = false;
+          state->services["NOAA:Scales"].lastError = e.what();
         }
       }
     });

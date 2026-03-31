@@ -38,9 +38,9 @@ private:
 
   SDL_Rect greylineBtnRect_ = {0, 0, 0, 0};
 
-  // Up to 8 lines: "DX:", grid, coords, bearing, distance, (or "Select
+  // Up to 9 lines: "DX:", grid, coords, bearing, distance, country, (or "Select
   // target"), +2 weather lines
-  static constexpr int kNumLines = 8;
+  static constexpr int kNumLines = 9;
   SDL_Texture *lineTex_[kNumLines] = {};
   int lineW_[kNumLines] = {};
   int lineH_[kNumLines] = {};

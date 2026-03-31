@@ -19,6 +19,8 @@ public:
   bool onMouseWheel(int scrollY) override;
 
   std::string getName() const override { return "Hurricane"; }
+  const char *typeId() const override { return "hurricane"; }
+  std::string getDisplayName() const override { return "Tropics"; }
 
 private:
   static SDL_Color categoryColor(int category);

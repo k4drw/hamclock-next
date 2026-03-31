@@ -19,6 +19,9 @@ public:
   bool onMouseWheel(int scrollY) override;
 
   std::string getName() const override { return "Forecast"; }
+  const char *typeId() const override { return "forecast"; }
+  std::string getDisplayName() const override { return "Forecast"; }
+  bool isScrollable() const override { return true; }
 
 private:
   FontManager &fontMgr_;

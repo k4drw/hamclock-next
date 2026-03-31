@@ -19,6 +19,10 @@ public:
                   RigService *rig = nullptr);
 
   std::string getName() const override { return "Rig Control"; }
+  const char *typeId() const override { return "rig_control"; }
+  std::string getDisplayName() const override { return "Rig Control"; }
+  bool isScrollable() const override { return false; }
+  bool requiresConfigKey() const override { return true; }
   void update() override;
   void render(SDL_Renderer *renderer) override;
   void onResize(int x, int y, int w, int h) override;

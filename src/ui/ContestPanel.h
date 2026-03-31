@@ -21,6 +21,9 @@ public:
   bool isModalActive() const override { return popupOpen_; }
 
   std::string getName() const override { return "ContestPanel"; }
+  const char *typeId() const override { return "contests"; }
+  std::string getDisplayName() const override { return "Contests"; }
+  bool isScrollable() const override { return true; }
 
 private:
   void renderPopup(SDL_Renderer *renderer);

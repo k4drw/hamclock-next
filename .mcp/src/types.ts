@@ -26,24 +26,6 @@ export interface RepoIndex {
   };
 }
 
-export interface ParityFeature {
-  feature_id: string;
-  name: string;
-  status: 'EQUIVALENT' | 'EQUIVALENT+' | 'PARTIAL' | 'STUB' | 'MISSING';
-  source_strategy: 'proxy-dependent -> direct-source' | 'unknown -> direct-source' | 'mixed -> unknown' | 'mixed -> direct-source' | 'mixed -> mixed' | 'N/A';
-  original_pointers: string[];
-  next_pointers: string[];
-  notes: string;
-  suggested_gaps: string[];
-}
-
-export interface ParityData {
-  features: ParityFeature[];
-  top_improvements: string[];
-  top_gaps: string[];
-  parity_score: number;
-}
-
 export interface VerificationResult {
   runtime_verification: 'disabled' | 'enabled';
   reachable?: boolean;

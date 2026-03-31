@@ -1,4 +1,5 @@
 #include "TropoPanel.h"
+#include "WidgetRegistry.h"
 #include "../core/Theme.h"
 #include "FontCatalog.h"
 
@@ -96,3 +97,7 @@ void TropoPanel::render(SDL_Renderer *renderer) {
 }
 
 } // namespace HamClock
+
+REGISTER_WIDGET("tropo", "Tropo", false, false, {
+  return std::make_unique<HamClock::TropoPanel>(0, 0, 0, 0, deps.fontMgr);
+})

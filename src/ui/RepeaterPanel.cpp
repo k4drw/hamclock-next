@@ -1,4 +1,5 @@
 #include "RepeaterPanel.h"
+#include "WidgetRegistry.h"
 #include "../core/Theme.h"
 #include "FontCatalog.h"
 #include <algorithm>
@@ -119,3 +120,7 @@ bool RepeaterPanel::onMouseWheel(int scrollY) {
   scrollOffset_ = std::clamp(scrollOffset_ - scrollY, 0, maxScroll_);
   return true;
 }
+
+REGISTER_WIDGET("repeater_dir", "Repeaters", false, true, {
+  return std::make_unique<RepeaterPanel>(0, 0, 0, 0, deps.fontMgr, deps.repeaterStore);
+})

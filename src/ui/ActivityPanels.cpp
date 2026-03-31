@@ -1,4 +1,5 @@
 #include "ActivityPanels.h"
+#include "WidgetRegistry.h"
 #include "../core/LiveSpotData.h" // For kBands and freqToBandIndex
 #include "../core/MemoryMonitor.h"
 #include "../core/StringUtils.h"
@@ -42,7 +43,7 @@ void DXPedPanel::update() {
     std::vector<std::string> rows;
     for (const auto &de : data.dxpeds) {
       std::stringstream ss;
-      ss << std::left << std::setw(12) << de.call << de.location;
+      ss << de.call << '\t' << de.location;
       rows.push_back(ss.str());
       if (rows.size() >= 10)
         break;
@@ -53,6 +54,26 @@ void DXPedPanel::update() {
     setRows(rows);
     lastUpdate_ = data.lastUpdated;
   }
+}
+
+void DXPedPanel::renderRowText(SDL_Renderer *renderer, int index, int rx, int ry,
+                               int rw, int rh, SDL_Color color) {
+  auto *cat = fontMgr_.catalog();
+  if (!cat)
+    return;
+  const std::string &row = rows_[index];
+  auto tab = row.find('\t');
+  const std::string call =
+      (tab != std::string::npos) ? row.substr(0, tab) : row;
+  const std::string loc =
+      (tab != std::string::npos) ? row.substr(tab + 1) : "";
+  int pad = std::max(2, static_cast<int>(width_ * 0.03f));
+  int midY = ry + rh / 2;
+  int colX = rx + rw * 42 / 100;
+  cat->drawText(renderer, call, rx + pad, midY, color, FontStyle::Fast, false,
+                false, true);
+  cat->drawText(renderer, loc, colX, midY, color, FontStyle::Fast, false,
+                false, true);
 }
 
 // --- ONTAPanel ---
@@ -608,3 +629,13 @@ bool ONTAPanel::handleSetupClick(int mx, int my) {
   }
   return false;
 }
+
+REGISTER_WIDGET("dx_peditions", "DX Peditions", true, false, {
+  return std::make_unique<DXPedPanel>(
+      0, 0, 0, 0, deps.fontMgr, *deps.activityProvider, deps.activityStore);
+})
+
+REGISTER_WIDGET("on_the_air", "On The Air", true, false, {
+  return std::make_unique<ONTAPanel>(
+      0, 0, 0, 0, deps.fontMgr, *deps.activityProvider, deps.activityStore);
+})

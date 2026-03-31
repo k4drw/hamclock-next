@@ -28,6 +28,10 @@ public:
 
   // Semantic Debug API
   std::string getName() const override { return "SDOPanel"; }
+  const char *typeId() const override { return "sdo"; }
+  std::string getDisplayName() const override { return "SDO"; }
+  bool isScrollable() const override { return false; }
+  bool requiresConfigKey() const override { return false; }
   std::vector<std::string> getActions() const override;
   SDL_Rect getActionRect(const std::string &action) const override;
   nlohmann::json getDebugData() const override;

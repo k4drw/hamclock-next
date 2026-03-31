@@ -49,6 +49,7 @@ void RotatorService::stop() {
     return;
 
   running_ = false;
+  stopCv_.notify_all();
   disconnectFromRotator();
 
   if (pollThread_.joinable()) {
@@ -190,7 +191,7 @@ void RotatorService::pollLoop() {
           state_->services["Rotator"].ok = false;
           state_->services["Rotator"].lastError = "Connection failed";
         }
-        std::this_thread::sleep_for(5s);
+        { std::unique_lock<std::mutex> lk(stopMutex_); stopCv_.wait_for(lk, std::chrono::seconds(5), [this]{ return !running_.load(); }); }
         continue;
       }
     }
@@ -228,18 +229,18 @@ void RotatorService::pollLoop() {
       }
 
       // Mark data as invalid
-      if (!store_) { std::this_thread::sleep_for(5s); continue; }
+      if (!store_) { std::unique_lock<std::mutex> lk(stopMutex_); stopCv_.wait_for(lk, std::chrono::seconds(5), [this]{ return !running_.load(); }); continue; }
       RotatorData data = store_->get();
       data.connected = false;
       data.valid = false;
       store_->set(data);
 
-      std::this_thread::sleep_for(5s);
+      { std::unique_lock<std::mutex> lk(stopMutex_); stopCv_.wait_for(lk, std::chrono::seconds(5), [this]{ return !running_.load(); }); }
       continue;
     }
 
     // Poll every 1000ms (1 Hz update rate)
-    std::this_thread::sleep_for(1000ms);
+    { std::unique_lock<std::mutex> lk(stopMutex_); stopCv_.wait_for(lk, std::chrono::milliseconds(1000), [this]{ return !running_.load(); }); }
 
     // Auto-tracking Loop
     if (connected_) {

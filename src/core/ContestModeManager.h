@@ -1,6 +1,6 @@
 #pragma once
 
-#include "WidgetType.h"
+#include <string>
 #include <vector>
 
 // One-click Contest Mode profile.
@@ -10,18 +10,18 @@ namespace ContestModeManager {
 
 // Contest preset: one widget per pane, no rotation.
 // Pane order matches AppConfig pane1..pane6.
-static const std::vector<WidgetType> kContestLayout[6] = {
-    {WidgetType::DX_CLUSTER},
-    {WidgetType::LIVE_SPOTS},
-    {WidgetType::BAND_CONDITIONS},
-    {WidgetType::SOLAR},
-    {WidgetType::DE_INFO},
-    {WidgetType::DX_INFO},
+static const std::vector<std::string> kContestLayout[6] = {
+    {"dx_cluster"},
+    {"live_spots"},
+    {"band_conditions"},
+    {"solar"},
+    {"de_info"},
+    {"dx_info"},
 };
 
 // Save current rotations to saved[], then apply contest preset.
-inline void activate(std::vector<WidgetType> rotations[6],
-                     std::vector<WidgetType> saved[6]) {
+inline void activate(std::vector<std::string> rotations[6],
+                     std::vector<std::string> saved[6]) {
   for (int i = 0; i < 6; ++i) {
     saved[i]     = rotations[i];
     rotations[i] = kContestLayout[i];
@@ -29,8 +29,8 @@ inline void activate(std::vector<WidgetType> rotations[6],
 }
 
 // Restore rotations[] from saved[].
-inline void deactivate(std::vector<WidgetType> rotations[6],
-                       const std::vector<WidgetType> saved[6]) {
+inline void deactivate(std::vector<std::string> rotations[6],
+                       const std::vector<std::string> saved[6]) {
   for (int i = 0; i < 6; ++i)
     rotations[i] = saved[i];
 }

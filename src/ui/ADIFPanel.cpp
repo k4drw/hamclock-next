@@ -342,3 +342,8 @@ bool ADIFPanel::onMouseUp(int mx, int my, Uint16 /*mod*/, int clicks) {
 
   return false;
 }
+
+#include "WidgetRegistry.h"
+REGISTER_WIDGET("adif", "ADIF Log", false, false, {
+  return std::make_unique<ADIFPanel>(0, 0, 0, 0, deps.fontMgr, deps.adifStore);
+})

@@ -27,6 +27,10 @@ public:
   void onResize(int x, int y, int w, int h) override;
 
   std::string getName() const override { return "System Info"; }
+  const char *typeId() const override { return "sys_info"; }
+  std::string getDisplayName() const override { return "System Info"; }
+  bool isScrollable() const override { return false; }
+  bool requiresConfigKey() const override { return false; }
   std::vector<std::string> getActions() const override { return {}; }
   SDL_Rect getActionRect(const std::string &action) const override;
 

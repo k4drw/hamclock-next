@@ -24,7 +24,11 @@ void BME280Provider::start() {
 }
 
 void BME280Provider::stop() {
-  running_ = false;
+  {
+    std::lock_guard<std::mutex> lk(stopMutex_);
+    running_ = false;
+  }
+  stopCv_.notify_all();
   if (thread_.joinable())
     thread_.join();
   if (fd_ >= 0) {
@@ -52,10 +56,9 @@ void BME280Provider::worker() {
     } else {
       LOG_W("BME280", "Read failed");
     }
-    // Sleep 60 seconds
-    for (int i = 0; i < 60 && running_; ++i) {
-      std::this_thread::sleep_for(std::chrono::seconds(1));
-    }
+    // Sleep 60 seconds, interruptible by stop()
+    std::unique_lock<std::mutex> lk(stopMutex_);
+    stopCv_.wait_for(lk, std::chrono::seconds(60), [this] { return !running_.load(); });
   }
 }
 

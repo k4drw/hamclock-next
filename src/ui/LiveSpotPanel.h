@@ -23,6 +23,10 @@ public:
   bool onMouseUp(int mx, int my, Uint16 mod, int clicks) override;
 
   std::string getName() const override { return "LiveSpots"; }
+  const char *typeId() const override { return "live_spots"; }
+  std::string getDisplayName() const override { return "Live Spots"; }
+  bool isScrollable() const override { return true; }
+  bool requiresConfigKey() const override { return false; }
   std::vector<std::string> getActions() const override;
   bool performAction(const std::string &action) override;
   SDL_Rect getActionRect(const std::string &action) const override;

@@ -1,4 +1,5 @@
 #include "WatchlistPanel.h"
+#include "WidgetRegistry.h"
 #include <iomanip>
 #include <sstream>
 
@@ -37,3 +38,8 @@ void WatchlistPanel::update() {
     lastUpdate_ = last;
   }
 }
+
+REGISTER_WIDGET("watchlist", "Watchlist", false, false, {
+  return std::make_unique<WatchlistPanel>(
+      0, 0, 0, 0, deps.fontMgr, deps.watchlistStore, deps.watchlistHitStore);
+})

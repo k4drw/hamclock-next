@@ -1,6 +1,5 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { loadParityData } from "../state.js";
 
 const VOACAP_SCHEMA = {
   schema_version: "1.1",
@@ -130,59 +129,4 @@ export function registerPropagationTools(server: McpServer) {
     }
   );
 
-  server.tool(
-    "propagation_parity_gaps",
-    "List all propagation-related parity gaps between hamclock-original and hamclock-next, sourced from parity_v2.json with a static fallback.",
-    {},
-    { readOnlyHint: true },
-    async () => {
-      const PROPAGATION_KEYWORDS = ["propagat", "voacap", "grayline", "muf", "band_condition", "ionospher"];
-      let text = "# Propagation Parity Gaps\n\n";
-
-      try {
-        const parityData = await loadParityData();
-        const propFeatures = parityData.features.filter(f =>
-          PROPAGATION_KEYWORDS.some(kw =>
-            f.feature_id.toLowerCase().includes(kw) || f.name.toLowerCase().includes(kw)
-          )
-        );
-        if (propFeatures.length > 0) {
-          for (const f of propFeatures) {
-            text += `## ${f.name}\n- **Status:** ${f.status}\n- **Notes:** ${f.notes}\n`;
-            if (f.suggested_gaps.length > 0) {
-              text += `- **Gaps:** ${f.suggested_gaps.join("; ")}\n`;
-            }
-            text += "\n";
-          }
-          return { content: [{ type: "text", text }] };
-        }
-      } catch {
-        // parity data unavailable — fall through to static list
-      }
-
-      // Static fallback when parity data is not loaded
-      const staticGaps = [
-        {
-          feature: "VOACAP MUF Map",
-          status: "Implemented (Internal)",
-          notes: "The internal engine handles MUF map generation. Improvements should be made directly to PropEngine.cpp."
-        },
-        {
-          feature: "VOACAP TOA Map",
-          status: "Implemented (Internal)",
-          notes: "TOA map is currently calculated using path-length based on ionospheric reflection height."
-        },
-        {
-          feature: "Grayline Propagation Enhancement",
-          status: "Partial",
-          notes: "The original HamClock includes a 1dB signal boost near the terminator. This logic should be calibrated in PropEngine.cpp."
-        }
-      ];
-      text += "*Note: parity_v2.json not loaded — showing static fallback. Run `parity_sync` to load live data.*\n\n";
-      for (const gap of staticGaps) {
-        text += `## ${gap.feature}\n- **Status:** ${gap.status}\n- **Notes:** ${gap.notes}\n\n`;
-      }
-      return { content: [{ type: "text", text }] };
-    }
-  );
 }

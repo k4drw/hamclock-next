@@ -25,11 +25,17 @@
 #else
 #include <unistd.h>
 #endif
+#ifdef __APPLE__
+#include <TargetConditionals.h>
+#endif
+#ifndef TARGET_OS_IPHONE
+#define TARGET_OS_IPHONE 0
+#endif
 
 DisplayPower::DisplayPower() { init(); }
 
 void DisplayPower::init() {
-#if defined(__EMSCRIPTEN__)
+#if defined(__EMSCRIPTEN__) || TARGET_OS_IPHONE
   methods_.push_back(Method::NONE);
 #else
   methods_.clear();
@@ -314,7 +320,7 @@ bool DisplayPower::blankFramebuffer(bool blank) {
 }
 
 bool DisplayPower::binaryExists(const char *name) {
-#if !defined(__EMSCRIPTEN__) && !defined(_WIN32)
+#if !defined(__EMSCRIPTEN__) && !defined(_WIN32) && !TARGET_OS_IPHONE
   std::string cmd = std::string("which ") + name + " > /dev/null 2>&1";
   return std::system(cmd.c_str()) == 0;
 #else
@@ -324,7 +330,7 @@ bool DisplayPower::binaryExists(const char *name) {
 }
 
 bool DisplayPower::runXsetDpms(bool on) {
-#if !defined(__EMSCRIPTEN__) && !defined(_WIN32)
+#if !defined(__EMSCRIPTEN__) && !defined(_WIN32) && !TARGET_OS_IPHONE
   std::string cmd;
   if (!xDisplayEnv_.empty())
     cmd = "DISPLAY=" + xDisplayEnv_ + " ";
@@ -338,7 +344,7 @@ bool DisplayPower::runXsetDpms(bool on) {
 }
 
 bool DisplayPower::runTvservice(bool on) {
-#if !defined(__EMSCRIPTEN__) && !defined(_WIN32)
+#if !defined(__EMSCRIPTEN__) && !defined(_WIN32) && !TARGET_OS_IPHONE
   std::string cmd =
       on ? "tvservice -p > /dev/null 2>&1" : "tvservice -o > /dev/null 2>&1";
   return std::system(cmd.c_str()) == 0;
@@ -349,7 +355,7 @@ bool DisplayPower::runTvservice(bool on) {
 }
 
 bool DisplayPower::runWlrRandr(bool on) {
-#if !defined(__EMSCRIPTEN__) && !defined(_WIN32)
+#if !defined(__EMSCRIPTEN__) && !defined(_WIN32) && !TARGET_OS_IPHONE
   if (wlrRandrOutput_.empty())
     return false;
   std::string cmd;
@@ -365,7 +371,7 @@ bool DisplayPower::runWlrRandr(bool on) {
 }
 
 bool DisplayPower::runDrmDpms(bool on) {
-#if defined(__linux__) && !defined(__EMSCRIPTEN__)
+#if defined(HAS_LIBDRM) && !defined(__EMSCRIPTEN__)
   bool ownedFd = false;
   int fd = drmFd_;
   if (fd < 0) {

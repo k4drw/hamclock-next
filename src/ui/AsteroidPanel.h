@@ -27,6 +27,8 @@ public:
 
   // Semantic Debug API
   std::string getName() const override { return "AsteroidPanel"; }
+  const char *typeId() const override { return "asteroid"; }
+  std::string getDisplayName() const override { return "Asteroids"; }
 
 protected:
   SDL_Color getRowColor(int index,

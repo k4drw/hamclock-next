@@ -1,4 +1,5 @@
 #include "WeatherPanel.h"
+#include "WidgetRegistry.h"
 #include "../core/Theme.h"
 #include "FontCatalog.h"
 #include <cstdio>
@@ -162,3 +163,11 @@ void WeatherPanel::render(SDL_Renderer *renderer) {
 void WeatherPanel::onResize(int x, int y, int w, int h) {
   Widget::onResize(x, y, w, h);
 }
+
+REGISTER_WIDGET("de_weather", "DE Weather", false, false, {
+  return std::make_unique<WeatherPanel>(0, 0, 0, 0, deps.fontMgr, deps.deWeatherStore, "DE Weather");
+})
+
+REGISTER_WIDGET("dx_weather", "DX Weather", false, false, {
+  return std::make_unique<WeatherPanel>(0, 0, 0, 0, deps.fontMgr, deps.dxWeatherStore, "DX Weather");
+})

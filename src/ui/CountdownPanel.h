@@ -15,6 +15,8 @@ public:
                  AppConfig &config, std::function<void()> onSave);
 
   std::string getName() const override { return "Countdown"; }
+  const char *typeId() const override { return "countdown"; }
+  std::string getDisplayName() const override { return "Countdown"; }
   void update() override;
   void render(SDL_Renderer *renderer) override;
   void onResize(int x, int y, int w, int h) override;

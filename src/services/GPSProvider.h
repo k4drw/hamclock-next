@@ -4,6 +4,8 @@
 #include "../core/HamClockState.h"
 #include <atomic>
 #include <chrono>
+#include <condition_variable>
+#include <mutex>
 #include <string>
 #include <thread>
 
@@ -24,6 +26,8 @@ private:
   HamClockState *state_;
   AppConfig &config_;
   std::atomic<bool> stopClicked_{false};
+  std::mutex stopMutex_;
+  std::condition_variable stopCv_;
   std::thread thread_;
   std::chrono::steady_clock::time_point lastUpdate_{};
 };

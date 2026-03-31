@@ -71,3 +71,8 @@ void CallbookPanel::render(SDL_Renderer *renderer) {
 void CallbookPanel::onResize(int x, int y, int w, int h) {
   Widget::onResize(x, y, w, h);
 }
+
+#include "WidgetRegistry.h"
+REGISTER_WIDGET("callbook", "Callbook", false, false, {
+  return std::make_unique<CallbookPanel>(0, 0, 0, 0, deps.fontMgr, deps.callbookStore);
+})

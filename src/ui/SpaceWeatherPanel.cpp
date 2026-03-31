@@ -531,3 +531,9 @@ nlohmann::json SpaceWeatherPanel::getDebugData() const {
   }
   return j;
 }
+
+#include "WidgetRegistry.h"
+REGISTER_WIDGET("solar", "Solar", false, false, {
+  return std::make_unique<SpaceWeatherPanel>(
+      0, 0, 0, 0, deps.fontMgr, deps.texMgr, deps.solarStore, deps.xrayHistoryStore);
+})

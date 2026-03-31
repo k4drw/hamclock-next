@@ -1,4 +1,5 @@
 #include "AsteroidPanel.h"
+#include "WidgetRegistry.h"
 #include "TextureManager.h"
 #include "../core/AsteroidPropagator.h"
 #include "../core/MemoryMonitor.h"
@@ -507,3 +508,9 @@ void AsteroidPanel::renderRowText(SDL_Renderer *renderer, int index, int rx,
     }
   }
 }
+
+REGISTER_WIDGET("asteroid", "Asteroids", false, false, {
+  return std::make_unique<AsteroidPanel>(0, 0, 0, 0, deps.fontMgr, deps.texMgr,
+      *deps.asteroidProvider, deps.state, &deps.appCfg,
+      [&appCfg = deps.appCfg, &cfgMgr = deps.cfgMgr]() { cfgMgr.save(appCfg); });
+})

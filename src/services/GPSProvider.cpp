@@ -33,7 +33,11 @@ void GPSProvider::start() {
 
 void GPSProvider::stop() {
 #ifndef __EMSCRIPTEN__
-  stopClicked_ = true;
+  {
+    std::lock_guard<std::mutex> lk(stopMutex_);
+    stopClicked_ = true;
+  }
+  stopCv_.notify_all();
   if (thread_.joinable()) {
     thread_.join();
   }
@@ -44,13 +48,15 @@ void GPSProvider::run() {
 #ifndef __EMSCRIPTEN__
   while (!stopClicked_) {
     if (!config_.gpsEnabled) {
-      std::this_thread::sleep_for(std::chrono::seconds(5));
+      std::unique_lock<std::mutex> lk(stopMutex_);
+      stopCv_.wait_for(lk, std::chrono::seconds(5), [this] { return stopClicked_.load(); });
       continue;
     }
 
     int sock = socket(AF_INET, SOCK_STREAM, 0);
     if (sock < 0) {
-      std::this_thread::sleep_for(std::chrono::seconds(10));
+      std::unique_lock<std::mutex> lk(stopMutex_);
+      stopCv_.wait_for(lk, std::chrono::seconds(10), [this] { return stopClicked_.load(); });
       continue;
     }
 
@@ -61,7 +67,8 @@ void GPSProvider::run() {
 #else
       close(sock);
 #endif
-      std::this_thread::sleep_for(std::chrono::seconds(10));
+      std::unique_lock<std::mutex> lk(stopMutex_);
+      stopCv_.wait_for(lk, std::chrono::seconds(10), [this] { return stopClicked_.load(); });
       continue;
     }
 
@@ -76,8 +83,8 @@ void GPSProvider::run() {
 #else
       close(sock);
 #endif
-      std::this_thread::sleep_for(
-          std::chrono::seconds(30)); // gpsd likely not running
+      std::unique_lock<std::mutex> lk(stopMutex_);
+      stopCv_.wait_for(lk, std::chrono::seconds(30), [this] { return stopClicked_.load(); }); // gpsd likely not running
       continue;
     }
 
@@ -92,7 +99,8 @@ void GPSProvider::run() {
 #else
       close(sock);
 #endif
-      std::this_thread::sleep_for(std::chrono::seconds(10));
+      std::unique_lock<std::mutex> lk(stopMutex_);
+      stopCv_.wait_for(lk, std::chrono::seconds(10), [this] { return stopClicked_.load(); });
       continue;
     }
 

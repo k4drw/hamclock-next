@@ -15,6 +15,8 @@ public:
             TextureManager &texMgr, DRAPProvider &provider);
 
   std::string getName() const override { return "DRAP"; }
+  const char *typeId() const override { return "drap"; }
+  std::string getDisplayName() const override { return "DRAP"; }
   void update() override;
   void render(SDL_Renderer *renderer) override;
   void onResize(int x, int y, int w, int h) override;

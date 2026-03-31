@@ -379,3 +379,10 @@ void CountdownPanel::onMouseMove(int mx, int my) {
   }
 }
 
+#include "WidgetRegistry.h"
+REGISTER_WIDGET("countdown", "Countdown", false, false, {
+  return std::make_unique<CountdownPanel>(
+      0, 0, 0, 0, deps.fontMgr, deps.appCfg,
+      [&appCfg = deps.appCfg, &cfgMgr = deps.cfgMgr]() { cfgMgr.save(appCfg); });
+})
+

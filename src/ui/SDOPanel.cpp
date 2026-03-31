@@ -1,4 +1,5 @@
 #include "SDOPanel.h"
+#include "WidgetRegistry.h"
 #include "../core/Astronomy.h"
 #include "../core/ConfigManager.h"
 #include "../core/Constants.h"
@@ -466,3 +467,9 @@ nlohmann::json SDOPanel::getDebugData() const {
 
   return data;
 }
+
+REGISTER_WIDGET("sdo", "SDO", false, false, {
+  auto p = std::make_unique<SDOPanel>(0, 0, 0, 0, deps.fontMgr, deps.texMgr, *deps.sdoProvider);
+  p->setObserver(deps.appCfg.lat, deps.appCfg.lon);
+  return p;
+})

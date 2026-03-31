@@ -64,3 +64,9 @@ void AuroraPanel::render(SDL_Renderer *renderer) {
 void AuroraPanel::onResize(int x, int y, int w, int h) {
   Widget::onResize(x, y, w, h);
 }
+
+#include "WidgetRegistry.h"
+REGISTER_WIDGET("aurora", "Aurora", false, false, {
+  return std::make_unique<AuroraPanel>(
+      0, 0, 0, 0, deps.fontMgr, deps.texMgr, *deps.auroraProvider);
+})

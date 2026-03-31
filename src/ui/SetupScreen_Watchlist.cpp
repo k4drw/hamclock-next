@@ -81,6 +81,31 @@ void SetupScreen::renderTabWatchlist(SDL_Renderer *renderer, int /*cx*/,
 
   y += pad / 2;
 
+  // On The Air filter (ALL / POTA / SOTA)
+  cat->drawText(renderer, "On The Air Filter:", fieldX, y, themes.text,
+                FontStyle::SmallBold);
+  y += cat->ptSize(FontStyle::SmallBold) + 4;
+
+  static const char *kFilterLabels[] = {"All", "POTA", "SOTA"};
+  static const char *kFilterValues[] = {"all", "pota", "sota"};
+  const int filterBtnW = 56;
+  const int filterBtnGap = 6;
+  for (int i = 0; i < 3; ++i) {
+    SDL_Rect r = {fieldX + i * (filterBtnW + filterBtnGap), y, filterBtnW, fieldH};
+    ontaFilterRects_[i] = r;
+    bool active = (ontaFilter_ == kFilterValues[i]);
+    SDL_Color fill = active ? themes.accent : themes.rowStripe1;
+    SDL_Color textCol = active ? themes.bg : themes.text;
+    SDL_SetRenderDrawColor(renderer, fill.r, fill.g, fill.b, 255);
+    SDL_RenderFillRect(renderer, &r);
+    SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
+                           themes.border.b, 255);
+    SDL_RenderDrawRect(renderer, &r);
+    cat->drawText(renderer, kFilterLabels[i], r.x + r.w / 2, r.y + r.h / 2,
+                  textCol, FontStyle::SmallBold, true, false, true);
+  }
+  y += fieldH + pad / 2;
+
   // Count hint
   char hint[48];
   std::snprintf(hint, sizeof(hint), "%d callsign(s)",

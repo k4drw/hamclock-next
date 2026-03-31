@@ -16,6 +16,8 @@ public:
   bool isConfiguring() const override { return showSetup_; }
 
   std::string getName() const override { return "Stopwatch"; }
+  const char *typeId() const override { return "stopwatch"; }
+  std::string getDisplayName() const override { return "Stopwatch"; }
   std::vector<std::string> getActions() const override {
     return {"Toggle", "Lap", "Reset"};
   }

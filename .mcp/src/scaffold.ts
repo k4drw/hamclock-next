@@ -4,6 +4,14 @@ import { writeFile, mkdir } from "fs/promises";
 import { resolve } from "path";
 import { existsSync } from "fs";
 
+// Convert CamelCase to snake_case for typeId generation
+function toSnakeCase(name: string): string {
+    return name
+        .replace(/([A-Z]+)([A-Z][a-z])/g, "$1_$2")
+        .replace(/([a-z\d])([A-Z])/g, "$1_$2")
+        .toLowerCase();
+}
+
 // ---------------------------------------------------------------------------
 // Templates
 // ---------------------------------------------------------------------------
@@ -12,31 +20,32 @@ function generateHeader(name: string, type: "Widget" | "Service"): string {
     const guard = name.toUpperCase() + "_H";
 
     if (type === "Widget") {
+        const typeId = toSnakeCase(name);
         return `#pragma once
 
 #include "Widget.h"
-#include "../core/HamClockState.h"
 #include "FontManager.h"
 #include <memory>
 #include <string>
 
 class ${name} : public Widget {
 public:
-  ${name}(int x, int y, int w, int h, FontManager &fontMgr, std::shared_ptr<HamClockState> state);
+  ${name}(int x, int y, int w, int h, FontManager &fontMgr);
   ~${name}() override = default;
 
   void update() override;
   void render(SDL_Renderer *renderer) override;
   void onResize(int x, int y, int w, int h) override;
-  
+
   std::string getName() const override { return "${name}"; }
-  std::vector<std::string> getActions() const override;
-  nlohmann::json getDebugData() const override;
+  const char *typeId() const override { return "${typeId}"; }
+  std::string getDisplayName() const override { return "${name}"; }
+  bool isScrollable() const override { return false; }
+  bool requiresConfigKey() const override { return false; }
 
 private:
   FontManager &fontMgr_;
-  std::shared_ptr<HamClockState> state_;
-  
+
   // Custom members
 };
 `;
@@ -69,10 +78,14 @@ private:
 
 function generateSource(name: string, type: "Widget" | "Service"): string {
     if (type === "Widget") {
+        const typeId = toSnakeCase(name);
         return `#include "${name}.h"
+#include "WidgetRegistry.h"
+#include "WidgetDeps.h"
+#include "../core/Theme.h"
 
-${name}::${name}(int x, int y, int w, int h, FontManager &fontMgr, std::shared_ptr<HamClockState> state)
-    : Widget(x, y, w, h), fontMgr_(fontMgr), state_(state) {
+${name}::${name}(int x, int y, int w, int h, FontManager &fontMgr)
+    : Widget(x, y, w, h), fontMgr_(fontMgr) {
 }
 
 void ${name}::update() {
@@ -81,7 +94,7 @@ void ${name}::update() {
 
 void ${name}::render(SDL_Renderer *renderer) {
   renderChrome(renderer);
-  renderTitle(renderer, fontMgr_, "${name}");
+  renderTitle(renderer, fontMgr_, getDisplayName().c_str());
 
   if (!fontMgr_.ready()) return;
 
@@ -107,15 +120,11 @@ void ${name}::onResize(int x, int y, int w, int h) {
   // Recalculate layout
 }
 
-std::vector<std::string> ${name}::getActions() const {
-  return {};
-}
-
-nlohmann::json ${name}::getDebugData() const {
-  nlohmann::json j;
-  // j["state"] = "active";
-  return j;
-}
+// Self-registration: widget appears in Setup picker automatically.
+// Replace deps.fontMgr with the actual constructor arguments needed.
+REGISTER_WIDGET("${typeId}", "${name}", /*scrollable*/false, /*requiresKey*/false, {
+  return std::make_unique<${name}>(0, 0, 0, 0, deps.fontMgr);
+})
 `;
     } else {
         return `#include "${name}.h"
@@ -126,9 +135,20 @@ ${name}::${name}(NetworkManager &netMgr, std::shared_ptr<HamClockState> state)
 }
 
 void ${name}::fetch() {
-  std::cout << "${name}: Fetching data..." << std::endl;
-  // netMgr_.fetchAsync("https://api.example.com", [this](std::string data) {
-  //   // Parse data
+  // SAFETY: Never capture raw 'this' in a fetchAsync lambda — the service may
+  // be destroyed before the callback fires. Use the shared_ptr<AsyncState> pattern:
+  //
+  // struct AsyncState {
+  //   std::mutex mutex;
+  //   ${name}Data data;
+  //   std::atomic<bool> ready{false};
+  // };
+  // std::shared_ptr<AsyncState> async_ = std::make_shared<AsyncState>();
+  //
+  // netMgr_.fetchAsync("https://api.example.com", [async = async_](std::string body) {
+  //   std::lock_guard<std::mutex> lk(async->mutex);
+  //   // parse body into async->data
+  //   async->ready.store(true);
   // });
 }
 
@@ -186,17 +206,22 @@ export async function scaffoldFeature(
     // Create instructions for registration
     let instructions = "";
     if (type === "Widget") {
+        const typeId = toSnakeCase(name);
         instructions = `
 Feature '${name}' created successfully!
 
-Next steps to register this Widget:
-1. Open 'src/core/WidgetType.h' and add a new enum value:
-   ${name.toUpperCase()},
+One step to register this Widget:
+1. Add 'src/ui/${name}.cpp' to CMakeLists.txt in the HAMCLOCK_SOURCES list.
 
-2. Open 'src/ui/WidgetSelector.cpp':
-   - Add #include "${name}.h"
-   - In createWidget(), add a case:
-     case WidgetType::${name.toUpperCase()}: return std::make_unique<${name}>(x, y, w, h, fontMgr, state);
+The widget self-registers at startup via REGISTER_WIDGET("${typeId}", ...) and will
+appear automatically in the Setup → Widgets picker and be available to all pane slots.
+
+Customise the generated files:
+- Adjust constructor arguments and factory lambda in REGISTER_WIDGET to pass
+  the correct deps (deps.fontMgr, deps.solarStore, etc. from WidgetDeps.h).
+- Set isScrollable=true if this widget is a scrollable list (pane 5 full-height mode).
+- Set requiresConfigKey=true if the widget needs an API key to be configured.
+- Update getDisplayName() in the header to a human-readable label.
 `;
     } else {
         instructions = `

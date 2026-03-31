@@ -1,4 +1,5 @@
 #include "SolarTimelinePanel.h"
+#include "WidgetRegistry.h"
 #include "../core/Astronomy.h"
 #include "../core/Logger.h"
 #include "../core/StringUtils.h"
@@ -23,15 +24,16 @@ SDL_Color SolarTimelinePanel::kpColor(float kp) const {
 void SolarTimelinePanel::update() {
   static constexpr uint32_t kFetchIntervalMs = 3 * 3600 * 1000; // 3h
   uint32_t now = SDL_GetTicks();
-  if (fetching_ || (lastFetch_ != 0 && now - lastFetch_ < kFetchIntervalMs))
+  if (async_->fetching.load() ||
+      (lastFetch_ != 0 && now - lastFetch_ < kFetchIntervalMs))
     return;
 
-  fetching_ = true;
+  async_->fetching.store(true);
   lastFetch_ = now;
 
   net_.fetchAsync(
       "https://services.swpc.noaa.gov/products/noaa-planetary-k-index-forecast.json",
-      [this](std::string body) {
+      [async = async_](std::string body) {
         SolarTimelineData d;
         try {
           auto j = nlohmann::json::parse(body);
@@ -63,10 +65,10 @@ void SolarTimelinePanel::update() {
           LOG_E("SolarTimeline", "Parse failed");
         }
         {
-          std::lock_guard<std::mutex> lk(mutex_);
-          data_ = std::move(d);
+          std::lock_guard<std::mutex> lk(async->mutex);
+          async->data = std::move(d);
         }
-        fetching_ = false;
+        async->fetching.store(false);
       },
       10800 // cache 3h
   );
@@ -85,8 +87,8 @@ void SolarTimelinePanel::render(SDL_Renderer *renderer) {
 
   SolarTimelineData d;
   {
-    std::lock_guard<std::mutex> lk(mutex_);
-    d = data_;
+    std::lock_guard<std::mutex> lk(async_->mutex);
+    d = async_->data;
   }
 
   if (!d.valid || d.blocks.empty()) {
@@ -170,3 +172,7 @@ void SolarTimelinePanel::render(SDL_Renderer *renderer) {
     cat->drawText(renderer, lbl.label, px, labelY, col, FontStyle::Micro, true);
   }
 }
+
+REGISTER_WIDGET("solar_timeline", "Solar Impact", false, false, {
+  return std::make_unique<SolarTimelinePanel>(0, 0, 0, 0, deps.fontMgr, deps.netManager);
+})

@@ -1,4 +1,5 @@
 #include "LiveSpotPanel.h"
+#include "WidgetRegistry.h"
 #include "../core/ConfigManager.h"
 #include "../core/MemoryMonitor.h"
 #include "../core/Theme.h"
@@ -545,3 +546,9 @@ nlohmann::json LiveSpotPanel::getDebugData() const {
   j["selectedBands"] = config_.liveSpotsBands;
   return j;
 }
+
+REGISTER_WIDGET("live_spots", "Live Spots", true, false, {
+  return std::make_unique<LiveSpotPanel>(
+      0, 0, 0, 0, deps.fontMgr, *deps.spotProvider, deps.spotStore,
+      deps.appCfg, deps.cfgMgr);
+})

@@ -326,3 +326,8 @@ bool ContestPanel::onKeyDown(SDL_Keycode key, Uint16 mod) {
   }
   return false;
 }
+
+#include "WidgetRegistry.h"
+REGISTER_WIDGET("contests", "Contests", true, false, {
+  return std::make_unique<ContestPanel>(0, 0, 0, 0, deps.fontMgr, deps.contestStore);
+})

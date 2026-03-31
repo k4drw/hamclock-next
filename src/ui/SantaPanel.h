@@ -13,6 +13,8 @@ public:
              std::shared_ptr<SantaStore> store);
 
   std::string getName() const override { return "Santa"; }
+  const char *typeId() const override { return "santa_tracker"; }
+  std::string getDisplayName() const override { return "Santa Tracker"; }
   void update() override;
   void render(SDL_Renderer *renderer) override;
 

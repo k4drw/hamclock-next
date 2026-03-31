@@ -5,7 +5,9 @@
 #include "../core/OrbitPredictor.h"
 #include "../core/RotatorData.h"
 #include <atomic>
+#include <condition_variable>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <thread>
 
@@ -52,6 +54,8 @@ private:
 
   std::atomic<bool> running_{false};
   std::thread pollThread_;
+  std::mutex stopMutex_;
+  std::condition_variable stopCv_;
 
   // Auto-tracking state
   mutable std::mutex trackMutex_;

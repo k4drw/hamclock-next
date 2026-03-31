@@ -61,5 +61,6 @@ static constexpr uint32_t AE_TOUCH = 19; // REST /set_touch: data1=x, data2=y (l
 static constexpr uint32_t AE_WHEEL = 20; // REST /set_wheel: data1=deltaY (positive=up, negative=down)
 static constexpr uint32_t AE_SATELLITE_DATA_READY = 21;
 static constexpr uint32_t AE_UPDATE_DATA_READY = 22;
+static constexpr uint32_t AE_SPACEWX_ALERT_READY = 23;
 
 } // namespace HamClock

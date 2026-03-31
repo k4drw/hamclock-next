@@ -1,4 +1,5 @@
 #include "DXClusterPanel.h"
+#include "WidgetRegistry.h"
 #include "../core/ConfigManager.h"
 #include "../core/LiveSpotData.h"
 #include "../core/Logger.h"
@@ -354,3 +355,15 @@ nlohmann::json DXClusterPanel::getDebugData() const {
   }
   return j;
 }
+
+#ifndef __EMSCRIPTEN__
+REGISTER_WIDGET("dx_cluster", "DX Cluster", true, false, {
+  return std::make_unique<DXClusterPanel>(
+      0, 0, 0, 0, deps.fontMgr, deps.dxcStore, deps.rigService, &deps.appCfg);
+})
+#else
+REGISTER_WIDGET("dx_cluster", "DX Cluster", true, false, {
+  return std::make_unique<DXClusterPanel>(
+      0, 0, 0, 0, deps.fontMgr, deps.dxcStore, nullptr, &deps.appCfg);
+})
+#endif

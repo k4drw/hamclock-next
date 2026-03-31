@@ -27,6 +27,8 @@ public:
   bool onMouseUp(int mx, int my, Uint16 mod, int clicks) override;
 
   std::string getName() const override { return "SpaceWeather"; }
+  const char *typeId() const override { return "solar"; }
+  std::string getDisplayName() const override { return "Solar"; }
   std::vector<std::string> getActions() const override;
   bool performAction(const std::string &action) override;
   SDL_Rect getActionRect(const std::string &action) const override;

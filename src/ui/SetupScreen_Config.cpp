@@ -1,4 +1,5 @@
 #include "SetupScreen.h"
+#include "WidgetRegistry.h"
 #include "../core/StringUtils.h"
 #include <SDL.h>
 #include <string>
@@ -50,6 +51,7 @@ void SetupScreen::setConfig(const AppConfig &cfg) {
   syncRotation_ = cfg.syncRotation;
   contestModeActive_ = cfg.contestModeActive;
   watchlistEntries_ = cfg.watchlist;
+  ontaFilter_ = cfg.ontaFilter;
   watchlistInputField_.clear();
   watchlistScrollOffset_ = 0;
   theme_ = cfg.theme;
@@ -103,6 +105,12 @@ void SetupScreen::setConfig(const AppConfig &cfg) {
   paneRotations_[3] = cfg.pane4Rotation;
   paneRotations_[4] = cfg.pane5Rotation;
   paneRotations_[5] = cfg.pane6Rotation;
+  {
+    bool allScrollable = !cfg.pane5Rotation.empty();
+    for (auto t : cfg.pane5Rotation)
+      { auto *d = WidgetRegistry::instance().find(t); if (!d || !d->isScrollable) { allScrollable = false; break; } }
+    pane5FullHeight_ = cfg.pane6Rotation.empty() && allScrollable;
+  }
 
   colorOverrides_ = cfg.colorOverrides;
 
@@ -150,6 +158,7 @@ AppConfig SetupScreen::getConfig(const AppConfig& base) const {
   cfg.rotationIntervalS = rotationInterval_;
   cfg.syncRotation = syncRotation_;
   cfg.watchlist = watchlistEntries_;
+  cfg.ontaFilter = ontaFilter_;
   cfg.theme = theme_;
   cfg.mapStyle = mapStyle_;
   cfg.projection = projection_;

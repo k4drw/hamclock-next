@@ -147,17 +147,19 @@ private:
   bool rotatorAutoTrack_ = false;
   bool rotatorUpover_ = false;
 
-  std::vector<WidgetType> paneRotations_[6];
+  std::vector<std::string> paneRotations_[6];
   bool syncRotation_ = false;
   SDL_Rect syncRotationRect_ = {0, 0, 0, 0};
 
   // Contest Mode state
   bool contestModeActive_ = false;
-  std::vector<WidgetType> contestSavedRotations_[6];
+  std::vector<std::string> contestSavedRotations_[6];
   SDL_Rect contestModeBtn_ = {0, 0, 0, 0};
 
   // Watchlist tab
   std::vector<std::string> watchlistEntries_;
+  std::string ontaFilter_;
+  SDL_Rect ontaFilterRects_[3] = {};  // 0=ALL, 1=POTA, 2=SOTA
   TextInput watchlistInputField_;
   SDL_Rect watchlistInputRect_ = {0, 0, 0, 0};
   SDL_Rect watchlistAddRect_ = {0, 0, 0, 0};
@@ -169,7 +171,8 @@ private:
   int widgetListStartY_ = 0;
   int widgetListEndY_ = 0;
   int widgetListMaxScroll_ = 0;
-  SDL_Rect sidePanelModeRects_[4] = {};
+  SDL_Rect fullHeightCheckRect_ = {0, 0, 0, 0};  // pane 5 "Full Height" checkbox
+  bool pane5FullHeight_ = false;
   int activePane_ = 0;
   int activeField_ = 0;
   bool complete_ = false;
@@ -193,6 +196,7 @@ private:
   SDL_Rect weatherOverlayRect_ = {0, 0, 0, 0};  SDL_Rect mapStyleRect_ = {0, 0, 0, 0};
   SDL_Rect projectionRect_ = {0, 0, 0, 0};
   SDL_Rect rotationToggleRect_ = {0, 0, 0, 0};
+  SDL_Rect paneDiagramRects_[6] = {};  // [0-3] top panes, [4-5] side panes
   SDL_Rect okBtnRect_ = {0, 0, 0, 0};
   SDL_Rect cancelBtnRect_ = {0, 0, 0, 0};
   SDL_Rect brightnessSliderRect_ = {0, 0, 0, 0};
@@ -203,7 +207,7 @@ private:
   std::unique_ptr<HamClock::ThemeCustomizer> themeCustomizer_;
 
   struct WidgetClickRect {
-    WidgetType type;
+    std::string type;
     SDL_Rect rect;
   };
   std::vector<WidgetClickRect> widgetRects_;

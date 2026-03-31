@@ -19,6 +19,10 @@ public:
   bool onMouseWheel(int scrollY) override;
 
   std::string getName() const override { return "Winlink"; }
+  const char *typeId() const override { return "winlink"; }
+  std::string getDisplayName() const override { return "Winlink"; }
+  bool isScrollable() const override { return false; }
+  bool requiresConfigKey() const override { return true; }
 
 private:
   FontManager &fontMgr_;

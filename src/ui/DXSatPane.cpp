@@ -1,4 +1,5 @@
 #include "DXSatPane.h"
+#include "WidgetRegistry.h"
 #include "../core/Constants.h"
 #include "../core/GreylineCalculator.h"
 #include "../core/MemoryMonitor.h"
@@ -208,9 +209,20 @@ bool DXSatPane::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
       return true;
   }
 
-  // 2. Upper 10% title bar → open selection menu
+  // 2. Upper 10% title bar — SAT mode opens satellite options menu;
+  // DX mode returns false so PaneContainer handles widget selection.
   int headerH = std::max(1, height_ / 10);
   if (my < y_ + headerH) {
+    if (mode_ == Mode::SAT) {
+      openMenu();
+      return true;
+    }
+    return false;
+  }
+
+  // 3. DX mode body click (lower 90%) not consumed by DXPanel — open satellite
+  // list so the user can switch this pane to satellite mode.
+  if (mode_ == Mode::DX) {
     openMenu();
     return true;
   }
@@ -509,3 +521,24 @@ nlohmann::json DXSatPane::getDebugData() const {
   }
   return satPanel_.getDebugData();
 }
+
+REGISTER_WIDGET("dx_info", "DX Info", false, false, {
+  auto p = std::make_unique<DXSatPane>(
+      0, 0, 0, 0, deps.fontMgr, deps.texMgr, deps.state,
+      *deps.satMgr, deps.dxWeatherStore);
+  p->setObserver(deps.appCfg.lat, deps.appCfg.lon);
+  p->restoreState(deps.appCfg.panelMode, deps.appCfg.selectedSatellite);
+  p->setMapTrackVisible(deps.appCfg.showSatTrack);
+  p->setOnModeChanged(
+      [&appCfg = deps.appCfg, &cfgMgr = deps.cfgMgr](const std::string &mode, const std::string &satName) {
+        appCfg.panelMode = mode;
+        appCfg.selectedSatellite = satName;
+        cfgMgr.save(appCfg);
+      });
+  p->setOnMapTrackToggle(
+      [&appCfg = deps.appCfg, &cfgMgr = deps.cfgMgr](bool enabled) {
+        appCfg.showSatTrack = enabled;
+        cfgMgr.save(appCfg);
+      });
+  return p;
+})

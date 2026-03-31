@@ -1,4 +1,5 @@
 #include "SetupScreen.h"
+#include "WidgetRegistry.h"
 #include "../core/ContestModeManager.h"
 #include "../core/DisplayPower.h"
 #include "../core/StringUtils.h"
@@ -89,6 +90,10 @@ bool SetupScreen::onMouseDown(int mx, int my, Uint16 mod, int clicks) {
         ti->setActive(true);
         ti->onMouseDown(mx, my, clicks, fontMgr_, r.x, r.y, r.w, r.h,
                         FontStyle::SmallRegular, textPad);
+#ifdef __ANDROID__
+        SDL_StopTextInput();  // reset IME composition buffer before activating new field
+        SDL_StartTextInput();
+#endif
       }
       return true;
     }
@@ -166,20 +171,36 @@ bool SetupScreen::onMouseDown(int mx, int my, Uint16 mod, int clicks) {
     if (hitField(brightTimeRect_, 1, &brightTimeInput_))
       return true;
   } else if (activeTab_ == Tab::Widgets) {
-    // 1. Pane Switching (4 top-bar panes, 1 row)
-    int yW = modalRect_.y + cat->ptSize(FontStyle::MediumBold) + 2 * pad +
-             fieldH + cat->ptSize(FontStyle::SmallBold) + pad / 2;
-    const int btnH = 22;
-    int paneW = fieldW / 4;
-    for (int i = 0; i < 4; ++i) {
-      SDL_Rect pr = {fieldX + i * paneW, yW, paneW - 4, btnH};
-      if (mx >= pr.x && mx < pr.x + pr.w && my >= pr.y && my < pr.y + pr.h) {
+    // 1. Pane Switching via layout diagram (panes 1-4 top bar + 5-6 side panel)
+    for (int i = 0; i < 6; ++i) {
+      const auto &pr = paneDiagramRects_[i];
+      if (pr.w > 0 && mx >= pr.x && mx < pr.x + pr.w && my >= pr.y && my < pr.y + pr.h) {
         if (activePane_ != i) {
           activePane_ = i;
           widgetListScrollOffset_ = 0;
         }
         return true;
       }
+    }
+
+    // 1b. "Full Height" checkbox for pane 5 and 6
+    if ((activePane_ == 4 || activePane_ == 5) && fullHeightCheckRect_.w > 0 &&
+        mx >= fullHeightCheckRect_.x && mx < fullHeightCheckRect_.x + fullHeightCheckRect_.w &&
+        my >= fullHeightCheckRect_.y && my < fullHeightCheckRect_.y + fullHeightCheckRect_.h) {
+      pane5FullHeight_ = !pane5FullHeight_;
+      if (pane5FullHeight_) {
+        activePane_ = 4; // switch to pane 5 since full height widgets reside there
+        paneRotations_[5].clear();
+        auto &p5 = paneRotations_[4];
+        p5.erase(std::remove_if(p5.begin(), p5.end(),
+                                [](const std::string &t) {
+                                  auto *d = WidgetRegistry::instance().find(t);
+                                  return !d || !d->isScrollable;
+                                }),
+                 p5.end());
+      }
+      widgetListScrollOffset_ = 0;
+      return true;
     }
 
     // 2. Sync Rotation Toggle
@@ -214,7 +235,8 @@ bool SetupScreen::onMouseDown(int mx, int my, Uint16 mod, int clicks) {
         mx < rotationToggleRect_.x + rotationToggleRect_.w &&
         my >= rotationToggleRect_.y &&
         my < rotationToggleRect_.y + rotationToggleRect_.h) {
-      activeField_ = 0; // Focus rotation interval input
+      activeField_ = 0;
+      rotationInterval_ = 0;  // Clear for fresh input
       return true;
     }
 
@@ -232,21 +254,6 @@ bool SetupScreen::onMouseDown(int mx, int my, Uint16 mod, int clicks) {
       return true;
     }
 
-    // 6. Side Panel Mode
-    static const WidgetType kMode5[] = {
-        WidgetType::DE_INFO, WidgetType::DX_CLUSTER, WidgetType::ON_THE_AIR,
-        WidgetType::LIVE_SPOTS};
-    for (int i = 0; i < 4; ++i) {
-      auto &sr = sidePanelModeRects_[i];
-      if (sr.w > 0 && mx >= sr.x && mx < sr.x + sr.w && my >= sr.y &&
-          my < sr.y + sr.h) {
-        paneRotations_[4] = {kMode5[i]};
-        paneRotations_[5] = (i == 0)
-                                ? std::vector<WidgetType>{WidgetType::DX_INFO}
-                                : std::vector<WidgetType>{};
-        return true;
-      }
-    }
   } else if (activeTab_ == Tab::Watchlist) {
     // Input field focus
     if (hitField(watchlistInputRect_, 0, &watchlistInputField_))
@@ -302,6 +309,16 @@ bool SetupScreen::onMouseDown(int mx, int my, Uint16 mod, int clicks) {
       if (watchlistScrollOffset_ + maxVisible < (int)watchlistEntries_.size())
         ++watchlistScrollOffset_;
       return true;
+    }
+
+    // On The Air filter buttons (ALL / POTA / SOTA)
+    static const char *kOntaFilterValues[] = {"all", "pota", "sota"};
+    for (int i = 0; i < 3; ++i) {
+      const SDL_Rect &r = ontaFilterRects_[i];
+      if (r.w > 0 && mx >= r.x && mx < r.x + r.w && my >= r.y && my < r.y + r.h) {
+        ontaFilter_ = kOntaFilterValues[i];
+        return true;
+      }
     }
   }
 
@@ -471,9 +488,15 @@ bool SetupScreen::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
   if (TextInput *ti = getActiveInput())
     ti->onMouseUp();
 
-  // If clicked outside modal, cancel
+  // If clicked outside modal, cancel (or just dismiss keyboard on Android)
   if (mx < modalRect_.x || mx >= modalRect_.x + modalRect_.w ||
       my < modalRect_.y || my >= modalRect_.y + modalRect_.h) {
+#ifdef __ANDROID__
+    if (SDL_IsTextInputActive()) {
+      SDL_StopTextInput();
+      return true; // consume tap — dismiss keyboard, don't close settings
+    }
+#endif
     cancelled_ = true;
     complete_ = true;
     return true;
@@ -657,6 +680,24 @@ bool SetupScreen::onKeyDown(SDL_Keycode key, Uint16 mod) {
     return true;
   }
 
+  // Rotation interval: handle digit keys directly from KEYDOWN so this works on
+  // framebuffer builds where SDL_TEXTINPUT events may not be generated.
+  if (activeTab_ == Tab::Widgets && activeField_ == 0) {
+    int digit = -1;
+    if (key >= SDLK_0 && key <= SDLK_9)
+      digit = key - SDLK_0;
+    else if (key >= SDLK_KP_1 && key <= SDLK_KP_9)
+      digit = key - SDLK_KP_1 + 1;
+    else if (key == SDLK_KP_0)
+      digit = 0;
+    if (digit >= 0) {
+      rotationInterval_ = rotationInterval_ * 10 + digit;
+      if (rotationInterval_ > 3600)
+        rotationInterval_ = 3600;
+      return true;
+    }
+  }
+
   switch (key) {
   case SDLK_ESCAPE:
     complete_ = true;
@@ -737,12 +778,8 @@ bool SetupScreen::onTextInput(const char *inputText) {
 
   if (activeTab_ == Tab::Widgets) {
     if (activeField_ == 0) {
-      // Rotation interval: numeric only
-      if (inputText[0] >= '0' && inputText[0] <= '9') {
-        rotationInterval_ = rotationInterval_ * 10 + (inputText[0] - '0');
-        if (rotationInterval_ > 3600)
-          rotationInterval_ = 3600;
-      }
+      // Digits are handled in onKeyDown to support framebuffer builds.
+      // Consume TEXTINPUT here to prevent double-counting.
       return true;
     }
   }

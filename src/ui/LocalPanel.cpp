@@ -1,8 +1,10 @@
 #include "LocalPanel.h"
+#include "WidgetRegistry.h"
 #include "../core/Astronomy.h"
 #include "../core/MemoryMonitor.h"
 #include "../core/Theme.h"
 #include "../core/TimeUtils.h"
+#include "../core/ConfigManager.h"
 #include "FontCatalog.h"
 
 #include <algorithm>
@@ -107,6 +109,7 @@ void LocalPanel::render(SDL_Renderer *renderer) {
   SDL_RenderSetClipRect(renderer, &clip);
 
   ThemeColors themes = getThemeColors(theme_);
+  AppConfig cfg = ConfigManager::instance().getConfig();
 
   renderChrome(renderer);
 
@@ -122,7 +125,8 @@ void LocalPanel::render(SDL_Renderer *renderer) {
       themes.warning, // Weather 2
   };
 
-  fontMgr_.catalog()->drawText(renderer, "DE", x_ + 10, y_ + 5, themes.accent,
+  std::string myCall = "DE";
+  fontMgr_.catalog()->drawText(renderer, myCall, x_ + 10, y_ + 5, themes.accent,
                                FontStyle::MicroBold);
 
   int titleH = 20;
@@ -207,3 +211,7 @@ nlohmann::json LocalPanel::getDebugData() const {
   }
   return json;
 }
+
+REGISTER_WIDGET("de_info", "DE Info", false, false, {
+  return std::make_unique<LocalPanel>(0, 0, 0, 0, deps.fontMgr, deps.state, deps.deWeatherStore);
+})

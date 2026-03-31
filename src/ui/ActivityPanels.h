@@ -15,7 +15,17 @@ public:
              ActivityProvider &provider,
              std::shared_ptr<ActivityDataStore> store);
 
+  std::string getName() const override { return "DXPedPanel"; }
+  const char *typeId() const override { return "dx_peditions"; }
+  std::string getDisplayName() const override { return "DX Peditions"; }
+  bool isScrollable() const override { return true; }
+  bool requiresConfigKey() const override { return false; }
+
   void update() override;
+
+protected:
+  void renderRowText(SDL_Renderer *renderer, int index, int rx, int ry,
+                     int rw, int rh, SDL_Color color) override;
 
 private:
   ActivityProvider &provider_;
@@ -64,6 +74,10 @@ public:
   }
 
   std::string getName() const override { return "ONTAPanel"; }
+  const char *typeId() const override { return "on_the_air"; }
+  std::string getDisplayName() const override { return "On The Air"; }
+  bool isScrollable() const override { return true; }
+  bool requiresConfigKey() const override { return false; }
 
   // Modal setup screen
   bool isModalActive() const override;

@@ -19,6 +19,8 @@ public:
   ~MoonPanel() override;
 
   std::string getName() const override { return "Moon"; }
+  const char *typeId() const override { return "moon"; }
+  std::string getDisplayName() const override { return "Moon"; }
   void update() override;
   void render(SDL_Renderer *renderer) override;
   void onResize(int x, int y, int w, int h) override;

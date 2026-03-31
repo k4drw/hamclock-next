@@ -19,6 +19,7 @@
 
 #include <SDL.h>
 
+#include <atomic>
 #include <ctime>
 #include <memory>
 #include <mutex>
@@ -130,7 +131,7 @@ private:
   void renderNightOverlay(SDL_Renderer *renderer);
   void renderGridOverlay(SDL_Renderer *renderer);
   void renderGreatCircle(SDL_Renderer *renderer);
-  enum class MarkerShape { Circle, Square };
+  enum class MarkerShape { Circle, Square, Triangle, CircleWithDot };
   void renderMarker(SDL_Renderer *renderer, double lat, double lon, Uint8 r,
                     Uint8 g, Uint8 b, MarkerShape shape = MarkerShape::Circle,
                     bool outline = true);
@@ -170,6 +171,10 @@ private:
   std::shared_ptr<IonosondeProvider> iono_;
   SolarDataStore *solar_ = nullptr;
   OrbitPredictor *predictor_ = nullptr;
+  // Guards WorkerService ground-track tasks: set to false in ~MapWidget() so
+  // any in-flight task exits early before touching the dangling predictor_.
+  std::shared_ptr<std::atomic<bool>> trackAlive_ =
+      std::make_shared<std::atomic<bool>>(true);
   AsteroidProvider *asteroidProvider_ = nullptr;
   std::vector<PaneContainer *> panes_;
 
@@ -253,7 +258,9 @@ private:
   void renderWxMbLegend(SDL_Renderer *renderer);
   void renderCloudLegend(SDL_Renderer *renderer);
   void renderTooltip(SDL_Renderer *renderer);
+  void renderTooltipLayer(SDL_Renderer *renderer) override;
   void renderProjectionSelect(SDL_Renderer *renderer);
+  void renderStarField(SDL_Renderer *renderer);
 
   AppConfig &config_;
   std::function<void()> onConfigChanged_;

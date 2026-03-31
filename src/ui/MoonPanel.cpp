@@ -157,3 +157,9 @@ void MoonPanel::onResize(int x, int y, int w, int h) {
     valueFontSize_ = cat->ptSize(FontStyle::SmallRegular);
   }
 }
+
+#include "WidgetRegistry.h"
+REGISTER_WIDGET("moon", "Moon", false, false, {
+  return std::make_unique<MoonPanel>(
+      0, 0, 0, 0, deps.fontMgr, deps.texMgr, deps.netManager, deps.moonStore);
+})

@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - master
-      - v1.0B04
     paths:
       - 'docs/wiki/**'
 
@@ -15,10 +14,10 @@ jobs:
       contents: write
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Sync to Wiki
-        uses: Andrew-Chen-Wang/github-wiki-action@v4
+        uses: Andrew-Chen-Wang/github-wiki-action@v5
         with:
           strategy: clone
           path: docs/wiki

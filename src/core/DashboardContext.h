@@ -104,6 +104,10 @@ class LightningProvider;
 class SolarStormProvider;
 }
 
+// New widget providers (forward declarations)
+class SpaceWeatherAlertStore;
+class SpaceWeatherAlertProvider;
+
 // Providers (shared_ptr)
 class SDOProvider;
 class AuroraProvider;
@@ -184,6 +188,10 @@ struct DashboardContext {
   std::shared_ptr<WxMbProvider> wxMbProvider;
   std::shared_ptr<QRZProvider> qrzProvider;
 
+  // New widget providers
+  std::shared_ptr<SpaceWeatherAlertStore> spaceWxAlertStore;
+  std::unique_ptr<SpaceWeatherAlertProvider> spaceWxAlertProvider;
+
   // Services
 #ifndef __EMSCRIPTEN__
   std::unique_ptr<RotatorService> rotatorService;
@@ -200,13 +208,13 @@ struct DashboardContext {
   LayoutManager layout;
 
   // Collections
-  std::map<WidgetType, std::unique_ptr<Widget>> widgetPool;
+  std::map<std::string, std::unique_ptr<Widget>> widgetPool;
   std::vector<Widget *> widgets;
   std::vector<Widget *> eventWidgets;
 
   // Widget factory — stored as a member so pane containers hold a valid [this]
   // capture rather than a dangling reference to a constructor-local lambda.
-  std::function<Widget *(WidgetType)> widgetFactory_;
+  std::function<Widget *(const std::string &)> widgetFactory_;
 
   // State
   Uint32 lastFetchMs = 0;
@@ -223,6 +231,13 @@ struct DashboardContext {
   bool cursorVisible = true;
   Uint32 lastSleepAssert = 0;
   Uint32 lastMemLogMs = 0;
+  float fingerScrollAccum_ = 0.0f;  // accumulated normalized finger-Y for swipe-to-scroll
+  bool fingerWasScrolling_ = false;  // true if current touch gesture crossed scroll threshold
+  // Guards the setOnParksReady lambda captured by the background worker thread.
+  // Set to false in ~DashboardContext() so the callback exits safely after
+  // the dashboard is destroyed, avoiding the data race on ctx.dashboard.get().
+  std::shared_ptr<std::atomic<bool>> parksReadyLive_ =
+      std::make_shared<std::atomic<bool>>(true);
 
   // State for background data aggregation
   std::vector<std::string> rssHeadlines[3];
@@ -231,7 +246,7 @@ struct DashboardContext {
   DashboardContext(AppContext &ctx);
   ~DashboardContext();
 
-  void applySidePanelMode(WidgetType chosen, AppContext &ctx);
+  void applySidePanelMode(const std::string &chosen, AppContext &ctx);
   void expandPane(int idx, AppContext &ctx);
   void restorePane(AppContext &ctx);
   void update(AppContext &ctx);
@@ -329,7 +344,7 @@ struct AppContext {
   // Rotation control commands written by WebServer thread, consumed on main
   // thread. rotationCmd: 0=none, 1=pause, 2=resume, 3=next, 4=jump-to-widget
   // rotationCmdPane: -1=all panes, 0-5=specific pane
-  // rotationCmdWidget: WidgetType as int (used with cmd=4)
+  // rotationCmdWidget: registry index (used with cmd=4)
   std::atomic<int> rotationCmd{0};
   std::atomic<int> rotationCmdPane{-1};
   std::atomic<int> rotationCmdWidget{-1};

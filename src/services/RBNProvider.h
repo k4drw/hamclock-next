@@ -4,7 +4,9 @@
 #include "../core/DXClusterData.h"
 #include "../core/PrefixManager.h"
 #include <atomic>
+#include <condition_variable>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <thread>
 
@@ -38,6 +40,8 @@ private:
   std::thread thread_;
   std::atomic<bool> running_{false};
   std::atomic<bool> stopRequested_{false};
+  std::mutex stopMutex_;
+  std::condition_variable stopCv_;
 
   static constexpr const char *DEFAULT_HOST = "telnet.reversebeacon.net";
   static constexpr int DEFAULT_PORT = 7000;

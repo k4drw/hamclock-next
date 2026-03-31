@@ -18,14 +18,43 @@ project(HamClock-Next
     LANGUAGES C CXX
 )
 
-if(EMSCRIPTEN)
-    # Use C++17 for WASM to avoid fmt/spdlog consteval issues in Emscripten's C++20 implementation
+if(EMSCRIPTEN OR IOS)
+    # Use C++17 for WASM/iOS to avoid fmt/spdlog consteval issues
     set(CMAKE_CXX_STANDARD 17)
 else()
     set(CMAKE_CXX_STANDARD 20)
 endif()
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+# ── iOS cross-compile config ──────────────────────────────────────────────
+if(IOS)
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "16.0" CACHE STRING "" FORCE)
+    # Use Apple SecureTransport (built into iOS) instead of mbedtls for CURL TLS
+    set(CURL_USE_SECTRANSP ON CACHE BOOL "" FORCE)
+    set(ENABLE_MBEDTLS OFF CACHE BOOL "" FORCE)
+    # Suppress tests in third-party deps (same pattern as Android)
+    set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
+    set(ENABLE_TESTING OFF CACHE BOOL "" FORCE)
+    set(BUILD_CURL_EXE OFF CACHE BOOL "" FORCE)
+    # Prevent host pkg-config from leaking macOS libraries into the iOS sysroot
+    macro(pkg_check_modules)
+        message(STATUS "iOS build: pkg_check_modules disabled")
+    endmacro()
+    # Pre-cache ApplicationServices to empty so find_library() in FreeType and
+    # HarfBuzz (pulled in by SDL2_ttf) skips the macOS host filesystem search.
+    # Both variable names are used across different library versions.
+    set(APPLICATIONSERVICES_LIBRARY "" CACHE FILEPATH "Disabled on iOS" FORCE)
+    set(APPLICATION_SERVICES_FRAMEWORK "" CACHE FILEPATH "Disabled on iOS" FORCE)
+    set(CORESERVICES_LIBRARY "" CACHE FILEPATH "Disabled on iOS" FORCE)
+    set(CORE_SERVICES_FRAMEWORK "" CACHE FILEPATH "Disabled on iOS" FORCE)
+
+    # Disable IMAGEIO backend for SDL2_image on iOS to avoid hardcoded ApplicationServices framework.
+    # iOS has ImageIO, but the SDL2_image CMakeLists.txt hardcodes the macOS-only ApplicationServices
+    # umbrella framework instead of linking ImageIO directly. Fall back to stb_image.
+    set(SDL2IMAGE_BACKEND_IMAGEIO OFF CACHE BOOL "Disabled on iOS" FORCE)
+endif()
+
 # Target architecture detection
 if(NOT HAMCLOCK_ARCH)
     set(HAMCLOCK_ARCH "${CMAKE_SYSTEM_PROCESSOR}")
@@ -61,6 +90,12 @@ set(SDL2IMAGE_BUILD_SHARED_LIBS OFF CACHE BOOL "Build shared SDL2_image library"
 # --- Build Options ---
 option(ENABLE_DEBUG_API "Enable debug API endpoints and live view (increases CPU usage)" OFF)
 option(ENABLE_ASAN "Enable AddressSanitizer + UBSan (Debug only)" OFF)
+set(HC_LOG_LEVEL "" CACHE STRING "Override compiled-in default log level (trace/debug/info/warn/error). Empty = warn.")
+
+if(HC_LOG_LEVEL)
+    add_compile_definitions(HC_LOG_LEVEL="${HC_LOG_LEVEL}")
+    message(STATUS "Log level override: ${HC_LOG_LEVEL}")
+endif()
 
 if(ENABLE_DEBUG_API)
     add_compile_definitions(ENABLE_DEBUG_API)
@@ -81,9 +116,11 @@ if(NOT EMSCRIPTEN)
         set(SDL2_STATIC ON CACHE BOOL "Build static SDL library" FORCE)
         # ...
         set(SDL_TEST OFF CACHE BOOL "Disable SDL tests")
-        set(SDL_JOYSTICK OFF CACHE BOOL "Disable SDL joystick")
-        set(SDL_HAPTIC OFF CACHE BOOL "Disable SDL haptic")
-        set(SDL_SENSOR OFF CACHE BOOL "Disable SDL sensor")
+        if(NOT ANDROID)
+            set(SDL_JOYSTICK OFF CACHE BOOL "Disable SDL joystick")
+            set(SDL_HAPTIC OFF CACHE BOOL "Disable SDL haptic")
+            set(SDL_SENSOR OFF CACHE BOOL "Disable SDL sensor")
+        endif()
 
         set(SDL_PIPEWIRE OFF CACHE BOOL "Disable SDL PipeWire audio")
 
@@ -151,8 +188,9 @@ if(NOT EMSCRIPTEN)
     endif()
 endif()
 
-# 4. mbedtls (for static SSL on Linux/RPi)
-if(NOT WIN32 AND NOT EMSCRIPTEN)
+# 4. mbedtls (for static SSL on Linux/RPi/Android — cross-compiles cleanly with NDK)
+# iOS uses SecureTransport (built into the OS) — mbedtls is not needed.
+if(NOT WIN32 AND NOT EMSCRIPTEN AND NOT IOS)
     set(ENABLE_TESTING OFF CACHE BOOL "Disable mbedtls tests")
     set(ENABLE_PROGRAMS OFF CACHE BOOL "Disable mbedtls programs")
     set(MBEDTLS_FATAL_WARNINGS OFF CACHE BOOL "No fatal warnings")
@@ -185,6 +223,9 @@ if(NOT EMSCRIPTEN)
     if(WIN32)
         # Windows always uses vendored static build
         set(USE_SYSTEM_CURL OFF)
+    elseif(IOS)
+        # iOS cross-compile: system CURL is macOS-targeted; always build from source
+        set(USE_SYSTEM_CURL OFF)
     else()
         # On Linux/macOS, check for system CURL first
         find_package(CURL)
@@ -205,6 +246,15 @@ if(NOT EMSCRIPTEN)
         if(WIN32)
             set(CURL_USE_OPENSSL OFF CACHE BOOL "Disable OpenSSL on Windows (use Schannel)")
             set(CURL_USE_SCHANNEL ON CACHE BOOL "Use Windows native SSL")
+        elseif(IOS)
+            set(CURL_USE_OPENSSL OFF CACHE BOOL "Disable OpenSSL")
+            set(CURL_USE_MBEDTLS OFF CACHE BOOL "Disable mbedtls on iOS" FORCE)
+            set(CURL_USE_SECTRANSP ON CACHE BOOL "Use iOS/macOS SecureTransport" FORCE)
+            set(CURL_USE_SCHANNEL OFF CACHE BOOL "Disable Schannel on non-Windows")
+            # Prevent CURL from finding host (macOS) libraries that have no iOS equivalent
+            set(USE_LIBIDN2 OFF CACHE BOOL "Disable libidn2 on iOS" FORCE)
+            set(CURL_USE_LIBPSL OFF CACHE BOOL "Disable libpsl on iOS" FORCE)
+            set(CURL_USE_LIBSSH2 OFF CACHE BOOL "Disable libssh2 on iOS" FORCE)
         else()
             set(CURL_USE_OPENSSL OFF CACHE BOOL "Disable OpenSSL")
             set(CURL_USE_MBEDTLS ON CACHE BOOL "Use mbedtls for static build")
@@ -334,15 +384,7 @@ else()
     endif()
 endif()
 
-# libpredict is special because it forces -Werror and adds tests unconditionally.
-# We use Populate + add_subdirectory with EXCLUDE_FROM_ALL to isolate it.
-if(NOT libpredict_FOUND)
-    FetchContent_GetProperties(libpredict)
-    if(NOT libpredict_POPULATED)
-        FetchContent_Populate(libpredict)
-        add_subdirectory(${libpredict_SOURCE_DIR} ${libpredict_BINARY_DIR} EXCLUDE_FROM_ALL)
-    endif()
-endif()
+
 
 if(NOT USE_SYSTEM_CURL AND NOT EMSCRIPTEN)
     if(ENABLE_DEBUG_API)
@@ -437,16 +479,16 @@ endforeach()
 # Special handling for libpredict (skipping tests)
 FetchContent_GetProperties(libpredict)
 if(NOT libpredict_POPULATED)
-    if(APPLE)
-        # macOS ld doesn't support --version-script used by libpredict shared build
-        set(PREDICT_SHARED OFF CACHE BOOL "Force static libpredict on macOS" FORCE)
-    endif()
     FetchContent_Populate(libpredict)
     include(GNUInstallDirs)
     set(LIBPREDICT_INCLUDE_DIR ${libpredict_BINARY_DIR}/include)
     include_directories(AFTER ${LIBPREDICT_INCLUDE_DIR})
     add_subdirectory(${libpredict_SOURCE_DIR}/include ${libpredict_BINARY_DIR}/include)
     add_subdirectory(${libpredict_SOURCE_DIR}/src ${libpredict_BINARY_DIR}/src)
+    if(APPLE)
+        # Apple ld doesn't support --version-script; strip it from the predict shared target
+        set_target_properties(predict PROPERTIES LINK_FLAGS "")
+    endif()
 endif()
 
 
@@ -545,9 +587,16 @@ set(HAMCLOCK_SOURCES
     src/services/MarineProvider.cpp
     src/services/WinlinkProvider.cpp
     src/services/GreylineDXProvider.cpp
+    src/services/SpaceWeatherAlertProvider.cpp
     src/ui/ActivityPanels.cpp
     src/ui/ADIFPanel.cpp
     src/ui/AlertsPanel.cpp
+    src/ui/SolarCyclePanel.cpp
+    src/ui/GreylineWindowsPanel.cpp
+    src/ui/DXCCProgressPanel.cpp
+    src/ui/SpaceWeatherAlertsPanel.cpp
+    src/ui/NOAASpaceWxPanel.cpp
+    src/ui/VoacapDeDxPanel.cpp
     src/ui/AsteroidPanel.cpp
     src/ui/ForecastPanel.cpp
     src/ui/HurricanePanel.cpp
@@ -577,6 +626,7 @@ set(HAMCLOCK_SOURCES
     src/ui/RigControlPanel.cpp
     src/ui/DXPanel.cpp
     src/ui/DXSatPane.cpp
+    src/ui/SatWidget.cpp
     src/ui/ListPanel.cpp
     src/ui/LiveSpotPanel.cpp
     src/ui/LocalPanel.cpp
@@ -586,6 +636,7 @@ set(HAMCLOCK_SOURCES
     src/ui/MapViewMenu.cpp
     src/ui/PaneContainer.cpp
     src/ui/PlaceholderWidget.cpp
+    src/ui/WidgetRegistry.cpp
     src/ui/ColorPicker.cpp
     src/ui/RenderUtils.cpp
     src/ui/RSSBanner.cpp
@@ -654,8 +705,8 @@ if(EMSCRIPTEN)
     )
 
     target_include_directories(hamclock-wasm PRIVATE
-        ${CMAKE_SOURCE_DIR}/include
-        ${CMAKE_SOURCE_DIR}/src
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
         ${libpredict_BINARY_DIR}/include
     )
 
@@ -682,11 +733,15 @@ else()
         set(HC_WIN32_FLAG WIN32)
     endif()
 
-    add_executable(hamclock-next ${HC_WIN32_FLAG} ${HAMCLOCK_SOURCES})
+    if(ANDROID)
+        add_library(hamclock-next SHARED ${HAMCLOCK_SOURCES})
+    else()
+        add_executable(hamclock-next ${HC_WIN32_FLAG} ${HAMCLOCK_SOURCES})
+    endif()
 
     target_include_directories(hamclock-next PRIVATE
-        ${CMAKE_SOURCE_DIR}/include
-        ${CMAKE_SOURCE_DIR}/src
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
     )
     target_include_directories(hamclock-next SYSTEM PRIVATE
         ${libpredict_BINARY_DIR}/include
@@ -706,13 +761,12 @@ else()
         predict_static
         Threads::Threads
         httplib::httplib
-        fmt::fmt
         spdlog::spdlog
         ${LIBDRM_LIBRARIES}
     )
 
     # TTS: platform-native voice alerts
-    if(APPLE)
+    if(APPLE AND NOT IOS)
         message(STATUS "TTS: macOS 'say' — voice alerts enabled")
         target_compile_definitions(hamclock-next PRIVATE HAMCLOCK_AUDIO_TTS)
     elseif(WIN32)
@@ -757,7 +811,7 @@ else()
         message(STATUS "AddressSanitizer + UBSan enabled")
     endif()
 
-    if(APPLE)
+    if(APPLE AND NOT IOS)
         # Clean up any leaked flags from dependencies that might have touched global linker flags
         string(REPLACE "-static-libgcc" "" CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS}")
         string(REPLACE "-static-libstdc++" "" CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS}")
@@ -782,6 +836,22 @@ else()
 
         target_sources(hamclock-next PRIVATE
             "${CMAKE_SOURCE_DIR}/packaging/macos/HamClockNext.icns"
+        )
+    endif()
+
+    if(IOS)
+        set_target_properties(hamclock-next PROPERTIES
+            MACOSX_BUNDLE TRUE
+            MACOSX_BUNDLE_GUI_IDENTIFIER "com.hamclock.next"
+            MACOSX_BUNDLE_BUNDLE_NAME "HamClock-Next"
+            MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
+            MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
+            XCODE_ATTRIBUTE_TARGETED_DEVICE_FAMILY "1,2"
+            XCODE_ATTRIBUTE_IPHONEOS_DEPLOYMENT_TARGET "16.0"
+            XCODE_ATTRIBUTE_CODE_SIGNING_REQUIRED "NO"
+            XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED "NO"
+            XCODE_ATTRIBUTE_UISupportedInterfaceOrientations "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
+            XCODE_ATTRIBUTE_UISupportedInterfaceOrientations_iPad "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
         )
     endif()
     install(TARGETS hamclock-next

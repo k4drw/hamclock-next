@@ -24,7 +24,8 @@ public:
     Aurora,
     DRAP,
     XRay,
-    ProtonFlux
+    ProtonFlux,
+    NOAAScales
   };
 
   NOAAProvider(NetworkManager &net, std::shared_ptr<SolarDataStore> store,
@@ -35,6 +36,7 @@ public:
   void fetch();
   void fetchDRAP();
   void fetchAuroraMap();
+  void fetchNOAAScales();
   void setDrapStore(std::shared_ptr<DRAPDataStore> s) {
     drapStore_ = std::move(s);
   }
@@ -81,6 +83,8 @@ private:
   static constexpr const char *PROTON_URL =
       "https://services.swpc.noaa.gov/json/goes/primary/"
       "integral-protons-6-hour.json";
+  static constexpr const char *NOAA_SCALES_URL =
+      "https://services.swpc.noaa.gov/products/noaa-scales.json";
 
   NetworkManager &net_;
   std::shared_ptr<SolarDataStore> store_;

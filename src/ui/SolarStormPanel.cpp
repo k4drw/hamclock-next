@@ -1,4 +1,5 @@
 #include "SolarStormPanel.h"
+#include "WidgetRegistry.h"
 #include "../core/Theme.h"
 #include "FontCatalog.h"
 #include "GraphHelper.h"
@@ -189,3 +190,7 @@ void SolarStormPanel::drawSparkline(SDL_Renderer *renderer, int x, int y, int w,
 
 
 } // namespace HamClock
+
+REGISTER_WIDGET("solar_storm", "Solar Storm", false, false, {
+  return std::make_unique<HamClock::SolarStormPanel>(0, 0, 0, 0, deps.fontMgr, deps.texMgr);
+})

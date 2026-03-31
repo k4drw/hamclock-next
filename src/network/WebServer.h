@@ -85,7 +85,7 @@ public:
   }
   void setTimePanel(TimePanel *tp) { std::lock_guard<std::mutex> lk(dataMutex_); timePanel_ = tp; }
   void setPaneExpandControl(std::atomic<int> *cmd) { std::lock_guard<std::mutex> lk(dataMutex_); paneExpandCmd_ = cmd; }
-  void setBMEProvider(BME280Provider *bme) { bmeProvider_ = bme; }
+  void setBMEProvider(BME280Provider *bme) { std::lock_guard<std::mutex> lk(dataMutex_); bmeProvider_ = bme; }
 
 private:
   void run();

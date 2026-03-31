@@ -67,6 +67,7 @@ bool BrightnessManager::detectBrightnessPath() {
   }
 
   // 2. Comprehensive glob search for any backlight control
+#if !defined(__ANDROID__)
   glob_t g;
   if (glob("/sys/class/backlight/*/brightness", 0, nullptr, &g) == 0) {
     for (size_t i = 0; i < g.gl_pathc; i++) {
@@ -81,6 +82,7 @@ bool BrightnessManager::detectBrightnessPath() {
     }
     globfree(&g);
   }
+#endif
 #endif
 
   return false;

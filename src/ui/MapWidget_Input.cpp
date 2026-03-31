@@ -6,6 +6,7 @@
 #include "MapWidget.h"
 #include "../core/AsteroidPropagator.h"
 #include "../core/Astronomy.h"
+#include "../core/StarCatalog.h"
 #include "../core/BeaconData.h"
 #include "../core/Constants.h"
 #include "../core/LiveSpotData.h"
@@ -23,6 +24,7 @@
 #include "FontCatalog.h"
 #include "PaneContainer.h"
 #include "RenderUtils.h"
+#include "../core/CountryGrid.h"
 #include <fmt/core.h>
 
 #include <algorithm>
@@ -96,6 +98,7 @@ bool MapWidget::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
     state_->mapDxGrid = state_->dxGrid;
     state_->mapDxActive = true;
     state_->dxCallsign.clear();
+    state_->dxFreqKhz = 0.0;
 
     // Clear both panel selections so they don't conflict
     if (dxcStore_)
@@ -118,6 +121,55 @@ bool MapWidget::onMouseWheel(int scrollY) {
 }
 
 void MapWidget::onMouseMove(int mx, int my) {
+  // Named-star hover: check BEFORE screenToLatLon so that stars right at the
+  // projection boundary are still reachable even if the mouse is 1-2 px inside
+  // the oval edge. The inMap test uses the STAR's position (not the mouse).
+  const std::string &proj = config_.projection;
+  if ((proj == "azimuthal" || proj == "robinson") &&
+      mx >= x_ && mx < x_ + width_ && my >= y_ && my < y_ + height_) {
+    double GMST_deg = Astronomy::calculateGST(std::chrono::system_clock::now()) * 15.0;
+    // Azimuthal circle parameters (unused for robinson).
+    float az_cx = 0, az_cy = 0, az_R2 = 0;
+    if (proj == "azimuthal") {
+      az_cx = mapRect_.x + mapRect_.w * 0.5f;
+      az_cy = mapRect_.y + mapRect_.h * 0.5f;
+      float R = std::min(mapRect_.w, mapRect_.h) * 0.5f;
+      az_R2 = R * R;
+    }
+    constexpr int kStarHitR = 6;
+    for (std::size_t i = 0; i < kBrightStarsCount; ++i) {
+      const StarEntry &star = kBrightStars[i];
+      if (!star.name)
+        continue;
+      double ra_frac = std::fmod((star.ra_deg - GMST_deg) / 360.0 + 10.0, 1.0);
+      int sx = x_ + static_cast<int>(ra_frac * width_);
+      int sy = y_ + static_cast<int>((90.0f - star.dec_deg) / 180.0f * height_);
+      int ddx = mx - sx, ddy = my - sy;
+      if (ddx * ddx + ddy * ddy > kStarHitR * kStarHitR)
+        continue;
+      // Check that the star itself is NOT inside the visible projection.
+      bool starInMap = false;
+      if (proj == "azimuthal") {
+        float fdx = sx - az_cx, fdy = sy - az_cy;
+        starInMap = (fdx * fdx + fdy * fdy) <= az_R2;
+      } else {
+        double sLat, sLon;
+        if (screenToLatLon(sx, sy, sLat, sLon)) {
+          SDL_FPoint fwd = latLonToScreen(sLat, sLon);
+          starInMap = (std::abs(fwd.x - sx) <= 2.0f && std::abs(fwd.y - sy) <= 2.0f);
+        }
+      }
+      if (!starInMap) {
+        tooltip_.text = star.name;
+        tooltip_.x = mx;
+        tooltip_.y = my;
+        tooltip_.visible = true;
+        tooltip_.timestamp = SDL_GetTicks();
+        return;
+      }
+    }
+  }
+
   double lat, lon;
   if (!screenToLatLon(mx, my, lat, lon)) {
     tooltip_.visible = false;
@@ -144,10 +196,16 @@ void MapWidget::onMouseMove(int mx, int my) {
   // 2. Check DX marker
   if (tip.empty() && state_->dxActive &&
       screenDist(state_->dxLocation.lat, state_->dxLocation.lon) < kHitRadius) {
-    tip = "DX [" + state_->dxGrid + "]";
+    tip = state_->dxCallsign.empty() ? "DX" : "DX: " + state_->dxCallsign;
+    int crow = std::clamp((int)((state_->dxLocation.lat + 90.0) * 2.0), 0, 359);
+    int ccol = std::clamp((int)((state_->dxLocation.lon + 180.0) * 2.0), 0, 719);
+    uint16_t cId = COUNTRY_GRID[crow][ccol];
+    if (cId > 0 && cId < NUM_COUNTRIES)
+      tip += "\n" + std::string(COUNTRY_NAMES[cId]);
     char buf[64];
-    std::snprintf(buf, sizeof(buf), " %.1f°N %.1f°%c",
+    std::snprintf(buf, sizeof(buf), "\n%.2f\xc2\xb0%c  %.2f\xc2\xb0%c",
                   std::fabs(state_->dxLocation.lat),
+                  state_->dxLocation.lat >= 0 ? 'N' : 'S',
                   std::fabs(state_->dxLocation.lon),
                   state_->dxLocation.lon >= 0 ? 'E' : 'W');
     tip += buf;
@@ -277,10 +335,62 @@ void MapWidget::onMouseMove(int mx, int my) {
     }
   }
 
+  // 8. Check Live Spots (generic ones on map)
+  if (tip.empty() && spotStore_) {
+    auto data = spotStore_->snapshot();
+    bool ofDe = config_.liveSpotsOfDe;
+    bool useCall = config_.liveSpotsUseCall;
+    std::string myLabel = useCall ? config_.callsign : config_.grid;
+    if (myLabel.empty()) myLabel = "DE";
+
+    for (const auto &spot : data->spots) {
+      double rLat, rLon;
+      if (Astronomy::gridToLatLon(spot.receiverGrid, rLat, rLon)) {
+        if (screenDist(rLat, rLon) < kHitRadius) {
+          if (ofDe) {
+            // I (or my grid) spot THEM
+            tip = spot.senderCallsign + " de " + myLabel;
+          } else {
+            // THEY spot ME (or my grid)
+            tip = myLabel + " de " + spot.senderCallsign;
+          }
+
+          int bi = freqToBandIndex(spot.freqKhz);
+          char buf[64];
+          std::snprintf(buf, sizeof(buf), "\n%.1f kHz", spot.freqKhz);
+          tip += buf;
+          if (bi >= 0)
+            tip += std::string(" (") + kBands[bi].name + ")";
+
+          // Add Country name
+          int row = std::clamp((int)((rLat + 90.0) * 2.0), 0, 359);
+          int col = std::clamp((int)((rLon + 180.0) * 2.0), 0, 719);
+          uint16_t cId = COUNTRY_GRID[row][col];
+          if (cId > 0 && cId < NUM_COUNTRIES) {
+            tip += "\n" + std::string(COUNTRY_NAMES[cId]);
+          }
+
+          break;
+        }
+      }
+    }
+  }
+
+  // 9. Fallback to Country lookup
+  if (tip.empty()) {
+    int row = std::clamp((int)((lat + 90.0) * 2.0), 0, 359);
+    int col = std::clamp((int)((lon + 180.0) * 2.0), 0, 719);
+    uint16_t cId = COUNTRY_GRID[row][col];
+    if (cId > 0 && cId < NUM_COUNTRIES) {
+      tip = COUNTRY_NAMES[cId];
+    }
+  }
+
   if (tip.empty()) {
     tooltip_.visible = false;
     return;
   }
+
 
   // Trim trailing whitespace (common in TLE names)
   size_t last = tip.find_last_not_of(" \r\n\t");

@@ -18,6 +18,10 @@ public:
                 std::shared_ptr<CalendarStore> store);
 
   std::string getName() const override { return "Calendar"; }
+  const char *typeId() const override { return "calendar"; }
+  std::string getDisplayName() const override { return "Calendar"; }
+  bool isScrollable() const override { return true; }
+  bool requiresConfigKey() const override { return false; }
   void update() override {}
   void render(SDL_Renderer *renderer) override;
   bool onMouseUp(int mx, int my, Uint16 mod, int clicks) override;
@@ -62,8 +66,16 @@ private:
   SDL_Rect dismissIncBtn_ = {};
   SDL_Rect doneBtn_ = {};
 
-  // Cached event list from last render — used by onMouseMove for tooltip
+  struct RenderedRow {
+    bool isHeader;
+    int eventIdx; // -1 if header
+    std::string label;
+  };
+
+  // Cached event list and row map from last render — used by onMouseMove for tooltip
   std::vector<CalendarEvent> upcoming_;
+  std::vector<RenderedRow> rows_;
+
   int firstRowY_ = 0;
   int lastRowH_ = 0;
   int numRows_ = 0;

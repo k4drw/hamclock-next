@@ -32,6 +32,8 @@ public:
   }
 
   std::string getName() const override { return "EMEToolPanel"; }
+  const char *typeId() const override { return "eme_tool"; }
+  std::string getDisplayName() const override { return "EME Tool"; }
   nlohmann::json getDebugData() const override;
 
 private:

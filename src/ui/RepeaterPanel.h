@@ -19,6 +19,10 @@ public:
   bool onMouseWheel(int scrollY) override;
 
   std::string getName() const override { return "Repeaters"; }
+  const char *typeId() const override { return "repeater_dir"; }
+  std::string getDisplayName() const override { return "Repeaters"; }
+  bool isScrollable() const override { return false; }
+  bool requiresConfigKey() const override { return true; }
 
 private:
   FontManager &fontMgr_;

@@ -93,4 +93,6 @@ void SetupScreen::renderTabIdentity(SDL_Renderer *renderer, int cx, int pad,
   }
   cat->drawText(renderer, "Mute all audio (TTS + alarm)", fieldX + 30, y + 10,
                 themes.text, FontStyle::SmallRegular, false, false, true);
+  y += 28;
+
 }
