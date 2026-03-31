@@ -479,16 +479,16 @@ endforeach()
 # Special handling for libpredict (skipping tests)
 FetchContent_GetProperties(libpredict)
 if(NOT libpredict_POPULATED)
-    if(APPLE)
-        # macOS ld doesn't support --version-script used by libpredict shared build
-        set(PREDICT_SHARED OFF CACHE BOOL "Force static libpredict on macOS" FORCE)
-    endif()
     FetchContent_Populate(libpredict)
     include(GNUInstallDirs)
     set(LIBPREDICT_INCLUDE_DIR ${libpredict_BINARY_DIR}/include)
     include_directories(AFTER ${LIBPREDICT_INCLUDE_DIR})
     add_subdirectory(${libpredict_SOURCE_DIR}/include ${libpredict_BINARY_DIR}/include)
     add_subdirectory(${libpredict_SOURCE_DIR}/src ${libpredict_BINARY_DIR}/src)
+    if(APPLE)
+        # Apple ld doesn't support --version-script; strip it from the predict shared target
+        set_target_properties(predict PROPERTIES LINK_FLAGS "")
+    endif()
 endif()
 
 
