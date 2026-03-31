@@ -2,8 +2,8 @@ name: Build iOS
 
 on:
   push:
-    branches: [master, 'v1.*']
-  pull_request:
+    tags:
+      - 'v*'
   workflow_dispatch:
 
 jobs:
