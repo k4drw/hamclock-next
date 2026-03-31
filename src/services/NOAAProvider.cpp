@@ -106,20 +106,19 @@ void NOAAProvider::fetchKIndex() {
 
     WorkerService::getInstance().submitTask([body, state]() {
       auto j = nlohmann::json::parse(body, nullptr, false);
-      if (j.is_discarded() || !j.is_array() || j.size() < 2) {
-        // We can't easily update state->services from here if it's not
-        // thread-safe. But HamClockState has a mutex for its services map.
+      if (j.is_discarded() || !j.is_array() || j.empty())
         return;
-      }
 
       const auto &row = j.back();
-      if (!row.is_array() || row.size() < 3)
+      // NOAA format: [{"time_tag":"...","Kp":2.67,"a_running":12,...}]
+      if (!row.is_object() || !row.contains("Kp") || !row["Kp"].is_number())
         return;
 
       auto *update = new SolarData();
-      double kp = StringUtils::safe_stod(row[1].get<std::string>());
+      double kp = row["Kp"].get<double>();
       update->k_index = static_cast<float>(kp);
-      update->a_index = StringUtils::safe_stoi(row[2].get<std::string>());
+      update->a_index = (row.contains("a_running") && row["a_running"].is_number())
+                        ? row["a_running"].get<int>() : 0;
       update->noaa_g_scale = calculateGScale(update->k_index);
       update->last_updated = std::chrono::system_clock::now();
       update->valid = true;
@@ -314,8 +313,12 @@ void NOAAProvider::fetchDST() {
         return;
 
       try {
+        // NOAA format: [{"time_tag":"...","dst":-21}]
+        const auto &row = j.back();
+        if (!row.is_object() || !row.contains("dst") || !row["dst"].is_number())
+          return;
         auto *update = new SolarData();
-        update->dst = StringUtils::safe_stoi(j.back()[1].get<std::string>());
+        update->dst = row["dst"].get<int>();
         update->valid = true;
 
         SDL_Event event;
