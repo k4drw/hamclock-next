@@ -382,8 +382,11 @@ void MapWidget::onMouseMove(int mx, int my) {
           tip = "Beacon: " + b.callsign + "\n" + b.location;
           for (const auto &ab : active) {
             if (ab.index == (int)i) {
-              tip += "\nTransmitting: " +
-                     std::string(kBands[ab.bandIndex + 5].name);
+              char fbuf[32];
+              std::snprintf(fbuf, sizeof(fbuf), "\n%.3f (%s)",
+                            BEACON_BANDS[ab.bandIndex] / 1000.0,
+                            kBands[ab.bandIndex + 5].name);
+              tip += fbuf;
               break;
             }
           }
