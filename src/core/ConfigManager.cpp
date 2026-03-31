@@ -239,8 +239,8 @@ bool ConfigManager::load(AppConfig &config) {
     config.projection = ap.value("projection", "equirectangular");
     config.mapStyle = ap.value("map_style", "nasa");
     if (config.mapStyle.empty()) config.mapStyle = "nasa";
-    config.showGrid = ap.value("show_grid", false);
     config.gridType = ap.value("grid_type", "latlon");
+    config.centerMapOnDe = ap.value("center_map_on_de", false);
 
     // Legacy migration: if show_muf_rt is present and true, defaulting to Muf
     if (ap.contains("prop_overlay")) {
@@ -608,8 +608,8 @@ bool ConfigManager::save(const AppConfig &config) {
   json["appearance"]["use_metric"] = config.useMetric;
   json["appearance"]["projection"] = config.projection;
   json["appearance"]["map_style"] = config.mapStyle;
-  json["appearance"]["show_grid"] = config.showGrid;
   json["appearance"]["grid_type"] = config.gridType;
+  json["appearance"]["center_map_on_de"] = config.centerMapOnDe;
   json["appearance"]["prop_overlay"] = propOverlayToStr(config.propOverlay);
   json["appearance"]["weather_overlay"] = weatherOverlayToStr(config.weatherOverlay);
   json["appearance"]["prop_band"] = config.propBand;

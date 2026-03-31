@@ -2074,8 +2074,11 @@ void DashboardContext::update(AppContext &ctx) {
       }
       // MOUSEBUTTONUP
       else if (event.type == SDL_MOUSEBUTTONUP) {
+        bool left = (event.button.button == SDL_BUTTON_LEFT);
+        bool right = (event.button.button == SDL_BUTTON_RIGHT);
+        
         // Suppress touch-emulated click if the touch gesture was a scroll.
-        if (event.button.button == SDL_BUTTON_LEFT &&
+        if ((left || right) &&
             !(event.button.which == SDL_TOUCH_MOUSEID && fingerWasScrolling_)) {
           int mx = event.button.x, my = event.button.y;
           if (FIDELITY_MODE && event.button.windowID != 0) {
@@ -2086,13 +2089,23 @@ void DashboardContext::update(AppContext &ctx) {
             mx = static_cast<int>(pixX / ctx.layScale);
             my = static_cast<int>(pixY / ctx.layScale);
           }
-          if (focusedWidget)
-            focusedWidget->onMouseUp(mx, my, SDL_GetModState(),
-                                     event.button.clicks);
-          else
-            for (auto *w : eventWidgets)
-              if (w->onMouseUp(mx, my, SDL_GetModState(), event.button.clicks))
-                break;
+          
+          if (left) {
+            if (focusedWidget)
+              focusedWidget->onMouseUp(mx, my, SDL_GetModState(),
+                                       event.button.clicks);
+            else
+              for (auto *w : eventWidgets)
+                if (w->onMouseUp(mx, my, SDL_GetModState(), event.button.clicks))
+                  break;
+          } else if (right) {
+            if (focusedWidget)
+              focusedWidget->onRightClick(mx, my, SDL_GetModState());
+            else
+              for (auto *w : eventWidgets)
+                if (w->onRightClick(mx, my, SDL_GetModState()))
+                  break;
+          }
         }
       }
       // MOUSEWHEEL

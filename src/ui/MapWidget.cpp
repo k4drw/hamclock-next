@@ -170,7 +170,8 @@ MapWidget::MapWidget(int x, int y, int w, int h, TextureManager &texMgr,
       config_(config),
       lastMufUpdateMs_(0),
       wxLastCheckMs_(0),
-      lastPropUpdateMs_(0) {
+      lastPropUpdateMs_(0),
+      lastMapCenterLon_(-999.0) {
   const char *driver = SDL_GetCurrentVideoDriver();
   LOG_D("MapWidget", "SDL Video Driver: {}", driver ? driver : "unknown");
 
@@ -248,9 +249,22 @@ void MapWidget::recalcMapRect() {
 }
 
 SDL_FPoint MapWidget::latLonToScreen(double lat, double lon) const {
+  if (config_.projection == "equirectangular") {
+    double dLon = lon - config_.mapCenterLon;
+    while (dLon > 180.0) dLon -= 360.0;
+    while (dLon < -180.0) dLon += 360.0;
+    // Clamp coordinates to [0, 1] range to avoid edge sampling artifacts
+    double nx = std::clamp((dLon + 180.0) / 360.0, 0.0, 1.0);
+    double ny = std::clamp((90.0 - lat) / 180.0, 0.0, 1.0);
+    return {static_cast<float>(mapRect_.x + nx * mapRect_.w),
+            static_cast<float>(mapRect_.y + ny * mapRect_.h)};
+  }
   if (config_.projection == "robinson") {
+    double centeredLon = lon - config_.mapCenterLon;
+    while (centeredLon > 180.0) centeredLon -= 360.0;
+    while (centeredLon < -180.0) centeredLon += 360.0;
     double rnx, rny;
-    projectRobinson(lat, lon, rnx, rny);
+    projectRobinson(lat, centeredLon, rnx, rny);
     float px = static_cast<float>(mapRect_.x + (rnx + 1.0) * 0.5 * mapRect_.w);
     float py = static_cast<float>(mapRect_.y + (1.0 - rny) * 0.5 * mapRect_.h);
     return {px, py};
@@ -289,12 +303,18 @@ SDL_FPoint MapWidget::latLonToScreen(double lat, double lon) const {
     double maxMercY =
         std::log(std::tan(M_PI / 4.0 + (maxLat * M_PI / 180.0) / 2.0));
     double ny = 0.5 - 0.5 * (mercY / maxMercY);
-    double nx = (lon + 180.0) / 360.0;
+    double centeredLon = lon - config_.mapCenterLon;
+    while (centeredLon > 180.0) centeredLon -= 360.0;
+    while (centeredLon < -180.0) centeredLon += 360.0;
+    double nx = (centeredLon + 180.0) / 360.0;
     float px = static_cast<float>(mapRect_.x + nx * mapRect_.w);
     float py = static_cast<float>(mapRect_.y + ny * mapRect_.h);
     return {px, py};
   }
-  double nx = (lon + 180.0) / 360.0;
+  double centeredLon = lon - config_.mapCenterLon;
+  while (centeredLon > 180.0) centeredLon -= 360.0;
+  while (centeredLon < -180.0) centeredLon += 360.0;
+  double nx = (centeredLon + 180.0) / 360.0;
   double ny = (90.0 - lat) / 180.0;
   float px = static_cast<float>(mapRect_.x + nx * mapRect_.w);
   float py = static_cast<float>(mapRect_.y + ny * mapRect_.h);
@@ -312,6 +332,9 @@ bool MapWidget::screenToLatLon(int sx, int sy, double &lat, double &lon) const {
     double rny =
         1.0 - (static_cast<double>(sy - mapRect_.y) / mapRect_.h) * 2.0;
     inverseRobinson(rnx, rny, lat, lon);
+    lon += config_.mapCenterLon;
+    while (lon > 180.0) lon -= 360.0;
+    while (lon < -180.0) lon += 360.0;
     return true;
   }
   if (config_.projection == "azimuthal") {
@@ -348,7 +371,9 @@ bool MapWidget::screenToLatLon(int sx, int sy, double &lat, double &lon) const {
   if (config_.projection == "mercator") {
     double nx = static_cast<double>(sx - mapRect_.x) / mapRect_.w;
     double ny = static_cast<double>(sy - mapRect_.y) / mapRect_.h;
-    lon = nx * 360.0 - 180.0;
+    lon = nx * 360.0 - 180.0 + config_.mapCenterLon;
+    while (lon > 180.0) lon -= 360.0;
+    while (lon < -180.0) lon += 360.0;
     constexpr double maxLat = 85.05112878;
     double maxMercY =
         std::log(std::tan(M_PI / 4.0 + (maxLat * M_PI / 180.0) / 2.0));
@@ -359,7 +384,9 @@ bool MapWidget::screenToLatLon(int sx, int sy, double &lat, double &lon) const {
 
   double nx = static_cast<double>(sx - mapRect_.x) / mapRect_.w;
   double ny = static_cast<double>(sy - mapRect_.y) / mapRect_.h;
-  lon = nx * 360.0 - 180.0;
+  lon = nx * 360.0 - 180.0 + config_.mapCenterLon;
+  while (lon > 180.0) lon -= 360.0;
+  while (lon < -180.0) lon += 360.0;
   lat = 90.0 - ny * 180.0;
   return true;
 }
@@ -375,6 +402,26 @@ void MapWidget::update() {
   }
 
   uint32_t nowMs = SDL_GetTicks();
+
+  // Auto-center on DE if enabled
+  if (config_.centerMapOnDe) {
+    if (std::abs(config_.mapCenterLon - state_->deLocation.lon) > 0.001) {
+      config_.mapCenterLon = state_->deLocation.lon;
+    }
+  }
+
+  // Detect map shift and invalidate mesh/geometry
+  if (std::abs(config_.mapCenterLon - lastMapCenterLon_) > 0.001) {
+    mapVerts_.clear();
+    mapBaseIndices_.clear();
+    gridDirty_ = true;
+    borderDirty_ = true;
+    greatCircleDirty_ = true;
+    satTrackDirty_ = true;
+    lastMapCenterLon_ = config_.mapCenterLon;
+    LOG_D("MapWidget", "Map center shifted to {}, invalidating mesh.",
+          config_.mapCenterLon);
+  }
 
   // General 1-second updates
   if (nowMs - lastPosUpdateMs_ > 1000) {
@@ -680,7 +727,8 @@ void MapWidget::render(SDL_Renderer *renderer) {
         wxmb_->invalidate();
     }
 
-    if (config_.projection != "equirectangular") {
+    if (config_.projection != "equirectangular" ||
+        std::abs(config_.mapCenterLon) > 0.001) {
       // Draw using mesh to support Robinson, Mercator, or Azimuthal warping
       // Low-memory mode: reduce mesh density on KMSDRM
       const bool isAz = (config_.projection == "azimuthal" ||
@@ -750,8 +798,9 @@ void MapWidget::render(SDL_Renderer *renderer) {
                 valid = inverseAzimuthal(nx, ny, antiLat, antiLon, lat, lon);
               }
               if (valid) {
-                float u = static_cast<float>((lon + 180.0) / 360.0);
-                float v = static_cast<float>((90.0 - lat) / 180.0);
+                // Ensure UV coordinates are strictly within [0, 1] to avoid texture wrapping artifacts
+                float u = std::clamp(static_cast<float>((lon + 180.0) / 360.0), 0.0f, 1.0f);
+                float v = std::clamp(static_cast<float>((90.0 - lat) / 180.0), 0.0f, 1.0f);
                 mapVerts_[idx] = {{sx, sy}, {255, 255, 255, 255}, {u, v}};
               } else {
                 mapVerts_[idx] = {{sx, sy}, {0, 0, 0, 0}, {0, 0}};
@@ -773,10 +822,14 @@ void MapWidget::render(SDL_Renderer *renderer) {
           }
         }
 
-        // Also ensure indices are ready with texture wrap fixing
-        if (nightIndices_.size() != (size_t)(gridW * gridH * 6)) {
-          nightIndices_.clear();
-          nightIndices_.reserve(gridW * gridH * 6);
+        // Build base-map index buffer with seam culling.
+        // Uses screen-x detection (not UV) because mapVerts_ is in lat/lon
+        // space and seam-crossing triangles have a full-width screen-x jump.
+        // Separate from nightIndices_ which is used by the screen-space night
+        // overlay mesh and is managed by renderNightOverlay().
+        if (mapBaseIndices_.size() != (size_t)(gridW * gridH * 6)) {
+          mapBaseIndices_.clear();
+          mapBaseIndices_.reserve(gridW * gridH * 6);
           for (int j = 0; j < gridH; ++j) {
             for (int i = 0; i < gridW; ++i) {
               int p0 = j * (gridW + 1) + i;
@@ -784,28 +837,29 @@ void MapWidget::render(SDL_Renderer *renderer) {
               int p2 = (j + 1) * (gridW + 1) + i;
               int p3 = p2 + 1;
 
-              // Check for texture wrapping (crossing date line)
               bool wrap = false;
               if (config_.projection == "azimuthal" ||
-                  config_.projection == "dual_azimuthal") {
-                float u0 = mapVerts_[p0].tex_coord.x;
-                float u1 = mapVerts_[p1].tex_coord.x;
-                float u2 = mapVerts_[p2].tex_coord.x;
-                float u3 = mapVerts_[p3].tex_coord.x;
-                // If any u-coord difference is very large, it's a wrap
-                if (std::abs(u0 - u1) > 0.5f || std::abs(u0 - u2) > 0.5f ||
-                    std::abs(u1 - u3) > 0.5f) {
+                  config_.projection == "dual_azimuthal" ||
+                  std::abs(config_.mapCenterLon) > 0.001) {
+                float x0 = mapVerts_[p0].position.x;
+                float x1 = mapVerts_[p1].position.x;
+                float x2 = mapVerts_[p2].position.x;
+                float x3 = mapVerts_[p3].position.x;
+                float threshold = mapRect_.w * 0.5f;
+                if (std::abs(x0 - x1) > threshold ||
+                    std::abs(x0 - x2) > threshold ||
+                    std::abs(x1 - x3) > threshold) {
                   wrap = true;
                 }
               }
 
               if (!wrap) {
-                nightIndices_.push_back(p0);
-                nightIndices_.push_back(p1);
-                nightIndices_.push_back(p2);
-                nightIndices_.push_back(p2);
-                nightIndices_.push_back(p1);
-                nightIndices_.push_back(p3);
+                mapBaseIndices_.push_back(p0);
+                mapBaseIndices_.push_back(p1);
+                mapBaseIndices_.push_back(p2);
+                mapBaseIndices_.push_back(p2);
+                mapBaseIndices_.push_back(p1);
+                mapBaseIndices_.push_back(p3);
               }
             }
           }
@@ -813,8 +867,8 @@ void MapWidget::render(SDL_Renderer *renderer) {
       }
 
       SDL_RenderGeometry(renderer, mapTex, mapVerts_.data(),
-                         (int)mapVerts_.size(), nightIndices_.data(),
-                         (int)nightIndices_.size());
+                         (int)mapVerts_.size(), mapBaseIndices_.data(),
+                         (int)mapBaseIndices_.size());
     } else {
       SDL_RenderCopy(renderer, mapTex, nullptr, &mapRect_);
     }
@@ -899,6 +953,29 @@ void MapWidget::render(SDL_Renderer *renderer) {
 
 void MapWidget::renderTooltipLayer(SDL_Renderer *renderer) {
   renderTooltip(renderer);
+  renderDeMenu(renderer);
+}
+
+void MapWidget::renderDeMenu(SDL_Renderer *renderer) {
+  if (!deMenuVisible_)
+    return;
+
+  ThemeColors themes = getThemeColors(theme_);
+
+  // Background
+  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, 255);
+  SDL_RenderFillRect(renderer, &deMenuRect_);
+
+  // Border
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
+                         themes.border.b, 255);
+  SDL_RenderDrawRect(renderer, &deMenuRect_);
+
+  // Text
+  auto *cat = fontMgr_.catalog();
+  cat->drawText(renderer, "Set DE Here", deMenuRect_.x + deMenuRect_.w / 2,
+                deMenuRect_.y + deMenuRect_.h / 2, themes.text, FontStyle::Fast,
+                true, false, true);
 }
 
 // DRAP absorption color: SDL_PIXELFORMAT_RGBA32 little-endian packing

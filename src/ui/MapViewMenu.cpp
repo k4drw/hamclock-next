@@ -20,6 +20,7 @@ void MapViewMenu::show(AppConfig &config, std::function<void()> onApply) {
   showGrid_ = config.showGrid;
   showBeacons_ = config.showBeacons;
   showBorders_ = config.showBorders;
+  centerMapOnDe_ = config.centerMapOnDe;
   gridType_ = config.gridType;
   propOverlay_ = config.propOverlay;
   weatherOverlay_ = config.weatherOverlay;
@@ -30,7 +31,7 @@ void MapViewMenu::show(AppConfig &config, std::function<void()> onApply) {
 
   // Center the menu
   int menuW = 500;
-  int menuH = 410;
+  int menuH = 450;
   menuRect_ = {HamClock::LOGICAL_WIDTH / 2 - menuW / 2,
                HamClock::LOGICAL_HEIGHT / 2 - menuH / 2, menuW, menuH};
 
@@ -61,8 +62,12 @@ void MapViewMenu::show(AppConfig &config, std::function<void()> onApply) {
   beaconsRec_ = {col2X + 10, y + 30, 20, 20};
   bordersRec_ = {col2X + 110, y + 30, 20, 20};
 
-  // Row 4 (VOACAP) - 3 columns
-  y += 70;
+  // Row 4
+  y += 65;
+  centerDeCheckRect_ = {col1X, y, 20, 20};
+
+  // Row 5 (VOACAP) - 3 columns
+  y += 50;
   int col3W = (menuW - 40) / 3 - 10; // ~143
   int c1 = menuRect_.x + 20;
   int c2 = c1 + col3W + 15;
@@ -178,6 +183,8 @@ void MapViewMenu::render(SDL_Renderer *renderer) {
                     themes.text);
   renderRadioButton(renderer, bordersRec_, showBorders_, "Borders",
                     themes.text);
+  renderRadioButton(renderer, centerDeCheckRect_, centerMapOnDe_,
+                    "Center on DE", themes.text);
 
   // VOACAP Extras (Used for VOACAP, Reliability, and TOA)
   if (propOverlay_ == PropOverlayType::Voacap ||
@@ -205,11 +212,12 @@ void MapViewMenu::render(SDL_Renderer *renderer) {
       drawDropdownList(renderer, styleRec_, mapOpts_);
     else if (openCombo_ == COMBO_GRID)
       drawDropdownList(renderer, gridRec_, gridOpts_);
-          else if (openCombo_ == COMBO_OVERLAY)
-            drawDropdownList(renderer, overlayRec_, overlayOpts_);
-          else if (openCombo_ == COMBO_WEATHER)
-            drawDropdownList(renderer, weatherRec_, weatherOpts_);
-          else if (openCombo_ == COMBO_BAND)      drawDropdownList(renderer, bandRec_, bandOpts_);
+    else if (openCombo_ == COMBO_OVERLAY)
+      drawDropdownList(renderer, overlayRec_, overlayOpts_);
+    else if (openCombo_ == COMBO_WEATHER)
+      drawDropdownList(renderer, weatherRec_, weatherOpts_);
+    else if (openCombo_ == COMBO_BAND)
+      drawDropdownList(renderer, bandRec_, bandOpts_);
     else if (openCombo_ == COMBO_MODE)
       drawDropdownList(renderer, modeRec_, modeOpts_);
     else if (openCombo_ == COMBO_POWER)
@@ -230,13 +238,13 @@ void MapViewMenu::render(SDL_Renderer *renderer) {
                 FontStyle::UI, true, false, true);
 
   // Apply button
-  SDL_SetRenderDrawColor(renderer, themes.success.r, themes.success.g,
-                         themes.success.b, 255);
+  SDL_SetRenderDrawColor(renderer, themes.rowStripe2.r, themes.rowStripe2.g,
+                         themes.rowStripe2.b, 255);
   SDL_RenderFillRect(renderer, &applyRect_);
   SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
   SDL_RenderDrawRect(renderer, &applyRect_);
   cat->drawText(renderer, "Apply", applyRect_.x + applyRect_.w / 2,
-                applyRect_.y + applyRect_.h / 2, themes.bg,
+                applyRect_.y + applyRect_.h / 2, themes.text,
                 FontStyle::UI, true, false, true);
 }
 
@@ -470,6 +478,15 @@ bool MapViewMenu::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
     return true;
   }
 
+  if (SDL_PointInRect(&pt, &bordersRec_)) {
+    showBorders_ = !showBorders_;
+    return true;
+  }
+  if (SDL_PointInRect(&pt, &centerDeCheckRect_)) {
+    centerMapOnDe_ = !centerMapOnDe_;
+    return true;
+  }
+
   // Check Cancel button
   if (SDL_PointInRect(&pt, &cancelRect_)) {
     hide();
@@ -481,13 +498,16 @@ bool MapViewMenu::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
     // Apply changes to config
     config_->projection = projection_;
     config_->mapStyle = mapStyle_;
-          config_->showGrid = showGrid_;
-          config_->showBeacons = showBeacons_;
-          config_->showBorders = showBorders_;
-          config_->gridType = gridType_;          config_->propOverlay = propOverlay_;
-          config_->weatherOverlay = weatherOverlay_;
-          config_->propBand = propBand_;    config_->propMode = propMode_;
+    config_->showGrid = showGrid_;
+    config_->showBeacons = showBeacons_;
+    config_->showBorders = showBorders_;
+    config_->gridType = gridType_;
+    config_->propOverlay = propOverlay_;
+    config_->weatherOverlay = weatherOverlay_;
+    config_->propBand = propBand_;
+    config_->propMode = propMode_;
     config_->propPower = propPower_;
+    config_->centerMapOnDe = centerMapOnDe_;
 
     hide();
     if (onApply_)

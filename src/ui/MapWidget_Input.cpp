@@ -45,6 +45,22 @@ bool MapWidget::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
     return mapViewMenu_->onMouseUp(mx, my, mod, clicks);
   }
 
+  if (deMenuVisible_) {
+    SDL_Point pt = {mx, my};
+    if (SDL_PointInRect(&pt, &deMenuRect_)) {
+      state_->deLocation = {deMenuLat_, deMenuLon_};
+      state_->deGrid = Astronomy::latLonToGrid(deMenuLat_, deMenuLon_);
+      // Persist to config
+      config_.lat = deMenuLat_;
+      config_.lon = deMenuLon_;
+      config_.grid = state_->deGrid;
+      if (onConfigChanged_)
+        onConfigChanged_();
+    }
+    deMenuVisible_ = false;
+    return true;
+  }
+
   // Check RSS toggle button (lower-left corner)
   if (mx >= rssRect_.x && mx < rssRect_.x + rssRect_.w && my >= rssRect_.y &&
       my < rssRect_.y + rssRect_.h) {
@@ -109,6 +125,34 @@ bool MapWidget::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
       activityStore_->set(ad);
     }
   }
+
+  return true;
+}
+
+bool MapWidget::onRightClick(int mx, int my, Uint16 /*mod*/) {
+  if (mapViewMenu_->isVisible())
+    return false;
+
+  double lat, lon;
+  if (!screenToLatLon(mx, my, lat, lon)) {
+    deMenuVisible_ = false;
+    return false;
+  }
+
+  deMenuVisible_ = true;
+  deMenuLat_ = lat;
+  deMenuLon_ = lon;
+
+  // Size the menu
+  int menuW = 110;
+  int menuH = 30;
+  deMenuRect_ = {mx, my, menuW, menuH};
+
+  // Boundary check
+  if (deMenuRect_.x + deMenuRect_.w > HamClock::LOGICAL_WIDTH)
+    deMenuRect_.x -= deMenuRect_.w;
+  if (deMenuRect_.y + deMenuRect_.h > HamClock::LOGICAL_HEIGHT)
+    deMenuRect_.y -= deMenuRect_.h;
 
   return true;
 }

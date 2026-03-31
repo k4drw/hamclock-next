@@ -182,6 +182,7 @@ struct AppConfig {
 
   // Map view
   double mapCenterLon = 0.0;
+  bool centerMapOnDe = false;
   int mapPanX = 0;
   int mapPanY = 0;
   double mapZoom = 1.0;

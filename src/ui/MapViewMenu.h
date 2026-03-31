@@ -35,6 +35,7 @@ private:
   bool showGrid_;
   bool showBeacons_;
   bool showBorders_;
+  bool centerMapOnDe_;
   std::string gridType_;
   PropOverlayType propOverlay_;
   WeatherOverlayType weatherOverlay_;
@@ -63,7 +64,7 @@ private:
   // Rects for dropdown HEADERS
   SDL_Rect projRec_, styleRec_;
   SDL_Rect gridRec_, overlayRec_, weatherRec_;
-  SDL_Rect beaconsRec_, bordersRec_;
+  SDL_Rect beaconsRec_, bordersRec_, centerDeCheckRect_;
   SDL_Rect bandRec_, modeRec_, powerRec_; // VOACAP row
 
   enum {
@@ -94,7 +95,7 @@ private:
   // SDL_Rect gridOffRect_, gridLatLonRect_, gridMaidenheadRect_; // REMOVED
   // SDL_Rect propNoneRect_, propMufRect_, propVoacapRect_; // REMOVED
   // SDL_Rect pb80_, pb40_, pb20_, pb15_, pb10_; // REMOVED
-  SDL_Rect applyRect_, cancelRect_;
+  SDL_Rect applyRect_, cancelRect_, centerDeRect_;
   int projHeaderY_ = 0, styleHeaderY_ = 0, gridHeaderY_ = 0, mufRtHeaderY_ = 0, weatherHeaderY_ = 0;
 
   void renderRadioButton(SDL_Renderer *renderer, const SDL_Rect &rect,
