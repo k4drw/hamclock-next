@@ -461,6 +461,7 @@ void WebServer::registerRoutes(httplib::Server &svr) {
     j["liveSpotsOfDe"] = cfg_->liveSpotsOfDe;
     j["liveSpotsUseCall"] = cfg_->liveSpotsUseCall;
     j["gpsEnabled"] = cfg_->gpsEnabled;
+    j["centerMapOnDe"] = cfg_->centerMapOnDe;
     j["rssEnabled"] = cfg_->rssEnabled;
     j["brightness"] = cfg_->brightness;
     j["brightnessSchedule"] = cfg_->brightnessSchedule;
@@ -543,6 +544,8 @@ void WebServer::registerRoutes(httplib::Server &svr) {
       cfg_->showSatTrack = req.get_param_value("show_sattrack") == "1";
     if (req.has_param("night_lights"))
       cfg_->mapNightLights = req.get_param_value("night_lights") == "1";
+    if (req.has_param("center_map_on_de"))
+      cfg_->centerMapOnDe = req.get_param_value("center_map_on_de") == "1";
     if (req.has_param("use_metric"))
       cfg_->useMetric = req.get_param_value("use_metric") == "1";
     if (req.has_param("grid_type"))

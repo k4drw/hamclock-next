@@ -232,10 +232,11 @@ void WebServer::run() {
         <option value="mercator">Mercator</option>
         <option value="dual_azimuthal">Dual Azimuthal</option>
       </select>
-      <div style="display:flex; gap:15px; margin-bottom:10px">
+      <div style="display:flex; gap:12px; margin-bottom:10px; flex-wrap:wrap">
         <label><input type="checkbox" id="show-borders"> Borders</label>
         <label><input type="checkbox" id="show-beacons"> Beacons</label>
         <label><input type="checkbox" id="show-sattrack"> Sat Track</label>
+        <label><input type="checkbox" id="center-map-on-de"> Center on DE</label>
       </div>
       <label>Grid Overlay</label>
       <select id="grid-mode">
@@ -612,6 +613,7 @@ void WebServer::run() {
         document.getElementById('show-borders').checked = !!c.showBorders;
         document.getElementById('show-beacons').checked = !!c.showBeacons;
         document.getElementById('show-sattrack').checked = !!c.showSatTrack;
+        document.getElementById('center-map-on-de').checked = !!c.centerMapOnDe;
         
         let gridVal = 'none';
         if (c.showGrid) {
@@ -652,6 +654,7 @@ void WebServer::run() {
       const showBorders = document.getElementById('show-borders').checked ? '1' : '0';
       const showBeacons = document.getElementById('show-beacons').checked ? '1' : '0';
       const showSatTrack = document.getElementById('show-sattrack').checked ? '1' : '0';
+      const centerMapOnDe = document.getElementById('center-map-on-de').checked ? '1' : '0';
       const gridMode = document.getElementById('grid-mode').value;
       const propOverlay = document.getElementById('prop-overlay').value;
       const wxOverlay = document.getElementById('weather-overlay').value;
@@ -666,6 +669,7 @@ void WebServer::run() {
       const params = new URLSearchParams({
         theme, map_style: mapStyle, projection, show_borders: showBorders,
         show_beacons: showBeacons, show_sattrack: showSatTrack, show_grid: showGrid, grid_type: gridType,
+        center_map_on_de: centerMapOnDe,
         prop_overlay: propOverlay, wx_overlay: wxOverlay, night_lights: nl, use_metric: mu,
         display_power_method: dpm, font_path: fontPath
       });
