@@ -145,19 +145,25 @@ void NOAAProvider::fetchKIndex() {
 
 void NOAAProvider::fetchSFI() {
   net_.fetchAsync(SFI_URL, [](std::string body) {
-    if (body.empty())
+    if (body.empty()) {
+      LOG_W("NOAAProvider", "SFI fetch returned empty body");
       return;
+    }
 
     WorkerService::getInstance().submitTask([body]() {
       auto j = nlohmann::json::parse(body, nullptr, false);
-      if (j.is_discarded() || !j.is_array())
+      if (j.is_discarded()) {
+        LOG_W("NOAAProvider", "SFI JSON parse failed");
         return;
+      }
 
       double flux = 0;
-      if (j.is_object() && j.contains("Flux")) {
-        flux = StringUtils::safe_stod(j["Flux"].get<std::string>());
-      } else if (j.is_array() && j.size() >= 2 && j.back().is_array()) {
-        flux = StringUtils::safe_stod(j.back()[1].get<std::string>());
+      // NOAA 10cm-flux.json: [{"flux": 152, "time_tag": "..."}]
+      if (j.is_array() && !j.empty() && j.back().is_object() &&
+          j.back().contains("flux") && j.back()["flux"].is_number()) {
+        flux = j.back()["flux"].get<double>();
+      } else {
+        LOG_W("NOAAProvider", "SFI JSON unexpected format");
       }
 
       if (flux > 0) {
@@ -171,6 +177,9 @@ void NOAAProvider::fetchSFI() {
         event.user.code = static_cast<int>(UpdateType::SFI);
         event.user.data1 = update;
         SDL_PushEvent(&event);
+        LOG_I("NOAAProvider", "Offloaded SFI update: SFI={}", update->sfi);
+      } else {
+        LOG_W("NOAAProvider", "SFI value was zero or missing");
       }
     });
   });

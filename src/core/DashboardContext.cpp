@@ -306,6 +306,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
       isWidgetConfigured("aurora") ||
       isWidgetConfigured("aurora_graph") ||
       isWidgetConfigured("drap") ||
+      isWidgetConfigured("band_conditions") ||
       appCfg.propOverlay == PropOverlayType::Aurora)
     noaaProvider->fetch();
   if (appCfg.propOverlay == PropOverlayType::Drap)
@@ -1294,6 +1295,7 @@ void DashboardContext::update(AppContext &ctx) {
                            isWidgetConfigured("aurora_graph") ||
                            isWidgetActive("drap") ||
                            isWidgetActive("noaa_spacewx") ||
+                           isWidgetActive("band_conditions") ||
                            appCfg.propOverlay == PropOverlayType::Drap;
     if (needsNoaa)
       noaaProvider->fetch();
@@ -1818,6 +1820,12 @@ void DashboardContext::update(AppContext &ctx) {
               break;
             }
             ctx.solarStore->set(data);
+            // Recalculate band conditions immediately when SFI or K-index arrive
+            auto code = static_cast<NOAAProvider::UpdateType>(event.user.code);
+            if (code == NOAAProvider::UpdateType::SFI ||
+                code == NOAAProvider::UpdateType::KIndex) {
+              bandProvider->update();
+            }
           }
           delete update;
           break;
