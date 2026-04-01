@@ -39,7 +39,19 @@
 #include <cstring>
 #include <vector>
 
+bool MapWidget::onMouseDown(int mx, int my, Uint16 /*mod*/, int /*clicks*/) {
+  if (mx >= x_ && mx < x_ + width_ && my >= y_ && my < y_ + height_) {
+    mouseDown_ = true;
+    return true;
+  }
+  return false;
+}
+
 bool MapWidget::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
+  if (!mouseDown_)
+    return false;
+  mouseDown_ = false;
+
   // Pass through to menu if visible
   if (mapViewMenu_->isVisible()) {
     return mapViewMenu_->onMouseUp(mx, my, mod, clicks);

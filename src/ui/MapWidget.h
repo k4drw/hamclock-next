@@ -45,6 +45,7 @@ public:
   void update() override;
   void render(SDL_Renderer *renderer) override;
   void onResize(int x, int y, int w, int h) override;
+  bool onMouseDown(int mx, int my, Uint16 mod, int clicks) override;
   bool onMouseUp(int mx, int my, Uint16 mod, int clicks) override;
   bool onRightClick(int mx, int my, Uint16 mod) override;
   void onMouseMove(int mx, int my) override;
@@ -259,6 +260,7 @@ private:
   bool deMenuVisible_ = false;
   SDL_Rect deMenuRect_ = {0, 0, 0, 0};
   double deMenuLat_ = 0, deMenuLon_ = 0;
+  bool mouseDown_ = false;
 
   void renderDeMenu(SDL_Renderer *renderer);
   void renderLegend(SDL_Renderer *renderer);
