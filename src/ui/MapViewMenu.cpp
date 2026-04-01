@@ -31,7 +31,7 @@ void MapViewMenu::show(AppConfig &config, std::function<void()> onApply) {
 
   // Center the menu
   int menuW = 500;
-  int menuH = 450;
+  int menuH = 470;
   menuRect_ = {HamClock::LOGICAL_WIDTH / 2 - menuW / 2,
                HamClock::LOGICAL_HEIGHT / 2 - menuH / 2, menuW, menuH};
 
@@ -67,15 +67,16 @@ void MapViewMenu::show(AppConfig &config, std::function<void()> onApply) {
   centerDeCheckRect_ = {col1X, y, 20, 20};
 
   // Row 5 (VOACAP) - 3 columns
-  y += 50;
+  y += 55;
+  voacapHeaderY_ = y;
   int col3W = (menuW - 40) / 3 - 10; // ~143
   int c1 = menuRect_.x + 20;
   int c2 = c1 + col3W + 15;
   int c3 = c2 + col3W + 15;
 
-  bandRec_ = {c1, y + 25, col3W, 30};
-  modeRec_ = {c2, y + 25, col3W, 30};
-  powerRec_ = {c3, y + 25, col3W, 30};
+  bandRec_ = {c1, y + 45, col3W, 30};
+  modeRec_ = {c2, y + 45, col3W, 30};
+  powerRec_ = {c3, y + 45, col3W, 30};
 
   // Footer buttons
   int btnFooterW = 100;
@@ -190,6 +191,14 @@ void MapViewMenu::render(SDL_Renderer *renderer) {
   if (propOverlay_ == PropOverlayType::Voacap ||
       propOverlay_ == PropOverlayType::Reliability ||
       propOverlay_ == PropOverlayType::Toa) {
+    cat->drawText(renderer, "VOACAP Settings", menuRect_.x + 20, voacapHeaderY_,
+                  themes.text, FontStyle::UI);
+    // Draw separator line
+    SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
+                           themes.border.b, 80);
+    SDL_RenderDrawLine(renderer, menuRect_.x + 20, voacapHeaderY_ + 18,
+                       menuRect_.x + menuRect_.w - 20, voacapHeaderY_ + 18);
+
     cat->drawText(renderer, "Band", bandRec_.x, bandRec_.y - 20, themes.text,
                   FontStyle::UI);
     drawDropdown(renderer, bandRec_, propBand_, openCombo_ == COMBO_BAND);

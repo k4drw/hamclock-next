@@ -96,7 +96,8 @@ private:
   // SDL_Rect propNoneRect_, propMufRect_, propVoacapRect_; // REMOVED
   // SDL_Rect pb80_, pb40_, pb20_, pb15_, pb10_; // REMOVED
   SDL_Rect applyRect_, cancelRect_, centerDeRect_;
-  int projHeaderY_ = 0, styleHeaderY_ = 0, gridHeaderY_ = 0, mufRtHeaderY_ = 0, weatherHeaderY_ = 0;
+  int projHeaderY_ = 0, styleHeaderY_ = 0, gridHeaderY_ = 0, mufRtHeaderY_ = 0,
+      weatherHeaderY_ = 0, voacapHeaderY_ = 0;
 
   void renderRadioButton(SDL_Renderer *renderer, const SDL_Rect &rect,
                          bool selected, const std::string &label,
