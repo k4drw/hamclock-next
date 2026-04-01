@@ -232,6 +232,13 @@ void ADIFProvider::processFile(const std::filesystem::path &path) {
           stats.bandCounts[useBand]++;
         }
 
+        // Track worked DXCC entities per band for cluster spot marking
+        if (!useBand.empty()) {
+          int entityNum = prefixMgr_.findDXCC(call);
+          if (entityNum > 0)
+            stats.workedEntitiesPerBand[entityNum].insert(useBand);
+        }
+
         // Maintain latest calls list (most recent first)
         auto it =
             std::find(stats.latestCalls.begin(), stats.latestCalls.end(), call);

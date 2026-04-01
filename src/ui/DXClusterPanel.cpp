@@ -1,8 +1,8 @@
 #include "DXClusterPanel.h"
 #include "WidgetRegistry.h"
+#include "../core/ADIFData.h"
 #include "../core/ConfigManager.h"
 #include "../core/LiveSpotData.h"
-#include "../core/Logger.h"
 #include "../core/MemoryMonitor.h"
 #include "../services/RigService.h"
 
@@ -10,11 +10,70 @@
 #include <iomanip>
 #include <sstream>
 
+// Returns IARU Region 2 sub-band mode label for a given frequency in kHz.
+static const char *modeFromFreq(double khz) {
+  // FT8 dial frequencies (±0.6 kHz)
+  static const double ft8f[] = {1840, 3573, 7074, 10136, 14074,
+                                 18100, 21074, 24915, 28074, 50313};
+  for (double f : ft8f)
+    if (std::abs(khz - f) < 0.6) return "FT8";
+  // FT4 dial frequencies (±0.6 kHz)
+  static const double ft4f[] = {3575, 7047, 14080, 18104, 21140, 24919, 28180};
+  for (double f : ft4f)
+    if (std::abs(khz - f) < 0.6) return "FT4";
+  // WSPR dial frequencies (±0.4 kHz)
+  static const double wsprf[] = {1836.6, 3592.6, 7038.6, 10138.7,
+                                  14095.6, 18104.6, 21094.6, 24924.6, 28124.6};
+  for (double f : wsprf)
+    if (std::abs(khz - f) < 0.4) return "WSPR";
+  // Band plan sub-bands
+  if (khz >= 1800  && khz < 1843)  return "CW";
+  if (khz >= 1843  && khz < 2000)  return "SSB";
+  if (khz >= 3500  && khz < 3570)  return "CW";
+  if (khz >= 3570  && khz < 3600)  return "RTTY";
+  if (khz >= 3600  && khz < 4000)  return "SSB";
+  if (khz >= 7000  && khz < 7040)  return "CW";
+  if (khz >= 7040  && khz < 7125)  return "RTTY";
+  if (khz >= 7125  && khz < 7300)  return "SSB";
+  if (khz >= 10100 && khz < 10130) return "CW";
+  if (khz >= 10130 && khz < 10150) return "RTTY";
+  if (khz >= 14000 && khz < 14070) return "CW";
+  if (khz >= 14070 && khz < 14100) return "RTTY";
+  if (khz >= 14100 && khz < 14350) return "SSB";
+  if (khz >= 18068 && khz < 18095) return "CW";
+  if (khz >= 18095 && khz < 18110) return "RTTY";
+  if (khz >= 18110 && khz < 18168) return "SSB";
+  if (khz >= 21000 && khz < 21070) return "CW";
+  if (khz >= 21070 && khz < 21150) return "RTTY";
+  if (khz >= 21150 && khz < 21450) return "SSB";
+  if (khz >= 24890 && khz < 24915) return "CW";
+  if (khz >= 24915 && khz < 24990) return "SSB";
+  if (khz >= 28000 && khz < 28070) return "CW";
+  if (khz >= 28070 && khz < 28300) return "RTTY";
+  if (khz >= 28300 && khz < 29700) return "SSB";
+  if (khz >= 50000 && khz < 50100) return "CW";
+  if (khz >= 50100 && khz < 50300) return "SSB";
+  return "";
+}
+
+static SDL_Color modeColor(const char *mode) {
+  if (!mode || mode[0] == '\0') return {120, 120, 120, 255};
+  std::string m(mode);
+  if (m == "CW")   return {220, 200,  60, 255}; // yellow
+  if (m == "SSB")  return { 80, 160, 255, 255}; // blue
+  if (m == "FT8")  return { 60, 210,  80, 255}; // green
+  if (m == "FT4")  return {255, 140,  40, 255}; // orange
+  if (m == "RTTY") return {230,  90,  50, 255}; // red-orange
+  if (m == "WSPR") return {180,  80, 255, 255}; // purple
+  return {160, 160, 160, 255};
+}
+
 DXClusterPanel::DXClusterPanel(int x, int y, int w, int h, FontManager &fontMgr,
                                std::shared_ptr<DXClusterDataStore> store,
-                               RigService *rigService, const AppConfig *config)
+                               RigService *rigService, const AppConfig *config,
+                               std::shared_ptr<ADIFStore> adifStore)
     : ListPanel(x, y, w, h, fontMgr, "DX Cluster", {}), store_(store),
-      rigService_(rigService), config_(config) {}
+      adifStore_(std::move(adifStore)), rigService_(rigService), config_(config) {}
 
 DXClusterPanel::~DXClusterPanel() { clearSpotCache(); }
 
@@ -22,6 +81,10 @@ void DXClusterPanel::clearSpotCache() {
   for (auto &cs : spotCache_) {
     if (cs.freqTex)
       MemoryMonitor::getInstance().destroyTexture(cs.freqTex);
+    if (cs.modeTex)
+      MemoryMonitor::getInstance().destroyTexture(cs.modeTex);
+    if (cs.badgeTex)
+      MemoryMonitor::getInstance().destroyTexture(cs.badgeTex);
     if (cs.callTex)
       MemoryMonitor::getInstance().destroyTexture(cs.callTex);
     if (cs.ageTex)
@@ -129,13 +192,19 @@ void DXClusterPanel::render(SDL_Renderer *renderer) {
   contentY_ = curY;
   rowH_ = rowH;
 
-  // Column layout: Freq (Right-aligned) | Call (Left) | Age (Right-anchored)
-  // Use worst-case sample strings to anchor fixed column boundaries
-  int freqColW = fontMgr_.getLogicalWidth("88888.8", rowFontSize_);
-  int ageColW  = fontMgr_.getLogicalWidth("999m", rowFontSize_);
-  int callX    = x_ + pad + freqColW + 6;
-  int freqXEnd = callX - 6;
-  int ageX     = x_ + width_ - pad - ageColW;
+  // Column layout: Freq | [Mode] | [Badge] | Call | Age
+  // Mode badge (CW/FT8/SSB…) shown at ≥140px; DXCC badge (N/B) shown at ≥120px.
+  int freqColW  = fontMgr_.getLogicalWidth("88888.8", rowFontSize_);
+  int ageColW   = fontMgr_.getLogicalWidth("999m", rowFontSize_);
+  bool showMode  = (width_ >= 140);
+  bool showBadge = (width_ >= 120) && adifStore_ && adifStore_->get().valid;
+  int modeColW  = showMode  ? (fontMgr_.getLogicalWidth("RTTY", rowFontSize_) + 2) : 0;
+  int badgeColW = showBadge ? (fontMgr_.getLogicalWidth("B", rowFontSize_) + 2) : 0;
+  int freqXEnd  = x_ + pad + freqColW;
+  int modeX     = freqXEnd + 4;
+  int badgeX    = modeX + modeColW + (showMode ? 4 : 0);
+  int callX     = badgeX + badgeColW + (showBadge ? 3 : (showMode ? 0 : 2));
+  int ageX      = x_ + width_ - pad - ageColW;
 
   for (size_t i = 0; i < visibleSpots_.size(); ++i) {
     if (i >= spotCache_.size())
@@ -146,8 +215,10 @@ void DXClusterPanel::render(SDL_Renderer *renderer) {
     auto &cache = spotCache_[i];
     SDL_Color color = getRowColor(i, getThemeColors(theme_).text);
 
+    bool freqChanged = std::abs(cache.lastFreq - spot.freq) > 0.001;
+
     // 1. Freq (right-aligned within freq column)
-    if (!cache.freqTex || std::abs(cache.lastFreq - spot.freq) > 0.001) {
+    if (!cache.freqTex || freqChanged) {
       if (cache.freqTex)
         MemoryMonitor::getInstance().destroyTexture(cache.freqTex);
       char buf[32];
@@ -165,7 +236,69 @@ void DXClusterPanel::render(SDL_Renderer *renderer) {
       SDL_RenderSetClipRect(renderer, nullptr);
     }
 
-    // 2. Call (left-aligned, clipped before age column)
+    // 2. Mode badge (left-aligned in mode column, only when wide enough)
+    if (showMode) {
+      std::string modeStr(modeFromFreq(spot.freq));
+      if (!cache.modeTex || freqChanged || cache.lastMode != modeStr) {
+        if (cache.modeTex)
+          MemoryMonitor::getInstance().destroyTexture(cache.modeTex);
+        cache.modeTex = nullptr;
+        cache.modeW = cache.modeH = 0;
+        if (!modeStr.empty()) {
+          SDL_Color mc = modeColor(modeStr.c_str());
+          cache.modeTex = fontMgr_.renderText(renderer, modeStr, mc,
+                                              rowFontSize_, &cache.modeW, &cache.modeH);
+        }
+        cache.lastMode = modeStr;
+      }
+      if (cache.modeTex) {
+        int ty = rowY + (rowH - cache.modeH) / 2;
+        SDL_Rect dst = {modeX, ty, cache.modeW, cache.modeH};
+        SDL_Rect clip = {modeX, rowY, modeColW, rowH};
+        SDL_RenderSetClipRect(renderer, &clip);
+        SDL_RenderCopy(renderer, cache.modeTex, nullptr, &dst);
+        SDL_RenderSetClipRect(renderer, nullptr);
+      }
+    }
+
+    // 3. DXCC needed badge (N=new entity, B=new band)
+    if (showBadge && spot.txDxcc > 0) {
+      ADIFStats adif = adifStore_->get();
+      auto it = adif.workedEntitiesPerBand.find(spot.txDxcc);
+      std::string badgeStr;
+      SDL_Color badgeCol = {120, 120, 120, 255};
+      if (it == adif.workedEntitiesPerBand.end()) {
+        badgeStr = "N"; // new entity — not in log at all
+        badgeCol = {0, 240, 220, 255}; // cyan
+      } else {
+        int bandIdx = freqToBandIndex(spot.freq);
+        if (bandIdx >= 0) {
+          std::string band(kBands[bandIdx].name);
+          if (it->second.find(band) == it->second.end()) {
+            badgeStr = "B"; // new band
+            badgeCol = {255, 220, 60, 255}; // yellow
+          }
+        }
+      }
+      if (!cache.badgeTex || cache.lastBadge != badgeStr) {
+        if (cache.badgeTex)
+          MemoryMonitor::getInstance().destroyTexture(cache.badgeTex);
+        cache.badgeTex = nullptr;
+        cache.badgeW = cache.badgeH = 0;
+        if (!badgeStr.empty()) {
+          cache.badgeTex = fontMgr_.renderText(renderer, badgeStr, badgeCol,
+                                               rowFontSize_, &cache.badgeW, &cache.badgeH);
+        }
+        cache.lastBadge = badgeStr;
+      }
+      if (cache.badgeTex) {
+        int ty = rowY + (rowH - cache.badgeH) / 2;
+        SDL_Rect dst = {badgeX, ty, cache.badgeW, cache.badgeH};
+        SDL_RenderCopy(renderer, cache.badgeTex, nullptr, &dst);
+      }
+    }
+
+    // 4. Call (left-aligned, clipped before age column)
     if (!cache.callTex || cache.lastCall != spot.call) {
       if (cache.callTex)
         MemoryMonitor::getInstance().destroyTexture(cache.callTex);
@@ -182,7 +315,7 @@ void DXClusterPanel::render(SDL_Renderer *renderer) {
       SDL_RenderSetClipRect(renderer, nullptr);
     }
 
-    // 3. Age (right-anchored, always visible)
+    // 5. Age (right-anchored, always visible)
     std::string age = formatAge(spot.time);
     if (!cache.ageTex || cache.lastAge != age) {
       if (cache.ageTex)
@@ -219,7 +352,7 @@ void DXClusterPanel::rebuildRows(const DXClusterData &data) {
     allRows_.push_back(ss.str());
     allFreqs_.push_back(spot.freqKhz);
     
-    allSpots_.push_back({spot.txCall, spot.freqKhz, spot.spottedAt});
+    allSpots_.push_back({spot.txCall, spot.freqKhz, spot.spottedAt, spot.txDxcc});
   }
 }
 
@@ -359,11 +492,11 @@ nlohmann::json DXClusterPanel::getDebugData() const {
 #ifndef __EMSCRIPTEN__
 REGISTER_WIDGET("dx_cluster", "DX Cluster", true, false, {
   return std::make_unique<DXClusterPanel>(
-      0, 0, 0, 0, deps.fontMgr, deps.dxcStore, deps.rigService, &deps.appCfg);
+      0, 0, 0, 0, deps.fontMgr, deps.dxcStore, deps.rigService, &deps.appCfg, deps.adifStore);
 })
 #else
 REGISTER_WIDGET("dx_cluster", "DX Cluster", true, false, {
   return std::make_unique<DXClusterPanel>(
-      0, 0, 0, 0, deps.fontMgr, deps.dxcStore, nullptr, &deps.appCfg);
+      0, 0, 0, 0, deps.fontMgr, deps.dxcStore, nullptr, &deps.appCfg, deps.adifStore);
 })
 #endif

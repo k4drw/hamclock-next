@@ -2,6 +2,7 @@
 
 #include <map>
 #include <mutex>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -29,6 +30,10 @@ struct ADIFStats {
   std::map<std::string, int> bandCounts;
   std::vector<std::string> latestCalls;
   std::vector<QSORecord> recentQSOs; // Most recent QSOs (newest first)
+
+  // DXCC entity number → set of bands with at least one QSO.
+  // Used by DXClusterPanel to mark spots as New/New-Band/Worked.
+  std::map<int, std::set<std::string>> workedEntitiesPerBand;
 
   bool valid = false;
   std::string activeBandFilter;
