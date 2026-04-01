@@ -4,6 +4,8 @@
 #include "../core/AuroraHistoryStore.h"
 #include "../core/AuroraMapData.h"
 #include "../core/DRAPData.h"
+#include "../core/KIndexHistoryData.h"
+#include "../core/SFIHistoryData.h"
 #include "../core/SolarData.h"
 #include "../core/XRayData.h"
 #include "../network/NetworkManager.h"
@@ -43,6 +45,12 @@ public:
   void setAuroraMapStore(std::shared_ptr<AuroraMapStore> s) {
     auroraMapStore_ = std::move(s);
   }
+  void setKIndexHistoryStore(std::shared_ptr<KIndexHistoryStore> s) {
+    kIndexHistoryStore_ = std::move(s);
+  }
+  void setSFIHistoryStore(std::shared_ptr<SFIHistoryStore> s) {
+    sfiHistoryStore_ = std::move(s);
+  }
 
 private:
   void fetchKIndex();
@@ -55,11 +63,14 @@ private:
   void fetchAuroraHistory();
   void fetchXRay();
   void fetchProtonFlux();
+  void fetchSFIHistory();
 
   static constexpr const char *K_INDEX_URL =
       "https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json";
   static constexpr const char *SFI_URL =
       "https://services.swpc.noaa.gov/products/summary/10cm-flux.json";
+  static constexpr const char *SFI_30D_URL =
+      "https://services.swpc.noaa.gov/products/10cm-flux-30-day.json";
   static constexpr const char *SN_URL =
       "https://services.swpc.noaa.gov/json/solar-cycle/"
       "predicted-solar-cycle.json";
@@ -92,5 +103,7 @@ private:
   std::shared_ptr<XRayHistoryStore> xrayStore_;
   std::shared_ptr<DRAPDataStore> drapStore_;
   std::shared_ptr<AuroraMapStore> auroraMapStore_;
+  std::shared_ptr<KIndexHistoryStore> kIndexHistoryStore_;
+  std::shared_ptr<SFIHistoryStore> sfiHistoryStore_;
   HamClockState *state_;
 };

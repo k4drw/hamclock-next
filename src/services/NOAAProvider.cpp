@@ -89,11 +89,14 @@ void NOAAProvider::fetch() {
   fetchXRay();
   fetchProtonFlux();
   fetchNOAAScales();
+  if (sfiHistoryStore_)
+    fetchSFIHistory();
 }
 
 void NOAAProvider::fetchKIndex() {
   auto state = state_;
-  net_.fetchAsync(K_INDEX_URL, [state](std::string body) {
+  auto kIndexHistoryStore = kIndexHistoryStore_;
+  net_.fetchAsync(K_INDEX_URL, [state, kIndexHistoryStore](std::string body) {
     if (body.empty()) {
       if (state) {
         std::lock_guard<std::mutex> lk(state->servicesMutex);
@@ -104,7 +107,7 @@ void NOAAProvider::fetchKIndex() {
       return;
     }
 
-    WorkerService::getInstance().submitTask([body, state]() {
+    WorkerService::getInstance().submitTask([body, state, kIndexHistoryStore]() {
       auto j = nlohmann::json::parse(body, nullptr, false);
       if (j.is_discarded() || !j.is_array() || j.empty())
         return;
@@ -122,6 +125,9 @@ void NOAAProvider::fetchKIndex() {
       update->noaa_g_scale = calculateGScale(update->k_index);
       update->last_updated = std::chrono::system_clock::now();
       update->valid = true;
+
+      if (kIndexHistoryStore)
+        kIndexHistoryStore->push(update->k_index);
 
       SDL_Event event;
       SDL_zero(event);
@@ -179,6 +185,40 @@ void NOAAProvider::fetchSFI() {
         LOG_I("NOAAProvider", "Offloaded SFI update: SFI={}", update->sfi);
       } else {
         LOG_W("NOAAProvider", "SFI value was zero or missing");
+      }
+    });
+  });
+}
+
+void NOAAProvider::fetchSFIHistory() {
+  auto sfiHistoryStore = sfiHistoryStore_;
+  net_.fetchAsync(SFI_30D_URL, [sfiHistoryStore](std::string body) {
+    if (body.empty() || !sfiHistoryStore)
+      return;
+
+    WorkerService::getInstance().submitTask([body, sfiHistoryStore]() {
+      auto j = nlohmann::json::parse(body, nullptr, false);
+      if (j.is_discarded() || !j.is_array() || j.empty())
+        return;
+
+      // Format: [{"flux":148,"time_tag":"2026-03-01T12:00:00"},...]
+      std::vector<SFIPoint> pts;
+      pts.reserve(j.size());
+      for (const auto &item : j) {
+        if (!item.is_object() || !item.contains("flux") || !item["flux"].is_number())
+          continue;
+        SFIPoint p;
+        p.flux = item["flux"].get<int>();
+        if (item.contains("time_tag") && item["time_tag"].is_string()) {
+          std::string tag = item["time_tag"].get<std::string>();
+          // Keep only YYYY-MM-DD portion
+          p.date = tag.size() >= 10 ? tag.substr(0, 10) : tag;
+        }
+        pts.push_back(p);
+      }
+      if (!pts.empty()) {
+        sfiHistoryStore->setPoints(std::move(pts));
+        LOG_I("NOAAProvider", "SFI 30-day history: {} points", sfiHistoryStore->getPoints().size());
       }
     });
   });

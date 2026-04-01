@@ -137,6 +137,10 @@
 #include "core/SpaceWeatherAlertData.h"
 #include "services/SpaceWeatherAlertProvider.h"
 #include "ui/SolarCyclePanel.h"
+#include "core/KIndexHistoryData.h"
+#include "core/SFIHistoryData.h"
+#include "ui/KIndexAlertPanel.h"
+#include "ui/SFITrendPanel.h"
 #include "ui/GreylineWindowsPanel.h"
 #include "ui/DXCCProgressPanel.h"
 #include "ui/SpaceWeatherAlertsPanel.h"
@@ -296,17 +300,23 @@ DashboardContext::DashboardContext(AppContext &ctx)
   const bool isMasterMode = (appCfg.hubMode == HubMode::Master);
 
   ctx.xrayHistoryStore = std::make_shared<XRayHistoryStore>();
+  ctx.kIndexHistoryStore = std::make_shared<KIndexHistoryStore>();
+  ctx.sfiHistoryStore = std::make_shared<SFIHistoryStore>();
   ctx.drapDataStore = std::make_shared<DRAPDataStore>();
   noaaProvider =
       std::make_unique<NOAAProvider>(netManager, solarStore, auroraHistoryStore,
                                      ctx.xrayHistoryStore, state.get());
   noaaProvider->setDrapStore(ctx.drapDataStore);
   noaaProvider->setAuroraMapStore(ctx.auroraMapStore);
+  noaaProvider->setKIndexHistoryStore(ctx.kIndexHistoryStore);
+  noaaProvider->setSFIHistoryStore(ctx.sfiHistoryStore);
   if (isMasterMode || isWidgetConfigured("solar") ||
       isWidgetConfigured("aurora") ||
       isWidgetConfigured("aurora_graph") ||
       isWidgetConfigured("drap") ||
       isWidgetConfigured("band_conditions") ||
+      isWidgetConfigured("kindex_trend") ||
+      isWidgetConfigured("sfi_trend") ||
       appCfg.propOverlay == PropOverlayType::Aurora)
     noaaProvider->fetch();
   if (appCfg.propOverlay == PropOverlayType::Drap)
@@ -603,6 +613,8 @@ DashboardContext::DashboardContext(AppContext &ctx)
     auto rotatorStore = ctx.rotatorStore;
     auto state = ctx.state;
     auto auroraHistoryStore = ctx.auroraHistoryStore;
+    auto kIndexHistoryStore = ctx.kIndexHistoryStore;
+    auto sfiHistoryStore = ctx.sfiHistoryStore;
     if (widgetPool.count(type) && widgetPool[type])
       return widgetPool[type].get();
 
@@ -844,6 +856,12 @@ DashboardContext::DashboardContext(AppContext &ctx)
     } else if (type == "noaa_spacewx") {
       widgetPool[type] = std::make_unique<NOAASpaceWxPanel>(
           0, 0, 0, 0, fontMgr, ctx.solarStore);
+    } else if (type == "kindex_trend") {
+      widgetPool[type] = std::make_unique<KIndexAlertPanel>(
+          0, 0, 0, 0, fontMgr, kIndexHistoryStore);
+    } else if (type == "sfi_trend") {
+      widgetPool[type] = std::make_unique<SFITrendPanel>(
+          0, 0, 0, 0, fontMgr, sfiHistoryStore, solarStore);
     } else {
       widgetPool[type] = std::make_unique<PlaceholderWidget>(
           0, 0, 0, 0, fontMgr, type.c_str(),
@@ -1296,6 +1314,8 @@ void DashboardContext::update(AppContext &ctx) {
                            isWidgetActive("drap") ||
                            isWidgetActive("noaa_spacewx") ||
                            isWidgetActive("band_conditions") ||
+                           isWidgetActive("kindex_trend") ||
+                           isWidgetActive("sfi_trend") ||
                            appCfg.propOverlay == PropOverlayType::Drap;
     if (needsNoaa)
       noaaProvider->fetch();

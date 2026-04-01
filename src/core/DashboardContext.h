@@ -27,6 +27,8 @@ struct HamClockState;
 // Data stores
 class SolarDataStore;
 class AuroraHistoryStore;
+class KIndexHistoryStore;
+class SFIHistoryStore;
 class WatchlistStore;
 class RSSDataStore;
 class WatchlistHitStore;
@@ -308,6 +310,8 @@ struct AppContext {
   std::shared_ptr<WinlinkStore> winlinkStore;
   std::shared_ptr<DRAPDataStore> drapDataStore;
   std::shared_ptr<XRayHistoryStore> xrayHistoryStore;
+  std::shared_ptr<KIndexHistoryStore> kIndexHistoryStore;
+  std::shared_ptr<SFIHistoryStore> sfiHistoryStore;
   std::shared_ptr<GreylineDXStore> greylineDXStore;
   std::shared_ptr<AuroraMapStore> auroraMapStore;
   std::shared_ptr<CalendarStore> calendarStore;

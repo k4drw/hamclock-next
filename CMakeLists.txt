@@ -606,6 +606,8 @@ set(HAMCLOCK_SOURCES
     src/ui/GreylineDXPanel.cpp
     src/ui/AuroraPanel.cpp
     src/ui/AuroraGraphPanel.cpp
+    src/ui/KIndexAlertPanel.cpp
+    src/ui/SFITrendPanel.cpp
     src/ui/DXClusterPanel.cpp
     src/ui/DXClusterSetup.cpp
     src/ui/BandConditionsPanel.cpp

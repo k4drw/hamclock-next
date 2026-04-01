@@ -44,6 +44,8 @@ class MarineStore;
 class WinlinkStore;
 class DRAPDataStore;
 class XRayHistoryStore;
+class KIndexHistoryStore;
+class SFIHistoryStore;
 class GreylineDXStore;
 class AuroraMapStore;
 class CalendarStore;
@@ -104,6 +106,8 @@ struct WidgetDeps {
   std::shared_ptr<WinlinkStore>         winlinkStore;
   std::shared_ptr<DRAPDataStore>        drapDataStore;
   std::shared_ptr<XRayHistoryStore>     xrayHistoryStore;
+  std::shared_ptr<KIndexHistoryStore>   kIndexHistoryStore;
+  std::shared_ptr<SFIHistoryStore>      sfiHistoryStore;
   std::shared_ptr<GreylineDXStore>      greylineDXStore;
   std::shared_ptr<AuroraMapStore>       auroraMapStore;
   std::shared_ptr<CalendarStore>        calendarStore;
