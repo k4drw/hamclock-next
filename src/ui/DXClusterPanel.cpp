@@ -14,7 +14,7 @@
 static const char *modeFromFreq(double khz) {
   // FT8 dial frequencies (±0.6 kHz)
   static const double ft8f[] = {1840, 3573, 7074, 10136, 14074,
-                                 18100, 21074, 24915, 28074, 50313};
+                                18100, 21074, 24915, 28074, 50313};
   for (double f : ft8f)
     if (std::abs(khz - f) < 0.6) return "FT8";
   // FT4 dial frequencies (±0.6 kHz)
@@ -185,32 +185,41 @@ void DXClusterPanel::render(SDL_Renderer *renderer) {
     curY += titleH_ + pad;
   }
 
-  // Calculate row height
-  int remaining = (y_ + height_) - curY;
+  // Column layout: Freq | [Mode] | [Badge] | Call | Age
+  // Mode badge (CW/FT8/SSB…) shown at ≥140px; DXCC badge (N/B) shown at ≥120px.
+  int freqColW = fontMgr_.getLogicalWidth("88888.8", rowFontSize_);
+  int ageColW = fontMgr_.getLogicalWidth("999m", rowFontSize_);
+  bool showMode = (width_ >= 140);
+  bool showBadge = (width_ >= 120) && adifStore_ && adifStore_->get().valid;
+  int modeColW =
+      showMode ? (fontMgr_.getLogicalWidth("RTTY", rowFontSize_) + 2) : 0;
+  int badgeColW =
+      showBadge ? (fontMgr_.getLogicalWidth("B", rowFontSize_) + 2) : 0;
+  int freqXEnd = x_ + pad + freqColW;
+  int modeX = freqXEnd + 4;
+  int badgeX = modeX + modeColW + (showMode ? 4 : 0);
+  int callX = badgeX + badgeColW + (showBadge ? 3 : (showMode ? 0 : 2));
+  int ageX = x_ + width_ - pad - ageColW;
+
+  // Band Legend at bottom
+  int legendH = (height_ >= 120) ? 28 : 0;
+  legendH_ = legendH;
+  // spdlog::info("DXCluster: height_={}, legendH_={}", height_, legendH_);
+
+  // Calculate row height (compact remaining space)
+  int remaining = (y_ + height_ - legendH) - curY;
   int rowH = std::max(rowFontSize_ + 4,
                       remaining / static_cast<int>(visibleSpots_.size()));
   contentY_ = curY;
   rowH_ = rowH;
-
-  // Column layout: Freq | [Mode] | [Badge] | Call | Age
-  // Mode badge (CW/FT8/SSB…) shown at ≥140px; DXCC badge (N/B) shown at ≥120px.
-  int freqColW  = fontMgr_.getLogicalWidth("88888.8", rowFontSize_);
-  int ageColW   = fontMgr_.getLogicalWidth("999m", rowFontSize_);
-  bool showMode  = (width_ >= 140);
-  bool showBadge = (width_ >= 120) && adifStore_ && adifStore_->get().valid;
-  int modeColW  = showMode  ? (fontMgr_.getLogicalWidth("RTTY", rowFontSize_) + 2) : 0;
-  int badgeColW = showBadge ? (fontMgr_.getLogicalWidth("B", rowFontSize_) + 2) : 0;
-  int freqXEnd  = x_ + pad + freqColW;
-  int modeX     = freqXEnd + 4;
-  int badgeX    = modeX + modeColW + (showMode ? 4 : 0);
-  int callX     = badgeX + badgeColW + (showBadge ? 3 : (showMode ? 0 : 2));
-  int ageX      = x_ + width_ - pad - ageColW;
 
   for (size_t i = 0; i < visibleSpots_.size(); ++i) {
     if (i >= spotCache_.size())
       break;
 
     int rowY = curY + static_cast<int>(i) * rowH;
+    if (rowY + rowH > y_ + height_ - legendH)
+      break;
     const auto &spot = visibleSpots_[i];
     auto &cache = spotCache_[i];
     SDL_Color color = getRowColor(i, getThemeColors(theme_).text);
@@ -333,6 +342,12 @@ void DXClusterPanel::render(SDL_Renderer *renderer) {
       SDL_RenderSetClipRect(renderer, nullptr);
     }
   }
+
+  // Band Legend at bottom (drawn last to ensure it borders the scrollable
+  // content)
+  if (legendH_ > 0) {
+    renderBandLegend(renderer, curY, y_ + height_ - 2);
+  }
 }
 
 void DXClusterPanel::rebuildRows(const DXClusterData &data) {
@@ -351,7 +366,7 @@ void DXClusterPanel::rebuildRows(const DXClusterData &data) {
        << std::setw(4) << formatAge(spot.spottedAt);
     allRows_.push_back(ss.str());
     allFreqs_.push_back(spot.freqKhz);
-    
+
     allSpots_.push_back({spot.txCall, spot.freqKhz, spot.spottedAt, spot.txDxcc});
   }
 }
@@ -487,6 +502,51 @@ nlohmann::json DXClusterPanel::getDebugData() const {
     j["selectedSpot"] = data->selectedSpot.txCall;
   }
   return j;
+}
+
+void DXClusterPanel::renderBandLegend(SDL_Renderer *renderer, int & /*curY*/,
+                                      int maxY) {
+  int cellH = 14;  // Tiny font target 12px + 2px padding
+  int legendH = cellH * 2;  // 28px for 2 rows
+  int legendY = maxY - legendH;
+
+  ThemeColors themes = getThemeColors(theme_);
+
+  // Background for the legend area to prevent spot overlap (fully opaque)
+  SDL_Rect legendRect = {x_ + 1, legendY, width_ - 2, legendH};
+  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, 255);
+  SDL_RenderFillRect(renderer, &legendRect);
+
+  // Top border/separator line
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
+                         themes.border.b, 200);
+  SDL_RenderDrawLine(renderer, x_ + 1, legendY, x_ + width_ - 1, legendY);
+
+  int cols = 6;
+  int cellW = (width_ - 4) / cols;
+  int boxSize = 7;
+
+  for (int i = 0; i < kNumBands; ++i) {
+    int row = i / cols;
+    int col = i % cols;
+    int lx = x_ + 4 + col * cellW;
+    int midY = legendY + row * cellH + cellH / 2;
+
+    // Colored square, vertically centered in the row
+    SDL_Rect box = {lx + 1, midY - boxSize / 2, boxSize, boxSize};
+    SDL_SetRenderDrawColor(renderer, kBands[i].color.r, kBands[i].color.g,
+                           kBands[i].color.b, 255);
+    SDL_RenderFillRect(renderer, &box);
+
+    // Label right of box, vertically centered on the same midline (strip
+    // trailing 'm')
+    std::string label(kBands[i].name);
+    if (!label.empty() && label.back() == 'm')
+      label.pop_back();
+    fontMgr_.catalog()->drawText(
+        renderer, label, lx + boxSize + 1, midY, themes.text, FontStyle::Tiny,
+        /*centered=*/false, /*rightAlign=*/false, /*vertCentered=*/true);
+  }
 }
 
 #ifndef __EMSCRIPTEN__

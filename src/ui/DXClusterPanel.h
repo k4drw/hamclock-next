@@ -55,6 +55,8 @@ private:
   SDL_Color getRowColor(int index,
                         const SDL_Color &defaultColor) const override;
 
+  void renderBandLegend(SDL_Renderer *renderer, int &curY, int maxY);
+
   std::function<void(const DXClusterSpot &)> onSpotActivated_;
   std::function<void()> onSpotDeactivated_;
 
@@ -103,4 +105,5 @@ private:
 
   int contentY_ = 0;  // Y where spot rows begin — set in render(), used in onMouseUp()
   int rowH_ = 14;     // Row height matching render — set in render(), used in onMouseUp()
+  int legendH_ = 0;
 };
