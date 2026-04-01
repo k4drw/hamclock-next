@@ -3,6 +3,7 @@
 #include "../core/StringUtils.h"
 #include "../core/Theme.h"
 #include "FontCatalog.h"
+#include "RenderUtils.h"
 #include <string>
 
 MapViewMenu::MapViewMenu(FontManager &fontMgr)
@@ -255,6 +256,15 @@ void MapViewMenu::render(SDL_Renderer *renderer) {
   }
 }
 
+bool MapViewMenu::onMouseDown(int mx, int my, Uint16 /*mod*/, int /*clicks*/) {
+  if (!visible_)
+    return false;
+  SDL_Point pt = {mx, my};
+  if (SDL_PointInRect(&pt, &menuRect_))
+    return true;
+  return false;
+}
+
 void MapViewMenu::drawDropdown(SDL_Renderer *renderer, const SDL_Rect &rect,
                                const std::string &currentVal, bool /*isOpen*/) {
   ThemeColors themes = getThemeColors(theme_);
@@ -269,13 +279,12 @@ void MapViewMenu::drawDropdown(SDL_Renderer *renderer, const SDL_Rect &rect,
   cat->drawText(renderer, currentVal, rect.x + 10, rect.y + rect.h / 2, themes.text,
                 FontStyle::Fast, false, false, true);
 
-  // Arrow
+  // Arrow (solid filled triangle)
   int cx = rect.x + rect.w - 15;
   int cy = rect.y + rect.h / 2;
-  SDL_SetRenderDrawColor(renderer, themes.text.r, themes.text.g, themes.text.b, 255);
-  SDL_RenderDrawLine(renderer, cx - 4, cy - 2, cx + 4, cy - 2);
-  SDL_RenderDrawLine(renderer, cx - 4, cy - 2, cx, cy + 3);
-  SDL_RenderDrawLine(renderer, cx, cy + 3, cx + 4, cy - 2);
+  RenderUtils::drawTriangle(renderer, (float)cx - 4, (float)cy - 2,
+                            (float)cx + 4, (float)cy - 2, (float)cx,
+                            (float)cy + 3, themes.text);
 }
 
 int MapViewMenu::getDropdownHeight(int numOpts) {
@@ -347,16 +356,15 @@ bool MapViewMenu::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
     return false;
   SDL_Point pt = {mx, my};
 
-  // Check Dropdowns
+  // Helper for combo handling
   auto handleCombo = [&](const SDL_Rect &rec, int comboId,
                          const std::vector<std::string> &opts,
                          std::function<void(int)> onSelect) {
     if (openCombo_ == comboId) {
-      // Check clicks inside list
       int h = getDropdownHeight(opts.size());
       SDL_Rect listRect = {rec.x, rec.y + rec.h, rec.w, h};
       if (SDL_PointInRect(&pt, &listRect)) {
-        int visIdx = (pt.y - listRect.y) / 30; // visual index
+        int visIdx = (pt.y - listRect.y) / 30;
         int idx = listScroll_ + visIdx;
         if (idx >= 0 && idx < (int)opts.size()) {
           onSelect(idx);
@@ -364,127 +372,63 @@ bool MapViewMenu::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
           return true;
         }
       }
-      // Clicked outside? Close it
       openCombo_ = -1;
       return true;
     }
-
-    // Click on Header? Toggle
     if (SDL_PointInRect(&pt, &rec)) {
-      if (openCombo_ == -1) {
-        openCombo_ = comboId;
-        listScroll_ = 0; // Reset scroll
-      } else {
-        openCombo_ = -1;
-      }
+      openCombo_ = (openCombo_ == comboId) ? -1 : comboId;
+      listScroll_ = 0;
       return true;
     }
     return false;
   };
 
-  // Use a helper macro or just direct calls
   if (handleCombo(projRec_, COMBO_PROJ, projOpts_, [&](int idx) {
-        if (idx == 0)
-          projection_ = "equirectangular";
-        else if (idx == 1)
-          projection_ = "robinson";
-        else if (idx == 2)
-          projection_ = "azimuthal";
-        else if (idx == 3)
-          projection_ = "mercator";
-        else if (idx == 4)
-          projection_ = "dual_azimuthal";
+        const char *p[] = {"equirectangular", "robinson", "azimuthal",
+                           "mercator", "dual_azimuthal"};
+        projection_ = p[idx];
       }))
     return true;
 
   if (handleCombo(styleRec_, COMBO_STYLE, mapOpts_, [&](int idx) {
-        if (idx == 0)
-          mapStyle_ = "nasa";
-        else if (idx == 1)
-          mapStyle_ = "topo";
-        else if (idx == 2)
-          mapStyle_ = "topo_bathy";
+        const char *s[] = {"nasa", "topo", "topo_bathy"};
+        mapStyle_ = s[idx];
       }))
     return true;
 
   if (handleCombo(gridRec_, COMBO_GRID, gridOpts_, [&](int idx) {
-        if (idx == 0)
+        if (idx == 0) {
           showGrid_ = false;
-        else if (idx == 1) {
+        } else {
           showGrid_ = true;
-          gridType_ = "latlon";
-        } else if (idx == 2) {
-          showGrid_ = true;
-          gridType_ = "maidenhead";
+          gridType_ = (idx == 1) ? "latlon" : "maidenhead";
         }
       }))
     return true;
 
-          if (handleCombo(overlayRec_, COMBO_OVERLAY, overlayOpts_, [&](int idx) {
-                if (idx == 0)
-                  propOverlay_ = PropOverlayType::None;
-                else if (idx == 1)
-                  propOverlay_ = PropOverlayType::Muf;
-                else if (idx == 2)
-                  propOverlay_ = PropOverlayType::Voacap;
-                else if (idx == 3)
-                  propOverlay_ = PropOverlayType::Reliability;
-                else if (idx == 4)
-                  propOverlay_ = PropOverlayType::Toa;
-                else if (idx == 5)
-                  propOverlay_ = PropOverlayType::Heatmap;
-                else if (idx == 6)
-                  propOverlay_ = PropOverlayType::Drap;
-                else if (idx == 7)
-                  propOverlay_ = PropOverlayType::Aurora;
-              }))
-            return true;
-      
-              if (handleCombo(weatherRec_, COMBO_WEATHER, weatherOpts_, [&](int idx) {
-                    if (idx == 0)
-                      weatherOverlay_ = WeatherOverlayType::None;
-                    else if (idx == 1)
-                      weatherOverlay_ = WeatherOverlayType::WxMb;
-                    else if (idx == 2)
-                      weatherOverlay_ = WeatherOverlayType::CloudsGrib;
-                  }))
-                return true;
-          
-              if (mx >= beaconsRec_.x && mx < beaconsRec_.x + beaconsRec_.w &&
-                  my >= beaconsRec_.y && my < beaconsRec_.y + beaconsRec_.h) {
-                showBeacons_ = !showBeacons_;
-                return true;
-              }
-              if (mx >= bordersRec_.x && mx < bordersRec_.x + bordersRec_.w &&
-                  my >= bordersRec_.y && my < bordersRec_.y + bordersRec_.h) {
-                showBorders_ = !showBorders_;
-                return true;
-              }
-          
-              if (propOverlay_ == PropOverlayType::Voacap ||          propOverlay_ == PropOverlayType::Reliability ||
-          propOverlay_ == PropOverlayType::Toa) {
-        if (handleCombo(bandRec_, COMBO_BAND, bandOpts_,                    [&](int idx) { propBand_ = bandOpts_[idx]; }))
-      return true;
+  if (handleCombo(overlayRec_, COMBO_OVERLAY, overlayOpts_, [&](int idx) {
+        PropOverlayType t[] = {
+            PropOverlayType::None,        PropOverlayType::Muf,
+            PropOverlayType::Voacap,       PropOverlayType::Reliability,
+            PropOverlayType::Toa,          PropOverlayType::Heatmap,
+            PropOverlayType::Drap,         PropOverlayType::Aurora};
+        propOverlay_ = t[idx];
+      }))
+    return true;
 
-    if (handleCombo(modeRec_, COMBO_MODE, modeOpts_,
-                    [&](int idx) { propMode_ = modeOpts_[idx]; }))
-      return true;
+  if (handleCombo(weatherRec_, COMBO_WEATHER, weatherOpts_, [&](int idx) {
+        WeatherOverlayType t[] = {WeatherOverlayType::None,
+                                  WeatherOverlayType::WxMb,
+                                  WeatherOverlayType::CloudsGrib};
+        weatherOverlay_ = t[idx];
+      }))
+    return true;
 
-    if (handleCombo(powerRec_, COMBO_POWER, powerOpts_, [&](int idx) {
-          // parse "100W" -> 100
-          propPower_ = StringUtils::safe_stoi(powerOpts_[idx]);
-          if (propPower_ <= 0)
-            propPower_ = 100;
-        }))
-      return true;
-  }
-
-  // If we clicked anywhere else while a combo is open, close it
-  if (openCombo_ != -1) {
-    openCombo_ = -1;
+  // Toggles
+  if (SDL_PointInRect(&pt, &beaconsRec_)) {
+    showBeacons_ = !showBeacons_;
     return true;
   }
-
   if (SDL_PointInRect(&pt, &bordersRec_)) {
     showBorders_ = !showBorders_;
     return true;
@@ -494,15 +438,35 @@ bool MapViewMenu::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
     return true;
   }
 
-  // Check Cancel button
+  // VOACAP Settings
+  if (propOverlay_ == PropOverlayType::Voacap ||
+      propOverlay_ == PropOverlayType::Reliability ||
+      propOverlay_ == PropOverlayType::Toa) {
+    if (handleCombo(bandRec_, COMBO_BAND, bandOpts_,
+                    [&](int idx) { propBand_ = bandOpts_[idx]; }))
+      return true;
+    if (handleCombo(modeRec_, COMBO_MODE, modeOpts_,
+                    [&](int idx) { propMode_ = modeOpts_[idx]; }))
+      return true;
+    if (handleCombo(powerRec_, COMBO_POWER, powerOpts_, [&](int idx) {
+          propPower_ = StringUtils::safe_stoi(powerOpts_[idx]);
+          if (propPower_ <= 0)
+            propPower_ = 100;
+        }))
+      return true;
+  }
+
+  // Close any open combo if clicking elsewhere in menu
+  if (openCombo_ != -1) {
+    openCombo_ = -1;
+    return true;
+  }
+
   if (SDL_PointInRect(&pt, &cancelRect_)) {
     hide();
     return true;
   }
-
-  // Check Apply button
   if (SDL_PointInRect(&pt, &applyRect_)) {
-    // Apply changes to config
     config_->projection = projection_;
     config_->mapStyle = mapStyle_;
     config_->showGrid = showGrid_;
@@ -515,14 +479,13 @@ bool MapViewMenu::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
     config_->propMode = propMode_;
     config_->propPower = propPower_;
     config_->centerMapOnDe = centerMapOnDe_;
-
     hide();
     if (onApply_)
       onApply_();
     return true;
   }
 
-  return true; // Consume all clicks when menu is visible
+  return true; // Consume all clicks in menu
 }
 
 bool MapViewMenu::onKeyDown(SDL_Keycode key, Uint16) {

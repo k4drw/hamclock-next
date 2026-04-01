@@ -39,7 +39,11 @@
 #include <cstring>
 #include <vector>
 
-bool MapWidget::onMouseDown(int mx, int my, Uint16 /*mod*/, int /*clicks*/) {
+bool MapWidget::onMouseDown(int mx, int my, Uint16 mod, int clicks) {
+  if (mapViewMenu_->isVisible()) {
+    if (mapViewMenu_->onMouseDown(mx, my, mod, clicks))
+      return true;
+  }
   if (mx >= x_ && mx < x_ + width_ && my >= y_ && my < y_ + height_) {
     mouseDown_ = true;
     return true;
@@ -48,14 +52,19 @@ bool MapWidget::onMouseDown(int mx, int my, Uint16 /*mod*/, int /*clicks*/) {
 }
 
 bool MapWidget::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
+  // Pass through to menu if visible (must check BEFORE mouseDown_ check
+  // since menu might have returned true for onMouseDown, leaving our
+  // mouseDown_ as false)
+  if (mapViewMenu_->isVisible()) {
+    if (mapViewMenu_->onMouseUp(mx, my, mod, clicks)) {
+      mouseDown_ = false; // Reset just in case
+      return true;
+    }
+  }
+
   if (!mouseDown_)
     return false;
   mouseDown_ = false;
-
-  // Pass through to menu if visible
-  if (mapViewMenu_->isVisible()) {
-    return mapViewMenu_->onMouseUp(mx, my, mod, clicks);
-  }
 
   if (deMenuVisible_) {
     SDL_Point pt = {mx, my};
