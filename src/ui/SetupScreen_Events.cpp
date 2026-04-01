@@ -741,9 +741,11 @@ bool SetupScreen::onKeyDown(SDL_Keycode key, Uint16 mod) {
     return true;
   default: {
     TextInput *ti = getActiveInput();
-    if (ti)
-      ti->onKeyDown(key, mod);
-    return true;
+    if (ti) {
+      if (ti->onKeyDown(key, mod))
+        return true;
+    }
+    return false;
   }
   }
 }
@@ -809,7 +811,7 @@ bool SetupScreen::onTextInput(const char *inputText) {
     }
     for (const char *p = inputText; *p; ++p) {
       if (!((*p >= 'A' && *p <= 'Z') || (*p >= 'a' && *p <= 'z') ||
-            (*p >= '0' && *p <= '9') || *p == '/')) {
+            (*p >= '0' && *p <= '9') || *p == '/' || *p == ',' || *p == ' ')) {
         return true;
       }
     }
