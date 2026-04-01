@@ -9,7 +9,6 @@ Presets let you save a complete dashboard configuration and recall it instantly 
 Click the **star icon (★)** in the Time Panel (top-left corner of the screen) to open the Presets modal.
 
 ![Presets modal](images/timepanel-presets-modal.png)
-<!-- TODO: screenshot needed -->
 
 ---
 

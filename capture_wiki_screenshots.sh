@@ -19,6 +19,12 @@
 #   docs/wiki/images/widgets/rss_banner.png         — RSS scrolling banner
 #   docs/wiki/images/map_looks/<label>.png          — curated map combinations
 #   docs/wiki/images/themes/<theme>.png             — theme gallery shots
+#   docs/wiki/images/modal-setup.png                — setup modal (ui_docs)
+#   docs/wiki/images/timepanel-presets-modal.png    — presets modal (ui_docs)
+#   docs/wiki/images/modal-widget-selector.png      — widget selector modal (ui_docs)
+#   docs/wiki/images/pane-rotation-indicator.png    — pane rotation indicator (ui_docs)
+#   docs/wiki/images/key-highlight-mode.png         — keyboard highlight mode (ui_docs)
+#   docs/wiki/images/layout-annotated.png           — annotated dashboard layout (ui_docs)
 #
 # Parts (for PARTS env var):
 #   fixed_ui   — TimePanel + RSS banner (Part 0)
@@ -26,7 +32,8 @@
 #   maximized  — maximized pane screenshots (Part 3)
 #   map_looks  — map look gallery (Part 4)
 #   themes     — theme gallery (Part 5)
-#   wiki       — regenerate wiki MD files (Part 6)
+#   ui_docs    — UI modals and annotated layout (Part 6)
+#   wiki       — regenerate wiki MD files (Part 7)
 #   all        — all of the above (default)
 #
 # Requirements: curl, jq, ImageMagick v7 (magick)
@@ -85,8 +92,21 @@ has_value() {
   # has_value <jq_key> <value> — returns 0 if value is in capabilities array
   echo "$CAPS" | jq -e --arg v "$2" ".${1}[] | select(. == \$v)" > /dev/null 2>&1
 }
+is_scrollable() {
+  # is_scrollable <widget_id> — returns 0 if widget is scrollable
+  echo "$CAPS" | jq -e --arg v "$1" ".widget_meta[] | select(.id == \$v and .scrollable == true)" > /dev/null 2>&1
+}
 part_enabled() {
   [ "$PARTS" = "all" ] || echo "$PARTS" | tr ',' '\n' | grep -qx "$1"
+}
+debug_click() {
+  local x="$1"
+  local y="$2"
+  hc_get "debug/click?x=${x}&y=${y}"
+}
+debug_key() {
+  local k="$1"
+  hc_get "debug/keypress?key=${k}"
 }
 # ---------------------------------------------------------------------------
 
@@ -102,7 +122,7 @@ echo ""
 if [ "$HC_AUTOSTART" = "1" ]; then
   if ! curl -sfL "${BASE_URL}/get_config.json" > /dev/null 2>&1; then
     echo "Starting HamClock-Next (HC_AUTOSTART=1)..."
-    ./build/hamclock-next > /dev/null 2>&1 &
+    ./build/hamclock-next --live-web > /dev/null 2>&1 &
     HC_PID=$!
     # Update trap to include killer cleanup
     trap "echo 'Cleaning up server (PID ${HC_PID})...'; kill ${HC_PID}; restore_state" EXIT
@@ -119,6 +139,7 @@ for i in $(seq 1 60); do
   READY=$(curl -sf "${BASE_URL}/api/sys/ready" || echo "offline")
   if [ "$READY" = "ready" ]; then
     echo " ok (${i}s)"
+    sleep 2 # wait for layout and sub-widgets to sync
     break
   fi
   if [ "$i" = "60" ]; then
@@ -263,13 +284,18 @@ if part_enabled widgets; then
   PHYS_RECT_3=$(get_phys_rect 3)
 
   TOPBAR_WIDGETS=()
+  SCROLL_WIDGETS=()
   while IFS= read -r WIDGET; do
     case "$WIDGET" in
-      de_info|dx_info|dx_cluster|live_spots|on_the_air)
+      de_info|dx_info|satellite)
         # Handled specifically later
         ;;
       *)
-        TOPBAR_WIDGETS+=("$WIDGET")
+        if is_scrollable "$WIDGET"; then
+          SCROLL_WIDGETS+=("$WIDGET")
+        else
+          TOPBAR_WIDGETS+=("$WIDGET")
+        fi
         ;;
     esac
   done < <(echo "$CAPS" | jq -r '.widgets[]')
@@ -282,14 +308,16 @@ if part_enabled widgets; then
     W2="${TOPBAR_WIDGETS[i+1]:-}"
     W3="${TOPBAR_WIDGETS[i+2]:-}"
 
-    # Check if all outputs already exist (skip whole batch if FORCE=0)
+    # Check if all outputs already exist
     ALL_EXIST=1
     for W in "$W1" ${W2:+"$W2"} ${W3:+"$W3"}; do
       [ -f "${OUTPUT_DIR}/widgets/${W}.png" ] || ALL_EXIST=0
     done
     if [ "$FORCE" = "0" ] && [ "$ALL_EXIST" = "1" ]; then
       echo "  SKIP (exists) batch: $W1${W2:+, $W2}${W3:+, $W3}"
-      WIDGET_COUNT=$((WIDGET_COUNT + 1 + ${#W2} + ${#W3}))
+      WIDGET_COUNT=$((WIDGET_COUNT + 1))
+      [ -n "$W2" ] && WIDGET_COUNT=$((WIDGET_COUNT + 1))
+      [ -n "$W3" ] && WIDGET_COUNT=$((WIDGET_COUNT + 1))
       continue
     fi
 
@@ -328,11 +356,34 @@ if part_enabled widgets; then
     rm -f "${FULL}"
   done
 
-  # Part 2 — Standard SidePanel Widgets
+  # Process Scrollable widgets in Double-Height SidePanel
+  for W in "${SCROLL_WIDGETS[@]}"; do
+    if [ "$FORCE" = "0" ] && [ -f "${OUTPUT_DIR}/widgets/${W}.png" ]; then
+      echo "  SKIP (exists) ${W} (double-height)"
+      WIDGET_COUNT=$((WIDGET_COUNT + 1))
+      continue
+    fi
+    echo "  ${W} (double-height SidePanel)"
+    # Set Pane 5 to widget and CLEAR Pane 6 to trigger full height
+    hc_get "set_config?pane4=${W}&pane5="
+    sleep 1
+    # Refresh rect for Pane 5 (now double height)
+    PHYS_RECT_5_DOUBLE=$(get_phys_rect 5)
+    sleep "${DELAY}"
+    FULL="${OUTPUT_DIR}/widgets/.full_${W}.png"
+    if capture "${FULL}"; then
+      magick "${FULL}" -crop "${PHYS_RECT_5_DOUBLE}" +repage "${OUTPUT_DIR}/widgets/${W}.png"
+      echo "  ✓ ${OUTPUT_DIR}/widgets/${W}.png"
+      rm -f "${FULL}"
+    fi
+    WIDGET_COUNT=$((WIDGET_COUNT + 1))
+  done
+
+  # Part 2 — Standard SidePanel Widgets (Split mode)
   echo ""
   echo "--- Part 2: SidePanel Widgets ---"
   echo "  Standard SidePanel (de_info, dx_info)"
-  hc_get "set_config?side_panel_mode=default"
+  hc_get "set_config?pane4=de_info&pane5=dx_info"
   sleep 1 # Wait for UI to rebuild panes!
   hc_get "set_satname?name=none"
 
@@ -358,6 +409,7 @@ if part_enabled widgets; then
 
   # Satellite
   echo "  satellite (in DXSatPane)"
+  hc_get "set_config?pane4=de_info&pane5=dx_info" # Ensure split mode
   hc_get "set_satname?name=ISS"
   sleep "${DELAY}"
   FULL="${OUTPUT_DIR}/widgets/.full_satellite.png"
@@ -371,24 +423,6 @@ if part_enabled widgets; then
     rm -f "${FULL}"
   fi
   hc_get "set_satname?name=none"
-
-  # Double Tall SidePanel Widgets
-  for W in dx_cluster live_spots on_the_air; do
-    echo "  ${W} (double-tall SidePanel)"
-    hc_get "set_config?side_panel_mode=${W}"
-    sleep 1
-    PHYS_RECT_5_DOUBLE=$(get_phys_rect 5)
-    sleep "${DELAY}"
-    FULL="${OUTPUT_DIR}/widgets/.full_${W}.png"
-    capture "${FULL}" || continue
-    if [ "$FORCE" = "1" ] || [ ! -f "${OUTPUT_DIR}/widgets/${W}.png" ]; then
-      magick "${FULL}" -crop "${PHYS_RECT_5_DOUBLE}" +repage "${OUTPUT_DIR}/widgets/${W}.png"
-      echo "  ✓ ${OUTPUT_DIR}/widgets/${W}.png"
-    else echo "  SKIP (exists) ${OUTPUT_DIR}/widgets/${W}.png"; fi
-    WIDGET_COUNT=$((WIDGET_COUNT + 1))
-    rm -f "${FULL}"
-  done
-  hc_get "set_config?side_panel_mode=default"
 
   echo "  Widget gallery: ${WIDGET_COUNT} images captured/checked"
 fi
@@ -449,6 +483,7 @@ if part_enabled map_looks; then
     "robinson|none|clouds_grib|dark|robinson_clouds_dark"
     "azimuthal|none|none|amber|azimuthal_clean_amber"
     "robinson|none|none|matrix|robinson_matrix"
+    "robinson|voacap|none|dark|robinson_voacap_dark"
   )
 
   LOOK_COUNT=0
@@ -512,13 +547,138 @@ if part_enabled themes; then
 fi
 
 # ============================================================================
-# Part 6 — Wiki MD Generation
+# Part 6 — UI Docs (Modals + Layout)
+# ============================================================================
+if part_enabled ui_docs; then
+  echo ""
+  echo "--- Part 6: UI Docs ---"
+  hc_get "set_theme?theme=dark"
+  hc_get "set_projection?type=equirectangular"
+  [ -z "${SCALE:-}" ] && compute_scale
+
+  # 1. Setup Modal (Gear icon in Time Panel)
+  OUT_SETUP="${OUTPUT_DIR}/modal-setup.png"
+  if [ "$FORCE" = "1" ] || [ ! -f "$OUT_SETUP" ]; then
+    echo "  modal-setup"
+    TP_RECT=$(curl -sf "${BASE_URL}/get_timepanel_rect" || echo '{"logical":{"x":661,"y":0,"w":139,"h":148}}')
+    GEAR_X=$(echo "$TP_RECT" | jq '.logical.x + .logical.w - 20')
+    GEAR_Y=$(echo "$TP_RECT" | jq '.logical.y + 20')
+    debug_click $GEAR_X $GEAR_Y
+    sleep 1
+    capture "$OUT_SETUP"
+    debug_key "Escape"
+    sleep 0.5
+  fi
+
+  # 2. Presets Modal (Star icon in Time Panel)
+  OUT_PRESETS="${OUTPUT_DIR}/timepanel-presets-modal.png"
+  if [ "$FORCE" = "1" ] || [ ! -f "$OUT_PRESETS" ]; then
+    echo "  modal-presets"
+    TP_RECT=$(curl -sf "${BASE_URL}/get_timepanel_rect" || echo '{"logical":{"x":661,"y":0,"w":139,"h":148}}')
+    STAR_X=$(echo "$TP_RECT" | jq '.logical.x + .logical.w - 50')
+    STAR_Y=$(echo "$TP_RECT" | jq '.logical.y + 20')
+    debug_click $STAR_X $STAR_Y
+    sleep 1
+    FULL="${OUTPUT_DIR}/.full_presets.png"
+    if capture "$FULL"; then
+      # Presets modal is centered, 420x330 logical
+      PX=$(awk "BEGIN { printf \"%d\", (800-420)/2 * $SCALE }")
+      PY=$(awk "BEGIN { printf \"%d\", (480-330)/2 * $SCALE }")
+      PW=$(awk "BEGIN { printf \"%d\", 420 * $SCALE }")
+      PH=$(awk "BEGIN { printf \"%d\", 330 * $SCALE }")
+      magick "$FULL" -crop "${PW}x${PH}+${PX}+${PY}" +repage "$OUT_PRESETS"
+      rm -f "$FULL"
+    fi
+    debug_key "Escape"
+    sleep 0.5
+  fi
+
+  # 3. Widget Selector Modal
+  OUT_SELECTOR="${OUTPUT_DIR}/modal-widget-selector.png"
+  if [ "$FORCE" = "1" ] || [ ! -f "$OUT_SELECTOR" ]; then
+    echo "  modal-widget-selector"
+    P1_RECT=$(curl -sf "${BASE_URL}/get_pane_rect?pane=1" || echo '{"logical":{"x":0,"y":0,"w":130,"h":110}}')
+    # Click top 10% of pane
+    P1_X=$(echo "$P1_RECT" | jq '.logical.x + .logical.w/2')
+    P1_Y=$(echo "$P1_RECT" | jq '.logical.y + 5')
+    debug_click $P1_X $P1_Y
+    sleep 1
+    FULL="${OUTPUT_DIR}/.full_selector.png"
+    if capture "$FULL"; then
+      PX=$(awk "BEGIN { printf \"%d\", 20 * $SCALE }")
+      PY=$(awk "BEGIN { printf \"%d\", 20 * $SCALE }")
+      PW=$(awk "BEGIN { printf \"%d\", 760 * $SCALE }")
+      PH=$(awk "BEGIN { printf \"%d\", 440 * $SCALE }")
+      magick "$FULL" -crop "${PW}x${PH}+${PX}+${PY}" +repage "$OUT_SELECTOR"
+      rm -f "$FULL"
+    fi
+    debug_key "Escape"
+    sleep 0.5
+  fi
+
+  # 4. Pane rotation indicator
+  OUT_ROT="${OUTPUT_DIR}/pane-rotation-indicator.png"
+  if [ "$FORCE" = "1" ] || [ ! -f "$OUT_ROT" ]; then
+    echo "  pane-rotation-indicator"
+    hc_get "set_pane?pane=1&action=solo&widget=solar"
+    hc_get "set_pane?pane=1&action=add&widget=band_conditions"
+    sleep 1
+    FULL="${OUTPUT_DIR}/.full_rot.png"
+    if capture "$FULL"; then
+      P1_RECT=$(curl -sf "${BASE_URL}/get_pane_rect?pane=1" || echo '{"logical":{"x":0,"y":0,"w":130,"h":110}}')
+      # Indicator is at top of pane
+      PX=$(echo "$P1_RECT" | jq ".logical.x + .logical.w/2 - 30")
+      PY=$(echo "$P1_RECT" | jq ".logical.y")
+      PX_PX=$(awk "BEGIN { printf \"%d\", $PX * $SCALE }")
+      PY_PX=$(awk "BEGIN { printf \"%d\", $PY * $SCALE }")
+      PW_PX=$(awk "BEGIN { printf \"%d\", 60 * $SCALE }")
+      PH_PX=$(awk "BEGIN { printf \"%d\", 15 * $SCALE }")
+      magick "$FULL" -crop "${PW_PX}x${PH_PX}+${PX_PX}+${PY_PX}" +repage "$OUT_ROT"
+      rm -f "$FULL"
+    fi
+  fi
+
+  # 5. K-mode highlight
+  OUT_K="${OUTPUT_DIR}/key-highlight-mode.png"
+  if [ "$FORCE" = "1" ] || [ ! -f "$OUT_K" ]; then
+    echo "  key-highlight-mode"
+    debug_key "K"
+    sleep 0.5
+    capture "$OUT_K"
+    debug_key "K"
+    sleep 0.5
+  fi
+
+  # 6. Annotated Layout
+  OUT_LAYOUT="${OUTPUT_DIR}/layout-annotated.png"
+  if [ "$FORCE" = "1" ] || [ ! -f "$OUT_LAYOUT" ]; then
+    echo "  layout-annotated"
+    FULL="${OUTPUT_DIR}/.full_layout.png"
+    if capture "$FULL"; then
+       magick "$FULL" \
+         -fill none -stroke red -strokewidth 3 \
+         -draw "rectangle $(awk "BEGIN { printf \"%d,%d %d,%d\", 139*$SCALE, 0*$SCALE, 799*$SCALE, 148*$SCALE }")" \
+         -annotate +$(awk "BEGIN { printf \"%d\", 145*$SCALE }")+$(awk "BEGIN { printf \"%d\", 25*$SCALE }") "Time Panel" \
+         -stroke blue \
+         -draw "rectangle $(awk "BEGIN { printf \"%d,%d %d,%d\", 139*$SCALE, 149*$SCALE, 799*$SCALE, 479*$SCALE }")" \
+         -annotate +$(awk "BEGIN { printf \"%d\", 145*$SCALE }")+$(awk "BEGIN { printf \"%d\", 175*$SCALE }") "Map & Overlays" \
+         -stroke green \
+         -draw "rectangle $(awk "BEGIN { printf \"%d,%d %d,%d\", 0*$SCALE, 0*$SCALE, 138*$SCALE, 479*$SCALE }")" \
+         -annotate +$(awk "BEGIN { printf \"%d\", 5*$SCALE }")+$(awk "BEGIN { printf \"%d\", 25*$SCALE }") "Panes" \
+         "$OUT_LAYOUT"
+       rm -f "$FULL"
+    fi
+  fi
+fi
+
+# ============================================================================
+# Part 7 — Wiki MD Generation
 # Regenerate Widget-Gallery.md, Map-and-Overlays.md (theme section),
 # and Widgets.md (map looks section) inline from captured images.
 # ============================================================================
 if part_enabled wiki; then
   echo ""
-  echo "--- Part 6: Wiki MD Generation ---"
+  echo "--- Part 7: Wiki MD Generation ---"
   WIKI_DIR="docs/wiki"
 
   # ---- 6a: Widget-Gallery.md ----
@@ -537,25 +697,38 @@ if part_enabled wiki; then
     # Format: "case WidgetType::FOO: return "Foo Name";"
     declare -A WIDGET_NAMES
     declare -a WIDGET_SLUGS
-    while IFS= read -r LINE; do
-      SLUG=$(echo "$LINE" | sed -n 's/.*widgetTypeToString.*"\([^"]*\)".*/\1/p')
-      [ -n "$SLUG" ] && WIDGET_SLUGS+=("$SLUG")
-    done < <(grep 'return "' "${WIDGET_TYPE_H}" | grep -v '//' | head -80)
 
-    # Get display names: look for widgetTypeDisplayName() section
-    IN_DISPLAY=0
-    while IFS= read -r LINE; do
-      if echo "$LINE" | grep -q "widgetTypeDisplayName"; then IN_DISPLAY=1; fi
-      if [ "$IN_DISPLAY" = "1" ]; then
-        SLUG=$(echo "$LINE" | sed -n 's/.*WidgetType::\([A-Z_]*\).*/\1/p' | tr '[:upper:]' '[:lower:]' | tr '_' '_')
-        NAME=$(echo "$LINE" | sed -n 's/.*return "\([^"]*\)".*/\1/p')
-        if [ -n "$SLUG" ] && [ -n "$NAME" ]; then
-          WIDGET_NAMES["$SLUG"]="$NAME"
+    if [ "$(echo "$CAPS" | jq -r '.widget_meta // empty')" ]; then
+      # Use server-provided metadata (the new way)
+      while IFS= read -r ITEM; do
+        SLUG=$(echo "$ITEM" | jq -r '.id')
+        NAME=$(echo "$ITEM" | jq -r '.displayName')
+        WIDGET_NAMES["$SLUG"]="$NAME"
+        WIDGET_SLUGS+=("$SLUG")
+      done < <(echo "$CAPS" | jq -c '.widget_meta[] | select(.requiresKey == false)')
+      # Sort by display name for consistent gallery
+      IFS=$'\n' WIDGET_SLUGS=($(for s in "${WIDGET_SLUGS[@]}"; do echo "${WIDGET_NAMES[$s]}|$s"; done | sort | cut -d'|' -f2))
+      unset IFS
+    else
+      # Fallback: Parse from WidgetType.h (old way)
+      while IFS= read -r LINE; do
+        SLUG=$(echo "$LINE" | sed -n 's/.*widgetTypeToString.*"\([^"]*\)".*/\1/p')
+        [ -n "$SLUG" ] && WIDGET_SLUGS+=("$SLUG")
+      done < <(grep 'return "' "${WIDGET_TYPE_H}" | grep -v '//' | head -80)
+
+      IN_DISPLAY=0
+      while IFS= read -r LINE; do
+        if echo "$LINE" | grep -q "widgetTypeDisplayName"; then IN_DISPLAY=1; fi
+        if [ "$IN_DISPLAY" = "1" ]; then
+          SLUG=$(echo "$LINE" | sed -n 's/.*WidgetType::\([A-Z_]*\).*/\1/p' | tr '[:upper:]' '[:lower:]' | tr '_' '_')
+          NAME=$(echo "$LINE" | sed -n 's/.*return "\([^"]*\)".*/\1/p')
+          if [ -n "$SLUG" ] && [ -n "$NAME" ]; then
+            WIDGET_NAMES["$SLUG"]="$NAME"
+          fi
+          if echo "$LINE" | grep -q "^}" && [ "$IN_DISPLAY" = "1" ]; then IN_DISPLAY=0; fi
         fi
-        # Stop at closing brace of function
-        if echo "$LINE" | grep -q "^}" && [ "$IN_DISPLAY" = "1" ]; then IN_DISPLAY=0; fi
-      fi
-    done < "${WIDGET_TYPE_H}"
+      done < "${WIDGET_TYPE_H}"
+    fi
 
     # Build gallery sections
     GALLERY_ROWS=""

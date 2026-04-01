@@ -679,17 +679,15 @@ void WebServer::registerRoutes(httplib::Server &svr) {
     }
 
     auto parsePane = [&](const std::string &val, std::vector<std::string> &rot) {
+      rot.clear();
       if (val.empty())
         return;
-      rot.clear();
       std::stringstream ss(val);
       std::string id;
       while (std::getline(ss, id, ',')) {
         if (!id.empty())
           rot.push_back(id);
       }
-      if (rot.empty())
-        rot.push_back("solar");
     };
     if (req.has_param("pane0"))
       parsePane(req.get_param_value("pane0"), cfg_->pane1Rotation);
@@ -2364,6 +2362,10 @@ void WebServer::registerRoutes(httplib::Server &svr) {
                              {"y", (int)(r.y * scale)},
                              {"w", (int)(r.w * scale)},
                              {"h", (int)(r.h * scale)}};
+            j["px"] = (int)(r.x * scale);
+            j["py"] = (int)(r.y * scale);
+            j["pw"] = (int)(r.w * scale);
+            j["ph"] = (int)(r.h * scale);
             j["scale"] = scale;
             res.set_content(j.dump(2), "application/json");
           });
@@ -2385,6 +2387,10 @@ void WebServer::registerRoutes(httplib::Server &svr) {
                              {"y", (int)(r.y * scale)},
                              {"w", (int)(r.w * scale)},
                              {"h", (int)(r.h * scale)}};
+            j["px"] = (int)(r.x * scale);
+            j["py"] = (int)(r.y * scale);
+            j["pw"] = (int)(r.w * scale);
+            j["ph"] = (int)(r.h * scale);
             j["scale"] = scale;
             res.set_content(j.dump(2), "application/json");
           });
