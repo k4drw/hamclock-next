@@ -145,6 +145,7 @@
 #include "ui/DXCCProgressPanel.h"
 #include "ui/SpaceWeatherAlertsPanel.h"
 #include "ui/NOAASpaceWxPanel.h"
+#include "ui/BigClockPanel.h"
 #include "ui/VoacapDeDxPanel.h"
 #include <SDL.h>
 #include <SDL_image.h>
@@ -689,6 +690,9 @@ DashboardContext::DashboardContext(AppContext &ctx)
     } else if (type == "clock_aux") {
       widgetPool[type] = std::make_unique<ClockAuxPanel>(0, 0, 0, 0, fontMgr,
                                                          appCfg, ctx.cfgMgr);
+    } else if (type == "big_clock") {
+      widgetPool[type] = std::make_unique<BigClockPanel>(0, 0, 0, 0, fontMgr,
+                                                         appCfg, ctx.cfgMgr);
     } else if (type == "history_flux") {
       widgetPool[type] = std::make_unique<HistoryPanel>(
           0, 0, 0, 0, fontMgr, texMgr, historyStore, "flux");
@@ -1149,10 +1153,15 @@ DashboardContext::DashboardContext(AppContext &ctx)
   rssBanner->setMetric(appCfg.useMetric);
   widgetSelector->setTheme(appCfg.theme);
   widgetSelector->setMetric(appCfg.useMetric);
+  widgetSelector->setLineAATexture(texMgr.get("line_aa"));
   for (auto &p : panes) {
     p->setTheme(appCfg.theme);
     p->setMetric(appCfg.useMetric);
+    p->setLineAATexture(texMgr.get("line_aa"));
   }
+  timePanel->setLineAATexture(texMgr.get("line_aa"));
+  mapArea->setLineAATexture(texMgr.get("line_aa"));
+  rssBanner->setLineAATexture(texMgr.get("line_aa"));
 
   texMgr.setLowMemCallback([this]() {
     LOG_W("Main", "Low memory signal: flushing FontManager cache");
@@ -1194,6 +1203,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
     if (w) {
       w->setTheme(appCfg.theme);
       w->setMetric(appCfg.useMetric);
+      w->setLineAATexture(texMgr.get("line_aa"));
     }
   }
 
@@ -1254,8 +1264,11 @@ void DashboardContext::expandPane(int idx, AppContext &ctx) {
   if (expandedPaneIdx_ >= 0 || idx < 0 || idx >= (int)panes.size())
     return;
   expandedPaneIdx_ = idx;
-  SDL_Rect mr = mapArea->getRect();
-  panes[idx]->onResize(mr.x, mr.y, mr.w, mr.h);
+  SDL_Rect targetRect = mapArea->getRect();
+  if (panes[idx]->getActiveType() == "big_clock") {
+    targetRect = {ctx.layLogicalOffX, ctx.layLogicalOffY, LOGICAL_WIDTH, LOGICAL_HEIGHT};
+  }
+  panes[idx]->onResize(targetRect.x, targetRect.y, targetRect.w, targetRect.h);
   panes[idx]->setExpanded(true);
   panes[idx]->setPaused(true);
 }
@@ -2103,13 +2116,19 @@ void DashboardContext::update(AppContext &ctx) {
         }
         if (focusedWidget)
           focusedWidget->onMouseMove(mx, my);
-        else
+        else {
+          bool isFS = (expandedPaneIdx_ >= 0 && panes[expandedPaneIdx_]->getActiveType() == "big_clock");
           for (auto *w : eventWidgets) {
-            // Suppress map tooltips when a pane is expanded (maximized)
-            if (expandedPaneIdx_ >= 0 && w == mapArea.get())
-              continue;
+            if (expandedPaneIdx_ >= 0) {
+              if (isFS) {
+                if (w != panes[expandedPaneIdx_].get() && w != widgetSelector.get()) continue;
+              } else if (w == mapArea.get()) {
+                continue;
+              }
+            }
             w->onMouseMove(mx, my);
           }
+        }
       }
       // MOUSEBUTTONUP
       else if (event.type == SDL_MOUSEBUTTONUP) {
@@ -2133,17 +2152,37 @@ void DashboardContext::update(AppContext &ctx) {
             if (focusedWidget)
               focusedWidget->onMouseUp(mx, my, SDL_GetModState(),
                                        event.button.clicks);
-            else
-              for (auto *w : eventWidgets)
+            else {
+              bool isFS = (expandedPaneIdx_ >= 0 && panes[expandedPaneIdx_]->getActiveType() == "big_clock");
+              for (auto *w : eventWidgets) {
+                if (expandedPaneIdx_ >= 0) {
+                  if (isFS) {
+                    if (w != panes[expandedPaneIdx_].get() && w != widgetSelector.get()) continue;
+                  } else if (w == mapArea.get()) {
+                    continue;
+                  }
+                }
                 if (w->onMouseUp(mx, my, SDL_GetModState(), event.button.clicks))
                   break;
+              }
+            }
           } else if (right) {
             if (focusedWidget)
               focusedWidget->onRightClick(mx, my, SDL_GetModState());
-            else
-              for (auto *w : eventWidgets)
+            else {
+              bool isFS = (expandedPaneIdx_ >= 0 && panes[expandedPaneIdx_]->getActiveType() == "big_clock");
+              for (auto *w : eventWidgets) {
+                if (expandedPaneIdx_ >= 0) {
+                  if (isFS) {
+                    if (w != panes[expandedPaneIdx_].get() && w != widgetSelector.get()) continue;
+                  } else if (w == mapArea.get()) {
+                    continue;
+                  }
+                }
                 if (w->onRightClick(mx, my, SDL_GetModState()))
                   break;
+              }
+            }
           }
         }
       }
@@ -2167,7 +2206,15 @@ void DashboardContext::update(AppContext &ctx) {
             mx = static_cast<int>(pixX / ctx.layScale);
             my = static_cast<int>(pixY / ctx.layScale);
           }
+          bool isFS = (expandedPaneIdx_ >= 0 && panes[expandedPaneIdx_]->getActiveType() == "big_clock");
           for (auto *w : eventWidgets) {
+            if (expandedPaneIdx_ >= 0) {
+              if (isFS) {
+                if (w != panes[expandedPaneIdx_].get() && w != widgetSelector.get()) continue;
+              } else if (w == mapArea.get()) {
+                continue;
+              }
+            }
             SDL_Rect r = w->getRect();
             if (mx >= r.x && mx < r.x + r.w && my >= r.y && my < r.y + r.h) {
               if (w->onMouseWheel(scrollY))
@@ -2316,9 +2363,16 @@ void DashboardContext::render(AppContext &ctx) {
   }
 
   Widget *activeModal = nullptr;
+  bool isFS = (expandedPaneIdx_ >= 0 && panes[expandedPaneIdx_]->getActiveType() == "big_clock");
   for (auto *w : widgets) {
-    if (expandedPaneIdx_ >= 0 && w == mapArea.get())
-      continue;  // hide map behind expanded pane
+    if (expandedPaneIdx_ >= 0) {
+      if (isFS) {
+        if (w != panes[expandedPaneIdx_].get() && w != widgetSelector.get())
+          continue;
+      } else if (w == mapArea.get()) {
+        continue;  // hide map behind expanded pane
+      }
+    }
     if (w->isModalActive())
       activeModal = w;
     SDL_Rect clip = w->getRect();
@@ -2331,8 +2385,14 @@ void DashboardContext::render(AppContext &ctx) {
   // always appear on top regardless of widget rendering order.
   Widget::flushPendingTooltip(ctx.renderer);
   for (auto *w : widgets) {
-    if (expandedPaneIdx_ >= 0 && w == mapArea.get())
-      continue;
+    if (expandedPaneIdx_ >= 0) {
+      if (isFS) {
+        if (w != panes[expandedPaneIdx_].get() && w != widgetSelector.get())
+          continue;
+      } else if (w == mapArea.get()) {
+        continue;
+      }
+    }
     w->renderTooltipLayer(ctx.renderer);
   }
 

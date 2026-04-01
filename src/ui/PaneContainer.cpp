@@ -24,6 +24,7 @@ void PaneContainer::setRotation(const std::vector<std::string> &types,
       if (activeWidget_) {
         activeWidget_->onResize(x_, y_, width_, height_);
         activeWidget_->setTheme(theme_);
+        activeWidget_->setLineAATexture(lineAATex_);
       }
     }
   } else {
@@ -59,6 +60,7 @@ void PaneContainer::forceAdvance() {
     if (activeWidget_) {
       activeWidget_->onResize(x_, y_, width_, height_);
       activeWidget_->setTheme(theme_);
+      activeWidget_->setLineAATexture(lineAATex_);
     }
   }
   lastRotateMs_ = SDL_GetTicks();
@@ -98,6 +100,7 @@ void PaneContainer::update() {
         if (activeWidget_) {
           activeWidget_->onResize(x_, y_, width_, height_);
           activeWidget_->setTheme(theme_);
+          activeWidget_->setLineAATexture(lineAATex_);
         }
       }
       lastRotateMs_ = now;
@@ -300,6 +303,7 @@ void PaneContainer::activateRotationIndex(size_t idx) {
     if (activeWidget_) {
       activeWidget_->onResize(x_, y_, width_, height_);
       activeWidget_->setTheme(theme_);
+      activeWidget_->setLineAATexture(lineAATex_);
     }
   }
   lastRotateMs_ = SDL_GetTicks();

@@ -309,6 +309,17 @@ bool ConfigManager::load(AppConfig &config) {
     config.auxClockStarMode  = json["aux_clock"].value("star_mode", 1);
   }
 
+  // Big Clock
+  if (json.contains("big_clock")) {
+    auto &bc = json["big_clock"];
+    config.bigClockDigital  = bc.value("digital",  true);
+    config.bigClock12h      = bc.value("twelve_h", false);
+    config.bigClockUtc      = bc.value("utc",       false);
+    config.bigClockShowSec  = bc.value("show_sec",  true);
+    config.bigClockShowDate = bc.value("show_date", true);
+    config.bigClockHue      = static_cast<uint8_t>(bc.value("hue", 85));
+  }
+
   // RSS
   if (json.contains("rss")) {
     config.rssEnabled = json["rss"].value("enabled", true);
@@ -743,6 +754,13 @@ bool ConfigManager::save(const AppConfig &config) {
   json["aux_clock"]["tz_offset"]  = config.auxClockTzOffset;
   json["aux_clock"]["tz_label"]   = config.auxClockTzLabel;
   json["aux_clock"]["star_mode"]  = config.auxClockStarMode;
+
+  json["big_clock"]["digital"]   = config.bigClockDigital;
+  json["big_clock"]["twelve_h"]  = config.bigClock12h;
+  json["big_clock"]["utc"]       = config.bigClockUtc;
+  json["big_clock"]["show_sec"]  = config.bigClockShowSec;
+  json["big_clock"]["show_date"] = config.bigClockShowDate;
+  json["big_clock"]["hue"]       = config.bigClockHue;
 
   json["rss"]["enabled"] = config.rssEnabled;
   json["activity"]["onta_filter"] = config.ontaFilter;

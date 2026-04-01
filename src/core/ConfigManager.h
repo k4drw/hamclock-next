@@ -212,6 +212,14 @@ struct AppConfig {
   std::string auxClockTzLabel = "UTC"; // Display label
   int auxClockStarMode = 1;
 
+  // Big Clock
+  bool bigClockDigital  = true;
+  bool bigClock12h      = false;
+  bool bigClockUtc      = false;
+  bool bigClockShowSec  = true;
+  bool bigClockShowDate = true;
+  uint8_t bigClockHue   = 85; // default green (matches original NV_SWHUE default)
+
   // Update
   std::string skippedVersion;
 

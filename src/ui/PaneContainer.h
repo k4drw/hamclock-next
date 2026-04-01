@@ -74,7 +74,11 @@ public:
   void setOnMaximizeRequested(std::function<void(int)> cb) {
     onMaximizeRequested_ = cb;
   }
-  void setLineAATexture(SDL_Texture *tex) { lineAATex_ = tex; }
+  void setLineAATexture(SDL_Texture *tex) override {
+    lineAATex_ = tex;
+    if (activeWidget_)
+      activeWidget_->setLineAATexture(tex);
+  }
 
 private:
   std::string currentType_;
