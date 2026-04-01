@@ -52,6 +52,7 @@ DELAY="${DELAY:-3}"
 OUTPUT_DIR="${OUTPUT_DIR:-docs/wiki/images}"
 FORCE="${FORCE:-0}"
 PARTS="${PARTS:-all}"
+HC_AUTOSTART="${HC_AUTOSTART:-0}"
 
 # ---------------------------------------------------------------------------
 FAILED=()
@@ -98,20 +99,30 @@ echo "Server: ${BASE_URL}"
 echo "FORCE=${FORCE}  PARTS=${PARTS}"
 echo ""
 
+if [ "$HC_AUTOSTART" = "1" ]; then
+  if ! curl -sfL "${BASE_URL}/get_config.json" > /dev/null 2>&1; then
+    echo "Starting HamClock-Next (HC_AUTOSTART=1)..."
+    ./build/hamclock-next > /dev/null 2>&1 &
+    HC_PID=$!
+    # Update trap to include killer cleanup
+    trap "echo 'Cleaning up server (PID ${HC_PID})...'; kill ${HC_PID}; restore_state" EXIT
+    sleep 2
+  fi
+fi
+
 curl -sfL "${BASE_URL}/get_config.json" > /dev/null || \
   die "Server not reachable at ${BASE_URL} — start hamclock-next first"
 
-# Wait for the dashboard to finish initializing (pane geometry available).
-# The server responds to get_config.json immediately but panes aren't wired until
-# the dashboard is created (~1-2 s after startup). Poll for up to 30 s.
+# Wait for the dashboard to finish initializing (using readiness probe).
 echo -n "Waiting for dashboard ready..."
-for i in $(seq 1 30); do
-  if curl -sf "${BASE_URL}/get_pane_rect?pane=1" > /dev/null 2>&1; then
+for i in $(seq 1 60); do
+  READY=$(curl -sf "${BASE_URL}/api/sys/ready" || echo "offline")
+  if [ "$READY" = "ready" ]; then
     echo " ok (${i}s)"
     break
   fi
-  if [ "$i" = "30" ]; then
-    die "Dashboard not ready after 30 s — is the server fully started?"
+  if [ "$i" = "60" ]; then
+    die "Dashboard not ready after 60 s ($READY) — check logs"
   fi
   echo -n "."
   sleep 1
@@ -119,6 +130,9 @@ done
 
 CAPS=$(curl -sf "${BASE_URL}/get_capabilities") || \
   die "/get_capabilities unavailable — rebuild server first (WebServer_Routes.cpp)"
+
+echo "Setting mock data for consistent screenshots..."
+hc_get "api/debug/set_mock_data?sfi=150&ssn=120&kp=2&temp=22"
 
 echo "Capabilities discovered:"
 echo "  $(echo "$CAPS" | jq '.widgets      | length') widgets"
@@ -154,7 +168,8 @@ if ! part_enabled wiki; then
   sleep 1  # ensure pause takes effect before first solo
 fi
 
-# Query pane 1 geometry once (reused by several parts)
+# SCALE is no longer used by get_phys_rect (API provides px, py, pw, ph)
+# but we keep it here for any manual math if needed.
 compute_scale() {
   PANE1_RECT=$(curl -sf "${BASE_URL}/get_pane_rect?pane=1") || { echo "  WARN: Could not fetch pane 1 rect — scale defaults to 1.0" >&2; SCALE=1; return; }
   REND_W=$(echo "$PANE1_RECT" | jq -r '.renderer_w')
@@ -168,15 +183,14 @@ compute_scale() {
 get_phys_rect() {
   local PANE="$1"
   local RECT
-  RECT=$(curl -sf "${BASE_URL}/get_pane_rect?pane=${PANE}") || { echo "  WARN: Could not fetch pane ${PANE} rect" >&2; echo "0x0+0+0"; return; }
-  local X; X=$(echo "$RECT" | jq -r '.x')
-  local Y; Y=$(echo "$RECT" | jq -r '.y')
-  local W; W=$(echo "$RECT" | jq -r '.w')
-  local H; H=$(echo "$RECT" | jq -r '.h')
-  local PX; PX=$(awk "BEGIN { printf \"%d\", $X * $SCALE }")
-  local PY; PY=$(awk "BEGIN { printf \"%d\", $Y * $SCALE }")
-  local PW; PW=$(awk "BEGIN { printf \"%d\", $W * $SCALE }")
-  local PH; PH=$(awk "BEGIN { printf \"%d\", $H * $SCALE }")
+  local XENDPOINT="/get_pane_rect?pane=${PANE}"
+  [ "$PANE" = "tp" ] && XENDPOINT="/get_timepanel_rect"
+  
+  RECT=$(curl -sf "${BASE_URL}${XENDPOINT}") || { echo "  WARN: Could not fetch ${XENDPOINT}" >&2; echo "0x0+0+0"; return; }
+  local PX; PX=$(echo "$RECT" | jq -r '.px')
+  local PY; PY=$(echo "$RECT" | jq -r '.py')
+  local PW; PW=$(echo "$RECT" | jq -r '.pw')
+  local PH; PH=$(echo "$RECT" | jq -r '.ph')
   echo "${PW}x${PH}+${PX}+${PY}"
 }
 
@@ -192,22 +206,14 @@ if part_enabled fixed_ui; then
   compute_scale
 
   # TimePanel
-  TP_RECT=$(curl -sf "${BASE_URL}/get_timepanel_rect") || { echo "  WARN: get_timepanel_rect unavailable — skip TimePanel"; TP_RECT=""; }
-  if [ -n "$TP_RECT" ]; then
-    TP_X=$(echo "$TP_RECT" | jq -r '.x')
-    TP_Y=$(echo "$TP_RECT" | jq -r '.y')
-    TP_W=$(echo "$TP_RECT" | jq -r '.w')
-    TP_H=$(echo "$TP_RECT" | jq -r '.h')
-    TP_PX=$(awk "BEGIN { printf \"%d\", $TP_X * $SCALE }")
-    TP_PY=$(awk "BEGIN { printf \"%d\", $TP_Y * $SCALE }")
-    TP_PW=$(awk "BEGIN { printf \"%d\", $TP_W * $SCALE }")
-    TP_PH=$(awk "BEGIN { printf \"%d\", $TP_H * $SCALE }")
+  PHYS_RECT_TP=$(get_phys_rect tp)
+  if [ -n "$PHYS_RECT_TP" ] && [ "$PHYS_RECT_TP" != "0x0+0+0" ]; then
     if [ "$FORCE" = "1" ] || [ ! -f "${OUTPUT_DIR}/widgets/time_panel.png" ]; then
       echo "  time_panel"
       sleep "${DELAY}"
       FULL="${OUTPUT_DIR}/widgets/.full_timepanel.png"
       if capture "${FULL}"; then
-        magick "${FULL}" -crop "${TP_PW}x${TP_PH}+${TP_PX}+${TP_PY}" +repage "${OUTPUT_DIR}/widgets/time_panel.png" \
+        magick "${FULL}" -crop "${PHYS_RECT_TP}" +repage "${OUTPUT_DIR}/widgets/time_panel.png" \
           && echo "  ✓ ${OUTPUT_DIR}/widgets/time_panel.png"
         rm -f "${FULL}"
       fi

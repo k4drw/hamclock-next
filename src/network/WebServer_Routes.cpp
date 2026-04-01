@@ -268,6 +268,10 @@ void WebServer::registerRoutes(httplib::Server &svr) {
             j["y"] = r.y;
             j["w"] = r.w;
             j["h"] = r.h;
+            j["px"] = (logW > 0) ? (r.x * outW / logW) : r.x;
+            j["py"] = (logH > 0) ? (r.y * outH / logH) : r.y;
+            j["pw"] = (logW > 0) ? (r.w * outW / logW) : r.w;
+            j["ph"] = (logH > 0) ? (r.h * outH / logH) : r.h;
             j["renderer_w"] = outW;
             j["renderer_h"] = outH;
             j["logical_w"] = logW;
@@ -319,6 +323,10 @@ void WebServer::registerRoutes(httplib::Server &svr) {
             j["y"] = r.y;
             j["w"] = r.w;
             j["h"] = r.h;
+            j["px"] = (logW > 0) ? (r.x * outW / logW) : r.x;
+            j["py"] = (logH > 0) ? (r.y * outH / logH) : r.y;
+            j["pw"] = (logW > 0) ? (r.w * outW / logW) : r.w;
+            j["ph"] = (logH > 0) ? (r.h * outH / logH) : r.h;
             j["renderer_w"] = outW;
             j["renderer_h"] = outH;
             j["logical_w"] = logW;
@@ -1507,6 +1515,61 @@ void WebServer::registerRoutes(httplib::Server &svr) {
             oss << "Dst       " << d.dst << "\n";
             res.set_content(oss.str(), "text/plain");
           });
+
+  svr.Get("/api/sys/ready", [this](const httplib::Request &,
+                                  httplib::Response &res) {
+    std::lock_guard<std::mutex> lk(dataMutex_);
+    if (!panes_ || panes_->empty()) {
+      res.status = 503;
+      res.set_content("waiting_for_panes", "text/plain");
+      return;
+    }
+    if (solar_ && !solar_->get().valid) {
+      res.status = 503;
+      res.set_content("waiting_for_solar", "text/plain");
+      return;
+    }
+    if (weatherStore_ && !weatherStore_->get().valid) {
+      res.status = 503;
+      res.set_content("waiting_for_weather", "text/plain");
+      return;
+    }
+    res.set_content("ready", "text/plain");
+  });
+
+  svr.Get("/api/debug/set_mock_data", [this](const httplib::Request &req,
+                                             httplib::Response &res) {
+    std::lock_guard<std::mutex> lk(dataMutex_);
+    if (solar_) {
+      auto d = solar_->get();
+      bool changed = false;
+      if (req.has_param("sfi")) {
+        d.sfi = StringUtils::safe_stoi(req.get_param_value("sfi"));
+        changed = true;
+      }
+      if (req.has_param("ssn")) {
+        d.sunspot_number = StringUtils::safe_stoi(req.get_param_value("ssn"));
+        changed = true;
+      }
+      if (req.has_param("kp")) {
+        d.k_index = (float)StringUtils::safe_stod(req.get_param_value("kp"));
+        changed = true;
+      }
+      if (changed) {
+        d.valid = true;
+        solar_->set(d);
+      }
+    }
+    if (weatherStore_) {
+      auto d = weatherStore_->get();
+      if (req.has_param("temp")) {
+        d.temp = (float)StringUtils::safe_stod(req.get_param_value("temp"));
+        d.valid = true;
+        weatherStore_->update(d);
+      }
+    }
+    res.set_content("ok", "text/plain");
+  });
 
   svr.Get("/get_sys.txt",
           [this](const httplib::Request &, httplib::Response &res) {
