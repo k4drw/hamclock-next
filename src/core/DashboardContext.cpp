@@ -787,7 +787,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
         ctx.cfgMgr.save(ctx.appCfg);
       });
       widgetPool[type] = std::unique_ptr<CalendarPanel>(calPanel);
-    } else if (type == "reminder") {
+    } else if (type == "reminders") {
       widgetPool[type] = std::make_unique<ReminderPanel>(
           0, 0, 0, 0, fontMgr, ctx.appCfg, ctx.cfgMgr, *callbookProvider,
           callbookStore, fccProvider);

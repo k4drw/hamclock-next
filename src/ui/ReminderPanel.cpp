@@ -764,8 +764,7 @@ void ReminderPanel::renderReminderList(SDL_Renderer *renderer) {
     yOff += lineH;
   }
 
-  if (config_.reminders.empty() && config_.callsignExpiry.empty() &&
-      !checking_) {
+  if (config_.reminders.empty() && config_.callsign.empty() && !checking_) {
     cat->drawText(renderer, "No Reminders", x_ + width_ / 2, y_ + height_ / 2,
                   themes.textDim, FontStyle::Micro, true);
   }

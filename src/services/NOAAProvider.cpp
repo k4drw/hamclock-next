@@ -257,6 +257,16 @@ void NOAAProvider::fetchSN() {
           }
         }
 
+        // Fallback to most recent if current month not found
+        if (ssn < 0 && !j.empty()) {
+          const auto &last = j.back();
+          if (last.contains("predicted_ssn")) {
+            ssn = last["predicted_ssn"].get<double>();
+            if (last.contains("time-tag"))
+              current_month = last["time-tag"].get<std::string>();
+          }
+        }
+
         if (ssn >= 0) {
           auto *update = new SolarData();
           update->sunspot_number = static_cast<int>(ssn);
@@ -463,7 +473,9 @@ struct SolarWindBackfill {
 // the nearest minute.  Returns -1 on failure.
 static int64_t parseNoaaMinute(const std::string &ts) {
   int y = 0, mo = 0, d = 0, h = 0, mi = 0, s = 0;
-  if (sscanf(ts.c_str(), "%d-%d-%d %d:%d:%d", &y, &mo, &d, &h, &mi, &s) != 6)
+  // Handle "YYYY-MM-DD HH:MM:SS" and "YYYY-MM-DDTHH:MM:SS"
+  if (sscanf(ts.c_str(), "%d-%d-%d %d:%d:%d", &y, &mo, &d, &h, &mi, &s) != 6 &&
+      sscanf(ts.c_str(), "%d-%d-%dT%d:%d:%d", &y, &mo, &d, &h, &mi, &s) != 6)
     return -1;
   std::tm tm{};
   tm.tm_year = y - 1900;

@@ -2341,14 +2341,71 @@ void WebServer::registerRoutes(httplib::Server &svr) {
         res.set_content("ok", "text/plain");
       });
 
+  svr.Get("/get_pane_rect",
+          [this](const httplib::Request &req, httplib::Response &res) {
+            int pIdx = StringUtils::safe_stoi(req.get_param_value("pane")) - 1;
+            if (pIdx < 0 || pIdx >= 6) {
+              res.status = 400;
+              return;
+            }
+            if (!panes_) {
+              res.status = 503;
+              return;
+            }
+            auto *target = (*panes_)[pIdx].get();
+            SDL_Rect r = target->getRect();
+            nlohmann::json j;
+            j["logical"] = {{"x", r.x}, {"y", r.y}, {"w", r.w}, {"h", r.h}};
+            int outW = LOGICAL_WIDTH, outH = LOGICAL_HEIGHT;
+            if (renderer_)
+              SDL_GetRendererOutputSize(renderer_, &outW, &outH);
+            float scale = (float)outW / LOGICAL_WIDTH;
+            j["physical"] = {{"x", (int)(r.x * scale)},
+                             {"y", (int)(r.y * scale)},
+                             {"w", (int)(r.w * scale)},
+                             {"h", (int)(r.h * scale)}};
+            j["scale"] = scale;
+            res.set_content(j.dump(2), "application/json");
+          });
+
+  svr.Get("/get_timepanel_rect",
+          [this](const httplib::Request &req, httplib::Response &res) {
+            if (!timePanel_) {
+              res.status = 503;
+              return;
+            }
+            SDL_Rect r = timePanel_->getRect();
+            nlohmann::json j;
+            j["logical"] = {{"x", r.x}, {"y", r.y}, {"w", r.w}, {"h", r.h}};
+            int outW = LOGICAL_WIDTH, outH = LOGICAL_HEIGHT;
+            if (renderer_)
+              SDL_GetRendererOutputSize(renderer_, &outW, &outH);
+            float scale = (float)outW / LOGICAL_WIDTH;
+            j["physical"] = {{"x", (int)(r.x * scale)},
+                             {"y", (int)(r.y * scale)},
+                             {"w", (int)(r.w * scale)},
+                             {"h", (int)(r.h * scale)}};
+            j["scale"] = scale;
+            res.set_content(j.dump(2), "application/json");
+          });
+
   svr.Get("/get_capabilities", [](const httplib::Request &,
                                   httplib::Response &res) {
     nlohmann::json j;
 
     nlohmann::json wArr = nlohmann::json::array();
-    for (auto *d : WidgetRegistry::instance().getAll(false))
+    nlohmann::json wMeta = nlohmann::json::array();
+    for (auto *d : WidgetRegistry::instance().getAll(false)) {
       wArr.push_back(d->typeId);
+      wMeta.push_back({
+          {"id", d->typeId},
+          {"displayName", d->displayName},
+          {"scrollable", d->isScrollable},
+          {"requiresKey", d->requiresConfigKey},
+      });
+    }
     j["widgets"] = wArr;
+    j["widget_meta"] = wMeta;
 
     j["projections"] =
         nlohmann::json::array({"equirectangular", "robinson", "azimuthal",
@@ -2644,9 +2701,17 @@ void WebServer::registerRoutes(httplib::Server &svr) {
           });
 
   svr.Get("/debug/keypress",
-          [](const httplib::Request &req, httplib::Response &res) {
+          [this](const httplib::Request &req, httplib::Response &res) {
+            if (!liveWebEnabled_) {
+              res.status = 403;
+              return;
+            }
             std::string key = req.get_param_value("key");
             SDL_Scancode sc = SDL_GetScancodeFromName(key.c_str());
+            if (sc == SDL_SCANCODE_UNKNOWN && key.length() == 1) {
+              // Fallback for single characters if name doesn't match
+              sc = SDL_GetScancodeFromKey(key[0]);
+            }
             SDL_Event down{}, up{};
             down.type = SDL_KEYDOWN;
             down.key.keysym.scancode = sc;
