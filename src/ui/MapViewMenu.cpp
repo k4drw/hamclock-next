@@ -31,7 +31,7 @@ void MapViewMenu::show(AppConfig &config, std::function<void()> onApply) {
 
   // Center the menu
   int menuW = 500;
-  int menuH = 470;
+  int menuH = 450;
   menuRect_ = {HamClock::LOGICAL_WIDTH / 2 - menuW / 2,
                HamClock::LOGICAL_HEIGHT / 2 - menuH / 2, menuW, menuH};
 
@@ -39,7 +39,7 @@ void MapViewMenu::show(AppConfig &config, std::function<void()> onApply) {
   int col2X = menuRect_.x + menuW / 2 + 10;
   int colW = menuW / 2 - 30; // 220
 
-  int y = menuRect_.y + 60; // Start below title
+  int y = menuRect_.y + 45; // Start below title
 
   // Row 1
   projRec_ = {col1X, y + 25, colW, 30};
@@ -48,26 +48,23 @@ void MapViewMenu::show(AppConfig &config, std::function<void()> onApply) {
   styleHeaderY_ = y;
 
   // Row 2
-  y += 70;
+  y += 60;
   gridRec_ = {col1X, y + 25, colW, 30};
   overlayRec_ = {col2X, y + 25, colW, 30};
   gridHeaderY_ = y;
   mufRtHeaderY_ = y;
 
   // Row 3
-  y += 70;
+  y += 60;
   weatherRec_ = {col1X, y + 25, colW, 30};
   weatherHeaderY_ = y;
 
-  beaconsRec_ = {col2X + 10, y + 30, 20, 20};
-  bordersRec_ = {col2X + 110, y + 30, 20, 20};
+  beaconsRec_ = {col2X + 10, y + 25, 20, 20};
+  bordersRec_ = {col2X + 110, y + 25, 20, 20};
+  centerDeCheckRect_ = {col2X + 10, y + 55, 20, 20};
 
-  // Row 4
-  y += 65;
-  centerDeCheckRect_ = {col1X, y, 20, 20};
-
-  // Row 5 (VOACAP) - 3 columns
-  y += 55;
+  // Row 4 (VOACAP) - 3 columns
+  y += 85;
   voacapHeaderY_ = y;
   int col3W = (menuW - 40) / 3 - 10; // ~143
   int c1 = menuRect_.x + 20;
@@ -213,25 +210,6 @@ void MapViewMenu::render(SDL_Renderer *renderer) {
                  openCombo_ == COMBO_POWER);
   }
 
-  // Draw open dropdown LIST on top of everything
-  if (openCombo_ != -1) {
-    if (openCombo_ == COMBO_PROJ)
-      drawDropdownList(renderer, projRec_, projOpts_);
-    else if (openCombo_ == COMBO_STYLE)
-      drawDropdownList(renderer, styleRec_, mapOpts_);
-    else if (openCombo_ == COMBO_GRID)
-      drawDropdownList(renderer, gridRec_, gridOpts_);
-    else if (openCombo_ == COMBO_OVERLAY)
-      drawDropdownList(renderer, overlayRec_, overlayOpts_);
-    else if (openCombo_ == COMBO_WEATHER)
-      drawDropdownList(renderer, weatherRec_, weatherOpts_);
-    else if (openCombo_ == COMBO_BAND)
-      drawDropdownList(renderer, bandRec_, bandOpts_);
-    else if (openCombo_ == COMBO_MODE)
-      drawDropdownList(renderer, modeRec_, modeOpts_);
-    else if (openCombo_ == COMBO_POWER)
-      drawDropdownList(renderer, powerRec_, powerOpts_);
-  }
 
   // Footer Buttons
   SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
@@ -255,6 +233,26 @@ void MapViewMenu::render(SDL_Renderer *renderer) {
   cat->drawText(renderer, "Apply", applyRect_.x + applyRect_.w / 2,
                 applyRect_.y + applyRect_.h / 2, themes.text,
                 FontStyle::UI, true, false, true);
+
+  // Draw open dropdown LIST on top of everything
+  if (openCombo_ != -1) {
+    if (openCombo_ == COMBO_PROJ)
+      drawDropdownList(renderer, projRec_, projOpts_);
+    else if (openCombo_ == COMBO_STYLE)
+      drawDropdownList(renderer, styleRec_, mapOpts_);
+    else if (openCombo_ == COMBO_GRID)
+      drawDropdownList(renderer, gridRec_, gridOpts_);
+    else if (openCombo_ == COMBO_OVERLAY)
+      drawDropdownList(renderer, overlayRec_, overlayOpts_);
+    else if (openCombo_ == COMBO_WEATHER)
+      drawDropdownList(renderer, weatherRec_, weatherOpts_);
+    else if (openCombo_ == COMBO_BAND)
+      drawDropdownList(renderer, bandRec_, bandOpts_);
+    else if (openCombo_ == COMBO_MODE)
+      drawDropdownList(renderer, modeRec_, modeOpts_);
+    else if (openCombo_ == COMBO_POWER)
+      drawDropdownList(renderer, powerRec_, powerOpts_);
+  }
 }
 
 void MapViewMenu::drawDropdown(SDL_Renderer *renderer, const SDL_Rect &rect,

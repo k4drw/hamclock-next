@@ -80,7 +80,7 @@ private:
   // Dropdown State
   int openCombo_ = -1;
   int listScroll_ = 0;
-  const int maxVisibleItems_ = 6;
+  const int maxVisibleItems_ = 4;
 
   void drawDropdown(SDL_Renderer *renderer, const SDL_Rect &rect,
                     const std::string &currentVal, bool isOpen);
