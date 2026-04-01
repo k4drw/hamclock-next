@@ -22,7 +22,7 @@ void SetupScreen::setConfig(const AppConfig &cfg) {
   rigPortInput_.setMaxLength(5);
   hubIpInput_.setMaxLength(40);
   hubPortInput_.setMaxLength(5);
-  watchlistInputField_.setMaxLength(12);
+  watchlistInputField_.setMaxLength(256);
 
   gpsEnabled_ = cfg.gpsEnabled;
   audioMuted_ = cfg.audioMuted;

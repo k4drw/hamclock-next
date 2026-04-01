@@ -75,6 +75,7 @@ private:
                        int fieldH, int fieldX, int textPad);
   void renderTabWatchlist(SDL_Renderer *renderer, int cx, int pad, int fieldW,
                           int fieldH, int fieldX, int textPad);
+  void addWatchlistEntriesFromInput();
 
   FontManager &fontMgr_;
   BrightnessManager &brightnessMgr_;
