@@ -477,8 +477,9 @@ DashboardContext::DashboardContext(AppContext &ctx)
   santaProvider->update();
 
   tropoProvider = std::make_unique<TropoProvider>(netManager);
-  tropoProvider->setCallback([&ctx, self = this](const TropoData &d) {
-    if (ctx.dashboard.get() == self &&
+  tropoProvider->setCallback([&ctx, self = this, live = dashboardLive_](const TropoData &d) {
+    if (live->load(std::memory_order_acquire) &&
+        ctx.dashboard.get() == self &&
         self->widgetPool.count("tropo")) {
       static_cast<TropoPanel *>(self->widgetPool["tropo"].get())
           ->updateData(d);
@@ -486,8 +487,9 @@ DashboardContext::DashboardContext(AppContext &ctx)
   });
 
   lightningProvider = std::make_shared<LightningProvider>(netManager);
-  lightningProvider->setCallback([&ctx, self = this](const LightningData &d) {
-    if (ctx.dashboard.get() == self &&
+  lightningProvider->setCallback([&ctx, self = this, live = dashboardLive_](const LightningData &d) {
+    if (live->load(std::memory_order_acquire) &&
+        ctx.dashboard.get() == self &&
         self->widgetPool.count("lightning")) {
       static_cast<LightningPanel *>(
           self->widgetPool["lightning"].get())
@@ -496,8 +498,9 @@ DashboardContext::DashboardContext(AppContext &ctx)
   });
 
   meteorProvider = std::make_unique<MeteorProvider>();
-  meteorProvider->setCallback([&ctx, self = this](const MeteorData &d) {
-    if (ctx.dashboard.get() == self &&
+  meteorProvider->setCallback([&ctx, self = this, live = dashboardLive_](const MeteorData &d) {
+    if (live->load(std::memory_order_acquire) &&
+        ctx.dashboard.get() == self &&
         self->widgetPool.count("meteor")) {
       static_cast<MeteorPanel *>(self->widgetPool["meteor"].get())
           ->updateData(d);
@@ -506,8 +509,9 @@ DashboardContext::DashboardContext(AppContext &ctx)
 
   solarStormProvider = std::make_shared<SolarStormProvider>(netManager);
   solarStormProvider->setCallback(
-      [&ctx, self = this](const SolarStormData &d) {
-        if (ctx.dashboard.get() == self &&
+      [&ctx, self = this, live = dashboardLive_](const SolarStormData &d) {
+        if (live->load(std::memory_order_acquire) &&
+            ctx.dashboard.get() == self &&
             self->widgetPool.count("solar_storm")) {
           static_cast<SolarStormPanel *>(
               self->widgetPool["solar_storm"].get())
@@ -516,8 +520,9 @@ DashboardContext::DashboardContext(AppContext &ctx)
       });
 
   ionosondeProvider = std::make_shared<IonosondeProvider>(netManager);
-  ionosondeProvider->setCallback([&ctx, self = this](const IonosondeData &d) {
-    if (ctx.dashboard.get() == self &&
+  ionosondeProvider->setCallback([&ctx, self = this, live = dashboardLive_](const IonosondeData &d) {
+    if (live->load(std::memory_order_acquire) &&
+        ctx.dashboard.get() == self &&
         self->widgetPool.count("ionosonde")) {
       static_cast<IonosondePanel *>(
           self->widgetPool["ionosonde"].get())
@@ -526,10 +531,11 @@ DashboardContext::DashboardContext(AppContext &ctx)
   });
 
   reachProvider = std::make_shared<ReachProvider>(netManager, state, spotStore);
-  reachProvider->setCallback([&ctx, self = this](const ReachData &d) {
+  reachProvider->setCallback([&ctx, self = this, live = dashboardLive_](const ReachData &d) {
     // Push SDL event so onPropDataReady runs on the main/render thread,
     // not the network worker thread where SDL_GL_GetCurrentWindow() is NULL.
-    if (ctx.dashboard.get() == self && self->mapArea) {
+    if (live->load(std::memory_order_acquire) &&
+        ctx.dashboard.get() == self && self->mapArea) {
       auto *result = new std::vector<float>(d.grid);
       SDL_Event event;
       SDL_zero(event);
@@ -1200,9 +1206,10 @@ DashboardContext::DashboardContext(AppContext &ctx)
 }
 
 DashboardContext::~DashboardContext() {
-  // Signal the setOnParksReady callback (runs on a background thread) to exit
-  // early rather than race on ctx.dashboard.get() after this object is freed.
+  // Signal background callbacks to exit early rather than race on
+  // ctx.dashboard.get() after this object is freed.
   parksReadyLive_->store(false, std::memory_order_release);
+  dashboardLive_->store(false, std::memory_order_release);
 #ifndef __EMSCRIPTEN__
   if (dxcProvider)
     dxcProvider->stop();
