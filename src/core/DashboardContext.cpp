@@ -2104,8 +2104,12 @@ void DashboardContext::update(AppContext &ctx) {
         if (focusedWidget)
           focusedWidget->onMouseMove(mx, my);
         else
-          for (auto *w : eventWidgets)
+          for (auto *w : eventWidgets) {
+            // Suppress map tooltips when a pane is expanded (maximized)
+            if (expandedPaneIdx_ >= 0 && w == mapArea.get())
+              continue;
             w->onMouseMove(mx, my);
+          }
       }
       // MOUSEBUTTONUP
       else if (event.type == SDL_MOUSEBUTTONUP) {
@@ -2327,6 +2331,8 @@ void DashboardContext::render(AppContext &ctx) {
   // always appear on top regardless of widget rendering order.
   Widget::flushPendingTooltip(ctx.renderer);
   for (auto *w : widgets) {
+    if (expandedPaneIdx_ >= 0 && w == mapArea.get())
+      continue;
     w->renderTooltipLayer(ctx.renderer);
   }
 
