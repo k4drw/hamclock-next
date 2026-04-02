@@ -228,3 +228,8 @@ nlohmann::json DXPanel::getDebugData() const {
   }
   return json;
 }
+
+#include "WidgetRegistry.h"
+REGISTER_WIDGET("dx_info_basic", "DX Info (Basic)", false, false, {
+  return std::make_unique<DXPanel>(0, 0, 0, 0, deps.fontMgr, deps.state, deps.dxWeatherStore);
+})

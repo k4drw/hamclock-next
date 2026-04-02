@@ -823,3 +823,8 @@ nlohmann::json TimePanel::getDebugData() const {
   }
   return j;
 }
+
+#include "WidgetRegistry.h"
+REGISTER_WIDGET("time", "Time/Clock", false, false, {
+  return std::make_unique<TimePanel>(0, 0, 0, 0, deps.fontMgr, deps.texMgr, deps.appCfg.callsign);
+})

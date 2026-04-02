@@ -103,3 +103,8 @@ void CallsignClock::onResize(int x, int y, int w, int h) {
   Widget::onResize(x, y, w, h);
   destroyCache();
 }
+
+#include "WidgetRegistry.h"
+REGISTER_WIDGET("callsign_clock", "Callsign/Clock", false, false, {
+  return std::make_unique<CallsignClock>(0, 0, 0, 0, deps.fontMgr, deps.appCfg.callsign);
+})
