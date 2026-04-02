@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../services/ProviderBase.h"
 #include "../network/NetworkManager.h"
 #include "OrbitPredictor.h"
 #include "SatelliteTypes.h"
@@ -30,7 +31,7 @@ private:
   mutable OrbitPredictor predictor_;
 };
 
-class SatelliteManager {
+class SatelliteManager : public ProviderBase {
 public:
   explicit SatelliteManager(NetworkManager &net);
   ~SatelliteManager();

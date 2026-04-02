@@ -6,12 +6,14 @@
 #include <algorithm>
 #include <cctype>
 #include <fstream>
+#include <SDL.h>
 
 ADIFProvider::ADIFProvider(std::shared_ptr<ADIFStore> store,
                            PrefixManager &prefixMgr)
     : store_(std::move(store)), prefixMgr_(prefixMgr) {}
 
 void ADIFProvider::fetch(const std::filesystem::path &path) {
+  lastFetchMs_ = SDL_GetTicks();
   if (std::filesystem::exists(path)) {
     processFile(path);
   }

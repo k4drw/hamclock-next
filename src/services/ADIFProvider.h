@@ -1,12 +1,13 @@
 #pragma once
 
+#include "ProviderBase.h"
 #include "../core/ADIFData.h"
 #include <filesystem>
 #include <memory>
 
 class PrefixManager;
 
-class ADIFProvider {
+class ADIFProvider : public ProviderBase {
 public:
   ADIFProvider(std::shared_ptr<ADIFStore> store, PrefixManager &prefixMgr);
 

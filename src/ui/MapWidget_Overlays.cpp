@@ -1181,16 +1181,14 @@ void MapWidget::renderPropagationOverlay(SDL_Renderer *renderer) {
   // Ensure vertices are populated BEFORE built indices if projection or size
   // changed. This prevents 'wrap' detection from using uninitialized UV
   // coordinates.
-  static std::string lastPropProj = "";
-  static SDL_Rect lastMapRect = {0, 0, 0, 0};
-  static double lastPropCenterLon = -999.0;
-  bool projChanged = (lastPropProj != config_.projection);
+  bool projChanged = (lastPropProj_ != config_.projection);
   bool rectChanged =
-      (lastMapRect.x != mapRect_.x || lastMapRect.y != mapRect_.y ||
-       lastMapRect.w != mapRect_.w || lastMapRect.h != mapRect_.h);
-  bool centerChanged = (std::abs(config_.mapCenterLon - lastPropCenterLon) > 0.001);
+      (lastPropMapRect_.x != mapRect_.x || lastPropMapRect_.y != mapRect_.y ||
+       lastPropMapRect_.w != mapRect_.w || lastPropMapRect_.h != mapRect_.h);
+  bool centerChanged = (std::abs(config_.mapCenterLon - lastPropCenterLon_) > 0.001);
+  bool typeChanged = (lastPropType_ != config_.propOverlay);
 
-  if (projChanged || rectChanged || centerChanged ||
+  if (projChanged || rectChanged || centerChanged || typeChanged ||
       propVerts_.size() != (size_t)((gridW + 1) * (gridH + 1))) {
     propVerts_.resize((gridW + 1) * (gridH + 1));
     if (config_.projection == "dual_azimuthal") {
@@ -1227,13 +1225,14 @@ void MapWidget::renderPropagationOverlay(SDL_Renderer *renderer) {
         }
       }
     }
-    lastPropProj = config_.projection;
-    lastMapRect = mapRect_;
-    lastPropCenterLon = config_.mapCenterLon;
+    lastPropProj_ = config_.projection;
+    lastPropMapRect_ = mapRect_;
+    lastPropCenterLon_ = config_.mapCenterLon;
+    lastPropType_ = config_.propOverlay;
   }
 
-  // Now rebuild indices if the count is wrong or projection/center changed
-  if (propIndices_.empty() || projChanged || rectChanged || centerChanged) {
+  // Now rebuild indices if the count is wrong or projection/center/type changed
+  if (propIndices_.empty() || projChanged || rectChanged || centerChanged || typeChanged) {
     propIndices_.clear();
     propIndices_.reserve(gridW * gridH * 6);
     for (int j = 0; j < gridH; ++j) {

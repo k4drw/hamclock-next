@@ -1,6 +1,7 @@
 #include "BandConditionsProvider.h"
 #include "../core/Logger.h"
 #include <chrono>
+#include <SDL.h>
 
 BandConditionsProvider::BandConditionsProvider(
     std::shared_ptr<SolarDataStore> solarStore,
@@ -8,6 +9,7 @@ BandConditionsProvider::BandConditionsProvider(
     : solarStore_(std::move(solarStore)), bandStore_(std::move(bandStore)) {}
 
 void BandConditionsProvider::update() {
+  lastFetchMs_ = SDL_GetTicks();
   SolarData solar = solarStore_->get();
   if (!solar.valid) {
     LOG_D("BandConditions", "Solar data not yet valid, skipping update");

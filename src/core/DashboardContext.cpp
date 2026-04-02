@@ -1420,6 +1420,118 @@ void DashboardContext::update(AppContext &ctx) {
     lastFetchMs = now;
   }
 
+  // --- Immediate Fetches for Active Widgets (Data missing or stale) ---
+  const uint32_t kCooldown = 60000u;
+  if (isPowerOn) {
+    // NOAA / SpaceWeather
+    const bool needsNoaa = isMaster || isWidgetActive("solar") ||
+                           isWidgetActive("aurora") ||
+                           isWidgetConfigured("aurora_graph") ||
+                           isWidgetActive("drap") ||
+                           isWidgetActive("noaa_spacewx") ||
+                           isWidgetActive("band_conditions") ||
+                           isWidgetActive("kindex_trend") ||
+                           isWidgetActive("sfi_trend") ||
+                           appCfg.propOverlay == PropOverlayType::Drap ||
+                           appCfg.propOverlay == PropOverlayType::Aurora;
+    if (needsNoaa && (!ctx.solarStore->get().valid || noaaProvider->isStale(now, 15 * 60 * 1000)) &&
+        noaaProvider->isStale(now, kCooldown)) {
+      noaaProvider->fetch();
+    }
+
+    // RSS
+    if (appCfg.rssEnabled && rssProvider->isStale(now, 15 * 60 * 1000) &&
+        rssProvider->isStale(now, kCooldown)) {
+      rssProvider->fetch();
+    }
+
+    // Satellite
+    if ((isMaster || isWidgetActive("eme_tool") || appCfg.showSatTrack) &&
+        satMgr->isStale(now, 2 * 60 * 60 * 1000) &&
+        satMgr->isStale(now, kCooldown)) {
+      satMgr->fetch();
+    }
+
+    // Weather
+    if ((isMaster || isWidgetActive("de_weather")) &&
+        (!ctx.deWeatherStore->get().valid || deWeatherProvider->isStale(now, 15 * 60 * 1000)) &&
+        deWeatherProvider->isStale(now, kCooldown)) {
+      deWeatherProvider->fetch(ctx.state->deLocation.lat, ctx.state->deLocation.lon);
+    }
+    if ((isMaster || isWidgetActive("dx_weather")) &&
+        (!ctx.dxWeatherStore->get().valid || dxWeatherProvider->isStale(now, 15 * 60 * 1000)) &&
+        dxWeatherProvider->isStale(now, kCooldown)) {
+      dxWeatherProvider->fetch(ctx.state->dxLocation.lat, ctx.state->dxLocation.lon);
+    }
+
+    // Live Spots
+    if ((isMaster || isWidgetActive("live_spots") || appCfg.propOverlay != PropOverlayType::None) &&
+        (!ctx.spotStore->snapshot()->valid || spotProvider->isStale(now, 5 * 60 * 1000)) &&
+        spotProvider->isStale(now, kCooldown)) {
+      spotProvider->fetch();
+    }
+
+    // Activity (POTA/SOTA/DXPeds)
+    if ((isMaster || isWidgetActive("on_the_air") || isWidgetActive("dx_peditions") || appCfg.ontaFilter != "Off") &&
+        (!ctx.activityStore->get().valid || activityProvider->isStale(now, 15 * 60 * 1000)) &&
+        activityProvider->isStale(now, kCooldown)) {
+      activityProvider->fetch();
+    }
+
+    // Band Conditions
+    if ((isMaster || isWidgetActive("band_conditions")) &&
+        (!ctx.bandStore->get().valid || bandProvider->isStale(now, 15 * 60 * 1000)) &&
+        bandProvider->isStale(now, kCooldown)) {
+      bandProvider->update();
+    }
+
+    // Contests
+    if ((isMaster || isWidgetActive("contests")) &&
+        (!ctx.contestStore->get().valid || contestProvider->isStale(now, 12 * 60 * 60 * 1000)) &&
+        contestProvider->isStale(now, kCooldown)) {
+      contestProvider->fetch();
+    }
+
+    // History
+    if ((isMaster || isWidgetActive("history_flux")) && historyProvider->isStale(now, kCooldown)) {
+      historyProvider->fetchFlux();
+    }
+    if ((isMaster || isWidgetActive("history_ssn") || isWidgetActive("solar_cycle")) && historyProvider->isStale(now, kCooldown)) {
+      historyProvider->fetchSSN();
+    }
+    if ((isMaster || isWidgetActive("history_kp")) && historyProvider->isStale(now, kCooldown)) {
+      historyProvider->fetchKp();
+    }
+
+    // SpaceWx Alerts
+    if ((isMaster || isWidgetActive("spacewx_alerts")) &&
+        (!spaceWxAlertStore->get().valid || spaceWxAlertProvider->isStale(now, 15 * 60 * 1000)) &&
+        spaceWxAlertProvider->isStale(now, kCooldown)) {
+      spaceWxAlertProvider->fetch();
+    }
+
+    // DST Index
+    if (dstProvider && (isMaster || isWidgetActive("dst_index")) &&
+        (!ctx.dstStore->get().valid || dstProvider->isStale(now, 12 * 60 * 60 * 1000)) &&
+        dstProvider->isStale(now, kCooldown)) {
+      dstProvider->fetch();
+    }
+
+    // ADIF
+    if ((isMaster || isWidgetActive("adif")) &&
+        (!ctx.adifStore->get().valid || adifProvider->isStale(now, 15 * 60 * 1000)) &&
+        adifProvider->isStale(now, kCooldown)) {
+      adifProvider->fetch(ctx.cfgMgr.configDir() / "logs.adif");
+    }
+
+    // Asteroid
+    if ((isMaster || isWidgetActive("asteroid")) &&
+        asteroidProvider->isStale(now, 24 * 60 * 60 * 1000) &&
+        asteroidProvider->isStale(now, kCooldown)) {
+      asteroidProvider->update();
+    }
+  }
+
   // --- DRAP fetch: immediate when overlay active and store empty (60s
   // cooldown) ---
   if (isPowerOn && appCfg.propOverlay == PropOverlayType::Drap &&

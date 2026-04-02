@@ -149,11 +149,9 @@ for i in $(seq 1 60); do
   sleep 1
 done
 
+# CAPS discovery
 CAPS=$(curl -sf "${BASE_URL}/get_capabilities") || \
   die "/get_capabilities unavailable — rebuild server first (WebServer_Routes.cpp)"
-
-echo "Setting mock data for consistent screenshots..."
-hc_get "api/debug/set_mock_data?sfi=150&ssn=120&kp=2&temp=22"
 
 echo "Capabilities discovered:"
 echo "  $(echo "$CAPS" | jq '.widgets      | length') widgets"

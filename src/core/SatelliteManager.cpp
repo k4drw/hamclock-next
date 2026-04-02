@@ -35,6 +35,7 @@ void SatelliteManager::setRotatorService(RotatorService *rotator) {
 }
 
 void SatelliteManager::fetch(bool force) {
+  lastFetchMs_ = SDL_GetTicks();
   // Skip if data is fresh (< 24 hours) unless forced
   if (!force && dataValid_) {
     auto elapsed = std::chrono::steady_clock::now() - lastFetch_;

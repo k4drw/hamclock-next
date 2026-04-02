@@ -287,6 +287,9 @@ private:
   std::string lastAuroraProjection_;
   SDL_Texture *auroraTexture_ = nullptr;
   PropOverlayType lastPropType_ = PropOverlayType::None;
+  std::string lastPropProj_ = "";
+  SDL_Rect lastPropMapRect_ = {0, 0, 0, 0};
+  double lastPropCenterLon_ = -999.0;
   std::string lastBand_;
   std::string lastMode_;
   int lastPower_ = -1;

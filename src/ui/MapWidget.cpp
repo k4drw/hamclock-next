@@ -171,6 +171,9 @@ MapWidget::MapWidget(int x, int y, int w, int h, TextureManager &texMgr,
       lastMufUpdateMs_(0),
       wxLastCheckMs_(0),
       lastPropUpdateMs_(0),
+      lastPropProj_(""),
+      lastPropMapRect_({0, 0, 0, 0}),
+      lastPropCenterLon_(-999.0),
       lastMapCenterLon_(-999.0) {
   const char *driver = SDL_GetCurrentVideoDriver();
   LOG_D("MapWidget", "SDL Video Driver: {}", driver ? driver : "unknown");
