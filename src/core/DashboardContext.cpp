@@ -809,7 +809,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
                                                       state, deWeatherStore);
     } else if (type == "satellite") {
       auto sw = std::make_unique<SatWidget>(0, 0, 0, 0, fontMgr, texMgr,
-                                            *satMgr);
+                                            *satMgr, appCfg);
       sw->setObserver(appCfg.lat, appCfg.lon);
       sw->restoreState(appCfg.satWidgetSatellite);
       sw->setMapTrackVisible(appCfg.showSatTrack);
@@ -2098,8 +2098,19 @@ void DashboardContext::update(AppContext &ctx) {
         }
         case AE_MARINE_DATA_READY: {
           auto *update = static_cast<MarineData *>(event.user.data1);
-          if (update && ctx.marineStore)
-            ctx.marineStore->update(*update);
+          if (update && ctx.marineStore) {
+            MarineData current = ctx.marineStore->get();
+            if (event.user.code == 0) { // Tides
+              current.tideStationId = update->tideStationId;
+              current.tides = update->tides;
+              current.tidesValid = update->tidesValid;
+            } else if (event.user.code == 1) { // Buoy
+              current.buoy = update->buoy;
+              current.buoyValid = update->buoyValid;
+            }
+            current.lastUpdate = update->lastUpdate;
+            ctx.marineStore->update(current);
+          }
           delete update;
           break;
         }

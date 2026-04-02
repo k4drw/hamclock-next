@@ -2,6 +2,8 @@
 
 #include "../core/OrbitPredictor.h"
 #include "../core/SatelliteManager.h"
+
+struct AppConfig;
 #include "FontManager.h"
 #include "SatPanel.h"
 #include "SatelliteSetup.h"
@@ -20,7 +22,7 @@
 class SatWidget : public Widget {
 public:
   SatWidget(int x, int y, int w, int h, FontManager &fontMgr,
-            TextureManager &texMgr, SatelliteManager &satMgr);
+            TextureManager &texMgr, SatelliteManager &satMgr, AppConfig &appCfg);
   ~SatWidget() override;
 
   void setObserver(double latDeg, double lonDeg);
@@ -100,6 +102,7 @@ private:
   FontManager     &fontMgr_;
   TextureManager  &texMgr_;
   SatelliteManager &satMgr_;
+  AppConfig       &appCfg_;
 
   SatPanel satPanel_;
   HamClock::SatelliteSetup satelliteSetup_;

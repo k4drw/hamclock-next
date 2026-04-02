@@ -4,13 +4,14 @@
 #include "../core/MemoryMonitor.h"
 #include "../core/Theme.h"
 #include "FontCatalog.h"
+#include "../core/ConfigManager.h"
 
 #include <algorithm>
 #include <cmath>
 
 SatWidget::SatWidget(int x, int y, int w, int h, FontManager &fontMgr,
-                     TextureManager &texMgr, SatelliteManager &satMgr)
-    : Widget(x, y, w, h), fontMgr_(fontMgr), texMgr_(texMgr), satMgr_(satMgr),
+                     TextureManager &texMgr, SatelliteManager &satMgr, AppConfig &appCfg)
+    : Widget(x, y, w, h), fontMgr_(fontMgr), texMgr_(texMgr), satMgr_(satMgr), appCfg_(appCfg),
       satPanel_(x, y, w, h, fontMgr, texMgr),
       satelliteSetup_(0, 0, HamClock::LOGICAL_WIDTH, HamClock::LOGICAL_HEIGHT,
                       fontMgr, satMgr) {}
@@ -48,6 +49,11 @@ void SatWidget::notifySatChanged() {
 // --- Widget overrides ---
 
 void SatWidget::update() {
+  // Sync with config (e.g. from Web API /set_satname)
+  if (selectedSatName_ != appCfg_.satWidgetSatellite) {
+    restoreState(appCfg_.satWidgetSatellite);
+  }
+
   // Deferred satellite restore: retry once data arrives
   if (!pendingSatRestore_.empty() && satMgr_.hasData()) {
     auto tle = satMgr_.findByName(pendingSatRestore_);
@@ -408,7 +414,7 @@ SDL_Rect SatWidget::getActionRect(const std::string &action) const {
 }
 
 REGISTER_WIDGET("satellite", "Satellite", false, false, {
-  auto sw = std::make_unique<SatWidget>(0, 0, 0, 0, deps.fontMgr, deps.texMgr, *deps.satMgr);
+  auto sw = std::make_unique<SatWidget>(0, 0, 0, 0, deps.fontMgr, deps.texMgr, *deps.satMgr, deps.appCfg);
   sw->setObserver(deps.appCfg.lat, deps.appCfg.lon);
   sw->restoreState(deps.appCfg.satWidgetSatellite);
   sw->setMapTrackVisible(deps.appCfg.showSatTrack);

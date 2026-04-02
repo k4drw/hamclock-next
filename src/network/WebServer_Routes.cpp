@@ -2254,8 +2254,14 @@ void WebServer::registerRoutes(httplib::Server &svr) {
               return;
             }
             std::string name = req.get_param_value("name");
-            satMgr_->trackSatellite((name == "none") ? "" : name);
-            cfg_->selectedSatellite = satMgr_->getTrackedSatellite();
+            bool wasTracking = !satMgr_->getTrackedSatellite().empty();
+            if (name == "none") {
+              satMgr_->trackSatellite("");
+            } else if (wasTracking) {
+              satMgr_->trackSatellite(name);
+            }
+            cfg_->selectedSatellite = (name == "none") ? "" : name;
+            cfg_->satWidgetSatellite = cfg_->selectedSatellite;
             if (cfgMgr_)
               cfgMgr_->save(*cfg_);
             res.set_content("ok", "text/plain");

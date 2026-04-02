@@ -43,8 +43,7 @@ void MarineProvider::fetch(const std::string &tideStation,
           WorkerService::getInstance().submitTask([store, body, stId]() {
             try {
               auto j = json::parse(body);
-              MarineData update = store->get(); // merge with existing buoy data
-
+              MarineData update; 
               update.tideStationId = stId;
               update.tides.clear();
 
@@ -93,7 +92,7 @@ void MarineProvider::fetchBuoy(const std::string &buoyStation, bool force) {
   // NDBC latest observation (text format, space-separated).
   char url[256];
   std::snprintf(url, sizeof(url),
-                "https://www.ndbc.noaa.gov/data/latest_obs/%s.txt",
+                "https://www.ndbc.noaa.gov/data/realtime2/%s.txt",
                 buoyStation.c_str());
 
   auto store = store_;
@@ -141,7 +140,7 @@ void MarineProvider::fetchBuoy(const std::string &buoyStation, bool force) {
               return "MM";
             };
 
-            MarineData update = store->get();
+            MarineData update;
             BuoyObservation &b = update.buoy;
             b.stationId = stId;
 
