@@ -3,6 +3,8 @@
 #include "../core/ConfigManager.h"
 #include "../core/DXClusterData.h"
 #include "../core/PrefixManager.h"
+#include "../core/WatchlistHitStore.h"
+#include "../core/WatchlistStore.h"
 #include <atomic>
 #include <condition_variable>
 #include <memory>
@@ -19,7 +21,10 @@ struct HamClockState;
 class RBNProvider {
 public:
   explicit RBNProvider(std::shared_ptr<DXClusterDataStore> store,
-                       PrefixManager &pm, HamClockState *state = nullptr);
+                       PrefixManager &pm,
+                       std::shared_ptr<WatchlistStore> watchlist = nullptr,
+                       std::shared_ptr<WatchlistHitStore> hits = nullptr,
+                       HamClockState *state = nullptr);
   ~RBNProvider();
 
   void start(const AppConfig &config);
@@ -34,6 +39,8 @@ private:
 
   std::shared_ptr<DXClusterDataStore> store_;
   PrefixManager &pm_;
+  std::shared_ptr<WatchlistStore> watchlist_;
+  std::shared_ptr<WatchlistHitStore> hits_;
   HamClockState *state_;
   AppConfig config_;
 

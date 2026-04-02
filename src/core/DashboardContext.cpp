@@ -367,14 +367,16 @@ DashboardContext::DashboardContext(AppContext &ctx)
   dxcProvider = std::make_unique<DXClusterProvider>(
       dxcStore, ctx.prefixMgr, watchlistStore, watchlistHitStore, state.get());
 #ifndef __EMSCRIPTEN__
-  if (isMasterMode || isWidgetConfigured("dx_cluster"))
+  if (isMasterMode || isWidgetConfigured("dx_cluster") || isWidgetConfigured("watchlist"))
     dxcProvider->start(appCfg);
 #endif
 
   rbnProvider =
-      std::make_unique<RBNProvider>(dxcStore, ctx.prefixMgr, state.get());
+      std::make_unique<RBNProvider>(dxcStore, ctx.prefixMgr, watchlistStore,
+                                   watchlistHitStore, state.get());
 #ifndef __EMSCRIPTEN__
-  if ((isMasterMode || isWidgetConfigured("dx_cluster")) &&
+  if ((isMasterMode || isWidgetConfigured("dx_cluster") ||
+       isWidgetConfigured("watchlist")) &&
       appCfg.rbnEnabled)
     rbnProvider->start(appCfg);
 #endif
