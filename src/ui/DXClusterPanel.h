@@ -10,6 +10,7 @@
 
 // Forward declarations
 class RigService;
+class WatchlistStore;
 struct AppConfig;
 
 class DXClusterPanel : public ListPanel {
@@ -18,7 +19,8 @@ public:
                  std::shared_ptr<DXClusterDataStore> store,
                  RigService *rigService = nullptr,
                  const AppConfig *config = nullptr,
-                 std::shared_ptr<ADIFStore> adifStore = nullptr);
+                 std::shared_ptr<ADIFStore> adifStore = nullptr,
+                 std::shared_ptr<WatchlistStore> watchlist = nullptr);
   ~DXClusterPanel() override;
 
   void update() override;
@@ -62,6 +64,7 @@ private:
 
   std::shared_ptr<DXClusterDataStore> store_;
   std::shared_ptr<ADIFStore> adifStore_;
+  std::shared_ptr<WatchlistStore> watchlist_;
   RigService *rigService_;
   const AppConfig *config_;
   std::chrono::system_clock::time_point lastUpdate_{};

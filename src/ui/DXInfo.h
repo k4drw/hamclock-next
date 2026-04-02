@@ -27,6 +27,7 @@ public:
   void render(SDL_Renderer *renderer) override;
   void onResize(int x, int y, int w, int h) override;
   bool onMouseUp(int mx, int my, Uint16 mod, int clicks) override;
+  bool onKeyDown(SDL_Keycode key, Uint16 mod) override;
 
   bool isModalActive() const override { return greylineModal_.isActive(); }
   void renderModal(SDL_Renderer *renderer) override {

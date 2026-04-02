@@ -36,8 +36,8 @@ void DXInfo::update() {
   lineText_[0] = "DX:";
 
   if (!state_->dxActive) {
-    lineText_[1] = "Select target";
-    lineText_[2] = "on map";
+    lineText_[1] = "Click map or";
+    lineText_[2] = "cluster spot";
     for (int i = 3; i < kNumLines; ++i)
       lineText_[i].clear();
     return;
@@ -200,7 +200,8 @@ void DXInfo::onResize(int x, int y, int w, int h) {
 
 bool DXInfo::onMouseUp(int mx, int my, Uint16 /*mod*/, int /*clicks*/) {
   if (greylineModal_.isActive()) {
-    return true; // Click consumed by active modal
+    greylineModal_.onMouseUp(mx, my, 0, 1);
+    return true;
   }
 
   // Handle Greyline button click
@@ -212,6 +213,13 @@ bool DXInfo::onMouseUp(int mx, int my, Uint16 /*mod*/, int /*clicks*/) {
         std::chrono::system_clock::now());
     greylineModal_.setWindow(window, state_->dxCallsign);
     return true;
+  }
+  return false;
+}
+
+bool DXInfo::onKeyDown(SDL_Keycode key, Uint16 mod) {
+  if (greylineModal_.isActive()) {
+    return greylineModal_.onKeyDown(key, mod);
   }
   return false;
 }

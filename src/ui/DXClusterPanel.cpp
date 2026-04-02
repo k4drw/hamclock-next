@@ -4,6 +4,7 @@
 #include "../core/ConfigManager.h"
 #include "../core/LiveSpotData.h"
 #include "../core/MemoryMonitor.h"
+#include "../core/WatchlistStore.h"
 #include "../services/RigService.h"
 
 #include <algorithm>
@@ -71,9 +72,11 @@ static SDL_Color modeColor(const char *mode) {
 DXClusterPanel::DXClusterPanel(int x, int y, int w, int h, FontManager &fontMgr,
                                std::shared_ptr<DXClusterDataStore> store,
                                RigService *rigService, const AppConfig *config,
-                               std::shared_ptr<ADIFStore> adifStore)
+                               std::shared_ptr<ADIFStore> adifStore,
+                               std::shared_ptr<WatchlistStore> watchlist)
     : ListPanel(x, y, w, h, fontMgr, "DX Cluster", {}), store_(store),
-      adifStore_(std::move(adifStore)), rigService_(rigService), config_(config) {}
+      adifStore_(std::move(adifStore)), watchlist_(std::move(watchlist)),
+      rigService_(rigService), config_(config) {}
 
 DXClusterPanel::~DXClusterPanel() { clearSpotCache(); }
 
@@ -225,6 +228,13 @@ void DXClusterPanel::render(SDL_Renderer *renderer) {
     SDL_Color color = getRowColor(i, getThemeColors(theme_).text);
 
     bool freqChanged = std::abs(cache.lastFreq - spot.freq) > 0.001;
+
+    // Watchlist accent bar (left edge, 3px wide, bright green)
+    if (watchlist_ && watchlist_->contains(spot.call)) {
+      SDL_SetRenderDrawColor(renderer, 0, 255, 80, 255);
+      SDL_Rect bar = {x_ + 1, rowY, 3, rowH};
+      SDL_RenderFillRect(renderer, &bar);
+    }
 
     // 1. Freq (right-aligned within freq column)
     if (!cache.freqTex || freqChanged) {
@@ -552,11 +562,11 @@ void DXClusterPanel::renderBandLegend(SDL_Renderer *renderer, int & /*curY*/,
 #ifndef __EMSCRIPTEN__
 REGISTER_WIDGET("dx_cluster", "DX Cluster", true, false, {
   return std::make_unique<DXClusterPanel>(
-      0, 0, 0, 0, deps.fontMgr, deps.dxcStore, deps.rigService, &deps.appCfg, deps.adifStore);
+      0, 0, 0, 0, deps.fontMgr, deps.dxcStore, deps.rigService, &deps.appCfg, deps.adifStore, deps.watchlistStore);
 })
 #else
 REGISTER_WIDGET("dx_cluster", "DX Cluster", true, false, {
   return std::make_unique<DXClusterPanel>(
-      0, 0, 0, 0, deps.fontMgr, deps.dxcStore, nullptr, &deps.appCfg, deps.adifStore);
+      0, 0, 0, 0, deps.fontMgr, deps.dxcStore, nullptr, &deps.appCfg, deps.adifStore, deps.watchlistStore);
 })
 #endif

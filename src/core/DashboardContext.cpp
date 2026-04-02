@@ -633,10 +633,10 @@ DashboardContext::DashboardContext(AppContext &ctx)
     } else if (type == "dx_cluster") {
 #ifndef __EMSCRIPTEN__
       widgetPool[type] = std::make_unique<DXClusterPanel>(
-          0, 0, 0, 0, fontMgr, dxcStore, rigService.get(), &appCfg, adifStore);
+          0, 0, 0, 0, fontMgr, dxcStore, rigService.get(), &appCfg, adifStore, watchlistStore);
 #else
       widgetPool[type] = std::make_unique<DXClusterPanel>(
-          0, 0, 0, 0, fontMgr, dxcStore, nullptr, &appCfg, adifStore);
+          0, 0, 0, 0, fontMgr, dxcStore, nullptr, &appCfg, adifStore, watchlistStore);
 #endif
     } else if (type == "live_spots") {
       widgetPool[type] = std::make_unique<LiveSpotPanel>(
