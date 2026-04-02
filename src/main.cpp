@@ -78,7 +78,7 @@
 #include "ui/DRAPPanel.h"
 #include "ui/DXClusterPanel.h"
 #include "ui/DXClusterSetup.h"
-#include "ui/DXSatPane.h"
+#include "ui/DXInfo.h"
 #include "ui/DebugOverlay.h"
 #include "ui/DstPanel.h"
 #include "ui/EMEToolPanel.h"

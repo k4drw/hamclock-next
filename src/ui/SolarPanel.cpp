@@ -100,8 +100,3 @@ void SolarPanel::onResize(int x, int y, int w, int h) {
   }
   destroyCache();
 }
-
-#include "WidgetRegistry.h"
-REGISTER_WIDGET("solar_basic", "Solar (Basic)", false, false, {
-  return std::make_unique<SolarPanel>(0, 0, 0, 0, deps.fontMgr, deps.solarStore);
-})

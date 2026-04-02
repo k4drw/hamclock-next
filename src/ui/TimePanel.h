@@ -31,8 +31,6 @@ public:
 
   // Semantic Debug API
   std::string getName() const override { return "TimePanel"; }
-  const char *typeId() const override { return "time"; }
-  std::string getDisplayName() const override { return "Time/Clock"; }
   std::vector<std::string> getActions() const override;
   SDL_Rect getActionRect(const std::string &action) const override;
   nlohmann::json getDebugData() const override;

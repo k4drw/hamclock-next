@@ -81,7 +81,7 @@
 #include "ui/DRAPPanel.h"
 #include "ui/DXClusterPanel.h"
 #include "ui/DXClusterSetup.h"
-#include "ui/DXSatPane.h"
+#include "ui/DXInfo.h"
 #include "ui/SatWidget.h"
 #include "ui/DebugOverlay.h"
 #include "ui/DstPanel.h"
@@ -807,23 +807,6 @@ DashboardContext::DashboardContext(AppContext &ctx)
     } else if (type == "de_info") {
       widgetPool[type] = std::make_unique<LocalPanel>(0, 0, 0, 0, fontMgr,
                                                       state, deWeatherStore);
-    } else if (type == "dx_info") {
-      auto p = std::make_unique<DXSatPane>(0, 0, 0, 0, fontMgr, texMgr, state,
-                                           *satMgr, dxWeatherStore);
-      p->setObserver(appCfg.lat, appCfg.lon);
-      p->restoreState(appCfg.panelMode, appCfg.selectedSatellite);
-      p->setMapTrackVisible(appCfg.showSatTrack);
-      p->setOnModeChanged(
-          [&ctx](const std::string &mode, const std::string &satName) {
-            ctx.appCfg.panelMode = mode;
-            ctx.appCfg.selectedSatellite = satName;
-            ctx.cfgMgr.save(ctx.appCfg);
-          });
-      p->setOnMapTrackToggle([&ctx](bool enabled) {
-        ctx.appCfg.showSatTrack = enabled;
-        ctx.cfgMgr.save(ctx.appCfg);
-      });
-      widgetPool[type] = std::move(p);
     } else if (type == "satellite") {
       auto sw = std::make_unique<SatWidget>(0, 0, 0, 0, fontMgr, texMgr,
                                             *satMgr);
@@ -839,6 +822,9 @@ DashboardContext::DashboardContext(AppContext &ctx)
         ctx.cfgMgr.save(ctx.appCfg);
       });
       widgetPool[type] = std::move(sw);
+    } else if (type == "dx_info") {
+      widgetPool[type] = std::make_unique<DXInfo>(0, 0, 0, 0, fontMgr, state,
+                                                  dxWeatherStore);
     } else if (type == "env_temp") {
       widgetPool[type] = std::make_unique<ENVPanel>(
           0, 0, 0, 0, fontMgr, deWeatherStore, ENVPanel::ENVMode::Temp);
@@ -1095,11 +1081,10 @@ DashboardContext::DashboardContext(AppContext &ctx)
     panePtrs.push_back(p.get());
   mapArea->setPanes(panePtrs);
 
-  // Wire predictor from DX_INFO widget to map and gimbal
-  auto *dxSatWidget =
-      dynamic_cast<DXSatPane *>(widgetFactory_("dx_info"));
-  if (dxSatWidget) {
-    mapArea->setPredictor(dxSatWidget->activePredictor());
+  // Wire predictor from standalone satellite widget to map
+  auto *satWidget = dynamic_cast<SatWidget *>(widgetFactory_("satellite"));
+  if (satWidget) {
+    mapArea->setPredictor(satWidget->activePredictor());
   }
 
   // NOAAProvider seems to populate solar data?  // Let's check main.cpp
@@ -2372,15 +2357,11 @@ void DashboardContext::update(AppContext &ctx) {
     return;
   }
 
-  // Sync predictor from DXSatPane (or SatWidget fallback) if in pool
-  auto *dxSatWidget =
-      dynamic_cast<DXSatPane *>(widgetPool["dx_info"].get());
+  // Sync predictor from standalone SatWidget if in pool
   auto *satWidget =
       dynamic_cast<SatWidget *>(widgetPool["satellite"].get());
   OrbitPredictor *activePredictor =
-      dxSatWidget ? dxSatWidget->activePredictor()
-      : satWidget ? satWidget->activePredictor()
-                  : nullptr;
+      satWidget ? satWidget->activePredictor() : nullptr;
   mapArea->setPredictor(activePredictor);
   auto *gimbal =
       dynamic_cast<GimbalPanel *>(widgetPool["gimbal"].get());
@@ -2388,8 +2369,6 @@ void DashboardContext::update(AppContext &ctx) {
     gimbal->setPredictor(activePredictor);
     gimbal->setObserver(appCfg.lat, appCfg.lon);
   }
-  if (dxSatWidget)
-    dxSatWidget->setObserver(appCfg.lat, appCfg.lon);
   if (satWidget)
     satWidget->setObserver(appCfg.lat, appCfg.lon);
   auto *sdoWidget =

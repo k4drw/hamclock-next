@@ -104,8 +104,3 @@ void DEInfo::onResize(int x, int y, int w, int h) {
   lineFontSize_[3] = cat->ptSize(FontStyle::Fast); // Grid + coords
   destroyCache();
 }
-
-#include "WidgetRegistry.h"
-REGISTER_WIDGET("de_info_basic", "DE Info (Basic)", false, false, {
-  return std::make_unique<DEInfo>(0, 0, 0, 0, deps.fontMgr, deps.appCfg.callsign, deps.appCfg.grid);
-})

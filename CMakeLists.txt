@@ -627,8 +627,7 @@ set(HAMCLOCK_SOURCES
     src/ui/ClockAuxPanel.cpp
     src/ui/ENVPanel.cpp
     src/ui/RigControlPanel.cpp
-    src/ui/DXPanel.cpp
-    src/ui/DXSatPane.cpp
+    src/ui/DXInfo.cpp
     src/ui/SatWidget.cpp
     src/ui/ListPanel.cpp
     src/ui/LiveSpotPanel.cpp

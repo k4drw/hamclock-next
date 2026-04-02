@@ -15,9 +15,6 @@ public:
 
   ~DEInfo() override { destroyCache(); }
 
-  std::string getName() const override { return "DEInfo"; }
-  const char *typeId() const override { return "de_info_basic"; }
-  std::string getDisplayName() const override { return "DE Info (Basic)"; }
   void update() override;
   void render(SDL_Renderer *renderer) override;
   void onResize(int x, int y, int w, int h) override;

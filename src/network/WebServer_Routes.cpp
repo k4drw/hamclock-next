@@ -268,10 +268,13 @@ void WebServer::registerRoutes(httplib::Server &svr) {
             j["y"] = r.y;
             j["w"] = r.w;
             j["h"] = r.h;
-            j["px"] = (logW > 0) ? (r.x * outW / logW) : r.x;
-            j["py"] = (logH > 0) ? (r.y * outH / logH) : r.y;
-            j["pw"] = (logW > 0) ? (r.w * outW / logW) : r.w;
-            j["ph"] = (logH > 0) ? (r.h * outH / logH) : r.h;
+            float scale = (logW > 0 && logH > 0)
+                              ? std::min((float)outW / logW, (float)outH / logH)
+                              : 1.0f;
+            j["px"] = (int)(r.x * scale);
+            j["py"] = (int)(r.y * scale);
+            j["pw"] = (int)(r.w * scale);
+            j["ph"] = (int)(r.h * scale);
             j["renderer_w"] = outW;
             j["renderer_h"] = outH;
             j["logical_w"] = logW;
@@ -323,10 +326,13 @@ void WebServer::registerRoutes(httplib::Server &svr) {
             j["y"] = r.y;
             j["w"] = r.w;
             j["h"] = r.h;
-            j["px"] = (logW > 0) ? (r.x * outW / logW) : r.x;
-            j["py"] = (logH > 0) ? (r.y * outH / logH) : r.y;
-            j["pw"] = (logW > 0) ? (r.w * outW / logW) : r.w;
-            j["ph"] = (logH > 0) ? (r.h * outH / logH) : r.h;
+            float scale = (logW > 0 && logH > 0)
+                              ? std::min((float)outW / logW, (float)outH / logH)
+                              : 1.0f;
+            j["px"] = (int)(r.x * scale);
+            j["py"] = (int)(r.y * scale);
+            j["pw"] = (int)(r.w * scale);
+            j["ph"] = (int)(r.h * scale);
             j["renderer_w"] = outW;
             j["renderer_h"] = outH;
             j["logical_w"] = logW;
@@ -507,7 +513,7 @@ void WebServer::registerRoutes(httplib::Server &svr) {
     addPane(cfg_->pane6Rotation);
     j["panes"] = panes;
     j["panelMode"] = cfg_->panelMode;
-    j["selectedSatellite"] = cfg_->selectedSatellite;
+    j["sat_widget_satellite"] = cfg_->satWidgetSatellite;
     j["displayPowerMethod"] = cfg_->displayPowerMethod;
     if (displayPower_) {
       nlohmann::json dpm = nlohmann::json::array();
@@ -526,6 +532,43 @@ void WebServer::registerRoutes(httplib::Server &svr) {
           [](const httplib::Request &, httplib::Response &res) {
             res.set_redirect("/api/config", 302);
           });
+
+  svr.Get("/set_dx", [this](const httplib::Request &req, httplib::Response &res) {
+    if (!state_) {
+      res.status = 503;
+      return;
+    }
+    std::lock_guard<std::mutex> lk(state_->locationMutex);
+    
+    bool changed = false;
+    if (req.has_param("lat") && req.has_param("lon")) {
+      state_->dxLocation.lat = StringUtils::safe_stod(req.get_param_value("lat"));
+      state_->dxLocation.lon = StringUtils::safe_stod(req.get_param_value("lon"));
+      state_->dxGrid = Astronomy::latLonToGrid(state_->dxLocation.lat, state_->dxLocation.lon);
+      state_->dxActive = true;
+      changed = true;
+    } else if (req.has_param("grid")) {
+      state_->dxGrid = req.get_param_value("grid");
+      Astronomy::gridToLatLon(state_->dxGrid, state_->dxLocation.lat, state_->dxLocation.lon);
+      state_->dxActive = true;
+      changed = true;
+    }
+    
+    if (req.has_param("call")) {
+       state_->dxCallsign = req.get_param_value("call");
+       state_->dxActive = true;
+       changed = true;
+    }
+    
+    if (changed) {
+      // Map needs redraw to show the new spot
+      if (mapReloadFlag_) mapReloadFlag_->store(true);
+      res.set_content("ok", "text/plain");
+    } else {
+      res.status = 400;
+      res.set_content("missing params: lat,lon or grid", "text/plain");
+    }
+  });
 
   svr.Get("/set_config", [this](const httplib::Request &req,
                                 httplib::Response &res) {
@@ -713,8 +756,9 @@ void WebServer::registerRoutes(httplib::Server &svr) {
 
     if (req.has_param("panel_mode"))
       cfg_->panelMode = req.get_param_value("panel_mode");
-    if (req.has_param("selected_satellite"))
-      cfg_->selectedSatellite = req.get_param_value("selected_satellite");
+    if (req.has_param("sat_widget_satellite")) {
+      cfg_->satWidgetSatellite = req.get_param_value("sat_widget_satellite");
+    }
     if (req.has_param("display_power_method"))
       cfg_->displayPowerMethod = req.get_param_value("display_power_method");
     if (req.has_param("lat"))
@@ -2339,61 +2383,6 @@ void WebServer::registerRoutes(httplib::Server &svr) {
         res.set_content("ok", "text/plain");
       });
 
-  svr.Get("/get_pane_rect",
-          [this](const httplib::Request &req, httplib::Response &res) {
-            int pIdx = StringUtils::safe_stoi(req.get_param_value("pane")) - 1;
-            if (pIdx < 0 || pIdx >= 6) {
-              res.status = 400;
-              return;
-            }
-            if (!panes_) {
-              res.status = 503;
-              return;
-            }
-            auto *target = (*panes_)[pIdx].get();
-            SDL_Rect r = target->getRect();
-            nlohmann::json j;
-            j["logical"] = {{"x", r.x}, {"y", r.y}, {"w", r.w}, {"h", r.h}};
-            int outW = LOGICAL_WIDTH, outH = LOGICAL_HEIGHT;
-            if (renderer_)
-              SDL_GetRendererOutputSize(renderer_, &outW, &outH);
-            float scale = (float)outW / LOGICAL_WIDTH;
-            j["physical"] = {{"x", (int)(r.x * scale)},
-                             {"y", (int)(r.y * scale)},
-                             {"w", (int)(r.w * scale)},
-                             {"h", (int)(r.h * scale)}};
-            j["px"] = (int)(r.x * scale);
-            j["py"] = (int)(r.y * scale);
-            j["pw"] = (int)(r.w * scale);
-            j["ph"] = (int)(r.h * scale);
-            j["scale"] = scale;
-            res.set_content(j.dump(2), "application/json");
-          });
-
-  svr.Get("/get_timepanel_rect",
-          [this](const httplib::Request &req, httplib::Response &res) {
-            if (!timePanel_) {
-              res.status = 503;
-              return;
-            }
-            SDL_Rect r = timePanel_->getRect();
-            nlohmann::json j;
-            j["logical"] = {{"x", r.x}, {"y", r.y}, {"w", r.w}, {"h", r.h}};
-            int outW = LOGICAL_WIDTH, outH = LOGICAL_HEIGHT;
-            if (renderer_)
-              SDL_GetRendererOutputSize(renderer_, &outW, &outH);
-            float scale = (float)outW / LOGICAL_WIDTH;
-            j["physical"] = {{"x", (int)(r.x * scale)},
-                             {"y", (int)(r.y * scale)},
-                             {"w", (int)(r.w * scale)},
-                             {"h", (int)(r.h * scale)}};
-            j["px"] = (int)(r.x * scale);
-            j["py"] = (int)(r.y * scale);
-            j["pw"] = (int)(r.w * scale);
-            j["ph"] = (int)(r.h * scale);
-            j["scale"] = scale;
-            res.set_content(j.dump(2), "application/json");
-          });
 
   svr.Get("/get_capabilities", [](const httplib::Request &,
                                   httplib::Response &res) {

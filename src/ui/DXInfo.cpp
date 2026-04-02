@@ -1,20 +1,27 @@
-#include "DXPanel.h"
+#include "DXInfo.h"
 #include "../core/Astronomy.h"
-#include "../core/Theme.h"
 #include "../core/ConfigManager.h"
-#include "FontCatalog.h"
+#include "../core/Constants.h"
 #include "../core/CountryGrid.h"
+#include "../core/GreylineCalculator.h"
+#include "../core/MemoryMonitor.h"
+#include "../core/Theme.h"
+#include "FontCatalog.h"
+#include "WidgetRegistry.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 
-DXPanel::DXPanel(int x, int y, int w, int h, FontManager &fontMgr,
-                 std::shared_ptr<HamClockState> state,
-                 std::shared_ptr<WeatherStore> weatherStore)
+DXInfo::DXInfo(int x, int y, int w, int h, FontManager &fontMgr,
+               std::shared_ptr<HamClockState> state,
+               std::shared_ptr<WeatherStore> weatherStore)
     : Widget(x, y, w, h), fontMgr_(fontMgr), state_(std::move(state)),
-      weatherStore_(std::move(weatherStore)) {}
+      weatherStore_(std::move(weatherStore)),
+      greylineModal_(0, 0, HamClock::LOGICAL_WIDTH, HamClock::LOGICAL_HEIGHT,
+                     fontMgr) {}
 
-void DXPanel::destroyCache() {
+void DXInfo::destroyCache() {
   for (int i = 0; i < kNumLines; ++i) {
     if (lineTex_[i]) {
       MemoryMonitor::getInstance().destroyTexture(lineTex_[i]);
@@ -22,18 +29,17 @@ void DXPanel::destroyCache() {
   }
 }
 
-void DXPanel::update() {
+void DXInfo::update() {
+  if (greylineModal_.isActive())
+    return;
+
   lineText_[0] = "DX:";
 
   if (!state_->dxActive) {
     lineText_[1] = "Select target";
     lineText_[2] = "on map";
-    lineText_[3].clear();
-    lineText_[4].clear();
-    lineText_[5].clear();
-    lineText_[6].clear();
-    lineText_[7].clear();
-    lineText_[8].clear();
+    for (int i = 3; i < kNumLines; ++i)
+      lineText_[i].clear();
     return;
   }
 
@@ -55,7 +61,7 @@ void DXPanel::update() {
 
   double bearing =
       Astronomy::calculateBearing(state_->deLocation, state_->dxLocation);
-  std::snprintf(buf, sizeof(buf), "Az: %.0f°", bearing); // degree sign
+  std::snprintf(buf, sizeof(buf), "Az: %.0f°", bearing);
   lineText_[3] = buf;
 
   double dist =
@@ -85,7 +91,7 @@ void DXPanel::update() {
     lineText_[5].clear();
   }
 
-  // Weather
+  // Weather data lines
   if (weatherStore_) {
     auto wd = weatherStore_->get();
     if (wd.valid) {
@@ -108,21 +114,21 @@ void DXPanel::update() {
   }
 }
 
-void DXPanel::render(SDL_Renderer *renderer) {
+void DXInfo::render(SDL_Renderer *renderer) {
   if (!fontMgr_.ready())
     return;
 
   ThemeColors themes = getThemeColors(theme_);
-  AppConfig cfg = ConfigManager::instance().getConfig();
 
+  // Standard Chrome rendering (Border and Title)
   renderChrome(renderer);
 
   int pad = static_cast<int>(width_ * 0.06f);
 
-  // Green theme colors
+  // DX Display Colors
   SDL_Color colors[kNumLines] = {
       {0, 255, 128, 255},   // "DX:" green
-      {0, 255, 128, 255},   // Grid green
+      {0, 255, 128, 255},   // Callsign/Grid green
       {180, 180, 180, 255}, // Coords gray
       {255, 255, 0, 255},   // Bearing yellow
       {0, 200, 255, 255},   // Distance cyan
@@ -132,12 +138,11 @@ void DXPanel::render(SDL_Renderer *renderer) {
       {0, 255, 0, 255},     // Weather 2 (Green)
   };
 
-  int titleH = 20;
-  std::string dxCall = "DX";
-  fontMgr_.catalog()->drawText(renderer, dxCall, x_ + 10, y_ + 5, themes.accent,
+  // Pane Title Label
+  fontMgr_.catalog()->drawText(renderer, "DX", x_ + 10, y_ + 5, themes.accent,
                                FontStyle::MicroBold);
 
-  // Greyline Button
+  // Greyline Sync Button
   if (state_->dxActive) {
     int btnW = 35;
     int btnH = 16;
@@ -156,11 +161,10 @@ void DXPanel::render(SDL_Renderer *renderer) {
     greylineBtnRect_ = {0, 0, 0, 0};
   }
 
-  int curY = y_ + titleH + pad / 2;
+  int curY = y_ + 20 + pad / 2;
   for (int i = 0; i < kNumLines; ++i) {
-    // Skip "DX:" label line if it's the first one and we have a title
     if (i == 0 && lineText_[i] == "DX:")
-      continue;
+      continue; // Handled by title
     if (lineText_[i].empty())
       continue;
 
@@ -184,34 +188,35 @@ void DXPanel::render(SDL_Renderer *renderer) {
   }
 }
 
-void DXPanel::onResize(int x, int y, int w, int h) {
+void DXInfo::onResize(int x, int y, int w, int h) {
   Widget::onResize(x, y, w, h);
   auto *cat = fontMgr_.catalog();
-  lineFontSize_[0] = cat->ptSize(FontStyle::Fast); // "DX:" label
-  lineFontSize_[1] = cat->ptSize(FontStyle::Fast); // Grid
-  lineFontSize_[2] = cat->ptSize(FontStyle::Fast); // Coords
-  lineFontSize_[3] = cat->ptSize(FontStyle::Fast); // Bearing
-  lineFontSize_[4] = cat->ptSize(FontStyle::Fast); // Distance
-  lineFontSize_[5] = cat->ptSize(FontStyle::Fast); // Country
-  lineFontSize_[6] = cat->ptSize(FontStyle::Fast); // Miles
-  lineFontSize_[7] = cat->ptSize(FontStyle::Fast); // Weather 1
-  lineFontSize_[8] = cat->ptSize(FontStyle::Fast); // Weather 2
+  for (int i = 0; i < kNumLines; ++i) {
+    lineFontSize_[i] = cat->ptSize(FontStyle::Fast);
+  }
+  greylineModal_.onResize(0, 0, HamClock::LOGICAL_WIDTH, HamClock::LOGICAL_HEIGHT);
   destroyCache();
 }
 
-bool DXPanel::onMouseUp(int mx, int my, Uint16 /*mod*/, int /*clicks*/) {
+bool DXInfo::onMouseUp(int mx, int my, Uint16 /*mod*/, int /*clicks*/) {
+  if (greylineModal_.isActive()) {
+    return true; // Click consumed by active modal
+  }
+
+  // Handle Greyline button click
   if (greylineBtnRect_.w > 0 && mx >= greylineBtnRect_.x &&
       mx < greylineBtnRect_.x + greylineBtnRect_.w && my >= greylineBtnRect_.y &&
       my < greylineBtnRect_.y + greylineBtnRect_.h) {
-    if (onGreylineSync_) {
-      onGreylineSync_();
-    }
+    auto window = HamClock::GreylineCalculator::findNextOverlap(
+        state_->deLocation, state_->dxLocation,
+        std::chrono::system_clock::now());
+    greylineModal_.setWindow(window, state_->dxCallsign);
     return true;
   }
   return false;
 }
 
-nlohmann::json DXPanel::getDebugData() const {
+nlohmann::json DXInfo::getDebugData() const {
   nlohmann::json json;
   json["weather"] = nullptr;
   json["has_target"] = state_->dxActive;
@@ -229,7 +234,8 @@ nlohmann::json DXPanel::getDebugData() const {
   return json;
 }
 
-#include "WidgetRegistry.h"
-REGISTER_WIDGET("dx_info_basic", "DX Info (Basic)", false, false, {
-  return std::make_unique<DXPanel>(0, 0, 0, 0, deps.fontMgr, deps.state, deps.dxWeatherStore);
+REGISTER_WIDGET("dx_info", "DX Info", false, false, {
+  auto p = std::make_unique<DXInfo>(0, 0, 0, 0, deps.fontMgr, deps.state,
+                                    deps.dxWeatherStore);
+  return p;
 })
