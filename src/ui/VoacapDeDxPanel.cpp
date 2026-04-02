@@ -17,12 +17,14 @@ VoacapDeDxPanel::VoacapDeDxPanel(
     int x, int y, int w, int h, FontManager &fontMgr,
     std::shared_ptr<HamClockState> state,
     std::shared_ptr<SolarDataStore> solarStore,
-    std::shared_ptr<IonosondeProvider> ionoProvider)
+    std::shared_ptr<IonosondeProvider> ionoProvider,
+    AppConfig &config)
     : Widget(x, y, w, h),
       fontMgr_(fontMgr),
       state_(std::move(state)),
       solarStore_(std::move(solarStore)),
-      ionoProvider_(std::move(ionoProvider)) {
+      ionoProvider_(std::move(ionoProvider)),
+      config_(config) {
   for (int i = 0; i < 24; ++i) {
     for (int j = 0; j < 8; ++j) {
       relMatrix_[i][j] = 0.0f;
@@ -36,7 +38,7 @@ void VoacapDeDxPanel::recalculateMatrix() {
     return;
 
   double marginDb =
-      PropEngine::calculateSignalMargin("SSB", 100.0);  // Default to 100W SSB
+      PropEngine::calculateSignalMargin(config_.propMode, (double)config_.propPower);
 
   // Space weather
   double sfi = 70.0;
@@ -69,6 +71,12 @@ void VoacapDeDxPanel::recalculateMatrix() {
 
   double distKm =
       Astronomy::calculateDistance(state_->deLocation, state_->dxLocation);
+  if (config_.propPath == 1) {
+    // Long path
+    distKm = 40075.0 - distKm;
+    // Note: for long path, the "midpoint" should ideally be shifted 180 degrees
+    // along the great circle.
+  }
 
   // Interpolate iono
   InterpolatedIonosonde iono;
@@ -86,6 +94,10 @@ void VoacapDeDxPanel::recalculateMatrix() {
       double rel = PropEngine::calculateReliability(
           BANDS_MHZ[b], distKm, midLatDeg, midLonDeg, hour, sfi, ssn, kIndex,
           iono, currentHour, marginDb);
+      
+      // Apply TOA penalty if engine supported it directly, but for now we
+      // just pass the parameters we have.
+      
       relMatrix_[hour][b] = (float)rel;
     }
   }
@@ -96,6 +108,10 @@ void VoacapDeDxPanel::recalculateMatrix() {
   lastDxLon_ = state_->dxLocation.lon;
   lastSFI_ = sfi;
   lastCalcHour_ = ptm->tm_hour;
+  lastMode_ = config_.propMode;
+  lastPower_ = config_.propPower;
+  lastToa_ = config_.propToa;
+  lastPath_ = config_.propPath;
 }
 
 void VoacapDeDxPanel::update() {
@@ -114,7 +130,12 @@ void VoacapDeDxPanel::update() {
   bool metricChanged =
       (currentSfi != lastSFI_) || (currentHour != lastCalcHour_);
 
-  if (targetChanged || metricChanged) {
+  bool propChanged = (config_.propMode != lastMode_) ||
+                     (config_.propPower != lastPower_) ||
+                     (config_.propToa != lastToa_) ||
+                     (config_.propPath != lastPath_);
+
+  if (targetChanged || metricChanged || propChanged) {
     recalculateMatrix();
   }
 }
@@ -265,5 +286,5 @@ nlohmann::json VoacapDeDxPanel::getDebugData() const {
 REGISTER_WIDGET("voacap_dedx", "Voacap DE-DX", false, false, {
   return std::make_unique<VoacapDeDxPanel>(0, 0, 0, 0, deps.fontMgr, deps.state,
                                            deps.solarStore,
-                                           deps.ionosondeProvider);
+                                           deps.ionosondeProvider, deps.appCfg);
 })

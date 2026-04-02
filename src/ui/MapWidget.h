@@ -49,6 +49,8 @@ public:
   bool onMouseUp(int mx, int my, Uint16 mod, int clicks) override;
   bool onRightClick(int mx, int my, Uint16 mod) override;
   void onMouseMove(int mx, int my) override;
+  bool onKeyDown(SDL_Keycode key, Uint16 mod) override;
+  bool onTextInput(const char *text) override;
   bool onMouseWheel(int scrollY) override;
 
   // Set the satellite predictor for map overlays (non-owning). nullptr to
@@ -293,6 +295,8 @@ private:
   std::string lastBand_;
   std::string lastMode_;
   int lastPower_ = -1;
+  float lastToa_ = -1.0f;
+  int lastPath_ = -1;
   double lastUpdateSunLat_ = -999.0;
   double lastUpdateSunLon_ = -999.0;
   double lastMapCenterLon_ = -999.0;

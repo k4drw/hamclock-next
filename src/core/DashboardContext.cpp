@@ -771,7 +771,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
 #endif
     } else if (type == "voacap_dedx") {
       widgetPool[type] = std::make_unique<VoacapDeDxPanel>(
-          0, 0, 0, 0, fontMgr, state, solarStore, ionosondeProvider);
+          0, 0, 0, 0, fontMgr, state, solarStore, ionosondeProvider, appCfg);
     } else if (type == "solar_timeline") {
       widgetPool[type] = std::make_unique<SolarTimelinePanel>(
           0, 0, 0, 0, fontMgr, netManager);

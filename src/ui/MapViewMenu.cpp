@@ -28,11 +28,19 @@ void MapViewMenu::show(AppConfig &config, std::function<void()> onApply) {
   propBand_ = config.propBand;
   propMode_ = config.propMode;
   propPower_ = config.propPower;
+  propToa_ = config.propToa;
+  propPath_ = config.propPath;
+
+  char buf[32];
+  std::snprintf(buf, sizeof(buf), "%.1f", propToa_);
+  propToaInput_.setValue(buf);
+  propToaInput_.setActive(false);
+
   openCombo_ = -1;
 
   // Center the menu
   int menuW = 500;
-  int menuH = 450;
+  int menuH = 480;
   menuRect_ = {HamClock::LOGICAL_WIDTH / 2 - menuW / 2,
                HamClock::LOGICAL_HEIGHT / 2 - menuH / 2, menuW, menuH};
 
@@ -65,7 +73,7 @@ void MapViewMenu::show(AppConfig &config, std::function<void()> onApply) {
   centerDeCheckRect_ = {col2X + 10, y + 55, 20, 20};
 
   // Row 4 (VOACAP) - 3 columns
-  y += 85;
+  y += 80;
   voacapHeaderY_ = y;
   int col3W = (menuW - 40) / 3 - 10; // ~143
   int c1 = menuRect_.x + 20;
@@ -75,6 +83,15 @@ void MapViewMenu::show(AppConfig &config, std::function<void()> onApply) {
   bandRec_ = {c1, y + 45, col3W, 30};
   modeRec_ = {c2, y + 45, col3W, 30};
   powerRec_ = {c3, y + 45, col3W, 30};
+
+  // Row 5 (TOA and Path)
+  y += 90;
+  toaRec_ = {c1, y + 10, 80, 26};
+  toaUpRec_ = {c1 + 82, y + 10, 24, 12};
+  toaDnRec_ = {c1 + 82, y + 24, 24, 12};
+
+  spRec_ = {c2, y + 13, 16, 16};
+  lpRec_ = {c3, y + 13, 16, 16};
 
   // Footer buttons
   int btnFooterW = 100;
@@ -87,7 +104,24 @@ void MapViewMenu::show(AppConfig &config, std::function<void()> onApply) {
 
 void MapViewMenu::hide() { visible_ = false; }
 
-void MapViewMenu::update() {}
+void MapViewMenu::update() {
+  if (!visible_ || repeatDir_ == 0)
+    return;
+
+  uint32_t now = SDL_GetTicks();
+  if (now - repeatStartMs_ > 500) { // Initial delay
+    if (now - repeatLastMs_ > 50) { // Repeat interval
+      propToa_ += (repeatDir_ * 0.1f);
+      if (propToa_ < 0.1f) propToa_ = 0.1f;
+      if (propToa_ > 90.0f) propToa_ = 90.0f;
+
+      char buf[32];
+      std::snprintf(buf, sizeof(buf), "%.1f", propToa_);
+      propToaInput_.setValue(buf);
+      repeatLastMs_ = now;
+    }
+  }
+}
 
 void MapViewMenu::render(SDL_Renderer *renderer) {
   if (!visible_)
@@ -209,6 +243,41 @@ void MapViewMenu::render(SDL_Renderer *renderer) {
                   FontStyle::UI);
     drawDropdown(renderer, powerRec_, std::to_string(propPower_) + "W",
                  openCombo_ == COMBO_POWER);
+
+    // Row 5: TOA and Path
+    cat->drawText(renderer, "Take-Off Angle (deg)", toaRec_.x, toaRec_.y - 20,
+                  themes.text, FontStyle::Fast);
+    propToaInput_.render(renderer, fontMgr_, toaRec_.x, toaRec_.y, toaRec_.w,
+                        toaRec_.h, FontStyle::UI, 5, propToaInput_.isActive(),
+                        true, themes.accent, themes.border, themes.text,
+                        themes.text, themes.textDim);
+
+    // Up/Down Arrows for TOA
+    SDL_SetRenderDrawColor(renderer, themes.rowStripe2.r, themes.rowStripe2.g,
+                           themes.rowStripe2.b, 255);
+    SDL_RenderFillRect(renderer, &toaUpRec_);
+    SDL_RenderFillRect(renderer, &toaDnRec_);
+    SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
+                           themes.border.b, 255);
+    SDL_RenderDrawRect(renderer, &toaUpRec_);
+    SDL_RenderDrawRect(renderer, &toaDnRec_);
+
+    RenderUtils::drawTriangle(
+        renderer, toaUpRec_.x + 4, toaUpRec_.y + toaUpRec_.h - 4,
+        toaUpRec_.x + toaUpRec_.w - 4, toaUpRec_.y + toaUpRec_.h - 4,
+        toaUpRec_.x + toaUpRec_.w / 2, toaUpRec_.y + 4, themes.text);
+
+    RenderUtils::drawTriangle(
+        renderer, toaDnRec_.x + 4, toaDnRec_.y + 4, toaDnRec_.x + toaDnRec_.w - 4,
+        toaDnRec_.y + 4, toaDnRec_.x + toaDnRec_.w / 2,
+        toaDnRec_.y + toaDnRec_.h - 4, themes.text);
+
+    cat->drawText(renderer, "Path", spRec_.x, toaRec_.y - 20, themes.text,
+                  FontStyle::Fast);
+    renderRadioButton(renderer, spRec_, propPath_ == 0, "Short Path",
+                      themes.text);
+    renderRadioButton(renderer, lpRec_, propPath_ == 1, "Long Path",
+                      themes.text);
   }
 
 
@@ -256,10 +325,58 @@ void MapViewMenu::render(SDL_Renderer *renderer) {
   }
 }
 
-bool MapViewMenu::onMouseDown(int mx, int my, Uint16 /*mod*/, int /*clicks*/) {
+bool MapViewMenu::onMouseDown(int mx, int my, Uint16 /*mod*/, int clicks) {
   if (!visible_)
     return false;
   SDL_Point pt = {mx, my};
+
+  if (SDL_PointInRect(&pt, &toaRec_)) {
+    if (!propToaInput_.isActive()) {
+      propToaInput_.setActive(true);
+      SDL_StartTextInput();
+    }
+    propToaInput_.onMouseDown(mx, my, clicks, fontMgr_, toaRec_.x, toaRec_.y,
+                              toaRec_.w, toaRec_.h, FontStyle::UI, 5);
+    return true;
+  }
+
+  if (propToaInput_.isActive()) {
+    propToaInput_.setActive(false);
+    SDL_StopTextInput();
+    // Parse the value back
+    try {
+      propToa_ = std::stof(propToaInput_.getValue());
+      if (propToa_ < 0.1f) propToa_ = 0.1f;
+      if (propToa_ > 90.0f) propToa_ = 90.0f;
+    } catch (...) {}
+    char buf[32];
+    std::snprintf(buf, sizeof(buf), "%.1f", propToa_);
+    propToaInput_.setValue(buf);
+  }
+
+  if (SDL_PointInRect(&pt, &toaUpRec_)) {
+    repeatDir_ = 1;
+    repeatStartMs_ = repeatLastMs_ = SDL_GetTicks();
+    
+    propToa_ += 0.1f;
+    if (propToa_ > 90.0f) propToa_ = 90.0f;
+    char buf[32];
+    std::snprintf(buf, sizeof(buf), "%.1f", propToa_);
+    propToaInput_.setValue(buf);
+    return true;
+  }
+  if (SDL_PointInRect(&pt, &toaDnRec_)) {
+    repeatDir_ = -1;
+    repeatStartMs_ = repeatLastMs_ = SDL_GetTicks();
+
+    propToa_ -= 0.1f;
+    if (propToa_ < 0.1f) propToa_ = 0.1f;
+    char buf[32];
+    std::snprintf(buf, sizeof(buf), "%.1f", propToa_);
+    propToaInput_.setValue(buf);
+    return true;
+  }
+
   if (SDL_PointInRect(&pt, &menuRect_))
     return true;
   return false;
@@ -352,6 +469,9 @@ void MapViewMenu::drawDropdownList(SDL_Renderer *renderer,
 }
 
 bool MapViewMenu::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
+  repeatDir_ = 0;
+  propToaInput_.onMouseUp();
+
   if (!visible_)
     return false;
   SDL_Point pt = {mx, my};
@@ -454,6 +574,15 @@ bool MapViewMenu::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
             propPower_ = 100;
         }))
       return true;
+
+    if (SDL_PointInRect(&pt, &spRec_)) {
+      propPath_ = 0;
+      return true;
+    }
+    if (SDL_PointInRect(&pt, &lpRec_)) {
+      propPath_ = 1;
+      return true;
+    }
   }
 
   // Close any open combo if clicking elsewhere in menu
@@ -467,6 +596,15 @@ bool MapViewMenu::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
     return true;
   }
   if (SDL_PointInRect(&pt, &applyRect_)) {
+    // Commit current TOA input if active
+    if (propToaInput_.isActive()) {
+      try {
+        propToa_ = std::stof(propToaInput_.getValue());
+        if (propToa_ < 0.1f) propToa_ = 0.1f;
+        if (propToa_ > 90.0f) propToa_ = 90.0f;
+      } catch (...) {}
+    }
+
     config_->projection = projection_;
     config_->mapStyle = mapStyle_;
     config_->showGrid = showGrid_;
@@ -478,6 +616,8 @@ bool MapViewMenu::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
     config_->propBand = propBand_;
     config_->propMode = propMode_;
     config_->propPower = propPower_;
+    config_->propToa = propToa_;
+    config_->propPath = propPath_;
     config_->centerMapOnDe = centerMapOnDe_;
     hide();
     if (onApply_)
@@ -488,9 +628,27 @@ bool MapViewMenu::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
   return true; // Consume all clicks in menu
 }
 
-bool MapViewMenu::onKeyDown(SDL_Keycode key, Uint16) {
+bool MapViewMenu::onKeyDown(SDL_Keycode key, Uint16 mod) {
   if (!visible_)
     return false;
+
+  if (propToaInput_.isActive()) {
+    if (key == SDLK_RETURN || key == SDLK_KP_ENTER) {
+      propToaInput_.setActive(false);
+      SDL_StopTextInput();
+      try {
+        propToa_ = std::stof(propToaInput_.getValue());
+        if (propToa_ < 0.1f) propToa_ = 0.1f;
+        if (propToa_ > 90.0f) propToa_ = 90.0f;
+      } catch (...) {}
+      char buf[32];
+      std::snprintf(buf, sizeof(buf), "%.1f", propToa_);
+      propToaInput_.setValue(buf);
+      return true;
+    }
+    return propToaInput_.onKeyDown(key, mod);
+  }
+
   if (key == SDLK_ESCAPE) {
     if (openCombo_ != -1)
       openCombo_ = -1;
@@ -499,6 +657,15 @@ bool MapViewMenu::onKeyDown(SDL_Keycode key, Uint16) {
     return true;
   }
   return true;
+}
+
+bool MapViewMenu::onTextInput(const char *text) {
+  if (!visible_)
+    return false;
+  if (propToaInput_.isActive()) {
+    return propToaInput_.onTextInput(text);
+  }
+  return false;
 }
 
 // Dummy helper just in case

@@ -522,7 +522,9 @@ void MapWidget::update() {
     bool changed = (lastPropType_ != config_.propOverlay) ||
                    (lastBand_ != config_.propBand) ||
                    (lastMode_ != config_.propMode) ||
-                   (lastPower_ != config_.propPower);
+                   (lastPower_ != config_.propPower) ||
+                   (lastToa_ != config_.propToa) ||
+                   (lastPath_ != config_.propPath);
 
     // DRAP reads a live data store: poll every 60s (2s until first data
     // arrives)
@@ -538,6 +540,8 @@ void MapWidget::update() {
       lastBand_ = config_.propBand;
       lastMode_ = config_.propMode;
       lastPower_ = config_.propPower;
+      lastToa_ = config_.propToa;
+      lastPath_ = config_.propPath;
     }
   }
 
@@ -1093,8 +1097,8 @@ void MapWidget::updatePropagationOverlay() {
   params.mhz = getMhz(config_.propBand);
   params.watts = config_.propPower;
   params.mode = config_.propMode;
-  params.toa = 3;
-  params.path = 0;
+  params.toa = (int)config_.propToa;
+  params.path = config_.propPath;
 
   SolarData sw{};
   if (solar_) {
@@ -1265,6 +1269,20 @@ void MapWidget::onResize(int x, int y, int w, int h) {
 
 
 // --- Semantic API ---
+
+bool MapWidget::onKeyDown(SDL_Keycode key, Uint16 mod) {
+  if (mapViewMenu_->isVisible()) {
+    return mapViewMenu_->onKeyDown(key, mod);
+  }
+  return false;
+}
+
+bool MapWidget::onTextInput(const char *text) {
+  if (mapViewMenu_->isVisible()) {
+    return mapViewMenu_->onTextInput(text);
+  }
+  return false;
+}
 
 std::string MapWidget::getName() const { return "Map"; }
 

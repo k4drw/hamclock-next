@@ -46,6 +46,8 @@ struct ConfigPreset {
   std::string propBand = "20m";
   std::string propMode = "SSB";
   int propPower = 100;
+  float propToa = 3.0f;
+  int propPath = 0; // 0=Short, 1=Long
 };
 
 struct AppConfig {
@@ -69,6 +71,8 @@ struct AppConfig {
   std::string propBand = "20m";
   std::string propMode = "SSB";
   int propPower = 100;      // Watts
+  float propToa = 3.0f;     // Take-off angle (degrees)
+  int propPath = 0;         // 0=Short, 1=Long
   int mufRtOpacity = 40;    // percentage
   bool showSatTrack = true; // Show satellite ground track line on world map
   bool showBeacons = true;  // Show NCDXF beacons on world map

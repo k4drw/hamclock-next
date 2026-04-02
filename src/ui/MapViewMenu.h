@@ -1,7 +1,6 @@
-#pragma once
-
 #include "../core/ConfigManager.h"
 #include "FontManager.h"
+#include "TextInput.h"
 #include "Widget.h"
 
 #include <SDL.h>
@@ -22,6 +21,7 @@ public:
   bool onMouseDown(int mx, int my, Uint16 mod, int clicks) override;
   bool onMouseUp(int mx, int my, Uint16 mod, int clicks) override;
   bool onKeyDown(SDL_Keycode key, Uint16 mod) override;
+  bool onTextInput(const char *text) override;
   bool onMouseWheel(int scrollY) override;
 
 private:
@@ -43,6 +43,9 @@ private:
   std::string propBand_;
   std::string propMode_;
   int propPower_;
+  float propToa_;
+  int propPath_;
+  TextInput propToaInput_;
 
   // Combo options
   std::vector<std::string> projOpts_ = {"Equirectangular", "Robinson",
@@ -67,6 +70,8 @@ private:
   SDL_Rect gridRec_, overlayRec_, weatherRec_;
   SDL_Rect beaconsRec_, bordersRec_, centerDeCheckRect_;
   SDL_Rect bandRec_, modeRec_, powerRec_; // VOACAP row
+  SDL_Rect toaRec_, toaUpRec_, toaDnRec_; // TOA spinner
+  SDL_Rect spRec_, lpRec_;                // Path toggles
 
   enum {
     COMBO_PROJ,
@@ -103,4 +108,9 @@ private:
   void renderRadioButton(SDL_Renderer *renderer, const SDL_Rect &rect,
                          bool selected, const std::string &label,
                          const SDL_Color &textColor);
+
+  // Auto-repeat for TOA arrows
+  int repeatDir_ = 0; // -1, 0, 1
+  uint32_t repeatStartMs_ = 0;
+  uint32_t repeatLastMs_ = 0;
 };

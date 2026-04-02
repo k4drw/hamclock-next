@@ -49,11 +49,12 @@ public:
   /**
    * Calculate reliability (0.0 to 1.0) for a given frequency.
    */
-  static double calculateReliability(double freqMhz, double distKm,
-                                     double midLat, double midLon, double hour,
-                                     double sfi, double ssn, double kIndex,
+  static double calculateReliability(double freqMhz, double distKm, double midLat,
+                                     double midLon, double hour, double sfi,
+                                     double ssn, double kIndex,
                                      const InterpolatedIonosonde &ionoData,
-                                     double currentHour, double signalMarginDb);
+                                     double currentHour, double signalMarginDb,
+                                     double toa = 3.0);
 
   /**
    * Calculate take-off angle (degrees) for a path from TX to a grid point.
@@ -63,7 +64,8 @@ public:
    * @param freqMhz Operating frequency
    * @return Elevation angle in degrees (0 = no path, ~1-40 = valid path)
    */
-  static double calculateTOA(double distKm, double muf, double freqMhz);
+  static double calculateTOA(double distKm, double muf, double freqMhz,
+                             double minToa = 3.0);
 
   /**
    * Generate a 660x330 grid of values.

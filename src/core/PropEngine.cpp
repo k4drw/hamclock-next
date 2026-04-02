@@ -84,7 +84,8 @@ double PropEngine::calculateReliability(double freqMhz, double distKm,
                                         double kIndex,
                                         const InterpolatedIonosonde &ionoData,
                                         double currentHour,
-                                        double signalMarginDb) {
+                                        double signalMarginDb,
+                                        double toa) {
   // Adjust ionosonde data for hour diff (if needed, simplified port)
   // For now, assume ionoData is "current" enough or has been adjusted.
   // Full VOACAP logic scales foF2 based on hour diff, but PropEngine usually
@@ -140,6 +141,18 @@ double PropEngine::calculateReliability(double freqMhz, double distKm,
     rel *= std::pow(0.92, hops - 1.0);
   }
 
+  // TOA penalty: if the angle required for this distance is below user minimum
+  // Assuming a reflection height of 300km (typical F2 layer)
+  double hopDist = distKm / std::max(1.0, hops);
+  double angleRad = std::atan2(300.0, hopDist / 2.0);
+  double angleDeg = angleRad * 180.0 / M_PI;
+
+  if (angleDeg < toa) {
+    // Penalty scales from 0.8 at just-below to 0.2 at far-below
+    double penalty = 1.0 - (toa - angleDeg) * 0.1;
+    rel *= std::max(0.2, penalty);
+  }
+
   if (std::abs(midLat) > 60.0) {
     rel *= 0.7;
     if (kIndex >= 3)
@@ -166,7 +179,7 @@ double PropEngine::calculateReliability(double freqMhz, double distKm,
   return std::min(99.0, std::max(0.0, rel));
 }
 
-double PropEngine::calculateTOA(double distKm, double muf, double freqMhz) {
+double PropEngine::calculateTOA(double distKm, double muf, double freqMhz, double minToa) {
   // No path if operating frequency exceeds MUF
   if (muf < 1.0 || freqMhz > muf * 1.05) return 0.0;
   if (distKm < 50.0) return 0.0; // TX vicinity — below minimum skip distance
@@ -181,6 +194,8 @@ double PropEngine::calculateTOA(double distKm, double muf, double freqMhz) {
   // Elevation angle at transmitter (flat-earth approximation)
   // el = arctan(2h / hopDist)
   double elDeg = std::atan2(2.0 * h, hopDist) * 180.0 / M_PI;
+
+  if (elDeg < minToa) return 0.0;
 
   return std::min(elDeg, 90.0);
 }
@@ -236,6 +251,9 @@ PropEngine::generateGrid(const PropPathParams &params, const SolarData &sw,
 
       // Should we skip our own location? (dist=0)
       double dist = haversineKm(params.txLat, params.txLon, lat, lon);
+      if (params.path == 1) {
+        dist = 40075.0 - dist;
+      }
       if (dist < 10.0) {
         // At TX location, 100% reliable or max MUF?
         grid[y * MAP_W + x] = (outputType == 0) ? 50.0f
@@ -300,13 +318,13 @@ PropEngine::generateGrid(const PropPathParams &params, const SolarData &sw,
         // TOA (take-off angle in degrees)
         double muf = calculateMUF(dist, midLatDeg, midLonDeg, utcHour, sfi,
                                   ssn, iono);
-        float val = (float)calculateTOA(dist, muf, params.mhz);
+        float val = (float)calculateTOA(dist, muf, params.mhz, params.toa);
         grid[y * MAP_W + x] = val;
       } else {
         // Reliability
         float val = (float)calculateReliability(
             params.mhz, dist, midLatDeg, midLonDeg, utcHour, sfi, ssn, kIndex,
-            iono, utcHour, marginDb);
+            iono, utcHour, marginDb, params.toa);
         grid[y * MAP_W + x] = val;
       }
     }

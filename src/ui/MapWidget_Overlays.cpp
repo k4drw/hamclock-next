@@ -1221,6 +1221,9 @@ void MapWidget::renderPropagationOverlay(SDL_Renderer *renderer) {
           int idx = j * (gridW + 1) + i;
           propVerts_[idx].position = {pt.x, pt.y};
           propVerts_[idx].color = {255, 255, 255, 190};
+
+          // UV mapping must correspond to the 660x330 unrotated equirectangular
+          // grid from PropEngine.
           propVerts_[idx].tex_coord = {(float)i / gridW, (float)j / gridH};
         }
       }
@@ -2223,13 +2226,17 @@ void MapWidget::renderOverlayInfo(SDL_Renderer *renderer) {
   if (config_.propOverlay == PropOverlayType::Muf) {
     text = "MUF Overlay (RT)";
   } else if (config_.propOverlay == PropOverlayType::Voacap) {
-    text = fmt::format("VOACAP ({} / {} / {}W)", config_.propBand,
-                       config_.propMode, config_.propPower);
+    text = fmt::format("VOACAP ({} / {} / {}W / {:.1f}° / {})", config_.propBand,
+                       config_.propMode, config_.propPower, config_.propToa,
+                       config_.propPath == 0 ? "SP" : "LP");
   } else if (config_.propOverlay == PropOverlayType::Reliability) {
-    text = fmt::format("Reliability ({} / {} / {}W)", config_.propBand,
-                       config_.propMode, config_.propPower);
+    text = fmt::format("Reliability ({} / {} / {}W / {:.1f}° / {})",
+                       config_.propBand, config_.propMode, config_.propPower,
+                       config_.propToa, config_.propPath == 0 ? "SP" : "LP");
   } else if (config_.propOverlay == PropOverlayType::Toa) {
-    text = fmt::format("TOA ({} / {})", config_.propBand, config_.propMode);
+    text = fmt::format("TOA ({} / {} / {:.1f}° / {})", config_.propBand,
+                       config_.propMode, config_.propToa,
+                       config_.propPath == 0 ? "SP" : "LP");
   } else if (config_.propOverlay == PropOverlayType::Drap) {
     text = "DRAP Absorption";
   } else if (config_.propOverlay == PropOverlayType::Heatmap) {
