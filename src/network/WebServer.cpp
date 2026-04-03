@@ -136,6 +136,8 @@ void WebServer::stop() {
 void WebServer::run() {
 #ifndef __EMSCRIPTEN__
   httplib::Server svr;
+  svr.set_read_timeout(10, 0);
+  svr.set_write_timeout(10, 0);
   svrPtr_ = &svr;
   svr.Get("/", [](const httplib::Request &, httplib::Response &res) {
     std::string html = R"HTML(<!DOCTYPE html>
