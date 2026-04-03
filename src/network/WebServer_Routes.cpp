@@ -775,7 +775,7 @@ void WebServer::registerRoutes(httplib::Server &svr) {
     if (req.has_param("prop_power"))
       cfg_->propPower = StringUtils::safe_stoi(req.get_param_value("prop_power"));
     if (req.has_param("prop_toa"))
-      cfg_->propToa = StringUtils::safe_stod(req.get_param_value("prop_toa"));
+      cfg_->propToa = (float)std::round(StringUtils::safe_stod(req.get_param_value("prop_toa")));
     if (req.has_param("prop_path"))
       cfg_->propPath = StringUtils::safe_stoi(req.get_param_value("prop_path"));
     if (req.has_param("display_power_method"))

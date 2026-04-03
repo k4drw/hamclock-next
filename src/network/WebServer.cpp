@@ -281,7 +281,7 @@ void WebServer::run() {
         <label>Power (Watts)</label>
         <input type="number" id="prop-power" min="1" max="1500" value="100">
         <label>Take-Off Angle (deg)</label>
-        <input type="number" id="prop-toa" step="0.1" min="0" max="90" value="3.0">
+        <input type="number" id="prop-toa" step="1" min="0" max="90" value="3">
         <label>Path</label>
         <select id="prop-path">
           <option value="0">Short Path</option>
@@ -660,7 +660,7 @@ void WebServer::run() {
         document.getElementById('prop-band').value = c.propBand || '20m';
         document.getElementById('prop-mode').value = c.propMode || 'SSB';
         document.getElementById('prop-power').value = c.propPower || 100;
-        document.getElementById('prop-toa').value = c.propToa || 3.0;
+        document.getElementById('prop-toa').value = Math.round(c.propToa || 3);
         document.getElementById('prop-path').value = c.propPath || 0;
         toggleVoacapFields();
 

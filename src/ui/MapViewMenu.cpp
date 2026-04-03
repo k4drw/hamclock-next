@@ -32,7 +32,7 @@ void MapViewMenu::show(AppConfig &config, std::function<void()> onApply) {
   propPath_ = config.propPath;
 
   char buf[32];
-  std::snprintf(buf, sizeof(buf), "%.1f", propToa_);
+  std::snprintf(buf, sizeof(buf), "%d", static_cast<int>(propToa_));
   propToaInput_.setValue(buf);
   propToaInput_.setActive(false);
 
@@ -111,14 +111,14 @@ void MapViewMenu::update() {
   uint32_t now = SDL_GetTicks();
   if (now - repeatStartMs_ > 500) {  // Initial delay
     if (now - repeatLastMs_ > 50) {  // Repeat interval
-      propToa_ += (repeatDir_ * 0.5f);
-      if (propToa_ < 0.1f)
-        propToa_ = 0.1f;
+      propToa_ += (repeatDir_ * 1.0f);
+      if (propToa_ < 0.0f)
+        propToa_ = 0.0f;
       if (propToa_ > 90.0f)
         propToa_ = 90.0f;
 
       char buf[32];
-      std::snprintf(buf, sizeof(buf), "%.1f", propToa_);
+      std::snprintf(buf, sizeof(buf), "%d", static_cast<int>(propToa_));
       propToaInput_.setValue(buf);
       repeatLastMs_ = now;
     }
@@ -348,15 +348,15 @@ bool MapViewMenu::onMouseDown(int mx, int my, Uint16 /*mod*/, int clicks) {
     SDL_StopTextInput();
     // Parse the value back
     try {
-      propToa_ = std::stof(propToaInput_.getValue());
-      if (propToa_ < 0.1f)
-        propToa_ = 0.1f;
+      propToa_ = std::round(std::stof(propToaInput_.getValue()));
+      if (propToa_ < 0.0f)
+        propToa_ = 0.0f;
       if (propToa_ > 90.0f)
         propToa_ = 90.0f;
     } catch (...) {
     }
     char buf[32];
-    std::snprintf(buf, sizeof(buf), "%.1f", propToa_);
+    std::snprintf(buf, sizeof(buf), "%d", static_cast<int>(propToa_));
     propToaInput_.setValue(buf);
   }
 
@@ -364,11 +364,11 @@ bool MapViewMenu::onMouseDown(int mx, int my, Uint16 /*mod*/, int clicks) {
     repeatDir_ = 1;
     repeatStartMs_ = repeatLastMs_ = SDL_GetTicks();
 
-    propToa_ += 0.5f;
+    propToa_ += 1.0f;
     if (propToa_ > 90.0f)
       propToa_ = 90.0f;
     char buf[32];
-    std::snprintf(buf, sizeof(buf), "%.1f", propToa_);
+    std::snprintf(buf, sizeof(buf), "%d", static_cast<int>(propToa_));
     propToaInput_.setValue(buf);
     return true;
   }
@@ -376,11 +376,11 @@ bool MapViewMenu::onMouseDown(int mx, int my, Uint16 /*mod*/, int clicks) {
     repeatDir_ = -1;
     repeatStartMs_ = repeatLastMs_ = SDL_GetTicks();
 
-    propToa_ -= 0.5f;
-    if (propToa_ < 0.1f)
-      propToa_ = 0.1f;
+    propToa_ -= 1.0f;
+    if (propToa_ < 0.0f)
+      propToa_ = 0.0f;
     char buf[32];
-    std::snprintf(buf, sizeof(buf), "%.1f", propToa_);
+    std::snprintf(buf, sizeof(buf), "%d", static_cast<int>(propToa_));
     propToaInput_.setValue(buf);
     return true;
   }
@@ -613,9 +613,9 @@ bool MapViewMenu::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
     // Commit current TOA input if active
     if (propToaInput_.isActive()) {
       try {
-        propToa_ = std::stof(propToaInput_.getValue());
-        if (propToa_ < 0.1f)
-          propToa_ = 0.1f;
+        propToa_ = std::round(std::stof(propToaInput_.getValue()));
+        if (propToa_ < 0.0f)
+          propToa_ = 0.0f;
         if (propToa_ > 90.0f)
           propToa_ = 90.0f;
       } catch (...) {
@@ -654,15 +654,15 @@ bool MapViewMenu::onKeyDown(SDL_Keycode key, Uint16 mod) {
       propToaInput_.setActive(false);
       SDL_StopTextInput();
       try {
-        propToa_ = std::stof(propToaInput_.getValue());
-        if (propToa_ < 0.1f)
-          propToa_ = 0.1f;
+        propToa_ = std::round(std::stof(propToaInput_.getValue()));
+        if (propToa_ < 0.0f)
+          propToa_ = 0.0f;
         if (propToa_ > 90.0f)
           propToa_ = 90.0f;
       } catch (...) {
       }
       char buf[32];
-      std::snprintf(buf, sizeof(buf), "%.1f", propToa_);
+      std::snprintf(buf, sizeof(buf), "%d", static_cast<int>(propToa_));
       propToaInput_.setValue(buf);
       return true;
     }
