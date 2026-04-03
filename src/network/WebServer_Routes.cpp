@@ -522,6 +522,12 @@ void WebServer::registerRoutes(httplib::Server &svr) {
       }
       j["displayPowerMethods"] = dpm;
     }
+    j["propBand"] = cfg_->propBand;
+    j["propMode"] = cfg_->propMode;
+    j["propPower"] = cfg_->propPower;
+    j["propToa"] = cfg_->propToa;
+    j["propPath"] = cfg_->propPath;
+    j["selectedSatellite"] = cfg_->selectedSatellite;
 
     res.set_content(j.dump(2), "application/json");
   });
@@ -756,9 +762,22 @@ void WebServer::registerRoutes(httplib::Server &svr) {
 
     if (req.has_param("panel_mode"))
       cfg_->panelMode = req.get_param_value("panel_mode");
+    if (req.has_param("selected_satellite"))
+      cfg_->selectedSatellite = req.get_param_value("selected_satellite");
     if (req.has_param("sat_widget_satellite")) {
       cfg_->satWidgetSatellite = req.get_param_value("sat_widget_satellite");
     }
+
+    if (req.has_param("prop_band"))
+      cfg_->propBand = req.get_param_value("prop_band");
+    if (req.has_param("prop_mode"))
+      cfg_->propMode = req.get_param_value("prop_mode");
+    if (req.has_param("prop_power"))
+      cfg_->propPower = StringUtils::safe_stoi(req.get_param_value("prop_power"));
+    if (req.has_param("prop_toa"))
+      cfg_->propToa = StringUtils::safe_stod(req.get_param_value("prop_toa"));
+    if (req.has_param("prop_path"))
+      cfg_->propPath = StringUtils::safe_stoi(req.get_param_value("prop_path"));
     if (req.has_param("display_power_method"))
       cfg_->displayPowerMethod = req.get_param_value("display_power_method");
     if (req.has_param("lat"))
