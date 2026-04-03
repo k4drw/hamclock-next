@@ -46,14 +46,14 @@ void MapViewMenu::show(AppConfig &config, std::function<void()> onApply) {
 
   int col1X = menuRect_.x + 20;
   int col2X = menuRect_.x + menuW / 2 + 10;
-  int colW = menuW / 2 - 30; // 220
+  int colW = menuW / 2 - 30;  // 220
 
-  int y = menuRect_.y + 45; // Start below title
+  int y = menuRect_.y + 45;  // Start below title
 
   // Row 1
   projRec_ = {col1X, y + 25, colW, 30};
   styleRec_ = {col2X, y + 25, colW, 30};
-  projHeaderY_ = y; // Label Y
+  projHeaderY_ = y;  // Label Y
   styleHeaderY_ = y;
 
   // Row 2
@@ -75,7 +75,7 @@ void MapViewMenu::show(AppConfig &config, std::function<void()> onApply) {
   // Row 4 (VOACAP) - 3 columns
   y += 80;
   voacapHeaderY_ = y;
-  int col3W = (menuW - 40) / 3 - 10; // ~143
+  int col3W = (menuW - 40) / 3 - 10;  // ~143
   int c1 = menuRect_.x + 20;
   int c2 = c1 + col3W + 15;
   int c3 = c2 + col3W + 15;
@@ -109,11 +109,13 @@ void MapViewMenu::update() {
     return;
 
   uint32_t now = SDL_GetTicks();
-  if (now - repeatStartMs_ > 500) { // Initial delay
-    if (now - repeatLastMs_ > 50) { // Repeat interval
-      propToa_ += (repeatDir_ * 0.1f);
-      if (propToa_ < 0.1f) propToa_ = 0.1f;
-      if (propToa_ > 90.0f) propToa_ = 90.0f;
+  if (now - repeatStartMs_ > 500) {  // Initial delay
+    if (now - repeatLastMs_ > 50) {  // Repeat interval
+      propToa_ += (repeatDir_ * 0.5f);
+      if (propToa_ < 0.1f)
+        propToa_ = 0.1f;
+      if (propToa_ > 90.0f)
+        propToa_ = 90.0f;
 
       char buf[32];
       std::snprintf(buf, sizeof(buf), "%.1f", propToa_);
@@ -248,9 +250,9 @@ void MapViewMenu::render(SDL_Renderer *renderer) {
     cat->drawText(renderer, "Take-Off Angle (deg)", toaRec_.x, toaRec_.y - 20,
                   themes.text, FontStyle::Fast);
     propToaInput_.render(renderer, fontMgr_, toaRec_.x, toaRec_.y, toaRec_.w,
-                        toaRec_.h, FontStyle::UI, 5, propToaInput_.isActive(),
-                        true, themes.accent, themes.border, themes.text,
-                        themes.text, themes.textDim);
+                         toaRec_.h, FontStyle::UI, 5, propToaInput_.isActive(),
+                         true, themes.accent, themes.border, themes.text,
+                         themes.text, themes.textDim);
 
     // Up/Down Arrows for TOA
     SDL_SetRenderDrawColor(renderer, themes.rowStripe2.r, themes.rowStripe2.g,
@@ -267,10 +269,10 @@ void MapViewMenu::render(SDL_Renderer *renderer) {
         toaUpRec_.x + toaUpRec_.w - 4, toaUpRec_.y + toaUpRec_.h - 4,
         toaUpRec_.x + toaUpRec_.w / 2, toaUpRec_.y + 4, themes.text);
 
-    RenderUtils::drawTriangle(
-        renderer, toaDnRec_.x + 4, toaDnRec_.y + 4, toaDnRec_.x + toaDnRec_.w - 4,
-        toaDnRec_.y + 4, toaDnRec_.x + toaDnRec_.w / 2,
-        toaDnRec_.y + toaDnRec_.h - 4, themes.text);
+    RenderUtils::drawTriangle(renderer, toaDnRec_.x + 4, toaDnRec_.y + 4,
+                              toaDnRec_.x + toaDnRec_.w - 4, toaDnRec_.y + 4,
+                              toaDnRec_.x + toaDnRec_.w / 2,
+                              toaDnRec_.y + toaDnRec_.h - 4, themes.text);
 
     cat->drawText(renderer, "Path", spRec_.x, toaRec_.y - 20, themes.text,
                   FontStyle::Fast);
@@ -280,7 +282,6 @@ void MapViewMenu::render(SDL_Renderer *renderer) {
                       themes.text);
   }
 
-
   // Footer Buttons
   SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
 
@@ -288,21 +289,23 @@ void MapViewMenu::render(SDL_Renderer *renderer) {
   SDL_SetRenderDrawColor(renderer, themes.danger.r, themes.danger.g,
                          themes.danger.b, 255);
   SDL_RenderFillRect(renderer, &cancelRect_);
-  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
+                         themes.border.b, 255);
   SDL_RenderDrawRect(renderer, &cancelRect_);
   cat->drawText(renderer, "Cancel", cancelRect_.x + cancelRect_.w / 2,
-                cancelRect_.y + cancelRect_.h / 2, themes.bg,
-                FontStyle::UI, true, false, true);
+                cancelRect_.y + cancelRect_.h / 2, themes.bg, FontStyle::UI,
+                true, false, true);
 
   // Apply button
   SDL_SetRenderDrawColor(renderer, themes.rowStripe2.r, themes.rowStripe2.g,
                          themes.rowStripe2.b, 255);
   SDL_RenderFillRect(renderer, &applyRect_);
-  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
+                         themes.border.b, 255);
   SDL_RenderDrawRect(renderer, &applyRect_);
   cat->drawText(renderer, "Apply", applyRect_.x + applyRect_.w / 2,
-                applyRect_.y + applyRect_.h / 2, themes.text,
-                FontStyle::UI, true, false, true);
+                applyRect_.y + applyRect_.h / 2, themes.text, FontStyle::UI,
+                true, false, true);
 
   // Draw open dropdown LIST on top of everything
   if (openCombo_ != -1) {
@@ -346,9 +349,12 @@ bool MapViewMenu::onMouseDown(int mx, int my, Uint16 /*mod*/, int clicks) {
     // Parse the value back
     try {
       propToa_ = std::stof(propToaInput_.getValue());
-      if (propToa_ < 0.1f) propToa_ = 0.1f;
-      if (propToa_ > 90.0f) propToa_ = 90.0f;
-    } catch (...) {}
+      if (propToa_ < 0.1f)
+        propToa_ = 0.1f;
+      if (propToa_ > 90.0f)
+        propToa_ = 90.0f;
+    } catch (...) {
+    }
     char buf[32];
     std::snprintf(buf, sizeof(buf), "%.1f", propToa_);
     propToaInput_.setValue(buf);
@@ -357,9 +363,10 @@ bool MapViewMenu::onMouseDown(int mx, int my, Uint16 /*mod*/, int clicks) {
   if (SDL_PointInRect(&pt, &toaUpRec_)) {
     repeatDir_ = 1;
     repeatStartMs_ = repeatLastMs_ = SDL_GetTicks();
-    
-    propToa_ += 0.1f;
-    if (propToa_ > 90.0f) propToa_ = 90.0f;
+
+    propToa_ += 0.5f;
+    if (propToa_ > 90.0f)
+      propToa_ = 90.0f;
     char buf[32];
     std::snprintf(buf, sizeof(buf), "%.1f", propToa_);
     propToaInput_.setValue(buf);
@@ -369,8 +376,9 @@ bool MapViewMenu::onMouseDown(int mx, int my, Uint16 /*mod*/, int clicks) {
     repeatDir_ = -1;
     repeatStartMs_ = repeatLastMs_ = SDL_GetTicks();
 
-    propToa_ -= 0.1f;
-    if (propToa_ < 0.1f) propToa_ = 0.1f;
+    propToa_ -= 0.5f;
+    if (propToa_ < 0.1f)
+      propToa_ = 0.1f;
     char buf[32];
     std::snprintf(buf, sizeof(buf), "%.1f", propToa_);
     propToaInput_.setValue(buf);
@@ -385,16 +393,18 @@ bool MapViewMenu::onMouseDown(int mx, int my, Uint16 /*mod*/, int clicks) {
 void MapViewMenu::drawDropdown(SDL_Renderer *renderer, const SDL_Rect &rect,
                                const std::string &currentVal, bool /*isOpen*/) {
   ThemeColors themes = getThemeColors(theme_);
-  SDL_SetRenderDrawColor(renderer, themes.rowStripe1.r, themes.rowStripe1.g, themes.rowStripe1.b, 255);
+  SDL_SetRenderDrawColor(renderer, themes.rowStripe1.r, themes.rowStripe1.g,
+                         themes.rowStripe1.b, 255);
   SDL_RenderFillRect(renderer, &rect);
-  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
+                         themes.border.b, 255);
   SDL_RenderDrawRect(renderer, &rect);
 
   auto *cat = fontMgr_.catalog();
 
   // Text
-  cat->drawText(renderer, currentVal, rect.x + 10, rect.y + rect.h / 2, themes.text,
-                FontStyle::Fast, false, false, true);
+  cat->drawText(renderer, currentVal, rect.x + 10, rect.y + rect.h / 2,
+                themes.text, FontStyle::Fast, false, false, true);
 
   // Arrow (solid filled triangle)
   int cx = rect.x + rect.w - 15;
@@ -421,7 +431,8 @@ void MapViewMenu::drawDropdownList(SDL_Renderer *renderer,
   // Background
   SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, 255);
   SDL_RenderFillRect(renderer, &listRect);
-  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
+                         themes.border.b, 255);
   SDL_RenderDrawRect(renderer, &listRect);
 
   int visibleCount = std::min((int)opts.size(), maxVisibleItems_);
@@ -433,12 +444,13 @@ void MapViewMenu::drawDropdownList(SDL_Renderer *renderer,
     SDL_Rect itemRec = {listRect.x, listRect.y + i * 30, listRect.w, 30};
 
     cat->drawText(renderer, opts[idx], itemRec.x + 10,
-                  itemRec.y + itemRec.h / 2, themes.text,
-                  FontStyle::Fast, false, false, true);
+                  itemRec.y + itemRec.h / 2, themes.text, FontStyle::Fast,
+                  false, false, true);
 
     // Divider
     if (i < visibleCount - 1) {
-      SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 100);
+      SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
+                             themes.border.b, 100);
       SDL_RenderDrawLine(renderer, itemRec.x, itemRec.y + 29,
                          itemRec.x + itemRec.w, itemRec.y + 29);
     }
@@ -459,11 +471,13 @@ void MapViewMenu::drawDropdownList(SDL_Renderer *renderer,
         (scrollableItems > 0) ? (float)listScroll_ / scrollableItems : 0.0f;
     int thumbY = track.y + (int)(scrollPct * (trackH - thumbH));
 
-    SDL_SetRenderDrawColor(renderer, themes.rowStripe2.r, themes.rowStripe2.g, themes.rowStripe2.b, 255);
+    SDL_SetRenderDrawColor(renderer, themes.rowStripe2.r, themes.rowStripe2.g,
+                           themes.rowStripe2.b, 255);
     SDL_RenderFillRect(renderer, &track);
 
     SDL_Rect thumb = {track.x, thumbY, sbWidth, thumbH};
-    SDL_SetRenderDrawColor(renderer, themes.textDim.r, themes.textDim.g, themes.textDim.b, 255);
+    SDL_SetRenderDrawColor(renderer, themes.textDim.r, themes.textDim.g,
+                           themes.textDim.b, 255);
     SDL_RenderFillRect(renderer, &thumb);
   }
 }
@@ -528,10 +542,10 @@ bool MapViewMenu::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
 
   if (handleCombo(overlayRec_, COMBO_OVERLAY, overlayOpts_, [&](int idx) {
         PropOverlayType t[] = {
-            PropOverlayType::None,        PropOverlayType::Muf,
-            PropOverlayType::Voacap,       PropOverlayType::Reliability,
-            PropOverlayType::Toa,          PropOverlayType::Heatmap,
-            PropOverlayType::Drap,         PropOverlayType::Aurora};
+            PropOverlayType::None,   PropOverlayType::Muf,
+            PropOverlayType::Voacap, PropOverlayType::Reliability,
+            PropOverlayType::Toa,    PropOverlayType::Heatmap,
+            PropOverlayType::Drap,   PropOverlayType::Aurora};
         propOverlay_ = t[idx];
       }))
     return true;
@@ -600,9 +614,12 @@ bool MapViewMenu::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
     if (propToaInput_.isActive()) {
       try {
         propToa_ = std::stof(propToaInput_.getValue());
-        if (propToa_ < 0.1f) propToa_ = 0.1f;
-        if (propToa_ > 90.0f) propToa_ = 90.0f;
-      } catch (...) {}
+        if (propToa_ < 0.1f)
+          propToa_ = 0.1f;
+        if (propToa_ > 90.0f)
+          propToa_ = 90.0f;
+      } catch (...) {
+      }
     }
 
     config_->projection = projection_;
@@ -625,7 +642,7 @@ bool MapViewMenu::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
     return true;
   }
 
-  return true; // Consume all clicks in menu
+  return true;  // Consume all clicks in menu
 }
 
 bool MapViewMenu::onKeyDown(SDL_Keycode key, Uint16 mod) {
@@ -638,9 +655,12 @@ bool MapViewMenu::onKeyDown(SDL_Keycode key, Uint16 mod) {
       SDL_StopTextInput();
       try {
         propToa_ = std::stof(propToaInput_.getValue());
-        if (propToa_ < 0.1f) propToa_ = 0.1f;
-        if (propToa_ > 90.0f) propToa_ = 90.0f;
-      } catch (...) {}
+        if (propToa_ < 0.1f)
+          propToa_ = 0.1f;
+        if (propToa_ > 90.0f)
+          propToa_ = 90.0f;
+      } catch (...) {
+      }
       char buf[32];
       std::snprintf(buf, sizeof(buf), "%.1f", propToa_);
       propToaInput_.setValue(buf);
@@ -669,22 +689,26 @@ bool MapViewMenu::onTextInput(const char *text) {
 }
 
 // Dummy helper just in case
-void MapViewMenu::renderRadioButton(SDL_Renderer *renderer, const SDL_Rect &rect,
-                                    bool selected, const std::string &label,
+void MapViewMenu::renderRadioButton(SDL_Renderer *renderer,
+                                    const SDL_Rect &rect, bool selected,
+                                    const std::string &label,
                                     const SDL_Color &textColor) {
   auto *cat = fontMgr_.catalog();
   ThemeColors themes = getThemeColors(theme_);
 
   // Draw the outer square
-  SDL_SetRenderDrawColor(renderer, themes.rowStripe1.r, themes.rowStripe1.g, themes.rowStripe1.b, 255);
+  SDL_SetRenderDrawColor(renderer, themes.rowStripe1.r, themes.rowStripe1.g,
+                         themes.rowStripe1.b, 255);
   SDL_RenderFillRect(renderer, &rect);
-  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
+                         themes.border.b, 255);
   SDL_RenderDrawRect(renderer, &rect);
 
   // If selected, draw the inner "checked" square
   if (selected) {
     SDL_Rect check = {rect.x + 4, rect.y + 4, rect.w - 8, rect.h - 8};
-    SDL_SetRenderDrawColor(renderer, themes.success.r, themes.success.g, themes.success.b, 255);
+    SDL_SetRenderDrawColor(renderer, themes.success.r, themes.success.g,
+                           themes.success.b, 255);
     SDL_RenderFillRect(renderer, &check);
   }
 
@@ -700,33 +724,33 @@ bool MapViewMenu::onMouseWheel(int scrollY) {
   // Determine which list is open
   int totalItems = 0;
   switch (openCombo_) {
-  case COMBO_PROJ:
-    totalItems = projOpts_.size();
-    break;
-  case COMBO_STYLE:
-    totalItems = mapOpts_.size();
-    break;
-  case COMBO_GRID:
-    totalItems = gridOpts_.size();
-    break;
-  case COMBO_OVERLAY:
-    totalItems = overlayOpts_.size();
-    break;
-  case COMBO_BAND:
-    totalItems = bandOpts_.size();
-    break;
-  case COMBO_MODE:
-    totalItems = modeOpts_.size();
-    break;
-  case COMBO_POWER:
-    totalItems = powerOpts_.size();
-    break;
+    case COMBO_PROJ:
+      totalItems = projOpts_.size();
+      break;
+    case COMBO_STYLE:
+      totalItems = mapOpts_.size();
+      break;
+    case COMBO_GRID:
+      totalItems = gridOpts_.size();
+      break;
+    case COMBO_OVERLAY:
+      totalItems = overlayOpts_.size();
+      break;
+    case COMBO_BAND:
+      totalItems = bandOpts_.size();
+      break;
+    case COMBO_MODE:
+      totalItems = modeOpts_.size();
+      break;
+    case COMBO_POWER:
+      totalItems = powerOpts_.size();
+      break;
   }
 
   if (totalItems <= maxVisibleItems_)
-    return true; // Consume but do nothing
+    return true;  // Consume but do nothing
 
-  listScroll_ -= scrollY; // Scroll up (neg) -> decrease index
+  listScroll_ -= scrollY;  // Scroll up (neg) -> decrease index
   if (listScroll_ < 0)
     listScroll_ = 0;
   if (listScroll_ > totalItems - maxVisibleItems_)

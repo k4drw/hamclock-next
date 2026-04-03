@@ -28,6 +28,7 @@ void GreylineModal::setWindow(const GreylineWindow &window, const std::string &d
   window_ = window;
   dxName_ = dxName;
   active_ = true;
+  openedMs_ = SDL_GetTicks();
 }
 
 static std::string formatTime(std::chrono::system_clock::time_point tp) {
@@ -42,6 +43,11 @@ static std::string formatTime(std::chrono::system_clock::time_point tp) {
 
 void GreylineModal::render(SDL_Renderer *renderer) {
   if (!active_) return;
+
+  if (!window_.valid && (SDL_GetTicks() - openedMs_ > 3000)) {
+    active_ = false;
+    return;
+  }
 
   ThemeColors themes = getThemeColors(theme_);
   auto *cat = fontMgr_.catalog();

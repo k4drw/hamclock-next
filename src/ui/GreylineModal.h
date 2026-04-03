@@ -25,6 +25,7 @@ private:
   GreylineWindow window_;
   std::string dxName_;
   bool active_ = false;
+  uint32_t openedMs_ = 0;
   SDL_Rect dialogRect_;
   SDL_Rect okRect_;
 

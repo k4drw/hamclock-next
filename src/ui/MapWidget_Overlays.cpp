@@ -1582,8 +1582,8 @@ void MapWidget::renderLegend(SDL_Renderer *renderer) {
     labelMax = "100";
   } else {
     // VOACAP uses Reliability scale/colors internally
-    labelMin = "0";
-    labelMax = "100";
+    labelMin = "0%";
+    labelMax = "100%";
   }
 
   auto *cat = fontMgr_.catalog();
