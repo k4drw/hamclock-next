@@ -55,7 +55,7 @@ private:
                                        "Topo + Bathy"};
   std::vector<std::string> gridOpts_ = {"Off", "Lat/Lon", "Maidenhead"};
   std::vector<std::string> overlayOpts_ = {"None", "MUF", "VOACAP",
-                                           "Reliability", "TOA", "Heatmap",
+                                           "Reliability", "Heatmap",
                                            "DRAP", "Aurora"};
   std::vector<std::string> weatherOpts_ = {"None", "WX/Pressure",
                                            "Clouds (GFS)"};

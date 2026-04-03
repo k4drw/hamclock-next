@@ -544,8 +544,8 @@ bool MapViewMenu::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
         PropOverlayType t[] = {
             PropOverlayType::None,   PropOverlayType::Muf,
             PropOverlayType::Voacap, PropOverlayType::Reliability,
-            PropOverlayType::Toa,    PropOverlayType::Heatmap,
-            PropOverlayType::Drap,   PropOverlayType::Aurora};
+            PropOverlayType::Heatmap, PropOverlayType::Drap,
+            PropOverlayType::Aurora};
         propOverlay_ = t[idx];
       }))
     return true;

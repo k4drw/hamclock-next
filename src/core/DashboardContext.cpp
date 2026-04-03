@@ -753,8 +753,9 @@ DashboardContext::DashboardContext(AppContext &ctx)
       widgetPool[type] = std::make_unique<HurricanePanel>(0, 0, 0, 0, fontMgr,
                                                           ctx.hurricaneStore);
     } else if (type == "marine") {
-      widgetPool[type] =
-          std::make_unique<MarinePanel>(0, 0, 0, 0, fontMgr, ctx.marineStore);
+      widgetPool[type] = std::make_unique<MarinePanel>(
+          0, 0, 0, 0, fontMgr, ctx.marineStore, marineProvider.get());
+
     } else if (type == "winlink") {
       widgetPool[type] =
           std::make_unique<WinlinkPanel>(0, 0, 0, 0, fontMgr, ctx.winlinkStore);
@@ -2104,6 +2105,9 @@ void DashboardContext::update(AppContext &ctx) {
             MarineData current = ctx.marineStore->get();
             if (event.user.code == 0) { // Tides
               current.tideStationId = update->tideStationId;
+              if (!update->tideStationName.empty()) {
+                current.tideStationName = update->tideStationName;
+              }
               current.tides = update->tides;
               current.tidesValid = update->tidesValid;
             } else if (event.user.code == 1) { // Buoy
@@ -2116,6 +2120,18 @@ void DashboardContext::update(AppContext &ctx) {
           delete update;
           break;
         }
+        case AE_MARINE_LOOKUP_READY: {
+          auto *res = static_cast<MarineLookupResult *>(event.user.data1);
+          if (res && ctx.dashboard) {
+            auto it = ctx.dashboard->widgetPool.find("marine");
+            if (it != ctx.dashboard->widgetPool.end()) {
+              static_cast<MarinePanel *>(it->second.get())->onLookupReady(*res);
+            }
+          }
+          delete res;
+          break;
+        }
+
         case AE_WINLINK_DATA_READY: {
           auto *update = static_cast<WinlinkData *>(event.user.data1);
           if (update && ctx.winlinkStore)

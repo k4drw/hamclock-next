@@ -64,8 +64,10 @@ class CallbookProvider;
 class IonosondeProvider;
 class RigService;
 class FccProvider;
+class MarineProvider;
 
 // ---------------------------------------------------------------------------
+
 
 struct WidgetDeps {
   // Core resources (long-lived, owned by DashboardContext / AppContext)
@@ -126,4 +128,6 @@ struct WidgetDeps {
   std::shared_ptr<IonosondeProvider> ionosondeProvider;
   FccProvider       *fccProvider       = nullptr;
   RigService        *rigService        = nullptr;  // nullptr in WASM builds
+  MarineProvider    *marineProvider    = nullptr;
 };
+

@@ -31,7 +31,17 @@ struct MarineData {
   std::chrono::system_clock::time_point lastUpdate;
 };
 
+struct MarineLookupResult {
+  std::string closestTideId;
+  std::string closestTideName;
+  std::string closestBuoyId;
+  std::string closestBuoyName;
+  double distKmTide = -1.0;
+  double distKmBuoy = -1.0;
+};
+
 class MarineStore {
+
 public:
   void update(const MarineData &data) {
     std::lock_guard<std::mutex> lock(mutex_);
