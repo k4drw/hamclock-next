@@ -45,6 +45,13 @@ public:
     (void)clicks;
     return false;
   }
+  
+  virtual bool onRightClick(int mx, int my, Uint16 mod) {
+    (void)mx;
+    (void)my;
+    (void)mod;
+    return false;
+  }
 
   // Called on mouse move. Check if handled.
   virtual void onMouseMove(int mx, int my) {
@@ -72,6 +79,7 @@ public:
   virtual bool isModalActive() const { return false; }
   virtual bool isConfiguring() const { return false; }
   virtual void renderModal(SDL_Renderer *renderer) { (void)renderer; }
+  virtual void setLineAATexture(SDL_Texture *tex) { (void)tex; }
   virtual void setMetric(bool metric) { useMetric_ = metric; }
 
   // Semantic Debug API

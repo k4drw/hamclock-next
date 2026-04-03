@@ -27,6 +27,8 @@ struct HamClockState;
 // Data stores
 class SolarDataStore;
 class AuroraHistoryStore;
+class KIndexHistoryStore;
+class SFIHistoryStore;
 class WatchlistStore;
 class RSSDataStore;
 class WatchlistHitStore;
@@ -233,10 +235,12 @@ struct DashboardContext {
   Uint32 lastMemLogMs = 0;
   float fingerScrollAccum_ = 0.0f;  // accumulated normalized finger-Y for swipe-to-scroll
   bool fingerWasScrolling_ = false;  // true if current touch gesture crossed scroll threshold
-  // Guards the setOnParksReady lambda captured by the background worker thread.
-  // Set to false in ~DashboardContext() so the callback exits safely after
+  // Guards provider callbacks captured by background threads.
+  // Set to false in ~DashboardContext() so callbacks exit safely after
   // the dashboard is destroyed, avoiding the data race on ctx.dashboard.get().
   std::shared_ptr<std::atomic<bool>> parksReadyLive_ =
+      std::make_shared<std::atomic<bool>>(true);
+  std::shared_ptr<std::atomic<bool>> dashboardLive_ =
       std::make_shared<std::atomic<bool>>(true);
 
   // State for background data aggregation
@@ -308,6 +312,8 @@ struct AppContext {
   std::shared_ptr<WinlinkStore> winlinkStore;
   std::shared_ptr<DRAPDataStore> drapDataStore;
   std::shared_ptr<XRayHistoryStore> xrayHistoryStore;
+  std::shared_ptr<KIndexHistoryStore> kIndexHistoryStore;
+  std::shared_ptr<SFIHistoryStore> sfiHistoryStore;
   std::shared_ptr<GreylineDXStore> greylineDXStore;
   std::shared_ptr<AuroraMapStore> auroraMapStore;
   std::shared_ptr<CalendarStore> calendarStore;

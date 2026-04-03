@@ -11,10 +11,15 @@
 struct ThemeColors;
 struct SDL_Renderer;
 
+class MarineProvider;
+
 class MarinePanel : public Widget {
+
 public:
   MarinePanel(int x, int y, int w, int h, FontManager &fontMgr,
-              std::shared_ptr<MarineStore> store);
+              std::shared_ptr<MarineStore> store,
+              MarineProvider *provider);
+
 
   void update() override;
   void render(SDL_Renderer *renderer) override;
@@ -29,7 +34,10 @@ public:
   bool isModalActive() const override { return menuVisible_; }
   void renderModal(SDL_Renderer *renderer) override;
 
+  void onLookupReady(const MarineLookupResult &res);
+
   std::string getName() const override { return "Marine"; }
+
   const char *typeId() const override { return "marine"; }
   std::string getDisplayName() const override { return "Marine"; }
 
@@ -40,7 +48,9 @@ private:
 
   FontManager &fontMgr_;
   std::shared_ptr<MarineStore> store_;
+  MarineProvider *provider_ = nullptr;
   MarineData currentData_;
+
 
   // Modal / Config state
   bool menuVisible_ = false;
@@ -54,8 +64,12 @@ private:
   SDL_Rect buoyRect_ = {0, 0, 0, 0};
   SDL_Rect okRect_ = {0, 0, 0, 0};
   SDL_Rect cancelRect_ = {0, 0, 0, 0};
+  SDL_Rect lookupRect_ = {0, 0, 0, 0};
+
+  bool isSearching_ = false;
 
   int titleFontSize_ = 12;
+
   int rowFontSize_ = 11;
   int subFontSize_ = 9;
   int menuFontSize_ = 16;

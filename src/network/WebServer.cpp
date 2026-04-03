@@ -136,6 +136,8 @@ void WebServer::stop() {
 void WebServer::run() {
 #ifndef __EMSCRIPTEN__
   httplib::Server svr;
+  svr.set_read_timeout(10, 0);
+  svr.set_write_timeout(10, 0);
   svrPtr_ = &svr;
   svr.Get("/", [](const httplib::Request &, httplib::Response &res) {
     std::string html = R"HTML(<!DOCTYPE html>
@@ -232,10 +234,11 @@ void WebServer::run() {
         <option value="mercator">Mercator</option>
         <option value="dual_azimuthal">Dual Azimuthal</option>
       </select>
-      <div style="display:flex; gap:15px; margin-bottom:10px">
+      <div style="display:flex; gap:12px; margin-bottom:10px; flex-wrap:wrap">
         <label><input type="checkbox" id="show-borders"> Borders</label>
         <label><input type="checkbox" id="show-beacons"> Beacons</label>
         <label><input type="checkbox" id="show-sattrack"> Sat Track</label>
+        <label><input type="checkbox" id="center-map-on-de"> Center on DE</label>
       </div>
       <label>Grid Overlay</label>
       <select id="grid-mode">
@@ -244,7 +247,7 @@ void WebServer::run() {
         <option value="maidenhead">Maidenhead</option>
       </select>
       <label>Propagation Overlay</label>
-      <select id="prop-overlay">
+      <select id="prop-overlay" onchange="toggleVoacapFields()">
         <option value="none">None</option>
         <option value="muf">MUF</option>
         <option value="voacap">VOACAP</option>
@@ -254,6 +257,39 @@ void WebServer::run() {
         <option value="drap">DRAP</option>
         <option value="aurora">Aurora</option>
       </select>
+      <div id="voacap-settings" style="display:none; border:1px solid var(--dim); padding:10px; margin:10px 0; background:#1a1a1a">
+        <div class="section-hdr">VOACAP Options</div>
+        <label>Band</label>
+        <select id="prop-band">
+          <option value="80m">80m</option>
+          <option value="40m">40m</option>
+          <option value="30m">30m</option>
+          <option value="20m">20m</option>
+          <option value="17m">17m</option>
+          <option value="15m">15m</option>
+          <option value="12m">12m</option>
+          <option value="10m">10m</option>
+          <option value="6m">6m</option>
+        </select>
+        <label>Mode</label>
+        <select id="prop-mode">
+          <option value="SSB">SSB</option>
+          <option value="CW">CW</option>
+          <option value="FT8">FT8</option>
+          <option value="WSPR">WSPR</option>
+          <option value="AM">AM</option>
+          <option value="RTTY">RTTY</option>
+        </select>
+        <label>Power (Watts)</label>
+        <input type="number" id="prop-power" min="1" max="1500" value="100">
+        <label>Take-Off Angle (deg)</label>
+        <input type="number" id="prop-toa" step="1" min="0" max="90" value="3">
+        <label>Path</label>
+        <select id="prop-path">
+          <option value="0">Short Path</option>
+          <option value="1">Long Path</option>
+        </select>
+      </div>
       <label>Weather Overlay</label>
       <select id="weather-overlay">
         <option value="none">None</option>
@@ -474,8 +510,10 @@ void WebServer::run() {
           <option value="sat">Satellite Tracking</option>
         </select>
         <div id="sat-select-container" style="display:none; margin-top:10px;">
-          <label>Tracking Satellite</label>
-          <select id="selected-satellite" style="margin-bottom:0"></select>
+          <label>Identity Satellite Tracker</label>
+          <select id="selected-satellite" style="margin-bottom:10px"></select>
+          <label>Standalone Widget Satellite</label>
+          <select id="sat-widget-satellite" style="margin-bottom:0"></select>
         </div>
       </div>
       
@@ -549,7 +587,7 @@ void WebServer::run() {
       const ids = ['identity','appearance','status','de-dx','network','cluster','radio','services','brightness','widgets','watchlist','update'];
       document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', ids[i] === name));
       document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id === name));
-      if (name === 'appearance') loadAppearance();
+      if (name === 'appearance') { loadAppearance(); toggleVoacapFields(); }
       if (name === 'status') refreshStatus();
       if (name === 'de-dx') refreshDeDx();
       if (name === 'network') loadNetwork();
@@ -612,6 +650,7 @@ void WebServer::run() {
         document.getElementById('show-borders').checked = !!c.showBorders;
         document.getElementById('show-beacons').checked = !!c.showBeacons;
         document.getElementById('show-sattrack').checked = !!c.showSatTrack;
+        document.getElementById('center-map-on-de').checked = !!c.centerMapOnDe;
         
         let gridVal = 'none';
         if (c.showGrid) {
@@ -620,6 +659,13 @@ void WebServer::run() {
         document.getElementById('grid-mode').value = gridVal;
 
         document.getElementById('prop-overlay').value = c.propOverlay || 'none';
+        document.getElementById('prop-band').value = c.propBand || '20m';
+        document.getElementById('prop-mode').value = c.propMode || 'SSB';
+        document.getElementById('prop-power').value = c.propPower || 100;
+        document.getElementById('prop-toa').value = Math.round(c.propToa || 3);
+        document.getElementById('prop-path').value = c.propPath || 0;
+        toggleVoacapFields();
+
         document.getElementById('weather-overlay').value = c.weatherOverlay || 'none';
         document.getElementById('night-lights').checked = !!c.mapNightLights;
         document.getElementById('use-metric').checked = !!c.useMetric;
@@ -639,10 +685,14 @@ void WebServer::run() {
         }
         dpmSelect.value = c.displayPowerMethod || 'auto';
 
-        const r2 = await fetch('/api/display/status');
-        const j = await r2.json();
         document.getElementById('pwr-msg').textContent = 'State: ' + j.power + ' (' + j.method + ')';
       } catch(e) {}
+    }
+
+    function toggleVoacapFields() {
+      const v = document.getElementById('prop-overlay').value;
+      const show = (v === 'voacap' || v === 'reliability' || v === 'toa');
+      document.getElementById('voacap-settings').style.display = show ? 'block' : 'none';
     }
 
     async function saveAppearance() {
@@ -652,6 +702,7 @@ void WebServer::run() {
       const showBorders = document.getElementById('show-borders').checked ? '1' : '0';
       const showBeacons = document.getElementById('show-beacons').checked ? '1' : '0';
       const showSatTrack = document.getElementById('show-sattrack').checked ? '1' : '0';
+      const centerMapOnDe = document.getElementById('center-map-on-de').checked ? '1' : '0';
       const gridMode = document.getElementById('grid-mode').value;
       const propOverlay = document.getElementById('prop-overlay').value;
       const wxOverlay = document.getElementById('weather-overlay').value;
@@ -666,8 +717,14 @@ void WebServer::run() {
       const params = new URLSearchParams({
         theme, map_style: mapStyle, projection, show_borders: showBorders,
         show_beacons: showBeacons, show_sattrack: showSatTrack, show_grid: showGrid, grid_type: gridType,
+        center_map_on_de: centerMapOnDe,
         prop_overlay: propOverlay, wx_overlay: wxOverlay, night_lights: nl, use_metric: mu,
-        display_power_method: dpm, font_path: fontPath
+        display_power_method: dpm, font_path: fontPath,
+        prop_band: document.getElementById('prop-band').value,
+        prop_mode: document.getElementById('prop-mode').value,
+        prop_power: document.getElementById('prop-power').value,
+        prop_toa: document.getElementById('prop-toa').value,
+        prop_path: document.getElementById('prop-path').value
       });
       try {
         const r = await fetch('/set_config?' + params);
@@ -977,12 +1034,14 @@ void WebServer::run() {
 
         // Populate satellites
         const satSel = document.getElementById('selected-satellite');
+        const satWidSel = document.getElementById('sat-widget-satellite');
         satSel.innerHTML = '';
+        satWidSel.innerHTML = '';
         availableSatellites.forEach(s => {
           const opt = document.createElement('option');
-          opt.value = s;
-          opt.textContent = s;
+          opt.value = opt.textContent = s;
           satSel.appendChild(opt);
+          satWidSel.appendChild(opt.cloneNode(true));
         });
 
         document.getElementById('rot-interval').value = c.rotationInterval || 30;
@@ -1018,6 +1077,7 @@ void WebServer::run() {
 
         document.getElementById('panel-mode').value = c.panelMode || 'dx';
         document.getElementById('selected-satellite').value = c.selectedSatellite || '';
+        document.getElementById('sat-widget-satellite').value = c.sat_widget_satellite || '';
         toggleSatSelect();
 
         // Aux Clock
@@ -1073,7 +1133,8 @@ void WebServer::run() {
         rotation_interval: document.getElementById('rot-interval').value,
         sync_rotation: document.getElementById('sync-rot').checked ? '1' : '0',
         panel_mode: document.getElementById('panel-mode').value,
-        selected_satellite: document.getElementById('selected-satellite').value
+        selected_satellite: document.getElementById('selected-satellite').value,
+        sat_widget_satellite: document.getElementById('sat-widget-satellite').value
       });
 
       for (let i = 0; i < 6; i++) {

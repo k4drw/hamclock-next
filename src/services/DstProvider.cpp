@@ -33,25 +33,27 @@ void DstProvider::fetch() {
       auto now = std::chrono::system_clock::now();
       time_t now_t = std::chrono::system_clock::to_time_t(now);
 
-      // Format: [ ["2024-03-01 00:00:00", -10], ... ]
-      // Skip header (index 0)
-      for (size_t i = 1; i < j.size(); ++i) {
-        auto row = j[i];
-        if (row.size() < 2)
+      // NOAA format: [{"time_tag": "2024-01-01T00:00:00", "dst": -10}, ...]
+      for (const auto &item : j) {
+        if (!item.is_object() || !item.contains("time_tag") ||
+            (!item.contains("dst") && !item.contains("Dst")))
           continue;
 
-        std::string time_str = row[0];
+        std::string time_str = item["time_tag"].get<std::string>();
         float val = 0;
-        if (row[1].is_string())
-          val = StringUtils::safe_stof(row[1].get<std::string>());
-        else if (row[1].is_number())
-          val = row[1].get<float>();
+        const auto &dv = item.contains("dst") ? item["dst"] : item["Dst"];
+        if (dv.is_string())
+          val = StringUtils::safe_stof(dv.get<std::string>());
+        else if (dv.is_number())
+          val = dv.get<float>();
 
-        // Parse YYYY-MM-DD HH:MM:SS
+        // Parse YYYY-MM-DD HH:MM:SS or YYYY-MM-DDTHH:MM:SS
         struct tm t;
         std::memset(&t, 0, sizeof(t));
         int y, mon, day, hr, min, sec;
         if (std::sscanf(time_str.c_str(), "%d-%d-%d %d:%d:%d", &y, &mon, &day,
+                        &hr, &min, &sec) == 6 ||
+            std::sscanf(time_str.c_str(), "%d-%d-%dT%d:%d:%d", &y, &mon, &day,
                         &hr, &min, &sec) == 6) {
           t.tm_year = y - 1900;
           t.tm_mon = mon - 1;
@@ -63,7 +65,7 @@ void DstProvider::fetch() {
           float age_hrs = (ts - now_t) / 3600.0f;
 
           // Keep last 48 hours
-          if (age_hrs > -48.0f) {
+          if (age_hrs > -48.0f && age_hrs <= 0.5f) {
             data.points.push_back({age_hrs, val});
           }
         }

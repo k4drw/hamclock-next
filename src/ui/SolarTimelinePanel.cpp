@@ -37,25 +37,35 @@ void SolarTimelinePanel::update() {
         SolarTimelineData d;
         try {
           auto j = nlohmann::json::parse(body);
-          // Format: [[header...], [time_tag, kp, status, source], ...]
-          for (size_t i = 1; i < j.size(); ++i) {
-            auto &row = j[i];
-            if (!row.is_array() || row.size() < 2)
+          // NOAA format: [{"time_tag": "2024-01-01T00:00:00", "kp": 2.67}, ...]
+          for (const auto &item : j) {
+            if (!item.is_object() || !item.contains("time_tag") ||
+                !item.contains("kp"))
               continue;
-            std::string timeStr = row[0].get<std::string>();
-            std::string kpStr   = row[1].get<std::string>();
 
-            struct tm t{};
-            if (std::sscanf(timeStr.c_str(), "%d-%d-%d %d:%d:%d",
-                            &t.tm_year, &t.tm_mon, &t.tm_mday,
-                            &t.tm_hour, &t.tm_min, &t.tm_sec) != 6)
+            std::string timeStr = item["time_tag"].get<std::string>();
+            float kpVal = 0;
+            if (item["kp"].is_number())
+              kpVal = item["kp"].get<float>();
+            else if (item["kp"].is_string())
+              kpVal = StringUtils::safe_stof(item["kp"].get<std::string>());
+
+            struct tm t {};
+            // Handle both "YYYY-MM-DD HH:MM:SS" (legacy) and "YYYY-MM-DDTHH:MM:SS" (new)
+            if (std::sscanf(timeStr.c_str(), "%d-%d-%d %d:%d:%d", &t.tm_year,
+                            &t.tm_mon, &t.tm_mday, &t.tm_hour, &t.tm_min,
+                            &t.tm_sec) != 6 &&
+                std::sscanf(timeStr.c_str(), "%d-%d-%dT%d:%d:%d", &t.tm_year,
+                            &t.tm_mon, &t.tm_mday, &t.tm_hour, &t.tm_min,
+                            &t.tm_sec) != 6) {
               continue;
+            }
             t.tm_year -= 1900;
-            t.tm_mon  -= 1;
+            t.tm_mon -= 1;
 
             KpForecastBlock blk;
             blk.timeUtc = Astronomy::portable_timegm(&t);
-            blk.kp      = StringUtils::safe_stof(kpStr);
+            blk.kp = kpVal;
             d.blocks.push_back(blk);
           }
           d.fetchedAt = std::time(nullptr);

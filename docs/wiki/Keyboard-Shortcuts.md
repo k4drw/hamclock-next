@@ -22,7 +22,6 @@ Closing the window (SDL_QUIT / OS close button) also exits cleanly.
 Pressing **K** with no modal open toggles highlight mode.
 
 ![K key highlight mode](images/key-highlight-mode.png)
-<!-- TODO: screenshot needed -->
 
 When active:
 - Every interactive region on screen is outlined in **cyan**

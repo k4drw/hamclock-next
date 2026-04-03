@@ -8,17 +8,23 @@
 #define M_PI 3.14159265358979323846
 #endif
 
-// BANDS_MHZ and BANDS_STR are defined in the header, now we explicitly instantiate
+// BANDS_MHZ and BANDS_STR are defined in the header, now we explicitly
+// instantiate
 constexpr double VoacapDeDxPanel::BANDS_MHZ[8];
-constexpr const char* VoacapDeDxPanel::BANDS_STR[8];
+constexpr const char *VoacapDeDxPanel::BANDS_STR[8];
 
-VoacapDeDxPanel::VoacapDeDxPanel(int x, int y, int w, int h,
-                                 FontManager &fontMgr,
-                                 std::shared_ptr<HamClockState> state,
-                                 std::shared_ptr<SolarDataStore> solarStore,
-                                 std::shared_ptr<IonosondeProvider> ionoProvider)
-    : Widget(x, y, w, h), fontMgr_(fontMgr), state_(std::move(state)),
-      solarStore_(std::move(solarStore)), ionoProvider_(std::move(ionoProvider)) {
+VoacapDeDxPanel::VoacapDeDxPanel(
+    int x, int y, int w, int h, FontManager &fontMgr,
+    std::shared_ptr<HamClockState> state,
+    std::shared_ptr<SolarDataStore> solarStore,
+    std::shared_ptr<IonosondeProvider> ionoProvider,
+    AppConfig &config)
+    : Widget(x, y, w, h),
+      fontMgr_(fontMgr),
+      state_(std::move(state)),
+      solarStore_(std::move(solarStore)),
+      ionoProvider_(std::move(ionoProvider)),
+      config_(config) {
   for (int i = 0; i < 24; ++i) {
     for (int j = 0; j < 8; ++j) {
       relMatrix_[i][j] = 0.0f;
@@ -28,9 +34,11 @@ VoacapDeDxPanel::VoacapDeDxPanel(int x, int y, int w, int h,
 
 void VoacapDeDxPanel::recalculateMatrix() {
   hasTarget_ = state_->dxActive;
-  if (!hasTarget_) return;
+  if (!hasTarget_)
+    return;
 
-  double marginDb = PropEngine::calculateSignalMargin("SSB", 100.0); // Default to 100W SSB
+  double marginDb =
+      PropEngine::calculateSignalMargin(config_.propMode, (double)config_.propPower);
 
   // Space weather
   double sfi = 70.0;
@@ -38,8 +46,10 @@ void VoacapDeDxPanel::recalculateMatrix() {
   double kIndex = 0.0;
   if (solarStore_) {
     auto sw = solarStore_->get();
-    if (sw.sfi > 0) sfi = sw.sfi;
-    if (sw.sunspot_number > 0) ssn = sw.sunspot_number;
+    if (sw.sfi > 0)
+      sfi = sw.sfi;
+    if (sw.sunspot_number > 0)
+      ssn = sw.sunspot_number;
     kIndex = sw.k_index;
   }
 
@@ -59,7 +69,14 @@ void VoacapDeDxPanel::recalculateMatrix() {
   double midLatDeg = midPhi * 180.0 / M_PI;
   double midLonDeg = midLam * 180.0 / M_PI;
 
-  double distKm = Astronomy::calculateDistance(state_->deLocation, state_->dxLocation);
+  double distKm =
+      Astronomy::calculateDistance(state_->deLocation, state_->dxLocation);
+  if (config_.propPath == 1) {
+    // Long path
+    distKm = 40075.0 - distKm;
+    // Note: for long path, the "midpoint" should ideally be shifted 180 degrees
+    // along the great circle.
+  }
 
   // Interpolate iono
   InterpolatedIonosonde iono;
@@ -75,8 +92,12 @@ void VoacapDeDxPanel::recalculateMatrix() {
   for (int hour = 0; hour < 24; ++hour) {
     for (int b = 0; b < 8; ++b) {
       double rel = PropEngine::calculateReliability(
-          BANDS_MHZ[b], distKm, midLatDeg, midLonDeg, hour,
-          sfi, ssn, kIndex, iono, currentHour, marginDb);
+          BANDS_MHZ[b], distKm, midLatDeg, midLonDeg, hour, sfi, ssn, kIndex,
+          iono, currentHour, marginDb);
+      
+      // Apply TOA penalty if engine supported it directly, but for now we
+      // just pass the parameters we have.
+      
       relMatrix_[hour][b] = (float)rel;
     }
   }
@@ -87,6 +108,10 @@ void VoacapDeDxPanel::recalculateMatrix() {
   lastDxLon_ = state_->dxLocation.lon;
   lastSFI_ = sfi;
   lastCalcHour_ = ptm->tm_hour;
+  lastMode_ = config_.propMode;
+  lastPower_ = config_.propPower;
+  lastToa_ = config_.propToa;
+  lastPath_ = config_.propPath;
 }
 
 void VoacapDeDxPanel::update() {
@@ -102,9 +127,15 @@ void VoacapDeDxPanel::update() {
                        (state_->deLocation.lat != lastDeLat_) ||
                        (state_->deLocation.lon != lastDeLon_);
 
-  bool metricChanged = (currentSfi != lastSFI_) || (currentHour != lastCalcHour_);
+  bool metricChanged =
+      (currentSfi != lastSFI_) || (currentHour != lastCalcHour_);
 
-  if (targetChanged || metricChanged) {
+  bool propChanged = (config_.propMode != lastMode_) ||
+                     (config_.propPower != lastPower_) ||
+                     (config_.propToa != lastToa_) ||
+                     (config_.propPath != lastPath_);
+
+  if (targetChanged || metricChanged || propChanged) {
     recalculateMatrix();
   }
 }
@@ -124,7 +155,8 @@ static SDL_Color reliabilityColor(float rel) {
 }
 
 void VoacapDeDxPanel::render(SDL_Renderer *renderer) {
-  if (!fontMgr_.ready()) return;
+  if (!fontMgr_.ready())
+    return;
 
   ThemeColors themes = getThemeColors(theme_);
   renderChrome(renderer);
@@ -132,8 +164,8 @@ void VoacapDeDxPanel::render(SDL_Renderer *renderer) {
   auto *cat = fontMgr_.catalog();
 
   int titleH = 20;
-  cat->drawText(renderer, "VOACAP DE-DX", x_ + width_ / 2, y_ + 5, themes.accent,
-                FontStyle::MicroBold, true, true);
+  cat->drawText(renderer, "VOACAP DE-DX", x_ + width_ / 2, y_ + 5,
+                themes.accent, FontStyle::MicroBold, true, true);
 
   if (!hasTarget_) {
     cat->drawText(renderer, "Select target on map", x_ + width_ / 2,
@@ -145,11 +177,11 @@ void VoacapDeDxPanel::render(SDL_Renderer *renderer) {
   // Draw matrix
   // X axis: 24 hours
   // Y axis: 8 bands (0=80m at bottom, 7=10m at top)
-  
-  int pLeft = 36;
+
+  int pLeft = 48;
   int pRight = 16;
   int pTop = titleH + 5;
-  int pBot = 40; // for timeline and legend
+  int pBot = 42;  // for timeline and legend
 
   int pWidth = width_ - pLeft - pRight;
   int pHeight = height_ - pTop - pBot;
@@ -157,8 +189,10 @@ void VoacapDeDxPanel::render(SDL_Renderer *renderer) {
   float cellW = static_cast<float>(pWidth) / 24.0f;
   float cellH = static_cast<float>(pHeight) / 8.0f;
 
-  if (cellW < 1.0f) cellW = 1.0f;
-  if (cellH < 1.0f) cellH = 1.0f;
+  if (cellW < 1.0f)
+    cellW = 1.0f;
+  if (cellH < 1.0f)
+    cellH = 1.0f;
 
   std::time_t t = std::time(nullptr);
   std::tm *ptm = std::gmtime(&t);
@@ -168,13 +202,15 @@ void VoacapDeDxPanel::render(SDL_Renderer *renderer) {
   for (int hourOffset = 0; hourOffset < 24; ++hourOffset) {
     int h = (utcHour + hourOffset) % 24;
     int px = x_ + pLeft + static_cast<int>(hourOffset * cellW);
-    
+    int nextPx = x_ + pLeft + static_cast<int>((hourOffset + 1) * cellW);
+
     for (int b = 0; b < 8; ++b) {
       int py = y_ + pTop + static_cast<int>((7 - b) * cellH);
+      int nextPy = y_ + pTop + static_cast<int>((7 - b + 1) * cellH);
 
       SDL_Color c = reliabilityColor(relMatrix_[h][b]);
-      
-      SDL_Rect rect = {px, py, static_cast<int>(cellW + 1), static_cast<int>(cellH + 1)};
+
+      SDL_Rect rect = {px, py, nextPx - px, nextPy - py};
       SDL_SetRenderDrawColor(renderer, c.r, c.g, c.b, c.a);
       SDL_RenderFillRect(renderer, &rect);
     }
@@ -182,41 +218,47 @@ void VoacapDeDxPanel::render(SDL_Renderer *renderer) {
 
   // Y-axis labels (Bands)
   for (int b = 0; b < 8; ++b) {
-    int py = y_ + pTop + static_cast<int>((7 - b) * cellH) + static_cast<int>(cellH / 2);
-    cat->drawText(renderer, BANDS_STR[b], x_ + (pLeft / 2), py, themes.textDim, FontStyle::Tiny, true, true);
+    int py = y_ + pTop + static_cast<int>((7 - b + 0.5f) * cellH);
+    cat->drawText(renderer, BANDS_STR[b], x_ + (pLeft / 2), py, themes.textDim,
+                  FontStyle::Tiny, false, true, true);
   }
 
   // X-axis labels (Timeline)
   // Draw current UTC at offset 0
-  int timelineY = y_ + pTop + pHeight + 11;
-  cat->drawText(renderer, "UTC", x_ + (pLeft / 2), timelineY, themes.textDim, FontStyle::Tiny, true, true);
-  
+  int timelineY = y_ + pTop + pHeight + 8;
+  cat->drawText(renderer, "UTC", x_ + (pLeft / 2), timelineY, themes.textDim,
+                FontStyle::Tiny, false, true, true);
+
   for (int hourOffset = 0; hourOffset < 24; hourOffset += 4) {
     int h = (utcHour + hourOffset) % 24;
-    int px = x_ + pLeft + static_cast<int>(hourOffset * cellW);
+    int px_center = x_ + pLeft + static_cast<int>((hourOffset + 0.5f) * cellW);
     std::string hStr = std::to_string(h);
-    cat->drawText(renderer, hStr, px + static_cast<int>(cellW / 2), timelineY, themes.textDim, FontStyle::Tiny, true, true);
+    cat->drawText(renderer, hStr, px_center, timelineY,
+                  themes.textDim, FontStyle::Tiny, false, true, true);
   }
 
   // Legend
-  int legendY = y_ + height_ - 14;
-  int legendItemW = pWidth / 4;
+  int legendY = y_ + pTop + pHeight + 23;
+  float legendItemW = static_cast<float>(pWidth) / 4.0f;
   const float relVals[4] = {0.0f, 20.0f, 50.0f, 80.0f};
-  const char* legendText[4] = {"<10", "10-33", "33-66", ">66"};
-  
+  const char *legendText[4] = {"<10", "10-33", "33-66", ">66"};
+
   for (int i = 0; i < 4; i++) {
-     SDL_Color c = reliabilityColor(relVals[i]);
-     
-     int lx = x_ + pLeft + i * legendItemW;
-     SDL_Rect boxRect = {lx, legendY - 4, 8, 8};
-     SDL_SetRenderDrawColor(renderer, c.r, c.g, c.b, c.a);
-     SDL_RenderFillRect(renderer, &boxRect);
-     
-     cat->drawText(renderer, legendText[i], lx + 12, legendY, themes.textDim, FontStyle::Tiny, false, true);
+    SDL_Color c = reliabilityColor(relVals[i]);
+
+    int lx = x_ + pLeft + static_cast<int>(i * legendItemW);
+    
+    SDL_Rect boxRect = {lx - 4, legendY - 8, 8, 8};
+    SDL_SetRenderDrawColor(renderer, c.r, c.g, c.b, c.a);
+    SDL_RenderFillRect(renderer, &boxRect);
+
+    cat->drawText(renderer, legendText[i], lx + 12, legendY + 6, themes.textDim,
+                  FontStyle::Tiny, false, false, true); // not horizontally centered
   }
 
   // Grid lines mapping
-  SDL_SetRenderDrawColor(renderer, themes.rowStripe2.r, themes.rowStripe2.g, themes.rowStripe2.b, 255);
+  SDL_SetRenderDrawColor(renderer, themes.rowStripe2.r, themes.rowStripe2.g,
+                         themes.rowStripe2.b, 255);
   for (int hourOffset = 0; hourOffset <= 24; ++hourOffset) {
     int px = x_ + pLeft + static_cast<int>(hourOffset * cellW);
     SDL_RenderDrawLine(renderer, px, y_ + pTop, px, y_ + pTop + pHeight);
@@ -243,7 +285,7 @@ nlohmann::json VoacapDeDxPanel::getDebugData() const {
 }
 
 REGISTER_WIDGET("voacap_dedx", "Voacap DE-DX", false, false, {
-  return std::make_unique<VoacapDeDxPanel>(
-      0, 0, 0, 0, deps.fontMgr, deps.state, deps.solarStore,
-      deps.ionosondeProvider);
+  return std::make_unique<VoacapDeDxPanel>(0, 0, 0, 0, deps.fontMgr, deps.state,
+                                           deps.solarStore,
+                                           deps.ionosondeProvider, deps.appCfg);
 })

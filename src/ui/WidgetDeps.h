@@ -44,6 +44,8 @@ class MarineStore;
 class WinlinkStore;
 class DRAPDataStore;
 class XRayHistoryStore;
+class KIndexHistoryStore;
+class SFIHistoryStore;
 class GreylineDXStore;
 class AuroraMapStore;
 class CalendarStore;
@@ -62,8 +64,10 @@ class CallbookProvider;
 class IonosondeProvider;
 class RigService;
 class FccProvider;
+class MarineProvider;
 
 // ---------------------------------------------------------------------------
+
 
 struct WidgetDeps {
   // Core resources (long-lived, owned by DashboardContext / AppContext)
@@ -104,6 +108,8 @@ struct WidgetDeps {
   std::shared_ptr<WinlinkStore>         winlinkStore;
   std::shared_ptr<DRAPDataStore>        drapDataStore;
   std::shared_ptr<XRayHistoryStore>     xrayHistoryStore;
+  std::shared_ptr<KIndexHistoryStore>   kIndexHistoryStore;
+  std::shared_ptr<SFIHistoryStore>      sfiHistoryStore;
   std::shared_ptr<GreylineDXStore>      greylineDXStore;
   std::shared_ptr<AuroraMapStore>       auroraMapStore;
   std::shared_ptr<CalendarStore>        calendarStore;
@@ -122,4 +128,6 @@ struct WidgetDeps {
   std::shared_ptr<IonosondeProvider> ionosondeProvider;
   FccProvider       *fccProvider       = nullptr;
   RigService        *rigService        = nullptr;  // nullptr in WASM builds
+  MarineProvider    *marineProvider    = nullptr;
 };
+

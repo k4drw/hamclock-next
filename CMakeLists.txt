@@ -591,6 +591,7 @@ set(HAMCLOCK_SOURCES
     src/ui/ActivityPanels.cpp
     src/ui/ADIFPanel.cpp
     src/ui/AlertsPanel.cpp
+    src/ui/BigClockPanel.cpp
     src/ui/SolarCyclePanel.cpp
     src/ui/GreylineWindowsPanel.cpp
     src/ui/DXCCProgressPanel.cpp
@@ -606,6 +607,8 @@ set(HAMCLOCK_SOURCES
     src/ui/GreylineDXPanel.cpp
     src/ui/AuroraPanel.cpp
     src/ui/AuroraGraphPanel.cpp
+    src/ui/KIndexAlertPanel.cpp
+    src/ui/SFITrendPanel.cpp
     src/ui/DXClusterPanel.cpp
     src/ui/DXClusterSetup.cpp
     src/ui/BandConditionsPanel.cpp
@@ -624,8 +627,7 @@ set(HAMCLOCK_SOURCES
     src/ui/ClockAuxPanel.cpp
     src/ui/ENVPanel.cpp
     src/ui/RigControlPanel.cpp
-    src/ui/DXPanel.cpp
-    src/ui/DXSatPane.cpp
+    src/ui/DXInfo.cpp
     src/ui/SatWidget.cpp
     src/ui/ListPanel.cpp
     src/ui/LiveSpotPanel.cpp

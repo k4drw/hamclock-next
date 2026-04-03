@@ -18,6 +18,9 @@ public:
 
     ~CallsignClock() override { destroyCache(); }
 
+    std::string getName() const override { return "CallsignClock"; }
+    const char *typeId() const override { return "callsign_clock"; }
+    std::string getDisplayName() const override { return "Callsign/Clock"; }
     void update() override;
     void render(SDL_Renderer* renderer) override;
     void onResize(int x, int y, int w, int h) override;

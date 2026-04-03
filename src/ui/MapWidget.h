@@ -45,8 +45,12 @@ public:
   void update() override;
   void render(SDL_Renderer *renderer) override;
   void onResize(int x, int y, int w, int h) override;
+  bool onMouseDown(int mx, int my, Uint16 mod, int clicks) override;
   bool onMouseUp(int mx, int my, Uint16 mod, int clicks) override;
+  bool onRightClick(int mx, int my, Uint16 mod) override;
   void onMouseMove(int mx, int my) override;
+  bool onKeyDown(SDL_Keycode key, Uint16 mod) override;
+  bool onTextInput(const char *text) override;
   bool onMouseWheel(int scrollY) override;
 
   // Set the satellite predictor for map overlays (non-owning). nullptr to
@@ -201,7 +205,8 @@ private:
   std::vector<SDL_Vertex> shadowVerts_;
   std::vector<SDL_Vertex> lightVerts_;
   std::vector<SDL_Vertex> propVerts_;
-  std::vector<int> nightIndices_;
+  std::vector<int> nightIndices_;    // screen-space: shadow/light overlay + azimuthal base map
+  std::vector<int> mapBaseIndices_;  // lat/lon-space: base map, grib cloud, weather fill
   std::vector<int> propIndices_;
   std::vector<SDL_Vertex> auroraVerts_;
   std::vector<int> auroraIndices_;
@@ -253,7 +258,13 @@ private:
     int cachedW = 0;
     int cachedH = 0;
   } tooltip_;
+  
+  bool deMenuVisible_ = false;
+  SDL_Rect deMenuRect_ = {0, 0, 0, 0};
+  double deMenuLat_ = 0, deMenuLon_ = 0;
+  bool mouseDown_ = false;
 
+  void renderDeMenu(SDL_Renderer *renderer);
   void renderLegend(SDL_Renderer *renderer);
   void renderWxMbLegend(SDL_Renderer *renderer);
   void renderCloudLegend(SDL_Renderer *renderer);
@@ -278,11 +289,17 @@ private:
   std::string lastAuroraProjection_;
   SDL_Texture *auroraTexture_ = nullptr;
   PropOverlayType lastPropType_ = PropOverlayType::None;
+  std::string lastPropProj_ = "";
+  SDL_Rect lastPropMapRect_ = {0, 0, 0, 0};
+  double lastPropCenterLon_ = -999.0;
   std::string lastBand_;
   std::string lastMode_;
   int lastPower_ = -1;
+  float lastToa_ = -1.0f;
+  int lastPath_ = -1;
   double lastUpdateSunLat_ = -999.0;
   double lastUpdateSunLon_ = -999.0;
+  double lastMapCenterLon_ = -999.0;
 
   void renderOverlayInfo(SDL_Renderer *renderer);
   void renderRssButton(SDL_Renderer *renderer);

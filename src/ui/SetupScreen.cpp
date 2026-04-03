@@ -348,3 +348,44 @@ void SetupScreen::onResize(int x, int y, int w, int h) {
 // onMouseDown, onMouseUp, onMouseWheel, onMouseMove, onKeyDown, onTextInput — defined in SetupScreen_Events.cpp
 
 // setConfig, getConfig, getActions, getActionRect — defined in SetupScreen_Config.cpp
+
+void SetupScreen::addWatchlistEntriesFromInput() {
+  std::string input = watchlistInputField_.getValue();
+  if (input.empty())
+    return;
+
+  // Split by comma and/or space
+  size_t start = 0;
+  size_t end = input.find_first_of(", ");
+  while (start != std::string::npos) {
+    std::string token = input.substr(
+        start, (end == std::string::npos) ? std::string::npos : end - start);
+
+    // Trim and uppercase
+    std::string call = StringUtils::trim(token);
+    std::transform(call.begin(), call.end(), call.begin(), ::toupper);
+
+    // Validate: alphanumeric or slash only
+    bool valid = !call.empty();
+    for (char c : call) {
+      if (!((c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '/')) {
+        valid = false;
+        break;
+      }
+    }
+
+    if (valid) {
+      if (std::find(watchlistEntries_.begin(), watchlistEntries_.end(), call) ==
+          watchlistEntries_.end()) {
+        watchlistEntries_.push_back(call);
+      }
+    }
+
+    if (end == std::string::npos)
+      break;
+    start = input.find_first_not_of(", ", end);
+    end = input.find_first_of(", ", start);
+  }
+
+  watchlistInputField_.clear();
+}

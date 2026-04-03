@@ -26,6 +26,11 @@ public:
     data_.calls.erase(c);
   }
 
+  void clear() {
+    std::lock_guard<std::mutex> lock(mutex_);
+    data_.calls.clear();
+  }
+
   bool contains(const std::string &call) const {
     std::lock_guard<std::mutex> lock(mutex_);
     std::string c = call;

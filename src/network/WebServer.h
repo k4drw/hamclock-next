@@ -38,6 +38,16 @@ class StopwatchPanel;
 class CalendarStore;
 class TimePanel;
 
+// Web interface for HamClock.
+//
+// Deadlock Prevention: This class interacts with HamClockState which has its
+// own locationMutex. To avoid ABBA deadlocks, the following order must be
+// strictly observed:
+//   1. Acquire WebServer::dataMutex_
+//   2. Acquire HamClockState::locationMutex
+//
+// Prefer snapshotting required state under dataMutex_ and releasing it
+// before acquiring locationMutex whenever feasible.
 class WebServer {
 public:
   WebServer(SDL_Renderer *renderer, AppConfig &cfg, HamClockState &state,

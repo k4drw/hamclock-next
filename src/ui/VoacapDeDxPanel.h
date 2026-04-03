@@ -15,7 +15,8 @@ public:
   VoacapDeDxPanel(int x, int y, int w, int h, FontManager &fontMgr,
                   std::shared_ptr<HamClockState> state,
                   std::shared_ptr<SolarDataStore> solarStore,
-                  std::shared_ptr<IonosondeProvider> ionoProvider);
+                  std::shared_ptr<IonosondeProvider> ionoProvider,
+                  AppConfig &config);
 
   void update() override;
   void render(SDL_Renderer *renderer) override;
@@ -35,6 +36,7 @@ private:
   std::shared_ptr<HamClockState> state_;
   std::shared_ptr<SolarDataStore> solarStore_;
   std::shared_ptr<IonosondeProvider> ionoProvider_;
+  AppConfig &config_;
 
   // 24 UTC hours x 8 bands (80, 40, 30, 20, 17, 15, 12, 10m)
   float relMatrix_[24][8];
@@ -47,6 +49,10 @@ private:
   double lastDxLon_ = -999;
   double lastSFI_ = -1;
   int lastCalcHour_ = -1;
+  std::string lastMode_;
+  int lastPower_ = -1;
+  float lastToa_ = -1.0f;
+  int lastPath_ = -1;
 
   void recalculateMatrix();
 

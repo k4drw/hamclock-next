@@ -22,7 +22,7 @@ To add a widget to a pane, click the **top strip** of the pane to open the widge
 | ![robinson_clouds_dark](images/map_looks/robinson_clouds_dark.png) | ![robinson_matrix](images/map_looks/robinson_matrix.png) |
 | | |
 |---|---|
-| ![robinson_muf_dark](images/map_looks/robinson_muf_dark.png) |  |
+| ![robinson_muf_dark](images/map_looks/robinson_muf_dark.png) | ![robinson_voacap_dark](images/map_looks/robinson_voacap_dark.png) |
 
 <!-- END MAP LOOKS -->
 
@@ -45,9 +45,9 @@ To add a widget to a pane, click the **top strip** of the pane to open the widge
 | **DST Index**    | Disturbance Storm Time index \u2014 a measure of geomagnetic storm severity                                        | NOAA SWPC (Kyoto)        |
 | **Ionosonde**    | Ionospheric sounding data                                                                                     | Remote ionosonde network |
 
-![Solar widget](images/widget-solar-flux.png)
+![Solar widget](images/widgets/solar.png)
 
-![SDO widget](images/widget-sdo.png)
+![SDO widget](images/widgets/sdo.png)
 
 ---
 
@@ -59,9 +59,9 @@ To add a widget to a pane, click the **top strip** of the pane to open the widge
 | **Live Spots**      | Real-time decoded signal spots from PSK Reporter or Reverse Beacon Network, plotted by band | PSK Reporter / RBN |
 | **NCDXF**           | NCDXF/IBP international beacon schedule and current beacon on air                           | NCDXF              |
 
-![Band Conditions widget](images/widget-band-conditions.png)
+![Band Conditions widget](images/widgets/band_conditions.png)
 
-![Live Spots widget](images/widget-live-spots.png)
+![Live Spots widget](images/widgets/live_spots.png)
 
 ---
 
@@ -78,11 +78,11 @@ To add a widget to a pane, click the **top strip** of the pane to open the widge
 | **Watchlist**    | Monitor specific callsigns in the DX cluster stream       | DX Cluster (filtered)             |
 | **Alerts**       | Triggered alerts based on watchlist or band activity      | Internal                          |
 
-![DX Cluster widget](images/widget-dx-cluster.png)
+![DX Cluster widget](images/widgets/dx_cluster.png)
 
-![DX Peditions widget](images/widget-dx-peditions.png)
+![DX Peditions widget](images/widgets/dx_peditions.png)
 
-![On The Air (POTA/SOTA) widget](images/widget-on-the-air.png)
+![On The Air (POTA/SOTA) widget](images/widgets/on_the_air.png)
 
 ---
 
@@ -99,7 +99,7 @@ To add a widget to a pane, click the **top strip** of the pane to open the widge
 | **Tropo**      | Tropospheric ducting forecast index                           | APRS / custom |
 | **Meteor**     | Meteor scatter activity / upcoming shower calendar            | IMO           |
 
-![DE Weather widget](images/widget-dx-weather.png)
+![DE Weather widget](images/widgets/de_weather.png)
 
 ---
 
@@ -113,9 +113,9 @@ To add a widget to a pane, click the **top strip** of the pane to open the widge
 | **Santa Tracker** | Tracks Santa's position on Christmas Eve; activates on Dec 24 only (originally a hidden easter egg in the original HamClock \u2014 now a proper selectable widget) | Internal calculation        |
 | **Asteroid**      | Next 5 close Earth approaches from the Minor Planet Center / JPL                                                                                              | JPL SBDB Close Approach API |
 
-![Moon widget](images/widget-moon.png)
+![Moon widget](images/widgets/moon.png)
 
-![Asteroid widget](images/widget-asteroids.png)
+![Asteroid widget](images/widgets/asteroid.png)
 
 ---
 
@@ -133,11 +133,11 @@ To add a widget to a pane, click the **top strip** of the pane to open the widge
 | **Winlink**      | Winlink gateway listing for your area (requires access)                                          | Winlink API              |
 | **Sys Info**     | System information: CPU, memory, network, uptime                                                 | Local OS                 |
 
-![DE Info widget](images/widget-de-info.png)
+![DE Info widget](images/widgets/de_info.png)
 
-![DX Info widget](images/widget-dx-info.png)
+![DX Info widget](images/widgets/dx_info.png)
 
-![Sys Info widget](images/widget-sys-info.png)
+![Sys Info widget](images/widgets/sys_info.png)
 
 ---
 
@@ -147,4 +147,4 @@ To add a widget to a pane, click the **top strip** of the pane to open the widge
 | ------------ | ------------------------------------------ | -------------------- |
 | **Contests** | Upcoming and active amateur radio contests | Contest calendar API |
 
-![Contests widget](images/widget-contests.png)
+![Contests widget](images/widgets/contests.png)

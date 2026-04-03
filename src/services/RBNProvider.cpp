@@ -3,6 +3,7 @@
 #include "../core/HamClockState.h"
 #include "../core/Logger.h"
 #include "../core/PrefixManager.h"
+#include "../core/SoundManager.h"
 #ifdef _WIN32
 #include <winsock2.h>
 #include <ws2tcpip.h>
@@ -17,8 +18,12 @@
 #include <cstring>
 
 RBNProvider::RBNProvider(std::shared_ptr<DXClusterDataStore> store,
-                         PrefixManager &pm, HamClockState *state)
-    : store_(store), pm_(pm), state_(state) {}
+                         PrefixManager &pm,
+                         std::shared_ptr<WatchlistStore> watchlist,
+                         std::shared_ptr<WatchlistHitStore> hits,
+                         HamClockState *state)
+    : store_(store), pm_(pm), watchlist_(watchlist), hits_(hits),
+      state_(state) {}
 
 RBNProvider::~RBNProvider() { stop(); }
 
@@ -383,4 +388,16 @@ void RBNProvider::processLine(const std::string &line) {
         spot.freqKhz, spot.mode, spot.snr);
 
   store_->addSpot(spot);
+
+  // Watchlist check
+  if (watchlist_ && hits_ && watchlist_->contains(spot.txCall)) {
+    WatchlistHit hit;
+    hit.call = spot.txCall;
+    hit.freqKhz = spot.freqKhz;
+    hit.mode = spot.mode;
+    hit.source = "RBN";
+    hit.time = spot.spottedAt;
+    hits_->addHit(hit);
+    SoundManager::getInstance().speak("Watchlist: " + hit.call);
+  }
 }

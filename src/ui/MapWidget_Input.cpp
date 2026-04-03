@@ -39,10 +39,61 @@
 #include <cstring>
 #include <vector>
 
-bool MapWidget::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
-  // Pass through to menu if visible
+bool MapWidget::onMouseDown(int mx, int my, Uint16 mod, int clicks) {
   if (mapViewMenu_->isVisible()) {
-    return mapViewMenu_->onMouseUp(mx, my, mod, clicks);
+    if (mapViewMenu_->onMouseDown(mx, my, mod, clicks))
+      return true;
+  }
+  if (mx >= x_ && mx < x_ + width_ && my >= y_ && my < y_ + height_) {
+    mouseDown_ = true;
+    return true;
+  }
+  return false;
+}
+
+bool MapWidget::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
+  // Pass through to menu if visible (must check BEFORE mouseDown_ check
+  // since menu might have returned true for onMouseDown, leaving our
+  // mouseDown_ as false)
+  if (mapViewMenu_->isVisible()) {
+    if (mapViewMenu_->onMouseUp(mx, my, mod, clicks)) {
+      mouseDown_ = false; // Reset just in case
+      return true;
+    }
+  }
+
+  if (!mouseDown_)
+    return false;
+  mouseDown_ = false;
+
+  // Calendar alert dismissal
+  if (calendarAlert_.active) {
+    const int panW = (int)(mapRect_.w * 0.60);
+    const int panH = 110;
+    const int panX = mapRect_.x + (mapRect_.w - panW) / 2;
+    const int panY = mapRect_.y + (mapRect_.h - panH) / 2;
+    SDL_Rect panRect = {panX, panY, panW, panH};
+    SDL_Point pt = {mx, my};
+    if (SDL_PointInRect(&pt, &panRect)) {
+      calendarAlert_.active = false;
+      return true;
+    }
+  }
+
+  if (deMenuVisible_) {
+    SDL_Point pt = {mx, my};
+    if (SDL_PointInRect(&pt, &deMenuRect_)) {
+      state_->deLocation = {deMenuLat_, deMenuLon_};
+      state_->deGrid = Astronomy::latLonToGrid(deMenuLat_, deMenuLon_);
+      // Persist to config
+      config_.lat = deMenuLat_;
+      config_.lon = deMenuLon_;
+      config_.grid = state_->deGrid;
+      if (onConfigChanged_)
+        onConfigChanged_();
+    }
+    deMenuVisible_ = false;
+    return true;
   }
 
   // Check RSS toggle button (lower-left corner)
@@ -109,6 +160,34 @@ bool MapWidget::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
       activityStore_->set(ad);
     }
   }
+
+  return true;
+}
+
+bool MapWidget::onRightClick(int mx, int my, Uint16 /*mod*/) {
+  if (mapViewMenu_->isVisible())
+    return false;
+
+  double lat, lon;
+  if (!screenToLatLon(mx, my, lat, lon)) {
+    deMenuVisible_ = false;
+    return false;
+  }
+
+  deMenuVisible_ = true;
+  deMenuLat_ = lat;
+  deMenuLon_ = lon;
+
+  // Size the menu
+  int menuW = 110;
+  int menuH = 30;
+  deMenuRect_ = {mx, my, menuW, menuH};
+
+  // Boundary check
+  if (deMenuRect_.x + deMenuRect_.w > HamClock::LOGICAL_WIDTH)
+    deMenuRect_.x -= deMenuRect_.w;
+  if (deMenuRect_.y + deMenuRect_.h > HamClock::LOGICAL_HEIGHT)
+    deMenuRect_.y -= deMenuRect_.h;
 
   return true;
 }
@@ -316,7 +395,43 @@ void MapWidget::onMouseMove(int mx, int my) {
     }
   }
 
-  // 7. Check DX Cluster selected spot only (mirrors renderDXClusterSpots logic)
+  // 7. Check NCDXF beacons
+  if (tip.empty() && config_.showBeacons && beacons_) {
+    // Only show if NCDXF widget is enabled in any pane's rotation (matching renderBeacons)
+    bool widgetEnabled = false;
+    for (auto *pane : panes_) {
+      if (pane) {
+        const auto &rotation = pane->getRotation();
+        if (std::find(rotation.begin(), rotation.end(), std::string("ncdxf")) !=
+            rotation.end()) {
+          widgetEnabled = true;
+          break;
+        }
+      }
+    }
+    if (widgetEnabled) {
+      auto active = beacons_->getActiveBeacons();
+      for (size_t i = 0; i < NCDXF_BEACONS.size(); ++i) {
+        const auto &b = NCDXF_BEACONS[i];
+        if (screenDist(b.lat, b.lon) < kHitRadius) {
+          tip = "Beacon: " + b.callsign + "\n" + b.location;
+          for (const auto &ab : active) {
+            if (ab.index == (int)i) {
+              char fbuf[32];
+              std::snprintf(fbuf, sizeof(fbuf), "\n%.3f (%s)",
+                            BEACON_BANDS[ab.bandIndex] / 1000.0,
+                            kBands[ab.bandIndex + 5].name);
+              tip += fbuf;
+              break;
+            }
+          }
+          break;
+        }
+      }
+    }
+  }
+
+  // 8. Check DX Cluster selected spot only (mirrors renderDXClusterSpots logic)
   if (tip.empty() && dxcStore_) {
     auto data = dxcStore_->snapshot();
     if (data->hasSelection && data->selectedSpot.txLat != 0.0) {
@@ -335,7 +450,7 @@ void MapWidget::onMouseMove(int mx, int my) {
     }
   }
 
-  // 8. Check Live Spots (generic ones on map)
+  // 9. Check Live Spots (generic ones on map)
   if (tip.empty() && spotStore_) {
     auto data = spotStore_->snapshot();
     bool ofDe = config_.liveSpotsOfDe;
@@ -376,7 +491,7 @@ void MapWidget::onMouseMove(int mx, int my) {
     }
   }
 
-  // 9. Fallback to Country lookup
+  // 10. Fallback to Country lookup
   if (tip.empty()) {
     int row = std::clamp((int)((lat + 90.0) * 2.0), 0, 359);
     int col = std::clamp((int)((lon + 180.0) * 2.0), 0, 719);

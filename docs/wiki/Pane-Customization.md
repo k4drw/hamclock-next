@@ -9,7 +9,6 @@ HamClock-Next has six rotatable panes. Each pane independently cycles through a 
 Click the **top strip** (title bar area) of any pane to open the widget picker for that pane.
 
 ![Widget selector open](images/modal-widget-selector.png)
-<!-- TODO: screenshot needed -->
 
 The picker lists all available widgets. Click one to immediately display it in the pane. The selected widget is added to that pane's rotation list.
 
@@ -39,7 +38,6 @@ When `syncRotation` is enabled, all panes advance simultaneously rather than ind
 Panes with more than one widget in their rotation list show a rotation indicator — a small visual cue (dots or arrows) that indicates multiple widgets are available and rotation is active.
 
 ![Pane rotation indicator](images/pane-rotation-indicator.png)
-<!-- TODO: screenshot needed -->
 
 Click the indicator arrows (if present) to manually advance or retreat through the pane's widget list without waiting for the timer.
 

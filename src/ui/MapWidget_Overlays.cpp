@@ -1126,23 +1126,24 @@ void MapWidget::renderBeacons(SDL_Renderer *renderer) {
   for (size_t i = 0; i < NCDXF_BEACONS.size(); ++i) {
     const auto &b = NCDXF_BEACONS[i];
 
-    // Check if this beacon is in the active list
-    bool isTransmitting = false;
+    int activeBandIndex = -1;
     for (const auto &ab : active) {
       if (ab.index == (int)i) {
-        isTransmitting = true;
+        activeBandIndex = ab.bandIndex;
         break;
       }
     }
 
-    if (isTransmitting) {
-      // Bright Yellow for transmitting
-      renderMarker(renderer, b.lat, b.lon, 255, 255, 0, MarkerShape::Triangle,
+    if (activeBandIndex >= 0) {
+      // Color by band: ActiveBeacon::bandIndex (0-4) maps to kBands (5-9)
+      const auto &bc = kBands[activeBandIndex + 5].color;
+      renderMarker(renderer, b.lat, b.lon, bc.r, bc.g, bc.b, MarkerShape::Triangle,
                    true);
     } else {
-      // Dim Gray for idle
-      renderMarker(renderer, b.lat, b.lon, 100, 100, 100, MarkerShape::Triangle,
-                   true);
+      // Muted Gray for idle beacons
+      ThemeColors themes = getThemeColors(theme_);
+      renderMarker(renderer, b.lat, b.lon, themes.textDim.r, themes.textDim.g,
+                   themes.textDim.b, MarkerShape::Triangle, true);
     }
   }
 
@@ -1180,14 +1181,14 @@ void MapWidget::renderPropagationOverlay(SDL_Renderer *renderer) {
   // Ensure vertices are populated BEFORE built indices if projection or size
   // changed. This prevents 'wrap' detection from using uninitialized UV
   // coordinates.
-  static std::string lastPropProj = "";
-  static SDL_Rect lastMapRect = {0, 0, 0, 0};
-  bool projChanged = (lastPropProj != config_.projection);
+  bool projChanged = (lastPropProj_ != config_.projection);
   bool rectChanged =
-      (lastMapRect.x != mapRect_.x || lastMapRect.y != mapRect_.y ||
-       lastMapRect.w != mapRect_.w || lastMapRect.h != mapRect_.h);
+      (lastPropMapRect_.x != mapRect_.x || lastPropMapRect_.y != mapRect_.y ||
+       lastPropMapRect_.w != mapRect_.w || lastPropMapRect_.h != mapRect_.h);
+  bool centerChanged = (std::abs(config_.mapCenterLon - lastPropCenterLon_) > 0.001);
+  bool typeChanged = (lastPropType_ != config_.propOverlay);
 
-  if (projChanged || rectChanged ||
+  if (projChanged || rectChanged || centerChanged || typeChanged ||
       propVerts_.size() != (size_t)((gridW + 1) * (gridH + 1))) {
     propVerts_.resize((gridW + 1) * (gridH + 1));
     if (config_.projection == "dual_azimuthal") {
@@ -1220,16 +1221,21 @@ void MapWidget::renderPropagationOverlay(SDL_Renderer *renderer) {
           int idx = j * (gridW + 1) + i;
           propVerts_[idx].position = {pt.x, pt.y};
           propVerts_[idx].color = {255, 255, 255, 190};
+
+          // UV mapping must correspond to the 660x330 unrotated equirectangular
+          // grid from PropEngine.
           propVerts_[idx].tex_coord = {(float)i / gridW, (float)j / gridH};
         }
       }
     }
-    lastPropProj = config_.projection;
-    lastMapRect = mapRect_;
+    lastPropProj_ = config_.projection;
+    lastPropMapRect_ = mapRect_;
+    lastPropCenterLon_ = config_.mapCenterLon;
+    lastPropType_ = config_.propOverlay;
   }
 
-  // Now rebuild indices if the count is wrong or projection changed
-  if (propIndices_.empty() || projChanged || rectChanged) {
+  // Now rebuild indices if the count is wrong or projection/center/type changed
+  if (propIndices_.empty() || projChanged || rectChanged || centerChanged || typeChanged) {
     propIndices_.clear();
     propIndices_.reserve(gridW * gridH * 6);
     for (int j = 0; j < gridH; ++j) {
@@ -1239,16 +1245,20 @@ void MapWidget::renderPropagationOverlay(SDL_Renderer *renderer) {
         int p2 = (j + 1) * (gridW + 1) + i;
         int p3 = p2 + 1;
 
-        // Check for texture wrapping (crossing date line)
+        // Check for texture wrapping (crossing date line or map seam)
         bool wrap = false;
         if (config_.projection == "azimuthal" ||
-            config_.projection == "dual_azimuthal") {
-          float u0 = propVerts_[p0].tex_coord.x;
-          float u1 = propVerts_[p1].tex_coord.x;
-          float u2 = propVerts_[p2].tex_coord.x;
-          float u3 = propVerts_[p3].tex_coord.x;
-          if (std::abs(u0 - u1) > 0.5f || std::abs(u0 - u2) > 0.5f ||
-              std::abs(u1 - u3) > 0.5f) {
+            config_.projection == "dual_azimuthal" ||
+            std::abs(config_.mapCenterLon) > 0.001) {
+          float x0 = propVerts_[p0].position.x;
+          float x1 = propVerts_[p1].position.x;
+          float x2 = propVerts_[p2].position.x;
+          float x3 = propVerts_[p3].position.x;
+          
+          // If any screen-x difference is very large, it's a wrap
+          float threshold = mapRect_.w * 0.5f;
+          if (std::abs(x0 - x1) > threshold || std::abs(x0 - x2) > threshold ||
+              std::abs(x1 - x3) > threshold) {
             wrap = true;
           }
         }
@@ -1266,7 +1276,8 @@ void MapWidget::renderPropagationOverlay(SDL_Renderer *renderer) {
   }
 
   if (config_.projection == "robinson" || config_.projection == "azimuthal" ||
-      config_.projection == "dual_azimuthal") {
+      config_.projection == "dual_azimuthal" ||
+      (config_.projection == "equirectangular" && std::abs(config_.mapCenterLon) > 0.001)) {
     SDL_RenderGeometry(renderer, propTexture_, propVerts_.data(),
                        (int)propVerts_.size(), propIndices_.data(),
                        (int)propIndices_.size());
@@ -1307,7 +1318,7 @@ void MapWidget::renderGribCloudOverlay(SDL_Renderer *renderer) {
 
   SDL_RenderSetClipRect(renderer, &mapRect_);
 
-  if (config_.projection != "equirectangular" && !mapVerts_.empty()) {
+  if ((config_.projection != "equirectangular" || std::abs(config_.mapCenterLon) > 0.001) && !mapVerts_.empty()) {
     // Manually modulate vertex colors/alpha.
     for (auto &v : mapVerts_) {
       v.color.r = 255;
@@ -1317,8 +1328,8 @@ void MapWidget::renderGribCloudOverlay(SDL_Renderer *renderer) {
     }
 
     SDL_RenderGeometry(renderer, gribCloudFillTex_, mapVerts_.data(),
-                       (int)mapVerts_.size(), nightIndices_.data(),
-                       (int)nightIndices_.size());
+                       (int)mapVerts_.size(), mapBaseIndices_.data(),
+                       (int)mapBaseIndices_.size());
 
     // RESET vertex colors for subsequent overlays (MapWidget reuses mapVerts_)
     for (auto &v : mapVerts_) {
@@ -1510,10 +1521,12 @@ void MapWidget::renderWxMbOverlay(SDL_Renderer *renderer) {
 
   // Render pressure fill layer underneath
   if (wxFillTex_ && config_.propOverlay == PropOverlayType::None) {
-    if (config_.projection != "equirectangular" && !mapVerts_.empty()) {
+    if ((config_.projection != "equirectangular" ||
+         std::abs(config_.mapCenterLon) > 0.001) &&
+        !mapVerts_.empty()) {
       SDL_RenderGeometry(renderer, wxFillTex_, mapVerts_.data(),
-                         (int)mapVerts_.size(), nightIndices_.data(),
-                         (int)nightIndices_.size());
+                         (int)mapVerts_.size(), mapBaseIndices_.data(),
+                         (int)mapBaseIndices_.size());
     } else {
       SDL_RenderCopy(renderer, wxFillTex_, nullptr, &mapRect_);
     }
@@ -1569,8 +1582,8 @@ void MapWidget::renderLegend(SDL_Renderer *renderer) {
     labelMax = "100";
   } else {
     // VOACAP uses Reliability scale/colors internally
-    labelMin = "0";
-    labelMax = "100";
+    labelMin = "0%";
+    labelMax = "100%";
   }
 
   auto *cat = fontMgr_.catalog();
@@ -2213,13 +2226,17 @@ void MapWidget::renderOverlayInfo(SDL_Renderer *renderer) {
   if (config_.propOverlay == PropOverlayType::Muf) {
     text = "MUF Overlay (RT)";
   } else if (config_.propOverlay == PropOverlayType::Voacap) {
-    text = fmt::format("VOACAP ({} / {} / {}W)", config_.propBand,
-                       config_.propMode, config_.propPower);
+    text = fmt::format("VOACAP ({} / {} / {}W / {:.1f}° / {})", config_.propBand,
+                       config_.propMode, config_.propPower, config_.propToa,
+                       config_.propPath == 0 ? "SP" : "LP");
   } else if (config_.propOverlay == PropOverlayType::Reliability) {
-    text = fmt::format("Reliability ({} / {} / {}W)", config_.propBand,
-                       config_.propMode, config_.propPower);
+    text = fmt::format("Reliability ({} / {} / {}W / {:.1f}° / {})",
+                       config_.propBand, config_.propMode, config_.propPower,
+                       config_.propToa, config_.propPath == 0 ? "SP" : "LP");
   } else if (config_.propOverlay == PropOverlayType::Toa) {
-    text = fmt::format("TOA ({} / {})", config_.propBand, config_.propMode);
+    text = fmt::format("TOA ({} / {} / {:.1f}° / {})", config_.propBand,
+                       config_.propMode, config_.propToa,
+                       config_.propPath == 0 ? "SP" : "LP");
   } else if (config_.propOverlay == PropOverlayType::Drap) {
     text = "DRAP Absorption";
   } else if (config_.propOverlay == PropOverlayType::Heatmap) {

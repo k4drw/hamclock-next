@@ -279,7 +279,8 @@ void ActivityLocationManager::resolveSummitAsync(const std::string &ref) {
         }
 
         // Persist cache asynchronously
-        WorkerService::getInstance().submitTask([this]() { saveApiCache(); });
+        WorkerService::getInstance().submitTask(
+            []() { ActivityLocationManager::getInstance().saveApiCache(); });
       },
       86400 * 30); // Cache API responses for 30 days
 }

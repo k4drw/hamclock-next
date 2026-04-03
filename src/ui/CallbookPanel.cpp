@@ -12,6 +12,7 @@ void CallbookPanel::render(SDL_Renderer *renderer) {
   ThemeColors themes = getThemeColors(theme_);
 
   renderChrome(renderer);
+  renderTitle(renderer, fontMgr_, "Callbook");
 
   auto *cat = fontMgr_.catalog();
   if (!currentData_.valid) {
@@ -21,9 +22,6 @@ void CallbookPanel::render(SDL_Renderer *renderer) {
   }
 
   int titleH = 20;
-  cat->drawText(renderer, "Callbook", x_ + 10, y_ + 5, themes.accent,
-                FontStyle::MicroBold);
-
   int curY = y_ + titleH + 10;
   int centerX = x_ + width_ / 2;
 

@@ -46,6 +46,8 @@ struct ConfigPreset {
   std::string propBand = "20m";
   std::string propMode = "SSB";
   int propPower = 100;
+  float propToa = 3.0f;
+  int propPath = 0; // 0=Short, 1=Long
 };
 
 struct AppConfig {
@@ -69,6 +71,8 @@ struct AppConfig {
   std::string propBand = "20m";
   std::string propMode = "SSB";
   int propPower = 100;      // Watts
+  float propToa = 3.0f;     // Take-off angle (degrees)
+  int propPath = 0;         // 0=Short, 1=Long
   int mufRtOpacity = 40;    // percentage
   bool showSatTrack = true; // Show satellite ground track line on world map
   bool showBeacons = true;  // Show NCDXF beacons on world map
@@ -182,6 +186,7 @@ struct AppConfig {
 
   // Map view
   double mapCenterLon = 0.0;
+  bool centerMapOnDe = false;
   int mapPanX = 0;
   int mapPanY = 0;
   double mapZoom = 1.0;
@@ -210,6 +215,14 @@ struct AppConfig {
   int auxClockTzOffset = 0;            // Hours from UTC (-12 to +14)
   std::string auxClockTzLabel = "UTC"; // Display label
   int auxClockStarMode = 1;
+
+  // Big Clock
+  bool bigClockDigital  = true;
+  bool bigClock12h      = false;
+  bool bigClockUtc      = false;
+  bool bigClockShowSec  = true;
+  bool bigClockShowDate = true;
+  uint8_t bigClockHue   = 85; // default green (matches original NV_SWHUE default)
 
   // Update
   std::string skippedVersion;

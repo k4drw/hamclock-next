@@ -1,10 +1,11 @@
 #pragma once
 
+#include "ProviderBase.h"
 #include "../core/BandConditionsData.h"
 #include "../core/SolarData.h"
 #include <memory>
 
-class BandConditionsProvider {
+class BandConditionsProvider : public ProviderBase {
 public:
   BandConditionsProvider(std::shared_ptr<SolarDataStore> solarStore,
                          std::shared_ptr<BandConditionsStore> bandStore);

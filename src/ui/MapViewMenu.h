@@ -1,7 +1,6 @@
-#pragma once
-
 #include "../core/ConfigManager.h"
 #include "FontManager.h"
+#include "TextInput.h"
 #include "Widget.h"
 
 #include <SDL.h>
@@ -19,8 +18,10 @@ public:
 
   void update() override;
   void render(SDL_Renderer *renderer) override;
+  bool onMouseDown(int mx, int my, Uint16 mod, int clicks) override;
   bool onMouseUp(int mx, int my, Uint16 mod, int clicks) override;
   bool onKeyDown(SDL_Keycode key, Uint16 mod) override;
+  bool onTextInput(const char *text) override;
   bool onMouseWheel(int scrollY) override;
 
 private:
@@ -35,12 +36,16 @@ private:
   bool showGrid_;
   bool showBeacons_;
   bool showBorders_;
+  bool centerMapOnDe_;
   std::string gridType_;
   PropOverlayType propOverlay_;
   WeatherOverlayType weatherOverlay_;
   std::string propBand_;
   std::string propMode_;
   int propPower_;
+  float propToa_;
+  int propPath_;
+  TextInput propToaInput_;
 
   // Combo options
   std::vector<std::string> projOpts_ = {"Equirectangular", "Robinson",
@@ -50,7 +55,7 @@ private:
                                        "Topo + Bathy"};
   std::vector<std::string> gridOpts_ = {"Off", "Lat/Lon", "Maidenhead"};
   std::vector<std::string> overlayOpts_ = {"None", "MUF", "VOACAP",
-                                           "Reliability", "TOA", "Heatmap",
+                                           "Reliability", "Heatmap",
                                            "DRAP", "Aurora"};
   std::vector<std::string> weatherOpts_ = {"None", "WX/Pressure",
                                            "Clouds (GFS)"};
@@ -63,8 +68,10 @@ private:
   // Rects for dropdown HEADERS
   SDL_Rect projRec_, styleRec_;
   SDL_Rect gridRec_, overlayRec_, weatherRec_;
-  SDL_Rect beaconsRec_, bordersRec_;
+  SDL_Rect beaconsRec_, bordersRec_, centerDeCheckRect_;
   SDL_Rect bandRec_, modeRec_, powerRec_; // VOACAP row
+  SDL_Rect toaRec_, toaUpRec_, toaDnRec_; // TOA spinner
+  SDL_Rect spRec_, lpRec_;                // Path toggles
 
   enum {
     COMBO_PROJ,
@@ -79,7 +86,7 @@ private:
   // Dropdown State
   int openCombo_ = -1;
   int listScroll_ = 0;
-  const int maxVisibleItems_ = 6;
+  const int maxVisibleItems_ = 4;
 
   void drawDropdown(SDL_Renderer *renderer, const SDL_Rect &rect,
                     const std::string &currentVal, bool isOpen);
@@ -94,10 +101,16 @@ private:
   // SDL_Rect gridOffRect_, gridLatLonRect_, gridMaidenheadRect_; // REMOVED
   // SDL_Rect propNoneRect_, propMufRect_, propVoacapRect_; // REMOVED
   // SDL_Rect pb80_, pb40_, pb20_, pb15_, pb10_; // REMOVED
-  SDL_Rect applyRect_, cancelRect_;
-  int projHeaderY_ = 0, styleHeaderY_ = 0, gridHeaderY_ = 0, mufRtHeaderY_ = 0, weatherHeaderY_ = 0;
+  SDL_Rect applyRect_, cancelRect_, centerDeRect_;
+  int projHeaderY_ = 0, styleHeaderY_ = 0, gridHeaderY_ = 0, mufRtHeaderY_ = 0,
+      weatherHeaderY_ = 0, voacapHeaderY_ = 0;
 
   void renderRadioButton(SDL_Renderer *renderer, const SDL_Rect &rect,
                          bool selected, const std::string &label,
                          const SDL_Color &textColor);
+
+  // Auto-repeat for TOA arrows
+  int repeatDir_ = 0; // -1, 0, 1
+  uint32_t repeatStartMs_ = 0;
+  uint32_t repeatLastMs_ = 0;
 };

@@ -268,6 +268,13 @@ void WebServer::registerRoutes(httplib::Server &svr) {
             j["y"] = r.y;
             j["w"] = r.w;
             j["h"] = r.h;
+            float scale = (logW > 0 && logH > 0)
+                              ? std::min((float)outW / logW, (float)outH / logH)
+                              : 1.0f;
+            j["px"] = (int)(r.x * scale);
+            j["py"] = (int)(r.y * scale);
+            j["pw"] = (int)(r.w * scale);
+            j["ph"] = (int)(r.h * scale);
             j["renderer_w"] = outW;
             j["renderer_h"] = outH;
             j["logical_w"] = logW;
@@ -319,6 +326,13 @@ void WebServer::registerRoutes(httplib::Server &svr) {
             j["y"] = r.y;
             j["w"] = r.w;
             j["h"] = r.h;
+            float scale = (logW > 0 && logH > 0)
+                              ? std::min((float)outW / logW, (float)outH / logH)
+                              : 1.0f;
+            j["px"] = (int)(r.x * scale);
+            j["py"] = (int)(r.y * scale);
+            j["pw"] = (int)(r.w * scale);
+            j["ph"] = (int)(r.h * scale);
             j["renderer_w"] = outW;
             j["renderer_h"] = outH;
             j["logical_w"] = logW;
@@ -461,6 +475,7 @@ void WebServer::registerRoutes(httplib::Server &svr) {
     j["liveSpotsOfDe"] = cfg_->liveSpotsOfDe;
     j["liveSpotsUseCall"] = cfg_->liveSpotsUseCall;
     j["gpsEnabled"] = cfg_->gpsEnabled;
+    j["centerMapOnDe"] = cfg_->centerMapOnDe;
     j["rssEnabled"] = cfg_->rssEnabled;
     j["brightness"] = cfg_->brightness;
     j["brightnessSchedule"] = cfg_->brightnessSchedule;
@@ -498,7 +513,7 @@ void WebServer::registerRoutes(httplib::Server &svr) {
     addPane(cfg_->pane6Rotation);
     j["panes"] = panes;
     j["panelMode"] = cfg_->panelMode;
-    j["selectedSatellite"] = cfg_->selectedSatellite;
+    j["sat_widget_satellite"] = cfg_->satWidgetSatellite;
     j["displayPowerMethod"] = cfg_->displayPowerMethod;
     if (displayPower_) {
       nlohmann::json dpm = nlohmann::json::array();
@@ -507,6 +522,12 @@ void WebServer::registerRoutes(httplib::Server &svr) {
       }
       j["displayPowerMethods"] = dpm;
     }
+    j["propBand"] = cfg_->propBand;
+    j["propMode"] = cfg_->propMode;
+    j["propPower"] = cfg_->propPower;
+    j["propToa"] = cfg_->propToa;
+    j["propPath"] = cfg_->propPath;
+    j["selectedSatellite"] = cfg_->selectedSatellite;
 
     res.set_content(j.dump(2), "application/json");
   });
@@ -517,6 +538,43 @@ void WebServer::registerRoutes(httplib::Server &svr) {
           [](const httplib::Request &, httplib::Response &res) {
             res.set_redirect("/api/config", 302);
           });
+
+  svr.Get("/set_dx", [this](const httplib::Request &req, httplib::Response &res) {
+    if (!state_) {
+      res.status = 503;
+      return;
+    }
+    std::lock_guard<std::mutex> lk(state_->locationMutex);
+    
+    bool changed = false;
+    if (req.has_param("lat") && req.has_param("lon")) {
+      state_->dxLocation.lat = StringUtils::safe_stod(req.get_param_value("lat"));
+      state_->dxLocation.lon = StringUtils::safe_stod(req.get_param_value("lon"));
+      state_->dxGrid = Astronomy::latLonToGrid(state_->dxLocation.lat, state_->dxLocation.lon);
+      state_->dxActive = true;
+      changed = true;
+    } else if (req.has_param("grid")) {
+      state_->dxGrid = req.get_param_value("grid");
+      Astronomy::gridToLatLon(state_->dxGrid, state_->dxLocation.lat, state_->dxLocation.lon);
+      state_->dxActive = true;
+      changed = true;
+    }
+    
+    if (req.has_param("call")) {
+       state_->dxCallsign = req.get_param_value("call");
+       state_->dxActive = true;
+       changed = true;
+    }
+    
+    if (changed) {
+      // Map needs redraw to show the new spot
+      if (mapReloadFlag_) mapReloadFlag_->store(true);
+      res.set_content("ok", "text/plain");
+    } else {
+      res.status = 400;
+      res.set_content("missing params: lat,lon or grid", "text/plain");
+    }
+  });
 
   svr.Get("/set_config", [this](const httplib::Request &req,
                                 httplib::Response &res) {
@@ -543,6 +601,8 @@ void WebServer::registerRoutes(httplib::Server &svr) {
       cfg_->showSatTrack = req.get_param_value("show_sattrack") == "1";
     if (req.has_param("night_lights"))
       cfg_->mapNightLights = req.get_param_value("night_lights") == "1";
+    if (req.has_param("center_map_on_de"))
+      cfg_->centerMapOnDe = req.get_param_value("center_map_on_de") == "1";
     if (req.has_param("use_metric"))
       cfg_->useMetric = req.get_param_value("use_metric") == "1";
     if (req.has_param("grid_type"))
@@ -668,17 +728,15 @@ void WebServer::registerRoutes(httplib::Server &svr) {
     }
 
     auto parsePane = [&](const std::string &val, std::vector<std::string> &rot) {
+      rot.clear();
       if (val.empty())
         return;
-      rot.clear();
       std::stringstream ss(val);
       std::string id;
       while (std::getline(ss, id, ',')) {
         if (!id.empty())
           rot.push_back(id);
       }
-      if (rot.empty())
-        rot.push_back("solar");
     };
     if (req.has_param("pane0"))
       parsePane(req.get_param_value("pane0"), cfg_->pane1Rotation);
@@ -706,6 +764,20 @@ void WebServer::registerRoutes(httplib::Server &svr) {
       cfg_->panelMode = req.get_param_value("panel_mode");
     if (req.has_param("selected_satellite"))
       cfg_->selectedSatellite = req.get_param_value("selected_satellite");
+    if (req.has_param("sat_widget_satellite")) {
+      cfg_->satWidgetSatellite = req.get_param_value("sat_widget_satellite");
+    }
+
+    if (req.has_param("prop_band"))
+      cfg_->propBand = req.get_param_value("prop_band");
+    if (req.has_param("prop_mode"))
+      cfg_->propMode = req.get_param_value("prop_mode");
+    if (req.has_param("prop_power"))
+      cfg_->propPower = StringUtils::safe_stoi(req.get_param_value("prop_power"));
+    if (req.has_param("prop_toa"))
+      cfg_->propToa = (float)std::round(StringUtils::safe_stod(req.get_param_value("prop_toa")));
+    if (req.has_param("prop_path"))
+      cfg_->propPath = StringUtils::safe_stoi(req.get_param_value("prop_path"));
     if (req.has_param("display_power_method"))
       cfg_->displayPowerMethod = req.get_param_value("display_power_method");
     if (req.has_param("lat"))
@@ -1505,6 +1577,61 @@ void WebServer::registerRoutes(httplib::Server &svr) {
             res.set_content(oss.str(), "text/plain");
           });
 
+  svr.Get("/api/sys/ready", [this](const httplib::Request &,
+                                  httplib::Response &res) {
+    std::lock_guard<std::mutex> lk(dataMutex_);
+    if (!panes_ || panes_->empty()) {
+      res.status = 503;
+      res.set_content("waiting_for_panes", "text/plain");
+      return;
+    }
+    if (solar_ && !solar_->get().valid) {
+      res.status = 503;
+      res.set_content("waiting_for_solar", "text/plain");
+      return;
+    }
+    if (weatherStore_ && !weatherStore_->get().valid) {
+      res.status = 503;
+      res.set_content("waiting_for_weather", "text/plain");
+      return;
+    }
+    res.set_content("ready", "text/plain");
+  });
+
+  svr.Get("/api/debug/set_mock_data", [this](const httplib::Request &req,
+                                             httplib::Response &res) {
+    std::lock_guard<std::mutex> lk(dataMutex_);
+    if (solar_) {
+      auto d = solar_->get();
+      bool changed = false;
+      if (req.has_param("sfi")) {
+        d.sfi = StringUtils::safe_stoi(req.get_param_value("sfi"));
+        changed = true;
+      }
+      if (req.has_param("ssn")) {
+        d.sunspot_number = StringUtils::safe_stoi(req.get_param_value("ssn"));
+        changed = true;
+      }
+      if (req.has_param("kp")) {
+        d.k_index = (float)StringUtils::safe_stod(req.get_param_value("kp"));
+        changed = true;
+      }
+      if (changed) {
+        d.valid = true;
+        solar_->set(d);
+      }
+    }
+    if (weatherStore_) {
+      auto d = weatherStore_->get();
+      if (req.has_param("temp")) {
+        d.temp = (float)StringUtils::safe_stod(req.get_param_value("temp"));
+        d.valid = true;
+        weatherStore_->update(d);
+      }
+    }
+    res.set_content("ok", "text/plain");
+  });
+
   svr.Get("/get_sys.txt",
           [this](const httplib::Request &, httplib::Response &res) {
             std::ostringstream oss;
@@ -2146,8 +2273,14 @@ void WebServer::registerRoutes(httplib::Server &svr) {
               return;
             }
             std::string name = req.get_param_value("name");
-            satMgr_->trackSatellite((name == "none") ? "" : name);
-            cfg_->selectedSatellite = satMgr_->getTrackedSatellite();
+            bool wasTracking = !satMgr_->getTrackedSatellite().empty();
+            if (name == "none") {
+              satMgr_->trackSatellite("");
+            } else if (wasTracking) {
+              satMgr_->trackSatellite(name);
+            }
+            cfg_->selectedSatellite = (name == "none") ? "" : name;
+            cfg_->satWidgetSatellite = cfg_->selectedSatellite;
             if (cfgMgr_)
               cfgMgr_->save(*cfg_);
             res.set_content("ok", "text/plain");
@@ -2275,14 +2408,24 @@ void WebServer::registerRoutes(httplib::Server &svr) {
         res.set_content("ok", "text/plain");
       });
 
+
   svr.Get("/get_capabilities", [](const httplib::Request &,
                                   httplib::Response &res) {
     nlohmann::json j;
 
     nlohmann::json wArr = nlohmann::json::array();
-    for (auto *d : WidgetRegistry::instance().getAll(false))
+    nlohmann::json wMeta = nlohmann::json::array();
+    for (auto *d : WidgetRegistry::instance().getAll(false)) {
       wArr.push_back(d->typeId);
+      wMeta.push_back({
+          {"id", d->typeId},
+          {"displayName", d->displayName},
+          {"scrollable", d->isScrollable},
+          {"requiresKey", d->requiresConfigKey},
+      });
+    }
     j["widgets"] = wArr;
+    j["widget_meta"] = wMeta;
 
     j["projections"] =
         nlohmann::json::array({"equirectangular", "robinson", "azimuthal",
@@ -2578,9 +2721,17 @@ void WebServer::registerRoutes(httplib::Server &svr) {
           });
 
   svr.Get("/debug/keypress",
-          [](const httplib::Request &req, httplib::Response &res) {
+          [this](const httplib::Request &req, httplib::Response &res) {
+            if (!liveWebEnabled_) {
+              res.status = 403;
+              return;
+            }
             std::string key = req.get_param_value("key");
             SDL_Scancode sc = SDL_GetScancodeFromName(key.c_str());
+            if (sc == SDL_SCANCODE_UNKNOWN && key.length() == 1) {
+              // Fallback for single characters if name doesn't match
+              sc = SDL_GetScancodeFromKey(key[0]);
+            }
             SDL_Event down{}, up{};
             down.type = SDL_KEYDOWN;
             down.key.keysym.scancode = sc;

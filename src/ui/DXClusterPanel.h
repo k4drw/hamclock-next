@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../core/ADIFData.h"
 #include "../core/DXClusterData.h"
 #include "ListPanel.h"
 #include <SDL.h>
@@ -9,6 +10,7 @@
 
 // Forward declarations
 class RigService;
+class WatchlistStore;
 struct AppConfig;
 
 class DXClusterPanel : public ListPanel {
@@ -16,7 +18,9 @@ public:
   DXClusterPanel(int x, int y, int w, int h, FontManager &fontMgr,
                  std::shared_ptr<DXClusterDataStore> store,
                  RigService *rigService = nullptr,
-                 const AppConfig *config = nullptr);
+                 const AppConfig *config = nullptr,
+                 std::shared_ptr<ADIFStore> adifStore = nullptr,
+                 std::shared_ptr<WatchlistStore> watchlist = nullptr);
   ~DXClusterPanel() override;
 
   void update() override;
@@ -53,10 +57,14 @@ private:
   SDL_Color getRowColor(int index,
                         const SDL_Color &defaultColor) const override;
 
+  void renderBandLegend(SDL_Renderer *renderer, int &curY, int maxY);
+
   std::function<void(const DXClusterSpot &)> onSpotActivated_;
   std::function<void()> onSpotDeactivated_;
 
   std::shared_ptr<DXClusterDataStore> store_;
+  std::shared_ptr<ADIFStore> adifStore_;
+  std::shared_ptr<WatchlistStore> watchlist_;
   RigService *rigService_;
   const AppConfig *config_;
   std::chrono::system_clock::time_point lastUpdate_{};
@@ -70,6 +78,7 @@ private:
     std::string call;
     double freq;
     std::chrono::system_clock::time_point time;
+    int txDxcc = -1;  // DXCC entity number for badge lookup
   };
   std::vector<SpotDisplay> allSpots_;
   std::vector<SpotDisplay> visibleSpots_;
@@ -77,11 +86,17 @@ private:
   struct CachedSpot {
     SDL_Texture *freqTex = nullptr;
     int freqW = 0, freqH = 0;
+    SDL_Texture *modeTex = nullptr;
+    int modeW = 0, modeH = 0;
+    SDL_Texture *badgeTex = nullptr;  // DXCC needed badge (N / B)
+    int badgeW = 0, badgeH = 0;
     SDL_Texture *callTex = nullptr;
     int callW = 0, callH = 0;
     SDL_Texture *ageTex = nullptr;
     int ageW = 0, ageH = 0;
     std::string lastAge;
+    std::string lastMode;
+    std::string lastBadge;
     double lastFreq = -1.0;
     std::string lastCall;
   };
@@ -93,4 +108,5 @@ private:
 
   int contentY_ = 0;  // Y where spot rows begin — set in render(), used in onMouseUp()
   int rowH_ = 14;     // Row height matching render — set in render(), used in onMouseUp()
+  int legendH_ = 0;
 };

@@ -17,8 +17,15 @@ public:
   void fetch(const std::string &tideStation, const std::string &buoyStation,
              bool force = false);
 
+  // Search for the closest NOAA tide station and NDBC buoy to the given lat/lon.
+  // Results are delivered via AE_MARINE_LOOKUP_READY event.
+  void lookupClosestStations(double lat, double lon);
+
 private:
+
   void fetchBuoy(const std::string &buoyStation, bool force);
+  void fetchStationName(const std::string &tideStation);
+
 
   NetworkManager &net_;
   std::shared_ptr<MarineStore> store_;

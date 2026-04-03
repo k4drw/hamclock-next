@@ -82,8 +82,7 @@ Select the active overlay and configure band/mode/power from the Configuration s
 
 ![MUF propagation overlay](images/map_looks/robinson_muf_dark.png)
 
-![VOACAP overlay](images/map_looks/robinson_clouds_dark.png)
-<!-- TODO: screenshot needed -->
+![VOACAP overlay](images/map_looks/robinson_voacap_dark.png)
 
 ### Propagation Settings
 

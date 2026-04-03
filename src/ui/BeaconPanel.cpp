@@ -3,6 +3,7 @@
 #include "../core/BeaconData.h"
 #include "../core/Logger.h"
 #include "../core/MemoryMonitor.h"
+#include "../core/LiveSpotData.h"
 #include "../core/Theme.h"
 #include "FontCatalog.h"
 #include "RenderUtils.h"
@@ -84,14 +85,7 @@ void BeaconPanel::render(SDL_Renderer *renderer) {
 
     // (Old layout-specific title was here, now replaced by standard one above)
 
-    // Band colors (standardized with theme tokens)
-    SDL_Color bandColors[] = {
-        themes.warning, // 20m: Yellow/Warning
-        themes.success, // 17m: Green/Success
-        themes.info,    // 15m: Cyan/Info
-        themes.info,    // 12m: Info
-        themes.accent,  // 10m: Accent
-    };
+    // Use kBands colors (5-9 map to 20m, 17m, 15m, 12m, 10m)
     const char *freqs[] = {"14.10", "18.11", "21.15", "24.93", "28.20"};
 
     int availableH = (height_ - curY - 6);
@@ -104,7 +98,7 @@ void BeaconPanel::render(SDL_Renderer *renderer) {
       int triSize = 6; // Fixed small size like original
 
       // Draw indicator (Triangle)
-      SDL_Color c = bandColors[i];
+      SDL_Color c = kBands[i + 5].color;
       RenderUtils::drawTriangle(
           renderer, (float)iconX - triSize, (float)iconY + triSize * 0.5f,
           (float)iconX + triSize, (float)iconY + triSize * 0.5f, (float)iconX,
@@ -112,11 +106,12 @@ void BeaconPanel::render(SDL_Renderer *renderer) {
 
       // Frequency - Use cached texture
       char freqKey[64];
+      const SDL_Color &c_freq = kBands[i + 5].color;
       snprintf(freqKey, sizeof(freqKey), "%s_%d_%d_%d_%d_0", freqs[i],
-               bandColors[i].r, bandColors[i].g, bandColors[i].b,
+               c_freq.r, c_freq.g, c_freq.b,
                callfontSize_);
       auto &freqCache = getCachedText(renderer, freqKey, freqs[i],
-                                      bandColors[i], callfontSize_, false);
+                                      kBands[i + 5].color, callfontSize_, false);
       if (freqCache.texture) {
         SDL_Rect freqDst = {x_ + 20, ry + rowH / 2 - freqCache.h / 2,
                             freqCache.w, freqCache.h};
@@ -182,7 +177,8 @@ void BeaconPanel::render(SDL_Renderer *renderer) {
       if (a.index == i) {
         int cellX = x_ + pad + callWidth + a.bandIndex * bandWidth;
         SDL_Rect cell = {cellX + 2, rowY, bandWidth - 4, rowHeight - 1};
-        SDL_SetRenderDrawColor(renderer, themes.success.r, themes.success.g, themes.success.b, themes.success.a);
+        SDL_Color bc = kBands[a.bandIndex + 5].color;
+        SDL_SetRenderDrawColor(renderer, bc.r, bc.g, bc.b, bc.a);
         SDL_RenderFillRect(renderer, &cell);
       }
     }

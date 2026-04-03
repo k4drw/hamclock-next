@@ -263,15 +263,7 @@ bool SetupScreen::onMouseDown(int mx, int my, Uint16 mod, int clicks) {
     if (watchlistAddRect_.w > 0 &&
         mx >= watchlistAddRect_.x && mx < watchlistAddRect_.x + watchlistAddRect_.w &&
         my >= watchlistAddRect_.y && my < watchlistAddRect_.y + watchlistAddRect_.h) {
-      std::string call = watchlistInputField_.getValue();
-      if (!call.empty()) {
-        std::transform(call.begin(), call.end(), call.begin(), ::toupper);
-        if (std::find(watchlistEntries_.begin(), watchlistEntries_.end(), call) ==
-            watchlistEntries_.end()) {
-          watchlistEntries_.push_back(call);
-        }
-        watchlistInputField_.clear();
-      }
+      addWatchlistEntriesFromInput();
       return true;
     }
 
@@ -305,7 +297,7 @@ bool SetupScreen::onMouseDown(int mx, int my, Uint16 mod, int clicks) {
         mx < watchlistScrollDownRect_.x + watchlistScrollDownRect_.w &&
         my >= watchlistScrollDownRect_.y &&
         my < watchlistScrollDownRect_.y + watchlistScrollDownRect_.h) {
-      int maxVisible = 8; // matches renderTabWatchlist
+      int maxVisible = 5; // matches renderTabWatchlist
       if (watchlistScrollOffset_ + maxVisible < (int)watchlistEntries_.size())
         ++watchlistScrollOffset_;
       return true;
@@ -668,15 +660,7 @@ bool SetupScreen::onKeyDown(SDL_Keycode key, Uint16 mod) {
   // Watchlist: Enter adds the entry
   if (activeTab_ == Tab::Watchlist && activeField_ == 0 &&
       (key == SDLK_RETURN || key == SDLK_KP_ENTER)) {
-    std::string call = watchlistInputField_.getValue();
-    if (!call.empty()) {
-      std::transform(call.begin(), call.end(), call.begin(), ::toupper);
-      if (std::find(watchlistEntries_.begin(), watchlistEntries_.end(), call) ==
-          watchlistEntries_.end()) {
-        watchlistEntries_.push_back(call);
-      }
-      watchlistInputField_.clear();
-    }
+    addWatchlistEntriesFromInput();
     return true;
   }
 
@@ -757,9 +741,11 @@ bool SetupScreen::onKeyDown(SDL_Keycode key, Uint16 mod) {
     return true;
   default: {
     TextInput *ti = getActiveInput();
-    if (ti)
-      ti->onKeyDown(key, mod);
-    return true;
+    if (ti) {
+      if (ti->onKeyDown(key, mod))
+        return true;
+    }
+    return false;
   }
   }
 }
@@ -796,14 +782,14 @@ bool SetupScreen::onTextInput(const char *inputText) {
   }
 
   if (activeTab_ == Tab::Watchlist && activeField_ == 0) {
-    // Callsign: alphanumeric + slash only, auto-uppercase, max 12 chars
+    // Callsign/List: alphanumeric, slash, comma, space, max 256 chars
     for (const char *p = inputText; *p; ++p) {
       if (!((*p >= 'A' && *p <= 'Z') || (*p >= 'a' && *p <= 'z') ||
-            (*p >= '0' && *p <= '9') || *p == '/')) {
+            (*p >= '0' && *p <= '9') || *p == '/' || *p == ',' || *p == ' ')) {
         return true;
       }
     }
-    if ((int)watchlistInputField_.getValue().size() < 12) {
+    if ((int)watchlistInputField_.getValue().size() < 256) {
       std::string upper = inputText;
       std::transform(upper.begin(), upper.end(), upper.begin(), ::toupper);
       watchlistInputField_.onTextInput(upper.c_str());
@@ -825,7 +811,7 @@ bool SetupScreen::onTextInput(const char *inputText) {
     }
     for (const char *p = inputText; *p; ++p) {
       if (!((*p >= 'A' && *p <= 'Z') || (*p >= 'a' && *p <= 'z') ||
-            (*p >= '0' && *p <= '9') || *p == '/')) {
+            (*p >= '0' && *p <= '9') || *p == '/' || *p == ',' || *p == ' ')) {
         return true;
       }
     }

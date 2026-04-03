@@ -89,11 +89,14 @@ void NOAAProvider::fetch() {
   fetchXRay();
   fetchProtonFlux();
   fetchNOAAScales();
+  if (sfiHistoryStore_)
+    fetchSFIHistory();
 }
 
 void NOAAProvider::fetchKIndex() {
   auto state = state_;
-  net_.fetchAsync(K_INDEX_URL, [state](std::string body) {
+  auto kIndexHistoryStore = kIndexHistoryStore_;
+  net_.fetchAsync(K_INDEX_URL, [state, kIndexHistoryStore](std::string body) {
     if (body.empty()) {
       if (state) {
         std::lock_guard<std::mutex> lk(state->servicesMutex);
@@ -104,25 +107,27 @@ void NOAAProvider::fetchKIndex() {
       return;
     }
 
-    WorkerService::getInstance().submitTask([body, state]() {
+    WorkerService::getInstance().submitTask([body, state, kIndexHistoryStore]() {
       auto j = nlohmann::json::parse(body, nullptr, false);
-      if (j.is_discarded() || !j.is_array() || j.size() < 2) {
-        // We can't easily update state->services from here if it's not
-        // thread-safe. But HamClockState has a mutex for its services map.
+      if (j.is_discarded() || !j.is_array() || j.empty())
         return;
-      }
 
       const auto &row = j.back();
-      if (!row.is_array() || row.size() < 3)
+      // NOAA format: [{"time_tag":"...","Kp":2.67,"a_running":12,...}]
+      if (!row.is_object() || !row.contains("Kp") || !row["Kp"].is_number())
         return;
 
       auto *update = new SolarData();
-      double kp = StringUtils::safe_stod(row[1].get<std::string>());
+      double kp = row["Kp"].get<double>();
       update->k_index = static_cast<float>(kp);
-      update->a_index = StringUtils::safe_stoi(row[2].get<std::string>());
+      update->a_index = (row.contains("a_running") && row["a_running"].is_number())
+                        ? row["a_running"].get<int>() : 0;
       update->noaa_g_scale = calculateGScale(update->k_index);
       update->last_updated = std::chrono::system_clock::now();
       update->valid = true;
+
+      if (kIndexHistoryStore)
+        kIndexHistoryStore->push(update->k_index);
 
       SDL_Event event;
       SDL_zero(event);
@@ -145,19 +150,25 @@ void NOAAProvider::fetchKIndex() {
 
 void NOAAProvider::fetchSFI() {
   net_.fetchAsync(SFI_URL, [](std::string body) {
-    if (body.empty())
+    if (body.empty()) {
+      LOG_W("NOAAProvider", "SFI fetch returned empty body");
       return;
+    }
 
     WorkerService::getInstance().submitTask([body]() {
       auto j = nlohmann::json::parse(body, nullptr, false);
-      if (j.is_discarded() || !j.is_array())
+      if (j.is_discarded()) {
+        LOG_W("NOAAProvider", "SFI JSON parse failed");
         return;
+      }
 
       double flux = 0;
-      if (j.is_object() && j.contains("Flux")) {
-        flux = StringUtils::safe_stod(j["Flux"].get<std::string>());
-      } else if (j.is_array() && j.size() >= 2 && j.back().is_array()) {
-        flux = StringUtils::safe_stod(j.back()[1].get<std::string>());
+      // NOAA 10cm-flux.json: [{"flux": 152, "time_tag": "..."}]
+      if (j.is_array() && !j.empty() && j.back().is_object() &&
+          j.back().contains("flux") && j.back()["flux"].is_number()) {
+        flux = j.back()["flux"].get<double>();
+      } else {
+        LOG_W("NOAAProvider", "SFI JSON unexpected format");
       }
 
       if (flux > 0) {
@@ -171,6 +182,43 @@ void NOAAProvider::fetchSFI() {
         event.user.code = static_cast<int>(UpdateType::SFI);
         event.user.data1 = update;
         SDL_PushEvent(&event);
+        LOG_I("NOAAProvider", "Offloaded SFI update: SFI={}", update->sfi);
+      } else {
+        LOG_W("NOAAProvider", "SFI value was zero or missing");
+      }
+    });
+  });
+}
+
+void NOAAProvider::fetchSFIHistory() {
+  auto sfiHistoryStore = sfiHistoryStore_;
+  net_.fetchAsync(SFI_30D_URL, [sfiHistoryStore](std::string body) {
+    if (body.empty() || !sfiHistoryStore)
+      return;
+
+    WorkerService::getInstance().submitTask([body, sfiHistoryStore]() {
+      auto j = nlohmann::json::parse(body, nullptr, false);
+      if (j.is_discarded() || !j.is_array() || j.empty())
+        return;
+
+      // Format: [{"flux":148,"time_tag":"2026-03-01T12:00:00"},...]
+      std::vector<SFIPoint> pts;
+      pts.reserve(j.size());
+      for (const auto &item : j) {
+        if (!item.is_object() || !item.contains("flux") || !item["flux"].is_number())
+          continue;
+        SFIPoint p;
+        p.flux = item["flux"].get<int>();
+        if (item.contains("time_tag") && item["time_tag"].is_string()) {
+          std::string tag = item["time_tag"].get<std::string>();
+          // Keep only YYYY-MM-DD portion
+          p.date = tag.size() >= 10 ? tag.substr(0, 10) : tag;
+        }
+        pts.push_back(p);
+      }
+      if (!pts.empty()) {
+        sfiHistoryStore->setPoints(std::move(pts));
+        LOG_I("NOAAProvider", "SFI 30-day history: {} points", sfiHistoryStore->getPoints().size());
       }
     });
   });
@@ -206,6 +254,16 @@ void NOAAProvider::fetchSN() {
               ssn = item["predicted_ssn"].get<double>();
               break;
             }
+          }
+        }
+
+        // Fallback to most recent if current month not found
+        if (ssn < 0 && !j.empty()) {
+          const auto &last = j.back();
+          if (last.contains("predicted_ssn")) {
+            ssn = last["predicted_ssn"].get<double>();
+            if (last.contains("time-tag"))
+              current_month = last["time-tag"].get<std::string>();
           }
         }
 
@@ -305,8 +363,12 @@ void NOAAProvider::fetchDST() {
         return;
 
       try {
+        // NOAA format: [{"time_tag":"...","dst":-21}]
+        const auto &row = j.back();
+        if (!row.is_object() || !row.contains("dst") || !row["dst"].is_number())
+          return;
         auto *update = new SolarData();
-        update->dst = StringUtils::safe_stoi(j.back()[1].get<std::string>());
+        update->dst = row["dst"].get<int>();
         update->valid = true;
 
         SDL_Event event;
@@ -411,7 +473,9 @@ struct SolarWindBackfill {
 // the nearest minute.  Returns -1 on failure.
 static int64_t parseNoaaMinute(const std::string &ts) {
   int y = 0, mo = 0, d = 0, h = 0, mi = 0, s = 0;
-  if (sscanf(ts.c_str(), "%d-%d-%d %d:%d:%d", &y, &mo, &d, &h, &mi, &s) != 6)
+  // Handle "YYYY-MM-DD HH:MM:SS" and "YYYY-MM-DDTHH:MM:SS"
+  if (sscanf(ts.c_str(), "%d-%d-%d %d:%d:%d", &y, &mo, &d, &h, &mi, &s) != 6 &&
+      sscanf(ts.c_str(), "%d-%d-%dT%d:%d:%d", &y, &mo, &d, &h, &mi, &s) != 6)
     return -1;
   std::tm tm{};
   tm.tm_year = y - 1900;

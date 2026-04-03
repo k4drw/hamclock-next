@@ -6,12 +6,14 @@
 #include <algorithm>
 #include <cctype>
 #include <fstream>
+#include <SDL.h>
 
 ADIFProvider::ADIFProvider(std::shared_ptr<ADIFStore> store,
                            PrefixManager &prefixMgr)
     : store_(std::move(store)), prefixMgr_(prefixMgr) {}
 
 void ADIFProvider::fetch(const std::filesystem::path &path) {
+  lastFetchMs_ = SDL_GetTicks();
   if (std::filesystem::exists(path)) {
     processFile(path);
   }
@@ -230,6 +232,13 @@ void ADIFProvider::processFile(const std::filesystem::path &path) {
         // Count by band
         if (!useBand.empty()) {
           stats.bandCounts[useBand]++;
+        }
+
+        // Track worked DXCC entities per band for cluster spot marking
+        if (!useBand.empty()) {
+          int entityNum = prefixMgr_.findDXCC(call);
+          if (entityNum > 0)
+            stats.workedEntitiesPerBand[entityNum].insert(useBand);
         }
 
         // Maintain latest calls list (most recent first)
