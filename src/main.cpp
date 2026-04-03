@@ -356,6 +356,7 @@ int main(int argc, char *argv[]) {
   } else {
     if (s_logLevel == "warn") applyLogLevel(ctx.appCfg.logLevel); // config overrides default only
     ctx.displayPower->setMethodByName(ctx.appCfg.displayPowerMethod);
+    SoundManager::getInstance().setMuted(ctx.appCfg.audioMuted);
   }
 #endif
 
@@ -591,11 +592,6 @@ int main(int argc, char *argv[]) {
 
   for (const auto &call : ctx.appCfg.watchlist)
     ctx.watchlistStore->add(call);
-  if (ctx.watchlistStore->getAll().empty()) {
-    ctx.watchlistStore->add("K1ABC");
-    ctx.watchlistStore->add("W1AW");
-    ctx.appCfg.watchlist = {"K1ABC", "W1AW"};
-  }
 
 #ifndef __EMSCRIPTEN__
   ctx.frameCapture = std::make_unique<FrameCapture>();
@@ -1010,6 +1006,13 @@ void main_tick() {
       ctx.netManager->setHubConfig(ctx.appCfg.hubMode, ctx.appCfg.hubIp,
                                    ctx.appCfg.hubPort);
       ctx.displayPower->setMethodByName(ctx.appCfg.displayPowerMethod);
+      SoundManager::getInstance().setMuted(ctx.appCfg.audioMuted);
+
+      // Reload WatchlistStore from the updated config
+      ctx.watchlistStore->clear();
+      for (const auto &call : ctx.appCfg.watchlist) {
+        ctx.watchlistStore->add(call);
+      }
 
       LOG_I("Main", "Config reloaded from remote API: callsign={}",
             ctx.appCfg.callsign);
