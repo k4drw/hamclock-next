@@ -178,10 +178,10 @@ void VoacapDeDxPanel::render(SDL_Renderer *renderer) {
   // X axis: 24 hours
   // Y axis: 8 bands (0=80m at bottom, 7=10m at top)
 
-  int pLeft = 36;
+  int pLeft = 48;
   int pRight = 16;
   int pTop = titleH + 5;
-  int pBot = 40;  // for timeline and legend
+  int pBot = 42;  // for timeline and legend
 
   int pWidth = width_ - pLeft - pRight;
   int pHeight = height_ - pTop - pBot;
@@ -202,14 +202,15 @@ void VoacapDeDxPanel::render(SDL_Renderer *renderer) {
   for (int hourOffset = 0; hourOffset < 24; ++hourOffset) {
     int h = (utcHour + hourOffset) % 24;
     int px = x_ + pLeft + static_cast<int>(hourOffset * cellW);
+    int nextPx = x_ + pLeft + static_cast<int>((hourOffset + 1) * cellW);
 
     for (int b = 0; b < 8; ++b) {
       int py = y_ + pTop + static_cast<int>((7 - b) * cellH);
+      int nextPy = y_ + pTop + static_cast<int>((7 - b + 1) * cellH);
 
       SDL_Color c = reliabilityColor(relMatrix_[h][b]);
 
-      SDL_Rect rect = {px, py, static_cast<int>(cellW + 1),
-                       static_cast<int>(cellH + 1)};
+      SDL_Rect rect = {px, py, nextPx - px, nextPy - py};
       SDL_SetRenderDrawColor(renderer, c.r, c.g, c.b, c.a);
       SDL_RenderFillRect(renderer, &rect);
     }
@@ -217,42 +218,42 @@ void VoacapDeDxPanel::render(SDL_Renderer *renderer) {
 
   // Y-axis labels (Bands)
   for (int b = 0; b < 8; ++b) {
-    int py = y_ + pTop + static_cast<int>((7 - b) * cellH) +
-             static_cast<int>(cellH / 2);
+    int py = y_ + pTop + static_cast<int>((7 - b + 0.5f) * cellH);
     cat->drawText(renderer, BANDS_STR[b], x_ + (pLeft / 2), py, themes.textDim,
-                  FontStyle::Tiny, true, true);
+                  FontStyle::Tiny, false, true, true);
   }
 
   // X-axis labels (Timeline)
   // Draw current UTC at offset 0
   int timelineY = y_ + pTop + pHeight + 8;
   cat->drawText(renderer, "UTC", x_ + (pLeft / 2), timelineY, themes.textDim,
-                FontStyle::Tiny, true, true);
+                FontStyle::Tiny, false, true, true);
 
   for (int hourOffset = 0; hourOffset < 24; hourOffset += 4) {
     int h = (utcHour + hourOffset) % 24;
-    int px = x_ + pLeft + static_cast<int>(hourOffset * cellW);
+    int px_center = x_ + pLeft + static_cast<int>((hourOffset + 0.5f) * cellW);
     std::string hStr = std::to_string(h);
-    cat->drawText(renderer, hStr, px + static_cast<int>(cellW / 2), timelineY,
-                  themes.textDim, FontStyle::Tiny, true, true);
+    cat->drawText(renderer, hStr, px_center, timelineY,
+                  themes.textDim, FontStyle::Tiny, false, true, true);
   }
 
   // Legend
   int legendY = y_ + pTop + pHeight + 23;
-  int legendItemW = pWidth / 4;
+  float legendItemW = static_cast<float>(pWidth) / 4.0f;
   const float relVals[4] = {0.0f, 20.0f, 50.0f, 80.0f};
   const char *legendText[4] = {"<10", "10-33", "33-66", ">66"};
 
   for (int i = 0; i < 4; i++) {
     SDL_Color c = reliabilityColor(relVals[i]);
 
-    int lx = x_ + pLeft + i * legendItemW;
-    SDL_Rect boxRect = {lx, legendY - 4, 8, 8};
+    int lx = x_ + pLeft + static_cast<int>(i * legendItemW);
+    
+    SDL_Rect boxRect = {lx - 4, legendY - 8, 8, 8};
     SDL_SetRenderDrawColor(renderer, c.r, c.g, c.b, c.a);
     SDL_RenderFillRect(renderer, &boxRect);
 
-    cat->drawText(renderer, legendText[i], lx + 4, legendY + 6, themes.textDim,
-                  FontStyle::Tiny, true, true);
+    cat->drawText(renderer, legendText[i], lx + 12, legendY + 6, themes.textDim,
+                  FontStyle::Tiny, false, false, true); // not horizontally centered
   }
 
   // Grid lines mapping

@@ -10,12 +10,13 @@ void SetupScreen::renderTabWatchlist(SDL_Renderer *renderer, int /*cx*/,
   int y = modalRect_.y + cat->ptSize(FontStyle::MediumBold) + 2 * pad + fieldH;
   ThemeColors themes = getThemeColors(theme_, colorOverrides_);
 
+  int titleY = y;
   cat->drawText(renderer, "Highlight Callsigns (Watchlist):", fieldX, y, themes.accent,
                 FontStyle::SmallBold);
   y += cat->ptSize(FontStyle::SmallBold) + pad / 2;
 
   // List area: up to 8 visible rows
-  const int maxVisible = 8;
+  const int maxVisible = 5;
   const int rowH = fieldH + 4;
   const int delBtnW = 36;
 
@@ -56,8 +57,13 @@ void SetupScreen::renderTabWatchlist(SDL_Renderer *renderer, int /*cx*/,
   watchlistScrollUpRect_ = {0, 0, 0, 0};
   watchlistScrollDownRect_ = {0, 0, 0, 0};
   if ((int)watchlistEntries_.size() > maxVisible) {
+    int arrowW = 30;
+    int arrowH = fieldH - 4;
+    int arrowY = titleY; // align with "Highlight Callsigns" title
+    
+    // Up arrow
     if (watchlistScrollOffset_ > 0) {
-      SDL_Rect upR = {fieldX, y, 40, fieldH};
+      SDL_Rect upR = {fieldX + fieldW - 2 * arrowW - 10, arrowY, arrowW, arrowH};
       watchlistScrollUpRect_ = upR;
       SDL_SetRenderDrawColor(renderer, themes.rowStripe2.r, themes.rowStripe2.g, themes.rowStripe2.b, 255);
       SDL_RenderFillRect(renderer, &upR);
@@ -66,8 +72,9 @@ void SetupScreen::renderTabWatchlist(SDL_Renderer *renderer, int /*cx*/,
       cat->drawText(renderer, "^", upR.x + upR.w / 2, upR.y + upR.h / 2,
                     themes.text, FontStyle::Fast, true, false, true);
     }
+    // Down arrow
     if (watchlistScrollOffset_ + maxVisible < (int)watchlistEntries_.size()) {
-      SDL_Rect downR = {fieldX + 44, y, 40, fieldH};
+      SDL_Rect downR = {fieldX + fieldW - arrowW, arrowY, arrowW, arrowH};
       watchlistScrollDownRect_ = downR;
       SDL_SetRenderDrawColor(renderer, themes.rowStripe2.r, themes.rowStripe2.g, themes.rowStripe2.b, 255);
       SDL_RenderFillRect(renderer, &downR);
@@ -76,7 +83,7 @@ void SetupScreen::renderTabWatchlist(SDL_Renderer *renderer, int /*cx*/,
       cat->drawText(renderer, "v", downR.x + downR.w / 2, downR.y + downR.h / 2,
                     themes.text, FontStyle::Fast, true, false, true);
     }
-    y += rowH;
+    // Note: No y increment here, arrows sit on the title line
   }
 
   y += pad / 2;

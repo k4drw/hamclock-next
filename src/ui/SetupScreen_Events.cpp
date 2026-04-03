@@ -297,7 +297,7 @@ bool SetupScreen::onMouseDown(int mx, int my, Uint16 mod, int clicks) {
         mx < watchlistScrollDownRect_.x + watchlistScrollDownRect_.w &&
         my >= watchlistScrollDownRect_.y &&
         my < watchlistScrollDownRect_.y + watchlistScrollDownRect_.h) {
-      int maxVisible = 8; // matches renderTabWatchlist
+      int maxVisible = 5; // matches renderTabWatchlist
       if (watchlistScrollOffset_ + maxVisible < (int)watchlistEntries_.size())
         ++watchlistScrollOffset_;
       return true;
