@@ -303,8 +303,8 @@ void MapViewMenu::render(SDL_Renderer *renderer) {
                 true, false, true);
 
   // Apply button
-  SDL_SetRenderDrawColor(renderer, themes.rowStripe2.r, themes.rowStripe2.g,
-                         themes.rowStripe2.b, 255);
+  SDL_SetRenderDrawColor(renderer, themes.success.r, themes.success.g,
+                         themes.success.b, 255);
   SDL_RenderFillRect(renderer, &applyRect_);
   SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
                          themes.border.b, 255);
