@@ -173,7 +173,11 @@ void DXClusterPanel::onResize(int x, int y, int w, int h) {
 }
 
 void DXClusterPanel::render(SDL_Renderer *renderer) {
-  // Base render for BG, Title, Border
+  // Calculate legend height once so ListPanel can account for it
+  legendH_ = (height_ >= 120) ? 28 : 0;
+  this->footerH_ = legendH_;
+
+  // Base render for BG, Title, Border, Stripes, and Highlights
   ListPanel::render(renderer);
 
   if (visibleSpots_.empty())
@@ -183,10 +187,6 @@ void DXClusterPanel::render(SDL_Renderer *renderer) {
     return;
 
   int pad = std::max(2, static_cast<int>(width_ * 0.03f));
-  int curY = y_ + pad;
-  if (titleTex_) {
-    curY += titleH_ + pad;
-  }
 
   // Column layout: Freq | [Mode] | [Badge] | Call | Age
   // Mode badge (CW/FT8/SSB…) shown at ≥140px; DXCC badge (N/B) shown at ≥120px.
@@ -204,24 +204,15 @@ void DXClusterPanel::render(SDL_Renderer *renderer) {
   int callX = badgeX + badgeColW + (showBadge ? 3 : (showMode ? 0 : 2));
   int ageX = x_ + width_ - pad - ageColW;
 
-  // Band Legend at bottom
-  int legendH = (height_ >= 120) ? 28 : 0;
-  legendH_ = legendH;
-  // spdlog::info("DXCluster: height_={}, legendH_={}", height_, legendH_);
-
-  // Calculate row height (compact remaining space)
-  int remaining = (y_ + height_ - legendH) - curY;
-  int rowH = std::max(rowFontSize_ + 4,
-                      remaining / static_cast<int>(visibleSpots_.size()));
-  contentY_ = curY;
-  rowH_ = rowH;
+  int curY = contentY_;
+  int rowH = rowH_;
 
   for (size_t i = 0; i < visibleSpots_.size(); ++i) {
     if (i >= spotCache_.size())
       break;
 
     int rowY = curY + static_cast<int>(i) * rowH;
-    if (rowY + rowH > y_ + height_ - legendH)
+    if (rowY + rowH > y_ + height_ - legendH_)
       break;
     const auto &spot = visibleSpots_[i];
     auto &cache = spotCache_[i];

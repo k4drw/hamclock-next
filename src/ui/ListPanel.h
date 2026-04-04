@@ -44,6 +44,12 @@ protected:
   std::vector<std::string> rows_;
   int highlightedIndex_ = -1;
 
+  // Geometry (calculated during render for subclasses to reuse)
+  int contentY_ = 0;
+  int rowH_ = 0;
+  int footerH_ = 0;
+  int titleAreaH_ = 20;
+
   SDL_Texture *titleTex_ = nullptr;
   int titleW_ = 0, titleH_ = 0;
 
