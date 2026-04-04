@@ -888,9 +888,9 @@ void MapWidget::render(SDL_Renderer *renderer) {
 
   renderWxMbOverlay(renderer);
   renderGribCloudOverlay(renderer);
-  renderPropagationOverlay(renderer);
   renderMufRtOverlay(renderer);
   renderNightOverlay(renderer);
+  renderPropagationOverlay(renderer);
 
   // Render global references and boundaries
   renderAuroraOverlay(renderer);
