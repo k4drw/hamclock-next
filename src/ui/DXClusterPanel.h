@@ -104,6 +104,8 @@ private:
   void clearSpotCache();
 
   int scrollOffset_ = 0;
+  int lastScrollOffset_ = -1;
+  std::string lastSelectionKey_;
   static constexpr int MAX_VISIBLE_ROWS = 15;
 
   int legendH_ = 0;

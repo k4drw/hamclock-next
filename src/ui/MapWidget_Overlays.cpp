@@ -982,14 +982,17 @@ void MapWidget::renderDXClusterSpots(SDL_Renderer *renderer) {
       color = kBands[bandIdx].color;
     }
 
-    // Draw path if RX location is known and different from TX
-    if ((spot.rxLat != 0.0 || spot.rxLon != 0.0) &&
-        (std::abs(spot.txLat - spot.rxLat) > 0.01 ||
-         std::abs(spot.txLon - spot.rxLon) > 0.01)) {
+    // Draw path from DE to TX spot using the configured DE location, so the
+    // arc always connects to the DE marker regardless of whether spot.rxLat/rxLon
+    // is populated.
+    LatLon de = state_ ? state_->deLocation : LatLon{0.0, 0.0};
+    if ((de.lat != 0.0 || de.lon != 0.0) &&
+        (std::abs(spot.txLat - de.lat) > 0.01 ||
+         std::abs(spot.txLon - de.lon) > 0.01)) {
       int baseSegments = 250;
       int segments = static_cast<int>(baseSegments * (1.0 + 0.8 * (config_.mapZoom - 1.0)));
       auto path = Astronomy::calculateGreatCirclePath(
-          {spot.rxLat, spot.rxLon}, {spot.txLat, spot.txLon}, segments);
+          de, {spot.txLat, spot.txLon}, segments);
 
       std::vector<SDL_FPoint> segment;
       SDL_Color lineColor = {color.r, color.g, color.b, 100};

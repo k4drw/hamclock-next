@@ -106,7 +106,17 @@ void DXClusterPanel::update() {
   }
 
   // Sync scroll offset and visible rows
-  if (dataChanged || true) { // Always update visible slice if needed
+  bool scrollChanged = (scrollOffset_ != lastScrollOffset_);
+  std::string selectionKey;
+  if (data->hasSelection)
+    selectionKey = data->selectedSpot.txCall + ":" +
+                   std::to_string(data->selectedSpot.freqKhz) + ":" +
+                   std::to_string(data->selectedSpot.spottedAt.time_since_epoch().count());
+  bool selectionChanged = (selectionKey != lastSelectionKey_);
+  if (dataChanged || scrollChanged || selectionChanged) {
+    lastScrollOffset_ = scrollOffset_;
+    lastSelectionKey_ = selectionKey;
+
     if (allRows_.empty()) {
       scrollOffset_ = 0;
     } else {
@@ -145,13 +155,13 @@ void DXClusterPanel::update() {
     // Update Highlight
     int highlighted = -1;
     if (data->hasSelection) {
-      // Find selected spot in current visible slice
+      // Find selected spot in current visible slice. In rebuildRows we reverse
+      // the spots, so DXClusterData::spots is not directly indexed — compare
+      // values against the reversed copy.
+      auto spots = data->spots;
+      std::reverse(spots.begin(), spots.end());
       for (int i = 0; i < (int)visibleFreqs_.size(); ++i) {
         int idx = scrollOffset_ + i;
-        // In rebuildRows we reverse the spots, so DXClusterData::spots is not
-        // directly indexed. We compare values.
-        auto spots = data->spots;
-        std::reverse(spots.begin(), spots.end());
         if (idx < (int)spots.size()) {
           const auto &spot = spots[idx];
           if (spot.txCall == data->selectedSpot.txCall &&
@@ -170,6 +180,7 @@ void DXClusterPanel::update() {
 void DXClusterPanel::onResize(int x, int y, int w, int h) {
   ListPanel::onResize(x, y, w, h);
   clearSpotCache();
+  lastScrollOffset_ = -1; // force visible-slice rebuild on next update
 }
 
 void DXClusterPanel::render(SDL_Renderer *renderer) {
