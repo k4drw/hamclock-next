@@ -32,7 +32,14 @@ void MarineProvider::fetch(const std::string &tideStation,
   if (!tideStation.empty()) {
     // Check if we need to fetch name metadata
     auto current = store_->get();
-    if (current.tideStationId != tideStation || current.tideStationName.empty()) {
+    if (current.tideStationId != tideStation) {
+      current.tideStationId = tideStation;
+      current.tideStationName.clear(); // Important: UI shows "Tide ID: " while name is empty
+      current.tides.clear();
+      current.tidesValid = false;
+      store_->update(current);
+      fetchStationName(tideStation);
+    } else if (current.tideStationName.empty()) {
       fetchStationName(tideStation);
     }
 

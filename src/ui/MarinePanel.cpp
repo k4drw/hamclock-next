@@ -372,6 +372,10 @@ void MarinePanel::saveSettings() {
   cfg.marineBuoy = buoyInput_.getValue();
   ConfigManager::instance().save(cfg);
   
+  if (provider_) {
+    provider_->fetch(cfg.marineStation, cfg.marineBuoy, true);
+  }
+  
   // No direct way to trigger fetch in provider from here without a pointer or observer.
   // The next update() loop or rotation will naturally pick up the new ID in main.cpp if we were to change how fetch is called,
   // but main.cpp usually handles the periodic fetch.

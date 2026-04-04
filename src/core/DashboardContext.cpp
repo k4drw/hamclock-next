@@ -1518,6 +1518,13 @@ void DashboardContext::update(AppContext &ctx) {
         asteroidProvider->isStale(now, kCooldown)) {
       asteroidProvider->update();
     }
+
+    // Marine (fetch periodically if widget active)
+    if (isWidgetActive("marine") &&
+        marineProvider->isStale(now, 15 * 60 * 1000) &&
+        marineProvider->isStale(now, kCooldown)) {
+      marineProvider->fetch(appCfg.marineStation, appCfg.marineBuoy);
+    }
   }
 
   // --- DRAP fetch: immediate when overlay active and store empty (60s
