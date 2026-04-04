@@ -207,8 +207,8 @@ void TimePanel::render(SDL_Renderer *renderer) {
   // --- Gear icon + rotation transport controls (bottom-right corner) ---
   if (!editing_) {
     float gcx = gearRect_.x + gearRect_.w / 2.0f;
-    float gcy = gearRect_.y + gearRect_.h / 2.0f;
-    float r = gearSize_ / 2.0f;
+    float gcy = gearRect_.y + gearRect_.h / 1.5f;
+    float r = gearSize_ / 2.5f;
     SDL_Color gearColor = themes.textDim;
     SDL_Color bgColor = themes.bg;
     RenderUtils::drawGear(renderer, gcx, gcy, r, gearColor, bgColor);
