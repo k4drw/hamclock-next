@@ -101,6 +101,7 @@ void AsteroidPanel::update() {
 
 void AsteroidPanel::rebuildRows() {
   std::vector<std::string> newRows;
+  allRowToAstIndex_.clear();
   rowToAstIndex_.clear();
 
   if (lastData_.asteroids.empty()) {
@@ -109,16 +110,23 @@ void AsteroidPanel::rebuildRows() {
     return;
   }
 
-  size_t count = std::min(lastData_.asteroids.size(), size_t(7));
+  size_t count = lastData_.asteroids.size();
 
   // Build display order: selected asteroid first (if any), then the rest.
   if (selectedIndex_ >= 0 && selectedIndex_ < (int)count) {
-    rowToAstIndex_.push_back(selectedIndex_);
+    allRowToAstIndex_.push_back(selectedIndex_);
   }
   for (size_t i = 0; i < count; ++i) {
     if ((int)i != selectedIndex_)
-      rowToAstIndex_.push_back(static_cast<int>(i));
+      allRowToAstIndex_.push_back(static_cast<int>(i));
   }
+
+  // Clamp scroll and slice visible window
+  int maxScroll = std::max(0, (int)allRowToAstIndex_.size() - MAX_VISIBLE_ROWS);
+  scrollOffset_ = std::min(scrollOffset_, maxScroll);
+  int end = std::min(scrollOffset_ + MAX_VISIBLE_ROWS, (int)allRowToAstIndex_.size());
+  rowToAstIndex_ = std::vector<int>(allRowToAstIndex_.begin() + scrollOffset_,
+                                     allRowToAstIndex_.begin() + end);
 
   auto formatRow = [&](int astIdx) {
     const auto &ast = lastData_.asteroids[astIdx];
@@ -142,6 +150,18 @@ void AsteroidPanel::rebuildRows() {
     newRows.push_back(formatRow(idx));
 
   setRows(newRows);
+}
+
+bool AsteroidPanel::onMouseWheel(int scrollY) {
+  if (allRowToAstIndex_.empty())
+    return false;
+  int maxScroll = std::max(0, (int)allRowToAstIndex_.size() - MAX_VISIBLE_ROWS);
+  int newOffset = std::clamp(scrollOffset_ - scrollY, 0, maxScroll);
+  if (newOffset == scrollOffset_)
+    return false;
+  scrollOffset_ = newOffset;
+  rebuildRows();
+  return true;
 }
 
 void AsteroidPanel::render(SDL_Renderer *renderer) {

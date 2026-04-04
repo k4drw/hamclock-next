@@ -24,6 +24,7 @@ public:
   void render(SDL_Renderer *renderer) override;
   void onResize(int x, int y, int w, int h) override;
   bool onMouseUp(int mx, int my, Uint16 mod, int clicks) override;
+  bool onMouseWheel(int scrollY) override;
 
   // Semantic Debug API
   std::string getName() const override { return "AsteroidPanel"; }
@@ -46,8 +47,11 @@ private:
   AsteroidProvider &provider_;
   AsteroidData lastData_;
   std::shared_ptr<HamClockState> state_;
-  int selectedIndex_ = -1;          // -1 = none; maps to asteroid index in lastData_
-  std::vector<int> rowToAstIndex_;  // display row → lastData_ asteroid index
+  int selectedIndex_ = -1;           // -1 = none; maps to asteroid index in lastData_
+  std::vector<int> allRowToAstIndex_; // all display rows before scroll slicing
+  std::vector<int> rowToAstIndex_;    // visible slice → lastData_ asteroid index
+  int scrollOffset_ = 0;
+  static constexpr int MAX_VISIBLE_ROWS = 7;
   AppConfig *config_ = nullptr;
   std::function<void()> onSave_;
 

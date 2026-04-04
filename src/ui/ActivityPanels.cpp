@@ -102,6 +102,22 @@ void DXPedPanel::renderRowText(SDL_Renderer *renderer, int index, int rx, int ry
 
 // --- ONTAPanel ---
 
+bool ONTAPanel::onMouseWheel(int scrollY) {
+  if (allSpots_.empty())
+    return false;
+  int maxScroll = std::max(0, (int)allSpots_.size() - MAX_VISIBLE_ROWS);
+  int newOffset = std::clamp(scrollOffset_ - scrollY, 0, maxScroll);
+  if (newOffset == scrollOffset_)
+    return false;
+  scrollOffset_ = newOffset;
+  int end = std::min(scrollOffset_ + MAX_VISIBLE_ROWS, (int)allSpots_.size());
+  currentSpots_ = std::vector<ONTASpot>(allSpots_.begin() + scrollOffset_,
+                                         allSpots_.begin() + end);
+  std::vector<std::string> rows(currentSpots_.size(), "");
+  setRows(rows);
+  return true;
+}
+
 ONTAPanel::ONTAPanel(int x, int y, int w, int h, FontManager &fontMgr,
                      ActivityProvider &provider,
                      std::shared_ptr<ActivityDataStore> store)
@@ -151,9 +167,7 @@ void ONTAPanel::setFilter(const std::string &f) {
 }
 
 void ONTAPanel::rebuildRows(const ActivityData &data) {
-  currentSpots_.clear();
-  std::vector<std::string> rows; // Use this to pass empty strings to ListPanel
-
+  allSpots_.clear();
   for (const auto &os : data.ontaSpots) {
     if (filter_ == Filter::POTA && os.program != "POTA")
       continue;
@@ -164,12 +178,16 @@ void ONTAPanel::rebuildRows(const ActivityData &data) {
       if (dist > maxDistKm_)
         continue;
     }
-
-    currentSpots_.push_back(os);
-    rows.push_back(""); // Add empty string for ListPanel to draw stripes
-    if (currentSpots_.size() >= MAX_VISIBLE_ROWS)
-      break;
+    allSpots_.push_back(os);
   }
+
+  int maxScroll = std::max(0, (int)allSpots_.size() - MAX_VISIBLE_ROWS);
+  scrollOffset_ = std::min(scrollOffset_, maxScroll);
+  int end = std::min(scrollOffset_ + MAX_VISIBLE_ROWS, (int)allSpots_.size());
+  currentSpots_ = std::vector<ONTASpot>(allSpots_.begin() + scrollOffset_,
+                                         allSpots_.begin() + end);
+
+  std::vector<std::string> rows(currentSpots_.size(), "");
   if (currentSpots_.empty() && data.valid) {
     std::string prog = (filter_ == Filter::POTA)   ? "POTA"
                        : (filter_ == Filter::SOTA) ? "SOTA"
