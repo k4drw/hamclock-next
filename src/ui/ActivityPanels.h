@@ -22,6 +22,7 @@ public:
   bool requiresConfigKey() const override { return false; }
 
   void update() override;
+  bool onMouseWheel(int scrollY) override;
 
 protected:
   void renderRowText(SDL_Renderer *renderer, int index, int rx, int ry,
@@ -32,6 +33,10 @@ private:
   std::shared_ptr<ActivityDataStore> store_;
   std::chrono::system_clock::time_point lastUpdate_{};
   uint32_t lastFetch_ = 0;
+
+  std::vector<std::string> allRows_;
+  int scrollOffset_ = 0;
+  static constexpr int MAX_VISIBLE_ROWS = 12;
 };
 
 class ONTAPanel : public ListPanel {

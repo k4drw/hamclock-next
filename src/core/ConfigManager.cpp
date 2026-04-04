@@ -509,8 +509,8 @@ bool ConfigManager::load(AppConfig &config) {
   // Marine
   if (json.contains("marine")) {
     auto &m = json["marine"];
-    config.marineStation = m.value("station", "8722670");
-    config.marineBuoy = m.value("buoy", "41114");
+    config.marineStation = m.value("station", "");
+    config.marineBuoy = m.value("buoy", "");
   }
 
   // Power

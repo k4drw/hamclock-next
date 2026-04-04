@@ -127,8 +127,8 @@ struct AppConfig {
   bool sdoShowMovie = false;
 
   // Marine Widget settings
-  std::string marineStation = "8722670"; // NOAA Tide station (Lake Worth FL)
-  std::string marineBuoy = "41114";      // NDBC Buoy ID (FL Atlantic)
+  std::string marineStation;
+  std::string marineBuoy;
 
   // Power / Screen
   bool preventSleep = true; // true to call SDL_DisableScreenSaver()

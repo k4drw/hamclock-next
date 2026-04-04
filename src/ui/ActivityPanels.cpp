@@ -40,20 +40,44 @@ void DXPedPanel::update() {
 
   auto data = store_->get();
   if (data.lastUpdated != lastUpdate_) {
-    std::vector<std::string> rows;
+    allRows_.clear();
     for (const auto &de : data.dxpeds) {
       std::stringstream ss;
       ss << de.call << '\t' << de.location;
-      rows.push_back(ss.str());
-      if (rows.size() >= 10)
-        break;
+      allRows_.push_back(ss.str());
     }
-    if (rows.empty() && data.valid) {
-      rows.push_back("No upcoming expeditions");
+    if (allRows_.empty() && data.valid) {
+      allRows_.push_back("No upcoming expeditions");
     }
-    setRows(rows);
+    // Clamp scroll and rebuild visible slice
+    int maxScroll = std::max(0, (int)allRows_.size() - MAX_VISIBLE_ROWS);
+    scrollOffset_ = std::min(scrollOffset_, maxScroll);
+    int end = std::min(scrollOffset_ + MAX_VISIBLE_ROWS, (int)allRows_.size());
+    setRows(std::vector<std::string>(allRows_.begin() + scrollOffset_,
+                                     allRows_.begin() + end));
     lastUpdate_ = data.lastUpdated;
   }
+}
+
+bool DXPedPanel::onMouseWheel(int scrollY) {
+  if (allRows_.empty())
+    return false;
+
+  int maxScroll = std::max(0, (int)allRows_.size() - MAX_VISIBLE_ROWS);
+  int newOffset = scrollOffset_ - scrollY;
+  if (newOffset < 0)
+    newOffset = 0;
+  if (newOffset > maxScroll)
+    newOffset = maxScroll;
+
+  if (newOffset != scrollOffset_) {
+    scrollOffset_ = newOffset;
+    int end = std::min(scrollOffset_ + MAX_VISIBLE_ROWS, (int)allRows_.size());
+    setRows(std::vector<std::string>(allRows_.begin() + scrollOffset_,
+                                     allRows_.begin() + end));
+    return true;
+  }
+  return false;
 }
 
 void DXPedPanel::renderRowText(SDL_Renderer *renderer, int index, int rx, int ry,
