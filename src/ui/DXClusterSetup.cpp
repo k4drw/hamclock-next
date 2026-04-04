@@ -85,14 +85,16 @@ void DXClusterSetup::render(SDL_Renderer *renderer) {
   y += fieldH + pad;
 
   // --- UDP / WSJT-X ---
-  toggleRect_ = {fieldX, y, 24, 24};
+  int toggleLabelW = fontMgr_.getLogicalWidth("UDP Mode (receive from WSJT-X / JTDX)", cat->ptSize(FontStyle::UI));
+  toggleRect_ = {fieldX, y, 35 + toggleLabelW, 24};
+  SDL_Rect toggleBox = {fieldX, y, 24, 24};
   SDL_SetRenderDrawColor(renderer, themes.rowStripe1.r, themes.rowStripe1.g, themes.rowStripe1.b, 255);
-  SDL_RenderFillRect(renderer, &toggleRect_);
+  SDL_RenderFillRect(renderer, &toggleBox);
   SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
-  SDL_RenderDrawRect(renderer, &toggleRect_);
+  SDL_RenderDrawRect(renderer, &toggleBox);
   if (useWSJTX_) {
     SDL_SetRenderDrawColor(renderer, themes.success.r, themes.success.g, themes.success.b, 255);
-    SDL_Rect inner = {toggleRect_.x + 4, toggleRect_.y + 4, 16, 16};
+    SDL_Rect inner = {toggleBox.x + 4, toggleBox.y + 4, 16, 16};
     SDL_RenderFillRect(renderer, &inner);
   }
   cat->drawText(renderer, "UDP Mode (receive from WSJT-X / JTDX)",

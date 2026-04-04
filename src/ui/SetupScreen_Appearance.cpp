@@ -96,16 +96,17 @@ void SetupScreen::renderTabAppearance(SDL_Renderer *renderer, int cx, int pad,
 
   // Row 2: Toggles (Night Lights, Metric) - Centered
   auto drawToggle = [&](SDL_Rect &r, bool val, const char *lbl) {
+    SDL_Rect box = {r.x, r.y, 20, 20};
     SDL_SetRenderDrawColor(renderer, themes.rowStripe1.r, themes.rowStripe1.g, themes.rowStripe1.b, 255);
-    SDL_RenderFillRect(renderer, &r);
+    SDL_RenderFillRect(renderer, &box);
     SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
-    SDL_RenderDrawRect(renderer, &r);
+    SDL_RenderDrawRect(renderer, &box);
     if (val) {
       SDL_SetRenderDrawColor(renderer, themes.success.r, themes.success.g, themes.success.b, 255);
       SDL_Rect check = {r.x + 4, r.y + 4, 12, 12};
       SDL_RenderFillRect(renderer, &check);
     }
-    cat->drawText(renderer, lbl, r.x + 25, r.y + r.h / 2, themes.text,
+    cat->drawText(renderer, lbl, r.x + 25, r.y + box.h / 2, themes.text,
                   FontStyle::SmallRegular, false, false, true);
   };
 
@@ -117,9 +118,9 @@ void SetupScreen::renderTabAppearance(SDL_Renderer *renderer, int cx, int pad,
   int wRow2 = wNL + toggleGap + wMU;
   int xRow2 = cx - wRow2 / 2;
 
-  nightLightsRect_ = {xRow2, y, 20, 20};
+  nightLightsRect_ = {xRow2, y, wNL, 20};
   drawToggle(nightLightsRect_, mapNightLights_, "Night Lights");
-  metricToggleRect_ = {xRow2 + wNL + toggleGap, y, 20, 20};
+  metricToggleRect_ = {xRow2 + wNL + toggleGap, y, wMU, 20};
   drawToggle(metricToggleRect_, useMetric_, "Metric Units");
   y += 20 + vSpace;
 
@@ -143,7 +144,9 @@ void SetupScreen::renderTabAppearance(SDL_Renderer *renderer, int cx, int pad,
                 themes.text, FontStyle::SmallRegular, true, false, true);
   y += fieldH + vSpace;
 
-  scheduleToggleRect_ = {fieldX, y, 20, 20};
+  int wSchedule = 25 + fontMgr_.getLogicalWidth("Enable Dim/Bright Schedule",
+                                              cat->ptSize(FontStyle::SmallRegular));
+  scheduleToggleRect_ = {fieldX, y, wSchedule, 20};
   drawToggle(scheduleToggleRect_, brightnessMgr_.isScheduleEnabled(),
              "Enable Dim/Bright Schedule");
   y += 20 + vSpace;

@@ -18,6 +18,36 @@ void TextInput::moveCursor(int newPos, bool extendSelection) {
     selectionAnchor_ = cursorPos_;
 }
 
+int TextInput::findNextWord(int start) const {
+  int len = static_cast<int>(text_.size());
+  if (start >= len)
+    return len;
+  int i = start;
+  // If at space, skip to start of word
+  while (i < len && !std::isalnum((unsigned char)text_[i]))
+    i++;
+  // Skip the word
+  while (i < len && std::isalnum((unsigned char)text_[i]))
+    i++;
+  return i;
+}
+
+int TextInput::findPrevWord(int start) const {
+  if (start <= 0)
+    return 0;
+  int i = start - 1;
+  // If at space, skip to end of previous word
+  while (i > 0 && !std::isalnum((unsigned char)text_[i]))
+    i--;
+  // Skip backwards through word
+  while (i > 0 && std::isalnum((unsigned char)text_[i]))
+    i--;
+  // If we stopped because we hit a non-alphanumeric, move forward one to start of word
+  if (i < static_cast<int>(text_.size()) && !std::isalnum((unsigned char)text_[i]))
+    i++;
+  return i;
+}
+
 bool TextInput::deleteSelection() {
   if (cursorPos_ == selectionAnchor_)
     return false;
@@ -75,7 +105,17 @@ bool TextInput::onKeyDown(SDL_Keycode key, Uint16 mod) {
 
   switch (key) {
   case SDLK_BACKSPACE:
-    if (!deleteSelection() && cursorPos_ > 0) {
+    if (deleteSelection()) {
+      return true;
+    }
+    if (ctrl) {
+      int prev = findPrevWord(cursorPos_);
+      if (prev < cursorPos_) {
+        text_.erase(prev, cursorPos_ - prev);
+        cursorPos_ = prev;
+        selectionAnchor_ = cursorPos_;
+      }
+    } else if (cursorPos_ > 0) {
       text_.erase(cursorPos_ - 1, 1);
       --cursorPos_;
       selectionAnchor_ = cursorPos_;
@@ -83,18 +123,33 @@ bool TextInput::onKeyDown(SDL_Keycode key, Uint16 mod) {
     return true;
 
   case SDLK_DELETE:
-    if (!deleteSelection() && cursorPos_ < static_cast<int>(text_.size())) {
+    if (deleteSelection()) {
+      return true;
+    }
+    if (ctrl) {
+      int next = findNextWord(cursorPos_);
+      if (next > cursorPos_) {
+        text_.erase(cursorPos_, next - cursorPos_);
+        selectionAnchor_ = cursorPos_;
+      }
+    } else if (cursorPos_ < static_cast<int>(text_.size())) {
       text_.erase(cursorPos_, 1);
       selectionAnchor_ = cursorPos_;
     }
     return true;
 
   case SDLK_LEFT:
-    moveCursor(cursorPos_ - 1, shift);
+    if (ctrl)
+      moveCursor(findPrevWord(cursorPos_), shift);
+    else
+      moveCursor(cursorPos_ - 1, shift);
     return true;
 
   case SDLK_RIGHT:
-    moveCursor(cursorPos_ + 1, shift);
+    if (ctrl)
+      moveCursor(findNextWord(cursorPos_), shift);
+    else
+      moveCursor(cursorPos_ + 1, shift);
     return true;
 
   case SDLK_HOME:

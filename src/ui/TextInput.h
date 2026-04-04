@@ -75,5 +75,7 @@ private:
 
     bool deleteSelection();
     void moveCursor(int newPos, bool extendSelection);
+    int findNextWord(int start) const;
+    int findPrevWord(int start) const;
     int clamp(int pos) const;
 };

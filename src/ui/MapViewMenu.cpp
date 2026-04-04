@@ -68,9 +68,13 @@ void MapViewMenu::show(AppConfig &config, std::function<void()> onApply) {
   weatherRec_ = {col1X, y + 25, colW, 30};
   weatherHeaderY_ = y;
 
-  beaconsRec_ = {col2X + 10, y + 25, 20, 20};
-  bordersRec_ = {col2X + 110, y + 25, 20, 20};
-  centerDeCheckRect_ = {col2X + 10, y + 55, 20, 20};
+  auto *cat = fontMgr_.catalog();
+  int beaconsLabelW = fontMgr_.getLogicalWidth("Beacons", cat->ptSize(FontStyle::UI));
+  beaconsRec_ = {col2X + 10, y + 25, 20 + 10 + beaconsLabelW, 20};
+  int bordersLabelW = fontMgr_.getLogicalWidth("Borders", cat->ptSize(FontStyle::UI));
+  bordersRec_ = {col2X + 110, y + 25, 20 + 10 + bordersLabelW, 20};
+  int centerDeLabelW = fontMgr_.getLogicalWidth("Center on DE", cat->ptSize(FontStyle::UI));
+  centerDeCheckRect_ = {col2X + 10, y + 55, 20 + 10 + centerDeLabelW, 20};
 
   // Row 4 (VOACAP) - 3 columns
   y += 80;
@@ -90,8 +94,10 @@ void MapViewMenu::show(AppConfig &config, std::function<void()> onApply) {
   toaUpRec_ = {c1 + 82, y + 10, 24, 12};
   toaDnRec_ = {c1 + 82, y + 24, 24, 12};
 
-  spRec_ = {c2, y + 13, 16, 16};
-  lpRec_ = {c3, y + 13, 16, 16};
+  int spLabelW = fontMgr_.getLogicalWidth("Short Path", cat->ptSize(FontStyle::Fast));
+  spRec_ = {c2, y + 13, 16 + 10 + spLabelW, 16};
+  int lpLabelW = fontMgr_.getLogicalWidth("Long Path", cat->ptSize(FontStyle::Fast));
+  lpRec_ = {c3, y + 13, 16 + 10 + lpLabelW, 16};
 
   // Footer buttons
   int btnFooterW = 100;
@@ -696,24 +702,25 @@ void MapViewMenu::renderRadioButton(SDL_Renderer *renderer,
   auto *cat = fontMgr_.catalog();
   ThemeColors themes = getThemeColors(theme_);
 
-  // Draw the outer square
+  // Draw the outer square (fixed size based on rect.h)
+  SDL_Rect box = {rect.x, rect.y, rect.h, rect.h};
   SDL_SetRenderDrawColor(renderer, themes.rowStripe1.r, themes.rowStripe1.g,
                          themes.rowStripe1.b, 255);
-  SDL_RenderFillRect(renderer, &rect);
+  SDL_RenderFillRect(renderer, &box);
   SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
                          themes.border.b, 255);
-  SDL_RenderDrawRect(renderer, &rect);
+  SDL_RenderDrawRect(renderer, &box);
 
   // If selected, draw the inner "checked" square
   if (selected) {
-    SDL_Rect check = {rect.x + 4, rect.y + 4, rect.w - 8, rect.h - 8};
+    SDL_Rect check = {box.x + 4, box.y + 4, box.w - 8, box.h - 8};
     SDL_SetRenderDrawColor(renderer, themes.success.r, themes.success.g,
                            themes.success.b, 255);
     SDL_RenderFillRect(renderer, &check);
   }
 
   // Draw the label
-  cat->drawText(renderer, label, rect.x + rect.w + 10, rect.y + rect.h / 2,
+  cat->drawText(renderer, label, box.x + box.w + 10, box.y + box.h / 2,
                 textColor, FontStyle::UI, false, false, true);
 }
 

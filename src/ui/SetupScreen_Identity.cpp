@@ -67,11 +67,13 @@ void SetupScreen::renderTabIdentity(SDL_Renderer *renderer, int cx, int pad,
                    themes.textDim, themes.text, themes.text, themes.textDim, "e.g. -82.64", &themes.rowStripe1);
   y = std::max(latY, lonY) + pad / 2 + pad;
 
-  gpsToggleRect_ = {fieldX, y, 20, 20};
+  int gpsLabelW = fontMgr_.getLogicalWidth("Synchronize with GPS (gpsd)", cat->ptSize(FontStyle::SmallRegular));
+  gpsToggleRect_ = {fieldX, y, 30 + gpsLabelW, 20};
+  SDL_Rect gpsBox = {fieldX, y, 20, 20};
   SDL_SetRenderDrawColor(renderer, themes.rowStripe1.r, themes.rowStripe1.g, themes.rowStripe1.b, 255);
-  SDL_RenderFillRect(renderer, &gpsToggleRect_);
+  SDL_RenderFillRect(renderer, &gpsBox);
   SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
-  SDL_RenderDrawRect(renderer, &gpsToggleRect_);
+  SDL_RenderDrawRect(renderer, &gpsBox);
   if (gpsEnabled_) {
     SDL_SetRenderDrawColor(renderer, themes.success.r, themes.success.g, themes.success.b, 255);
     SDL_Rect check = {fieldX + 4, y + 4, 12, 12};
@@ -81,11 +83,13 @@ void SetupScreen::renderTabIdentity(SDL_Renderer *renderer, int cx, int pad,
                 themes.text, FontStyle::SmallRegular, false, false, true);
   y += 28;
 
-  audioMuteToggleRect_ = {fieldX, y, 20, 20};
+  int muteLabelW = fontMgr_.getLogicalWidth("Mute all audio (TTS + alarm)", cat->ptSize(FontStyle::SmallRegular));
+  audioMuteToggleRect_ = {fieldX, y, 30 + muteLabelW, 20};
+  SDL_Rect muteBox = {fieldX, y, 20, 20};
   SDL_SetRenderDrawColor(renderer, themes.rowStripe1.r, themes.rowStripe1.g, themes.rowStripe1.b, 255);
-  SDL_RenderFillRect(renderer, &audioMuteToggleRect_);
+  SDL_RenderFillRect(renderer, &muteBox);
   SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
-  SDL_RenderDrawRect(renderer, &audioMuteToggleRect_);
+  SDL_RenderDrawRect(renderer, &muteBox);
   if (audioMuted_) {
     SDL_SetRenderDrawColor(renderer, themes.success.r, themes.success.g, themes.success.b, 255);
     SDL_Rect check = {fieldX + 4, y + 4, 12, 12};
