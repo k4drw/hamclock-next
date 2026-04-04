@@ -929,6 +929,15 @@ void MapWidget::render(SDL_Renderer *renderer) {
 
     renderMarker(renderer, state_->dxLocation.lat, state_->dxLocation.lon,
                  r, g, b, MarkerShape::CircleWithDot);
+
+    // If manual map selection (no callsign), show the grid square label
+    if (state_->dxCallsign.empty() && !state_->dxGrid.empty()) {
+      SDL_FPoint sp = latLonToScreen(state_->dxLocation.lat, state_->dxLocation.lon);
+      SDL_Color color = {r, g, b, 255};
+      fontMgr_.catalog()->drawText(renderer, state_->dxGrid, static_cast<int>(sp.x) + 8,
+                                   static_cast<int>(sp.y), color, FontStyle::Tiny,
+                                   /*centered=*/false, /*rightAlign=*/false, /*vertCentered=*/true);
+    }
   }
 
   renderMarker(renderer, sunLat_, sunLon_, themes.warning.r, themes.warning.g,
