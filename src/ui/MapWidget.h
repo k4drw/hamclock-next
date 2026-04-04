@@ -254,6 +254,7 @@ private:
 
   LatLon lastDE_ = {0, 0};
   LatLon lastDX_ = {0, 0};
+  double lastZoom_ = 1.0;
 
   // Tooltip state
   struct Tooltip {

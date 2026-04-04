@@ -122,84 +122,62 @@ void MapWidget::renderGreatCircle(SDL_Renderer *renderer) {
   if (cachedGreatCircle_.empty())
     return;
 
+  SDL_RenderSetClipRect(renderer, &mapRect_);
+
+  ThemeColors themes = getThemeColors(theme_);
+  SDL_Color color = themes.accent;
+
+  // Use band color if selected DX is a spot
+  if (state_->dxActive && dxcStore_) {
+    auto data = dxcStore_->snapshot();
+    if (data->hasSelection && data->selectedSpot.freqKhz > 0) {
+      int bi = freqToBandIndex(data->selectedSpot.freqKhz);
+      if (bi >= 0) {
+        color = kBands[bi].color;
+      }
+    }
+  }
+
+  const auto &path = cachedGreatCircle_;
+
   SDL_Texture *lineTex = texMgr_.get(LINE_AA_KEY);
   if (!lineTex)
     return;
 
-  if (greatCircleDirty_) {
-    ThemeColors themes = getThemeColors(theme_);
-    greatCircleVerts_.clear();
-    greatCircleIndices_.clear();
+  std::vector<SDL_FPoint> screenPoints;
+  screenPoints.reserve(path.size());
 
-    const auto &path = cachedGreatCircle_;
-    float thickness = 1.2f;
-    float r = thickness / 2.0f;
-    SDL_Color color = themes.accent;  // Yellow -> Theme Accent
+  for (size_t i = 0; i < path.size(); ++i) {
+    if (i > 0) {
+      double lon0 = path[i - 1].lon;
+      double lon1 = path[i].lon;
+      if (std::fabs(lon0 - lon1) > 180.0) {
+        // Wrapped segment logic
+        double lon1_adj = (lon1 < 0) ? lon1 + 360.0 : lon1 - 360.0;
+        double borderLon = (lon1 < 0) ? 180.0 : -180.0;
+        double dLon = lon1_adj - lon0;
+        double f = (std::fabs(dLon) > 1e-6) ? (borderLon - lon0) / dLon : 0.5;
+        double borderLat =
+            path[i - 1].lat + f * (path[i].lat - path[i - 1].lat);
 
-    std::vector<SDL_FPoint> segment;
-    auto add_segment_geom = [&](const std::vector<SDL_FPoint> &seg) {
-      for (size_t i = 1; i < seg.size(); i++) {
-        SDL_FPoint p1 = seg[i - 1];
-        SDL_FPoint p2 = seg[i];
-        float dx = p2.x - p1.x;
-        float dy = p2.y - p1.y;
-        float len = std::sqrt(dx * dx + dy * dy);
-        if (len < 0.1f)
-          continue;
-
-        float nx = -dy / len * r;
-        float ny = dx / len * r;
-
-        int base = static_cast<int>(greatCircleVerts_.size());
-        greatCircleVerts_.push_back({{p1.x + nx, p1.y + ny}, color, {0, 0}});
-        greatCircleVerts_.push_back({{p1.x - nx, p1.y - ny}, color, {0, 1}});
-        greatCircleVerts_.push_back({{p2.x + nx, p2.y + ny}, color, {1, 0}});
-        greatCircleVerts_.push_back({{p2.x - nx, p2.y - ny}, color, {1, 1}});
-
-        greatCircleIndices_.push_back(base + 0);
-        greatCircleIndices_.push_back(base + 1);
-        greatCircleIndices_.push_back(base + 2);
-        greatCircleIndices_.push_back(base + 1);
-        greatCircleIndices_.push_back(base + 2);
-        greatCircleIndices_.push_back(base + 3);
-      }
-    };
-
-    for (size_t i = 0; i < path.size(); ++i) {
-      if (i > 0) {
-        double lon0 = path[i - 1].lon;
-        double lon1 = path[i].lon;
-        if (std::fabs(lon0 - lon1) > 180.0) {
-          double lon1_adj = (lon1 < 0) ? lon1 + 360.0 : lon1 - 360.0;
-          double borderLon = (lon1 < 0) ? 180.0 : -180.0;
-          double dLon = lon1_adj - lon0;
-          double f = 0.5;
-          if (std::fabs(dLon) > 1e-6) {
-            f = (borderLon - lon0) / dLon;
-          }
-          double borderLat =
-              path[i - 1].lat + f * (path[i].lat - path[i - 1].lat);
-
-          segment.push_back(latLonToScreen(borderLat, borderLon));
-          add_segment_geom(segment);
-          segment.clear();
-          segment.push_back(latLonToScreen(borderLat, -borderLon));
+        screenPoints.push_back(latLonToScreen(borderLat, borderLon));
+        if (screenPoints.size() >= 2) {
+          RenderUtils::drawPolylineTextured(renderer, lineTex, screenPoints.data(),
+                                           (int)screenPoints.size(), 1.2f, color);
         }
+        screenPoints.clear();
+        screenPoints.push_back(latLonToScreen(borderLat, -borderLon));
       }
-      segment.push_back(latLonToScreen(path[i].lat, path[i].lon));
     }
-    if (segment.size() >= 2) {
-      add_segment_geom(segment);
-    }
-    greatCircleDirty_ = false;
+    screenPoints.push_back(latLonToScreen(path[i].lat, path[i].lon));
   }
-
-  if (!greatCircleVerts_.empty()) {
-    SDL_RenderGeometry(renderer, lineTex, greatCircleVerts_.data(),
-                       (int)greatCircleVerts_.size(),
-                       greatCircleIndices_.data(),
-                       (int)greatCircleIndices_.size());
+  if (screenPoints.size() >= 2) {
+    RenderUtils::drawPolylineTextured(renderer, lineTex, screenPoints.data(),
+                                     (int)screenPoints.size(), 1.2f, color);
   }
+  
+  SDL_RenderSetClipRect(renderer, nullptr);
+  greatCircleDirty_ = false;
 }
 
 void MapWidget::renderNightOverlay(SDL_Renderer *renderer) {
@@ -908,62 +886,42 @@ void MapWidget::renderSpotOverlay(SDL_Renderer *renderer) {
     SDL_Color color = {bc.r, bc.g, bc.b, 180};
     SDL_Color mColor = {bc.r, bc.g, bc.b, 255};
 
-    int segments = useCompatibilityRenderPath_ ? 20 : 100;
+    int baseSegments = 250;
+    int segments = static_cast<int>(baseSegments * (1.0 + 0.8 * (config_.mapZoom - 1.0)));
     auto path = Astronomy::calculateGreatCirclePath(de, {lat, lon}, segments);
 
-    // Batch Lines
-    float thickness = 1.3f;
+    // Batch Lines via drawPolylineTextured equivalents
+    std::vector<SDL_FPoint> screenPoints;
+    screenPoints.reserve(path.size());
 
-    float r = thickness / 2.0f;
+    for (size_t i = 0; i < path.size(); ++i) {
+      if (i > 0) {
+        double lon0 = path[i - 1].lon;
+        double lon1 = path[i].lon;
 
-    auto addLine = [&](SDL_FPoint p1, SDL_FPoint p2) {
-      float dx = p2.x - p1.x;
-      float dy = p2.y - p1.y;
-      float len = std::sqrt(dx * dx + dy * dy);
-      if (len < 0.1f)
-        return;
+        if (std::fabs(lon0 - lon1) > 180.0) {
+          // Wrapped segment
+          double lon1_adj = (lon1 < 0) ? lon1 + 360.0 : lon1 - 360.0;
+          double borderLon = (lon1 < 0) ? 180.0 : -180.0;
+          double dLon = lon1_adj - lon0;
+          double f = (std::fabs(dLon) > 1e-6) ? (borderLon - lon0) / dLon : 0.5;
+          double borderLat =
+              path[i - 1].lat + f * (path[i].lat - path[i - 1].lat);
 
-      float nx = -dy / len * r;
-      float ny = dx / len * r;
-
-      int base = static_cast<int>(spotVerts_.size());
-      spotVerts_.push_back({{p1.x + nx, p1.y + ny}, color, {0, 0}});
-      spotVerts_.push_back({{p1.x - nx, p1.y - ny}, color, {0, 1}});
-      spotVerts_.push_back({{p2.x + nx, p2.y + ny}, color, {1, 0}});
-      spotVerts_.push_back({{p2.x - nx, p2.y - ny}, color, {1, 1}});
-
-      spotIndices_.push_back(base + 0);
-      spotIndices_.push_back(base + 1);
-      spotIndices_.push_back(base + 2);
-      spotIndices_.push_back(base + 1);
-      spotIndices_.push_back(base + 2);
-      spotIndices_.push_back(base + 3);
-    };
-
-    for (size_t i = 1; i < path.size(); ++i) {
-      double lon0 = path[i - 1].lon;
-      double lon1 = path[i].lon;
-
-      if (std::fabs(lon0 - lon1) > 180.0) {
-        double lon1_adj = (lon1 < 0) ? lon1 + 360.0 : lon1 - 360.0;
-        double borderLon = (lon1 < 0) ? 180.0 : -180.0;
-        double dLon = lon1_adj - lon0;
-        double f = (std::fabs(dLon) > 1e-6) ? (borderLon - lon0) / dLon : 0.5;
-        double borderLat =
-            path[i - 1].lat + f * (path[i].lat - path[i - 1].lat);
-
-        SDL_FPoint p0 = latLonToScreen(path[i - 1].lat, path[i - 1].lon);
-        SDL_FPoint pE1 = latLonToScreen(borderLat, borderLon);
-        addLine(p0, pE1);
-
-        SDL_FPoint pE2 = latLonToScreen(borderLat, -borderLon);
-        SDL_FPoint p1 = latLonToScreen(path[i].lat, path[i].lon);
-        addLine(pE2, p1);
-      } else {
-        SDL_FPoint p0 = latLonToScreen(path[i - 1].lat, path[i - 1].lon);
-        SDL_FPoint p1 = latLonToScreen(path[i].lat, path[i].lon);
-        addLine(p0, p1);
+          screenPoints.push_back(latLonToScreen(borderLat, borderLon));
+          if (screenPoints.size() >= 2) {
+            RenderUtils::drawPolylineTextured(renderer, lineTex, screenPoints.data(),
+                                             (int)screenPoints.size(), 1.2f, color);
+          }
+          screenPoints.clear();
+          screenPoints.push_back(latLonToScreen(borderLat, -borderLon));
+        }
       }
+      screenPoints.push_back(latLonToScreen(path[i].lat, path[i].lon));
+    }
+    if (screenPoints.size() >= 2) {
+      RenderUtils::drawPolylineTextured(renderer, lineTex, screenPoints.data(),
+                                       (int)screenPoints.size(), 1.3f, color);
     }
 
     // Batch Marker (as a small quad)
@@ -983,11 +941,6 @@ void MapWidget::renderSpotOverlay(SDL_Renderer *renderer) {
     markerIndices_.push_back(mBase + 3);
   }
 
-  if (!spotVerts_.empty()) {
-    SDL_RenderGeometry(renderer, lineTex, spotVerts_.data(),
-                       (int)spotVerts_.size(), spotIndices_.data(),
-                       (int)spotIndices_.size());
-  }
   if (!markerVerts_.empty()) {
     SDL_RenderGeometry(renderer, markerTex, markerVerts_.data(),
                        (int)markerVerts_.size(), markerIndices_.data(),
@@ -1033,8 +986,10 @@ void MapWidget::renderDXClusterSpots(SDL_Renderer *renderer) {
     if ((spot.rxLat != 0.0 || spot.rxLon != 0.0) &&
         (std::abs(spot.txLat - spot.rxLat) > 0.01 ||
          std::abs(spot.txLon - spot.rxLon) > 0.01)) {
+      int baseSegments = 250;
+      int segments = static_cast<int>(baseSegments * (1.0 + 0.8 * (config_.mapZoom - 1.0)));
       auto path = Astronomy::calculateGreatCirclePath(
-          {spot.rxLat, spot.rxLon}, {spot.txLat, spot.txLon}, 100);
+          {spot.rxLat, spot.rxLon}, {spot.txLat, spot.txLon}, segments);
 
       std::vector<SDL_FPoint> segment;
       SDL_Color lineColor = {color.r, color.g, color.b, 100};
@@ -1056,7 +1011,7 @@ void MapWidget::renderDXClusterSpots(SDL_Renderer *renderer) {
             if (segment.size() >= 2) {
               RenderUtils::drawPolylineTextured(
                   renderer, lineTex, segment.data(),
-                  static_cast<int>(segment.size()), 1.0f, lineColor);
+                  static_cast<int>(segment.size()), 1.2f, lineColor);
             }
             segment.clear();
             segment.push_back(latLonToScreen(borderLat, -borderLon));
@@ -1067,7 +1022,7 @@ void MapWidget::renderDXClusterSpots(SDL_Renderer *renderer) {
       if (segment.size() >= 2) {
         RenderUtils::drawPolylineTextured(renderer, lineTex, segment.data(),
                                           static_cast<int>(segment.size()),
-                                          1.0f, lineColor);
+                                          1.2f, lineColor);
       }
     }
 
@@ -1173,7 +1128,9 @@ void MapWidget::renderONTASpots(SDL_Renderer *renderer) {
   SDL_Color color = (lowerProg == "pota") ? themes.success : themes.info;
 
   LatLon de = state_->deLocation;
-  auto path = Astronomy::calculateGreatCirclePath(de, {spotLat, spotLon}, 100);
+  int baseSegments = 250;
+  int segments = static_cast<int>(baseSegments * (1.0 + 0.8 * (config_.mapZoom - 1.0)));
+  auto path = Astronomy::calculateGreatCirclePath(de, {spotLat, spotLon}, segments);
 
   std::vector<SDL_FPoint> segment;
   SDL_Color lineColor = {color.r, color.g, color.b, 100};
@@ -1194,7 +1151,7 @@ void MapWidget::renderONTASpots(SDL_Renderer *renderer) {
         if (segment.size() >= 2) {
           RenderUtils::drawPolylineTextured(renderer, lineTex, segment.data(),
                                             static_cast<int>(segment.size()),
-                                            1.0f, lineColor);
+                                            1.2f, lineColor);
         }
         segment.clear();
         segment.push_back(latLonToScreen(borderLat, -borderLon));
@@ -1204,7 +1161,7 @@ void MapWidget::renderONTASpots(SDL_Renderer *renderer) {
   }
   if (segment.size() >= 2) {
     RenderUtils::drawPolylineTextured(renderer, lineTex, segment.data(),
-                                      static_cast<int>(segment.size()), 1.0f,
+                                      static_cast<int>(segment.size()), 1.2f,
                                       lineColor);
   }
 

@@ -311,8 +311,8 @@ SDL_FPoint MapWidget::latLonToScreen(double lat, double lon) const {
     while (dLon > 180.0) dLon -= 360.0;
     while (dLon < -180.0) dLon += 360.0;
     // Clamp coordinates to [0, 1] range to avoid edge sampling artifacts
-    double nx = std::clamp((dLon + 180.0) / 360.0, 0.0, 1.0);
-    double ny = std::clamp((90.0 - lat) / 180.0, 0.0, 1.0);
+    double nx = (dLon + 180.0) / 360.0;
+    double ny = (90.0 - lat) / 180.0;
     float px = static_cast<float>(mapRect_.x + nx * mapRect_.w);
     float py = static_cast<float>(mapRect_.y + ny * mapRect_.h);
     if (config_.mapZoom > 1.0) {
@@ -619,12 +619,15 @@ void MapWidget::update() {
     if (state_->deLocation.lat != lastDE_.lat ||
         state_->deLocation.lon != lastDE_.lon ||
         state_->dxLocation.lat != lastDX_.lat ||
-        state_->dxLocation.lon != lastDX_.lon) {
-      int segments = useCompatibilityRenderPath_ ? 100 : 250;
+        state_->dxLocation.lon != lastDX_.lon ||
+        config_.mapZoom != lastZoom_) {
+      int baseSegments = 250;
+      int segments = static_cast<int>(baseSegments * (1.0 + 0.8 * (config_.mapZoom - 1.0)));
       cachedGreatCircle_ = Astronomy::calculateGreatCirclePath(
           state_->deLocation, state_->dxLocation, segments);
       lastDE_ = state_->deLocation;
       lastDX_ = state_->dxLocation;
+      lastZoom_ = config_.mapZoom;
       greatCircleDirty_ = true;
     }
   } else if (!cachedGreatCircle_.empty()) {
@@ -1028,26 +1031,8 @@ void MapWidget::render(SDL_Renderer *renderer) {
   renderNightOverlay(renderer);
   renderPropagationOverlay(renderer);
   
-  // Overlays (clipped to mapRect_, and further constrained to exclude side panes
-  // when zoomed)
+  // Overlays (clipped to mapRect_)
   SDL_Rect clipRect = mapRect_;
-  if (config_.mapZoom > 1.0) {
-    int leftMax = mapRect_.x;
-    int rightMin = mapRect_.x + mapRect_.w;
-    for (auto *pane : panes_) {
-      if (pane) {
-        SDL_Rect pr = pane->getRect();
-        if (pr.x < x_ + width_ / 2) {
-          leftMax = std::max(leftMax, pr.x + pr.w);
-        } else {
-          rightMin = std::min(rightMin, pr.x);
-        }
-      }
-    }
-    clipRect.x = leftMax;
-    clipRect.w = rightMin - leftMax;
-  }
-
   SDL_RenderSetClipRect(renderer, &clipRect);
 
   // Render global references and boundaries
