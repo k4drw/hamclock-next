@@ -6,6 +6,126 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [Unreleased] — v1.4
+
+### Added
+- **DX Cluster Band Filter** — click any band label in the cluster's color legend to filter spots to that band; click again to clear. Selected band is highlighted with a white border; unselected bands are dimmed.
+- **Marine Auto-Setup** — when the Marine widget is added with no station configured, it automatically finds and saves the nearest NOAA tide station and NDBC buoy to your QTH. Data appears immediately without opening the setup dialog.
+- **Map Zoom with Pane-Aware Clipping** — map overlays (borders, grids, sat footprints) are correctly masked by widget boundaries when zoomed; no more ghosting behind semi-transparent panels.
+
+### Changed
+- **Map Great-Circle Paths** — all great-circle overlays (Spots, ONTA, Selection) now use 250 segments for smooth curves at any zoom level; selection paths adopt the band color of the selected spot.
+- **Map Reset Gesture** — reset is now triggered by right-mouse double-click, freeing left-click double-click from accidental resets during panning. A 300 ms debounce prevents the "Set DE Here" context menu from appearing on reset.
+- **Map View Menu** — Apply button uses the success (green) color for visual clarity.
+
+### Fixed
+- **ONTAPanel, WatchlistPanel, AsteroidPanel** — removed hard row caps that silently dropped excess entries; all three panels now scroll with the mouse wheel and display the full untruncated list.
+- **DX Peditions Panel** — removed 10-row cap; full list now shown with scroll support.
+- **Marine Widget** — fetches updated data immediately after saving new station or buoy IDs; no restart required.
+- **Moon Widget** — reduced backing circle radius by 1 px to eliminate the visible halo/masking ring; backing color updated to deep navy for better theme blending.
+- **Map Path Truncation** — long-distance great-circle routes (e.g., US to Europe) no longer truncate before reaching their destination.
+
+---
+
+## [v1.3.0] — 2026-04-03
+
+### Added
+- **K-Index Alert & Trend** — new widget showing a 24-hour Kp sparkline with color-coded severity zones and G-scale alert labels.
+- **SFI 30-Day Trend** — long-term Solar Flux Index chart with band-viability reference lines at 70 / 100 / 150 / 200 SFU.
+- **Space Weather SWPC Alerts** — scrollable live timeline of NOAA SWPC alerts (flares, geostorms, CME) with color-coded severity.
+- **NOAA Severity Scales** — 3×4 table showing current and D+1 to D+3 forecast for R (Radio Blackouts), S (Solar Radiation), and G (Geomagnetic) scales.
+- **Big Clock Widget** — high-visibility standalone clock with digital and analog faces, user-selectable color themes, UTC/Local toggle, and smooth sub-second hand animation.
+- **DX Cluster DXCC "Needed" Markers** — spots are tagged **N** (New DXCC), **B** (New Band), or **W** (Worked/Unconfirmed) based on your local ADIF log.
+- **DX Cluster Sub-Band Mode Badges** — intelligent CW / SSB / FT8 / FT4 / RTTY detection based on spot frequency.
+- **DX Cluster Band Legend** — persistent color legend identifying sub-band modes; click a band to filter (precursor to v1.4 full filtering).
+- **Greyline Windows Widget** — 24-hour timeline of ±30-minute sunrise/sunset windows for both DE and DX locations.
+- **Watchlist Batch Input** — paste comma- or space-separated callsigns (up to 256 characters) directly into the Watchlist setup field.
+- **Global Watchlist Notifications** — spot alerts for watched callsigns fire even when the Watchlist widget is not currently visible in any pane.
+- **VOACAP Short/Long Path & Take-Off Angle** — added Short Path / Long Path selection and user-defined TOA for high-fidelity propagation prediction.
+- **Solar Cycle 25 Progress** — tracks current cycle age, SSN trends, and projected time to solar maximum.
+- **"Center on DE" Map Mode** — persistent setting that keeps the map centered on your home longitude across all projections.
+- **NCDXF Band-Coded Beacon Markers** — beacon map markers are now color-coded by their active transmitting band.
+- **Marine "Find Closest" Feature** — automatically identifies and selects the nearest NOAA tide station and NDBC buoy based on your QTH coordinates.
+- **Dynamic Watchlist Sync** — watchlist changes via the web UI take effect immediately without a service reload.
+
+### Changed
+- **Map Controls** — anti-aliased geometry for map controls and menus; tooltips suppressed when a widget is expanded to full height.
+- **VOACAP UI** — propagation settings grouped into a "VOACAP Options" submenu; settings synchronized with the remote web UI.
+- **Audio Mute** — global mute setting synchronized across all notification buffers and TTS generators.
+
+### Fixed
+- **NOAA SWPC Data Format** — migrated all solar data parsers (Kp, SFI, Sunspot Number, Solar Wind, DST, X-Ray flux) from array-indexed to key-based JSON lookup, resolving "No Data" errors caused by upstream API format changes.
+- **Thread Safety** — resolved race conditions and deadlocks in network, sensor, and dashboard shutdown sequences.
+- **Version Comparison** — rewrote update checker using 32-bit bit-packing for deterministic comparison across beta and stable versions.
+- **Network Timeouts** — enforced 10-second server timeouts to prevent slow clients from stalling the HamClock process.
+- **Android** — keyboard auto-show/hide resolved; accidental selections during scroll suppressed.
+- **iOS** — landscape-only orientation enforced to preserve dashboard aspect ratio.
+- **Windows** — system font discovery and SysInfo crash on environments without thermal sensor zones.
+
+---
+
+## [v1.2.0] — 2026-03-31
+
+### Added
+- **Android Support** — official APK build workflow via Docker/GitHub Actions; native touch UX (scroll-gesture suppression, immersive landscape mode).
+- **iOS Support** — CI/CD pipeline for iOS simulator builds; landscape orientation enforced; Apple framework bridging.
+- **VOACAP DE-DX Widget** — hour-by-hour path reliability matrix showing 24-hour propagation forecasts for the active DE–DX path.
+- **Solar Cycle 25 Tracker Widget** — real-time SSN trends, cycle phase classification, and time-to-maximum prediction.
+- **Greyline Windows Widget** — 24-hour timeline visualizing ±30-minute sunrise/sunset windows for DE and DX locations.
+- **DXCC Progress (Recent) Widget** — dynamic tracking of unique DXCC entities worked from the 100 most recent ADIF log entries.
+- **Space Weather Alerts Widget** — live stream of NOAA SWPC alerts (X/M flares, geostorms, CME) with color-coded severity.
+- **NOAA Severity Scales Widget** — instant visualization of current R / S / G scale values.
+- **Standalone Satellite Widget** — dedicated satellite tracking widget placeable in any pane, decoupled from the DX Info panel.
+- **LiveSpots Map Tooltips** — hovering over a PSK Reporter / RBN / WSPR spot on the map shows frequency, mode, and country name.
+- **Astronomical Star Field** — Yale BSC subset (mag ≤ 4.5) rendered on the map background, correctly projected for Robinson and Azimuthal views.
+- **Side Panel Full-Height Mode** — Panes 5 and 6 can be toggled to full height for scrollable list widgets (DX Cluster, Live Spots, Calendar).
+
+### Changed
+- **DX Cluster Marker Style** — updated to match original HamClock "CircleWithDot" bullseye; band-color coding applied to active spots.
+- **NCDXF Beacons** — rendered as standard triangles on the map, matching original HamClock style.
+- **CalendarPanel** — added "Today" and "Tomorrow" date headings for improved event legibility.
+- **Widget Self-Registration** — eliminated centralized WidgetType enum and switch blocks; widgets now self-register via `REGISTER_WIDGET` macro for a modular, contributor-friendly architecture.
+- **Setup Screen Pane Selection** — replaced abstract "Top 1–4" buttons with a visual pane diagram.
+
+### Fixed
+- **Thread Safety** — completed C++ concurrency audit; fixed 5 critical data races, TOCTOU hazards, and blocking joins.
+- **Sensor Threads** — GPS, BME280, and LTR329 handlers now use interruptible condition variable waits instead of bare sleeps; improves shutdown responsiveness.
+- **Observer Coordinates** — DXSatPane and GimbalPane now reliably load user-defined QTH coordinates on startup (was defaulting to 0,0).
+- **Tooltip Ghost** — tooltips no longer persist when the cursor crosses pane boundaries.
+- **Windows** — font discovery paths corrected; SysInfo crash resolved on systems without thermal sensor zones.
+- **SpaceWxAlerts** — layout collision and flicker resolved.
+
+---
+
+## [v1.1.0] — 2026-03-20
+
+### Added
+- **Rig Control Widget** — live CAT control via Hamlib `rigctld`; compact mode shows frequency/mode, expanded mode adds frequency stepping, VFO A/B, RIT, split, and S-meter.
+- **Solar Impact Timeline Widget** — 3-day Kp forecast displayed as an impact timeline.
+- **Widget Maximize** — any pane can be expanded to temporarily fill the map area for a larger view.
+- **Contest Mode Profile** — quick-swap contest layout preset with one click.
+- **ONTA Geofenced Distance Filter** — filter POTA/SOTA activators by maximum distance (km) from your QTH.
+- **Voice Alerts (TTS)** — native voice notifications via `flite` for Watchlist hits, solar flares, countdowns, and calendar events.
+- **LTR329 Photosensor Driver** — automatic ambient-light dimming via I²C sensor on Raspberry Pi and similar hardware.
+- **WSPR Heatmap Integration** — WSPR source data integrated into the propagation Heatmap engine (via db1.wspr.live).
+- **New REST Endpoints** — `/get_capabilities`, `/get_config.json`, `/get_build.txt`, `/get_env.txt`, `/get_sensors.txt`, `/get_stopwatch.txt`, `/debug/logs` (in-memory ring buffer); `set_pane` extended with `solo` mode.
+- **Glyph Font Fallback** — missing Unicode symbols now fall back to a bundled glyph font when a custom font is active.
+
+### Changed
+- **GreylineDXPanel** — added peak countdown timers and near-peak visual warnings.
+- **CalendarPanel** — inline configuration, state persistence, ListPanel visual style, multi-line hover tooltips.
+- **SolarStormPanel** — added CME arrival countdown display.
+- **Architecture** — major decomposition of `SetupScreen.cpp` and `main.cpp` into focused modules; `ProviderBase` standardizes update intervals and thread lifetimes across all networking providers; `GraphHelper` deduplicates time-series rendering logic; `TimeUtils` standardizes date/time formatting.
+
+### Fixed
+- **Web Config** — missing handlers for latitude/longitude, audio muting, and font selection added to the web UI.
+- **Moon and SDO Panels** — no longer render as invisible under light themes (paper background bleed-through resolved).
+- **TTS Behavior** — startup greeting plays only once; voice alerts silent when screen is blanked.
+- **Stability** — 4 dangling-pointer and Use-After-Free issues fixed in satellite tracking and WebServer teardown; MJPEG mutex deadlock resolved.
+- **Heatmap Overlay** — fixed skipped data computations and persistence bugs.
+
+---
+
 ## [v1.0.0] — 2026-03-13
 
 ### Added
