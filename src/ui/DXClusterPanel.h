@@ -107,4 +107,5 @@ private:
   static constexpr int MAX_VISIBLE_ROWS = 15;
 
   int legendH_ = 0;
+  int activeBandFilter_ = -1;
 };
