@@ -55,6 +55,18 @@ static const RobinsonCoeff robinson_coeffs[] = {
     {0.7986, 0.7346}, {0.7597, 0.7903}, {0.7186, 0.8435}, {0.6732, 0.8936},
     {0.6213, 0.9394}, {0.5722, 0.9761}, {0.5322, 1.0000}};
 
+float MapWidget::getRobinsonXCoeff(double lat) {
+  double abs_lat = std::abs(lat);
+  if (abs_lat > 90.0)
+    abs_lat = 90.0;
+  int idx = static_cast<int>(abs_lat / 5.0);
+  if (idx >= 18)
+    idx = 17;
+  double remainder = (abs_lat - idx * 5.0) / 5.0;
+  return robinson_coeffs[idx].x +
+         (robinson_coeffs[idx + 1].x - robinson_coeffs[idx].x) * remainder;
+}
+
 static void projectRobinson(double lat, double lon, double &nx, double &ny) {
   double abs_lat = std::abs(lat);
   if (abs_lat > 90.0)
@@ -64,9 +76,7 @@ static void projectRobinson(double lat, double lon, double &nx, double &ny) {
     idx = 17;
   double remainder = (abs_lat - idx * 5.0) / 5.0;
 
-  double x_coeff =
-      robinson_coeffs[idx].x +
-      (robinson_coeffs[idx + 1].x - robinson_coeffs[idx].x) * remainder;
+  double x_coeff = MapWidget::getRobinsonXCoeff(lat);
   double y_coeff =
       robinson_coeffs[idx].y +
       (robinson_coeffs[idx + 1].y - robinson_coeffs[idx].y) * remainder;
@@ -75,7 +85,10 @@ static void projectRobinson(double lat, double lon, double &nx, double &ny) {
   ny = (lat < 0) ? -y_coeff : y_coeff;  // [-1, 1]
 }
 
-static void inverseRobinson(double nx, double ny, double &lat, double &lon) {
+static bool inverseRobinson(double nx, double ny, double &lat, double &lon) {
+  if (std::abs(ny) > 1.0)
+    return false;
+
   double low = -90.0, high = 90.0;
   for (int i = 0; i < 20; ++i) {
     double mid = (low + high) / 2.0;
@@ -92,17 +105,17 @@ static void inverseRobinson(double nx, double ny, double &lat, double &lon) {
   int idx = static_cast<int>(abs_lat / 5.0);
   if (idx >= 18)
     idx = 17;
-  double remainder = (abs_lat - idx * 5.0) / 5.0;
-  double x_coeff =
-      robinson_coeffs[idx].x +
-      (robinson_coeffs[idx + 1].x - robinson_coeffs[idx].x) * remainder;
+  double x_coeff = MapWidget::getRobinsonXCoeff(lat);
   if (x_coeff < 0.01)
     x_coeff = 0.01;
+
+  bool inside = (std::abs(nx) <= x_coeff);
   lon = (nx / x_coeff) * 180.0;
   if (lon > 180.0)
     lon = 180.0;
   if (lon < -180.0)
     lon = -180.0;
+  return inside;
 }
 
 // Azimuthal equidistant projection helpers (all angles in degrees)
@@ -334,10 +347,13 @@ bool MapWidget::screenToLatLon(int sx, int sy, double &lat, double &lon) const {
         (static_cast<double>(sx - mapRect_.x) / mapRect_.w) * 2.0 - 1.0;
     double rny =
         1.0 - (static_cast<double>(sy - mapRect_.y) / mapRect_.h) * 2.0;
-    inverseRobinson(rnx, rny, lat, lon);
+    if (!inverseRobinson(rnx, rny, lat, lon))
+      return false;
     lon += config_.mapCenterLon;
-    while (lon > 180.0) lon -= 360.0;
-    while (lon < -180.0) lon += 360.0;
+    while (lon > 180.0)
+      lon -= 360.0;
+    while (lon < -180.0)
+      lon += 360.0;
     return true;
   }
   if (config_.projection == "azimuthal") {
@@ -411,6 +427,8 @@ void MapWidget::update() {
     if (std::abs(config_.mapCenterLon - state_->deLocation.lon) > 0.001) {
       config_.mapCenterLon = state_->deLocation.lon;
     }
+  } else if (std::abs(config_.mapCenterLon) > 0.001) {
+    config_.mapCenterLon = 0.0;
   }
 
   // Detect map shift and invalidate mesh/geometry
@@ -727,6 +745,13 @@ void MapWidget::render(SDL_Renderer *renderer) {
       greatCircleDirty_ = true;
       satTrackDirty_ = true;
       asteroidTrackDirty_ = true;
+      // Invalidate overlay meshes for the new projection
+      shadowVerts_.clear();
+      lightVerts_.clear();
+      nightIndices_.clear();
+      nightLightIndices_.clear();
+      auroraVerts_.clear();
+      propVerts_.clear();
       // Clear WX GPU buffers — will be re-projected on next getSegments() call.
       wxVerts_.clear();
       wxIndices_.clear();
@@ -899,8 +924,6 @@ void MapWidget::render(SDL_Renderer *renderer) {
   renderGridOverlay(renderer);
 
   // Render paths and dynamic markers
-  renderGreatCircle(renderer);
-
   renderGreatCircle(renderer);
 
   renderSatellite(renderer);

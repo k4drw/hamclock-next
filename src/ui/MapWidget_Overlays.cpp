@@ -213,9 +213,9 @@ void MapWidget::renderNightOverlay(SDL_Renderer *renderer) {
   const bool isAz = (config_.projection == "azimuthal" ||
                      config_.projection == "dual_azimuthal");
   const int gridW =
-      useCompatibilityRenderPath_ ? (isAz ? 96 : 48) : (isAz ? 192 : 96);
+      useCompatibilityRenderPath_ ? (isAz ? 128 : 64) : (isAz ? 256 : 128);
   const int gridH =
-      useCompatibilityRenderPath_ ? (isAz ? 48 : 24) : (isAz ? 96 : 48);
+      useCompatibilityRenderPath_ ? (isAz ? 64 : 32) : (isAz ? 128 : 64);
 
   // Constants matching original HamClock: 12 deg grayline, 0.75 power curve
   constexpr float GRAYLINE_COS = -0.21f;  // ~cos(90+12)
@@ -239,7 +239,10 @@ void MapWidget::renderNightOverlay(SDL_Renderer *renderer) {
   // Reuse buffers and only recompute if the sun has moved or size changed
   bool needsUpdate =
       (std::abs(lastUpdateSunLat_ - sunLat_) > 0.001 ||
-       std::abs(lastUpdateSunLon_ - sunLon_) > 0.001 || shadowVerts_.empty());
+       std::abs(lastUpdateSunLon_ - sunLon_) > 0.001 ||
+       std::abs(config_.mapCenterLon - lastMapCenterLon_) > 0.001 ||
+       config_.projection != lastUpdateProj_ ||
+       shadowVerts_.empty());
 
   if (shadowVerts_.size() != (size_t)((gridW + 1) * (gridH + 1))) {
     shadowVerts_.resize((gridW + 1) * (gridH + 1));
@@ -266,8 +269,7 @@ void MapWidget::renderNightOverlay(SDL_Renderer *renderer) {
                   : (cosZ > GRAYLINE_COS
                          ? 1.0f - std::pow(cosZ / GRAYLINE_COS, GRAYLINE_POW)
                          : 0.0f);
-          float nf = (1.0f - fd) * 0.50f;  // Mute night shading to 50% to allow
-                                           // overlays to show through
+          float nf = (1.0f - fd);
 
           // Projection-aware texture coordinates for night lights
           float u = static_cast<float>((lon + 180.0) / 360.0);
@@ -277,18 +279,47 @@ void MapWidget::renderNightOverlay(SDL_Renderer *renderer) {
           lightVerts_[idx] = {
               {sx, sy}, {255, 255, 255, (Uint8)(nf * 255)}, {u, v}};
         } else {
-          shadowVerts_[idx] = {{sx, sy}, {0, 0, 0, 0}, {0, 0}};
-          lightVerts_[idx] = {{sx, sy}, {0, 0, 0, 0}, {0, 0}};
+          // Boundary Snapping for Robinson/Azimuthal limbs
+          if (config_.projection == "robinson") {
+            // Find map-edge at this latitude
+            float x_coeff = MapWidget::getRobinsonXCoeff(lat);
+            float rnx = (sx < mapRect_.x + mapRect_.w * 0.5f) ? -x_coeff : x_coeff;
+            float snapped_sx = mapRect_.x + (rnx + 1.0f) * 0.5f * mapRect_.w;
+            
+            double latRad = lat * M_PI / 180.0;
+            double edgeLon = (rnx / (x_coeff > 0.01f ? x_coeff : 0.01f)) * 180.0 + config_.mapCenterLon;
+            while (edgeLon > 180.0) edgeLon -= 360.0;
+            while (edgeLon < -180.0) edgeLon += 360.0;
+            double dLonRad = (edgeLon * M_PI / 180.0) - sLonRad;
+            double cosZ = sinSLat * std::sin(latRad) +
+                          cosSLat * std::cos(latRad) * std::cos(dLonRad);
+            float fd = (cosZ > 0) ? 1.0f : (cosZ > GRAYLINE_COS ? 1.0f - std::pow(cosZ / GRAYLINE_COS, GRAYLINE_POW) : 0.0f);
+            float nf = (1.0f - fd);
+            float u = static_cast<float>((edgeLon + 180.0) / 360.0);
+            float v = static_cast<float>((90.0 - lat) / 180.0);
+
+            shadowVerts_[idx] = {{snapped_sx, sy}, {255, 255, 255, (Uint8)(nf * 255)}, {0, 0}};
+            lightVerts_[idx] = {{snapped_sx, sy}, {255, 255, 255, (Uint8)(nf * 255)}, {u, v}};
+          } else {
+            shadowVerts_[idx] = {{sx, sy}, {0, 0, 0, 0}, {0, 0}};
+            lightVerts_[idx] = {{sx, sy}, {0, 0, 0, 0}, {0, 0}};
+          }
         }
       }
     }
     lastUpdateSunLat_ = sunLat_;
     lastUpdateSunLon_ = sunLon_;
+    lastMapCenterLon_ = config_.mapCenterLon;
+    lastUpdateProj_ = config_.projection;
   }
 
-  if (nightIndices_.size() != (size_t)(gridW * gridH * 6)) {
+  if (needsUpdate || nightIndices_.empty() || nightLightIndices_.empty()) {
+    // Reset light grid to base size before adding duplication-fix vertices
+    lightVerts_.resize((gridW + 1) * (gridH + 1));
     nightIndices_.clear();
     nightIndices_.reserve(gridW * gridH * 6);
+    nightLightIndices_.clear();
+    nightLightIndices_.reserve(gridW * gridH * 6);
     for (int j = 0; j < gridH; ++j) {
       for (int i = 0; i < gridW; ++i) {
         int p0 = j * (gridW + 1) + i;
@@ -296,27 +327,103 @@ void MapWidget::renderNightOverlay(SDL_Renderer *renderer) {
         int p2 = (j + 1) * (gridW + 1) + i;
         int p3 = p2 + 1;
 
-        // Check for texture wrapping (crossing date line) in Azimuthal
-        bool wrap = false;
-        if (config_.projection == "azimuthal" ||
-            config_.projection == "dual_azimuthal") {
-          float u0 = lightVerts_[p0].tex_coord.x;
-          float u1 = lightVerts_[p1].tex_coord.x;
-          float u2 = lightVerts_[p2].tex_coord.x;
-          float u3 = lightVerts_[p3].tex_coord.x;
-          if (std::abs(u0 - u1) > 0.5f || std::abs(u0 - u2) > 0.5f ||
-              std::abs(u1 - u3) > 0.5f) {
-            wrap = true;
-          }
-        }
-
-        if (!wrap) {
+        // Shading: Add both triangles of the quad if any vertex is inside the map.
+        // The alpha gradient will provide a smooth, non-jagged edge.
+        if (shadowVerts_[p0].color.a > 0 || shadowVerts_[p1].color.a > 0 ||
+            shadowVerts_[p2].color.a > 0 || shadowVerts_[p3].color.a > 0) {
           nightIndices_.push_back(p0);
           nightIndices_.push_back(p1);
           nightIndices_.push_back(p2);
           nightIndices_.push_back(p2);
           nightIndices_.push_back(p1);
           nightIndices_.push_back(p3);
+        }
+
+        // Lights: Triangles with UV-seam splitting.
+        // For cells spanning the texture seam, we mathematically split them
+        // at the U=0.0/1.0 boundary to provide perfectly solid coverage.
+        float u0 = lightVerts_[p0].tex_coord.x;
+        float u1 = lightVerts_[p1].tex_coord.x;
+        float u2 = lightVerts_[p2].tex_coord.x;
+        float u3 = lightVerts_[p3].tex_coord.x;
+
+        // Detect seam crossing on horizontal edges
+        bool wrap01 = std::abs(u0 - u1) > 0.5f;
+        bool wrap23 = std::abs(u2 - u3) > 0.5f;
+
+        if (!wrap01 && !wrap23) {
+          // No seam crossing: standard triangles (if any vertex in quad is in-map)
+          if (lightVerts_[p0].color.a > 0 || lightVerts_[p1].color.a > 0 ||
+              lightVerts_[p2].color.a > 0 || lightVerts_[p3].color.a > 0) {
+            nightLightIndices_.push_back(p0);
+            nightLightIndices_.push_back(p1);
+            nightLightIndices_.push_back(p2);
+            nightLightIndices_.push_back(p2);
+            nightLightIndices_.push_back(p1);
+            nightLightIndices_.push_back(p3);
+          }
+        } else {
+          // Crosses longitude seam: Calculate intersection points at U=1.0/0.0
+          auto splitEdge = [&](int idxA, int idxB, SDL_Vertex &vLeft, SDL_Vertex &vRight) {
+            const SDL_Vertex &va = lightVerts_[idxA];
+            const SDL_Vertex &vb = lightVerts_[idxB];
+            float ua = va.tex_coord.x;
+            float ub = vb.tex_coord.x;
+            if (std::abs(ua - ub) > 0.5f) {
+              float t = (ua > ub) ? (1.0f - ua) / ((1.0f - ua) + ub)
+                                  : (1.0f - ub) / ((1.0f - ub) + ua);
+              vLeft = va;
+              vLeft.position.x = va.position.x + t * (vb.position.x - va.position.x);
+              vLeft.position.y = va.position.y + t * (vb.position.y - va.position.y);
+              vLeft.color.a = (Uint8)(va.color.a + t * (vb.color.a - va.color.a));
+              vLeft.tex_coord.x = (ua > ub) ? 1.0f : 0.0f;
+              vRight = vLeft;
+              vRight.tex_coord.x = (ua > ub) ? 0.0f : 1.0f;
+              if (ua < ub) std::swap(vLeft, vRight);
+            } else {
+              // Edge doesn't cross, but cell does. Use the "natural" side.
+              vLeft = (ua > 0.5f) ? vb : va;
+              vRight = vLeft;
+            }
+          };
+
+          SDL_Vertex s0L, s0R, s1L, s1R;
+          splitEdge(p0, p1, s0L, s0R);
+          splitEdge(p2, p3, s1L, s1R);
+
+          int startIdx = (int)lightVerts_.size();
+          lightVerts_.push_back(s0L); // startIdx + 0
+          lightVerts_.push_back(s0R); // startIdx + 1
+          lightVerts_.push_back(s1L); // startIdx + 2
+          lightVerts_.push_back(s1R); // startIdx + 3
+
+          // Left-side sub-quad (ends at U=1.0)
+          int lp0 = (u0 > 0.5f) ? p0 : p1;
+          int lp2 = (u2 > 0.5f) ? p2 : p3;
+          if (lightVerts_[lp0].color.a > 0 || lightVerts_[lp2].color.a > 0 || lightVerts_[startIdx + 0].color.a > 0) {
+            nightLightIndices_.push_back(lp0);
+            nightLightIndices_.push_back(startIdx + 0);
+            nightLightIndices_.push_back(lp2);
+          }
+          if (lightVerts_[lp2].color.a > 0 || lightVerts_[startIdx + 0].color.a > 0 || lightVerts_[startIdx + 2].color.a > 0) {
+            nightLightIndices_.push_back(lp2);
+            nightLightIndices_.push_back(startIdx + 0);
+            nightLightIndices_.push_back(startIdx + 2);
+          }
+
+          // Right-side sub-quad (starts at U=0.0)
+          int rp1 = (u0 <= 0.5f) ? p0 : p1;
+          int rp3 = (u2 <= 0.5f) ? p2 : p3;
+          if (lightVerts_[startIdx + 1].color.a > 0 || lightVerts_[rp1].color.a > 0 || lightVerts_[startIdx + 3].color.a > 0) {
+            nightLightIndices_.push_back(startIdx + 1);
+            nightLightIndices_.push_back(rp1);
+            nightLightIndices_.push_back(startIdx + 3);
+          }
+          if (lightVerts_[startIdx + 3].color.a > 0 || lightVerts_[rp1].color.a > 0 || lightVerts_[rp3].color.a > 0) {
+            nightLightIndices_.push_back(startIdx + 3);
+            nightLightIndices_.push_back(rp1);
+            nightLightIndices_.push_back(rp3);
+          }
         }
       }
     }
@@ -338,8 +445,8 @@ void MapWidget::renderNightOverlay(SDL_Renderer *renderer) {
       SDL_SetTextureColorMod(nightTex, 255, 255, 255);
       SDL_SetTextureBlendMode(nightTex, SDL_BLENDMODE_BLEND);
       SDL_RenderGeometry(renderer, nightTex, lightVerts_.data(),
-                         (int)lightVerts_.size(), nightIndices_.data(),
-                         (int)nightIndices_.size());
+                         (int)lightVerts_.size(), nightLightIndices_.data(),
+                         (int)nightLightIndices_.size());
     }
   }
 #else
@@ -1174,9 +1281,9 @@ void MapWidget::renderPropagationOverlay(SDL_Renderer *renderer) {
   const bool isAz = (config_.projection == "azimuthal" ||
                      config_.projection == "dual_azimuthal");
   const int gridW =
-      useCompatibilityRenderPath_ ? (isAz ? 96 : 48) : (isAz ? 192 : 96);
+      useCompatibilityRenderPath_ ? (isAz ? 128 : 64) : (isAz ? 256 : 128);
   const int gridH =
-      useCompatibilityRenderPath_ ? (isAz ? 48 : 24) : (isAz ? 96 : 48);
+      useCompatibilityRenderPath_ ? (isAz ? 64 : 32) : (isAz ? 128 : 64);
 
   // Ensure vertices are populated BEFORE built indices if projection or size
   // changed. This prevents 'wrap' detection from using uninitialized UV

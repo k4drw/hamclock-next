@@ -128,6 +128,9 @@ public:
   void showCalendarAlert(const std::string &summary, const std::string &source,
                          time_t startTime, int dismissMinutes);
 
+  // Robinson boundary helper
+  static float getRobinsonXCoeff(double lat);
+
 private:
   SDL_FPoint latLonToScreen(double lat, double lon) const;
   bool screenToLatLon(int sx, int sy, double &lat, double &lon) const;
@@ -205,7 +208,8 @@ private:
   std::vector<SDL_Vertex> shadowVerts_;
   std::vector<SDL_Vertex> lightVerts_;
   std::vector<SDL_Vertex> propVerts_;
-  std::vector<int> nightIndices_;    // screen-space: shadow/light overlay + azimuthal base map
+  std::vector<int> nightIndices_;      // screen-space: shadow overlay + azimuthal base map
+  std::vector<int> nightLightIndices_; // screen-space: light overlay (culled for texture wrapping)
   std::vector<int> mapBaseIndices_;  // lat/lon-space: base map, grib cloud, weather fill
   std::vector<int> propIndices_;
   std::vector<SDL_Vertex> auroraVerts_;
@@ -300,6 +304,7 @@ private:
   double lastUpdateSunLat_ = -999.0;
   double lastUpdateSunLon_ = -999.0;
   double lastMapCenterLon_ = -999.0;
+  std::string lastUpdateProj_ = "";
 
   void renderOverlayInfo(SDL_Renderer *renderer);
   void renderRssButton(SDL_Renderer *renderer);
