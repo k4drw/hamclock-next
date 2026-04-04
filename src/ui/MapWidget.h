@@ -142,6 +142,8 @@ private:
   void renderMarker(SDL_Renderer *renderer, double lat, double lon, Uint8 r,
                     Uint8 g, Uint8 b, MarkerShape shape = MarkerShape::Circle,
                     bool outline = true);
+  void resetMap();
+  void showDEMenu(int mx, int my);
   void renderSatellite(SDL_Renderer *renderer);
   void renderSatFootprint(SDL_Renderer *renderer, double lat, double lon,
                           double footprintKm);
@@ -201,6 +203,10 @@ private:
   double sunLon_ = 0;
   uint32_t lastPosUpdateMs_ = 0;
   uint32_t lastSatTrackUpdateMs_ = 0;
+  uint32_t rightClickTimeMs_ = 0;
+  bool deMenuPending_ = false;
+  int deMenuX_ = 0;
+  int deMenuY_ = 0;
 
   // Math caches to save CPU
   std::vector<LatLon> cachedGreatCircle_;
@@ -267,6 +273,9 @@ private:
   SDL_Rect deMenuRect_ = {0, 0, 0, 0};
   double deMenuLat_ = 0, deMenuLon_ = 0;
   bool mouseDown_ = false;
+  int lastMouseX_ = 0, lastMouseY_ = 0;
+  bool dragThresholdMet_ = false;
+  uint32_t clickTimeMs_ = 0;
 
   void renderDeMenu(SDL_Renderer *renderer);
   void renderLegend(SDL_Renderer *renderer);
@@ -291,11 +300,17 @@ private:
   uint32_t lastPropUpdateMs_ = 0;
   std::chrono::system_clock::time_point lastAuroraUpdateTime_;
   std::string lastAuroraProjection_;
+  double lastAuroraZoom_ = 1.0;
+  int lastAuroraPanX_ = 0;
+  int lastAuroraPanY_ = 0;
   SDL_Texture *auroraTexture_ = nullptr;
   PropOverlayType lastPropType_ = PropOverlayType::None;
   std::string lastPropProj_ = "";
   SDL_Rect lastPropMapRect_ = {0, 0, 0, 0};
   double lastPropCenterLon_ = -999.0;
+  double lastPropZoom_ = 1.0;
+  int lastPropPanX_ = 0;
+  int lastPropPanY_ = 0;
   std::string lastBand_;
   std::string lastMode_;
   int lastPower_ = -1;
@@ -303,8 +318,14 @@ private:
   int lastPath_ = -1;
   double lastUpdateSunLat_ = -999.0;
   double lastUpdateSunLon_ = -999.0;
+  double lastUpdateZoom_ = 1.0;
+  int lastUpdatePanX_ = 0;
+  int lastUpdatePanY_ = 0;
   double lastMapCenterLon_ = -999.0;
   std::string lastUpdateProj_ = "";
+  double lastWxZoom_ = 1.0;
+  int lastWxPanX_ = 0;
+  int lastWxPanY_ = 0;
 
   void renderOverlayInfo(SDL_Renderer *renderer);
   void renderRssButton(SDL_Renderer *renderer);

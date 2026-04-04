@@ -223,6 +223,47 @@ void MapWidget::setTheme(const std::string &theme) {
 }
 void MapWidget::setMetric(bool metric) { Widget::setMetric(metric); }
 
+void MapWidget::resetMap() {
+  config_.mapZoom = 1.0;
+  config_.mapPanX = 0;
+  config_.mapPanY = 0;
+  mapVerts_.clear();
+  gridDirty_ = true;
+  borderDirty_ = true;
+  greatCircleDirty_ = true;
+  satTrackDirty_ = true;
+  asteroidTrackDirty_ = true;
+  wxVerts_.clear();
+  if (wxmb_)
+    wxmb_->invalidate();
+}
+
+void MapWidget::showDEMenu(int mx, int my) {
+  if (mapViewMenu_->isVisible())
+    return;
+
+  double lat, lon;
+  if (!screenToLatLon(mx, my, lat, lon)) {
+    deMenuVisible_ = false;
+    return;
+  }
+
+  deMenuVisible_ = true;
+  deMenuLat_ = lat;
+  deMenuLon_ = lon;
+
+  // Size the menu
+  int menuW = 110;
+  int menuH = 30;
+  deMenuRect_ = {mx, my, menuW, menuH};
+
+  // Boundary check
+  if (deMenuRect_.x + deMenuRect_.w > HamClock::LOGICAL_WIDTH)
+    deMenuRect_.x -= deMenuRect_.w;
+  if (deMenuRect_.y + deMenuRect_.h > HamClock::LOGICAL_HEIGHT)
+    deMenuRect_.y -= deMenuRect_.h;
+}
+
 MapWidget::~MapWidget() {
   // Signal any in-flight WorkerService ground-track task to exit early rather
   // than dereference the now-dangling predictor_.
@@ -272,8 +313,15 @@ SDL_FPoint MapWidget::latLonToScreen(double lat, double lon) const {
     // Clamp coordinates to [0, 1] range to avoid edge sampling artifacts
     double nx = std::clamp((dLon + 180.0) / 360.0, 0.0, 1.0);
     double ny = std::clamp((90.0 - lat) / 180.0, 0.0, 1.0);
-    return {static_cast<float>(mapRect_.x + nx * mapRect_.w),
-            static_cast<float>(mapRect_.y + ny * mapRect_.h)};
+    float px = static_cast<float>(mapRect_.x + nx * mapRect_.w);
+    float py = static_cast<float>(mapRect_.y + ny * mapRect_.h);
+    if (config_.mapZoom > 1.0) {
+      float cx = mapRect_.x + mapRect_.w * 0.5f;
+      float cy = mapRect_.y + mapRect_.h * 0.5f;
+      px = (px - cx) * (float)config_.mapZoom + cx + (float)config_.mapPanX;
+      py = (py - cy) * (float)config_.mapZoom + cy + (float)config_.mapPanY;
+    }
+    return {px, py};
   }
   if (config_.projection == "robinson") {
     double centeredLon = lon - config_.mapCenterLon;
@@ -283,6 +331,12 @@ SDL_FPoint MapWidget::latLonToScreen(double lat, double lon) const {
     projectRobinson(lat, centeredLon, rnx, rny);
     float px = static_cast<float>(mapRect_.x + (rnx + 1.0) * 0.5 * mapRect_.w);
     float py = static_cast<float>(mapRect_.y + (1.0 - rny) * 0.5 * mapRect_.h);
+    if (config_.mapZoom > 1.0) {
+      float cx = mapRect_.x + mapRect_.w * 0.5f;
+      float cy = mapRect_.y + mapRect_.h * 0.5f;
+      px = (px - cx) * (float)config_.mapZoom + cx + (float)config_.mapPanX;
+      py = (py - cy) * (float)config_.mapZoom + cy + (float)config_.mapPanY;
+    }
     return {px, py};
   }
   if (config_.projection == "azimuthal") {
@@ -294,6 +348,12 @@ SDL_FPoint MapWidget::latLonToScreen(double lat, double lon) const {
     float scale = std::min(mapRect_.w, mapRect_.h);
     float px = mapRect_.x + (mapRect_.w * 0.5f) + (float)nx * (scale * 0.5f);
     float py = mapRect_.y + (mapRect_.h * 0.5f) - (float)ny * (scale * 0.5f);
+    if (config_.mapZoom > 1.0) {
+      float cx = mapRect_.x + mapRect_.w * 0.5f;
+      float cy = mapRect_.y + mapRect_.h * 0.5f;
+      px = (px - cx) * (float)config_.mapZoom + cx + (float)config_.mapPanX;
+      py = (py - cy) * (float)config_.mapZoom + cy + (float)config_.mapPanY;
+    }
     return {px, py};
   }
   if (config_.projection == "dual_azimuthal") {
@@ -302,12 +362,21 @@ SDL_FPoint MapWidget::latLonToScreen(double lat, double lon) const {
     int halfW = mapRect_.w / 2;
     float R = std::min(halfW, mapRect_.h) * 0.5f;
     // Left hemisphere: DE-centered
-    float cx = mapRect_.x + halfW * 0.5f;
+    float cxL = mapRect_.x + halfW * 0.5f;
     float cy = mapRect_.y + mapRect_.h * 0.5f;
     double nx, ny;
     projectAzimuthal(lat, lon, deLat, deLon, nx, ny);
-    float px = cx + (float)nx * R;
+    float px = cxL + (float)nx * R;
     float py = cy - (float)ny * R;
+
+    // TODO: if px > halfW, it should probably be in the other hemisphere?
+    // The existing logic doesn't seem to handle the split well for individual
+    // markers.
+    if (config_.mapZoom > 1.0) {
+      float cx = mapRect_.x + mapRect_.w * 0.5f;
+      px = (px - cx) * (float)config_.mapZoom + cx + (float)config_.mapPanX;
+      py = (py - cy) * (float)config_.mapZoom + cy + (float)config_.mapPanY;
+    }
     return {px, py};
   }
   if (config_.projection == "mercator") {
@@ -325,6 +394,12 @@ SDL_FPoint MapWidget::latLonToScreen(double lat, double lon) const {
     double nx = (centeredLon + 180.0) / 360.0;
     float px = static_cast<float>(mapRect_.x + nx * mapRect_.w);
     float py = static_cast<float>(mapRect_.y + ny * mapRect_.h);
+    if (config_.mapZoom > 1.0) {
+      float cx = mapRect_.x + mapRect_.w * 0.5f;
+      float cy = mapRect_.y + mapRect_.h * 0.5f;
+      px = (px - cx) * (float)config_.mapZoom + cx + (float)config_.mapPanX;
+      py = (py - cy) * (float)config_.mapZoom + cy + (float)config_.mapPanY;
+    }
     return {px, py};
   }
   double centeredLon = lon - config_.mapCenterLon;
@@ -334,19 +409,35 @@ SDL_FPoint MapWidget::latLonToScreen(double lat, double lon) const {
   double ny = (90.0 - lat) / 180.0;
   float px = static_cast<float>(mapRect_.x + nx * mapRect_.w);
   float py = static_cast<float>(mapRect_.y + ny * mapRect_.h);
+  if (config_.mapZoom > 1.0) {
+    float cx = mapRect_.x + mapRect_.w * 0.5f;
+    float cy = mapRect_.y + mapRect_.h * 0.5f;
+    px = (px - cx) * (float)config_.mapZoom + cx + (float)config_.mapPanX;
+    py = (py - cy) * (float)config_.mapZoom + cy + (float)config_.mapPanY;
+  }
   return {px, py};
 }
 
 bool MapWidget::screenToLatLon(int sx, int sy, double &lat, double &lon) const {
-  if (sx < mapRect_.x || sx > mapRect_.x + mapRect_.w || sy < mapRect_.y ||
-      sy > mapRect_.y + mapRect_.h)
+  float fx = (float)sx;
+  float fy = (float)sy;
+
+  if (config_.mapZoom > 1.0) {
+    float cx = mapRect_.x + mapRect_.w * 0.5f;
+    float cy = mapRect_.y + mapRect_.h * 0.5f;
+    fx = (fx - (float)config_.mapPanX - cx) / (float)config_.mapZoom + cx;
+    fy = (fy - (float)config_.mapPanY - cy) / (float)config_.mapZoom + cy;
+  }
+
+  if (fx < mapRect_.x || fx > mapRect_.x + mapRect_.w || fy < mapRect_.y ||
+      fy > mapRect_.y + mapRect_.h)
     return false;
 
   if (config_.projection == "robinson") {
     double rnx =
-        (static_cast<double>(sx - mapRect_.x) / mapRect_.w) * 2.0 - 1.0;
+        (static_cast<double>(fx - mapRect_.x) / mapRect_.w) * 2.0 - 1.0;
     double rny =
-        1.0 - (static_cast<double>(sy - mapRect_.y) / mapRect_.h) * 2.0;
+        1.0 - (static_cast<double>(fy - mapRect_.y) / mapRect_.h) * 2.0;
     if (!inverseRobinson(rnx, rny, lat, lon))
       return false;
     lon += config_.mapCenterLon;
@@ -357,8 +448,8 @@ bool MapWidget::screenToLatLon(int sx, int sy, double &lat, double &lon) const {
     return true;
   }
   if (config_.projection == "azimuthal") {
-    double nx = (static_cast<double>(sx - mapRect_.x) / mapRect_.w) * 2.0 - 1.0;
-    double ny = 1.0 - (static_cast<double>(sy - mapRect_.y) / mapRect_.h) * 2.0;
+    double nx = (static_cast<double>(fx - mapRect_.x) / mapRect_.w) * 2.0 - 1.0;
+    double ny = 1.0 - (static_cast<double>(fy - mapRect_.y) / mapRect_.h) * 2.0;
     double deLat = state_ ? state_->deLocation.lat : 0.0;
     double deLon = state_ ? state_->deLocation.lon : 0.0;
     return inverseAzimuthal(nx, ny, deLat, deLon, lat, lon);
@@ -368,7 +459,7 @@ bool MapWidget::screenToLatLon(int sx, int sy, double &lat, double &lon) const {
     double deLon = state_ ? state_->deLocation.lon : 0.0;
     int halfW = mapRect_.w / 2;
     float R = std::min(halfW, mapRect_.h) * 0.5f;
-    bool rightHalf = (sx >= mapRect_.x + halfW);
+    bool rightHalf = (fx >= mapRect_.x + halfW);
     float cx, cy;
     double centerLat, centerLon;
     if (!rightHalf) {
@@ -383,13 +474,13 @@ bool MapWidget::screenToLatLon(int sx, int sy, double &lat, double &lon) const {
       centerLat = -deLat;
       centerLon = deLon + (deLon >= 0.0 ? -180.0 : 180.0);
     }
-    double nx = (sx - cx) / R;
-    double ny = (cy - sy) / R;
+    double nx = (fx - cx) / R;
+    double ny = (cy - fy) / R;
     return inverseAzimuthal(nx, ny, centerLat, centerLon, lat, lon);
   }
   if (config_.projection == "mercator") {
-    double nx = static_cast<double>(sx - mapRect_.x) / mapRect_.w;
-    double ny = static_cast<double>(sy - mapRect_.y) / mapRect_.h;
+    double nx = static_cast<double>(fx - mapRect_.x) / mapRect_.w;
+    double ny = static_cast<double>(fy - mapRect_.y) / mapRect_.h;
     lon = nx * 360.0 - 180.0 + config_.mapCenterLon;
     while (lon > 180.0) lon -= 360.0;
     while (lon < -180.0) lon += 360.0;
@@ -401,8 +492,8 @@ bool MapWidget::screenToLatLon(int sx, int sy, double &lat, double &lon) const {
     return true;
   }
 
-  double nx = static_cast<double>(sx - mapRect_.x) / mapRect_.w;
-  double ny = static_cast<double>(sy - mapRect_.y) / mapRect_.h;
+  double nx = static_cast<double>(fx - mapRect_.x) / mapRect_.w;
+  double ny = static_cast<double>(fy - mapRect_.y) / mapRect_.h;
   lon = nx * 360.0 - 180.0 + config_.mapCenterLon;
   while (lon > 180.0) lon -= 360.0;
   while (lon < -180.0) lon += 360.0;
@@ -421,6 +512,12 @@ void MapWidget::update() {
   }
 
   uint32_t nowMs = SDL_GetTicks();
+
+  // Handle deferred DE menu display for right-click timing
+  if (deMenuPending_ && nowMs - rightClickTimeMs_ > 300) {
+    showDEMenu(deMenuX_, deMenuY_);
+    deMenuPending_ = false;
+  }
 
   // Auto-center on DE if enabled
   if (config_.centerMapOnDe) {
@@ -791,6 +888,12 @@ void MapWidget::render(SDL_Renderer *renderer) {
               int idx = j * (gridW + 1) + i;
               double nx = (sx - cx) / R;
               double ny = (cy - sy) / R;
+
+              if (config_.mapZoom > 1.0) {
+                nx = (nx * R - (float)config_.mapPanX) / (float)config_.mapZoom / R;
+                ny = (ny * R + (float)config_.mapPanY) / (float)config_.mapZoom / R;
+              }
+
               double lat, lon;
               if (inverseAzimuthal(nx, ny, deLat, deLon, lat, lon)) {
                 float u = static_cast<float>((lon + 180.0) / 360.0);
@@ -823,10 +926,18 @@ void MapWidget::render(SDL_Renderer *renderer) {
               if (sx < mapRect_.x + halfW) {
                 double nx = (sx - cxL) / R;
                 double ny = (cy - sy) / R;
+                if (config_.mapZoom > 1.0) {
+                  nx = (nx * R - (float)config_.mapPanX) / (float)config_.mapZoom / R;
+                  ny = (ny * R + (float)config_.mapPanY) / (float)config_.mapZoom / R;
+                }
                 valid = inverseAzimuthal(nx, ny, deLat, deLon, lat, lon);
               } else {
                 double nx = (sx - cxR) / R;
                 double ny = (cy - sy) / R;
+                if (config_.mapZoom > 1.0) {
+                  nx = (nx * R - (float)config_.mapPanX) / (float)config_.mapZoom / R;
+                  ny = (ny * R + (float)config_.mapPanY) / (float)config_.mapZoom / R;
+                }
                 valid = inverseAzimuthal(nx, ny, antiLat, antiLon, lat, lon);
               }
               if (valid) {
@@ -916,6 +1027,28 @@ void MapWidget::render(SDL_Renderer *renderer) {
   renderMufRtOverlay(renderer);
   renderNightOverlay(renderer);
   renderPropagationOverlay(renderer);
+  
+  // Overlays (clipped to mapRect_, and further constrained to exclude side panes
+  // when zoomed)
+  SDL_Rect clipRect = mapRect_;
+  if (config_.mapZoom > 1.0) {
+    int leftMax = mapRect_.x;
+    int rightMin = mapRect_.x + mapRect_.w;
+    for (auto *pane : panes_) {
+      if (pane) {
+        SDL_Rect pr = pane->getRect();
+        if (pr.x < x_ + width_ / 2) {
+          leftMax = std::max(leftMax, pr.x + pr.w);
+        } else {
+          rightMin = std::min(rightMin, pr.x);
+        }
+      }
+    }
+    clipRect.x = leftMax;
+    clipRect.w = rightMin - leftMax;
+  }
+
+  SDL_RenderSetClipRect(renderer, &clipRect);
 
   // Render global references and boundaries
   renderAuroraOverlay(renderer);
@@ -933,6 +1066,8 @@ void MapWidget::render(SDL_Renderer *renderer) {
   renderADIFPins(renderer);
   renderONTASpots(renderer);
   renderBeacons(renderer);
+
+  SDL_RenderSetClipRect(renderer, nullptr);
 
   renderMarker(renderer, state_->deLocation.lat, state_->deLocation.lon,
                themes.accent.r, themes.accent.g, themes.accent.b);

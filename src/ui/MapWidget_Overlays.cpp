@@ -242,6 +242,9 @@ void MapWidget::renderNightOverlay(SDL_Renderer *renderer) {
        std::abs(lastUpdateSunLon_ - sunLon_) > 0.001 ||
        std::abs(config_.mapCenterLon - lastMapCenterLon_) > 0.001 ||
        config_.projection != lastUpdateProj_ ||
+       config_.mapZoom != lastUpdateZoom_ ||
+       config_.mapPanX != lastUpdatePanX_ ||
+       config_.mapPanY != lastUpdatePanY_ ||
        shadowVerts_.empty());
 
   if (shadowVerts_.size() != (size_t)((gridW + 1) * (gridH + 1))) {
@@ -311,6 +314,9 @@ void MapWidget::renderNightOverlay(SDL_Renderer *renderer) {
     lastUpdateSunLon_ = sunLon_;
     lastMapCenterLon_ = config_.mapCenterLon;
     lastUpdateProj_ = config_.projection;
+    lastUpdateZoom_ = config_.mapZoom;
+    lastUpdatePanX_ = config_.mapPanX;
+    lastUpdatePanY_ = config_.mapPanY;
   }
 
   if (needsUpdate || nightIndices_.empty() || nightLightIndices_.empty()) {
@@ -1294,8 +1300,10 @@ void MapWidget::renderPropagationOverlay(SDL_Renderer *renderer) {
        lastPropMapRect_.w != mapRect_.w || lastPropMapRect_.h != mapRect_.h);
   bool centerChanged = (std::abs(config_.mapCenterLon - lastPropCenterLon_) > 0.001);
   bool typeChanged = (lastPropType_ != config_.propOverlay);
+  bool zoomChanged = (config_.mapZoom != lastPropZoom_);
+  bool panChanged = (config_.mapPanX != lastPropPanX_ || config_.mapPanY != lastPropPanY_);
 
-  if (projChanged || rectChanged || centerChanged || typeChanged ||
+  if (projChanged || rectChanged || centerChanged || typeChanged || zoomChanged || panChanged ||
       propVerts_.size() != (size_t)((gridW + 1) * (gridH + 1))) {
     propVerts_.resize((gridW + 1) * (gridH + 1));
     if (config_.projection == "dual_azimuthal") {
@@ -1339,10 +1347,13 @@ void MapWidget::renderPropagationOverlay(SDL_Renderer *renderer) {
     lastPropMapRect_ = mapRect_;
     lastPropCenterLon_ = config_.mapCenterLon;
     lastPropType_ = config_.propOverlay;
+    lastPropZoom_ = config_.mapZoom;
+    lastPropPanX_ = config_.mapPanX;
+    lastPropPanY_ = config_.mapPanY;
   }
 
-  // Now rebuild indices if the count is wrong or projection/center/type changed
-  if (propIndices_.empty() || projChanged || rectChanged || centerChanged || typeChanged) {
+  // Now rebuild indices if the count is wrong or projection/center/type/zoom/pan changed
+  if (propIndices_.empty() || projChanged || rectChanged || centerChanged || typeChanged || zoomChanged || panChanged) {
     propIndices_.clear();
     propIndices_.reserve(gridW * gridH * 6);
     for (int j = 0; j < gridH; ++j) {
@@ -1462,9 +1473,16 @@ void MapWidget::renderWxMbOverlay(SDL_Renderer *renderer) {
     std::vector<WxSegment> segs;
     std::vector<WxQuiver> quivers;
     SDL_Surface *fillSurface = nullptr;
-    if (wxmb_->getSegments(segs, quivers, fillSurface)) {
+    bool zoomChanged = (config_.mapZoom != lastWxZoom_);
+    bool panChanged = (config_.mapPanX != lastWxPanX_ || config_.mapPanY != lastWxPanY_);
+
+    if (wxmb_->getSegments(segs, quivers, fillSurface) || zoomChanged || panChanged || wxVerts_.empty()) {
       wxVerts_.clear();
       wxIndices_.clear();
+      
+      lastWxZoom_ = config_.mapZoom;
+      lastWxPanX_ = config_.mapPanX;
+      lastWxPanY_ = config_.mapPanY;
 
       if (fillSurface) {
         if (wxFillTex_) {
@@ -2150,6 +2168,9 @@ void MapWidget::renderAuroraOverlay(SDL_Renderer *renderer) {
   bool needsUpdate = !auroraTexture_ ||
                      auroraVerts_.empty() ||
                      (lastAuroraProjection_ != config_.projection) ||
+                     (config_.mapZoom != lastAuroraZoom_) ||
+                     (config_.mapPanX != lastAuroraPanX_) ||
+                     (config_.mapPanY != lastAuroraPanY_) ||
                      (data.lastUpdate > lastAuroraUpdateTime_);
 
   if (needsUpdate) {
@@ -2268,6 +2289,9 @@ void MapWidget::renderAuroraOverlay(SDL_Renderer *renderer) {
 
     lastAuroraUpdateTime_ = data.lastUpdate;
     lastAuroraProjection_ = config_.projection;
+    lastAuroraZoom_ = config_.mapZoom;
+    lastAuroraPanX_ = config_.mapPanX;
+    lastAuroraPanY_ = config_.mapPanY;
   }
 
   if (auroraTexture_ && !auroraVerts_.empty()) {
