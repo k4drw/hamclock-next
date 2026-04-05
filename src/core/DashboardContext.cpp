@@ -199,7 +199,19 @@ using namespace HamClock;
 class DisplayPower;
 void preventRPiSleep(bool prevent, DisplayPower *dp = nullptr);
 
-AppContext::~AppContext() = default;
+AppContext::~AppContext() {
+#ifndef __EMSCRIPTEN__
+  // Stop the WebServer thread before any member destructors run.
+  // dashboard (DashboardContext) is declared after webServer in AppContext, so it
+  // would normally be destroyed first by reverse member-destruction order — leaving
+  // the HTTP thread holding dangling raw pointers to timePanel_, rssBanner_,
+  // adifProvider_, satMgr_, etc. that live inside DashboardContext.
+  // Explicitly stopping here ensures the thread is joined before anything it
+  // references can be freed.
+  if (webServer)
+    webServer->stop();
+#endif
+}
 
 void AppContext::updateLayoutMetrics() {
   SDL_GetWindowSize(window, &globalWinW, &globalWinH);
