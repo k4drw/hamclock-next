@@ -334,6 +334,9 @@ private:
   double lastWxZoom_ = 1.0;
   int lastWxPanX_ = 0;
   int lastWxPanY_ = 0;
+  
+  size_t propRotationIdx_ = 0;
+  Uint32 lastPropRotateMs_ = 0;
 
   void renderOverlayInfo(SDL_Renderer *renderer);
   void renderRssButton(SDL_Renderer *renderer);

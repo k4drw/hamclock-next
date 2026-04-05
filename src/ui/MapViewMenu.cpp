@@ -32,6 +32,9 @@ void MapViewMenu::show(AppConfig &config, std::function<void()> onApply) {
   propPath_ = config.propPath;
   propColormap_ = config.propColormap;
 
+  propRotation_ = config.propRotation;
+  rotatingProp_ = !propRotation_.empty();
+
   char buf[32];
   std::snprintf(buf, sizeof(buf), "%d", static_cast<int>(propToa_));
   propToaInput_.setValue(buf);
@@ -110,6 +113,18 @@ void MapViewMenu::show(AppConfig &config, std::function<void()> onApply) {
   spRec_ = {c2, y + 13, 16 + 10 + spLabelW, 16};
   int lpLabelW = fontMgr_.getLogicalWidth("Long Path", cat->ptSize(FontStyle::Fast));
   lpRec_ = {c3, y + 13, 16 + 10 + lpLabelW, 16};
+
+  // Rotation checklist rects (2 columns)
+  propRotationHeaderY_ = voacapHeaderY_;
+  propRotationCheckRects_.clear();
+  
+  for (int i = 0; i < 6; ++i) { // Only 6 now
+    int row = i % 3;
+    int col = i / 3;
+    int cx = menuRect_.x + 30 + col * (menuW / 2 - 20);
+    int cy = propRotationHeaderY_ + 25 + row * 26;
+    propRotationCheckRects_.push_back({cx, cy, menuW / 2 - 40, 20});
+  }
 
   // Footer buttons
   int btnFooterW = 100;
@@ -218,14 +233,16 @@ void MapViewMenu::render(SDL_Renderer *renderer) {
     propLabel = "VOACAP";
   else if (propOverlay_ == PropOverlayType::Reliability)
     propLabel = "Reliability";
-  else if (propOverlay_ == PropOverlayType::Toa)
-    propLabel = "TOA";
   else if (propOverlay_ == PropOverlayType::Heatmap)
     propLabel = "Heatmap";
   else if (propOverlay_ == PropOverlayType::Drap)
     propLabel = "DRAP";
   else if (propOverlay_ == PropOverlayType::Aurora)
     propLabel = "Aurora";
+  
+  if (rotatingProp_)
+    propLabel = "Rotating...";
+
   drawDropdown(renderer, overlayRec_, propLabel, openCombo_ == COMBO_OVERLAY);
 
   // Weather Section
@@ -267,10 +284,9 @@ void MapViewMenu::render(SDL_Renderer *renderer) {
   renderRadioButton(renderer, centerDeCheckRect_, centerMapOnDe_,
                     "Center on DE", themes.text);
 
-  // VOACAP Extras (Used for VOACAP, Reliability, and TOA)
+  // VOACAP Extras (Used for VOACAP and Reliability)
   if (propOverlay_ == PropOverlayType::Voacap ||
-      propOverlay_ == PropOverlayType::Reliability ||
-      propOverlay_ == PropOverlayType::Toa) {
+      propOverlay_ == PropOverlayType::Reliability) {
     cat->drawText(renderer, "VOACAP Settings", menuRect_.x + 20, voacapHeaderY_,
                   themes.text, FontStyle::UI);
     // Draw separator line
@@ -322,10 +338,26 @@ void MapViewMenu::render(SDL_Renderer *renderer) {
 
     cat->drawText(renderer, "Path", spRec_.x, toaRec_.y - 20, themes.text,
                   FontStyle::Fast);
-    renderRadioButton(renderer, spRec_, propPath_ == 0, "Short Path",
-                      themes.text);
     renderRadioButton(renderer, lpRec_, propPath_ == 1, "Long Path",
                       themes.text);
+  } else if (rotatingProp_) {
+    // Render Rotation Checklist
+    cat->drawText(renderer, "Rotation Set", menuRect_.x + 20, propRotationHeaderY_,
+                  themes.text, FontStyle::UI);
+    SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
+                           themes.border.b, 80);
+    SDL_RenderDrawLine(renderer, menuRect_.x + 20, propRotationHeaderY_ + 18,
+                       menuRect_.x + menuRect_.w - 20, propRotationHeaderY_ + 18);
+
+    PropOverlayType types[] = {
+        PropOverlayType::Muf,  PropOverlayType::Voacap, PropOverlayType::Reliability,
+        PropOverlayType::Heatmap, PropOverlayType::Drap, PropOverlayType::Aurora};
+    const char* labels[] = {"MUF-RT", "VOACAP", "Reliability", "Heatmap", "DRAP", "Aurora"};
+
+    for (int i = 0; i < 6; ++i) {
+      bool isSelected = std::find(propRotation_.begin(), propRotation_.end(), types[i]) != propRotation_.end();
+      renderRadioButton(renderer, propRotationCheckRects_[i], isSelected, labels[i], themes.text);
+    }
   }
 
   // Footer Buttons
@@ -508,7 +540,7 @@ void MapViewMenu::drawDropdownList(SDL_Renderer *renderer,
     // Divider
     if (i < visibleCount - 1) {
       SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
-                             themes.border.b, 100);
+                         themes.border.b, 100);
       SDL_RenderDrawLine(renderer, itemRec.x, itemRec.y + 29,
                          itemRec.x + itemRec.w, itemRec.y + 29);
     }
@@ -559,7 +591,7 @@ bool MapViewMenu::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
 
   repeatDir_ = 0;
   propToaInput_.onMouseUp();
-  
+
   SDL_Point pt = {mx, my};
 
   // Helper for combo handling
@@ -618,7 +650,21 @@ bool MapViewMenu::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
             PropOverlayType::Voacap, PropOverlayType::Reliability,
             PropOverlayType::Heatmap, PropOverlayType::Drap,
             PropOverlayType::Aurora};
-        propOverlay_ = t[idx];
+        if (idx < 7) {
+          propOverlay_ = t[idx];
+          rotatingProp_ = false;
+          propRotation_.clear();
+        } else {
+          // "Rotating..." selected
+          rotatingProp_ = true;
+          if (propRotation_.empty()) {
+            // Default to current overlay if it was valid
+            if (propOverlay_ != PropOverlayType::None)
+              propRotation_.push_back(propOverlay_);
+            else
+              propRotation_.push_back(PropOverlayType::Muf);
+          }
+        }
       }))
     return true;
 
@@ -653,8 +699,7 @@ bool MapViewMenu::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
 
   // VOACAP Settings
   if (propOverlay_ == PropOverlayType::Voacap ||
-      propOverlay_ == PropOverlayType::Reliability ||
-      propOverlay_ == PropOverlayType::Toa) {
+      propOverlay_ == PropOverlayType::Reliability) {
     if (handleCombo(bandRec_, COMBO_BAND, bandOpts_,
                     [&](int idx) { propBand_ = bandOpts_[idx]; }))
       return true;
@@ -672,11 +717,27 @@ bool MapViewMenu::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
       propPath_ = 0;
       return true;
     }
-    if (SDL_PointInRect(&pt, &lpRec_)) {
-      propPath_ = 1;
-      return true;
+      if (SDL_PointInRect(&pt, &lpRec_)) {
+        propPath_ = 1;
+        return true;
+      }
+    } else if (rotatingProp_) {
+      PropOverlayType types[] = {
+          PropOverlayType::Muf,  PropOverlayType::Voacap, PropOverlayType::Reliability,
+          PropOverlayType::Heatmap, PropOverlayType::Drap, PropOverlayType::Aurora};
+      for (int i = 0; i < 6; ++i) {
+        if (SDL_PointInRect(&pt, &propRotationCheckRects_[i])) {
+          auto it = std::find(propRotation_.begin(), propRotation_.end(), types[i]);
+          if (it != propRotation_.end()) {
+            if (propRotation_.size() > 1)
+              propRotation_.erase(it);
+          } else {
+            propRotation_.push_back(types[i]);
+          }
+          return true;
+        }
+      }
     }
-  }
 
   // Close any open combo if clicking elsewhere in menu
   if (openCombo_ != -1) {
@@ -689,18 +750,6 @@ bool MapViewMenu::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
     return true;
   }
   if (SDL_PointInRect(&pt, &applyRect_)) {
-    // Commit current TOA input if active
-    if (propToaInput_.isActive()) {
-      try {
-        propToa_ = std::round(std::stof(propToaInput_.getValue()));
-        if (propToa_ < 0.0f)
-          propToa_ = 0.0f;
-        if (propToa_ > 90.0f)
-          propToa_ = 90.0f;
-      } catch (...) {
-      }
-    }
-
     config_->projection = projection_;
     config_->mapStyle = mapStyle_;
     config_->showGrid = showGrid_;
@@ -711,11 +760,11 @@ bool MapViewMenu::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
     config_->weatherOverlay = weatherOverlay_;
     config_->propBand = propBand_;
     config_->propMode = propMode_;
-    config_->propPower = propPower_;
     config_->propToa = propToa_;
     config_->propPath = propPath_;
     config_->propColormap = propColormap_;
     config_->centerMapOnDe = centerMapOnDe_;
+    config_->propRotation = propRotation_;
     hide();
     if (onApply_)
       onApply_();
@@ -762,13 +811,9 @@ bool MapViewMenu::onKeyDown(SDL_Keycode key, Uint16 mod) {
 bool MapViewMenu::onTextInput(const char *text) {
   if (!visible_)
     return false;
-  if (propToaInput_.isActive()) {
-    return propToaInput_.onTextInput(text);
-  }
   return false;
 }
 
-// Dummy helper just in case
 void MapViewMenu::renderRadioButton(SDL_Renderer *renderer,
                                     const SDL_Rect &rect, bool selected,
                                     const std::string &label,

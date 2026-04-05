@@ -636,6 +636,24 @@ void MapWidget::update() {
     greatCircleDirty_ = true;
   }
 
+  // Propagation Rotation
+  if (config_.propRotation.size() > 1 && config_.rotationIntervalS > 0) {
+    uint32_t intervalMs = static_cast<uint32_t>(config_.rotationIntervalS * 1000);
+    if (nowMs - lastPropRotateMs_ >= intervalMs || lastPropRotateMs_ == 0) {
+      if (lastPropRotateMs_ != 0) {
+        propRotationIdx_ = (propRotationIdx_ + 1) % config_.propRotation.size();
+      }
+      config_.propOverlay = config_.propRotation[propRotationIdx_];
+      lastPropRotateMs_ = nowMs;
+    }
+  } else if (!config_.propRotation.empty()) {
+    // If rotation set is defined but has 1 item, ensure it's synced
+    if (config_.propOverlay != config_.propRotation[0]) {
+      config_.propOverlay = config_.propRotation[0];
+      propRotationIdx_ = 0;
+    }
+  }
+
   // Propagation Overlay updates (every 15 mins or on change)
   if (config_.propOverlay != PropOverlayType::None) {
     bool changed = (lastPropType_ != config_.propOverlay) ||

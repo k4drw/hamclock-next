@@ -49,6 +49,9 @@ private:
   float propToa_;
   int propPath_;
   TextInput propToaInput_;
+  
+  std::vector<PropOverlayType> propRotation_;
+  bool rotatingProp_ = false;
 
   // Combo options
   std::vector<std::string> projOpts_ = {"Equirectangular", "Robinson",
@@ -59,7 +62,7 @@ private:
   std::vector<std::string> gridOpts_ = {"Off", "Lat/Lon", "Maidenhead"};
   std::vector<std::string> overlayOpts_ = {"None", "MUF-RT", "VOACAP",
                                            "Reliability", "Heatmap",
-                                           "DRAP", "Aurora"};
+                                           "DRAP", "Aurora", "Rotating..."};
   std::vector<std::string> weatherOpts_ = {"None", "WX/Pressure",
                                            "Clouds (GFS)"};
   std::vector<std::string> bandOpts_ = {"80m", "60m", "40m", "30m", "20m",
@@ -78,6 +81,9 @@ private:
   SDL_Rect toaRec_, toaUpRec_, toaDnRec_; // TOA spinner
   SDL_Rect spRec_, lpRec_;                // Path toggles
   SDL_Rect editPropColorsRec_;            // Button next to custom prop dropdown
+  
+  std::vector<SDL_Rect> propRotationCheckRects_;
+  int propRotationHeaderY_ = 0;
 
   enum {
     COMBO_PROJ,

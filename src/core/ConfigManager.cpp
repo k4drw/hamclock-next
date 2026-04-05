@@ -252,6 +252,14 @@ bool ConfigManager::load(AppConfig &config) {
           showMuf ? PropOverlayType::Muf : PropOverlayType::None;
     }
 
+    if (ap.contains("prop_rotation") && ap["prop_rotation"].is_array()) {
+      config.propRotation.clear();
+      for (auto &item : ap["prop_rotation"]) {
+        if (item.is_string())
+          config.propRotation.push_back(propOverlayFromStr(item.get<std::string>()));
+      }
+    }
+
     if (ap.contains("weather_overlay")) {
       config.weatherOverlay =
           weatherOverlayFromStr(ap.value("weather_overlay", "none"));
@@ -438,6 +446,15 @@ bool ConfigManager::load(AppConfig &config) {
     loadRotation("pane4_rotation", "pane4_widget", config.pane4Rotation, "band_conditions");
     loadRotation("pane5_rotation", "pane5_widget", config.pane5Rotation, "de_info");
     loadRotation("pane6_rotation", "pane6_widget", config.pane6Rotation, "dx_info", /*allowEmpty=*/true);
+    
+    if (pa.contains("prop_rotation") && pa["prop_rotation"].is_array()) {
+      config.propRotation.clear();
+      for (auto &item : pa["prop_rotation"]) {
+        if (item.is_string())
+          config.propRotation.push_back(propOverlayFromStr(item.get<std::string>()));
+      }
+    }
+
     config.rotationIntervalS = pa.value("rotation_interval_s", 30);
     config.syncRotation = pa.value("sync_rotation", false);
     if (pa.contains("watchlist") && pa["watchlist"].is_array()) {
@@ -580,6 +597,11 @@ bool ConfigManager::load(AppConfig &config) {
       loadPresetRotation(jp, "pane6_rotation", p.pane6Rotation);
       p.rotationIntervalS = jp.value("rotation_interval_s", 30);
       p.propOverlay  = propOverlayFromStr(jp.value("prop_overlay", "none"));
+      if (jp.contains("prop_rotation") && jp["prop_rotation"].is_array()) {
+        for (auto &e : jp["prop_rotation"])
+          if (e.is_string())
+            p.propRotation.push_back(propOverlayFromStr(e.get<std::string>()));
+      }
       p.weatherOverlay = weatherOverlayFromStr(jp.value("weather_overlay", "none"));
       p.mapStyle     = jp.value("map_style", "nasa");
       p.mapNightLights = jp.value("map_night_lights", true);
@@ -639,6 +661,12 @@ bool ConfigManager::save(const AppConfig &config) {
   json["appearance"]["grid_type"] = config.gridType;
   json["appearance"]["center_map_on_de"] = config.centerMapOnDe;
   json["appearance"]["prop_overlay"] = propOverlayToStr(config.propOverlay);
+  {
+    auto arr = nlohmann::json::array();
+    for (auto t : config.propRotation)
+      arr.push_back(propOverlayToStr(t));
+    json["appearance"]["prop_rotation"] = arr;
+  }
   json["appearance"]["weather_overlay"] = weatherOverlayToStr(config.weatherOverlay);
   json["appearance"]["prop_band"] = config.propBand;
   json["appearance"]["prop_mode"] = config.propMode;
@@ -734,6 +762,12 @@ bool ConfigManager::save(const AppConfig &config) {
   saveRotation("pane5_rotation", config.pane5Rotation);
   saveRotation("pane6_rotation", config.pane6Rotation);
   json["panes"]["rotation_interval_s"] = config.rotationIntervalS;
+  {
+    auto arr = nlohmann::json::array();
+    for (auto t : config.propRotation)
+      arr.push_back(propOverlayToStr(t));
+    json["panes"]["prop_rotation"] = arr;
+  }
   json["panes"]["sync_rotation"] = config.syncRotation;
   {
     auto wl = nlohmann::json::array();
@@ -819,6 +853,12 @@ bool ConfigManager::save(const AppConfig &config) {
       jp["pane6_rotation"]     = savePresetRotation(p.pane6Rotation);
       jp["rotation_interval_s"] = p.rotationIntervalS;
       jp["prop_overlay"]       = propOverlayToStr(p.propOverlay);
+      {
+        auto arr = nlohmann::json::array();
+        for (auto t : p.propRotation)
+          arr.push_back(propOverlayToStr(t));
+        jp["prop_rotation"] = arr;
+      }
       jp["weather_overlay"]    = weatherOverlayToStr(p.weatherOverlay);
       jp["map_style"]          = p.mapStyle;
       jp["map_night_lights"]   = p.mapNightLights;
@@ -903,6 +943,7 @@ void ConfigManager::applyPreset(AppConfig &config, int index) {
   config.pane6Rotation = p.pane6Rotation;
   config.rotationIntervalS = p.rotationIntervalS;
   config.propOverlay = p.propOverlay;
+  config.propRotation = p.propRotation;
   config.weatherOverlay = p.weatherOverlay;
   config.mapStyle = p.mapStyle;
   config.mapNightLights = p.mapNightLights;
@@ -926,6 +967,7 @@ void ConfigManager::savePreset(AppConfig &config, const std::string &name) {
   p.pane6Rotation = config.pane6Rotation;
   p.rotationIntervalS = config.rotationIntervalS;
   p.propOverlay = config.propOverlay;
+  p.propRotation = config.propRotation;
   p.weatherOverlay = config.weatherOverlay;
   p.mapStyle = config.mapStyle;
   p.mapNightLights = config.mapNightLights;

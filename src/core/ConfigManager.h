@@ -38,6 +38,7 @@ struct ConfigPreset {
   std::vector<std::string> pane6Rotation;
   int rotationIntervalS = 30;
   PropOverlayType propOverlay = PropOverlayType::None;
+  std::vector<PropOverlayType> propRotation;
   WeatherOverlayType weatherOverlay = WeatherOverlayType::None;
   std::string mapStyle = "nasa";
   bool mapNightLights = true;
@@ -68,6 +69,7 @@ struct AppConfig {
   bool showGrid = false;
   std::string gridType = "latlon"; // "latlon" or "maidenhead"
   PropOverlayType propOverlay = PropOverlayType::None;
+  std::vector<PropOverlayType> propRotation;
   WeatherOverlayType weatherOverlay = WeatherOverlayType::None;
   std::string propBand = "20m";
   std::string propMode = "SSB";

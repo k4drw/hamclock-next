@@ -451,6 +451,7 @@ void PresetsModal::applyPreset(int index) {
   cfg_->pane6Rotation = p.pane6Rotation;
   cfg_->rotationIntervalS = p.rotationIntervalS;
   cfg_->propOverlay = p.propOverlay;
+  cfg_->propRotation = p.propRotation;
   cfg_->weatherOverlay = p.weatherOverlay;
   cfg_->mapStyle = p.mapStyle;
   cfg_->mapNightLights = p.mapNightLights;
@@ -487,7 +488,10 @@ void PresetsModal::applyPropFirehose() {
   cfg_->pane3Rotation = {"aurora", "aurora_graph", "voacap_dedx"};
   cfg_->pane4Rotation = {"ionosonde", "tropo", "drap", "band_conditions"};
 
-  // Force map to MUF overlay
+  // Force map to full rotation of propagation overlays
+  cfg_->propRotation = {
+      PropOverlayType::Muf,     PropOverlayType::Reliability, PropOverlayType::Heatmap, 
+      PropOverlayType::Drap,        PropOverlayType::Aurora};
   cfg_->propOverlay = PropOverlayType::Muf;
 
   // Ensure rotation is active
