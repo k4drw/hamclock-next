@@ -7,6 +7,7 @@
 #include "../core/CalendarData.h"
 #include "../ui/StopwatchPanel.h"
 #include "../ui/TimePanel.h"
+#include "../ui/RSSBanner.h"
 #include "NetworkManager.h"
 #include <SDL.h>
 #include "../core/ConfigManager.h"
@@ -311,6 +312,43 @@ void WebServer::registerRoutes(httplib::Server &svr) {
               return;
             }
             SDL_Rect r = timePanel_->getRect();
+            int outW = 0, outH = 0;
+            int logW = 0, logH = 0;
+            if (renderer_) {
+              SDL_GetRendererOutputSize(renderer_, &outW, &outH);
+              SDL_RenderGetLogicalSize(renderer_, &logW, &logH);
+            }
+            if (logW == 0)
+              logW = 800;
+            if (logH == 0)
+              logH = 480;
+            nlohmann::json j;
+            j["x"] = r.x;
+            j["y"] = r.y;
+            j["w"] = r.w;
+            j["h"] = r.h;
+            float scale = (logW > 0 && logH > 0)
+                              ? std::min((float)outW / logW, (float)outH / logH)
+                              : 1.0f;
+            j["px"] = (int)(r.x * scale);
+            j["py"] = (int)(r.y * scale);
+            j["pw"] = (int)(r.w * scale);
+            j["ph"] = (int)(r.h * scale);
+            j["renderer_w"] = outW;
+            j["renderer_h"] = outH;
+            j["logical_w"] = logW;
+            j["logical_h"] = logH;
+            res.set_content(j.dump(), "application/json");
+          });
+
+  svr.Get("/get_rss_rect",
+          [this](const httplib::Request &, httplib::Response &res) {
+            std::lock_guard<std::mutex> lk(dataMutex_);
+            if (!rssBanner_) {
+              res.status = 503;
+              return;
+            }
+            SDL_Rect r = rssBanner_->getRect();
             int outW = 0, outH = 0;
             int logW = 0, logH = 0;
             if (renderer_) {
@@ -2677,24 +2715,9 @@ void WebServer::registerRoutes(httplib::Server &svr) {
             res.set_content(oss.str(), "text/plain");
           });
 
-#ifdef ENABLE_DEBUG_API
-  svr.Get("/debug/widgets",
-          [](const httplib::Request &, httplib::Response &res) {
-            nlohmann::json j = nlohmann::json::array();
-            auto snapshot = UIRegistry::getInstance().getSnapshot();
-            for (const auto &[id, info] : snapshot) {
-              nlohmann::json w;
-              w["id"] = id;
-              w["name"] = info.name;
-              w["rect"] = {{"x", info.rect.x},
-                           {"y", info.rect.y},
-                           {"w", info.rect.w},
-                           {"h", info.rect.h}};
-              j.push_back(w);
-            }
-            res.set_content(j.dump(2), "application/json");
-          });
-
+  // /debug/click and /debug/keypress are available in all builds (not gated by
+  // ENABLE_DEBUG_API) because they serve the automation/screenshot use case.
+  // They are runtime-gated by liveWebEnabled_ (requires --live-web flag).
   svr.Get("/debug/click",
           [this](const httplib::Request &req, httplib::Response &res) {
             if (!liveWebEnabled_) {
@@ -2740,6 +2763,24 @@ void WebServer::registerRoutes(httplib::Server &svr) {
             SDL_PushEvent(&down);
             SDL_PushEvent(&up);
             res.set_content("ok", "text/plain");
+          });
+
+#ifdef ENABLE_DEBUG_API
+  svr.Get("/debug/widgets",
+          [](const httplib::Request &, httplib::Response &res) {
+            nlohmann::json j = nlohmann::json::array();
+            auto snapshot = UIRegistry::getInstance().getSnapshot();
+            for (const auto &[id, info] : snapshot) {
+              nlohmann::json w;
+              w["id"] = id;
+              w["name"] = info.name;
+              w["rect"] = {{"x", info.rect.x},
+                           {"y", info.rect.y},
+                           {"w", info.rect.w},
+                           {"h", info.rect.h}};
+              j.push_back(w);
+            }
+            res.set_content(j.dump(2), "application/json");
           });
 
   svr.Get("/debug/watchlist/add",

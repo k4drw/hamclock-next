@@ -37,6 +37,7 @@ class ADIFProvider;
 class StopwatchPanel;
 class CalendarStore;
 class TimePanel;
+class RSSBanner;
 
 // Web interface for HamClock.
 //
@@ -94,6 +95,7 @@ public:
     calendarStore_ = std::move(s);
   }
   void setTimePanel(TimePanel *tp) { std::lock_guard<std::mutex> lk(dataMutex_); timePanel_ = tp; }
+  void setRssBanner(RSSBanner *rb) { std::lock_guard<std::mutex> lk(dataMutex_); rssBanner_ = rb; }
   void setPaneExpandControl(std::atomic<int> *cmd) { std::lock_guard<std::mutex> lk(dataMutex_); paneExpandCmd_ = cmd; }
   void setBMEProvider(BME280Provider *bme) { std::lock_guard<std::mutex> lk(dataMutex_); bmeProvider_ = bme; }
 
@@ -131,6 +133,7 @@ private:
   StopwatchPanel *stopwatch_ = nullptr;
   std::shared_ptr<CalendarStore> calendarStore_;
   TimePanel *timePanel_ = nullptr;
+  RSSBanner *rssBanner_ = nullptr;
   std::atomic<int> *paneExpandCmd_ = nullptr;
   bool screenLocked_ = false;
   bool liveWebEnabled_ = false;

@@ -1527,6 +1527,20 @@ void DashboardContext::update(AppContext &ctx) {
     }
   }
 
+  // --- Late-start DX Cluster / RBN providers ---
+  // dxcProvider and rbnProvider are only started at build time when
+  // isWidgetConfigured() finds dx_cluster/watchlist in the saved pane rotations.
+  // If the widget is added mid-session (e.g. set_pane?action=solo), the provider
+  // must be started now so the panel receives data without requiring a restart.
+#ifndef __EMSCRIPTEN__
+  if (!dxcProvider->isRunning() &&
+      (isMaster || isWidgetActive("dx_cluster") || isWidgetActive("watchlist")))
+    dxcProvider->start(appCfg);
+  if (!rbnProvider->isRunning() && appCfg.rbnEnabled &&
+      (isMaster || isWidgetActive("dx_cluster") || isWidgetActive("watchlist")))
+    rbnProvider->start(appCfg);
+#endif
+
   // --- DRAP fetch: immediate when overlay active and store empty (60s
   // cooldown) ---
   if (isPowerOn && appCfg.propOverlay == PropOverlayType::Drap &&

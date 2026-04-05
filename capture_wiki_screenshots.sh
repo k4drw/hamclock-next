@@ -37,6 +37,13 @@
 #   all        — all of the above (default)
 #
 # Requirements: curl, jq, ImageMagick v7 (magick)
+#
+# Headless / CI use (no display required):
+#   SDL_VIDEODRIVER=offscreen HC_AUTOSTART=1 ./capture_wiki_screenshots.sh
+#
+# Or with Xvfb:
+#   Xvfb :99 -screen 0 1280x800x24 &
+#   DISPLAY=:99 HC_AUTOSTART=1 ./capture_wiki_screenshots.sh
 
 WINDOW_W="${WINDOW_W:-1280}"
 WINDOW_H="${WINDOW_H:-800}"
@@ -55,7 +62,7 @@ fi
 HC_IP="${HC_IP:-127.0.0.1}"
 HC_PORT="${HC_PORT:-8080}"
 BASE_URL="http://${HC_IP}:${HC_PORT}"
-DELAY="${DELAY:-3}"
+DELAY="${DELAY:-10}"
 OUTPUT_DIR="${OUTPUT_DIR:-docs/wiki/images}"
 FORCE="${FORCE:-0}"
 PARTS="${PARTS:-all}"
@@ -133,13 +140,29 @@ fi
 curl -sfL "${BASE_URL}/get_config.json" > /dev/null || \
   die "Server not reachable at ${BASE_URL} — start hamclock-next first"
 
+# Check whether --live-web is active (required for debug/click + debug/keypress).
+# A 403 means the server is running but without --live-web.
+LIVE_WEB=0
+_LW_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${BASE_URL}/debug/click?x=0&y=0" 2>/dev/null)
+if [ "$_LW_STATUS" = "200" ]; then
+  LIVE_WEB=1
+elif [ "$_LW_STATUS" = "403" ]; then
+  echo "WARN: Server running without --live-web — ui_docs will be skipped."
+  echo "      Restart with: ./build/hamclock-next --live-web"
+elif [ "$_LW_STATUS" = "404" ]; then
+  echo "WARN: /debug/click not found (404) — rebuild required."
+  echo "      cmake --build build --target hamclock-next -j10"
+else
+  echo "WARN: /debug/click returned HTTP ${_LW_STATUS} — ui_docs may not work"
+fi
+
 # Wait for the dashboard to finish initializing (using readiness probe).
 echo -n "Waiting for dashboard ready..."
 for i in $(seq 1 60); do
   READY=$(curl -sf "${BASE_URL}/api/sys/ready" || echo "offline")
   if [ "$READY" = "ready" ]; then
     echo " ok (${i}s)"
-    sleep 2 # wait for layout and sub-widgets to sync
+    sleep 5 # wait for layout and sub-widgets to sync
     break
   fi
   if [ "$i" = "60" ]; then
@@ -148,6 +171,9 @@ for i in $(seq 1 60); do
   echo -n "."
   sleep 1
 done
+
+DX=$(curl -sfL "${BASE_URL}/set_dx?lat=-27.61638&lon=-48.513308")
+echo "DX set: $DX"
 
 # CAPS discovery
 CAPS=$(curl -sf "${BASE_URL}/get_capabilities") || \
@@ -162,9 +188,10 @@ echo "  $(echo "$CAPS" | jq '.wx_overlays  | length') wx overlays"
 echo ""
 
 # Save current visual state for restore on exit
-SAVED_THEME=$(curl -sfL "${BASE_URL}/get_config.json" | jq -r '.theme      // "dark"')         || SAVED_THEME="dark"
-SAVED_PROJ=$(curl -sf  "${BASE_URL}/get_config.json" | jq -r '.projection // "equirectangular"') || SAVED_PROJ="equirectangular"
-SAVED_RSS=$(curl -sf   "${BASE_URL}/get_config.json" | jq -r '.rssEnabled // true')             || SAVED_RSS="true"
+_CFG=$(curl -sf "${BASE_URL}/get_config.json") || _CFG="{}"
+SAVED_THEME=$(echo "$_CFG" | jq -r '.theme      // "dark"')          || SAVED_THEME="dark"
+SAVED_PROJ=$(echo  "$_CFG" | jq -r '.projection // "equirectangular"') || SAVED_PROJ="equirectangular"
+SAVED_RSS=$(echo   "$_CFG" | jq -r '.rssEnabled // true')             || SAVED_RSS="true"
 SAVED_RSS_PARAM=$( [ "$SAVED_RSS" = "true" ] && echo "1" || echo "0" )
 
 restore_state() {
@@ -205,11 +232,33 @@ get_phys_rect() {
   local XENDPOINT="/get_pane_rect?pane=${PANE}"
   [ "$PANE" = "tp" ] && XENDPOINT="/get_timepanel_rect"
   
-  RECT=$(curl -sf "${BASE_URL}${XENDPOINT}") || { echo "  WARN: Could not fetch ${XENDPOINT}" >&2; echo "0x0+0+0"; return; }
+  local ATTEMPT=0
+  local MAX_ATTEMPTS=5
+  while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+    RECT=$(curl -sf "${BASE_URL}${XENDPOINT}") && break
+    echo "  WARN: API for $XENDPOINT not ready, retrying ($((ATTEMPT+1))/$MAX_ATTEMPTS)..." >&2
+    ATTEMPT=$((ATTEMPT + 1))
+    sleep 2
+  done
+
+  if [ $ATTEMPT -eq $MAX_ATTEMPTS ]; then
+    echo "  ERROR: Could not fetch ${XENDPOINT} after $MAX_ATTEMPTS attempts" >&2
+    echo "0x0+0+0"
+    return 1
+  fi
+
   local PX; PX=$(echo "$RECT" | jq -r '.px')
   local PY; PY=$(echo "$RECT" | jq -r '.py')
   local PW; PW=$(echo "$RECT" | jq -r '.pw')
   local PH; PH=$(echo "$RECT" | jq -r '.ph')
+
+  # Validate results
+  if [ -z "$PX" ] || [ "$PX" = "null" ] || [ "$PW" -le 0 ]; then
+     echo "  ERROR: Invalid coordinates for ${XENDPOINT}: ${RECT}" >&2
+     echo "0x0+0+0"
+     return 1
+  fi
+
   echo "${PW}x${PH}+${PX}+${PY}"
 }
 
@@ -241,22 +290,39 @@ if part_enabled fixed_ui; then
     fi
   fi
 
-  # RSS Banner (logical coords: x=139, y=412, w=660, h=68 — fixed in DashboardContext)
-  RSS_PX=$(awk "BEGIN { printf \"%d\", 139 * $SCALE }")
-  RSS_PY=$(awk "BEGIN { printf \"%d\", 412 * $SCALE }")
-  RSS_PW=$(awk "BEGIN { printf \"%d\", 660 * $SCALE }")
-  RSS_PH=$(awk "BEGIN { printf \"%d\", 68  * $SCALE }")
+  # RSS Banner — use /get_rss_rect for accurate physical coords (accounts for
+  # layLogicalOffX/Y and actual render scale, same as /get_timepanel_rect)
   if [ "$FORCE" = "1" ] || [ ! -f "${OUTPUT_DIR}/widgets/rss_banner.png" ]; then
     echo "  rss_banner"
     hc_get "set_rss?enabled=1"
-    sleep "${DELAY}"
-    FULL="${OUTPUT_DIR}/widgets/.full_rss.png"
-    if capture "${FULL}"; then
-      magick "${FULL}" -crop "${RSS_PW}x${RSS_PH}+${RSS_PX}+${RSS_PY}" +repage "${OUTPUT_DIR}/widgets/rss_banner.png" \
-        && echo "  ✓ ${OUTPUT_DIR}/widgets/rss_banner.png"
-      rm -f "${FULL}"
+    # Wait up to 45 s for the RSS provider to fetch and render a headline.
+    # set_rss triggers a dashboard reload + network fetch; 10 s is not enough.
+    RSS_RECT=""
+    for i in $(seq 1 45); do
+      sleep 1
+      RSS_RECT=$(curl -sf "${BASE_URL}/get_rss_rect" 2>/dev/null) && break
+      echo -n "."
+    done
+    echo ""
+    if [ -z "$RSS_RECT" ]; then
+      echo "  WARN: /get_rss_rect unavailable — rebuild required; skipping rss_banner"
+      FAILED+=("rss_banner:no_rect_endpoint")
+    else
+      PHYS_RECT_RSS=$(echo "$RSS_RECT" | jq -r '"\(.pw)x\(.ph)+\(.px)+\(.py)"')
+      # Extra delay so headline text has rendered after the reload
+      sleep 20
+      FULL="${OUTPUT_DIR}/widgets/.full_rss.png"
+      if capture "${FULL}"; then
+        magick "${FULL}" -crop "${PHYS_RECT_RSS}" +repage "${OUTPUT_DIR}/widgets/rss_banner.png" \
+          && echo "  ✓ ${OUTPUT_DIR}/widgets/rss_banner.png"
+        rm -f "${FULL}"
+      fi
     fi
     hc_get "set_rss?enabled=${SAVED_RSS_PARAM}"
+    # set_rss triggers a full dashboard rebuild — wait before next part starts
+    echo -n "  Waiting for dashboard rebuild after RSS restore..."
+    sleep "${DELAY}"
+    echo " ok"
   else
     echo "  SKIP (exists) ${OUTPUT_DIR}/widgets/rss_banner.png"
   fi
@@ -354,23 +420,19 @@ if part_enabled widgets; then
     rm -f "${FULL}"
   done
 
-  # Process Scrollable widgets in Double-Height SidePanel
+  # Process Scrollable widgets — solo on pane 1 (same as topbar)
   for W in "${SCROLL_WIDGETS[@]}"; do
     if [ "$FORCE" = "0" ] && [ -f "${OUTPUT_DIR}/widgets/${W}.png" ]; then
-      echo "  SKIP (exists) ${W} (double-height)"
+      echo "  SKIP (exists) ${W}"
       WIDGET_COUNT=$((WIDGET_COUNT + 1))
       continue
     fi
-    echo "  ${W} (double-height SidePanel)"
-    # Set Pane 5 to widget and CLEAR Pane 6 to trigger full height
-    hc_get "set_config?pane4=${W}&pane5="
-    sleep 1
-    # Refresh rect for Pane 5 (now double height)
-    PHYS_RECT_5_DOUBLE=$(get_phys_rect 5)
+    echo "  ${W} (scrollable)"
+    hc_get "set_pane?pane=1&action=solo&widget=${W}"
     sleep "${DELAY}"
     FULL="${OUTPUT_DIR}/widgets/.full_${W}.png"
     if capture "${FULL}"; then
-      magick "${FULL}" -crop "${PHYS_RECT_5_DOUBLE}" +repage "${OUTPUT_DIR}/widgets/${W}.png"
+      magick "${FULL}" -crop "${PHYS_RECT_1}" +repage "${OUTPUT_DIR}/widgets/${W}.png"
       echo "  ✓ ${OUTPUT_DIR}/widgets/${W}.png"
       rm -f "${FULL}"
     fi
@@ -381,8 +443,9 @@ if part_enabled widgets; then
   echo ""
   echo "--- Part 2: SidePanel Widgets ---"
   echo "  Standard SidePanel (de_info, dx_info)"
-  hc_get "set_config?pane4=de_info&pane5=dx_info"
-  sleep 1 # Wait for UI to rebuild panes!
+  hc_get "set_pane?pane=5&action=solo&widget=de_info"
+  hc_get "set_pane?pane=6&action=solo&widget=dx_info"
+  sleep 2
   hc_get "set_satname?name=none"
 
   PHYS_RECT_5=$(get_phys_rect 5)
@@ -407,9 +470,11 @@ if part_enabled widgets; then
 
   # Satellite
   echo "  satellite (in DXSatPane)"
-  hc_get "set_config?pane4=de_info&pane5=dx_info" # Ensure split mode
-  hc_get "set_satname?name=ISS"
-  sleep "${DELAY}"
+  hc_get "set_pane?pane=5&action=solo&widget=de_info"
+  hc_get "set_pane?pane=6&action=solo&widget=satellite"
+  sleep 2
+  hc_get "set_satname?name=ISS%20(ZARYA)"
+  sleep 2
   FULL="${OUTPUT_DIR}/widgets/.full_satellite.png"
   capture "${FULL}" || true
   if [ -f "$FULL" ]; then
@@ -438,7 +503,7 @@ if part_enabled maximized; then
   hc_get "set_wx_overlay?type=none"
   [ -z "${SCALE:-}" ] && compute_scale
 
-  MAXIMIZED_WIDGETS=(solar aurora live_spots aurora_graph band_conditions dx_cluster)
+  MAXIMIZED_WIDGETS=(solar dx_cluster aurora_graph band_conditions big_clock)
   MAX_COUNT=0
 
   for W in "${MAXIMIZED_WIDGETS[@]}"; do
@@ -450,9 +515,9 @@ if part_enabled maximized; then
     fi
     echo "  ${W} (maximized)"
     hc_get "set_pane?pane=1&action=solo&widget=${W}"
-    sleep 1
+    sleep "${DELAY}"  # wait for widget to fully render before expanding
     hc_get "api/panes/expand?pane=1"
-    sleep "${DELAY}"
+    sleep 2
     if capture "$OUT"; then
       MAX_COUNT=$((MAX_COUNT + 1))
     fi
@@ -550,32 +615,42 @@ fi
 if part_enabled ui_docs; then
   echo ""
   echo "--- Part 6: UI Docs ---"
+  if [ "$LIVE_WEB" != "1" ]; then
+    echo "  SKIP: Server not running with --live-web (modal clicks require it)."
+    echo "        Restart with: ./build/hamclock-next --live-web"
+  else
   hc_get "set_theme?theme=dark"
   hc_get "set_projection?type=equirectangular"
   [ -z "${SCALE:-}" ] && compute_scale
 
-  # 1. Setup Modal (Gear icon in Time Panel)
+  # Helper: get_tp_rect — returns flat JSON {x,y,w,h,...} (not .logical.x)
+  TP_RECT=$(curl -sf "${BASE_URL}/get_timepanel_rect" || echo '{"x":0,"y":0,"w":235,"h":148}')
+
+  # 1. Setup Modal — gear icon is bottom-right of TimePanel
+  # gearSize = clamp(h*0.10, 8, 18) ≈ 14; pad = max(4, w*0.03) ≈ 7
+  # gear center ≈ (x+w-14, y+h-14) in logical coords
   OUT_SETUP="${OUTPUT_DIR}/modal-setup.png"
   if [ "$FORCE" = "1" ] || [ ! -f "$OUT_SETUP" ]; then
     echo "  modal-setup"
-    TP_RECT=$(curl -sf "${BASE_URL}/get_timepanel_rect" || echo '{"logical":{"x":661,"y":0,"w":139,"h":148}}')
-    GEAR_X=$(echo "$TP_RECT" | jq '.logical.x + .logical.w - 20')
-    GEAR_Y=$(echo "$TP_RECT" | jq '.logical.y + 20')
-    debug_click $GEAR_X $GEAR_Y
+    GEAR_X=$(echo "$TP_RECT" | jq '.x + .w - 14 | floor')
+    GEAR_Y=$(echo "$TP_RECT" | jq '.y + .h - 14 | floor')
+    debug_click "$GEAR_X" "$GEAR_Y"
     sleep 1
     capture "$OUT_SETUP"
     debug_key "Escape"
     sleep 0.5
   fi
 
-  # 2. Presets Modal (Star icon in Time Panel)
+  # 2. Presets Modal — star icon is left side of date row (bottom 22% of TimePanel)
+  # presetsRect_ = {x+4, dateBaseY+(dateRowH-22)/2, 22, 22}
+  # dateBaseY = y + h*(50+16+50)/148 ≈ y + h*116/148
+  # star center ≈ (x+15, y+h*116/148 + (h*32/148)/2)
   OUT_PRESETS="${OUTPUT_DIR}/timepanel-presets-modal.png"
   if [ "$FORCE" = "1" ] || [ ! -f "$OUT_PRESETS" ]; then
     echo "  modal-presets"
-    TP_RECT=$(curl -sf "${BASE_URL}/get_timepanel_rect" || echo '{"logical":{"x":661,"y":0,"w":139,"h":148}}')
-    STAR_X=$(echo "$TP_RECT" | jq '.logical.x + .logical.w - 50')
-    STAR_Y=$(echo "$TP_RECT" | jq '.logical.y + 20')
-    debug_click $STAR_X $STAR_Y
+    STAR_X=$(echo "$TP_RECT" | jq '.x + 15 | floor')
+    STAR_Y=$(echo "$TP_RECT" | jq '(.y + .h * 116 / 148 + .h * 32 / 148 / 2) | floor')
+    debug_click "$STAR_X" "$STAR_Y"
     sleep 1
     FULL="${OUTPUT_DIR}/.full_presets.png"
     if capture "$FULL"; then
@@ -591,15 +666,15 @@ if part_enabled ui_docs; then
     sleep 0.5
   fi
 
-  # 3. Widget Selector Modal
+  # 3. Widget Selector Modal — click top 5% of pane 1
+  # Pane 1 is at x=235, y=0, w=160, h=148 (logical). Selector opens on click < h/10.
   OUT_SELECTOR="${OUTPUT_DIR}/modal-widget-selector.png"
   if [ "$FORCE" = "1" ] || [ ! -f "$OUT_SELECTOR" ]; then
     echo "  modal-widget-selector"
-    P1_RECT=$(curl -sf "${BASE_URL}/get_pane_rect?pane=1" || echo '{"logical":{"x":0,"y":0,"w":130,"h":110}}')
-    # Click top 10% of pane
-    P1_X=$(echo "$P1_RECT" | jq '.logical.x + .logical.w/2')
-    P1_Y=$(echo "$P1_RECT" | jq '.logical.y + 5')
-    debug_click $P1_X $P1_Y
+    P1_RECT=$(curl -sf "${BASE_URL}/get_pane_rect?pane=1" || echo '{"x":235,"y":0,"w":160,"h":148}')
+    P1_X=$(echo "$P1_RECT" | jq '.x + .w / 2 | floor')
+    P1_Y=$(echo "$P1_RECT" | jq '.y + 5 | floor')
+    debug_click "$P1_X" "$P1_Y"
     sleep 1
     FULL="${OUTPUT_DIR}/.full_selector.png"
     if capture "$FULL"; then
@@ -614,24 +689,22 @@ if part_enabled ui_docs; then
     sleep 0.5
   fi
 
-  # 4. Pane rotation indicator
+  # 4. Pane rotation indicator — top strip of pane 1 when it has 2+ widgets
   OUT_ROT="${OUTPUT_DIR}/pane-rotation-indicator.png"
   if [ "$FORCE" = "1" ] || [ ! -f "$OUT_ROT" ]; then
     echo "  pane-rotation-indicator"
     hc_get "set_pane?pane=1&action=solo&widget=solar"
     hc_get "set_pane?pane=1&action=add&widget=band_conditions"
-    sleep 1
+    sleep 2
     FULL="${OUTPUT_DIR}/.full_rot.png"
     if capture "$FULL"; then
-      P1_RECT=$(curl -sf "${BASE_URL}/get_pane_rect?pane=1" || echo '{"logical":{"x":0,"y":0,"w":130,"h":110}}')
-      # Indicator is at top of pane
-      PX=$(echo "$P1_RECT" | jq ".logical.x + .logical.w/2 - 30")
-      PY=$(echo "$P1_RECT" | jq ".logical.y")
-      PX_PX=$(awk "BEGIN { printf \"%d\", $PX * $SCALE }")
-      PY_PX=$(awk "BEGIN { printf \"%d\", $PY * $SCALE }")
-      PW_PX=$(awk "BEGIN { printf \"%d\", 60 * $SCALE }")
-      PH_PX=$(awk "BEGIN { printf \"%d\", 15 * $SCALE }")
-      magick "$FULL" -crop "${PW_PX}x${PH_PX}+${PX_PX}+${PY_PX}" +repage "$OUT_ROT"
+      P1_RECT=$(curl -sf "${BASE_URL}/get_pane_rect?pane=1" || echo '{"x":235,"y":0,"w":160,"h":148,"px":235,"py":0,"pw":160,"ph":148}')
+      # Indicator strip is at the very top of pane 1 (first ~10px logical)
+      IND_PX=$(echo "$P1_RECT" | jq '.px')
+      IND_PY=$(echo "$P1_RECT" | jq '.py')
+      IND_PW=$(echo "$P1_RECT" | jq '.pw')
+      IND_PH=$(awk "BEGIN { printf \"%d\", 12 * $SCALE }")
+      magick "$FULL" -crop "${IND_PW}x${IND_PH}+${IND_PX}+${IND_PY}" +repage "$OUT_ROT"
       rm -f "$FULL"
     fi
   fi
@@ -653,20 +726,33 @@ if part_enabled ui_docs; then
     echo "  layout-annotated"
     FULL="${OUTPUT_DIR}/.full_layout.png"
     if capture "$FULL"; then
-       magick "$FULL" \
-         -fill none -stroke red -strokewidth 3 \
-         -draw "rectangle $(awk "BEGIN { printf \"%d,%d %d,%d\", 139*$SCALE, 0*$SCALE, 799*$SCALE, 148*$SCALE }")" \
-         -annotate +$(awk "BEGIN { printf \"%d\", 145*$SCALE }")+$(awk "BEGIN { printf \"%d\", 25*$SCALE }") "Time Panel" \
-         -stroke blue \
-         -draw "rectangle $(awk "BEGIN { printf \"%d,%d %d,%d\", 139*$SCALE, 149*$SCALE, 799*$SCALE, 479*$SCALE }")" \
-         -annotate +$(awk "BEGIN { printf \"%d\", 145*$SCALE }")+$(awk "BEGIN { printf \"%d\", 175*$SCALE }") "Map & Overlays" \
-         -stroke green \
-         -draw "rectangle $(awk "BEGIN { printf \"%d,%d %d,%d\", 0*$SCALE, 0*$SCALE, 138*$SCALE, 479*$SCALE }")" \
-         -annotate +$(awk "BEGIN { printf \"%d\", 5*$SCALE }")+$(awk "BEGIN { printf \"%d\", 25*$SCALE }") "Panes" \
-         "$OUT_LAYOUT"
-       rm -f "$FULL"
+      # HamClock-Next canonical layout (800×480 logical):
+      #   Time Panel:  x=0,   y=0,   w=235, h=148
+      #   Data Panes:  x=235, y=0,   w=480, h=148  (panes 1-4)
+      #   Side Panel:  x=0,   y=148, w=139, h=332
+      #   Map:         x=139, y=149, w=660, h=330
+      magick "$FULL" \
+        -fill none -stroke red -strokewidth 3 \
+        -draw "rectangle $(awk "BEGIN { printf \"%d,%d %d,%d\", 0*$SCALE, 0*$SCALE, 235*$SCALE, 148*$SCALE }")" \
+        -fill white -pointsize 14 \
+        -annotate +$(awk "BEGIN { printf \"%d\", 5*$SCALE }")+$(awk "BEGIN { printf \"%d\", 20*$SCALE }") "Time Panel" \
+        -fill none -stroke orange -strokewidth 3 \
+        -draw "rectangle $(awk "BEGIN { printf \"%d,%d %d,%d\", 236*$SCALE, 0*$SCALE, 799*$SCALE, 148*$SCALE }")" \
+        -fill white \
+        -annotate +$(awk "BEGIN { printf \"%d\", 240*$SCALE }")+$(awk "BEGIN { printf \"%d\", 20*$SCALE }") "Data Panes" \
+        -fill none -stroke green -strokewidth 3 \
+        -draw "rectangle $(awk "BEGIN { printf \"%d,%d %d,%d\", 0*$SCALE, 149*$SCALE, 139*$SCALE, 479*$SCALE }")" \
+        -fill white \
+        -annotate +$(awk "BEGIN { printf \"%d\", 3*$SCALE }")+$(awk "BEGIN { printf \"%d\", 175*$SCALE }") "Side Panel" \
+        -fill none -stroke "#4488FF" -strokewidth 3 \
+        -draw "rectangle $(awk "BEGIN { printf \"%d,%d %d,%d\", 140*$SCALE, 149*$SCALE, 799*$SCALE, 479*$SCALE }")" \
+        -fill white \
+        -annotate +$(awk "BEGIN { printf \"%d\", 145*$SCALE }")+$(awk "BEGIN { printf \"%d\", 175*$SCALE }") "Map & Overlays" \
+        "$OUT_LAYOUT"
+      rm -f "$FULL"
     fi
   fi
+  fi  # end LIVE_WEB=1 gate
 fi
 
 # ============================================================================

@@ -682,6 +682,7 @@ void main_tick() {
       if (ctx.webServer) {
         ctx.webServer->setPanes(nullptr);
         ctx.webServer->setTimePanel(nullptr);
+        ctx.webServer->setRssBanner(nullptr);
         ctx.webServer->setSatelliteManager(nullptr);
         ctx.webServer->setRotatorService(nullptr);
         ctx.webServer->setStopwatch(nullptr);
@@ -972,6 +973,7 @@ void main_tick() {
         ctx.webServer->setRotatorService(ctx.dashboard->rotatorService.get());
         ctx.webServer->setPanes(&ctx.dashboard->panes);
         ctx.webServer->setTimePanel(ctx.dashboard->timePanel.get());
+        ctx.webServer->setRssBanner(ctx.dashboard->rssBanner.get());
         ctx.webServer->setPaneExpandControl(&ctx.paneExpandCmd);
         ctx.webServer->setWeatherStore(ctx.deWeatherStore);
         ctx.webServer->setBMEProvider(ctx.bmeProvider.get());
@@ -1027,6 +1029,7 @@ void main_tick() {
         if (ctx.webServer) {
           ctx.webServer->setPanes(nullptr);
           ctx.webServer->setTimePanel(nullptr);
+          ctx.webServer->setRssBanner(nullptr);
           ctx.webServer->setSatelliteManager(nullptr);
           ctx.webServer->setRotatorService(nullptr);
           ctx.webServer->setStopwatch(nullptr);
