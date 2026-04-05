@@ -174,6 +174,11 @@ void WebServer::run() {
     .dim { color: #666; font-size: 0.85em; }
     #msg { margin-top: 8px; color: var(--green); min-height: 1.2em; }
     #msg.err { color: #f44; }
+    .pw-wrap { position: relative; display: flex; align-items: center; }
+    .pw-wrap input { padding-right: 32px; margin-bottom: 0; }
+    .pw-toggle { position: absolute; right: 8px; cursor: pointer; color: #888; font-size: 1.2em; user-select: none; }
+    .pw-toggle:hover { color: var(--green); }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   </style>
 </head>
 <body>
@@ -192,6 +197,7 @@ void WebServer::run() {
     <div class="tab" onclick="showTab('services')">Services</div>
     <div class="tab" onclick="showTab('brightness')">Brightness</div>
     <div class="tab" onclick="showTab('widgets')">Widgets</div>
+    <div class="tab" onclick="showTab('widget-config')">Widget Config</div>
     <div class="tab" onclick="showTab('watchlist')">Watchlist</div>
     <div class="tab" onclick="showTab('update')">Update</div>
   </div>
@@ -207,6 +213,16 @@ void WebServer::run() {
       <label>Longitude</label>
       <input type="number" id="lon" step="0.0001" min="-180" max="180">
       <label style="margin-top:4px"><input type="checkbox" id="audio-muted"> Mute Audio / TTS</label>
+      <div class="grid-2">
+        <div>
+          <label>Callsign Color</label>
+          <input type="color" id="call-fg" style="height:38px">
+        </div>
+        <div>
+          <label>Callsign BG</label>
+          <input type="color" id="call-bg" style="height:38px">
+        </div>
+      </div>
       <button onclick="saveConfig()" style="margin-top:8px">Save</button>
       <div id="msg"></div>
     </div>
@@ -298,6 +314,8 @@ void WebServer::run() {
       </select>
       <label style="margin-top:10px"><input type="checkbox" id="night-lights"> Show Night Lights</label>
       <label><input type="checkbox" id="use-metric"> Use Metric Units</label>
+      <label>MUF Real-time Opacity</label>
+      <input type="range" id="muf-opacity" min="0" max="1" step="0.1" value="0.5">
       <div class="section-hdr" style="margin-top:16px">Font</div>
       <label>Font</label>
       <select id="font-path"></select>
@@ -339,15 +357,16 @@ void WebServer::run() {
   </div>
 
   <div id="network" class="panel">
-    <div class="card">
+    <div class="card" id="cors-proxy-card">
       <label>CORS Proxy URL</label>
       <input type="text" id="cors-proxy-url" placeholder="/proxy/">
       <div class="dim" style="margin-bottom:10px">
         Prefix prepended to external API URLs in WASM builds.<br>
-        Default <code>/proxy/</code> uses the bundled serve.py proxy.<br>
-        Leave empty only if your server already sends CORS headers.
+        Default <code>/proxy/</code> uses the bundled serve.py proxy.
       </div>
-      <div class="section-hdr" style="margin-top:16px">Local Data Hub</div>
+    </div>
+    <div class="card">
+      <div class="section-hdr">Local Data Hub</div>
       <label>Hub Mode</label>
       <select id="hub-mode" onchange="toggleHubFields()">
         <option value="Off">Off</option>
@@ -412,11 +431,20 @@ void WebServer::run() {
       <label>Username</label>
       <input type="text" id="qrz-user">
       <label>Password</label>
-      <input type="password" id="qrz-pass" placeholder="(unchanged if blank)">
+      <div class="pw-wrap" style="margin-bottom:10px">
+        <input type="password" id="qrz-pass" placeholder="(unchanged if blank)">
+        <span class="pw-toggle" onclick="togglePW('qrz-pass')">👁</span>
+      </div>
       <label>RepeaterBook Key</label>
-      <input type="text" id="rb-key">
+      <div class="pw-wrap" style="margin-bottom:10px">
+        <input type="password" id="rb-key">
+        <span class="pw-toggle" onclick="togglePW('rb-key')">👁</span>
+      </div>
       <label>Winlink Key</label>
-      <input type="text" id="wl-key">
+      <div class="pw-wrap" style="margin-bottom:10px">
+        <input type="password" id="wl-key">
+        <span class="pw-toggle" onclick="togglePW('wl-key')">👁</span>
+      </div>
     </div>
     <div class="card">
       <div class="section-hdr">Live Spots</div>
@@ -443,6 +471,8 @@ void WebServer::run() {
         <option value="pota">POTA Only</option>
         <option value="sota">SOTA Only</option>
       </select>
+      <label>Max Distance (km)</label>
+      <input type="number" id="onta-max-dist" min="0" max="20000">
       <button onclick="saveServices()">Save</button>
       <div id="services-msg"></div>
     </div>
@@ -517,7 +547,94 @@ void WebServer::run() {
         </div>
       </div>
       
-      <div class="section-hdr" style="margin-top:16px">Aux Clock</div>
+      <button onclick="saveWidgets()" style="margin-top:16px">Save Widgets</button>
+      <div id="widgets-msg"></div>
+    </div>
+  </div>
+
+  <div id="widget-config" class="panel">
+    <div class="card">
+      <div class="section-hdr">Daily Alarm</div>
+      <div class="grid-2">
+        <div>
+          <label>Alarm Time</label>
+          <input type="time" id="alarm-time">
+        </div>
+        <div>
+          <label>Mode</label>
+          <select id="alarm-utc">
+            <option value="0">Local</option>
+            <option value="1">UTC</option>
+          </select>
+        </div>
+      </div>
+      <label><input type="checkbox" id="alarm-armed"> Alarm Armed</label>
+    </div>
+
+    <div class="card">
+      <div class="section-hdr">SDO</div>
+      <label>Wavelength</label>
+      <select id="sdo-wavelength">
+        <option value="211193171">Composite (211/193/171)</option>
+        <option value="HMIB">Magnetogram</option>
+        <option value="HMIIC">White Light (6173A)</option>
+        <option value="0131">131A (Teal)</option>
+        <option value="0193">193A (Brown)</option>
+        <option value="0211">211A (Purple)</option>
+        <option value="0304">304A (Red)</option>
+        <option value="1600">1600A (Yellow)</option>
+        <option value="1700">1700A (Pink)</option>
+      </select>
+      <div class="grid-2" style="margin-top:8px">
+        <label><input type="checkbox" id="sdo-rotating"> Rotating</label>
+        <label><input type="checkbox" id="sdo-pfss"> Show PFSS</label>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-hdr">Marine</div>
+      <label>Tide Station ID</label>
+      <div style="display:flex;gap:10px;align-items:center">
+        <input type="text" id="marine-station" style="width:100px">
+        <span id="marine-station-name" class="dim"></span>
+      </div>
+      <label style="margin-top:8px">Buoy ID</label>
+      <input type="text" id="marine-buoy">
+    </div>
+
+    <div class="card">
+      <div class="section-hdr">Big Clock</div>
+      <div class="grid-2">
+        <div>
+          <label>Type</label>
+          <select id="bc-digital">
+            <option value="1">Digital</option>
+            <option value="0">Analog</option>
+          </select>
+        </div>
+        <div>
+          <label>Time Format</label>
+          <select id="bc-12h">
+            <option value="0">24 Hour</option>
+            <option value="1">12 Hour</option>
+          </select>
+        </div>
+      </div>
+      <div class="grid-2" style="margin-top:8px">
+        <label><input type="checkbox" id="bc-utc"> UTC Mode</label>
+        <label><input type="checkbox" id="bc-sec"> Show Seconds</label>
+      </div>
+      <div class="grid-2" style="margin-top:8px">
+        <label><input type="checkbox" id="bc-date"> Show Date</label>
+        <div>
+          <label>Hue (0-359)</label>
+          <input type="number" id="bc-hue" min="0" max="359">
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-hdr">Aux Clock</div>
       <label>Timezone</label>
       <select id="aux-tz-preset" onchange="toggleAuxCustom()">
         <option value="999|Local">Local (system time, DST-aware)</option>
@@ -543,9 +660,19 @@ void WebServer::run() {
         <option value="1">P</option>
         <option value="2">C</option>
       </select>
+    </div>
 
-      <button onclick="saveWidgets()" style="margin-top:16px">Save Widgets</button>
-      <div id="widgets-msg"></div>
+    <div class="card">
+      <div class="section-hdr">Other Display Options</div>
+      <label>Idle Minutes (0=off)</label>
+      <input type="number" id="idle-minutes" min="0" max="1440">
+      <label><input type="checkbox" id="ltr329-auto-dim"> LTR329 Auto Dim</label>
+      <label><input type="checkbox" id="prevent-sleep"> Prevent Screen Sleep</label>
+    </div>
+
+    <div class="card">
+      <button onclick="saveWidgetConfig()">Save Widget Config</button>
+      <div id="wcfg-msg"></div>
     </div>
   </div>
 
@@ -584,7 +711,7 @@ void WebServer::run() {
   <script>
     // Tab navigation
     function showTab(name) {
-      const ids = ['identity','appearance','status','de-dx','network','cluster','radio','services','brightness','widgets','watchlist','update'];
+      const ids = ['identity','appearance','status','de-dx','network','cluster','radio','services','brightness','widgets','widget-config','watchlist','update'];
       document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', ids[i] === name));
       document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id === name));
       if (name === 'appearance') { loadAppearance(); toggleVoacapFields(); }
@@ -596,8 +723,14 @@ void WebServer::run() {
       if (name === 'services') loadServices();
       if (name === 'brightness') loadBrightness();
       if (name === 'widgets') loadWidgets();
+      if (name === 'widget-config') loadWidgetConfig();
       if (name === 'watchlist') loadWatchlist();
       if (name === 'update') loadUpdate();
+    }
+
+    function togglePW(id) {
+      const el = document.getElementById(id);
+      el.type = el.type === 'password' ? 'text' : 'password';
     }
 
     // Parse key-value text format ("Key   Value\n") — kept for Status/DE-DX tabs
@@ -620,6 +753,11 @@ void WebServer::run() {
         document.getElementById('lat').value = (c.lat !== undefined) ? c.lat : '';
         document.getElementById('lon').value = (c.lon !== undefined) ? c.lon : '';
         document.getElementById('audio-muted').checked = !!c.audioMuted;
+        document.getElementById('call-fg').value = c.callsignColor || '#ffffff';
+        document.getElementById('call-bg').value = c.callsignBgColor || '#000000';
+        if (c.installType !== 'WASM') {
+          document.getElementById('cors-proxy-card').style.display = 'none';
+        }
       } catch(e) { setMsg('Failed to load config: ' + e, true); }
     }
 
@@ -669,6 +807,7 @@ void WebServer::run() {
         document.getElementById('weather-overlay').value = c.weatherOverlay || 'none';
         document.getElementById('night-lights').checked = !!c.mapNightLights;
         document.getElementById('use-metric').checked = !!c.useMetric;
+        document.getElementById('muf-opacity').value = c.mufRtOpacity !== undefined ? c.mufRtOpacity : 0.5;
         await loadFonts(c.fontPath || '');
 
         const dpmSelect = document.getElementById('display-power-method');
@@ -724,7 +863,8 @@ void WebServer::run() {
         prop_mode: document.getElementById('prop-mode').value,
         prop_power: document.getElementById('prop-power').value,
         prop_toa: document.getElementById('prop-toa').value,
-        prop_path: document.getElementById('prop-path').value
+        prop_path: document.getElementById('prop-path').value,
+        muf_opacity: document.getElementById('muf-opacity').value
       });
       try {
         const r = await fetch('/set_config?' + params);
@@ -754,7 +894,12 @@ void WebServer::run() {
       const lat  = document.getElementById('lat').value;
       const lon  = document.getElementById('lon').value;
       const audioMuted = document.getElementById('audio-muted').checked ? '1' : '0';
-      const params = new URLSearchParams({call, grid, lat, lon, audio_muted: audioMuted});
+      const callFg = document.getElementById('call-fg').value;
+      const callBg = document.getElementById('call-bg').value;
+      const params = new URLSearchParams({
+        call, grid, lat, lon, audio_muted: audioMuted,
+        callsign_color: callFg, callsign_bg_color: callBg
+      });
       try {
         const r = await fetch('/set_config?' + params);
         const t = await r.text();
@@ -952,6 +1097,7 @@ void WebServer::run() {
         document.getElementById('gps-enabled').checked = !!c.gpsEnabled;
         document.getElementById('rss-enabled').checked = !!c.rssEnabled;
         document.getElementById('onta-filter').value = c.ontaFilter || 'all';
+        document.getElementById('onta-max-dist').value = c.ontaMaxDistKm || 0;
         document.getElementById('spots-of-de').checked = !!c.liveSpotsOfDe;
         document.getElementById('spots-use-call').checked = !!c.liveSpotsUseCall;
       } catch(e) {}
@@ -972,6 +1118,7 @@ void WebServer::run() {
         gps_enabled: document.getElementById('gps-enabled').checked ? '1' : '0',
         rss_enabled: document.getElementById('rss-enabled').checked ? '1' : '0',
         onta_filter: document.getElementById('onta-filter').value,
+        onta_max_dist: document.getElementById('onta-max-dist').value,
         live_spots_of_de: document.getElementById('spots-of-de').checked ? '1' : '0',
         live_spots_use_call: document.getElementById('spots-use-call').checked ? '1' : '0'
       });
@@ -1079,6 +1226,39 @@ void WebServer::run() {
         document.getElementById('selected-satellite').value = c.selectedSatellite || '';
         document.getElementById('sat-widget-satellite').value = c.sat_widget_satellite || '';
         toggleSatSelect();
+      } catch(e) {}
+    }
+
+    async function loadWidgetConfig() {
+      try {
+        const r = await fetch('/api/config');
+        const c = await r.json();
+
+        // Alarms
+        const ah = String(c.alarmTimeHH !== undefined ? c.alarmTimeHH : 0).padStart(2, '0');
+        const am = String(c.alarmTimeMM !== undefined ? c.alarmTimeMM : 0).padStart(2, '0');
+        document.getElementById('alarm-time').value = ah + ':' + am;
+        document.getElementById('alarm-armed').checked = !!c.alarmArmed;
+        document.getElementById('alarm-utc').value = c.alarmUtc ? '1' : '0';
+
+        // SDO
+        const sdoWl = c.sdoWavelength || '0193';
+        document.getElementById('sdo-wavelength').value = sdoWl;
+        document.getElementById('sdo-rotating').checked = !!c.sdoRotating;
+        document.getElementById('sdo-pfss').checked = !!c.sdoPfss;
+
+        // Marine
+        document.getElementById('marine-station').value = c.marineStation || '';
+        document.getElementById('marine-station-name').textContent = c.marineStationName || '';
+        document.getElementById('marine-buoy').value = c.marineBuoy || '';
+
+        // Big Clock
+        document.getElementById('bc-digital').value = c.bigClockDigital ? '1' : '0';
+        document.getElementById('bc-12h').value = c.bigClock12h ? '1' : '0';
+        document.getElementById('bc-utc').checked = !!c.bigClockUtc;
+        document.getElementById('bc-sec').checked = !!c.bigClockShowSec;
+        document.getElementById('bc-date').checked = !!c.bigClockShowDate;
+        document.getElementById('bc-hue').value = c.bigClockHue !== undefined ? c.bigClockHue : 0;
 
         // Aux Clock
         const tzOff = c.auxClockTzOffset !== undefined ? c.auxClockTzOffset : 0;
@@ -1094,6 +1274,11 @@ void WebServer::run() {
         }
         document.getElementById('aux-star-mode').value = c.auxClockStarMode !== undefined ? c.auxClockStarMode : 1;
         toggleAuxCustom();
+
+        // Misc
+        document.getElementById('idle-minutes').value = c.idleMinutes !== undefined ? c.idleMinutes : 0;
+        document.getElementById('ltr329-auto-dim').checked = !!c.ltr329AutoDim;
+        document.getElementById('prevent-sleep').checked = !!c.preventSleep;
 
       } catch(e) {}
     }
@@ -1144,6 +1329,36 @@ void WebServer::run() {
         });
         params.set(`pane${i}`, active.join(','));
       }
+ 
+      try {
+        const r = await fetch('/set_config?' + params);
+        showTabMsg('widgets-msg', await r.text() === 'ok');
+      } catch(e) { showTabMsg('widgets-msg', false); }
+    }
+
+    async function saveWidgetConfig() {
+      const alarmParts = (document.getElementById('alarm-time').value || '00:00').split(':');
+      const params = new URLSearchParams({
+        alarm_armed: document.getElementById('alarm-armed').checked ? '1' : '0',
+        alarm_hour: alarmParts[0] || '0',
+        alarm_min: alarmParts[1] || '0',
+        alarm_utc: document.getElementById('alarm-utc').value,
+        sdo_wavelength: document.getElementById('sdo-wavelength').value.trim(),
+        sdo_rotating: document.getElementById('sdo-rotating').checked ? '1' : '0',
+        sdo_pfss: document.getElementById('sdo-pfss').checked ? '1' : '0',
+        marine_station: document.getElementById('marine-station').value.trim(),
+        marine_buoy: document.getElementById('marine-buoy').value.trim(),
+        bc_digital: document.getElementById('bc-digital').value,
+        bc_12h: document.getElementById('bc-12h').value,
+        bc_utc: document.getElementById('bc-utc').checked ? '1' : '0',
+        bc_sec: document.getElementById('bc-sec').checked ? '1' : '0',
+        bc_date: document.getElementById('bc-date').checked ? '1' : '0',
+        bc_hue: document.getElementById('bc-hue').value,
+        idle_minutes: document.getElementById('idle-minutes').value,
+        ltr329_auto_dim: document.getElementById('ltr329-auto-dim').checked ? '1' : '0',
+        prevent_sleep: document.getElementById('prevent-sleep').checked ? '1' : '0',
+        aux_star_mode: document.getElementById('aux-star-mode').value
+      });
 
       const auxPreset = document.getElementById('aux-tz-preset').value;
       if (auxPreset.startsWith('custom')) {
@@ -1154,12 +1369,11 @@ void WebServer::run() {
         params.set('aux_tz_offset', parts[0]);
         params.set('aux_tz_label', parts[1]);
       }
-      params.set('aux_star_mode', document.getElementById('aux-star-mode').value);
 
       try {
         const r = await fetch('/set_config?' + params);
-        showTabMsg('widgets-msg', await r.text() === 'ok');
-      } catch(e) { showTabMsg('widgets-msg', false); }
+        showTabMsg('wcfg-msg', await r.text() === 'ok');
+      } catch(e) { showTabMsg('wcfg-msg', false); }
     }
 
     async function loadWatchlist() {

@@ -457,7 +457,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
     hurricaneProvider->fetch();
 
   marineProvider =
-      std::make_unique<MarineProvider>(netManager, ctx.marineStore);
+      std::make_unique<MarineProvider>(netManager, ctx.marineStore, state.get());
   if (isMasterMode || isWidgetConfigured("marine"))
     marineProvider->fetch(appCfg.marineStation, appCfg.marineBuoy);
 

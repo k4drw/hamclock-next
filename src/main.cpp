@@ -612,6 +612,7 @@ int main(int argc, char *argv[]) {
   ctx.webServer->setRotationControl(&ctx.rotationCmd, &ctx.rotationCmdPane,
                                     &ctx.rotationCmdWidget);
   ctx.webServer->setMapReloadFlag(&ctx.mapUpdateRequested);
+  ctx.webServer->setMarineStore(ctx.marineStore);
   ctx.webServer->start();
 
   ctx.gpsProvider = std::make_unique<GPSProvider>(ctx.state.get(), ctx.appCfg);

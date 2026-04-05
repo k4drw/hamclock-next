@@ -16,8 +16,11 @@ double safe_stod(const std::string &s);
 // Safely convert a string to a float, returning 0.0f on failure.
 float safe_stof(const std::string &s);
 
-// Safely convert a string to an int, returning 0 on failure.
+// Safate convert a string to an int, returning 0 on failure.
 int safe_stoi(const std::string &s);
+
+// Safely convert a string to a long long, returning 0 on failure.
+long long safe_stoll(const std::string &s);
 
 // Convert a string to lowercase.
 std::string toLower(const std::string &s);

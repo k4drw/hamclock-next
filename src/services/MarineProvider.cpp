@@ -3,6 +3,7 @@
 #include "../core/StringUtils.h"
 #include "../core/WorkerService.h"
 #include "../core/Astronomy.h"
+#include "../core/HamClockState.h"
 #include <SDL.h>
 #include <chrono>
 #include <cstdio>
@@ -18,8 +19,9 @@ using json = nlohmann::json;
 
 
 MarineProvider::MarineProvider(NetworkManager &net,
-                               std::shared_ptr<MarineStore> store)
-    : net_(net), store_(std::move(store)) {}
+                               std::shared_ptr<MarineStore> store,
+                               struct HamClockState *state)
+    : net_(net), store_(std::move(store)), state_(state) {}
 
 void MarineProvider::fetch(const std::string &tideStation,
                            const std::string &buoyStation, bool force) {
@@ -57,11 +59,17 @@ void MarineProvider::fetch(const std::string &tideStation,
     std::string stId = tideStation;
     net_.fetchAsync(
         url,
-        [store, stId](std::string body) {
-          if (body.empty())
+        [store, stId, state = state_](std::string body) {
+          if (body.empty()) {
+            if (state) {
+              std::lock_guard<std::mutex> lk(state->servicesMutex);
+              state->services["Marine"].ok = false;
+              state->services["Marine"].lastError = "Tide API empty response";
+            }
             return;
+          }
 
-          WorkerService::getInstance().submitTask([store, body, stId]() {
+          WorkerService::getInstance().submitTask([store, body, stId, state]() {
             try {
               auto j = json::parse(body);
               MarineData update; 
@@ -98,6 +106,12 @@ void MarineProvider::fetch(const std::string &tideStation,
               event.user.code = 0;
               event.user.data1 = new MarineData(update);
               SDL_PushEvent(&event);
+
+              if (state) {
+                std::lock_guard<std::mutex> lk(state->servicesMutex);
+                state->services["Marine"].ok = true;
+                state->services["Marine"].lastSuccess = std::chrono::system_clock::now();
+              }
             } catch (...) {
             }
           });
@@ -127,11 +141,17 @@ void MarineProvider::fetchBuoy(const std::string &buoyStation, bool force) {
       url,
 
 
-      [store, stId](std::string body) {
-        if (body.empty())
+      [store, stId, state = state_](std::string body) {
+        if (body.empty()) {
+          if (state) {
+            std::lock_guard<std::mutex> lk(state->servicesMutex);
+            state->services["Marine"].ok = false;
+            state->services["Marine"].lastError = "Buoy data empty response";
+          }
           return;
+        }
 
-        WorkerService::getInstance().submitTask([store, body, stId]() {
+        WorkerService::getInstance().submitTask([store, body, stId, state]() {
           try {
             // NDBC text: header rows start with '#', data on line after headers
             std::istringstream ss(body);
@@ -195,6 +215,12 @@ void MarineProvider::fetchBuoy(const std::string &buoyStation, bool force) {
             event.user.code = 1; // code=1 = buoy update
             event.user.data1 = new MarineData(update);
             SDL_PushEvent(&event);
+
+            if (state) {
+              std::lock_guard<std::mutex> lk(state->servicesMutex);
+              state->services["Marine"].ok = true;
+              state->services["Marine"].lastSuccess = std::chrono::system_clock::now();
+            }
           } catch (...) {
           }
         });
