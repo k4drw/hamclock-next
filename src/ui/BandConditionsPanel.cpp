@@ -147,23 +147,32 @@ void BandConditionsPanel::renderPropagationLogic(SDL_Renderer *renderer,
   auto *cat = fontMgr_.catalog();
   int pad = 10;
   int startX = x_ + width_ / 2 + pad;
-  int startY = y_ + 30; // Below "Band Conditions" title
-  int lineH = 15;
+  int startY = y_ + 28; // Below "Band Conditions" title
+  int lineH = 13;
 
-  cat->drawText(renderer, "Current Activity:", startX, startY, themes.accent,
-                FontStyle::MicroBold);
+  cat->drawText(renderer, "How it works (N0NBH standards):", startX, startY,
+                themes.accent, FontStyle::MicroBold);
   startY += lineH;
-  std::string sfiText = "Solar Flux (SFI): " + std::to_string(currentData_.sfi);
-  cat->drawText(renderer, sfiText, startX, startY, themes.text, FontStyle::Micro);
+  cat->drawText(renderer, "Simplified propagation model for HF.", startX,
+                startY, themes.textDim, FontStyle::Tiny);
+  startY += lineH + 5;
+
+  cat->drawText(renderer, "Current Activity Indices:", startX, startY,
+                themes.accent, FontStyle::MicroBold);
   startY += lineH;
-  char kStr[32];
-  std::snprintf(kStr, sizeof(kStr), "Geomag Index (K): %.1f",
+  std::string sfiText = "SFI: " + std::to_string(currentData_.sfi) +
+                        " (Higher improves 15m/10m)";
+  cat->drawText(renderer, sfiText, startX, startY, themes.text, FontStyle::Tiny);
+  startY += lineH;
+
+  char kStr[64];
+  std::snprintf(kStr, sizeof(kStr), "K: %.1f (High K degrades prop.)",
                 currentData_.k_index);
   cat->drawText(renderer, std::string(kStr), startX, startY, themes.text,
-                FontStyle::Micro);
+                FontStyle::Tiny);
 
-  startY += lineH + 5;
-  cat->drawText(renderer, "Propagation Logic:", startX, startY, themes.accent,
+  startY += lineH + 8;
+  cat->drawText(renderer, "Logic Thresholds:", startX, startY, themes.accent,
                 FontStyle::MicroBold);
   startY += lineH;
 

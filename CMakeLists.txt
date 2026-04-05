@@ -638,6 +638,7 @@ set(HAMCLOCK_SOURCES
     src/ui/MapViewMenu.cpp
     src/ui/PaneContainer.cpp
     src/ui/PlaceholderWidget.cpp
+    src/ui/PropColorCustomizer.cpp
     src/ui/WidgetRegistry.cpp
     src/ui/ColorPicker.cpp
     src/ui/RenderUtils.cpp

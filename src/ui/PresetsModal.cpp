@@ -43,8 +43,12 @@ void PresetsModal::computeLayout() {
   int contestRowY = my + 66;
   contestApplyRect_ = {mx + kModalW - 138, contestRowY + 3, 60, 24};
 
-  // List area (pushed down by kRowH to make room for Contest row)
-  int listY = my + 100;
+  // Propagation Firehose row
+  int firehoseRowY = my + 98;
+  propFirehoseApplyRect_ = {mx + kModalW - 138, firehoseRowY + 3, 60, 24};
+
+  // List area (pushed down by 2*kRowH + padding to make room for both built-in rows)
+  int listY = my + 132;
   int listH = kVisibleRows * kRowH;
   listRect_ = {mx + 8, listY, kModalW - 16, listH};
 
@@ -183,6 +187,21 @@ void PresetsModal::render(SDL_Renderer *renderer) {
                   FontStyle::Caption, true, false, true);
   }
 
+  // ── Propagation Firehose row ─────────────────────────────────────────────
+  {
+    int rowY = propFirehoseApplyRect_.y - 3;
+    SDL_Rect rowBg = {listRect_.x, rowY, listRect_.w, kRowH};
+    fillRect(renderer, rowBg, themes.rowStripe2);
+    drawRect(renderer, rowBg, themes.border);
+    cat->drawText(renderer, "\xe2\x9c\xaf Prop Firehose", listRect_.x + 8, rowY + 7,
+                  accent, FontStyle::Fast);
+    fillRect(renderer, propFirehoseApplyRect_, btnFill);
+    drawRect(renderer, propFirehoseApplyRect_, btnBorder);
+    cat->drawText(renderer, "Apply", propFirehoseApplyRect_.x + propFirehoseApplyRect_.w / 2,
+                  propFirehoseApplyRect_.y + propFirehoseApplyRect_.h / 2, greenColor,
+                  FontStyle::Caption, true, false, true);
+  }
+
   // ── Separator ────────────────────────────────────────────────────────────
   SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, themes.border.a);
   SDL_RenderDrawLine(renderer, dialogRect_.x + 4, listRect_.y - 2,
@@ -312,6 +331,12 @@ bool PresetsModal::onMouseUp(int mx, int my, Uint16 /*mod*/) {
     if (onApply_)
       onApply_();
     active_ = false;
+    return true;
+  }
+
+  // Prop Firehose built-in apply
+  if (ptInRect(mx, my, propFirehoseApplyRect_)) {
+    applyPropFirehose();
     return true;
   }
 
@@ -450,4 +475,28 @@ void PresetsModal::deletePreset(int index) {
   int total = (int)cfg_->presets.size();
   if (scrollOffset_ > 0 && scrollOffset_ >= total - kVisibleRows + 1)
     scrollOffset_ = std::max(0, total - kVisibleRows);
+}
+
+void PresetsModal::applyPropFirehose() {
+  if (!cfg_)
+    return;
+
+  // Distribute 13 propagation/solar widgets across 4 panes
+  cfg_->pane1Rotation = {"solar", "solar_storm", "solar_cycle"};
+  cfg_->pane2Rotation = {"solar_timeline", "sfi_trend", "noaa_spacewx"};
+  cfg_->pane3Rotation = {"aurora", "aurora_graph", "voacap_dedx"};
+  cfg_->pane4Rotation = {"ionosonde", "tropo", "drap", "band_conditions"};
+
+  // Force map to MUF overlay
+  cfg_->propOverlay = PropOverlayType::Muf;
+
+  // Ensure rotation is active
+  if (cfg_->rotationIntervalS == 0) {
+    cfg_->rotationIntervalS = 30;
+  }
+
+  if (onApply_)
+    onApply_();
+
+  active_ = false;
 }
