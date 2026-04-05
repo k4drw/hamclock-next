@@ -23,6 +23,7 @@
 #include "FontCatalog.h"
 #include "PaneContainer.h"
 #include "RenderUtils.h"
+#include "../core/ConfigManager.h"
 #include <fmt/core.h>
 
 #include <algorithm>
@@ -1139,14 +1140,14 @@ void MapWidget::renderDeMenu(SDL_Renderer *renderer) {
 
 // DRAP absorption color: SDL_PIXELFORMAT_RGBA32 little-endian packing
 // pixels[i] = (a << 24) | (b << 16) | (g << 8) | r
-static uint32_t drapColor(float mhz) {
-  if (mhz < 0.1f)
-    return 0;  // fully transparent
-  if (mhz < 5.0f)
-    return (80u << 24) | (0u << 16) | (255u << 8) | 255u;  // yellow, 80 alpha
-  if (mhz < 15.0f)
-    return (160u << 24) | (0u << 16) | (140u << 8) | 255u;  // orange, 160 alpha
-  return (200u << 24) | (50u << 16) | (50u << 8) | 220u;  // red, 200 alpha
+static uint32_t drapColor(float mhz, const std::string &variant) {
+  float t = std::min(mhz / 30.0f, 1.0f);
+  SDL_Color c = MapWidget::getPropColor(PropOverlayType::Drap, t, variant);
+  uint8_t a = (mhz < 0.1f) ? 0 : (mhz < 5.0f ? 80 : (mhz < 15.0f ? 160 : 200));
+  return (static_cast<uint32_t>(a) << 24) |
+         (static_cast<uint32_t>(c.b) << 16) |
+         (static_cast<uint32_t>(c.g) << 8) |
+         static_cast<uint32_t>(c.r);
 }
 
 void MapWidget::updatePropagationOverlay() {
@@ -1200,7 +1201,7 @@ void MapWidget::updatePropagationOverlay() {
 
     std::vector<uint32_t> pixels(grid.cells.size());
     for (int i = 0; i < (int)grid.cells.size(); i++)
-      pixels[i] = drapColor(grid.cells[i]);
+      pixels[i] = drapColor(grid.cells[i], config_.propColormap);
     SDL_UpdateTexture(propTexture_, nullptr, pixels.data(),
                       grid.cols * sizeof(uint32_t));
     return;
@@ -1291,6 +1292,9 @@ void MapWidget::onPropDataReady(PropOverlayType type,
   if (grid.size() != PropEngine::MAP_W * PropEngine::MAP_H)
     return;
 
+  lastPropType_ = type;
+  lastPropGrid_ = grid;
+
   // Use the renderer cached during the last render() call.
   SDL_Renderer *renderer = cachedRenderer_;
   if (!renderer)
@@ -1321,9 +1325,87 @@ void MapWidget::onPropDataReady(PropOverlayType type,
     float t = val / maxVal;
     t = std::max(0.0f, std::min(t, 1.0f));
 
-    uint8_t r = 0, g = 0, b = 0;
-    if (type == PropOverlayType::Reliability) {
-      // Reliability: Grey -> Yellow -> Green
+    SDL_Color c = getPropColor(type, t, config_.propColormap);
+    uint8_t r = c.r;
+    uint8_t g = c.g;
+    uint8_t b = c.b;
+
+    uint8_t a = (val > 0.1f) ? 200 : 0;
+    pixels[i] = (a << 24) | (b << 16) | (g << 8) | r;
+  }
+
+  SDL_UpdateTexture(propTexture_, nullptr, pixels.data(),
+                    PropEngine::MAP_W * sizeof(uint32_t));
+}
+
+void MapWidget::forcePropUpdate() {
+  if (lastPropGrid_.empty())
+    return;
+  onPropDataReady(lastPropType_, lastPropGrid_);
+}
+
+SDL_Color MapWidget::getPropColor(PropOverlayType type, float t,
+                                 const std::string &variant) {
+  t = std::max(0.0f, std::min(t, 1.0f));
+  uint8_t r = 0, g = 0, b = 0;
+  bool vibrant = (variant == "vibrant");
+
+  if (variant == "custom") {
+    const auto &ovr = ConfigManager::instance().getConfig().colorOverrides;
+    auto getOvrColor = [&](const std::string &key, SDL_Color fallback) {
+      auto it = ovr.find(key);
+      return (it != ovr.end()) ? it->second : fallback;
+    };
+
+    SDL_Color c0 = getOvrColor("prop_color_0", {150, 0, 0, 255});
+    SDL_Color c25 = getOvrColor("prop_color_25", {255, 150, 0, 255});
+    SDL_Color c50 = getOvrColor("prop_color_50", {255, 255, 0, 255});
+    SDL_Color c75 = getOvrColor("prop_color_75", {0, 255, 255, 255});
+    SDL_Color c100 = getOvrColor("prop_color_100", {255, 255, 255, 255});
+
+    SDL_Color ca, cb;
+    float f;
+    if (t < 0.25f) {
+      ca = c0; cb = c25; f = t / 0.25f;
+    } else if (t < 0.5f) {
+      ca = c25; cb = c50; f = (t - 0.25f) / 0.25f;
+    } else if (t < 0.75f) {
+      ca = c50; cb = c75; f = (t - 0.5f) / 0.25f;
+    } else {
+      ca = c75; cb = c100; f = (t - 0.75f) / 0.25f;
+    }
+    r = (uint8_t)(ca.r + f * (cb.r - ca.r));
+    g = (uint8_t)(ca.g + f * (cb.g - ca.g));
+    b = (uint8_t)(ca.b + f * (cb.b - ca.b));
+    return {r, g, b, 255};
+  }
+
+  if (type == PropOverlayType::Reliability || type == PropOverlayType::Voacap) {
+    if (vibrant) {
+      // Vibrant Reliability: Red -> Yellow -> Green -> Cyan -> White
+      if (t < 0.25f) {
+        float f = t / 0.25f;
+        r = (uint8_t)(150 + f * 105);
+        g = (uint8_t)(f * 150);
+        b = 0;
+      } else if (t < 0.5f) {
+        float f = (t - 0.25f) / 0.25f;
+        r = 255;
+        g = (uint8_t)(150 + f * 105);
+        b = 0;
+      } else if (t < 0.75f) {
+        float f = (t - 0.5f) / 0.25f;
+        r = (uint8_t)(255 * (1.0f - f));
+        g = 255;
+        b = (uint8_t)(f * 255);
+      } else {
+        float f = (t - 0.75f) / 0.25f;
+        r = (uint8_t)(f * 255);
+        g = 255;
+        b = 255;
+      }
+    } else {
+      // Muted Reliability: Grey -> Yellow -> Green
       if (t < 0.5f) {
         float f = t / 0.5f;
         r = (uint8_t)(100 + f * 155);
@@ -1331,14 +1413,25 @@ void MapWidget::onPropDataReady(PropOverlayType type,
         b = 100;
       } else {
         float f = (t - 0.5f) / 0.5f;
-        r = (uint8_t)(255 * (1.0f - f));
+        r = (uint8_t)(100 * (1.0f - f));
         g = 255;
         b = (uint8_t)(100 * (1.0f - f));
       }
-    } else if (type == PropOverlayType::Toa) {
-      // TOA: low angle = green (favorable long DX), high angle = red
-      // (steep/local) t=0 → transparent (no path); t>0 rendered
-      // green→yellow→red
+    }
+  } else if (type == PropOverlayType::Toa) {
+    if (vibrant) {
+      if (t < 0.5f) {
+        float f = t * 2.0f;
+        r = (uint8_t)(f * 255);
+        g = 255;
+        b = 0;
+      } else {
+        float f = (t - 0.5f) * 2.0f;
+        r = 255;
+        g = (uint8_t)((1.0f - f) * 255);
+        b = 0;
+      }
+    } else {
       if (t < 0.5f) {
         float f = t * 2.0f;
         r = (uint8_t)(f * 255.0f);
@@ -1350,56 +1443,118 @@ void MapWidget::onPropDataReady(PropOverlayType type,
         g = (uint8_t)((1.0f - f) * 200.0f);
         b = 0;
       }
-    } else if (type == PropOverlayType::Heatmap) {
-      // Heatmap: Purple -> Red -> Orange -> Yellow -> White
-      if (t < 0.25f) {  // Purple -> Red
+    }
+  } else if (type == PropOverlayType::Heatmap) {
+    if (vibrant) {
+      if (t < 0.25f) {
+        float f = t / 0.25f;
+        r = (uint8_t)(f * 255);
+        g = 0;
+        b = (uint8_t)((1.0f - f) * 100);
+      } else if (t < 0.5f) {
+        float f = (t - 0.25f) / 0.25f;
+        r = 255;
+        g = (uint8_t)(f * 150);
+        b = 0;
+      } else if (t < 0.75f) {
+        float f = (t - 0.5f) / 0.25f;
+        r = 255;
+        g = (uint8_t)(150 + f * 105);
+        b = (uint8_t)(f * 100);
+      } else {
+        float f = (t - 0.75f) / 0.25f;
+        r = 255;
+        g = 255;
+        b = (uint8_t)(100 + f * 155);
+      }
+    } else {
+      if (t < 0.25f) {
         float f = t / 0.25f;
         r = (uint8_t)(128 + f * 127);
         g = 0;
         b = (uint8_t)(128 * (1.0f - f));
-      } else if (t < 0.5f) {  // Red -> Orange
+      } else if (t < 0.5f) {
         float f = (t - 0.25f) / 0.25f;
         r = 255;
         g = (uint8_t)(f * 128);
         b = 0;
-      } else if (t < 0.75f) {  // Orange -> Yellow
+      } else if (t < 0.75f) {
         float f = (t - 0.5f) / 0.25f;
         r = 255;
         g = (uint8_t)(128 + f * 127);
         b = 0;
-      } else {  // Yellow -> White
+      } else {
         float f = (t - 0.75f) / 0.25f;
         r = 255;
         g = 255;
         b = (uint8_t)(f * 255);
       }
+    }
+  } else if (type == PropOverlayType::Drap) {
+    if (vibrant) {
+      if (t < 0.33f) { // yellow
+        r = 255; g = 255; b = 0;
+      } else if (t < 0.66f) { // orange
+        r = 255; g = 140; b = 0;
+      } else { // red
+        r = 220; g = 50; b = 50;
+      }
     } else {
-      // Jet-like colormap for MUF
-      if (t < 0.25f) {  // Blue -> Cyan
+      if (t < 0.33f) {
+        r = 200; g = 200; b = 50;
+      } else if (t < 0.66f) {
+        r = 200; g = 120; b = 50;
+      } else {
+        r = 180; g = 50; b = 50;
+      }
+    }
+  } else {
+    // Jet/Turbo style for MUF and others
+    if (vibrant) {
+      if (t < 0.2f) {
+        float f = t / 0.2f;
+        b = (uint8_t)(128 + f * 127);
+        g = 0;
+        r = 0;
+      } else if (t < 0.4f) {
+        float f = (t - 0.2f) / 0.2f;
+        b = 255;
+        g = (uint8_t)(f * 255);
+      } else if (t < 0.6f) {
+        float f = (t - 0.4f) / 0.2f;
+        g = 255;
+        b = (uint8_t)((1.0f - f) * 255);
+      } else if (t < 0.8f) {
+        float f = (t - 0.6f) / 0.2f;
+        r = (uint8_t)(f * 255);
+        g = 255;
+      } else {
+        float f = (t - 0.8f) / 0.2f;
+        r = 255;
+        g = (uint8_t)((1.0f - f) * 255);
+      }
+    } else {
+      if (t < 0.25f) {
         float f = t / 0.25f;
         b = 255;
         g = (uint8_t)(f * 255.0f);
-      } else if (t < 0.5f) {  // Cyan -> Green
+      } else if (t < 0.5f) {
         float f = (t - 0.25f) / 0.25f;
         g = 255;
         b = (uint8_t)((1.0f - f) * 255.0f);
-      } else if (t < 0.75f) {  // Green -> Yellow
+      } else if (t < 0.75f) {
         float f = (t - 0.5f) / 0.25f;
         g = 255;
         r = (uint8_t)(f * 255.0f);
-      } else {  // Yellow -> Red
+      } else {
         float f = (t - 0.75f) / 0.25f;
         r = 255;
         g = (uint8_t)((1.0f - f) * 255.0f);
       }
     }
-
-    uint8_t a = (val > 0.1f) ? 200 : 0;
-    pixels[i] = (a << 24) | (b << 16) | (g << 8) | r;
   }
 
-  SDL_UpdateTexture(propTexture_, nullptr, pixels.data(),
-                    PropEngine::MAP_W * sizeof(uint32_t));
+  return {r, g, b, 255};
 }
 
 void MapWidget::onResize(int x, int y, int w, int h) {

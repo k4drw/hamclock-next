@@ -131,6 +131,12 @@ public:
   // Robinson boundary helper
   static float getRobinsonXCoeff(double lat);
 
+  // Centralized propagation colormap engine
+  static SDL_Color getPropColor(PropOverlayType type, float t,
+                                const std::string &variant);
+
+  void forcePropUpdate();
+
 private:
   SDL_FPoint latLonToScreen(double lat, double lon) const;
   bool screenToLatLon(int sx, int sy, double &lat, double &lon) const;
@@ -306,6 +312,7 @@ private:
   int lastAuroraPanY_ = 0;
   SDL_Texture *auroraTexture_ = nullptr;
   PropOverlayType lastPropType_ = PropOverlayType::None;
+  std::vector<float> lastPropGrid_;
   std::string lastPropProj_ = "";
   SDL_Rect lastPropMapRect_ = {0, 0, 0, 0};
   double lastPropCenterLon_ = -999.0;

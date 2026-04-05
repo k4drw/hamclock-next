@@ -265,7 +265,7 @@ void WebServer::run() {
       <label>Propagation Overlay</label>
       <select id="prop-overlay" onchange="toggleVoacapFields()">
         <option value="none">None</option>
-        <option value="muf">MUF</option>
+        <option value="muf">MUF-RT</option>
         <option value="voacap">VOACAP</option>
         <option value="reliability">Reliability</option>
         <option value="toa">Time of Arrival</option>

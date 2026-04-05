@@ -136,6 +136,7 @@ bool MapWidget::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
       mapVerts_.clear();
       shadowVerts_.clear();  // force night overlay recompute for new projection
       lightVerts_.clear();
+      forcePropUpdate();
     });
     return true;
   }

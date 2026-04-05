@@ -1642,7 +1642,7 @@ void MapWidget::renderLegend(SDL_Renderer *renderer) {
   PropOverlayType type = config_.propOverlay;
 
   if (type == PropOverlayType::Muf) {
-    title = "MUF (MHz)";
+    title = "MUF-RT (MHz)";
     labelMin = "0";
     labelMax = "50";
   } else if (type == PropOverlayType::Reliability) {
@@ -1709,75 +1709,19 @@ void MapWidget::renderLegend(SDL_Renderer *renderer) {
         b = 50;
       }
     } else if (type == PropOverlayType::Reliability ||
-               type == PropOverlayType::Voacap) {
-      if (t < 0.5f) {
-        float f = t / 0.5f;
-        r = (uint8_t)(100 + f * 155);
-        g = (uint8_t)(100 + f * 155);
-        b = 100;
-      } else {
-        float f = (t - 0.5f) / 0.5f;
-        r = (uint8_t)(255 * (1.0f - f));
-        g = 255;
-        b = (uint8_t)(100 * (1.0f - f));
-      }
-    } else if (type == PropOverlayType::Toa) {
-      if (t < 0.5f) {
-        float f = t * 2.0f;
-        r = (uint8_t)(f * 255.0f);
-        g = 200;
-        b = 0;
-      } else {
-        float f = (t - 0.5f) * 2.0f;
-        r = 255;
-        g = (uint8_t)((1.0f - f) * 200.0f);
-        b = 0;
-      }
-    } else if (type == PropOverlayType::Heatmap) {
-      if (t < 0.25f) {
-        float f = t / 0.25f;
-        r = (uint8_t)(128 + f * 127);
-        g = 0;
-        b = (uint8_t)(128 * (1.0f - f));
-      } else if (t < 0.5f) {
-        float f = (t - 0.25f) / 0.25f;
-        r = 255;
-        g = (uint8_t)(f * 128);
-        b = 0;
-      } else if (t < 0.75f) {
-        float f = (t - 0.5f) / 0.25f;
-        r = 255;
-        g = (uint8_t)(128 + f * 127);
-        b = 0;
-      } else {
-        float f = (t - 0.75f) / 0.25f;
-        r = 255;
-        g = 255;
-        b = (uint8_t)(f * 255);
-      }
+               type == PropOverlayType::Voacap ||
+               type == PropOverlayType::Toa ||
+               type == PropOverlayType::Heatmap ||
+               type == PropOverlayType::Muf) {
+      SDL_Color c = getPropColor(type, t, config_.propColormap);
+      r = c.r;
+      g = c.g;
+      b = c.b;
     } else if (type == PropOverlayType::Aurora) {
       // Aurora: black -> green
       r = 0;
       g = (uint8_t)(t * 255);
       b = 0;
-    } else {  // MUF
-      if (t < 0.25f) {
-        float f = t / 0.25f;
-        b = 255;
-        g = (uint8_t)(f * 255.0f);
-      } else if (t < 0.5f) {
-        float f = (t - 0.25f) / 0.25f;
-        g = 255;
-        b = (uint8_t)((1.0f - f) * 255.0f);
-      } else if (t < 0.75f) {
-        float f = (t - 0.5f) / 0.25f;
-        g = 255;
-        r = (uint8_t)(f * 255.0f);
-      } else {
-        float f = (t - 0.75f) / 0.25f;
-        r = 255;
-        g = (uint8_t)((1.0f - f) * 255.0f);
-      }
     }
 
     SDL_SetRenderDrawColor(renderer, r, g, b, 255);

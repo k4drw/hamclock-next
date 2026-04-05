@@ -30,6 +30,7 @@ void MapViewMenu::show(AppConfig &config, std::function<void()> onApply) {
   propPower_ = config.propPower;
   propToa_ = config.propToa;
   propPath_ = config.propPath;
+  propColormap_ = config.propColormap;
 
   char buf[32];
   std::snprintf(buf, sizeof(buf), "%d", static_cast<int>(propToa_));
@@ -37,6 +38,11 @@ void MapViewMenu::show(AppConfig &config, std::function<void()> onApply) {
   propToaInput_.setActive(false);
 
   openCombo_ = -1;
+
+  // Initialize customizer sub-modal
+  propCustomizer_ = std::make_unique<HamClock::PropColorCustomizer>(
+      HamClock::LOGICAL_WIDTH / 2 - 250, HamClock::LOGICAL_HEIGHT / 2 - 190, 500, 380,
+      fontMgr_, config.theme, config.colorOverrides, [onApply]() { onApply(); });
 
   // Center the menu
   int menuW = 500;
@@ -67,26 +73,32 @@ void MapViewMenu::show(AppConfig &config, std::function<void()> onApply) {
   y += 60;
   weatherRec_ = {col1X, y + 25, colW, 30};
   weatherHeaderY_ = y;
+  weatherHeaderY_ = y;
+  propColormapRec_ = {col2X, y + 25, colW - 50, 30};
+  editPropColorsRec_ = {col2X + colW - 45, y + 25, 45, 30};
+  propColorHeaderY_ = y;
 
+  // Row 4 (Toggles)
+  y += 70;
   auto *cat = fontMgr_.catalog();
   int beaconsLabelW = fontMgr_.getLogicalWidth("Beacons", cat->ptSize(FontStyle::UI));
-  beaconsRec_ = {col2X + 10, y + 25, 20 + 10 + beaconsLabelW, 20};
+  beaconsRec_ = {col1X + 10, y, 20 + 10 + beaconsLabelW, 20};
   int bordersLabelW = fontMgr_.getLogicalWidth("Borders", cat->ptSize(FontStyle::UI));
-  bordersRec_ = {col2X + 110, y + 25, 20 + 10 + bordersLabelW, 20};
+  bordersRec_ = {col1X + 110, y, 20 + 10 + bordersLabelW, 20};
   int centerDeLabelW = fontMgr_.getLogicalWidth("Center on DE", cat->ptSize(FontStyle::UI));
-  centerDeCheckRect_ = {col2X + 10, y + 55, 20 + 10 + centerDeLabelW, 20};
+  centerDeCheckRect_ = {col2X + 10, y, 20 + 10 + centerDeLabelW, 20};
 
-  // Row 4 (VOACAP) - 3 columns
-  y += 80;
+  // Row 5 (VOACAP) - 3 columns
+  y += 40;
   voacapHeaderY_ = y;
-  int col3W = (menuW - 40) / 3 - 10;  // ~143
+  int col3W = (menuW - 40) / 3;
   int c1 = menuRect_.x + 20;
-  int c2 = c1 + col3W + 15;
-  int c3 = c2 + col3W + 15;
+  int c2 = c1 + col3W + 10;
+  int c3 = c2 + col3W + 10;
 
-  bandRec_ = {c1, y + 45, col3W, 30};
-  modeRec_ = {c2, y + 45, col3W, 30};
-  powerRec_ = {c3, y + 45, col3W, 30};
+  bandRec_ = {c1, y + 25, col3W, 30};
+  modeRec_ = {c2, y + 25, col3W, 30};
+  powerRec_ = {c3, y + 25, col3W, 30};
 
   // Row 5 (TOA and Path)
   y += 90;
@@ -111,7 +123,15 @@ void MapViewMenu::show(AppConfig &config, std::function<void()> onApply) {
 void MapViewMenu::hide() { visible_ = false; }
 
 void MapViewMenu::update() {
-  if (!visible_ || repeatDir_ == 0)
+  if (!visible_)
+    return;
+
+  if (propCustomizer_ && propCustomizer_->isActive()) {
+    propCustomizer_->update();
+    return;
+  }
+
+  if (repeatDir_ == 0)
     return;
 
   uint32_t now = SDL_GetTicks();
@@ -193,7 +213,7 @@ void MapViewMenu::render(SDL_Renderer *renderer) {
                 themes.text, FontStyle::UI);
   std::string propLabel = "None";
   if (propOverlay_ == PropOverlayType::Muf)
-    propLabel = "MUF";
+    propLabel = "MUF-RT";
   else if (propOverlay_ == PropOverlayType::Voacap)
     propLabel = "VOACAP";
   else if (propOverlay_ == PropOverlayType::Reliability)
@@ -218,6 +238,26 @@ void MapViewMenu::render(SDL_Renderer *renderer) {
     weatherLabel = "Clouds (GFS)";
   drawDropdown(renderer, weatherRec_, weatherLabel,
                openCombo_ == COMBO_WEATHER);
+
+  // Prop Color Section
+  cat->drawText(renderer, "Prop Colors", propColormapRec_.x, propColorHeaderY_,
+                themes.text, FontStyle::UI);
+  std::string propColorLabel = "Muted";
+  if (propColormap_ == "vibrant")
+    propColorLabel = "Vibrant";
+  else if (propColormap_ == "custom")
+    propColorLabel = "Custom";
+    
+  drawDropdown(renderer, propColormapRec_, propColorLabel,
+               openCombo_ == COMBO_PROP_COLOR);
+
+  if (propColormap_ == "custom") {
+    SDL_SetRenderDrawColor(renderer, themes.accent.r, themes.accent.g, themes.accent.b, 255);
+    SDL_RenderFillRect(renderer, &editPropColorsRec_);
+    cat->drawText(renderer, "Edit...", editPropColorsRec_.x + editPropColorsRec_.w / 2,
+                  editPropColorsRec_.y + editPropColorsRec_.h / 2, themes.bg,
+                  FontStyle::UI, true, false, true);
+  }
 
   // Beacons & Borders Toggles
   renderRadioButton(renderer, beaconsRec_, showBeacons_, "Beacons",
@@ -331,12 +371,24 @@ void MapViewMenu::render(SDL_Renderer *renderer) {
       drawDropdownList(renderer, modeRec_, modeOpts_);
     else if (openCombo_ == COMBO_POWER)
       drawDropdownList(renderer, powerRec_, powerOpts_);
+    else if (openCombo_ == COMBO_PROP_COLOR)
+      drawDropdownList(renderer, propColormapRec_, propColorOpts_);
+  }
+
+  // Customizer sub-modal
+  if (propCustomizer_ && propCustomizer_->isActive()) {
+    propCustomizer_->render(renderer);
   }
 }
 
-bool MapViewMenu::onMouseDown(int mx, int my, Uint16 /*mod*/, int clicks) {
+bool MapViewMenu::onMouseDown(int mx, int my, Uint16 mod, int clicks) {
   if (!visible_)
     return false;
+
+  if (propCustomizer_ && propCustomizer_->isActive()) {
+    return propCustomizer_->onMouseDown(mx, my, mod, clicks);
+  }
+
   SDL_Point pt = {mx, my};
 
   if (SDL_PointInRect(&pt, &toaRec_)) {
@@ -489,11 +541,25 @@ void MapViewMenu::drawDropdownList(SDL_Renderer *renderer,
 }
 
 bool MapViewMenu::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
-  repeatDir_ = 0;
-  propToaInput_.onMouseUp();
-
   if (!visible_)
     return false;
+
+  if (propCustomizer_ && propCustomizer_->isActive()) {
+    return propCustomizer_->onMouseUp(mx, my, mod, clicks);
+  }
+
+  // Edit Colors button
+  if (propColormap_ == "custom" && mx >= editPropColorsRec_.x &&
+      mx < editPropColorsRec_.x + editPropColorsRec_.w &&
+      my >= editPropColorsRec_.y &&
+      my < editPropColorsRec_.y + editPropColorsRec_.h) {
+    propCustomizer_->setActive(true);
+    return true;
+  }
+
+  repeatDir_ = 0;
+  propToaInput_.onMouseUp();
+  
   SDL_Point pt = {mx, my};
 
   // Helper for combo handling
@@ -561,6 +627,13 @@ bool MapViewMenu::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
                                   WeatherOverlayType::WxMb,
                                   WeatherOverlayType::CloudsGrib};
         weatherOverlay_ = t[idx];
+      }))
+    return true;
+
+  if (handleCombo(propColormapRec_, COMBO_PROP_COLOR, propColorOpts_, [&](int idx) {
+        if (idx == 0) propColormap_ = "muted";
+        else if (idx == 1) propColormap_ = "vibrant";
+        else if (idx == 2) propColormap_ = "custom";
       }))
     return true;
 
@@ -641,6 +714,7 @@ bool MapViewMenu::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
     config_->propPower = propPower_;
     config_->propToa = propToa_;
     config_->propPath = propPath_;
+    config_->propColormap = propColormap_;
     config_->centerMapOnDe = centerMapOnDe_;
     hide();
     if (onApply_)
@@ -724,6 +798,12 @@ void MapViewMenu::renderRadioButton(SDL_Renderer *renderer,
                 textColor, FontStyle::UI, false, false, true);
 }
 
+void MapViewMenu::onMouseMove(int mx, int my) {
+  if (visible_ && propCustomizer_ && propCustomizer_->isActive()) {
+    propCustomizer_->onMouseMove(mx, my);
+  }
+}
+
 bool MapViewMenu::onMouseWheel(int scrollY) {
   if (!visible_ || openCombo_ == -1)
     return false;
@@ -751,6 +831,9 @@ bool MapViewMenu::onMouseWheel(int scrollY) {
       break;
     case COMBO_POWER:
       totalItems = powerOpts_.size();
+      break;
+    case COMBO_PROP_COLOR:
+      totalItems = propColorOpts_.size();
       break;
   }
 

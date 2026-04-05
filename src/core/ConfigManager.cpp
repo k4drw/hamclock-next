@@ -234,6 +234,7 @@ bool ConfigManager::load(AppConfig &config) {
       config.callsignBgColor = hexToColor(hexBgColor, {0, 0, 0, 0});
     }
     config.theme = ap.value("theme", "default");
+    config.propColormap = ap.value("prop_colormap", "muted");
     config.mapNightLights = ap.value("map_night_lights", true);
     config.useMetric = ap.value("use_metric", true);
     config.projection = ap.value("projection", "equirectangular");
@@ -360,9 +361,8 @@ bool ConfigManager::load(AppConfig &config) {
     config.corsProxyUrl = n.value("cors_proxy_url", config.corsProxyUrl);
   }
 
-  // Color Overrides
+    // Color Overrides
   if (json.contains("color_overrides") && json["color_overrides"].is_object()) {
-    config.colorOverrides.clear();
     for (auto &el : json["color_overrides"].items()) {
       if (el.value().is_string()) {
         config.colorOverrides[el.key()] =
@@ -370,6 +370,18 @@ bool ConfigManager::load(AppConfig &config) {
       }
     }
   }
+
+  // Ensure default custom propagation colors exist
+  if (config.colorOverrides.find("prop_color_0") == config.colorOverrides.end())
+    config.colorOverrides["prop_color_0"] = {150, 0, 0, 255};
+  if (config.colorOverrides.find("prop_color_25") == config.colorOverrides.end())
+    config.colorOverrides["prop_color_25"] = {255, 150, 0, 255};
+  if (config.colorOverrides.find("prop_color_50") == config.colorOverrides.end())
+    config.colorOverrides["prop_color_50"] = {255, 255, 0, 255};
+  if (config.colorOverrides.find("prop_color_75") == config.colorOverrides.end())
+    config.colorOverrides["prop_color_75"] = {0, 255, 255, 255};
+  if (config.colorOverrides.find("prop_color_100") == config.colorOverrides.end())
+    config.colorOverrides["prop_color_100"] = {255, 255, 255, 255};
 
   // Local Data Hub
   if (json.contains("hub")) {
@@ -619,6 +631,7 @@ bool ConfigManager::save(const AppConfig &config) {
   if (config.callsignBgColor.a > 0)
     json["appearance"]["callsign_bg_color"] = colorToHex(config.callsignBgColor);
   json["appearance"]["theme"] = config.theme;
+  json["appearance"]["prop_colormap"] = config.propColormap;
   json["appearance"]["map_night_lights"] = config.mapNightLights;
   json["appearance"]["use_metric"] = config.useMetric;
   json["appearance"]["projection"] = config.projection;
