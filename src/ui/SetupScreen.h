@@ -183,11 +183,14 @@ private:
   double gridLon_ = 0.0;
   bool gridValid_ = false;
   bool mismatchWarning_ = false;
+  int defaultTzOffset_ = 0;
+  std::string defaultTzLabel_ = "UTC";
   SDL_Rect toggleRect_ = {0, 0, 0, 0};
   SDL_Rect clusterToggleRect_ = {0, 0, 0, 0};
   SDL_Rect rbnToggleRect_ = {0, 0, 0, 0};
   SDL_Rect gpsToggleRect_ = {0, 0, 0, 0};
   SDL_Rect audioMuteToggleRect_ = {0, 0, 0, 0};
+  SDL_Rect defaultTzRect_ = {0, 0, 0, 0};
   SDL_Rect themeRect_ = {0, 0, 0, 0};
   SDL_Rect nightLightsRect_ = {0, 0, 0, 0};
   SDL_Rect metricToggleRect_ = {0, 0, 0, 0};
@@ -237,6 +240,25 @@ private:
 #endif
   int fontListSelected_ = 0;
   SDL_Rect fontListRect_ = {};         // "Change..." button rect
+  
+  // Timezone Picker Modal
+  struct TzPreset { int offset; const char *label; };
+  static const TzPreset kTzPresets[];
+  static const int kNumTzPresets;
+  bool tzModalOpen_ = false;
+  int tzModalSelected_ = 0; // index into kTzPresets
+  bool tzModalCustom_ = false;
+  TextInput tzCustomOffsetInput_;
+  TextInput tzCustomLabelInput_;
+  bool tzCustomOffsetActive_ = true;
+  SDL_Rect tzModalRect_ = {};
+  SDL_Rect tzModalRowRects_[10] = {}; // 9 presets + Custom
+  SDL_Rect tzModalCustomOffsetRect_ = {};
+  SDL_Rect tzModalCustomLabelRect_ = {};
+  SDL_Rect tzModalOkRect_ = {};
+  SDL_Rect tzModalCancelRect_ = {};
+  void renderTzModal(SDL_Renderer *renderer);
+
 #ifndef __EMSCRIPTEN__
   bool fontModalOpen_ = false;
   std::string fontModalFilter_;

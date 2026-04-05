@@ -220,6 +220,8 @@ bool ConfigManager::load(AppConfig &config) {
     config.grid = id.value("grid", "");
     config.lat = id.value("lat", 0.0);
     config.lon = id.value("lon", 0.0);
+    config.defaultTzOffset = id.value("default_tz_offset", 0);
+    config.defaultTzLabel = id.value("default_tz_label", "UTC");
   }
 
   // Appearance
@@ -324,9 +326,10 @@ bool ConfigManager::load(AppConfig &config) {
   if (json.contains("big_clock")) {
     auto &bc = json["big_clock"];
     config.bigClockDigital  = bc.value("digital",  true);
-    config.bigClock12h      = bc.value("twelve_h", false);
-    config.bigClockUtc      = bc.value("utc",       false);
-    config.bigClockShowSec  = bc.value("show_sec",  true);
+    config.bigClock12h = bc.value("12h", false);
+    config.bigClockUtc = bc.value("utc", false);
+    config.bigClockUseDefaultTz = bc.value("use_default_tz", false);
+    config.bigClockShowSec = bc.value("show_sec", true);
     config.bigClockShowDate = bc.value("show_date", true);
     config.bigClockHue      = static_cast<uint8_t>(bc.value("hue", 85));
   }
@@ -648,6 +651,8 @@ bool ConfigManager::save(const AppConfig &config) {
   json["identity"]["grid"] = config.grid;
   json["identity"]["lat"] = config.lat;
   json["identity"]["lon"] = config.lon;
+  json["identity"]["default_tz_offset"] = config.defaultTzOffset;
+  json["identity"]["default_tz_label"] = config.defaultTzLabel;
 
   json["appearance"]["callsign_color"] = colorToHex(config.callsignColor);
   if (config.callsignBgColor.a > 0)
@@ -809,9 +814,10 @@ bool ConfigManager::save(const AppConfig &config) {
   json["aux_clock"]["star_mode"]  = config.auxClockStarMode;
 
   json["big_clock"]["digital"]   = config.bigClockDigital;
-  json["big_clock"]["twelve_h"]  = config.bigClock12h;
-  json["big_clock"]["utc"]       = config.bigClockUtc;
-  json["big_clock"]["show_sec"]  = config.bigClockShowSec;
+  json["big_clock"]["12h"] = config.bigClock12h;
+  json["big_clock"]["utc"] = config.bigClockUtc;
+  json["big_clock"]["use_default_tz"] = config.bigClockUseDefaultTz;
+  json["big_clock"]["show_sec"] = config.bigClockShowSec;
   json["big_clock"]["show_date"] = config.bigClockShowDate;
   json["big_clock"]["hue"]       = config.bigClockHue;
 

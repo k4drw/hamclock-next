@@ -108,9 +108,9 @@ std::string getLocalIP() {
 } // namespace
 
 TimePanel::TimePanel(int x, int y, int w, int h, FontManager &fontMgr,
-                     TextureManager &texMgr, const std::string &callsign)
-    : Widget(x, y, w, h), fontMgr_(fontMgr), texMgr_(texMgr),
-      callsign_(callsign) {}
+                     TextureManager &texMgr, AppConfig &config)
+    : Widget(x, y, w, h), fontMgr_(fontMgr), texMgr_(texMgr), config_(config),
+      callsign_(config.callsign) {}
 
 void TimePanel::destroyCache() {
   MemoryMonitor::getInstance().destroyTexture(callTex_);
@@ -123,13 +123,19 @@ void TimePanel::destroyCache() {
 void TimePanel::update() {
   auto now = std::chrono::system_clock::now();
   std::time_t t = std::chrono::system_clock::to_time_t(now);
-  std::tm utc{};
-  Astronomy::portable_gmtime(&t, &utc);
+  std::tm display_tm{};
+
+  if (config_.defaultTzOffset == 999) {
+    Astronomy::portable_localtime(&t, &display_tm);
+  } else {
+    std::time_t offset_t = t + config_.defaultTzOffset;
+    Astronomy::portable_gmtime(&offset_t, &display_tm);
+  }
 
   char buf[32];
-  currentHM_ = TimeUtils::hm(utc.tm_hour, utc.tm_min);
+  currentHM_ = TimeUtils::hm(display_tm.tm_hour, display_tm.tm_min);
 
-  std::snprintf(buf, sizeof(buf), "%02d", utc.tm_sec);
+  std::snprintf(buf, sizeof(buf), "%02d", display_tm.tm_sec);
   currentSec_ = buf;
 
   static constexpr const char *kDays[] = {"Sun", "Mon", "Tue", "Wed",
@@ -137,8 +143,8 @@ void TimePanel::update() {
   static constexpr const char *kMonths[] = {"Jan", "Feb", "Mar", "Apr",
                                             "May", "Jun", "Jul", "Aug",
                                             "Sep", "Oct", "Nov", "Dec"};
-  std::snprintf(buf, sizeof(buf), "%s, %d %s %04d", kDays[utc.tm_wday],
-                utc.tm_mday, kMonths[utc.tm_mon], 1900 + utc.tm_year);
+  std::snprintf(buf, sizeof(buf), "%s, %d %s %04d", kDays[display_tm.tm_wday],
+                display_tm.tm_mday, kMonths[display_tm.tm_mon], 1900 + display_tm.tm_year);
   currentDate_ = buf;
 
   // System info: uptime every second, rotating values every 3 seconds

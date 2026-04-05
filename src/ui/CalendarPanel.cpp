@@ -10,8 +10,9 @@
 #include <ctime>
 
 CalendarPanel::CalendarPanel(int x, int y, int w, int h, FontManager &fontMgr,
-                             std::shared_ptr<CalendarStore> store)
-    : Widget(x, y, w, h), fontMgr_(fontMgr), store_(std::move(store)) {}
+                             AppConfig &config, std::shared_ptr<CalendarStore> store)
+    : Widget(x, y, w, h), fontMgr_(fontMgr), config_(config),
+      store_(std::move(store)) {}
 
 void CalendarPanel::render(SDL_Renderer *renderer) {
   if (!fontMgr_.ready())
@@ -76,12 +77,22 @@ void CalendarPanel::render(SDL_Renderer *renderer) {
     int lastY = -1, lastM = -1, lastD = -1;
     time_t nowT = std::time(nullptr);
     struct tm nowTm {};
-    Astronomy::portable_gmtime(&nowT, &nowTm);
+    if (config_.defaultTzOffset == 999) {
+      Astronomy::portable_localtime(&nowT, &nowTm);
+    } else {
+      time_t t = nowT + config_.defaultTzOffset;
+      Astronomy::portable_gmtime(&t, &nowTm);
+    }
 
     for (size_t i = 0; i < upcoming_.size(); ++i) {
       const CalendarEvent &ev = upcoming_[i];
       struct tm startTm {};
-      Astronomy::portable_gmtime(&ev.start, &startTm);
+      if (config_.defaultTzOffset == 999) {
+        Astronomy::portable_localtime(&ev.start, &startTm);
+      } else {
+        time_t t = ev.start + config_.defaultTzOffset;
+        Astronomy::portable_gmtime(&t, &startTm);
+      }
 
       if (startTm.tm_year != lastY || startTm.tm_mon != lastM ||
           startTm.tm_mday != lastD) {
@@ -148,7 +159,12 @@ void CalendarPanel::render(SDL_Renderer *renderer) {
           std::snprintf(timeBuf, sizeof(timeBuf), "Active");
         } else if (ev.allDay) {
           struct tm evDay {};
-          Astronomy::portable_gmtime(&ev.start, &evDay);
+          if (config_.defaultTzOffset == 999) {
+            Astronomy::portable_localtime(&ev.start, &evDay);
+          } else {
+            time_t t = ev.start + config_.defaultTzOffset;
+            Astronomy::portable_gmtime(&t, &evDay);
+          }
           bool isToday = (evDay.tm_year == nowTm.tm_year &&
                           evDay.tm_mon == nowTm.tm_mon &&
                           evDay.tm_mday == nowTm.tm_mday);
@@ -160,8 +176,16 @@ void CalendarPanel::render(SDL_Renderer *renderer) {
           }
         } else {
           struct tm t {};
-          Astronomy::portable_gmtime(&ev.start, &t);
-          std::snprintf(timeBuf, sizeof(timeBuf), "%02d:%02dZ", t.tm_hour, t.tm_min);
+          if (config_.defaultTzOffset == 999) {
+            Astronomy::portable_localtime(&ev.start, &t);
+          } else {
+            time_t ot = ev.start + config_.defaultTzOffset;
+            Astronomy::portable_gmtime(&ot, &t);
+          }
+          if (config_.defaultTzLabel == "UTC")
+            std::snprintf(timeBuf, sizeof(timeBuf), "%02d:%02dZ", t.tm_hour, t.tm_min);
+          else
+            std::snprintf(timeBuf, sizeof(timeBuf), "%02d:%02d %s", t.tm_hour, t.tm_min, config_.defaultTzLabel.c_str());
         }
 
         SDL_Color rowCol = active ? themes.accent
@@ -436,10 +460,21 @@ void CalendarPanel::onMouseMove(int mx, int my) {
     }
   } else {
     struct tm st{}, et{};
-    Astronomy::portable_gmtime(&ev.start, &st);
-    Astronomy::portable_gmtime(&ev.end, &et);
-    std::snprintf(timeBuf, sizeof(timeBuf), "%02d:%02dZ – %02d:%02dZ",
-                  st.tm_hour, st.tm_min, et.tm_hour, et.tm_min);
+    if (config_.defaultTzOffset == 999) {
+      Astronomy::portable_localtime(&ev.start, &st);
+      Astronomy::portable_localtime(&ev.end, &et);
+    } else {
+      time_t ost = ev.start + config_.defaultTzOffset;
+      time_t oet = ev.end + config_.defaultTzOffset;
+      Astronomy::portable_gmtime(&ost, &st);
+      Astronomy::portable_gmtime(&oet, &et);
+    }
+    if (config_.defaultTzLabel == "UTC")
+      std::snprintf(timeBuf, sizeof(timeBuf), "%02d:%02dZ \xe2\x80\x93 %02d:%02dZ",
+                    st.tm_hour, st.tm_min, et.tm_hour, et.tm_min);
+    else
+      std::snprintf(timeBuf, sizeof(timeBuf), "%02d:%02d \xe2\x80\x93 %02d:%02d %s",
+                    st.tm_hour, st.tm_min, et.tm_hour, et.tm_min, config_.defaultTzLabel.c_str());
   }
   tooltip_.text2 = timeBuf;
 
@@ -449,7 +484,7 @@ void CalendarPanel::onMouseMove(int mx, int my) {
 }
 
 REGISTER_WIDGET("calendar", "Calendar", true, false, {
-  auto *p = new CalendarPanel(0, 0, 0, 0, deps.fontMgr, deps.calendarStore);
+  auto *p = new CalendarPanel(0, 0, 0, 0, deps.fontMgr, deps.appCfg, deps.calendarStore);
   p->setNotifyMinutes(deps.appCfg.calendarNotifyMinutes);
   p->setAllDayNotifyHour(deps.appCfg.calendarAllDayNotifyHour);
   p->setDismissMinutes(deps.appCfg.calendarDismissMinutes);

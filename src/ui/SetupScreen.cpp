@@ -12,6 +12,21 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <ctime>
+
+const SetupScreen::TzPreset SetupScreen::kTzPresets[] = {
+    {999, "Local"}, // system local time, DST-aware
+    {0, "UTC"},
+    {-5, "EST"},
+    {-6, "CST"},
+    {-7, "MST"},
+    {-8, "PST"},
+    {1, "CET"},
+    {9, "JST"},
+    {10, "AEST"},
+};
+const int SetupScreen::kNumTzPresets = static_cast<int>(
+    sizeof(SetupScreen::kTzPresets) / sizeof(SetupScreen::kTzPresets[0]));
 
 SetupScreen::SetupScreen(int x, int y, int w, int h, FontManager &fontMgr,
                          BrightnessManager &brightnessMgr,
@@ -319,6 +334,7 @@ void SetupScreen::render(SDL_Renderer *renderer) {
 #ifndef __EMSCRIPTEN__
   renderFontModal(renderer);
 #endif
+  renderTzModal(renderer);
 }
 
 // renderTabIdentity — defined in SetupScreen_Identity.cpp
@@ -388,4 +404,89 @@ void SetupScreen::addWatchlistEntriesFromInput() {
   }
 
   watchlistInputField_.clear();
+}
+
+void SetupScreen::renderTzModal(SDL_Renderer *renderer) {
+  if (!tzModalOpen_) return;
+
+  ThemeColors themes = getThemeColors(theme_, colorOverrides_);
+  auto *cat = fontMgr_.catalog();
+
+  // Basic modal layout (hardcoded for simplicity)
+  int mW = 280;
+  int mH = 380;
+  int mx = (width_ - mW) / 2;
+  int my = (height_ - mH) / 2;
+  tzModalRect_ = {mx, my, mW, mH};
+
+  SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, 250);
+  SDL_RenderFillRect(renderer, &tzModalRect_);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
+  SDL_RenderDrawRect(renderer, &tzModalRect_);
+
+  int ry = my + 10;
+  cat->drawText(renderer, "Select Default Timezone", mx + mW/2, ry, themes.accent, FontStyle::SmallBold, true);
+  ry += 25;
+
+  int rowH = 24;
+  for (int i = 0; i <= kNumTzPresets; ++i) { // +1 for "Custom..."
+    SDL_Rect r = {mx + 10, ry, mW - 20, rowH};
+    tzModalRowRects_[i] = r;
+    bool selected = (!tzModalCustom_ && tzModalSelected_ == i);
+    if (i == kNumTzPresets) selected = tzModalCustom_;
+
+    if (selected) {
+      SDL_SetRenderDrawColor(renderer, themes.accent.r, themes.accent.g, themes.accent.b, 60);
+      SDL_RenderFillRect(renderer, &r);
+    }
+    SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 80);
+    SDL_RenderDrawRect(renderer, &r);
+
+    if (i < kNumTzPresets) {
+      char buf[64];
+      if (kTzPresets[i].offset == 999)
+        std::strcpy(buf, "Local (System DST)");
+      else
+        std::snprintf(buf, sizeof(buf), "%s (UTC%+d)", kTzPresets[i].label, kTzPresets[i].offset);
+      cat->drawText(renderer, buf, r.x + 10, r.y + rowH / 2, selected ? themes.text : themes.textDim, FontStyle::UI, false, false, true);
+    } else {
+      cat->drawText(renderer, "Custom...", r.x + 10, r.y + rowH / 2, selected ? themes.text : themes.textDim, FontStyle::UI, false, false, true);
+    }
+    ry += rowH + 2;
+  }
+
+  ry += 10;
+  // Custom inputs
+  tzModalCustomOffsetRect_ = {mx + 80, ry, 60, 22};
+  tzModalCustomLabelRect_ = {mx + 200, ry, 70, 22};
+  
+  cat->drawText(renderer, "UTC+/-", mx + 10, ry + 11, themes.textDim, FontStyle::UI, false, false, true);
+  tzCustomOffsetInput_.render(renderer, fontMgr_, tzModalCustomOffsetRect_.x, tzModalCustomOffsetRect_.y, 
+                             tzModalCustomOffsetRect_.w, tzModalCustomOffsetRect_.h, FontStyle::UI, 4,
+                             tzModalCustom_ && tzCustomOffsetActive_, true, themes.accent, themes.border,
+                             themes.text, themes.text, themes.textDim, "0", &themes.rowStripe1);
+
+  cat->drawText(renderer, "Lbl", mx + 150, ry + 11, themes.textDim, FontStyle::UI, false, false, true);
+  tzCustomLabelInput_.render(renderer, fontMgr_, tzModalCustomLabelRect_.x, tzModalCustomLabelRect_.y,
+                             tzModalCustomLabelRect_.w, tzModalCustomLabelRect_.h, FontStyle::UI, 4,
+                             tzModalCustom_ && !tzCustomOffsetActive_, true, themes.accent, themes.border,
+                             themes.text, themes.text, themes.textDim, "UTC", &themes.rowStripe1);
+
+  ry += 35;
+  int btnW = 100;
+  int btnH = 30;
+  tzModalCancelRect_ = {mx + 20, ry, btnW, btnH};
+  tzModalOkRect_ = {mx + mW - btnW - 20, ry, btnW, btnH};
+
+  auto drawBtn = [&](const SDL_Rect &r, const char *lbl, SDL_Color bg) {
+    SDL_SetRenderDrawColor(renderer, bg.r, bg.g, bg.b, 255);
+    SDL_RenderFillRect(renderer, &r);
+    SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 150);
+    SDL_RenderDrawRect(renderer, &r);
+    cat->drawText(renderer, lbl, r.x + r.w / 2, r.y + r.h / 2, themes.bg, FontStyle::SmallBold, true, false, true);
+  };
+
+  drawBtn(tzModalCancelRect_, "Cancel", themes.danger);
+  drawBtn(tzModalOkRect_, "Done", themes.success);
 }

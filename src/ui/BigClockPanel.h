@@ -53,6 +53,7 @@ private:
   bool    tmpDigital_  = true;
   bool    tmp12h_      = false;
   bool    tmpUtc_      = false;
+  bool    tmpUseDefaultTz_ = false;
   bool    tmpShowSec_  = true;
   bool    tmpShowDate_ = true;
   uint8_t tmpHue_      = 85;
@@ -61,7 +62,7 @@ private:
   SDL_Rect modalRect_  = {};
   SDL_Rect doneRect_   = {};
   SDL_Rect cancelRect_ = {};
-  static constexpr int kNumOptions = 5;
+  static constexpr int kNumOptions = 6;
   SDL_Rect optRects_[kNumOptions] = {};
   static constexpr int kNumSwatches = 8;
   SDL_Rect swatchRects_[kNumSwatches] = {};

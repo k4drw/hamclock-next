@@ -11,6 +11,62 @@ bool SetupScreen::onMouseDown(int mx, int my, Uint16 mod, int clicks) {
     return themeCustomizer_->onMouseDown(mx, my, mod, clicks);
   }
 
+  if (tzModalOpen_) {
+    if (mx >= tzModalOkRect_.x && mx < tzModalOkRect_.x + tzModalOkRect_.w &&
+        my >= tzModalOkRect_.y && my < tzModalOkRect_.y + tzModalOkRect_.h) {
+      if (tzModalCustom_) {
+        defaultTzOffset_ = std::clamp(StringUtils::safe_stoi(tzCustomOffsetInput_.getValue()), -12, 14);
+        defaultTzLabel_ = tzCustomLabelInput_.getValue();
+        if (defaultTzLabel_.empty()) defaultTzLabel_ = "UTC";
+      } else {
+        defaultTzOffset_ = kTzPresets[tzModalSelected_].offset;
+        defaultTzLabel_ = kTzPresets[tzModalSelected_].label;
+      }
+      tzModalOpen_ = false;
+      return true;
+    }
+    if (mx >= tzModalCancelRect_.x && mx < tzModalCancelRect_.x + tzModalCancelRect_.w &&
+        my >= tzModalCancelRect_.y && my < tzModalCancelRect_.y + tzModalCancelRect_.h) {
+      tzModalOpen_ = false;
+      return true;
+    }
+    for (int i = 0; i <= kNumTzPresets; ++i) {
+      if (mx >= tzModalRowRects_[i].x && mx < tzModalRowRects_[i].x + tzModalRowRects_[i].w &&
+          my >= tzModalRowRects_[i].y && my < tzModalRowRects_[i].y + tzModalRowRects_[i].h) {
+        if (i < kNumTzPresets) {
+          tzModalSelected_ = i;
+          tzModalCustom_ = false;
+        } else {
+          tzModalCustom_ = true;
+          tzCustomOffsetActive_ = true;
+          tzCustomOffsetInput_.setActive(true);
+        }
+        return true;
+      }
+    }
+    if (tzModalCustom_) {
+      if (mx >= tzModalCustomOffsetRect_.x && mx < tzModalCustomOffsetRect_.x + tzModalCustomOffsetRect_.w &&
+          my >= tzModalCustomOffsetRect_.y && my < tzModalCustomOffsetRect_.y + tzModalCustomOffsetRect_.h) {
+        tzCustomOffsetActive_ = true;
+        tzCustomOffsetInput_.setActive(true);
+        tzCustomLabelInput_.setActive(false);
+        return true;
+      }
+      if (mx >= tzModalCustomLabelRect_.x && mx < tzModalCustomLabelRect_.x + tzModalCustomLabelRect_.w &&
+          my >= tzModalCustomLabelRect_.y && my < tzModalCustomLabelRect_.y + tzModalCustomLabelRect_.h) {
+        tzCustomOffsetActive_ = false;
+        tzCustomOffsetInput_.setActive(false);
+        tzCustomLabelInput_.setActive(true);
+        return true;
+      }
+    }
+    if (mx < tzModalRect_.x || mx >= tzModalRect_.x + tzModalRect_.w ||
+        my < tzModalRect_.y || my >= tzModalRect_.y + tzModalRect_.h) {
+      tzModalOpen_ = false;
+    }
+    return true;
+  }
+
 #ifndef __EMSCRIPTEN__
   if (fontModalOpen_) {
     if (fontModalOkRect_.w > 0 &&
@@ -326,6 +382,25 @@ bool SetupScreen::onMouseDown(int mx, int my, Uint16 mod, int clicks) {
       audioMuted_ = !audioMuted_;
       return true;
     }
+    if (mx >= defaultTzRect_.x && mx < defaultTzRect_.x + defaultTzRect_.w &&
+        my >= defaultTzRect_.y && my < defaultTzRect_.y + defaultTzRect_.h) {
+      tzModalOpen_ = true;
+      // Sync temp modal state
+      tzModalCustom_ = true;
+      tzModalSelected_ = 0;
+      for (int i = 0; i < kNumTzPresets; ++i) {
+        if (kTzPresets[i].offset == defaultTzOffset_ && defaultTzLabel_ == kTzPresets[i].label) {
+          tzModalSelected_ = i;
+          tzModalCustom_ = false;
+          break;
+        }
+      }
+      if (tzModalCustom_) {
+        tzCustomOffsetInput_.setValue(std::to_string(defaultTzOffset_ == 999 ? 0 : defaultTzOffset_));
+        tzCustomLabelInput_.setValue(defaultTzLabel_);
+      }
+      return true;
+    }
   } else if (activeTab_ == Tab::Spotting) {
     if (mx >= clusterToggleRect_.x &&
         mx <= clusterToggleRect_.x + clusterToggleRect_.w &&
@@ -639,6 +714,24 @@ bool SetupScreen::onKeyDown(SDL_Keycode key, Uint16 mod) {
   }
 #endif
 
+  if (tzModalOpen_) {
+    if (key == SDLK_ESCAPE) {
+      tzModalOpen_ = false;
+      return true;
+    }
+    if (tzModalCustom_) {
+      if (key == SDLK_TAB) {
+        tzCustomOffsetActive_ = !tzCustomOffsetActive_;
+        tzCustomOffsetInput_.setActive(tzCustomOffsetActive_);
+        tzCustomLabelInput_.setActive(!tzCustomOffsetActive_);
+        return true;
+      }
+      if (tzCustomOffsetActive_) return tzCustomOffsetInput_.onKeyDown(key, mod);
+      return tzCustomLabelInput_.onKeyDown(key, mod);
+    }
+    return true;
+  }
+
   int nFields = 1;
 
   if (activeTab_ == Tab::Identity) {
@@ -761,6 +854,11 @@ bool SetupScreen::onTextInput(const char *inputText) {
     return true;
   }
 #endif
+
+  if (tzModalOpen_ && tzModalCustom_) {
+    if (tzCustomOffsetActive_) return tzCustomOffsetInput_.onTextInput(inputText);
+    return tzCustomLabelInput_.onTextInput(inputText);
+  }
 
   if (activeTab_ == Tab::Widgets) {
     if (activeField_ == 0) {

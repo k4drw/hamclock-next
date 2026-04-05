@@ -562,7 +562,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
   });
 
   timePanel =
-      std::make_unique<TimePanel>(0, 0, 0, 0, fontMgr, texMgr, appCfg.callsign);
+      std::make_unique<TimePanel>(0, 0, 0, 0, fontMgr, texMgr, appCfg);
   timePanel->setCallColor(appCfg.callsignColor);
   timePanel->setCallBgColor(appCfg.callsignBgColor);
   timePanel->setOnConfigChanged(
@@ -791,7 +791,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
       widgetPool[type] = std::make_unique<SolarTimelinePanel>(
           0, 0, 0, 0, fontMgr, netManager);
     } else if (type == "calendar") {
-      auto *calPanel = new CalendarPanel(0, 0, 0, 0, fontMgr, ctx.calendarStore);
+      auto *calPanel = new CalendarPanel(0, 0, 0, 0, fontMgr, appCfg, ctx.calendarStore);
       calPanel->setNotifyMinutes(appCfg.calendarNotifyMinutes);
       calPanel->setAllDayNotifyHour(appCfg.calendarAllDayNotifyHour);
       calPanel->setDismissMinutes(appCfg.calendarDismissMinutes);

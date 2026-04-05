@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../core/CalendarData.h"
+#include "../core/ConfigManager.h"
 #include "FontManager.h"
 #include "Widget.h"
 #include <ctime>
@@ -15,7 +16,7 @@
 class CalendarPanel : public Widget {
 public:
   CalendarPanel(int x, int y, int w, int h, FontManager &fontMgr,
-                std::shared_ptr<CalendarStore> store);
+                AppConfig &config, std::shared_ptr<CalendarStore> store);
 
   std::string getName() const override { return "Calendar"; }
   const char *typeId() const override { return "calendar"; }
@@ -43,6 +44,7 @@ private:
   bool handleSetupClick(int mx, int my);
 
   FontManager &fontMgr_;
+  AppConfig &config_;
   std::shared_ptr<CalendarStore> store_;
 
   // Config values (live) and pending (while setup is open)

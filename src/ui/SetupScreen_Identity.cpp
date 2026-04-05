@@ -97,6 +97,24 @@ void SetupScreen::renderTabIdentity(SDL_Renderer *renderer, int cx, int pad,
   }
   cat->drawText(renderer, "Mute all audio (TTS + alarm)", fieldX + 30, y + 10,
                 themes.text, FontStyle::SmallRegular, false, false, true);
-  y += 28;
+  y += 28 + vSpace;
 
+  cat->drawText(renderer, "Default Timezone:", fieldX, y, themes.text, FontStyle::SmallBold);
+  y += labelH;
+  defaultTzRect_ = {fieldX, y, fieldW, fieldH};
+  SDL_SetRenderDrawColor(renderer, themes.rowStripe1.r, themes.rowStripe1.g, themes.rowStripe1.b, 255);
+  SDL_RenderFillRect(renderer, &defaultTzRect_);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
+  SDL_RenderDrawRect(renderer, &defaultTzRect_);
+  
+  char tzBuf[64];
+  if (defaultTzOffset_ == 999) std::strcpy(tzBuf, "Local");
+  else std::snprintf(tzBuf, sizeof(tzBuf), "%s (UTC%+d)", defaultTzLabel_.c_str(), defaultTzOffset_);
+  cat->drawText(renderer, tzBuf, fieldX + textPad, y + fieldH / 2, themes.text, FontStyle::SmallRegular, false, false, true);
+  
+  // "Change" hint
+  int hintW = fontMgr_.getLogicalWidth("Change...", cat->ptSize(FontStyle::Tiny));
+  cat->drawText(renderer, "Change...", fieldX + fieldW - hintW - textPad, y + fieldH / 2, themes.accent, FontStyle::Tiny, false, false, true);
+
+  y += fieldH + vSpace;
 }

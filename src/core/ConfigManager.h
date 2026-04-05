@@ -57,6 +57,8 @@ struct AppConfig {
   std::string grid;
   double lat = 0.0;
   double lon = 0.0;
+  int defaultTzOffset = 0;              // Global default TZ offset (0 = UTC)
+  std::string defaultTzLabel = "UTC";   // Global default TZ label
   // Appearance
   SDL_Color callsignColor = {255, 165, 0, 255}; // default orange
   SDL_Color callsignBgColor = {0, 0, 0, 0};     // default transparent (no bg)
@@ -223,6 +225,7 @@ struct AppConfig {
   bool bigClockDigital  = true;
   bool bigClock12h      = false;
   bool bigClockUtc      = false;
+  bool bigClockUseDefaultTz = false;
   bool bigClockShowSec  = true;
   bool bigClockShowDate = true;
   uint8_t bigClockHue   = 85; // default green (matches original NV_SWHUE default)
