@@ -527,6 +527,7 @@ set(HAMCLOCK_SOURCES
     src/core/OrbitPredictor.cpp
     src/core/DXClusterData.cpp
     src/core/DisplayPower.cpp
+    src/core/PaneRestrictions.cpp
     src/core/GreylineCalculator.cpp
     src/core/BrightnessManager.cpp
     src/core/CPUMonitor.cpp

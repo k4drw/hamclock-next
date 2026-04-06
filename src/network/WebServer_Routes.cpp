@@ -29,6 +29,7 @@
 #include "../core/BrightnessManager.h"
 #include "../core/ContestData.h"
 #include "../core/Theme.h"
+#include "../core/PaneRestrictions.h"
 #include "../core/DXClusterData.h"
 #include "../core/LiveSpotData.h"
 #include "../core/SatelliteManager.h"
@@ -393,8 +394,14 @@ void WebServer::registerRoutes(httplib::Server &svr) {
       auto it = std::find(rot.begin(), rot.end(), wId);
       if (it != rot.end())
         rot.erase(it);
-      else
+      else {
+        if (!HamClock::PaneRestrictions::isWidgetAllowed(pIdx, wId)) {
+          res.status = 400;
+          res.set_content("Widget " + wId + " not allowed in pane " + std::to_string(pIdx + 1), "text/plain");
+          return;
+        }
         rot.push_back(wId);
+      }
       if (rot.empty())
         rot.push_back("solar");
       pane->setRotation(rot, cfg_->rotationIntervalS, cfg_->syncRotation);
@@ -808,29 +815,36 @@ void WebServer::registerRoutes(httplib::Server &svr) {
       }
     }
 
-    auto parsePane = [&](const std::string &val, std::vector<std::string> &rot) {
+    auto parsePane = [&](const std::string &val, std::vector<std::string> &rot,
+                         int paneIdx) {
       rot.clear();
-      if (val.empty())
+      if (val.empty()) {
+        rot.push_back("solar");
         return;
+      }
       std::stringstream ss(val);
       std::string id;
       while (std::getline(ss, id, ',')) {
-        if (!id.empty())
-          rot.push_back(id);
+        if (!id.empty()) {
+          if (HamClock::PaneRestrictions::isWidgetAllowed(paneIdx, id))
+            rot.push_back(id);
+        }
       }
+      if (rot.empty())
+        rot.push_back("solar");
     };
     if (req.has_param("pane0"))
-      parsePane(req.get_param_value("pane0"), cfg_->pane1Rotation);
+      parsePane(req.get_param_value("pane0"), cfg_->pane1Rotation, 0);
     if (req.has_param("pane1"))
-      parsePane(req.get_param_value("pane1"), cfg_->pane2Rotation);
+      parsePane(req.get_param_value("pane1"), cfg_->pane2Rotation, 1);
     if (req.has_param("pane2"))
-      parsePane(req.get_param_value("pane2"), cfg_->pane3Rotation);
+      parsePane(req.get_param_value("pane2"), cfg_->pane3Rotation, 2);
     if (req.has_param("pane3"))
-      parsePane(req.get_param_value("pane3"), cfg_->pane4Rotation);
+      parsePane(req.get_param_value("pane3"), cfg_->pane4Rotation, 3);
     if (req.has_param("pane4"))
-      parsePane(req.get_param_value("pane4"), cfg_->pane5Rotation);
+      parsePane(req.get_param_value("pane4"), cfg_->pane5Rotation, 4);
     if (req.has_param("pane5"))
-      parsePane(req.get_param_value("pane5"), cfg_->pane6Rotation);
+      parsePane(req.get_param_value("pane5"), cfg_->pane6Rotation, 5);
 
     if (req.has_param("aux_tz_offset"))
       cfg_->auxClockTzOffset =

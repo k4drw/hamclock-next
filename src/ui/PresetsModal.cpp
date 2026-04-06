@@ -39,17 +39,9 @@ void PresetsModal::computeLayout() {
   nameFieldRect_ = {mx + 8, saveY, kModalW - 16 - okW - 6, 28};
   nameOkRect_ = {nameFieldRect_.x + nameFieldRect_.w + 6, saveY, okW, 28};
 
-  // Built-in Contest row (sits between save area and user preset list)
-  int contestRowY = my + 66;
-  contestApplyRect_ = {mx + kModalW - 138, contestRowY + 3, 60, 24};
-
-  // Propagation Firehose row
-  int firehoseRowY = my + 98;
-  propFirehoseApplyRect_ = {mx + kModalW - 138, firehoseRowY + 3, 60, 24};
-
-  // List area (pushed down by 2*kRowH + padding to make room for both built-in rows)
-  int listY = my + 132;
-  int listH = kVisibleRows * kRowH;
+  // List area (pushed down by save area + padding)
+  int listY = my + 66;
+  int listH = (kVisibleRows + 2) * kRowH;  // Expand list to fill space of removed rows
   listRect_ = {mx + 8, listY, kModalW - 16, listH};
 
   // Done button
@@ -130,7 +122,7 @@ void PresetsModal::render(SDL_Renderer *renderer) {
     // "★ Save Current Configuration" button
     fillRect(renderer, saveBtnRect_, btnFill);
     drawRect(renderer, saveBtnRect_, btnBorder);
-    cat->drawText(renderer, "\xe2\x9c\xaf Save Current Configuration",
+    cat->drawText(renderer, "Save Current Configuration",
                   saveBtnRect_.x + saveBtnRect_.w / 2,
                   saveBtnRect_.y + saveBtnRect_.h / 2, accent, FontStyle::Fast,
                   true, false, true);
@@ -170,36 +162,6 @@ void PresetsModal::render(SDL_Renderer *renderer) {
     cat->drawText(renderer, "OK", nameOkRect_.x + nameOkRect_.w / 2,
                   nameOkRect_.y + nameOkRect_.h / 2, white, FontStyle::Fast,
                   true, false, true);
-  }
-
-  // ── Built-in Contest Mode row ────────────────────────────────────────────
-  {
-    int rowY = contestApplyRect_.y - 3;
-    SDL_Rect rowBg = {listRect_.x, rowY, listRect_.w, kRowH};
-    fillRect(renderer, rowBg, themes.rowStripe2);
-    drawRect(renderer, rowBg, themes.border);
-    cat->drawText(renderer, "\xe2\x98\x86 Contest Mode", listRect_.x + 8, rowY + 7,
-                  accent, FontStyle::Fast);
-    fillRect(renderer, contestApplyRect_, btnFill);
-    drawRect(renderer, contestApplyRect_, btnBorder);
-    cat->drawText(renderer, "Apply", contestApplyRect_.x + contestApplyRect_.w / 2,
-                  contestApplyRect_.y + contestApplyRect_.h / 2, greenColor,
-                  FontStyle::Caption, true, false, true);
-  }
-
-  // ── Propagation Firehose row ─────────────────────────────────────────────
-  {
-    int rowY = propFirehoseApplyRect_.y - 3;
-    SDL_Rect rowBg = {listRect_.x, rowY, listRect_.w, kRowH};
-    fillRect(renderer, rowBg, themes.rowStripe2);
-    drawRect(renderer, rowBg, themes.border);
-    cat->drawText(renderer, "\xe2\x9c\xaf Prop Firehose", listRect_.x + 8, rowY + 7,
-                  accent, FontStyle::Fast);
-    fillRect(renderer, propFirehoseApplyRect_, btnFill);
-    drawRect(renderer, propFirehoseApplyRect_, btnBorder);
-    cat->drawText(renderer, "Apply", propFirehoseApplyRect_.x + propFirehoseApplyRect_.w / 2,
-                  propFirehoseApplyRect_.y + propFirehoseApplyRect_.h / 2, greenColor,
-                  FontStyle::Caption, true, false, true);
   }
 
   // ── Separator ────────────────────────────────────────────────────────────
@@ -317,26 +279,6 @@ bool PresetsModal::onMouseUp(int mx, int my, Uint16 /*mod*/) {
       cancelSave();
     else
       active_ = false;
-    return true;
-  }
-
-  // Contest Mode built-in apply
-  if (ptInRect(mx, my, contestApplyRect_)) {
-    cfg_->pane1Rotation = {"dx_cluster"};
-    cfg_->pane2Rotation = {"live_spots"};
-    cfg_->pane3Rotation = {"band_conditions"};
-    cfg_->pane4Rotation = {"solar"};
-    cfg_->pane5Rotation = {"de_info"};
-    cfg_->pane6Rotation = {"dx_info"};
-    if (onApply_)
-      onApply_();
-    active_ = false;
-    return true;
-  }
-
-  // Prop Firehose built-in apply
-  if (ptInRect(mx, my, propFirehoseApplyRect_)) {
-    applyPropFirehose();
     return true;
   }
 
@@ -483,10 +425,11 @@ void PresetsModal::applyPropFirehose() {
     return;
 
   // Distribute 13 propagation/solar widgets across 4 panes
-  cfg_->pane1Rotation = {"solar", "solar_storm", "solar_cycle"};
-  cfg_->pane2Rotation = {"solar_timeline", "sfi_trend", "noaa_spacewx"};
-  cfg_->pane3Rotation = {"aurora", "aurora_graph", "voacap_dedx"};
-  cfg_->pane4Rotation = {"ionosonde", "tropo", "drap", "band_conditions"};
+  // Move restricted items (ionosonde, tropo, drap) out of Pane 4
+  cfg_->pane1Rotation = {"solar", "solar_storm", "solar_cycle", "ionosonde"};
+  cfg_->pane2Rotation = {"solar_timeline", "sfi_trend", "noaa_spacewx", "tropo"};
+  cfg_->pane3Rotation = {"aurora", "aurora_graph", "voacap_dedx", "drap"};
+  cfg_->pane4Rotation = {"solar", "band_conditions", "ncdxf"};
 
   // Force map to full rotation of propagation overlays
   cfg_->propRotation = {

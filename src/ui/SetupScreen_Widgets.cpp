@@ -1,5 +1,6 @@
 #include "SetupScreen.h"
 #include "WidgetRegistry.h"
+#include "../core/PaneRestrictions.h"
 #include "../core/Theme.h"
 #include <SDL.h>
 #include <algorithm>
@@ -200,7 +201,14 @@ void SetupScreen::renderTabWidgets(SDL_Renderer *renderer, int cx, int pad,
 
   // When full height active, only show scrollable widgets for both side panes
   std::vector<std::string> filteredTypes;
-  if ((activePane_ == 4 || activePane_ == 5) && pane5FullHeight_) {
+  auto allowedForPane = HamClock::PaneRestrictions::getAllowedWidgets(activePane_);
+  if (!allowedForPane.empty()) {
+    for (const auto &t : kAllTypesVec) {
+      if (std::find(allowedForPane.begin(), allowedForPane.end(), t) !=
+          allowedForPane.end())
+        filteredTypes.push_back(t);
+    }
+  } else if ((activePane_ == 4 || activePane_ == 5) && pane5FullHeight_) {
     for (const auto &t : kAllTypesVec) {
       auto *d = WidgetRegistry::instance().find(t);
       if (d && d->isScrollable)
@@ -238,13 +246,6 @@ void SetupScreen::renderTabWidgets(SDL_Renderer *renderer, int cx, int pad,
       auto *desc = WidgetRegistry::instance().find(t);
       const char *label = desc ? desc->displayName : t.c_str();
 
-      bool allowed = true;
-      if (activePane_ == 3) {
-        allowed = (t == "ncdxf" || t == "solar" ||
-                   t == "dx_weather" || t == "de_weather" ||
-                   t == "band_conditions");
-      }
-
       int drawX = fieldX + col * colW;
       int drawY = y + row * rowH;
       int labelW = fontMgr_.getLogicalWidth(label, cat->ptSize(FontStyle::Fast));
@@ -255,21 +256,16 @@ void SetupScreen::renderTabWidgets(SDL_Renderer *renderer, int cx, int pad,
       SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
       SDL_RenderDrawRect(renderer, &box);
 
-      if (allowed) {
-        bool selected = std::find(currentPane.begin(), currentPane.end(), t) !=
-                        currentPane.end();
-        if (selected) {
-          SDL_SetRenderDrawColor(renderer, themes.success.r, themes.success.g, themes.success.b, 255);
-          SDL_Rect check = {box.x + 3, box.y + 3, 10, 10};
-          SDL_RenderFillRect(renderer, &check);
-        }
-        cat->drawText(renderer, label, box.x + 22, box.y + 8,
-                      themes.text, FontStyle::Fast, false, false, true);
-        widgetRects_.push_back({t, hitRect});
-      } else {
-        cat->drawText(renderer, label, box.x + 22, box.y + 8,
-                      themes.textDim, FontStyle::Fast, false, false, true);
+      bool selected = std::find(currentPane.begin(), currentPane.end(), t) !=
+                      currentPane.end();
+      if (selected) {
+        SDL_SetRenderDrawColor(renderer, themes.success.r, themes.success.g, themes.success.b, 255);
+        SDL_Rect check = {box.x + 3, box.y + 3, 10, 10};
+        SDL_RenderFillRect(renderer, &check);
       }
+      cat->drawText(renderer, label, box.x + 22, box.y + 8,
+                    themes.text, FontStyle::Fast, false, false, true);
+      widgetRects_.push_back({t, hitRect});
     }
   }
 

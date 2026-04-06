@@ -1,5 +1,6 @@
-// DashboardContext.cpp — implementations for AppContext and DashboardContext methods.
-// All method bodies extracted from main.cpp; struct definitions are in DashboardContext.h.
+#include "DashboardContext.h"
+#include "PaneRestrictions.h"
+#include "../ui/RenderUtils.h"
 
 #include "core/ActivityLocationManager.h"
 #include "core/AuroraHistoryStore.h"
@@ -966,6 +967,27 @@ DashboardContext::DashboardContext(AppContext &ctx)
         [this](const std::string &t) { return widgetFactory_(t); });
   }
 
+  // Scrub configuration to ensure restricted panes (like Pane 4) don't have prohibited widgets.
+  auto scrubRotation = [](int paneIdx, std::vector<std::string> &rot) {
+    auto allowed = PaneRestrictions::getAllowedWidgets(paneIdx);
+    if (allowed.empty())
+      return;
+    auto it = std::remove_if(rot.begin(), rot.end(), [&](const std::string &t) {
+      return std::find(allowed.begin(), allowed.end(), t) == allowed.end();
+    });
+    if (it != rot.end()) {
+      rot.erase(it, rot.end());
+      if (rot.empty())
+        rot.push_back("solar");
+    }
+  };
+  scrubRotation(0, appCfg.pane1Rotation);
+  scrubRotation(1, appCfg.pane2Rotation);
+  scrubRotation(2, appCfg.pane3Rotation);
+  scrubRotation(3, appCfg.pane4Rotation);
+  scrubRotation(4, appCfg.pane5Rotation);
+  scrubRotation(5, appCfg.pane6Rotation);
+
   panes[0]->setRotation(appCfg.pane1Rotation, appCfg.rotationIntervalS,
                         appCfg.syncRotation);
   panes[1]->setRotation(appCfg.pane2Rotation, appCfg.rotationIntervalS,
@@ -993,8 +1015,9 @@ DashboardContext::DashboardContext(AppContext &ctx)
                                      }),
                       available.end());
     }
-    if (paneIdx == 3) { // Pane 4 (top-right small pane)
-      available = {"ncdxf", "solar", "dx_weather", "de_weather", "band_conditions"};
+    auto allowedForPane = PaneRestrictions::getAllowedWidgets(paneIdx);
+    if (!allowedForPane.empty()) {
+      available = allowedForPane;
     }
     std::vector<std::string> current = panes[paneIdx]->getRotation();
     std::vector<std::string> forbidden;

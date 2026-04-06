@@ -196,6 +196,23 @@ static void addFactoryPresets(AppConfig &config) {
     p.pane6Rotation = {"env_humidity"};
     config.presets.push_back(std::move(p));
   }
+  // Propagation Firehose preset
+  {
+    ConfigPreset p;
+    p.name = "Prop Firehose";
+    p.pane1Rotation = {"solar", "solar_storm", "solar_cycle", "ionosonde"};
+    p.pane2Rotation = {"solar_timeline", "sfi_trend", "noaa_spacewx", "tropo"};
+    p.pane3Rotation = {"aurora", "aurora_graph", "voacap_dedx", "drap"};
+    p.pane4Rotation = {"solar", "band_conditions", "ncdxf"};
+    p.pane5Rotation = {"de_info"};
+    p.pane6Rotation = {"dx_info"};
+    p.propRotation = {PropOverlayType::Muf, PropOverlayType::Reliability,
+                      PropOverlayType::Heatmap, PropOverlayType::Drap,
+                      PropOverlayType::Aurora};
+    p.propOverlay = PropOverlayType::Muf;
+    p.rotationIntervalS = 30;
+    config.presets.push_back(std::move(p));
+  }
 }
 
 bool ConfigManager::load(AppConfig &config) {
