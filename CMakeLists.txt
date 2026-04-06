@@ -163,6 +163,7 @@ if(NOT EMSCRIPTEN)
             GIT_REPOSITORY https://github.com/libsdl-org/SDL_image.git
             GIT_TAG        release-2.8.2
             GIT_SHALLOW    TRUE
+            GIT_SUBMODULES ""
         )
     endif()
 endif()
