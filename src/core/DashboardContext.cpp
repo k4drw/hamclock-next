@@ -2265,57 +2265,42 @@ void DashboardContext::update(AppContext &ctx) {
           break;
         }
         case AE_TOUCH: {
-          int mx =
-              static_cast<int>(reinterpret_cast<intptr_t>(event.user.data1));
-          int my =
-              static_cast<int>(reinterpret_cast<intptr_t>(event.user.data2));
-          // If setup active, send to setup widget
-          if (ctx.activeSetup != AppContext::SetupMode::None &&
-              ctx.setupWidget) {
-            ctx.setupWidget->onMouseDown(mx, my, 0, 1);
-            ctx.setupWidget->onMouseUp(mx, my, 0, 1);
+          int mx = static_cast<int>(reinterpret_cast<intptr_t>(event.user.data1));
+          int my = static_cast<int>(reinterpret_cast<intptr_t>(event.user.data2));
+
+          if (focusedWidget) {
+            focusedWidget->onMouseDown(mx, my, 0, 1);
+            focusedWidget->onMouseUp(mx, my, 0, 1);
           } else {
-            // Scan all eventWidgets for an active modal/config, mirroring
-            // the SDL_MOUSEBUTTONUP focusedWidget logic so every modal
-            // (not just mapArea's MapViewMenu) receives web touch events.
-            Widget *focused = nullptr;
-            for (auto *w : ctx.dashboard->eventWidgets) {
-              if (w->isModalActive() || w->isConfiguring()) {
-                focused = w;
-                break;
+            bool isFS = (expandedPaneIdx_ >= 0 &&
+                         panes[expandedPaneIdx_]->getActiveType() == "big_clock");
+            for (auto *w : eventWidgets) {
+              if (expandedPaneIdx_ >= 0) {
+                if (isFS) {
+                  if (w != panes[expandedPaneIdx_].get() && w != widgetSelector.get())
+                    continue;
+                } else if (w == mapArea.get()) {
+                  continue;
+                }
               }
-            }
-            if (focused) {
-              focused->onMouseUp(mx, my, 0, 1);
-            } else {
-              for (auto *w : ctx.dashboard->eventWidgets)
+              SDL_Rect r = w->getRect();
+              if (mx >= r.x && mx < r.x + r.w && my >= r.y && my < r.y + r.h) {
+                w->onMouseDown(mx, my, 0, 1);
                 if (w->onMouseUp(mx, my, 0, 1))
                   break;
+              }
             }
           }
           break;
         }
         case AE_WHEEL: {
-          int dy =
-              static_cast<int>(reinterpret_cast<intptr_t>(event.user.data1));
-          if (ctx.activeSetup != AppContext::SetupMode::None &&
-              ctx.setupWidget) {
-            ctx.setupWidget->onMouseWheel(dy);
+          int dy = static_cast<int>(reinterpret_cast<intptr_t>(event.user.data1));
+          if (focusedWidget) {
+            focusedWidget->onMouseWheel(dy);
           } else {
-            // Same fix: scan all eventWidgets for active modal/config.
-            Widget *focused = nullptr;
-            for (auto *w : ctx.dashboard->eventWidgets) {
-              if (w->isModalActive() || w->isConfiguring()) {
-                focused = w;
+            for (auto *w : eventWidgets) {
+              if (w->onMouseWheel(dy))
                 break;
-              }
-            }
-            if (focused) {
-              focused->onMouseWheel(dy);
-            } else {
-              for (auto *w : ctx.dashboard->eventWidgets)
-                if (w->onMouseWheel(dy))
-                  break;
             }
           }
           break;
