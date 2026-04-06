@@ -581,16 +581,23 @@ void MapWidget::renderSatFootprint(SDL_Renderer *renderer, double lat,
       while (prevLon > 180.0) prevLon -= 360.0;
       while (prevLon < -180.0) prevLon += 360.0;
 
-      if (std::abs(pLon - prevLon) > 180.0) {
-        // Crossing Date Line
-        double lon1 = prevLon;
-        double lon2 = pLon;
-        double lon2_adj = (lon2 < 0) ? lon2 + 360.0 : lon2 - 360.0;
-        double borderLon = (lon2 < 0) ? 180.0 : -180.0;
-        double f = (borderLon - lon1) / (lon2_adj - lon1);
+      // Normalize relative to map center for correct edge detection.
+      double rpLon = pLon - config_.mapCenterLon;
+      while (rpLon >  180.0) rpLon -= 360.0;
+      while (rpLon < -180.0) rpLon += 360.0;
+      double rprevLon = prevLon - config_.mapCenterLon;
+      while (rprevLon >  180.0) rprevLon -= 360.0;
+      while (rprevLon < -180.0) rprevLon += 360.0;
+
+      if (std::abs(rpLon - rprevLon) > 180.0) {
+        // Crossing map edge
+        double rpLon_adj = (rpLon < 0) ? rpLon + 360.0 : rpLon - 360.0;
+        double borderRLon = (rpLon < 0) ? 180.0 : -180.0;
+        double f = (borderRLon - rprevLon) / (rpLon_adj - rprevLon);
         double prevLat =
             lat + angRadDeg * std::cos(2.0 * M_PI * (i - 1) / kSegments);
         double borderLat = prevLat + f * (pLat - prevLat);
+        double borderLon = config_.mapCenterLon + borderRLon;
 
         segment.push_back(latLonToScreen(borderLat, borderLon));
         if (segment.size() >= 2) {
@@ -600,7 +607,7 @@ void MapWidget::renderSatFootprint(SDL_Renderer *renderer, double lat,
               {themes.accent.r, themes.accent.g, themes.accent.b, 120});
         }
         segment.clear();
-        segment.push_back(latLonToScreen(borderLat, -borderLon));
+        segment.push_back(latLonToScreen(borderLat, config_.mapCenterLon - borderRLon));
       }
     }
 
@@ -667,19 +674,28 @@ void MapWidget::renderSatGroundTrack(SDL_Renderer *renderer) {
       if (i > 0) {
         double lon0 = cachedSatTrack_[i - 1].lon;
         double lon1 = cachedSatTrack_[i].lon;
-        if (std::fabs(lon0 - lon1) > 180.0) {
-          double lon1_adj = (lon1 < 0) ? lon1 + 360.0 : lon1 - 360.0;
-          double borderLon = (lon1 < 0) ? 180.0 : -180.0;
-          double dLon = lon1_adj - lon0;
-          double f = (std::fabs(dLon) > 1e-6) ? (borderLon - lon0) / dLon : 0.5;
+        // Normalize relative to map center so the wrap is detected at the actual
+        // map edge (mapCenterLon±180), not always at the geographic ±180.
+        double rlon0 = lon0 - config_.mapCenterLon;
+        while (rlon0 >  180.0) rlon0 -= 360.0;
+        while (rlon0 < -180.0) rlon0 += 360.0;
+        double rlon1 = lon1 - config_.mapCenterLon;
+        while (rlon1 >  180.0) rlon1 -= 360.0;
+        while (rlon1 < -180.0) rlon1 += 360.0;
+        if (std::fabs(rlon0 - rlon1) > 180.0) {
+          double rlon1_adj = (rlon1 < 0) ? rlon1 + 360.0 : rlon1 - 360.0;
+          double borderRLon = (rlon1 < 0) ? 180.0 : -180.0;
+          double dRLon = rlon1_adj - rlon0;
+          double f = (std::fabs(dRLon) > 1e-6) ? (borderRLon - rlon0) / dRLon : 0.5;
           double borderLat =
               cachedSatTrack_[i - 1].lat +
               f * (cachedSatTrack_[i].lat - cachedSatTrack_[i - 1].lat);
+          double borderLon = config_.mapCenterLon + borderRLon;
 
           segment.push_back(latLonToScreen(borderLat, borderLon));
           add_segment_geom(segment);
           segment.clear();
-          segment.push_back(latLonToScreen(borderLat, -borderLon));
+          segment.push_back(latLonToScreen(borderLat, config_.mapCenterLon - borderRLon));
         }
       }
       segment.push_back(
