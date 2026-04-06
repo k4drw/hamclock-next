@@ -72,6 +72,8 @@ endif()
 add_compile_definitions(HAMCLOCK_VERSION="v${HAMCLOCK_DISPLAY_VERSION}")
 add_compile_definitions(HAMCLOCK_INSTALL_TYPE="${HAMCLOCK_INSTALL_TYPE}")
 add_compile_definitions(HAMCLOCK_ARCH="${HAMCLOCK_ARCH}")
+string(TIMESTAMP HAMCLOCK_BUILD_DATETIME "%Y-%m-%d %H:%M UTC" UTC)
+add_compile_definitions(HAMCLOCK_BUILD_DATETIME="${HAMCLOCK_BUILD_DATETIME}")
 
 # Pthreads are not enabled for WASM: the app is single-threaded in that
 # context and enabling them would require SharedArrayBuffer + COOP/COEP HTTP

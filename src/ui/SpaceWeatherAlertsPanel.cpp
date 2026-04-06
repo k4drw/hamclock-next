@@ -110,7 +110,7 @@ void SpaceWeatherAlertsPanel::render(SDL_Renderer *renderer) {
           std::time_t tzTime = utcEpoch + static_cast<std::time_t>(config_.defaultTzOffset * 3600LL);
           Astronomy::portable_gmtime(&tzTime, &local);
         }
-        char buf[16];
+        char buf[32];
         std::snprintf(buf, sizeof(buf), "%02d-%02d %02d:%02d",
                       local.tm_mon + 1, local.tm_mday, local.tm_hour, local.tm_min);
         return buf;

@@ -542,6 +542,7 @@ void WebServer::registerRoutes(httplib::Server &svr) {
     j["version"] = HAMCLOCK_VERSION;
     j["arch"] = HAMCLOCK_ARCH;
     j["installType"] = HAMCLOCK_INSTALL_TYPE;
+    j["buildDate"] = HAMCLOCK_BUILD_DATETIME;
 
     nlohmann::json panes = nlohmann::json::array();
     auto addPane = [&](const std::vector<std::string> &rot) {
