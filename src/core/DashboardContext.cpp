@@ -863,7 +863,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
           0, 0, 0, 0, fontMgr, adifStore, ctx.prefixMgr);
     } else if (type == "spacewx_alerts") {
       widgetPool[type] = std::make_unique<SpaceWeatherAlertsPanel>(
-          0, 0, 0, 0, fontMgr, spaceWxAlertStore);
+          0, 0, 0, 0, fontMgr, appCfg, spaceWxAlertStore);
     } else if (type == "noaa_spacewx") {
       widgetPool[type] = std::make_unique<NOAASpaceWxPanel>(
           0, 0, 0, 0, fontMgr, ctx.solarStore);

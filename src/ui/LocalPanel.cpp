@@ -29,10 +29,19 @@ void LocalPanel::update() {
   auto now = std::chrono::system_clock::now();
   std::time_t t = std::chrono::system_clock::to_time_t(now);
 
-  // Use OS local time so DST and timezone boundaries are honoured.
+  // Use the user's configured global timezone (defaultTzOffset).
+  // Sentinel 999 = OS local time (DST-aware); any other value = fixed UTC offset.
+  AppConfig cfg = ConfigManager::instance().getConfig();
   std::tm local{};
-  Astronomy::portable_localtime(&t, &local);
-  double utcOffsetHours = Astronomy::portable_utcoffset(&t, &local) / 3600.0;
+  double utcOffsetHours;
+  if (cfg.defaultTzOffset == 999) {
+    Astronomy::portable_localtime(&t, &local);
+    utcOffsetHours = Astronomy::portable_utcoffset(&t, &local) / 3600.0;
+  } else {
+    std::time_t tzTime = t + static_cast<std::time_t>(cfg.defaultTzOffset * 3600LL);
+    Astronomy::portable_gmtime(&tzTime, &local);
+    utcOffsetHours = cfg.defaultTzOffset;
+  }
 
   lineText_[0] = "DE:";
 

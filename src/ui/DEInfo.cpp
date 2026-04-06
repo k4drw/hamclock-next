@@ -1,5 +1,6 @@
 #include "DEInfo.h"
 #include "../core/Astronomy.h"
+#include "../core/ConfigManager.h"
 #include "../core/MemoryMonitor.h"
 #include "FontCatalog.h"
 
@@ -19,12 +20,21 @@ void DEInfo::update() {
   lineText_[0] = "DE:";
   lineText_[1] = callsign_;
 
-  // Local time from OS timezone (honours DST and timezone boundaries)
+  // Use the user's configured global timezone (defaultTzOffset).
+  // Sentinel 999 = OS local time (DST-aware); any other value = fixed UTC offset.
   auto now = std::chrono::system_clock::now();
   std::time_t t = std::chrono::system_clock::to_time_t(now);
+  AppConfig cfg = ConfigManager::instance().getConfig();
   std::tm local{};
-  Astronomy::portable_localtime(&t, &local);
-  int utcOffset = static_cast<int>(Astronomy::portable_utcoffset(&t, &local) / 3600);
+  int utcOffset;
+  if (cfg.defaultTzOffset == 999) {
+    Astronomy::portable_localtime(&t, &local);
+    utcOffset = static_cast<int>(Astronomy::portable_utcoffset(&t, &local) / 3600);
+  } else {
+    std::time_t tzTime = t + static_cast<std::time_t>(cfg.defaultTzOffset * 3600LL);
+    Astronomy::portable_gmtime(&tzTime, &local);
+    utcOffset = cfg.defaultTzOffset;
+  }
 
   char buf[64];
   std::snprintf(buf, sizeof(buf), "%02d:%02d UTC%+d", local.tm_hour,

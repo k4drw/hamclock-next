@@ -1,6 +1,7 @@
 #include "ClockAuxPanel.h"
 #include "WidgetRegistry.h"
 
+#include "../core/Astronomy.h"
 #include "../core/Constants.h"
 #include "../core/StringUtils.h"
 #include "../core/Theme.h"
@@ -69,6 +70,7 @@ void ClockAuxPanel::render(SDL_Renderer *renderer) {
   auto now = std::chrono::system_clock::now();
   std::time_t now_c = std::chrono::system_clock::to_time_t(now);
 
+  struct tm localTm{};
   struct tm *gmt;
   int offset = config_.auxClockTzOffset;
   std::string label = config_.auxClockTzLabel;
@@ -78,7 +80,9 @@ void ClockAuxPanel::render(SDL_Renderer *renderer) {
   }
 
   if (offset == kLocalSentinel) {
-    gmt = std::localtime(&now_c);
+    Astronomy::portable_localtime(&now_c, &localTm);
+    gmt = &localTm;
+    label = Astronomy::portable_tzabbr(localTm);
   } else {
     std::time_t tzTime = now_c + (offset * 3600);
     gmt = std::gmtime(&tzTime);

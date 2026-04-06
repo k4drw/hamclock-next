@@ -1,7 +1,9 @@
 #include "SetupScreen.h"
+#include "../core/Astronomy.h"
 #include "../core/Theme.h"
 #include <SDL.h>
 #include <algorithm>
+#include <ctime>
 
 void SetupScreen::renderTabIdentity(SDL_Renderer *renderer, int cx, int pad,
                                     int fieldW, int fieldH, int fieldX,
@@ -108,8 +110,13 @@ void SetupScreen::renderTabIdentity(SDL_Renderer *renderer, int cx, int pad,
   SDL_RenderDrawRect(renderer, &defaultTzRect_);
   
   char tzBuf[64];
-  if (defaultTzOffset_ == 999) std::strcpy(tzBuf, "Local");
-  else std::snprintf(tzBuf, sizeof(tzBuf), "%s (UTC%+d)", defaultTzLabel_.c_str(), defaultTzOffset_);
+  if (defaultTzOffset_ == 999) {
+    std::time_t now = std::time(nullptr);
+    struct tm local{};
+    Astronomy::portable_localtime(&now, &local);
+    std::string abbr = Astronomy::portable_tzabbr(local);
+    std::snprintf(tzBuf, sizeof(tzBuf), "%s", abbr.c_str());
+  } else std::snprintf(tzBuf, sizeof(tzBuf), "%s (UTC%+d)", defaultTzLabel_.c_str(), defaultTzOffset_);
   cat->drawText(renderer, tzBuf, fieldX + textPad, y + fieldH / 2, themes.text, FontStyle::SmallRegular, false, false, true);
   
   // "Change" hint

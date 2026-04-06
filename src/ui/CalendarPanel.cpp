@@ -184,8 +184,15 @@ void CalendarPanel::render(SDL_Renderer *renderer) {
           }
           if (config_.defaultTzLabel == "UTC")
             std::snprintf(timeBuf, sizeof(timeBuf), "%02d:%02dZ", t.tm_hour, t.tm_min);
-          else
-            std::snprintf(timeBuf, sizeof(timeBuf), "%02d:%02d %s", t.tm_hour, t.tm_min, config_.defaultTzLabel.c_str());
+          else {
+            std::string dynAbbr;
+            const char *tzLabel = config_.defaultTzLabel.c_str();
+            if (config_.defaultTzOffset == 999) {
+              dynAbbr = Astronomy::portable_tzabbr(t);
+              tzLabel = dynAbbr.c_str();
+            }
+            std::snprintf(timeBuf, sizeof(timeBuf), "%02d:%02d %s", t.tm_hour, t.tm_min, tzLabel);
+          }
         }
 
         SDL_Color rowCol = active ? themes.accent

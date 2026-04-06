@@ -1,5 +1,6 @@
 #include "SpaceWeatherAlertsPanel.h"
 #include "WidgetRegistry.h"
+#include "../core/Astronomy.h"
 #include "../core/Theme.h"
 #include "FontCatalog.h"
 #include <SDL.h>
@@ -9,8 +10,9 @@
 
 SpaceWeatherAlertsPanel::SpaceWeatherAlertsPanel(
     int x, int y, int w, int h, FontManager &fontMgr,
+    AppConfig &config,
     std::shared_ptr<SpaceWeatherAlertStore> store)
-    : Widget(x, y, w, h), fontMgr_(fontMgr), store_(std::move(store)) {}
+    : Widget(x, y, w, h), fontMgr_(fontMgr), config_(config), store_(std::move(store)) {}
 
 void SpaceWeatherAlertsPanel::update() { currentData_ = store_->get(); }
 
@@ -89,11 +91,32 @@ void SpaceWeatherAlertsPanel::render(SDL_Renderer *renderer) {
 
     int textX = x_ + pad + 10;
 
-    // Date/time first (left-aligned): "YYYY-MM-DD HH:MM" → "MM-DD HH:MM"
+    // Date/time: convert UTC "YYYY-MM-DD HH:MM" to the user's configured TZ
     if (!a.issueTime.empty()) {
-      std::string t =
-          a.issueTime.size() >= 16 ? a.issueTime.substr(5, 11) : a.issueTime;
-      cat->drawText(renderer, t, textX, curY, themes.textDim, FontStyle::Tiny);
+      auto convertIssueTime = [&](const std::string &utcStr) -> std::string {
+        if (utcStr.size() < 16)
+          return utcStr.size() >= 6 ? utcStr.substr(5) : utcStr;
+        int yr, mo, dy, hr, mn;
+        if (std::sscanf(utcStr.c_str(), "%d-%d-%d %d:%d", &yr, &mo, &dy, &hr, &mn) != 5)
+          return utcStr.substr(5, 11);
+        struct tm utcTm{};
+        utcTm.tm_year = yr - 1900; utcTm.tm_mon = mo - 1; utcTm.tm_mday = dy;
+        utcTm.tm_hour = hr; utcTm.tm_min = mn;
+        std::time_t utcEpoch = Astronomy::portable_timegm(&utcTm);
+        struct tm local{};
+        if (config_.defaultTzOffset == 999) {
+          Astronomy::portable_localtime(&utcEpoch, &local);
+        } else {
+          std::time_t tzTime = utcEpoch + static_cast<std::time_t>(config_.defaultTzOffset * 3600LL);
+          Astronomy::portable_gmtime(&tzTime, &local);
+        }
+        char buf[16];
+        std::snprintf(buf, sizeof(buf), "%02d-%02d %02d:%02d",
+                      local.tm_mon + 1, local.tm_mday, local.tm_hour, local.tm_min);
+        return buf;
+      };
+      cat->drawText(renderer, convertIssueTime(a.issueTime), textX, curY,
+                    themes.textDim, FontStyle::Tiny);
     }
 
     // Type label after the time column
@@ -184,5 +207,5 @@ void SpaceWeatherAlertsPanel::onMouseMove(int mx, int my) {
 }
 
 REGISTER_WIDGET("spacewx_alerts", "SpaceWx Alerts", false, false, {
-  return std::make_unique<SpaceWeatherAlertsPanel>(0, 0, 0, 0, deps.fontMgr, deps.spaceWxAlertStore);
+  return std::make_unique<SpaceWeatherAlertsPanel>(0, 0, 0, 0, deps.fontMgr, deps.appCfg, deps.spaceWxAlertStore);
 })
