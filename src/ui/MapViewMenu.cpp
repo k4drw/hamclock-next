@@ -47,6 +47,10 @@ void MapViewMenu::show(AppConfig &config, std::function<void()> onApply) {
       HamClock::LOGICAL_WIDTH / 2 - 250, HamClock::LOGICAL_HEIGHT / 2 - 190, 500, 380,
       fontMgr_, config.theme, config.colorOverrides, [onApply]() { onApply(); });
 
+  recalcLayout();
+}
+
+void MapViewMenu::recalcLayout() {
   // Center the menu
   int menuW = 500;
   int menuH = 480;
@@ -55,14 +59,14 @@ void MapViewMenu::show(AppConfig &config, std::function<void()> onApply) {
 
   int col1X = menuRect_.x + 20;
   int col2X = menuRect_.x + menuW / 2 + 10;
-  int colW = menuW / 2 - 30;  // 220
+  int colW = menuW / 2 - 30; // 220
 
-  int y = menuRect_.y + 45;  // Start below title
+  int y = menuRect_.y + 45; // Start below title
 
   // Row 1
   projRec_ = {col1X, y + 25, colW, 30};
   styleRec_ = {col2X, y + 25, colW, 30};
-  projHeaderY_ = y;  // Label Y
+  projHeaderY_ = y; // Label Y
   styleHeaderY_ = y;
 
   // Row 2
@@ -76,7 +80,6 @@ void MapViewMenu::show(AppConfig &config, std::function<void()> onApply) {
   y += 60;
   weatherRec_ = {col1X, y + 25, colW, 30};
   weatherHeaderY_ = y;
-  weatherHeaderY_ = y;
   propColormapRec_ = {col2X, y + 25, colW - 50, 30};
   editPropColorsRec_ = {col2X + colW - 45, y + 25, 45, 30};
   propColorHeaderY_ = y;
@@ -84,11 +87,14 @@ void MapViewMenu::show(AppConfig &config, std::function<void()> onApply) {
   // Row 4 (Toggles)
   y += 70;
   auto *cat = fontMgr_.catalog();
-  int beaconsLabelW = fontMgr_.getLogicalWidth("Beacons", cat->ptSize(FontStyle::UI));
+  int beaconsLabelW =
+      fontMgr_.getLogicalWidth("Beacons", cat->ptSize(FontStyle::UI));
   beaconsRec_ = {col1X + 10, y, 20 + 10 + beaconsLabelW, 20};
-  int bordersLabelW = fontMgr_.getLogicalWidth("Borders", cat->ptSize(FontStyle::UI));
+  int bordersLabelW =
+      fontMgr_.getLogicalWidth("Borders", cat->ptSize(FontStyle::UI));
   bordersRec_ = {col1X + 110, y, 20 + 10 + bordersLabelW, 20};
-  int centerDeLabelW = fontMgr_.getLogicalWidth("Center on DE", cat->ptSize(FontStyle::UI));
+  int centerDeLabelW =
+      fontMgr_.getLogicalWidth("Center on DE", cat->ptSize(FontStyle::UI));
   centerDeCheckRect_ = {col2X + 10, y, 20 + 10 + centerDeLabelW, 20};
 
   // Row 5 (VOACAP) - 3 columns
@@ -109,15 +115,17 @@ void MapViewMenu::show(AppConfig &config, std::function<void()> onApply) {
   toaUpRec_ = {c1 + 82, y + 10, 24, 12};
   toaDnRec_ = {c1 + 82, y + 24, 24, 12};
 
-  int spLabelW = fontMgr_.getLogicalWidth("Short Path", cat->ptSize(FontStyle::Fast));
+  int spLabelW =
+      fontMgr_.getLogicalWidth("Short Path", cat->ptSize(FontStyle::Fast));
   spRec_ = {c2, y + 13, 16 + 10 + spLabelW, 16};
-  int lpLabelW = fontMgr_.getLogicalWidth("Long Path", cat->ptSize(FontStyle::Fast));
+  int lpLabelW =
+      fontMgr_.getLogicalWidth("Long Path", cat->ptSize(FontStyle::Fast));
   lpRec_ = {c3, y + 13, 16 + 10 + lpLabelW, 16};
 
   // Rotation checklist rects (2 columns)
   propRotationHeaderY_ = voacapHeaderY_;
   propRotationCheckRects_.clear();
-  
+
   for (int i = 0; i < 6; ++i) { // Only 6 now
     int row = i % 3;
     int col = i / 3;
@@ -133,6 +141,10 @@ void MapViewMenu::show(AppConfig &config, std::function<void()> onApply) {
   cancelRect_ = {menuRect_.x + menuW / 2 - btnFooterW - 10, btnY, btnFooterW,
                  btnH};
   applyRect_ = {menuRect_.x + menuW / 2 + 10, btnY, btnFooterW, btnH};
+}
+
+void MapViewMenu::onFontChanged() {
+    recalcLayout();
 }
 
 void MapViewMenu::hide() { visible_ = false; }

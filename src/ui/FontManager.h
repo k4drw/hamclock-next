@@ -63,7 +63,12 @@ public:
     size_ = 0;
     filePath_ = path;
     defaultSize_ = defaultPtSize;
-    return getFont(defaultPtSize) != nullptr;
+    if (getFont(defaultPtSize) == nullptr) {
+      std::fprintf(stderr, "FontManager: failed to load font from file '%s'\n",
+                   path.c_str());
+      return false;
+    }
+    return true;
   }
 
   bool ready() const { return data_ != nullptr || !filePath_.empty(); }

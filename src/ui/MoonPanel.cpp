@@ -1,4 +1,5 @@
 #include "MoonPanel.h"
+#include "../core/Constants.h"
 #include "../core/Theme.h"
 #include "../core/WorkerService.h"
 #include "FontCatalog.h"

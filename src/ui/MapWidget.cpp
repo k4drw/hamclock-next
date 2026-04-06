@@ -223,6 +223,17 @@ void MapWidget::setTheme(const std::string &theme) {
   }
 }
 void MapWidget::setMetric(bool metric) { Widget::setMetric(metric); }
+void MapWidget::onFontChanged() {
+  if (mapViewMenu_) {
+    mapViewMenu_->onFontChanged();
+  }
+  // Invalidate tooltip cache to pick up new font metrics
+  if (tooltip_.cachedTexture) {
+    MemoryMonitor::getInstance().destroyTexture(tooltip_.cachedTexture);
+    tooltip_.cachedTexture = nullptr;
+    tooltip_.cachedText.clear();
+  }
+}
 
 void MapWidget::resetMap() {
   config_.mapZoom = 1.0;

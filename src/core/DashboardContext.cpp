@@ -1571,8 +1571,14 @@ void DashboardContext::update(AppContext &ctx) {
     }
 
     // DX timezone lookup via ZoneDetect API — fires once per DX location change.
-    // locationMutex is already held by the main thread for the entire update()
-    // call, so we read state directly without re-locking here.
+    // locationMutex is held by the main thread (main.cpp) for the entire
+    // update+render tick.  The callback MUST NOT re-acquire it: NetworkManager
+    // delivers cache-hit callbacks synchronously on the calling thread, so
+    // attempting std::lock_guard(locationMutex) here would deadlock.
+    // dxTzOffset (int) and dxTzValid (bool) are the only fields the callback
+    // writes; DXInfo::update() reads them without holding locationMutex, so
+    // omitting the lock in the callback does not change the thread-safety
+    // contract for those two fields.
     if (ctx.state->dxActive) {
       bool changed =
           (ctx.state->dxLocation.lat != ctx.state->dxTzQueryLoc.lat ||
@@ -1598,7 +1604,6 @@ void DashboardContext::update(AppContext &ctx) {
           if (q2 == std::string::npos) return;
           std::string tzId = body.substr(q1 + 1, q2 - q1 - 1);
           int offset = tzIdToOffset(tzId, dxLon);
-          std::lock_guard<std::mutex> lk(stateRef->locationMutex);
           stateRef->dxTzId     = tzId;
           stateRef->dxTzOffset = offset;
           stateRef->dxTzValid  = true;

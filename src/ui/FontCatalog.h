@@ -1,6 +1,5 @@
 #pragma once
 
-#include "../core/Constants.h"
 #include "../core/MemoryMonitor.h"
 #include "FontManager.h"
 #include <SDL.h>
@@ -246,6 +245,12 @@ private:
   static constexpr int kMediumBasePt = 24;
   static constexpr int kLargeBasePt = 60;
   static constexpr int kFastBasePt = 12;
+
+  void clearCache() {
+    for (auto &kv : textCache_)
+      SDL_DestroyTexture(kv.second.tex);
+    textCache_.clear();
+  }
 
   static int idx(FontStyle s) { return static_cast<int>(s); }
   static int clampPt(float v) {

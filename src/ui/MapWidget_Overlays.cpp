@@ -2224,9 +2224,6 @@ void MapWidget::renderAuroraOverlay(SDL_Renderer *renderer) {
 }
 
 void MapWidget::renderProjectionSelect(SDL_Renderer *renderer) {
-  // Show "Map View ▼" to indicate it opens a menu
-  std::string label = "Map View \xE2\x96\xBC";  // ▼ in UTF-8
-
   // Position at top-left of Widget (independent of centered mapRect_)
   projRect_ = {x_ + 4, y_ + 4, 100, 22};
 
@@ -2243,10 +2240,19 @@ void MapWidget::renderProjectionSelect(SDL_Renderer *renderer) {
   SDL_RenderDrawRect(renderer, &projRect_);
 
   auto *cat = fontMgr_.catalog();
-  // Text
-  cat->drawText(renderer, label, projRect_.x + projRect_.w / 2,
+  // Text — plain ASCII so it stays in the main font path for custom fonts.
+  // U+25BC (▼) is in the symbol codepoint range and would route the entire
+  // string through the glyph fallback font, making Latin chars invisible.
+  cat->drawText(renderer, "Map View", projRect_.x + 8,
                 projRect_.y + projRect_.h / 2, themes.text, FontStyle::Micro,
-                true, false, true);
+                false, false, true);
+
+  // Dropdown arrow drawn programmatically (same as MapViewMenu::drawDropdown)
+  int ax = projRect_.x + projRect_.w - 12;
+  int ay = projRect_.y + projRect_.h / 2;
+  RenderUtils::drawTriangle(renderer, (float)ax - 4, (float)ay - 2,
+                            (float)ax + 4, (float)ay - 2, (float)ax,
+                            (float)ay + 3, themes.text);
 }
 
 void MapWidget::renderRssButton(SDL_Renderer *renderer) {

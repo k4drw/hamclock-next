@@ -107,6 +107,7 @@ public:
 
   void setTheme(const std::string &theme) override;
   void setMetric(bool metric) override;
+  void onFontChanged() override;
 
   // Modal interface for MapViewMenu
   bool isModalActive() const override;

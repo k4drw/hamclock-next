@@ -19,6 +19,7 @@ public:
 
   void update() override;
   void render(SDL_Renderer *renderer) override;
+  void onFontChanged() override;
   bool onMouseDown(int mx, int my, Uint16 mod, int clicks) override;
   bool onMouseUp(int mx, int my, Uint16 mod, int clicks) override;
   bool onKeyDown(SDL_Keycode key, Uint16 mod) override;
@@ -118,6 +119,7 @@ private:
   int projHeaderY_ = 0, styleHeaderY_ = 0, gridHeaderY_ = 0, mufRtHeaderY_ = 0,
       weatherHeaderY_ = 0, propColorHeaderY_ = 0, voacapHeaderY_ = 0;
 
+  void recalcLayout();
   void renderRadioButton(SDL_Renderer *renderer, const SDL_Rect &rect,
                          bool selected, const std::string &label,
                          const SDL_Color &textColor);

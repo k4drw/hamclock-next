@@ -59,6 +59,8 @@ public:
     (void)my;
   }
 
+  virtual void onFontChanged() {}
+
   // Called on keyboard/text events. Returns true if consumed.
   virtual bool onKeyDown(SDL_Keycode key, Uint16 mod) {
     (void)key;
