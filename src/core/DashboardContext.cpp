@@ -146,6 +146,7 @@
 #include "ui/SpaceWeatherAlertsPanel.h"
 #include "ui/NOAASpaceWxPanel.h"
 #include "ui/BigClockPanel.h"
+#include "ui/CallsignClock.h"
 #include "ui/VoacapDeDxPanel.h"
 #include <SDL.h>
 #include <SDL_image.h>
@@ -658,7 +659,10 @@ DashboardContext::DashboardContext(AppContext &ctx)
           std::make_unique<BandConditionsPanel>(0, 0, 0, 0, fontMgr, bandStore);
     } else if (type == "contests") {
       widgetPool[type] =
-          std::make_unique<ContestPanel>(0, 0, 0, 0, fontMgr, contestStore);
+          std::make_unique<ContestPanel>(0, 0, 0, 0, fontMgr, contestStore, appCfg);
+    } else if (type == "callsign_clock") {
+      widgetPool[type] =
+          std::make_unique<CallsignClock>(0, 0, 0, 0, fontMgr, appCfg.callsign, appCfg);
     } else if (type == "callbook") {
       widgetPool[type] =
           std::make_unique<CallbookPanel>(0, 0, 0, 0, fontMgr, callbookStore);
@@ -671,7 +675,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
           0, 0, 0, 0, fontMgr, watchlistStore, watchlistHitStore);
     } else if (type == "eme_tool") {
       widgetPool[type] = std::make_unique<EMEToolPanel>(0, 0, 0, 0, fontMgr,
-                                                        texMgr, moonStore);
+                                                        texMgr, moonStore, appCfg);
     } else if (type == "santa_tracker") {
       widgetPool[type] =
           std::make_unique<SantaPanel>(0, 0, 0, 0, fontMgr, santaStore);
@@ -857,7 +861,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
           0, 0, 0, 0, fontMgr, texMgr, historyStore);
     } else if (type == "greyline_windows") {
       widgetPool[type] = std::make_unique<GreylineWindowsPanel>(
-          0, 0, 0, 0, fontMgr, state);
+          0, 0, 0, 0, fontMgr, state, appCfg);
     } else if (type == "dxcc_progress") {
       widgetPool[type] = std::make_unique<DXCCProgressPanel>(
           0, 0, 0, 0, fontMgr, adifStore, ctx.prefixMgr);

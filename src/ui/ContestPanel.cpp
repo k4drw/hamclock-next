@@ -6,21 +6,32 @@
 #include <ctime>
 
 ContestPanel::ContestPanel(int x, int y, int w, int h, FontManager &fontMgr,
-                           std::shared_ptr<ContestStore> store)
-    : Widget(x, y, w, h), fontMgr_(fontMgr), store_(std::move(store)) {}
+                           std::shared_ptr<ContestStore> store, AppConfig &config)
+    : Widget(x, y, w, h), fontMgr_(fontMgr), store_(std::move(store)),
+      config_(config) {}
 
 void ContestPanel::update() {
   currentData_ = store_->get();
   dataValid_ = currentData_.valid;
 }
 
-// Format a time_point as "Feb 09 13:00z"
-static std::string formatContestTime(std::chrono::system_clock::time_point tp) {
+// Format a time_point with the configured timezone
+static std::string formatContestTime(std::chrono::system_clock::time_point tp,
+                                     int tzOffset, const std::string &tzLabel) {
   std::time_t t = std::chrono::system_clock::to_time_t(tp);
   struct tm buf{};
-  struct tm *tm = Astronomy::portable_gmtime(&t, &buf);
+  if (tzOffset == 999) {
+    Astronomy::portable_localtime(&t, &buf);
+  } else {
+    std::time_t ot = t + static_cast<std::time_t>(tzOffset) * 3600LL;
+    Astronomy::portable_gmtime(&ot, &buf);
+  }
+  static constexpr const char *kMon[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                                         "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
   char s[32];
-  std::strftime(s, sizeof(s), "%b %d %H:%Mz", tm);
+  std::snprintf(s, sizeof(s), "%s %02d %02d:%02d %s",
+                kMon[buf.tm_mon], buf.tm_mday, buf.tm_hour, buf.tm_min,
+                tzLabel.c_str());
   return s;
 }
 
@@ -228,8 +239,10 @@ void ContestPanel::renderPopup(SDL_Renderer *renderer) {
 
   // Start / End times
   {
-    std::string startStr = "Start: " + formatContestTime(c.startTime);
-    std::string endStr = "End:   " + formatContestTime(c.endTime);
+    std::string startStr = "Start: " + formatContestTime(c.startTime,
+                              config_.defaultTzOffset, config_.defaultTzLabel);
+    std::string endStr = "End:   " + formatContestTime(c.endTime,
+                              config_.defaultTzOffset, config_.defaultTzLabel);
     cat->drawText(renderer, startStr, x_ + pad, curY, themes.text,
                   FontStyle::Fast);
     curY += lineH;
@@ -329,5 +342,6 @@ bool ContestPanel::onKeyDown(SDL_Keycode key, Uint16 mod) {
 
 #include "WidgetRegistry.h"
 REGISTER_WIDGET("contests", "Contests", true, false, {
-  return std::make_unique<ContestPanel>(0, 0, 0, 0, deps.fontMgr, deps.contestStore);
+  return std::make_unique<ContestPanel>(0, 0, 0, 0, deps.fontMgr, deps.contestStore,
+                                        deps.appCfg);
 })

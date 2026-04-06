@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../core/ConfigManager.h"
 #include "FontManager.h"
 #include "Widget.h"
 
@@ -11,10 +12,12 @@ struct SDL_Texture;
 class CallsignClock : public Widget {
 public:
     CallsignClock(int x, int y, int w, int h,
-                  FontManager& fontMgr, const std::string& callsign)
+                  FontManager& fontMgr, const std::string& callsign,
+                  AppConfig& config)
         : Widget(x, y, w, h)
         , fontMgr_(fontMgr)
-        , callsign_(callsign) {}
+        , callsign_(callsign)
+        , config_(config) {}
 
     ~CallsignClock() override { destroyCache(); }
 
@@ -30,6 +33,7 @@ private:
 
     FontManager& fontMgr_;
     std::string callsign_;
+    AppConfig& config_;
 
     // Cached textures: callsign (static), time (changes per second), date (changes per day)
     SDL_Texture* callTex_ = nullptr;

@@ -198,6 +198,16 @@ void VoacapDeDxPanel::render(SDL_Renderer *renderer) {
   std::tm *ptm = std::gmtime(&t);
   int utcHour = ptm->tm_hour;
 
+  // Compute local-time base hour for X axis labels
+  int localBase;
+  if (config_.defaultTzOffset == 999) {
+    struct tm lt{};
+    Astronomy::portable_localtime(&t, &lt);
+    localBase = lt.tm_hour;
+  } else {
+    localBase = (utcHour + config_.defaultTzOffset + 48) % 24;
+  }
+
   // The matrix rendering
   for (int hourOffset = 0; hourOffset < 24; ++hourOffset) {
     int h = (utcHour + hourOffset) % 24;
@@ -226,11 +236,11 @@ void VoacapDeDxPanel::render(SDL_Renderer *renderer) {
   // X-axis labels (Timeline)
   // Draw current UTC at offset 0
   int timelineY = y_ + pTop + pHeight + 8;
-  cat->drawText(renderer, "UTC", x_ + (pLeft / 2), timelineY, themes.textDim,
-                FontStyle::Tiny, false, true, true);
+  cat->drawText(renderer, config_.defaultTzLabel.c_str(), x_ + (pLeft / 2), timelineY,
+                themes.textDim, FontStyle::Tiny, false, true, true);
 
   for (int hourOffset = 0; hourOffset < 24; hourOffset += 4) {
-    int h = (utcHour + hourOffset) % 24;
+    int h = (localBase + hourOffset) % 24;
     int px_center = x_ + pLeft + static_cast<int>((hourOffset + 0.5f) * cellW);
     std::string hStr = std::to_string(h);
     cat->drawText(renderer, hStr, px_center, timelineY,

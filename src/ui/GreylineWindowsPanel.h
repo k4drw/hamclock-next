@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../core/Astronomy.h"
+#include "../core/ConfigManager.h"
 #include "../core/HamClockState.h"
 #include "FontManager.h"
 #include "Widget.h"
@@ -12,7 +13,7 @@ struct SDL_Renderer;
 class GreylineWindowsPanel : public Widget {
 public:
   GreylineWindowsPanel(int x, int y, int w, int h, FontManager &fontMgr,
-                       std::shared_ptr<HamClockState> state);
+                       std::shared_ptr<HamClockState> state, AppConfig &config);
 
   std::string getName() const override { return "GreylineWindows"; }
   const char *typeId() const override { return "greyline_windows"; }
@@ -26,6 +27,7 @@ public:
 private:
   FontManager &fontMgr_;
   std::shared_ptr<HamClockState> state_;
+  AppConfig &config_;
 
   SunTimes deTimes_{};
   SunTimes dxTimes_{};

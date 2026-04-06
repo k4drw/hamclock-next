@@ -592,6 +592,7 @@ set(HAMCLOCK_SOURCES
     src/ui/ADIFPanel.cpp
     src/ui/AlertsPanel.cpp
     src/ui/BigClockPanel.cpp
+    src/ui/CallsignClock.cpp
     src/ui/SolarCyclePanel.cpp
     src/ui/GreylineWindowsPanel.cpp
     src/ui/DXCCProgressPanel.cpp

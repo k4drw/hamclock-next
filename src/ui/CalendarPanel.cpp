@@ -80,7 +80,7 @@ void CalendarPanel::render(SDL_Renderer *renderer) {
     if (config_.defaultTzOffset == 999) {
       Astronomy::portable_localtime(&nowT, &nowTm);
     } else {
-      time_t t = nowT + config_.defaultTzOffset;
+      time_t t = nowT + static_cast<time_t>(config_.defaultTzOffset) * 3600LL;
       Astronomy::portable_gmtime(&t, &nowTm);
     }
 
@@ -90,7 +90,7 @@ void CalendarPanel::render(SDL_Renderer *renderer) {
       if (config_.defaultTzOffset == 999) {
         Astronomy::portable_localtime(&ev.start, &startTm);
       } else {
-        time_t t = ev.start + config_.defaultTzOffset;
+        time_t t = ev.start + static_cast<time_t>(config_.defaultTzOffset) * 3600LL;
         Astronomy::portable_gmtime(&t, &startTm);
       }
 
@@ -162,7 +162,7 @@ void CalendarPanel::render(SDL_Renderer *renderer) {
           if (config_.defaultTzOffset == 999) {
             Astronomy::portable_localtime(&ev.start, &evDay);
           } else {
-            time_t t = ev.start + config_.defaultTzOffset;
+            time_t t = ev.start + static_cast<time_t>(config_.defaultTzOffset) * 3600LL;
             Astronomy::portable_gmtime(&t, &evDay);
           }
           bool isToday = (evDay.tm_year == nowTm.tm_year &&
@@ -179,7 +179,7 @@ void CalendarPanel::render(SDL_Renderer *renderer) {
           if (config_.defaultTzOffset == 999) {
             Astronomy::portable_localtime(&ev.start, &t);
           } else {
-            time_t ot = ev.start + config_.defaultTzOffset;
+            time_t ot = ev.start + static_cast<time_t>(config_.defaultTzOffset) * 3600LL;
             Astronomy::portable_gmtime(&ot, &t);
           }
           if (config_.defaultTzLabel == "UTC")
@@ -471,8 +471,8 @@ void CalendarPanel::onMouseMove(int mx, int my) {
       Astronomy::portable_localtime(&ev.start, &st);
       Astronomy::portable_localtime(&ev.end, &et);
     } else {
-      time_t ost = ev.start + config_.defaultTzOffset;
-      time_t oet = ev.end + config_.defaultTzOffset;
+      time_t ost = ev.start + static_cast<time_t>(config_.defaultTzOffset) * 3600LL;
+      time_t oet = ev.end + static_cast<time_t>(config_.defaultTzOffset) * 3600LL;
       Astronomy::portable_gmtime(&ost, &st);
       Astronomy::portable_gmtime(&oet, &et);
     }

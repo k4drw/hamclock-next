@@ -128,7 +128,7 @@ void TimePanel::update() {
   if (config_.defaultTzOffset == 999) {
     Astronomy::portable_localtime(&t, &display_tm);
   } else {
-    std::time_t offset_t = t + config_.defaultTzOffset;
+    std::time_t offset_t = t + static_cast<std::time_t>(config_.defaultTzOffset) * 3600LL;
     Astronomy::portable_gmtime(&offset_t, &display_tm);
   }
 
