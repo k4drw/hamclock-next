@@ -1046,11 +1046,15 @@ DashboardContext::DashboardContext(AppContext &ctx)
 
     widgetSelector->show(
         paneIdx, available, current, forbidden,
-        [&ctx, this](int idx, const std::vector<std::string> &finalSelection, bool fullHeightSelected) {
+        [&ctx, this, isFullHeight](int idx, const std::vector<std::string> &finalSelection, bool fullHeightSelected) {
           int targetIdx = idx;
           if (fullHeightSelected) {
             targetIdx = 4; // Always use pane 5 for full height widgets
             panes[5]->setRotation({}, ctx.appCfg.rotationIntervalS, ctx.appCfg.syncRotation);
+          } else if (isFullHeight) {
+            // Transitioning out of full-height: restore pane 6 with a default
+            // widget so it becomes visible and clickable in the split layout
+            panes[5]->setRotation({"solar"}, ctx.appCfg.rotationIntervalS, ctx.appCfg.syncRotation);
           }
           panes[targetIdx]->setRotation(finalSelection, ctx.appCfg.rotationIntervalS,
                                   ctx.appCfg.syncRotation);

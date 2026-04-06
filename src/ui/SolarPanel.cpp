@@ -70,7 +70,7 @@ void SolarPanel::render(SDL_Renderer *renderer) {
   }
 
   // Wide Layout
-  bool needRedraw = (currentText_ != lastText_) || (fontSize_ != lastFontSize_);
+  bool needRedraw = (currentText_ != lastText_) || (fontSize_ != lastFontSize_) || !cached_;
   if (needRedraw) {
     destroyCache();
     // Slightly smaller font if title is present? Or just keep it.

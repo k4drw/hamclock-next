@@ -19,6 +19,7 @@ void WidgetSelector::show(
   paneIndex_ = paneIndex;
   fullHeightMode_ = startFullHeight;
   
+  allAvailable_ = available; // save before full-height filter for toggle use
   available_ = available;
   if (fullHeightMode_) {
     available_.erase(std::remove_if(available_.begin(), available_.end(),
@@ -117,6 +118,12 @@ void WidgetSelector::render(SDL_Renderer *renderer) {
 
   auto *cat = fontMgr_.catalog();
 
+  // Clip item rendering to the area above the footer separator so items
+  // can never visually overflow into the button row if the list is large.
+  int itemClipH = okRect_.y - 8 - menuRect_.y;
+  SDL_Rect itemClip = {menuRect_.x, menuRect_.y, menuRect_.w, itemClipH};
+  SDL_RenderSetClipRect(renderer, &itemClip);
+
   for (size_t i = 0; i < available_.size(); ++i) {
     const std::string &t = available_[i];
     bool isForbidden =
@@ -161,6 +168,9 @@ void WidgetSelector::render(SDL_Renderer *renderer) {
                          itemRects_[i].y + itemRects_[i].h);
     }
   }
+
+  // Restore clip to full menu area before drawing footer
+  SDL_RenderSetClipRect(renderer, &menuRect_);
 
   // Footer separator
   SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
@@ -238,11 +248,12 @@ bool WidgetSelector::onMouseUp(int mx, int my, Uint16 /*mod*/, int clicks) {
       my >= fullHeightRect_.y && my < fullHeightRect_.y + fullHeightRect_.h) {
     fullHeightMode_ = !fullHeightMode_;
 
-    // Re-filter the available list based on new mode
+    // Re-filter from the original available list (same scope as initial show())
     std::vector<std::string> newAvailable;
-    for (auto *d : WidgetRegistry::instance().getAll(false)) {
-      if (!fullHeightMode_ || d->isScrollable) {
-        newAvailable.push_back(d->typeId);
+    for (const auto &t : allAvailable_) {
+      auto *d = WidgetRegistry::instance().find(t);
+      if (!fullHeightMode_ || (d && d->isScrollable)) {
+        newAvailable.push_back(t);
       }
     }
     std::sort(newAvailable.begin(), newAvailable.end(),
