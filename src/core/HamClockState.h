@@ -34,6 +34,12 @@ struct HamClockState {
   std::string mapDxGrid;
   bool mapDxActive = false;
 
+  // DX timezone — populated async by ZoneDetect lookup, guarded by locationMutex
+  std::string dxTzId;                     // IANA ID, e.g. "America/New_York"
+  int    dxTzOffset = 0;                  // UTC offset in whole hours (DST-aware on Linux/macOS)
+  bool   dxTzValid  = false;             // true once lookup result is stored
+  LatLon dxTzQueryLoc = {-999.0, 0.0};  // sentinel: triggers fetch on first DX selection
+
   // Telemetry
   float fps = 0.0f;
   std::map<std::string, ServiceStatus> services;

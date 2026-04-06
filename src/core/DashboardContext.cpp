@@ -1286,6 +1286,34 @@ void DashboardContext::restorePane(AppContext &ctx) {
     layout.recalculate(ctx.globalWinW, ctx.globalWinH);
 }
 
+// Compute integer UTC offset for an IANA timezone ID.
+// Linux/macOS: uses POSIX TZ env-var + localtime (DST-aware), serialised by a
+// static mutex so it is safe to call from the NetworkManager callback thread.
+// WASM / Windows: falls back to longitude-based solar time (every 15° ≈ 1 hr).
+static int tzIdToOffset(const std::string &tzId, double fallbackLon) {
+#if defined(__EMSCRIPTEN__) || defined(_WIN32)
+  int off = static_cast<int>(std::round(fallbackLon / 15.0));
+  return std::clamp(off, -12, 14);
+#else
+  static std::mutex gTzMutex;
+  std::lock_guard<std::mutex> lock(gTzMutex);
+  const char *saved = getenv("TZ");
+  std::string savedStr = saved ? saved : "";
+  setenv("TZ", tzId.c_str(), 1);
+  tzset();
+  std::time_t now = std::time(nullptr);
+  struct tm local{};
+  Astronomy::portable_localtime(&now, &local);
+  int off = static_cast<int>(Astronomy::portable_utcoffset(&now, &local) / 3600);
+  if (!savedStr.empty())
+    setenv("TZ", savedStr.c_str(), 1);
+  else
+    unsetenv("TZ");
+  tzset();
+  return off;
+#endif
+}
+
 void DashboardContext::update(AppContext &ctx) {
   auto &appCfg = ctx.appCfg;
 
@@ -1536,6 +1564,42 @@ void DashboardContext::update(AppContext &ctx) {
         marineProvider->isStale(now, 15 * 60 * 1000) &&
         marineProvider->isStale(now, kCooldown)) {
       marineProvider->fetch(appCfg.marineStation, appCfg.marineBuoy);
+    }
+
+    // DX timezone lookup via ZoneDetect API — fires once per DX location change.
+    // locationMutex is already held by the main thread for the entire update()
+    // call, so we read state directly without re-locking here.
+    if (ctx.state->dxActive) {
+      bool changed =
+          (ctx.state->dxLocation.lat != ctx.state->dxTzQueryLoc.lat ||
+           ctx.state->dxLocation.lon != ctx.state->dxTzQueryLoc.lon);
+      if (changed) {
+        ctx.state->dxTzValid    = false;
+        ctx.state->dxTzQueryLoc = ctx.state->dxLocation;
+        double dxLat = ctx.state->dxLocation.lat;
+        double dxLon = ctx.state->dxLocation.lon;
+        char url[128];
+        std::snprintf(url, sizeof(url),
+            "https://timezone.bertold.org/timezone?lat=%.4f&lon=%.4f&c=1",
+            dxLat, dxLon);
+        auto dashLive = dashboardLive_;
+        auto stateRef = ctx.state;
+        ctx.netManager->fetchAsync(url, [dashLive, stateRef, dxLon](std::string body) {
+          if (!dashLive->load(std::memory_order_acquire)) return;
+          auto pos = body.find("\"TimezoneId\"");
+          if (pos == std::string::npos) return;
+          auto q1 = body.find('"', pos + 13);
+          if (q1 == std::string::npos) return;
+          auto q2 = body.find('"', q1 + 1);
+          if (q2 == std::string::npos) return;
+          std::string tzId = body.substr(q1 + 1, q2 - q1 - 1);
+          int offset = tzIdToOffset(tzId, dxLon);
+          std::lock_guard<std::mutex> lk(stateRef->locationMutex);
+          stateRef->dxTzId     = tzId;
+          stateRef->dxTzOffset = offset;
+          stateRef->dxTzValid  = true;
+        }, 86400, false);
+      }
     }
   }
 

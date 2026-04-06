@@ -62,8 +62,8 @@ private:
   HamClock::GreylineModal greylineModal_;
   SDL_Rect greylineBtnRect_ = {0, 0, 0, 0};
 
-  // Up to 9 lines: "DX:", grid, coords, bearing, distance, country, +2 weather
-  static constexpr int kNumLines = 9;
+  // Up to 10 lines: "DX:", grid, coords, bearing, distance, country, +2 weather, local time
+  static constexpr int kNumLines = 10;
   SDL_Texture *lineTex_[kNumLines] = {};
   int lineW_[kNumLines] = {};
   int lineH_[kNumLines] = {};
