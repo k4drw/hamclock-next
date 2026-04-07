@@ -427,30 +427,15 @@ static double computeF2MUF(double gcd_km, const LayerParams &lp, double *elev_de
         return lp.foF2;
     }
 
-    // 1-hop parameters
-    double halfDist1 = gcd_km / 2.0;
-    double sec1 = sqrt(1.0 + (halfDist1 / lp.hmF2) * (halfDist1 / lp.hmF2));
-    double muf1 = lp.foF2 * sec1;
-    double elev1 = atan2(lp.hmF2, halfDist1) * RAD2DEG;
-
-    // 2-hop: each hop covers gcd/2; sec for each hop is sqrt(1+(gcd/4/hmF2)²)
-    double halfDist2 = gcd_km / 4.0;
-    double sec2 = sqrt(1.0 + (halfDist2 / lp.hmF2) * (halfDist2 / lp.hmF2));
-    double muf2 = lp.foF2 * sec2;    // 2-hop MUF is lower (gentler angle per hop)
-    double elev2 = atan2(lp.hmF2, halfDist2) * RAD2DEG;
-
-    // Max single-hop skip distance (km) — roughly 2 * sqrt(2*RE*hmF2)
+    // N-hop model: compute hops needed to cover the path within max F2 skip
     double maxSkip1 = 2.0 * sqrt(2.0 * RE_KM * lp.hmF2);
+    int nHops = std::max(1, (int)std::ceil(gcd_km / maxSkip1));
+    double halfDist = gcd_km / (2.0 * nHops);
+    double sec = sqrt(1.0 + (halfDist / lp.hmF2) * (halfDist / lp.hmF2));
+    double elev = atan2(lp.hmF2, halfDist) * RAD2DEG;
 
-    if (gcd_km <= maxSkip1) {
-        // 1-hop is geometrically feasible
-        if (elev_deg_out) *elev_deg_out = elev1;
-        return muf1;
-    } else {
-        // 2-hop (or could do more, but 2 is sufficient for most world-map paths)
-        if (elev_deg_out) *elev_deg_out = elev2;
-        return muf2;
-    }
+    if (elev_deg_out) *elev_deg_out = elev;
+    return lp.foF2 * sec;
 }
 
 // ---------------------------------------------------------------------------
@@ -477,7 +462,7 @@ static double absorptionDB(double gcd_km, double freqMHz, const LayerParams &lp,
 
     // Path factor: number of hops × elevation correction
     double maxSkip = 2.0 * sqrt(2.0 * RE_KM * lp.hmF2);
-    int nHops = (gcd_km <= maxSkip) ? 1 : 2;
+    int nHops = std::max(1, (int)std::ceil(gcd_km / maxSkip));
     double halfDist = gcd_km / (2.0 * nHops);
     double secEl = sqrt(1.0 + (halfDist / lp.hmF2) * (halfDist / lp.hmF2));
     double pathFactor = (double)nHops * secEl;

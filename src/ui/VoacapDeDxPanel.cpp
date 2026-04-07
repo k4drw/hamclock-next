@@ -62,22 +62,10 @@ void VoacapDeDxPanel::recalculateMatrix() {
       std::sqrt((std::cos(phi1) + Bx) * (std::cos(phi1) + Bx) + By * By));
   double midLam = lam1 + std::atan2(By, std::cos(phi1) + Bx);
 
-  double shortKm = Astronomy::calculateDistance(state_->deLocation, state_->dxLocation);
-  double distKm;
-  double midLatDeg, midLonDeg;
-
-  if (config_.propPath == 1) {
-    // Long path: antipode of short-path midpoint
-    distKm = 40075.0 - shortKm;
-    midLatDeg = -(midPhi * 180.0 / M_PI);
-    double lon = midLam + M_PI;
-    if (lon > M_PI) lon -= 2.0 * M_PI;
-    midLonDeg = lon * 180.0 / M_PI;
-  } else {
-    distKm    = shortKm;
-    midLatDeg = midPhi * 180.0 / M_PI;
-    midLonDeg = midLam * 180.0 / M_PI;
-  }
+  // Widget always uses short path — independent of the overlay's path setting
+  double distKm = Astronomy::calculateDistance(state_->deLocation, state_->dxLocation);
+  double midLatDeg = midPhi * 180.0 / M_PI;
+  double midLonDeg = midLam * 180.0 / M_PI;
 
   std::time_t t = std::time(nullptr);
   std::tm *ptm = std::gmtime(&t);
@@ -104,7 +92,6 @@ void VoacapDeDxPanel::recalculateMatrix() {
   lastMode_ = config_.propMode;
   lastPower_ = config_.propPower;
   lastToa_ = config_.propToa;
-  lastPath_ = config_.propPath;
 }
 
 void VoacapDeDxPanel::update() {
@@ -125,8 +112,7 @@ void VoacapDeDxPanel::update() {
 
   bool propChanged = (config_.propMode != lastMode_) ||
                      (config_.propPower != lastPower_) ||
-                     (config_.propToa != lastToa_) ||
-                     (config_.propPath != lastPath_);
+                     (config_.propToa != lastToa_);
 
   if (targetChanged || metricChanged || propChanged) {
     recalculateMatrix();
