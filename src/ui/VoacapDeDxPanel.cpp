@@ -177,19 +177,8 @@ void VoacapDeDxPanel::render(SDL_Renderer *renderer) {
   std::tm *ptm = std::gmtime(&t);
   int utcHour = ptm->tm_hour;
 
-  // Compute local-time base hour for X axis labels
-  int localBase;
-  if (config_.defaultTzOffset == 999) {
-    struct tm lt{};
-    Astronomy::portable_localtime(&t, &lt);
-    localBase = lt.tm_hour;
-  } else {
-    localBase = (utcHour + config_.defaultTzOffset + 48) % 24;
-  }
-
-  // The matrix rendering
+  // The matrix rendering: column 0 = UTC 00:00, column 23 = UTC 23:00
   for (int hourOffset = 0; hourOffset < 24; ++hourOffset) {
-    int h = (utcHour + hourOffset) % 24;
     int px = x_ + pLeft + static_cast<int>(hourOffset * cellW);
     int nextPx = x_ + pLeft + static_cast<int>((hourOffset + 1) * cellW);
 
@@ -197,7 +186,7 @@ void VoacapDeDxPanel::render(SDL_Renderer *renderer) {
       int py = y_ + pTop + static_cast<int>((7 - b) * cellH);
       int nextPy = y_ + pTop + static_cast<int>((7 - b + 1) * cellH);
 
-      SDL_Color c = reliabilityColor(relMatrix_[h][b]);
+      SDL_Color c = reliabilityColor(relMatrix_[hourOffset][b]);
 
       SDL_Rect rect = {px, py, nextPx - px, nextPy - py};
       SDL_SetRenderDrawColor(renderer, c.r, c.g, c.b, c.a);
@@ -215,13 +204,12 @@ void VoacapDeDxPanel::render(SDL_Renderer *renderer) {
   // X-axis labels (Timeline)
   // Draw current UTC at offset 0
   int timelineY = y_ + pTop + pHeight + 8;
-  cat->drawText(renderer, config_.defaultTzLabel.c_str(), x_ + (pLeft / 2), timelineY,
+  cat->drawText(renderer, "UTC", x_ + (pLeft / 2), timelineY,
                 themes.textDim, FontStyle::Tiny, false, true, true);
 
   for (int hourOffset = 0; hourOffset < 24; hourOffset += 4) {
-    int h = (localBase + hourOffset) % 24;
     int px_center = x_ + pLeft + static_cast<int>((hourOffset + 0.5f) * cellW);
-    std::string hStr = std::to_string(h);
+    std::string hStr = std::to_string(hourOffset);
     cat->drawText(renderer, hStr, px_center, timelineY,
                   themes.textDim, FontStyle::Tiny, false, true, true);
   }
@@ -255,6 +243,13 @@ void VoacapDeDxPanel::render(SDL_Renderer *renderer) {
   for (int b = 0; b <= 8; ++b) {
     int pyy = y_ + pTop + static_cast<int>(b * cellH);
     SDL_RenderDrawLine(renderer, x_ + pLeft, pyy, x_ + pLeft + pWidth, pyy);
+  }
+
+  // "Now" cursor: white vertical line at the current UTC hour column
+  {
+    int nowPx = x_ + pLeft + static_cast<int>(utcHour * cellW);
+    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+    SDL_RenderDrawLine(renderer, nowPx, y_ + pTop, nowPx, y_ + pTop + pHeight);
   }
 }
 
