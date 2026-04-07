@@ -30,6 +30,7 @@ void MapViewMenu::show(AppConfig &config, std::function<void()> onApply) {
   propPower_ = config.propPower;
   propToa_ = config.propToa;
   propPath_ = config.propPath;
+  propAntGain_ = config.propAntGain;
   propColormap_ = config.propColormap;
 
   propRotation_ = config.propRotation;
@@ -39,6 +40,10 @@ void MapViewMenu::show(AppConfig &config, std::function<void()> onApply) {
   std::snprintf(buf, sizeof(buf), "%d", static_cast<int>(propToa_));
   propToaInput_.setValue(buf);
   propToaInput_.setActive(false);
+
+  std::snprintf(buf, sizeof(buf), "%d", propAntGain_);
+  propAntGainInput_.setValue(buf);
+  propAntGainInput_.setActive(false);
 
   openCombo_ = -1;
 
@@ -98,29 +103,35 @@ void MapViewMenu::recalcLayout() {
   centerDeCheckRect_ = {col2X + 10, y, 20 + 10 + centerDeLabelW, 20};
 
   // Row 5 (VOACAP) - 3 columns
-  y += 40;
+  y += 35;
   voacapHeaderY_ = y;
   int col3W = (menuW - 40) / 3;
   int c1 = menuRect_.x + 20;
   int c2 = c1 + col3W + 10;
   int c3 = c2 + col3W + 10;
 
-  bandRec_ = {c1, y + 25, col3W, 30};
-  modeRec_ = {c2, y + 25, col3W, 30};
-  powerRec_ = {c3, y + 25, col3W, 30};
+  bandRec_ = {c1, y + 35, col3W, 30};
+  modeRec_ = {c2, y + 35, col3W, 30};
+  powerRec_ = {c3, y + 35, col3W, 30};
 
-  // Row 5 (TOA and Path)
+  // Row 5b (TOA, Path stacked, Ant Gain)
   y += 90;
   toaRec_ = {c1, y + 10, 80, 26};
   toaUpRec_ = {c1 + 82, y + 10, 24, 12};
   toaDnRec_ = {c1 + 82, y + 24, 24, 12};
 
+  // Path radios stacked vertically under c2
   int spLabelW =
-      fontMgr_.getLogicalWidth("Short Path", cat->ptSize(FontStyle::Fast));
-  spRec_ = {c2, y + 13, 16 + 10 + spLabelW, 16};
+      fontMgr_.getLogicalWidth("Short", cat->ptSize(FontStyle::Fast));
+  spRec_ = {c2, y + 8, 16 + 10 + spLabelW, 16};
   int lpLabelW =
-      fontMgr_.getLogicalWidth("Long Path", cat->ptSize(FontStyle::Fast));
-  lpRec_ = {c3, y + 13, 16 + 10 + lpLabelW, 16};
+      fontMgr_.getLogicalWidth("Long", cat->ptSize(FontStyle::Fast));
+  lpRec_ = {c2, y + 30, 16 + 10 + lpLabelW, 16};
+
+  // Ant Gain spinner at c3 (same geometry as TOA)
+  antGainRec_ = {c3, y + 10, 80, 26};
+  antGainUpRec_ = {c3 + 82, y + 10, 24, 12};
+  antGainDnRec_ = {c3 + 82, y + 24, 24, 12};
 
   // Rotation checklist rects (2 columns)
   propRotationHeaderY_ = voacapHeaderY_;
@@ -164,15 +175,18 @@ void MapViewMenu::update() {
   uint32_t now = SDL_GetTicks();
   if (now - repeatStartMs_ > 500) {  // Initial delay
     if (now - repeatLastMs_ > 50) {  // Repeat interval
-      propToa_ += (repeatDir_ * 1.0f);
-      if (propToa_ < 0.0f)
-        propToa_ = 0.0f;
-      if (propToa_ > 90.0f)
-        propToa_ = 90.0f;
-
       char buf[32];
-      std::snprintf(buf, sizeof(buf), "%d", static_cast<int>(propToa_));
-      propToaInput_.setValue(buf);
+      if (repeatTarget_ == 0) {
+        propToa_ += (repeatDir_ * 1.0f);
+        if (propToa_ < 0.0f) propToa_ = 0.0f;
+        if (propToa_ > 90.0f) propToa_ = 90.0f;
+        std::snprintf(buf, sizeof(buf), "%d", static_cast<int>(propToa_));
+        propToaInput_.setValue(buf);
+      } else {
+        propAntGain_ = std::max(-10, std::min(30, propAntGain_ + repeatDir_));
+        std::snprintf(buf, sizeof(buf), "%d", propAntGain_);
+        propAntGainInput_.setValue(buf);
+      }
       repeatLastMs_ = now;
     }
   }
@@ -350,10 +364,35 @@ void MapViewMenu::render(SDL_Renderer *renderer) {
 
     cat->drawText(renderer, "Path", spRec_.x, toaRec_.y - 20, themes.text,
                   FontStyle::Fast);
-    renderRadioButton(renderer, spRec_, propPath_ == 0, "Short Path",
-                      themes.text);
-    renderRadioButton(renderer, lpRec_, propPath_ == 1, "Long Path",
-                      themes.text);
+    renderRadioButton(renderer, spRec_, propPath_ == 0, "Short", themes.text);
+    renderRadioButton(renderer, lpRec_, propPath_ == 1, "Long", themes.text);
+
+    // Antenna Gain spinner (mirrors TOA)
+    cat->drawText(renderer, "Ant Gain (dBi)", antGainRec_.x, antGainRec_.y - 20,
+                  themes.text, FontStyle::Fast);
+    propAntGainInput_.render(renderer, fontMgr_, antGainRec_.x, antGainRec_.y,
+                             antGainRec_.w, antGainRec_.h, FontStyle::UI, 5,
+                             propAntGainInput_.isActive(), true, themes.accent,
+                             themes.border, themes.text, themes.text,
+                             themes.textDim);
+
+    SDL_SetRenderDrawColor(renderer, themes.rowStripe2.r, themes.rowStripe2.g,
+                           themes.rowStripe2.b, 255);
+    SDL_RenderFillRect(renderer, &antGainUpRec_);
+    SDL_RenderFillRect(renderer, &antGainDnRec_);
+    SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
+                           themes.border.b, 255);
+    SDL_RenderDrawRect(renderer, &antGainUpRec_);
+    SDL_RenderDrawRect(renderer, &antGainDnRec_);
+    RenderUtils::drawTriangle(
+        renderer, antGainUpRec_.x + 4, antGainUpRec_.y + antGainUpRec_.h - 4,
+        antGainUpRec_.x + antGainUpRec_.w - 4, antGainUpRec_.y + antGainUpRec_.h - 4,
+        antGainUpRec_.x + antGainUpRec_.w / 2, antGainUpRec_.y + 4, themes.text);
+    RenderUtils::drawTriangle(
+        renderer, antGainDnRec_.x + 4, antGainDnRec_.y + 4,
+        antGainDnRec_.x + antGainDnRec_.w - 4, antGainDnRec_.y + 4,
+        antGainDnRec_.x + antGainDnRec_.w / 2, antGainDnRec_.y + antGainDnRec_.h - 4,
+        themes.text);
   } else if (rotatingProp_) {
     // Render Rotation Checklist
     cat->drawText(renderer, "Rotation Set", menuRect_.x + 20, propRotationHeaderY_,
@@ -439,6 +478,7 @@ bool MapViewMenu::onMouseDown(int mx, int my, Uint16 mod, int clicks) {
 
   if (SDL_PointInRect(&pt, &toaRec_)) {
     if (!propToaInput_.isActive()) {
+      propAntGainInput_.setActive(false);
       propToaInput_.setActive(true);
       SDL_StartTextInput();
     }
@@ -447,45 +487,83 @@ bool MapViewMenu::onMouseDown(int mx, int my, Uint16 mod, int clicks) {
     return true;
   }
 
-  if (propToaInput_.isActive()) {
-    propToaInput_.setActive(false);
-    SDL_StopTextInput();
-    // Parse the value back
-    try {
-      propToa_ = std::round(std::stof(propToaInput_.getValue()));
-      if (propToa_ < 0.0f)
-        propToa_ = 0.0f;
-      if (propToa_ > 90.0f)
-        propToa_ = 90.0f;
-    } catch (...) {
+  if (SDL_PointInRect(&pt, &antGainRec_)) {
+    if (!propAntGainInput_.isActive()) {
+      propToaInput_.setActive(false);
+      propAntGainInput_.setActive(true);
+      SDL_StartTextInput();
     }
-    char buf[32];
-    std::snprintf(buf, sizeof(buf), "%d", static_cast<int>(propToa_));
-    propToaInput_.setValue(buf);
+    propAntGainInput_.onMouseDown(mx, my, clicks, fontMgr_, antGainRec_.x,
+                                  antGainRec_.y, antGainRec_.w, antGainRec_.h,
+                                  FontStyle::UI, 5);
+    return true;
   }
 
-  if (SDL_PointInRect(&pt, &toaUpRec_)) {
-    repeatDir_ = 1;
-    repeatStartMs_ = repeatLastMs_ = SDL_GetTicks();
+  auto commitInputs = [&]() {
+    if (propToaInput_.isActive()) {
+      propToaInput_.setActive(false);
+      SDL_StopTextInput();
+      try {
+        propToa_ = std::round(std::stof(propToaInput_.getValue()));
+        if (propToa_ < 0.0f) propToa_ = 0.0f;
+        if (propToa_ > 90.0f) propToa_ = 90.0f;
+      } catch (...) {}
+      char buf[32];
+      std::snprintf(buf, sizeof(buf), "%d", static_cast<int>(propToa_));
+      propToaInput_.setValue(buf);
+    }
+    if (propAntGainInput_.isActive()) {
+      propAntGainInput_.setActive(false);
+      SDL_StopTextInput();
+      try {
+        propAntGain_ = std::stoi(propAntGainInput_.getValue());
+        if (propAntGain_ < -10) propAntGain_ = -10;
+        if (propAntGain_ > 30)  propAntGain_ = 30;
+      } catch (...) {}
+      char buf[32];
+      std::snprintf(buf, sizeof(buf), "%d", propAntGain_);
+      propAntGainInput_.setValue(buf);
+    }
+  };
+  commitInputs();
 
+  if (SDL_PointInRect(&pt, &toaUpRec_)) {
+    repeatDir_ = 1; repeatTarget_ = 0;
+    repeatStartMs_ = repeatLastMs_ = SDL_GetTicks();
     propToa_ += 1.0f;
-    if (propToa_ > 90.0f)
-      propToa_ = 90.0f;
+    if (propToa_ > 90.0f) propToa_ = 90.0f;
     char buf[32];
     std::snprintf(buf, sizeof(buf), "%d", static_cast<int>(propToa_));
     propToaInput_.setValue(buf);
     return true;
   }
   if (SDL_PointInRect(&pt, &toaDnRec_)) {
-    repeatDir_ = -1;
+    repeatDir_ = -1; repeatTarget_ = 0;
     repeatStartMs_ = repeatLastMs_ = SDL_GetTicks();
-
     propToa_ -= 1.0f;
-    if (propToa_ < 0.0f)
-      propToa_ = 0.0f;
+    if (propToa_ < 0.0f) propToa_ = 0.0f;
     char buf[32];
     std::snprintf(buf, sizeof(buf), "%d", static_cast<int>(propToa_));
     propToaInput_.setValue(buf);
+    return true;
+  }
+
+  if (SDL_PointInRect(&pt, &antGainUpRec_)) {
+    repeatDir_ = 1; repeatTarget_ = 1;
+    repeatStartMs_ = repeatLastMs_ = SDL_GetTicks();
+    propAntGain_ = std::min(30, propAntGain_ + 1);
+    char buf[32];
+    std::snprintf(buf, sizeof(buf), "%d", propAntGain_);
+    propAntGainInput_.setValue(buf);
+    return true;
+  }
+  if (SDL_PointInRect(&pt, &antGainDnRec_)) {
+    repeatDir_ = -1; repeatTarget_ = 1;
+    repeatStartMs_ = repeatLastMs_ = SDL_GetTicks();
+    propAntGain_ = std::max(-10, propAntGain_ - 1);
+    char buf[32];
+    std::snprintf(buf, sizeof(buf), "%d", propAntGain_);
+    propAntGainInput_.setValue(buf);
     return true;
   }
 
@@ -605,6 +683,7 @@ bool MapViewMenu::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
 
   repeatDir_ = 0;
   propToaInput_.onMouseUp();
+  propAntGainInput_.onMouseUp();
 
   SDL_Point pt = {mx, my};
 
@@ -777,6 +856,7 @@ bool MapViewMenu::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
     config_->propPower = propPower_;
     config_->propToa = propToa_;
     config_->propPath = propPath_;
+    config_->propAntGain = propAntGain_;
     config_->propColormap = propColormap_;
     config_->centerMapOnDe = centerMapOnDe_;
     config_->propRotation = propRotation_;
@@ -799,18 +879,32 @@ bool MapViewMenu::onKeyDown(SDL_Keycode key, Uint16 mod) {
       SDL_StopTextInput();
       try {
         propToa_ = std::round(std::stof(propToaInput_.getValue()));
-        if (propToa_ < 0.0f)
-          propToa_ = 0.0f;
-        if (propToa_ > 90.0f)
-          propToa_ = 90.0f;
-      } catch (...) {
-      }
+        if (propToa_ < 0.0f) propToa_ = 0.0f;
+        if (propToa_ > 90.0f) propToa_ = 90.0f;
+      } catch (...) {}
       char buf[32];
       std::snprintf(buf, sizeof(buf), "%d", static_cast<int>(propToa_));
       propToaInput_.setValue(buf);
       return true;
     }
     return propToaInput_.onKeyDown(key, mod);
+  }
+
+  if (propAntGainInput_.isActive()) {
+    if (key == SDLK_RETURN || key == SDLK_KP_ENTER) {
+      propAntGainInput_.setActive(false);
+      SDL_StopTextInput();
+      try {
+        propAntGain_ = std::stoi(propAntGainInput_.getValue());
+        if (propAntGain_ < -10) propAntGain_ = -10;
+        if (propAntGain_ > 30)  propAntGain_ = 30;
+      } catch (...) {}
+      char buf[32];
+      std::snprintf(buf, sizeof(buf), "%d", propAntGain_);
+      propAntGainInput_.setValue(buf);
+      return true;
+    }
+    return propAntGainInput_.onKeyDown(key, mod);
   }
 
   if (key == SDLK_ESCAPE) {

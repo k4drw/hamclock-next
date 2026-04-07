@@ -49,7 +49,9 @@ private:
   int propPower_;
   float propToa_;
   int propPath_;
+  int propAntGain_;
   TextInput propToaInput_;
+  TextInput propAntGainInput_;
   
   std::vector<PropOverlayType> propRotation_;
   bool rotatingProp_ = false;
@@ -79,8 +81,9 @@ private:
   SDL_Rect propColormapRec_;
   SDL_Rect beaconsRec_, bordersRec_, centerDeCheckRect_;
   SDL_Rect bandRec_, modeRec_, powerRec_; // VOACAP row
-  SDL_Rect toaRec_, toaUpRec_, toaDnRec_; // TOA spinner
-  SDL_Rect spRec_, lpRec_;                // Path toggles
+  SDL_Rect toaRec_, toaUpRec_, toaDnRec_;             // TOA spinner
+  SDL_Rect antGainRec_, antGainUpRec_, antGainDnRec_; // Ant Gain spinner
+  SDL_Rect spRec_, lpRec_;                            // Path toggles (stacked under c2)
   SDL_Rect editPropColorsRec_;            // Button next to custom prop dropdown
   
   std::vector<SDL_Rect> propRotationCheckRects_;
@@ -124,8 +127,9 @@ private:
                          bool selected, const std::string &label,
                          const SDL_Color &textColor);
 
-  // Auto-repeat for TOA arrows
-  int repeatDir_ = 0; // -1, 0, 1
+  // Auto-repeat for spinners (TOA and Ant Gain)
+  int repeatDir_ = 0;    // -1, 0, 1
+  int repeatTarget_ = 0; // 0=TOA, 1=AntGain
   uint32_t repeatStartMs_ = 0;
   uint32_t repeatLastMs_ = 0;
 

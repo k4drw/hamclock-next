@@ -43,6 +43,7 @@ public:
      * @param watts     Transmitter power (watts)
      * @param mode      Mode string ("SSB", "CW", "FT8", etc.)
      * @param minToaDeg Minimum take-off angle filter (degrees); 0 = no filter
+     * @param antGainDB Antenna gain (dBi); default 3 dBi (typical dipole)
      * @return Circuit reliability (0-100 %), or 0 if path not supported
      */
     static double pathReliability(double freqMHz, double distKm,
@@ -50,5 +51,6 @@ public:
                                   int utcHour, int month,
                                   double ssn, double watts,
                                   const std::string &mode,
-                                  double minToaDeg = 3.0);
+                                  double minToaDeg = 3.0,
+                                  double antGainDB = 3.0);
 };

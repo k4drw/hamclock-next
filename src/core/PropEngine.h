@@ -13,6 +13,7 @@ struct PropPathParams {
   std::string mode; // "SSB", "CW", "FT8", etc.
   int toa;          // Take-off angle (approx)
   int path;         // 0=Short, 1=Long
+  int antGainDB = 3; // Antenna gain (dBi)
 };
 
 class PropEngine {

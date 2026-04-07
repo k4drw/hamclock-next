@@ -325,6 +325,7 @@ private:
   int lastPower_ = -1;
   float lastToa_ = -1.0f;
   int lastPath_ = -1;
+  int lastAntGain_ = -1;
   double lastUpdateSunLat_ = -999.0;
   double lastUpdateSunLon_ = -999.0;
   double lastUpdateZoom_ = 1.0;

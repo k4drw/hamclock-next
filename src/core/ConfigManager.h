@@ -49,6 +49,7 @@ struct ConfigPreset {
   int propPower = 100;
   float propToa = 3.0f;
   int propPath = 0; // 0=Short, 1=Long
+  int propAntGain = 3; // Antenna gain (dBi)
 };
 
 struct AppConfig {
@@ -78,6 +79,7 @@ struct AppConfig {
   int propPower = 100;      // Watts
   float propToa = 3.0f;     // Take-off angle (degrees)
   int propPath = 0;         // 0=Short, 1=Long
+  int propAntGain = 3;      // Antenna gain (dBi)
   int mufRtOpacity = 40;    // percentage
   bool showSatTrack = true; // Show satellite ground track line on world map
   bool showBeacons = true;  // Show NCDXF beacons on world map

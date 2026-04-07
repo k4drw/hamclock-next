@@ -673,7 +673,8 @@ void MapWidget::update() {
                    (lastMode_ != config_.propMode) ||
                    (lastPower_ != config_.propPower) ||
                    (lastToa_ != config_.propToa) ||
-                   (lastPath_ != config_.propPath);
+                   (lastPath_ != config_.propPath) ||
+                   (lastAntGain_ != config_.propAntGain);
 
     // DRAP reads a live data store: poll every 60s (2s until first data
     // arrives)
@@ -691,6 +692,7 @@ void MapWidget::update() {
       lastPower_ = config_.propPower;
       lastToa_ = config_.propToa;
       lastPath_ = config_.propPath;
+      lastAntGain_ = config_.propAntGain;
     }
   }
 
@@ -1282,6 +1284,7 @@ void MapWidget::updatePropagationOverlay() {
   params.mode = config_.propMode;
   params.toa = (int)config_.propToa;
   params.path = config_.propPath;
+  params.antGainDB = config_.propAntGain;
 
   SolarData sw{};
   if (solar_) {

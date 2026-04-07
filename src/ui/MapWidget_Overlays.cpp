@@ -1729,10 +1729,17 @@ void MapWidget::renderLegend(SDL_Renderer *renderer) {
                type == PropOverlayType::Toa ||
                type == PropOverlayType::Heatmap ||
                type == PropOverlayType::Muf) {
-      SDL_Color c = getPropColor(type, t, config_.propColormap);
-      r = c.r;
-      g = c.g;
-      b = c.b;
+      // Reliability pixels at val=0 are rendered transparent (alpha=0), so the
+      // dark map underneath shows as black.  Match that in the legend so the
+      // leftmost "0" swatch is black, not the dark-red the colormap would give.
+      if (type == PropOverlayType::Reliability && i == 0) {
+        r = 0; g = 0; b = 0;
+      } else {
+        SDL_Color c = getPropColor(type, t, config_.propColormap);
+        r = c.r;
+        g = c.g;
+        b = c.b;
+      }
     } else if (type == PropOverlayType::Aurora) {
       // Aurora: black -> green
       r = 0;
@@ -2287,9 +2294,10 @@ void MapWidget::renderOverlayInfo(SDL_Renderer *renderer) {
     text = fmt::format("MUF-VCAP ({} / {:.1f}° / {})", config_.propBand,
                        config_.propToa, config_.propPath == 0 ? "SP" : "LP");
   } else if (config_.propOverlay == PropOverlayType::Reliability) {
-    text = fmt::format("Reliability ({} / {} / {}W / {:.1f}° / {})",
+    text = fmt::format("Reliability ({} / {} / {}W / {}dBi / {:.1f}° / {})",
                        config_.propBand, config_.propMode, config_.propPower,
-                       config_.propToa, config_.propPath == 0 ? "SP" : "LP");
+                       config_.propAntGain, config_.propToa,
+                       config_.propPath == 0 ? "SP" : "LP");
   } else if (config_.propOverlay == PropOverlayType::Toa) {
     text = fmt::format("TOA ({} / {} / {:.1f}° / {})", config_.propBand,
                        config_.propMode, config_.propToa,

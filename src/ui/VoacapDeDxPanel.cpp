@@ -78,7 +78,8 @@ void VoacapDeDxPanel::recalculateMatrix() {
       double rel = VoacapEngine::pathReliability(
           BANDS_MHZ[b], distKm, midLatDeg, midLonDeg,
           hour, month, ssn,
-          (double)config_.propPower, config_.propMode, minToa);
+          (double)config_.propPower, config_.propMode, minToa,
+          (double)config_.propAntGain);
       relMatrix_[hour][b] = (float)rel;
     }
   }
@@ -92,6 +93,7 @@ void VoacapDeDxPanel::recalculateMatrix() {
   lastMode_ = config_.propMode;
   lastPower_ = config_.propPower;
   lastToa_ = config_.propToa;
+  lastAntGain_ = config_.propAntGain;
 }
 
 void VoacapDeDxPanel::update() {
@@ -112,7 +114,8 @@ void VoacapDeDxPanel::update() {
 
   bool propChanged = (config_.propMode != lastMode_) ||
                      (config_.propPower != lastPower_) ||
-                     (config_.propToa != lastToa_);
+                     (config_.propToa != lastToa_) ||
+                     (config_.propAntGain != lastAntGain_);
 
   if (targetChanged || metricChanged || propChanged) {
     recalculateMatrix();

@@ -508,7 +508,8 @@ static double modeAdvantageDB(const std::string &mode) {
  */
 static double computeReliability(double freqMHz, double muf,
                                  double gcdKm,   double absDB,
-                                 double txPowerW, const std::string &mode) {
+                                 double txPowerW, const std::string &mode,
+                                 double antGainDB = 3.0) {
     if (muf <= 0.0 || freqMHz <= 0.0) return 0.0;
 
     // --- P(MUF): ionospheric path support probability ---
@@ -532,15 +533,13 @@ static double computeReliability(double freqMHz, double muf,
     double Fa = 76.8 - 27.7 * log10(freqMHz);
     double N_floor = -139.2 + Fa;           // dBm, in 3 kHz bandwidth
 
-    // Effective antenna gain: assume typical amateur installation ~3 dB over isotropic
-    // (dipole at non-optimal angle, accounts for ground losses etc.)
-    static constexpr double ANT_GAIN_DB = 3.0;
+    // Effective antenna gain (dBi): user-configurable, default 3 dBi (typical dipole)
 
     // Required SNR for SSB baseline ≈ 10 dB (ITU-R circuit quality threshold)
     static constexpr double REQ_SNR_SSB = 10.0;
 
     // Signal margin = available_signal - noise - required_SNR + mode_advantage
-    double sm = (P_tx_dBm + ANT_GAIN_DB)
+    double sm = (P_tx_dBm + antGainDB)
               - L_fs - absDB
               - N_floor - REQ_SNR_SSB
               + modeAdvantageDB(mode);
@@ -630,7 +629,8 @@ std::vector<float> VoacapEngine::generateGrid(const PropPathParams &params,
                     double absDB = absorptionDB(gcd_km, freqMHz, lp,
                                                 midLat, midLon, utcHour, month);
                     val = (float)computeReliability(freqMHz, muf, gcd_km, absDB,
-                                                   params.watts, params.mode);
+                                                   params.watts, params.mode,
+                                                   (double)params.antGainDB);
                 }
             } else {
                 // TOA output: elevation angle to this pixel (degrees)
@@ -649,7 +649,8 @@ double VoacapEngine::pathReliability(double freqMHz, double distKm,
                                      int utcHour, int month,
                                      double ssn, double watts,
                                      const std::string &mode,
-                                     double minToaDeg) {
+                                     double minToaDeg,
+                                     double antGainDB) {
     if (distKm < 10.0)
         return 100.0;
 
@@ -669,5 +670,5 @@ double VoacapEngine::pathReliability(double freqMHz, double distKm,
 
     double absDB = absorptionDB(distKm, freqMHz, lp, midLat, midLon,
                                 (double)utcHour, month);
-    return computeReliability(freqMHz, muf, distKm, absDB, watts, mode);
+    return computeReliability(freqMHz, muf, distKm, absDB, watts, mode, antGainDB);
 }

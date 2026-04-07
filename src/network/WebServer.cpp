@@ -301,10 +301,12 @@ void WebServer::run() {
         <label>Take-Off Angle (deg)</label>
         <input type="number" id="prop-toa" step="1" min="0" max="90" value="3">
         <label>Path</label>
-        <select id="prop-path">
-          <option value="0">Short Path</option>
-          <option value="1">Long Path</option>
-        </select>
+        <div style="display:flex;gap:14px;margin:4px 0 8px">
+          <label style="display:flex;align-items:center;gap:5px;cursor:pointer"><input type="radio" name="prop-path" value="0" checked> Short</label>
+          <label style="display:flex;align-items:center;gap:5px;cursor:pointer"><input type="radio" name="prop-path" value="1"> Long</label>
+        </div>
+        <label>Antenna Gain (dBi)</label>
+        <input type="number" id="prop-ant-gain" min="-10" max="30" value="3">
       </div>
       <label>Weather Overlay</label>
       <select id="weather-overlay">
@@ -801,7 +803,9 @@ void WebServer::run() {
         document.getElementById('prop-mode').value = c.propMode || 'SSB';
         document.getElementById('prop-power').value = c.propPower || 100;
         document.getElementById('prop-toa').value = Math.round(c.propToa || 3);
-        document.getElementById('prop-path').value = c.propPath || 0;
+        const pathVal = String(c.propPath || 0);
+        document.querySelectorAll('input[name="prop-path"]').forEach(r => { r.checked = (r.value === pathVal); });
+        document.getElementById('prop-ant-gain').value = (c.propAntGain !== undefined) ? c.propAntGain : 3;
         toggleVoacapFields();
 
         document.getElementById('weather-overlay').value = c.weatherOverlay || 'none';
@@ -863,7 +867,8 @@ void WebServer::run() {
         prop_mode: document.getElementById('prop-mode').value,
         prop_power: document.getElementById('prop-power').value,
         prop_toa: document.getElementById('prop-toa').value,
-        prop_path: document.getElementById('prop-path').value,
+        prop_path: (document.querySelector('input[name="prop-path"]:checked') || {value:'0'}).value,
+        prop_ant_gain: document.getElementById('prop-ant-gain').value,
         muf_opacity: document.getElementById('muf-opacity').value
       });
       try {

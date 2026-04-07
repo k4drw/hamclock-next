@@ -289,6 +289,7 @@ bool ConfigManager::load(AppConfig &config) {
     config.propPower = ap.value("prop_power", 100);
     config.propToa = ap.value("prop_toa", 3.0f);
     config.propPath = ap.value("prop_path", 0);
+    config.propAntGain = ap.value("prop_ant_gain", 3);
     config.mufRtOpacity = ap.value("muf_rt_opacity", 40);
     config.showSatTrack = ap.value("show_sat_track", true);
     config.showBeacons = ap.value("show_beacons", true);
@@ -632,6 +633,7 @@ bool ConfigManager::load(AppConfig &config) {
       p.propPower    = jp.value("prop_power", 100);
       p.propToa      = jp.value("prop_toa", 3.0f);
       p.propPath     = jp.value("prop_path", 0);
+      p.propAntGain  = jp.value("prop_ant_gain", 3);
       config.presets.push_back(std::move(p));
     }
   }
@@ -695,6 +697,7 @@ bool ConfigManager::save(const AppConfig &config) {
   json["appearance"]["prop_power"] = config.propPower;
   json["appearance"]["prop_toa"] = config.propToa;
   json["appearance"]["prop_path"] = config.propPath;
+  json["appearance"]["prop_ant_gain"] = config.propAntGain;
   // Legacy compat
   json["appearance"]["show_muf_rt"] =
       (config.propOverlay == PropOverlayType::Muf);
@@ -892,6 +895,7 @@ bool ConfigManager::save(const AppConfig &config) {
       jp["prop_power"]         = p.propPower;
       jp["prop_toa"]           = p.propToa;
       jp["prop_path"]          = p.propPath;
+      jp["prop_ant_gain"]      = p.propAntGain;
       presetsArr.push_back(jp);
     }
     json["presets"] = presetsArr;
@@ -977,6 +981,7 @@ void ConfigManager::applyPreset(AppConfig &config, int index) {
   config.propPower = p.propPower;
   config.propToa = p.propToa;
   config.propPath = p.propPath;
+  config.propAntGain = p.propAntGain;
 }
 
 void ConfigManager::savePreset(AppConfig &config, const std::string &name) {
@@ -1001,6 +1006,7 @@ void ConfigManager::savePreset(AppConfig &config, const std::string &name) {
   p.propPower = config.propPower;
   p.propToa = config.propToa;
   p.propPath = config.propPath;
+  p.propAntGain = config.propAntGain;
   config.presets.push_back(std::move(p));
 }
 

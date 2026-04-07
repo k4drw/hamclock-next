@@ -577,6 +577,7 @@ void WebServer::registerRoutes(httplib::Server &svr) {
     j["propPower"] = cfg_->propPower;
     j["propToa"] = cfg_->propToa;
     j["propPath"] = cfg_->propPath;
+    j["propAntGain"] = cfg_->propAntGain;
     j["selectedSatellite"] = cfg_->selectedSatellite;
     j["corsProxyUrl"] = cfg_->corsProxyUrl;
     j["pskrProxyUrl"] = cfg_->pskrProxyUrl;
@@ -874,6 +875,8 @@ void WebServer::registerRoutes(httplib::Server &svr) {
       cfg_->propToa = (float)std::round(StringUtils::safe_stod(req.get_param_value("prop_toa")));
     if (req.has_param("prop_path"))
       cfg_->propPath = StringUtils::safe_stoi(req.get_param_value("prop_path"));
+    if (req.has_param("prop_ant_gain"))
+      cfg_->propAntGain = StringUtils::safe_stoi(req.get_param_value("prop_ant_gain"));
     if (req.has_param("display_power_method"))
       cfg_->displayPowerMethod = req.get_param_value("display_power_method");
     if (req.has_param("lat"))

@@ -52,6 +52,7 @@ private:
   std::string lastMode_;
   int lastPower_ = -1;
   float lastToa_ = -1.0f;
+  int lastAntGain_ = -1;
 
   void recalculateMatrix();
 
