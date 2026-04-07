@@ -1444,17 +1444,17 @@ SDL_Color MapWidget::getPropColor(PropOverlayType type, float t,
         b = 255;
       }
     } else {
-      // Muted Reliability: Grey -> Yellow -> Green
+      // Muted Reliability: Soft Grey -> Pastel Yellow -> Soft Green
       if (t < 0.5f) {
         float f = t / 0.5f;
-        r = (uint8_t)(100 + f * 155);
-        g = (uint8_t)(100 + f * 155);
-        b = 100;
+        r = (uint8_t)(80 + f * 100);
+        g = (uint8_t)(80 + f * 100);
+        b = 80;
       } else {
         float f = (t - 0.5f) / 0.5f;
-        r = (uint8_t)(100 * (1.0f - f));
-        g = 255;
-        b = (uint8_t)(100 * (1.0f - f));
+        r = (uint8_t)(180 * (1.0f - f));
+        g = (uint8_t)(180 + f * 20); // soft green-cyan
+        b = (uint8_t)(80 * (1.0f - f));
       }
     }
   } else if (type == PropOverlayType::Toa) {
@@ -1471,16 +1471,17 @@ SDL_Color MapWidget::getPropColor(PropOverlayType type, float t,
         b = 0;
       }
     } else {
+      // Muted TOA: Soft Yellow -> Dusty Orange
       if (t < 0.5f) {
         float f = t * 2.0f;
-        r = (uint8_t)(f * 255.0f);
-        g = 200;
-        b = 0;
+        r = (uint8_t)(160 + f * 40);
+        g = 180;
+        b = 120;
       } else {
         float f = (t - 0.5f) * 2.0f;
-        r = 255;
-        g = (uint8_t)((1.0f - f) * 200.0f);
-        b = 0;
+        r = 200;
+        g = (uint8_t)(180 - f * 80);
+        b = (uint8_t)(120 - f * 40);
       }
     }
   } else if (type == PropOverlayType::Heatmap) {
@@ -1507,26 +1508,27 @@ SDL_Color MapWidget::getPropColor(PropOverlayType type, float t,
         b = (uint8_t)(100 + f * 155);
       }
     } else {
+      // Muted Heatmap: Dusty Purple/Red -> Pastel Yellow -> Pale Cyan
       if (t < 0.25f) {
         float f = t / 0.25f;
-        r = (uint8_t)(128 + f * 127);
-        g = 0;
-        b = (uint8_t)(128 * (1.0f - f));
+        r = (uint8_t)(100 + f * 50);
+        g = 100;
+        b = (uint8_t)(150 - f * 50);
       } else if (t < 0.5f) {
         float f = (t - 0.25f) / 0.25f;
-        r = 255;
-        g = (uint8_t)(f * 128);
-        b = 0;
+        r = (uint8_t)(150 + f * 50);
+        g = (uint8_t)(100 + f * 50);
+        b = 100;
       } else if (t < 0.75f) {
         float f = (t - 0.5f) / 0.25f;
-        r = 255;
-        g = (uint8_t)(128 + f * 127);
-        b = 0;
+        r = 200;
+        g = (uint8_t)(150 + f * 50);
+        b = (uint8_t)(100 + f * 50);
       } else {
         float f = (t - 0.75f) / 0.25f;
-        r = 255;
-        g = 255;
-        b = (uint8_t)(f * 255);
+        r = (uint8_t)(200 - f * 50);
+        g = (uint8_t)(200 + f * 30);
+        b = (uint8_t)(150 + f * 80);
       }
     }
   } else if (type == PropOverlayType::Drap) {
@@ -1539,12 +1541,13 @@ SDL_Color MapWidget::getPropColor(PropOverlayType type, float t,
         r = 220; g = 50; b = 50;
       }
     } else {
+      // Muted DRAP: Soft Gold -> Terracotta -> Brick
       if (t < 0.33f) {
-        r = 200; g = 200; b = 50;
+        r = 170; g = 170; b = 80;
       } else if (t < 0.66f) {
-        r = 200; g = 120; b = 50;
+        r = 180; g = 120; b = 70;
       } else {
-        r = 180; g = 50; b = 50;
+        r = 160; g = 80; b = 80;
       }
     }
   } else {
@@ -1572,24 +1575,25 @@ SDL_Color MapWidget::getPropColor(PropOverlayType type, float t,
       g = (uint8_t)(stops[i].g + f * (stops[i+1].g - stops[i].g));
       b = (uint8_t)(stops[i].b + f * (stops[i+1].b - stops[i].b));
     } else {
-      // Muted MUF: simple blue → cyan → green → yellow → red rainbow
-      if (t < 0.25f) {
-        float f = t / 0.25f;
-        b = 255;
-        g = (uint8_t)(f * 255.0f);
-      } else if (t < 0.5f) {
-        float f = (t - 0.25f) / 0.25f;
-        g = 255;
-        b = (uint8_t)((1.0f - f) * 255.0f);
-      } else if (t < 0.75f) {
-        float f = (t - 0.5f) / 0.25f;
-        g = 255;
-        r = (uint8_t)(f * 255.0f);
-      } else {
-        float f = (t - 0.75f) / 0.25f;
-        r = 255;
-        g = (uint8_t)((1.0f - f) * 255.0f);
+      // Muted MUF: Pastel rainbow with greyish base
+      struct { float t; uint8_t r, g, b; } stops[] = {
+        {0.000f,  40,  40,  60}, // Dark Grey-Blue
+        {0.200f,  80,  90, 160}, // Muted Indigo
+        {0.400f,  90, 160, 150}, // Muted Teal
+        {0.600f, 100, 170,  90}, // Muted Green
+        {0.800f, 180, 170,  80}, // Muted Yellow-Gold
+        {1.000f, 180,  90,  80}, // Muted Red-Brick
+      };
+      constexpr int N = 6;
+      int i = N - 2;
+      for (int k = 0; k < N - 1; ++k) {
+        if (t <= stops[k + 1].t) { i = k; break; }
       }
+      float span = stops[i + 1].t - stops[i].t;
+      float f = (span > 0.0f) ? (t - stops[i].t) / span : 1.0f;
+      r = (uint8_t)(stops[i].r + f * (stops[i+1].r - stops[i].r));
+      g = (uint8_t)(stops[i].g + f * (stops[i+1].g - stops[i].g));
+      b = (uint8_t)(stops[i].b + f * (stops[i+1].b - stops[i].b));
     }
   }
 

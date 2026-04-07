@@ -691,8 +691,8 @@ bool MapViewMenu::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
     return true;
 
   if (handleCombo(propColormapRec_, COMBO_PROP_COLOR, propColorOpts_, [&](int idx) {
-        if (idx == 0) propColormap_ = "muted";
-        else if (idx == 1) propColormap_ = "vibrant";
+        if (idx == 0) propColormap_ = "vibrant";
+        else if (idx == 1) propColormap_ = "muted";
         else if (idx == 2) propColormap_ = "custom";
       }))
     return true;

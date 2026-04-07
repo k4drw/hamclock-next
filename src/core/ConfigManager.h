@@ -63,7 +63,7 @@ struct AppConfig {
   SDL_Color callsignColor = {255, 165, 0, 255}; // default orange
   SDL_Color callsignBgColor = {0, 0, 0, 0};     // default transparent (no bg)
   std::string theme = "default";
-  std::string propColormap = "muted";         // "muted" (Next) or "vibrant" (Original)
+  std::string propColormap = "vibrant";       // "vibrant" (Original) or "muted" (Next)
   bool mapNightLights = true;
   bool useMetric = true;
   std::string projection = "equirectangular"; // or "robinson"

@@ -71,7 +71,7 @@ private:
   std::vector<std::string> modeOpts_ = {"SSB", "CW", "FT8", "AM", "WSPR"};
   std::vector<std::string> powerOpts_ = {"1W",   "5W",   "10W",
                                          "100W", "500W", "1500W"};
-  std::vector<std::string> propColorOpts_ = {"Muted", "Vibrant", "Custom"};
+  std::vector<std::string> propColorOpts_ = {"Vibrant", "Muted", "Custom"};
 
   // Rects for dropdown HEADERS
   SDL_Rect projRec_, styleRec_;
