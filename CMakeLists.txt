@@ -540,6 +540,7 @@ set(HAMCLOCK_SOURCES
     src/core/SoundManager.cpp
     src/core/WorkerService.cpp
     src/core/PropEngine.cpp
+    src/core/VoacapEngine.cpp
     src/core/ActivityLocationManager.cpp
     src/network/FrameCapture.cpp
     src/network/NetworkManager.cpp

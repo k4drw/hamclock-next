@@ -350,6 +350,8 @@ void MapViewMenu::render(SDL_Renderer *renderer) {
 
     cat->drawText(renderer, "Path", spRec_.x, toaRec_.y - 20, themes.text,
                   FontStyle::Fast);
+    renderRadioButton(renderer, spRec_, propPath_ == 0, "Short Path",
+                      themes.text);
     renderRadioButton(renderer, lpRec_, propPath_ == 1, "Long Path",
                       themes.text);
   } else if (rotatingProp_) {
@@ -772,6 +774,7 @@ bool MapViewMenu::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
     config_->weatherOverlay = weatherOverlay_;
     config_->propBand = propBand_;
     config_->propMode = propMode_;
+    config_->propPower = propPower_;
     config_->propToa = propToa_;
     config_->propPath = propPath_;
     config_->propColormap = propColormap_;

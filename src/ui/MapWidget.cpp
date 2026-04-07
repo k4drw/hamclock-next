@@ -11,6 +11,7 @@
 #include "../core/LiveSpotData.h"
 #include "../core/Logger.h"
 #include "../core/PropEngine.h"
+#include "../core/VoacapEngine.h"
 #include "../core/StringUtils.h"
 #include "../core/WorkerService.h"
 #include "../core/WorldBorders.h"
@@ -1289,7 +1290,8 @@ void MapWidget::updatePropagationOverlay() {
 
   // outputType: 0=MUF, 1=Reliability, 2=TOA
   int outputType = 0;
-  if (config_.propOverlay == PropOverlayType::Reliability) {
+  if (config_.propOverlay == PropOverlayType::Reliability ||
+      config_.propOverlay == PropOverlayType::Voacap) {
     outputType = 1;
   } else if (config_.propOverlay == PropOverlayType::Toa) {
     outputType = 2;
@@ -1301,10 +1303,16 @@ void MapWidget::updatePropagationOverlay() {
   std::shared_ptr<IonosondeProvider> provider =
       (overlayType == PropOverlayType::Muf) ? iono_ : nullptr;
 
+  // Use VoacapEngine for CCIR-model overlays; PropEngine for real-time MUF (ionosonde)
+  bool useVoacap = (overlayType == PropOverlayType::Voacap  ||
+                    overlayType == PropOverlayType::Reliability ||
+                    overlayType == PropOverlayType::Toa);
+
   WorkerService::getInstance().submitTask(
-      [params, sw, provider, outputType, overlayType]() {
-        auto grid =
-            PropEngine::generateGrid(params, sw, provider.get(), outputType);
+      [params, sw, provider, outputType, overlayType, useVoacap]() {
+        auto grid = useVoacap
+            ? VoacapEngine::generateGrid(params, sw, nullptr, outputType)
+            : PropEngine::generateGrid(params, sw, provider.get(), outputType);
 
         auto *result = new std::vector<float>(std::move(grid));
         SDL_Event event;
@@ -1340,7 +1348,7 @@ void MapWidget::onPropDataReady(PropOverlayType type,
 
   std::vector<uint32_t> pixels(grid.size());
   float maxVal;
-  if (type == PropOverlayType::Reliability)
+  if (type == PropOverlayType::Reliability || type == PropOverlayType::Voacap)
     maxVal = 100.0f;
   else if (type == PropOverlayType::Toa)
     maxVal = 40.0f;
