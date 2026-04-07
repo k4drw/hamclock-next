@@ -1288,14 +1288,14 @@ void MapWidget::updatePropagationOverlay() {
     sw = solar_->get();
   }
 
-  // outputType: 0=MUF, 1=Reliability, 2=TOA
+  // outputType: 0=MUF (foF2×M3000 at pixel location), 1=Reliability, 2=TOA
   int outputType = 0;
-  if (config_.propOverlay == PropOverlayType::Reliability ||
-      config_.propOverlay == PropOverlayType::Voacap) {
+  if (config_.propOverlay == PropOverlayType::Reliability) {
     outputType = 1;
   } else if (config_.propOverlay == PropOverlayType::Toa) {
     outputType = 2;
   }
+  // Voacap → outputType=0 (CCIR-predicted MUF, matches original CM_MUF_V)
 
   PropOverlayType overlayType = config_.propOverlay;
 
@@ -1348,14 +1348,16 @@ void MapWidget::onPropDataReady(PropOverlayType type,
 
   std::vector<uint32_t> pixels(grid.size());
   float maxVal;
-  if (type == PropOverlayType::Reliability || type == PropOverlayType::Voacap)
+  if (type == PropOverlayType::Reliability)
     maxVal = 100.0f;
+  else if (type == PropOverlayType::Voacap)
+    maxVal = 35.0f;  // MUF(3000) in MHz, same scale as MUF-RT
   else if (type == PropOverlayType::Toa)
     maxVal = 40.0f;
   else if (type == PropOverlayType::Heatmap)
     maxVal = 1.0f;  // ReachProvider normalizes grid to 0..1
   else
-    maxVal = 50.0f;  // MUF
+    maxVal = 35.0f;  // MUF (matches original HamClock CM_MUF_V scale)
 
   for (size_t i = 0; i < grid.size(); ++i) {
     float val = grid[i];
@@ -1417,7 +1419,7 @@ SDL_Color MapWidget::getPropColor(PropOverlayType type, float t,
     return {r, g, b, 255};
   }
 
-  if (type == PropOverlayType::Reliability || type == PropOverlayType::Voacap) {
+  if (type == PropOverlayType::Reliability) {
     if (vibrant) {
       // Vibrant Reliability: Red -> Yellow -> Green -> Cyan -> White
       if (t < 0.25f) {
@@ -1546,31 +1548,31 @@ SDL_Color MapWidget::getPropColor(PropOverlayType type, float t,
       }
     }
   } else {
-    // Jet/Turbo style for MUF and others
     if (vibrant) {
-      if (t < 0.2f) {
-        float f = t / 0.2f;
-        b = (uint8_t)(128 + f * 127);
-        g = 0;
-        r = 0;
-      } else if (t < 0.4f) {
-        float f = (t - 0.2f) / 0.2f;
-        b = 255;
-        g = (uint8_t)(f * 255);
-      } else if (t < 0.6f) {
-        float f = (t - 0.4f) / 0.2f;
-        g = 255;
-        b = (uint8_t)((1.0f - f) * 255);
-      } else if (t < 0.8f) {
-        float f = (t - 0.6f) / 0.2f;
-        r = (uint8_t)(f * 255);
-        g = 255;
-      } else {
-        float f = (t - 0.8f) / 0.2f;
-        r = 255;
-        g = (uint8_t)((1.0f - f) * 255);
+      // Vibrant MUF: original HamClock d_scale ramp (0-35 MHz)
+      // black → purple → blue → cyan → green → yellow → orange → red
+      struct { float t; uint8_t r, g, b; } stops[] = {
+        {0.000f,   0,   0,   0},
+        {0.114f,  78,  19, 138},
+        {0.257f,   0,  30, 245},
+        {0.429f, 120, 251, 214},
+        {0.571f, 120, 250,  77},
+        {0.771f, 254, 253,  84},
+        {0.857f, 236, 111,  45},
+        {1.000f, 233,  51,  35},
+      };
+      constexpr int N = 8;
+      int i = N - 2;
+      for (int k = 0; k < N - 1; ++k) {
+        if (t <= stops[k + 1].t) { i = k; break; }
       }
+      float span = stops[i + 1].t - stops[i].t;
+      float f = (span > 0.0f) ? (t - stops[i].t) / span : 1.0f;
+      r = (uint8_t)(stops[i].r + f * (stops[i+1].r - stops[i].r));
+      g = (uint8_t)(stops[i].g + f * (stops[i+1].g - stops[i].g));
+      b = (uint8_t)(stops[i].b + f * (stops[i+1].b - stops[i].b));
     } else {
+      // Muted MUF: simple blue → cyan → green → yellow → red rainbow
       if (t < 0.25f) {
         float f = t / 0.25f;
         b = 255;

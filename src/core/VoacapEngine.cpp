@@ -95,11 +95,22 @@ static double geomagLat(double lat, double lon) {
     return asin(std::max(-1.0, std::min(1.0, s)));
 }
 
-/** Magnetic dip angle (radians) at geographic (lat, lon) [radians].
- *  Uses tilted-dipole: tan(dip) = 2*sin(geomag_lat)/cos(geomag_lat). */
+/** Rawer magnetic dip angle (radians) at geographic (lat, lon) [radians].
+ *
+ *  The CCIR/voacapl VERSY routine uses the *Rawer* modified dip, not the
+ *  standard dip.  From Fortran MAGVAR line 39:
+ *    X = ATAN(ATAN(-UNE(1)/SQRT(TMP)) / SQRT(GOB))
+ *  i.e. Rawer_dip = atan(standard_dip_radians / sqrt(cos(geographic_lat)))
+ *
+ *  This amplifies the dip at high geographic latitudes (where cos(lat)→0),
+ *  making the CCIR basis functions behave correctly near the poles.
+ */
 static double magneticDip(double lat, double lon) {
     double glat = geomagLat(lat, lon);
-    return atan2(2.0 * sin(glat), cos(glat));
+    double dip  = atan2(2.0 * sin(glat), cos(glat));  // standard tilted-dipole dip (radians)
+    double gob  = cos(lat);
+    if (gob < 1e-6) gob = 1e-6;                        // pole guard (matches Fortran MAGVAR)
+    return atan(dip / sqrt(gob));                       // Rawer modification
 }
 
 /** Electron gyrofrequency (MHz) at geographic latitude (radians).
@@ -586,6 +597,8 @@ std::vector<float> VoacapEngine::generateGrid(const PropPathParams &params,
     double txLat = params.txLat * DEG2RAD;
     double txLon = params.txLon * DEG2RAD;
     double freqMHz = params.mhz;
+    double minToaDeg = (params.toa > 0) ? (double)params.toa : 3.0;
+    bool longPath = (params.path == 1);
 
     // --- Per-pixel computation ---
     for (int py = 0; py < MAP_H; ++py) {
@@ -595,43 +608,47 @@ std::vector<float> VoacapEngine::generateGrid(const PropPathParams &params,
             double rxLon = ((double)px / MAP_W - 0.5) * 2.0 * M_PI;   // -π..π
             double rxLat = (0.5 - (double)py / MAP_H) * M_PI;          // π/2..-π/2
 
-            double gcd_km = greatCircleKm(txLat, txLon, rxLat, rxLon);
+            // Path distance and midpoint, respecting short/long path choice.
+            // Long-path midpoint is the antipode of the short-path midpoint.
+            double shortKm = greatCircleKm(txLat, txLon, rxLat, rxLon);
+            double gcd_km  = longPath ? (40075.0 - shortKm) : shortKm;
 
-            // Skip very short paths (< 10 km) — essentially at TX
             if (gcd_km < 10.0) {
-                grid[py * MAP_W + px] = (float)((outputType == 1) ? 100.0 :
-                                                (outputType == 2) ? 88.0 : freqMHz);
+                if (outputType == 1) grid[py * MAP_W + px] = 100.0f;
+                else if (outputType == 2) grid[py * MAP_W + px] = 88.0f;
+                else grid[py * MAP_W + px] = 35.0f;
                 continue;
             }
 
-            // Compute layer parameters at path midpoint
             double midLat, midLon;
             greatCirclePoint(txLat, txLon, rxLat, rxLon, 0.5, midLat, midLon);
+            if (longPath) {
+                midLat = -midLat;
+                midLon += M_PI;
+                if (midLon > M_PI) midLon -= 2.0 * M_PI;
+            }
 
             LayerParams lp = computeLayerParams(midLat, midLon, tc,
                                                 ssn_clamp, utcHour, month);
+            double elev;
+            double muf = computeF2MUF(gcd_km, lp, &elev);
 
             float val = 0.0f;
-
             if (outputType == 0) {
-                // MUF in MHz
-                double elev;
-                double muf = computeF2MUF(gcd_km, lp, &elev);
-                val = (float)std::max(0.0, std::min(50.0, muf));
-
+                // VOACAP MUF: oblique path MUF from DE to this pixel.
+                // Filtered by minimum TOA (antenna elevation constraint).
+                if (elev >= minToaDeg)
+                    val = (float)std::max(0.0, std::min(35.0, muf));
             } else if (outputType == 1) {
-                // Circuit reliability (%)
-                double elev;
-                double muf = computeF2MUF(gcd_km, lp, &elev);
-                double absDB = absorptionDB(gcd_km, freqMHz, lp,
-                                            midLat, midLon, utcHour, month);
-                val = (float)computeReliability(freqMHz, muf, gcd_km, absDB,
-                                               params.watts, params.mode);
-
+                // Reliability: full circuit model, TOA-filtered.
+                if (elev >= minToaDeg) {
+                    double absDB = absorptionDB(gcd_km, freqMHz, lp,
+                                                midLat, midLon, utcHour, month);
+                    val = (float)computeReliability(freqMHz, muf, gcd_km, absDB,
+                                                   params.watts, params.mode);
+                }
             } else {
-                // TOA = take-off angle (degrees)
-                double elev;
-                computeF2MUF(gcd_km, lp, &elev);
+                // TOA output: elevation angle to this pixel (degrees)
                 val = (float)std::max(0.0, std::min(88.0, elev));
             }
 
@@ -640,4 +657,32 @@ std::vector<float> VoacapEngine::generateGrid(const PropPathParams &params,
     }
 
     return grid;
+}
+
+double VoacapEngine::pathReliability(double freqMHz, double distKm,
+                                     double midLatDeg, double midLonDeg,
+                                     int utcHour, int month,
+                                     double ssn, double watts,
+                                     const std::string &mode,
+                                     double minToaDeg) {
+    if (distKm < 10.0)
+        return 100.0;
+
+    float ssn_clamp = (float)std::max(0.0, std::min(100.0, ssn));
+    TimeCoeffs tc = computeTimeCoeffs(month - 1, ssn_clamp, (float)utcHour);
+
+    double midLat = midLatDeg * DEG2RAD;
+    double midLon = midLonDeg * DEG2RAD;
+
+    LayerParams lp = computeLayerParams(midLat, midLon, tc,
+                                        ssn_clamp, (float)utcHour, month);
+    double elev;
+    double muf = computeF2MUF(distKm, lp, &elev);
+
+    if (elev < minToaDeg)
+        return 0.0;
+
+    double absDB = absorptionDB(distKm, freqMHz, lp, midLat, midLon,
+                                (double)utcHour, month);
+    return computeReliability(freqMHz, muf, distKm, absDB, watts, mode);
 }

@@ -1660,7 +1660,11 @@ void MapWidget::renderLegend(SDL_Renderer *renderer) {
   if (type == PropOverlayType::Muf) {
     title = "MUF-RT (MHz)";
     labelMin = "0";
-    labelMax = "50";
+    labelMax = "35";
+  } else if (type == PropOverlayType::Voacap) {
+    title = "MUF-VCAP (MHz)";
+    labelMin = "0";
+    labelMax = "35";
   } else if (type == PropOverlayType::Reliability) {
     title = "Rel (%)";
     labelMin = "0";
@@ -1681,10 +1685,6 @@ void MapWidget::renderLegend(SDL_Renderer *renderer) {
     title = "Aurora (%)";
     labelMin = "0";
     labelMax = "100";
-  } else {
-    // VOACAP uses Reliability scale/colors internally
-    labelMin = "0%";
-    labelMax = "100%";
   }
 
   auto *cat = fontMgr_.catalog();
@@ -2283,9 +2283,9 @@ void MapWidget::renderOverlayInfo(SDL_Renderer *renderer) {
   if (config_.propOverlay == PropOverlayType::Muf) {
     text = "MUF Overlay (RT)";
   } else if (config_.propOverlay == PropOverlayType::Voacap) {
-    text = fmt::format("VOACAP ({} / {} / {}W / {:.1f}° / {})", config_.propBand,
-                       config_.propMode, config_.propPower, config_.propToa,
-                       config_.propPath == 0 ? "SP" : "LP");
+    // band and path affect the MUF map; toa filters unreachable elevations
+    text = fmt::format("MUF-VCAP ({} / {:.1f}° / {})", config_.propBand,
+                       config_.propToa, config_.propPath == 0 ? "SP" : "LP");
   } else if (config_.propOverlay == PropOverlayType::Reliability) {
     text = fmt::format("Reliability ({} / {} / {}W / {:.1f}° / {})",
                        config_.propBand, config_.propMode, config_.propPower,

@@ -2,6 +2,7 @@
 #include "WidgetRegistry.h"
 #include "../core/Astronomy.h"
 #include "../core/Theme.h"
+#include "../core/VoacapEngine.h"
 #include <cmath>
 
 #ifndef M_PI
@@ -37,23 +38,18 @@ void VoacapDeDxPanel::recalculateMatrix() {
   if (!hasTarget_)
     return;
 
-  double marginDb =
-      PropEngine::calculateSignalMargin(config_.propMode, (double)config_.propPower);
-
   // Space weather
   double sfi = 70.0;
   double ssn = 50.0;
-  double kIndex = 0.0;
   if (solarStore_) {
     auto sw = solarStore_->get();
     if (sw.sfi > 0)
       sfi = sw.sfi;
     if (sw.sunspot_number > 0)
       ssn = sw.sunspot_number;
-    kIndex = sw.k_index;
   }
 
-  // Calculate mid-point
+  // Short-path great-circle distance and midpoint
   double phi1 = state_->deLocation.lat * M_PI / 180.0;
   double lam1 = state_->deLocation.lon * M_PI / 180.0;
   double phi2 = state_->dxLocation.lat * M_PI / 180.0;
@@ -66,38 +62,35 @@ void VoacapDeDxPanel::recalculateMatrix() {
       std::sqrt((std::cos(phi1) + Bx) * (std::cos(phi1) + Bx) + By * By));
   double midLam = lam1 + std::atan2(By, std::cos(phi1) + Bx);
 
-  double midLatDeg = midPhi * 180.0 / M_PI;
-  double midLonDeg = midLam * 180.0 / M_PI;
+  double shortKm = Astronomy::calculateDistance(state_->deLocation, state_->dxLocation);
+  double distKm;
+  double midLatDeg, midLonDeg;
 
-  double distKm =
-      Astronomy::calculateDistance(state_->deLocation, state_->dxLocation);
   if (config_.propPath == 1) {
-    // Long path
-    distKm = 40075.0 - distKm;
-    // Note: for long path, the "midpoint" should ideally be shifted 180 degrees
-    // along the great circle.
-  }
-
-  // Interpolate iono
-  InterpolatedIonosonde iono;
-  if (ionoProvider_) {
-    iono = ionoProvider_->interpolate(midLatDeg, midLonDeg);
+    // Long path: antipode of short-path midpoint
+    distKm = 40075.0 - shortKm;
+    midLatDeg = -(midPhi * 180.0 / M_PI);
+    double lon = midLam + M_PI;
+    if (lon > M_PI) lon -= 2.0 * M_PI;
+    midLonDeg = lon * 180.0 / M_PI;
+  } else {
+    distKm    = shortKm;
+    midLatDeg = midPhi * 180.0 / M_PI;
+    midLonDeg = midLam * 180.0 / M_PI;
   }
 
   std::time_t t = std::time(nullptr);
   std::tm *ptm = std::gmtime(&t);
-  double currentHour = ptm->tm_hour + ptm->tm_min / 60.0;
+  int month = ptm->tm_mon + 1;
+  double minToa = (config_.propToa > 0.0f) ? (double)config_.propToa : 3.0;
 
-  // Compute 24 hours x 8 bands
+  // Compute 24 hours x 8 bands using CCIR/VOACAP engine
   for (int hour = 0; hour < 24; ++hour) {
     for (int b = 0; b < 8; ++b) {
-      double rel = PropEngine::calculateReliability(
-          BANDS_MHZ[b], distKm, midLatDeg, midLonDeg, hour, sfi, ssn, kIndex,
-          iono, currentHour, marginDb);
-      
-      // Apply TOA penalty if engine supported it directly, but for now we
-      // just pass the parameters we have.
-      
+      double rel = VoacapEngine::pathReliability(
+          BANDS_MHZ[b], distKm, midLatDeg, midLonDeg,
+          hour, month, ssn,
+          (double)config_.propPower, config_.propMode, minToa);
       relMatrix_[hour][b] = (float)rel;
     }
   }

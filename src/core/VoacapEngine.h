@@ -29,4 +29,26 @@ public:
                                            const SolarData &sw,
                                            const class IonosondeProvider *iono,
                                            int outputType);
+
+    /**
+     * Single-path circuit reliability using the CCIR/VOACAP model.
+     *
+     * @param freqMHz   Operating frequency (MHz)
+     * @param distKm    Great-circle path distance (km)
+     * @param midLatDeg Path midpoint latitude (degrees)
+     * @param midLonDeg Path midpoint longitude (degrees)
+     * @param utcHour   UTC hour (0-23)
+     * @param month     Month (1-12)
+     * @param ssn       Sunspot number (clamped to 0-100 internally)
+     * @param watts     Transmitter power (watts)
+     * @param mode      Mode string ("SSB", "CW", "FT8", etc.)
+     * @param minToaDeg Minimum take-off angle filter (degrees); 0 = no filter
+     * @return Circuit reliability (0-100 %), or 0 if path not supported
+     */
+    static double pathReliability(double freqMHz, double distKm,
+                                  double midLatDeg, double midLonDeg,
+                                  int utcHour, int month,
+                                  double ssn, double watts,
+                                  const std::string &mode,
+                                  double minToaDeg = 3.0);
 };
