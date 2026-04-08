@@ -48,7 +48,7 @@ void WidgetSelector::show(
 
   // Center the menu
   int numCols = 4; // 4 columns to fit ~47 widgets without scrolling
-  int itemH = 28;
+  int itemH = 20;
   int baseW = 180; // 4 × 180 = 720px, fits in 800px logical width
   int menuW = baseW * numCols;
   int footerH = 50;

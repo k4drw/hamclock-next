@@ -124,6 +124,7 @@
 #include "ui/WeatherPanel.h"
 #include "ui/WidgetSelector.h"
 #include "ui/WinlinkPanel.h"
+#include "ui/WorldClockPanel.h"
 #include "ui/icon_png.h"
 
 #include "core/Constants.h"
@@ -661,6 +662,9 @@ DashboardContext::DashboardContext(AppContext &ctx)
     } else if (type == "contests") {
       widgetPool[type] =
           std::make_unique<ContestPanel>(0, 0, 0, 0, fontMgr, contestStore, appCfg);
+    } else if (type == "world_clock") {
+      widgetPool[type] = std::make_unique<WorldClockPanel>(
+          0, 0, 0, 0, ctx.cfgMgr, fontMgr);
     } else if (type == "callsign_clock") {
       widgetPool[type] =
           std::make_unique<CallsignClock>(0, 0, 0, 0, fontMgr, appCfg.callsign, appCfg);

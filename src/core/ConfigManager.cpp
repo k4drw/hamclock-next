@@ -638,6 +638,22 @@ bool ConfigManager::load(AppConfig &config) {
     }
   }
 
+  // World Clock
+  config.worldClocks.clear();
+  if (json.contains("world_clocks") && json["world_clocks"].is_array()) {
+    for (auto &item : json["world_clocks"]) {
+      WorldClockEntry entry;
+      entry.label = item.value("label", "");
+      entry.offsetMinutes = item.value("offset_minutes", 0);
+      entry.active = item.value("active", false);
+      config.worldClocks.push_back(entry);
+    }
+  }
+  // Ensure we always have 4 entries
+  while (config.worldClocks.size() < 4) {
+    config.worldClocks.push_back({"", 0, false});
+  }
+
   // Seed factory presets on first use
   if (config.presets.empty())
     addFactoryPresets(config);
@@ -840,6 +856,17 @@ bool ConfigManager::save(const AppConfig &config) {
   json["big_clock"]["show_sec"] = config.bigClockShowSec;
   json["big_clock"]["show_date"] = config.bigClockShowDate;
   json["big_clock"]["hue"]       = config.bigClockHue;
+  
+  // World Clock
+  auto wcArr = nlohmann::json::array();
+  for (const auto &entry : config.worldClocks) {
+    nlohmann::json item;
+    item["label"] = entry.label;
+    item["offset_minutes"] = entry.offsetMinutes;
+    item["active"] = entry.active;
+    wcArr.push_back(item);
+  }
+  json["world_clocks"] = wcArr;
 
   json["rss"]["enabled"] = config.rssEnabled;
   json["activity"]["onta_filter"] = config.ontaFilter;

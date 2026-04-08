@@ -52,6 +52,12 @@ struct ConfigPreset {
   int propAntGain = 3; // Antenna gain (dBi)
 };
 
+struct WorldClockEntry {
+  std::string label;
+  int offsetMinutes = 0; // minutes from UTC
+  bool active = false;
+};
+
 struct AppConfig {
   // Identity
   std::string callsign;
@@ -231,6 +237,9 @@ struct AppConfig {
   bool bigClockShowSec  = true;
   bool bigClockShowDate = true;
   uint8_t bigClockHue   = 85; // default green (matches original NV_SWHUE default)
+
+  // World Clock
+  std::vector<WorldClockEntry> worldClocks;
 
   // Update
   std::string skippedVersion;
