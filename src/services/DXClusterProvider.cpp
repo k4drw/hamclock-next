@@ -172,8 +172,11 @@ void DXClusterProvider::runHubClient() {
     } else {
       if (store_) store_->setConnected(false, "Hub unreachable");
     }
-    for (int i = 0; i < 300 && !stopClicked_; ++i)
-      std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    {
+      std::unique_lock<std::mutex> lk(sleepMutex_);
+      sleepCv_.wait_for(lk, std::chrono::seconds(30),
+                        [this] { return stopClicked_.load(); });
+    }
   }
 }
 
@@ -315,8 +318,12 @@ void DXClusterProvider::runTelnet(const std::string &host, int port,
   bool initialRequestSent = false;
   auto lastHeartbeat = std::chrono::system_clock::now();
 
-  // Elwood's 500ms delay (DXCMSG_DT) to let the server breathe
-  std::this_thread::sleep_for(std::chrono::milliseconds(500));
+  // Elwood's 500ms delay (DXCMSG_DT) to let the server breathe — interruptible
+  {
+    std::unique_lock<std::mutex> lk(sleepMutex_);
+    sleepCv_.wait_for(lk, std::chrono::milliseconds(500),
+                      [this] { return stopClicked_.load(); });
+  }
 
   if (!login.empty() && !stopClicked_) {
     std::string cmd = login + "\r\n";
