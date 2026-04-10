@@ -67,10 +67,10 @@ void WorldClockPanel::renderMain(SDL_Renderer *renderer) {
     // Label
     cat->drawText(renderer, wc.label, x_ + 10, curY + (rowH - 12)/2, themes.textDim, FontStyle::Micro);
     
-    // Time
-    int tw, th;
-    cat->renderText(renderer, timeStr, themes.text, FontStyle::MediumBold, &tw, &th);
-    cat->drawText(renderer, timeStr, x_ + width_ - tw - 10, curY + (rowH - th)/2, themes.text, FontStyle::MediumBold);
+    // Time (right-aligned; drawText with rightAlign+vertCentered avoids a
+    // throwaway renderText call that would leak a GPU texture each frame)
+    cat->drawText(renderer, timeStr, x_ + width_ - 10, curY + rowH / 2,
+                  themes.text, FontStyle::MediumBold, false, true, true);
 
     curY += rowH;
   }
@@ -141,9 +141,8 @@ void WorldClockPanel::renderConfig(SDL_Renderer *renderer) {
   auto drawConfigBtn = [&](const SDL_Rect &r, const char *label, SDL_Color color) {
     SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, 255);
     SDL_RenderFillRect(renderer, &r);
-    int tw, th;
-    cat->renderText(renderer, label, themes.bg, FontStyle::MicroBold, &tw, &th);
-    cat->drawText(renderer, label, r.x + (r.w - tw)/2, r.y + (r.h - th)/2, themes.bg, FontStyle::MicroBold);
+    cat->drawText(renderer, label, r.x + r.w / 2, r.y + r.h / 2,
+                  themes.bg, FontStyle::MicroBold, true, false, true);
   };
 
   drawConfigBtn(ui_.cancelRect, "Cancel", themes.danger);

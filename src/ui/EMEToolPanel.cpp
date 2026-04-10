@@ -159,8 +159,7 @@ void EMEToolPanel::render(SDL_Renderer *renderer) {
                   curve_[idx].deEl, curve_[idx].dxEl);
 
     int tw, th;
-    cat->renderText(renderer, tbuf, themes.text, FontStyle::Micro, &tw,
-                    &th);
+    SDL_Texture *tipTex = cat->renderText(renderer, tbuf, themes.text, FontStyle::Micro, &tw, &th);
     SDL_Rect tipRect = {tooltip_.x + 10, tooltip_.y - th - 5, tw + 10, th + 6};
     if (tipRect.x + tipRect.w > x_ + width_)
       tipRect.x = tooltip_.x - tipRect.w - 10;
@@ -172,8 +171,11 @@ void EMEToolPanel::render(SDL_Renderer *renderer) {
     SDL_RenderFillRect(renderer, &tipRect);
     SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, themes.border.a);
     SDL_RenderDrawRect(renderer, &tipRect);
-    cat->drawText(renderer, tbuf, tipRect.x + 5, tipRect.y + tipRect.h / 2,
-                  themes.text, FontStyle::Micro, false, false, true);
+    if (tipTex) {
+      SDL_Rect dst = {tipRect.x + 5, tipRect.y + (tipRect.h - th) / 2, tw, th};
+      SDL_RenderCopy(renderer, tipTex, nullptr, &dst);
+      cat->destroyTexture(tipTex);
+    }
   }
 
   // --- Info section ---
