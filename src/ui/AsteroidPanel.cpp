@@ -524,7 +524,7 @@ void AsteroidPanel::renderRowText(SDL_Renderer *renderer, int index, int rx,
       int ty = ry + (rh - th) / 2;
       SDL_Rect dst = {tx, ty, tw, th};
       SDL_RenderCopy(renderer, tex, nullptr, &dst);
-      SDL_DestroyTexture(tex);
+      MemoryMonitor::getInstance().destroyTexture(tex);
     }
   }
 }

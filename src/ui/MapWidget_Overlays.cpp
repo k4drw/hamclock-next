@@ -830,7 +830,7 @@ void MapWidget::renderAsteroidOverlay(SDL_Renderer *renderer) {
       SDL_Rect dst = {static_cast<int>(sp.x) - iw / 2,
                       static_cast<int>(sp.y) - ih / 2, iw, ih};
       SDL_RenderCopy(renderer, iconTex, nullptr, &dst);
-      SDL_DestroyTexture(iconTex);
+      MemoryMonitor::getInstance().destroyTexture(iconTex);
     }
   }
 

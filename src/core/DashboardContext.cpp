@@ -2699,8 +2699,8 @@ void DashboardContext::render(AppContext &ctx) {
       auto *cat = &fontCatalog;
       if (cat) {
         int tw, th;
-        cat->renderText(ctx.renderer, hoverTooltip, {255, 255, 255, 255},
-                        FontStyle::Micro, &tw, &th);
+        SDL_Texture *tipTex = cat->renderText(ctx.renderer, hoverTooltip,
+                        {255, 255, 255, 255}, FontStyle::Micro, &tw, &th);
         int pad = 4;
         SDL_Rect box = {mx + 12, my + 12, tw + pad * 2, th + pad * 2};
         // Keep tooltip on screen
@@ -2713,8 +2713,11 @@ void DashboardContext::render(AppContext &ctx) {
         SDL_RenderFillRect(ctx.renderer, &box);
         SDL_SetRenderDrawColor(ctx.renderer, 255, 255, 255, 180);
         SDL_RenderDrawRect(ctx.renderer, &box);
-        cat->drawText(ctx.renderer, hoverTooltip, box.x + pad, box.y + pad,
-                      {255, 255, 255, 255}, FontStyle::Micro);
+        if (tipTex) {
+          SDL_Rect dst = {box.x + pad, box.y + pad, tw, th};
+          SDL_RenderCopy(ctx.renderer, tipTex, nullptr, &dst);
+          cat->destroyTexture(tipTex);
+        }
       }
     }
   }
