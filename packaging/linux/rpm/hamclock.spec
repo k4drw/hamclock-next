@@ -30,6 +30,8 @@ BuildRequires:  openssl-devel
 BuildRequires:  libdrm-devel
 BuildRequires:  flite-devel
 %if 0%{?suse_version}
+BuildRequires:  libopenssl-3-devel
+BuildRequires:  libopenssl3
 BuildRequires:  libgbm-devel
 BuildRequires:  Mesa-libEGL-devel
 BuildRequires:  Mesa-libGLESv2-devel
