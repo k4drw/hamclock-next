@@ -256,7 +256,7 @@ void AsteroidPanel::render(SDL_Renderer *renderer) {
       SDL_Rect dst = {slotX + (iconSlotW - iw) / 2,
                       iconRowY + (rowFontSize_ + pad - ih) / 2, iw, ih};
       SDL_RenderCopy(renderer, t, nullptr, &dst);
-      SDL_DestroyTexture(t);
+      MemoryMonitor::getInstance().destroyTexture(t);
     }
   }
 

@@ -6,24 +6,44 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
-## [Unreleased] — v1.4
+## [v1.4.0] — 2026-04-10
 
 ### Added
-- **DX Cluster Band Filter** — click any band label in the cluster's color legend to filter spots to that band; click again to clear. Selected band is highlighted with a white border; unselected bands are dimmed.
-- **Marine Auto-Setup** — when the Marine widget is added with no station configured, it automatically finds and saves the nearest NOAA tide station and NDBC buoy to your QTH. Data appears immediately without opening the setup dialog.
-- **Map Zoom with Pane-Aware Clipping** — map overlays (borders, grids, sat footprints) are correctly masked by widget boundaries when zoomed; no more ghosting behind semi-transparent panels.
+- **Native CCIR/VOACAP Engine** — high-fidelity HF propagation model directly ported from VOACAP Fortran, replacing the simplified PropEngine approximation with accurate, multi-path reliability and MUF calculations.
+- **Global Timezone Support** — choose a dashboard-wide UTC offset in the setup screen to localize time across all panels, including TimePanel, Calendar, and VOACAP charts.
+- **DX Local Time** — displays the active DX station's local time (HH:MM UTC±N) via an asynchronous background lookup service.
+- **Interactive Map Zoom & Pan** — implemented mouse-wheel zooming and click-drag panning with automated coordinate transformation across all map projections.
+- **DX Cluster Band Filter** — click any band label in the cluster's color legend to filter spots to that band; click again to clear.
+- **Marine Auto-Setup** — when the Marine widget is added with no station configured, it automatically finds and saves the nearest NOAA tide station and NDBC buoy to your QTH.
+- **Configurable Antenna Gain** — set target dBi (default 3 dBi) in VOACAP options (web + native UI) to tune reliability models to specific station hardware.
+- **CCIR Coefficient Tools** — included scripts and automation for parsing and refreshing embedded ionospheric data from raw NOAA/CCIR ASCII sources.
+- **World Clock Widget** — displays up to 4 configurable timezone clocks; each slot has a label, active toggle, and adjustable UTC offset (±30 min; Shift for ±1 hr). Configuration is accessed via an in-widget gear icon.
 
 ### Changed
+- **Propagation Colormaps** — "Vibrant" is now the default; "Muted" is now a desaturated pastel palette for improved legibility in high-contrast environments.
 - **Map Great-Circle Paths** — all great-circle overlays (Spots, ONTA, Selection) now use 250 segments for smooth curves at any zoom level; selection paths adopt the band color of the selected spot.
-- **Map Reset Gesture** — reset is now triggered by right-mouse double-click, freeing left-click double-click from accidental resets during panning. A 300 ms debounce prevents the "Set DE Here" context menu from appearing on reset.
+- **Map Reset Gesture** — reset is now triggered by right-mouse double-click, freeing left-click double-click from accidental resets during panning.
+- **Pane 4 Restrictions** — centralized enforcement of compatible widgets for the small top-right pane to prevent layout collisions.
+- **Live-Web UI** — overhauled event sequencing to restore full mouse interaction for web-based remote control.
 - **Map View Menu** — Apply button uses the success (green) color for visual clarity.
 
 ### Fixed
-- **ONTAPanel, WatchlistPanel, AsteroidPanel** — removed hard row caps that silently dropped excess entries; all three panels now scroll with the mouse wheel and display the full untruncated list.
+- **DX Timezone Deadlock** — resolved a critical application freeze caused by re-locking the location mutex during asynchronous data delivery.
+- **ONTAPanel, WatchlistPanel, AsteroidPanel** — removed hard row caps that silently dropped excess entries; all three panels now scroll with the mouse wheel.
 - **DX Peditions Panel** — removed 10-row cap; full list now shown with scroll support.
+- **Custom Font Visibility** — fixed a bug where the "Map View" button label would disappear when using certain symbol-heavy custom fonts.
+- **Antimeridian Sat Tracks** — fixed visual artifacts and "streaks" in satellite ground tracks when the map is centered on non-zero longitudes.
 - **Marine Widget** — fetches updated data immediately after saving new station or buoy IDs; no restart required.
-- **Moon Widget** — reduced backing circle radius by 1 px to eliminate the visible halo/masking ring; backing color updated to deep navy for better theme blending.
-- **Map Path Truncation** — long-distance great-circle routes (e.g., US to Europe) no longer truncate before reaching their destination.
+- **Moon Widget** — reduced backing circle radius by 1 px to eliminate the visible halo; backing color updated to deep navy.
+- **N-Hop MUF Model** — corrected F2 MUF and absorption calculations for long-path (>20,000 km) geometry using an N-hop model instead of hardcoded 1/2-hop logic.
+- **VOACAP DE-DX Timeline** — chart now uses a fixed UTC midnight-to-midnight axis with a real-time "now" cursor; eliminates "split window" issues at the UTC boundary.
+- **VOACAP DE-DX Widget** — isolated to always show the DE↔DX short path, decoupled from the map's long-path overlay setting.
+- **Reliability Legend** — updated the 0% swatch to black/transparent to match the map's skip-zone rendering.
+- **Memory Safety** — fixed a Use-After-Free risk during application shutdown by ensuring the WebServer thread stops before dashboard context destruction.
+- **Sensor Shutdown Responsiveness** — `LTR329Provider` and `DXClusterProvider` now use interruptible condition-variable waits instead of bare `sleep_for` calls; `stop()` returns immediately rather than blocking for the full poll interval.
+- **GPU Memory Stability** — capped the `FontManager` volatile text cache and implemented LRU pruning to prevent GPU buffer (BO) exhaustion during long-term operation on low-memory hardware (RPi 3B).
+- **GPU Texture Leaks** — resolved critical per-frame leaks in `WorldClockPanel` and hover-tooltip rendering paths (DashboardContext/EMEToolPanel) that caused OOM crashes on Linux/RPi. Corrected `MemoryMonitor` VRAM accounting for textures destroyed via standard SDL calls.
+- **MemoryMonitor Accounting Sweep** — proactive audit replaced bare `SDL_DestroyTexture` calls (which bypass VRAM tracking) with `MemoryMonitor::destroyTexture` in `ClockAuxPanel` (hmTex_/secTex_, destructor + render + resize — 5 sites) and `AsteroidPanel` icon render loop; eliminated a per-frame GPU texture allocation in `ONTAPanel` chip-label measurement, replacing `renderText`+`destroyTexture` with a CPU-only `getLogicalWidth` call.
 
 ---
 

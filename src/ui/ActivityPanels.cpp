@@ -264,12 +264,8 @@ void ONTAPanel::render(SDL_Renderer *renderer) {
 
   std::string chip = filterLabel(filter_);
   auto *cat = fontMgr_.catalog();
-  int cw = 0, ch = 0;
-  SDL_Texture *chipTex =
-      cat->renderText(renderer, chip, themes.text, FontStyle::Fast, &cw, &ch);
-  if (chipTex) {
-    cat->destroyTexture(chipTex);
-  }
+  // Measure chip label width without allocating a GPU texture on every frame.
+  int cw = fontMgr_.getLogicalWidth(chip, cat->ptSize(FontStyle::Fast));
 
   // Visual button background centered vertically in title area
   int btnH = 20;

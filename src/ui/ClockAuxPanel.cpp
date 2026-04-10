@@ -53,8 +53,8 @@ void ClockAuxPanel::syncFromConfig() {
 }
 
 ClockAuxPanel::~ClockAuxPanel() {
-  if (hmTex_)  SDL_DestroyTexture(hmTex_);
-  if (secTex_) SDL_DestroyTexture(secTex_);
+  MemoryMonitor::getInstance().destroyTexture(hmTex_);
+  MemoryMonitor::getInstance().destroyTexture(secTex_);
 }
 
 void ClockAuxPanel::update() {}
@@ -106,13 +106,13 @@ void ClockAuxPanel::render(SDL_Renderer *renderer) {
 
   // Rebuild textures only when string changes
   if (hmStr != lastHM_ || !hmTex_) {
-    if (hmTex_) { SDL_DestroyTexture(hmTex_); hmTex_ = nullptr; }
+    MemoryMonitor::getInstance().destroyTexture(hmTex_);
     hmTex_ = fontMgr_.renderText(renderer, hmStr, themes.text, hmFontSize_,
                                  &hmW_, &hmH_, true);
     lastHM_ = hmStr;
   }
   if (secStr != lastSec_ || !secTex_) {
-    if (secTex_) { SDL_DestroyTexture(secTex_); secTex_ = nullptr; }
+    MemoryMonitor::getInstance().destroyTexture(secTex_);
     secTex_ = fontMgr_.renderText(renderer, secStr, themes.text, secFontSize_,
                                   &secW_, &secH_, true);
     lastSec_ = secStr;
@@ -188,8 +188,8 @@ void ClockAuxPanel::onResize(int x, int y, int w, int h) {
   secFontSize_   = cat->ptSize(FontStyle::FastBold);
   infoFontSize_  = cat->ptSize(FontStyle::Fast);
   // Invalidate cached textures on resize
-  if (hmTex_)  { SDL_DestroyTexture(hmTex_);  hmTex_  = nullptr; }
-  if (secTex_) { SDL_DestroyTexture(secTex_); secTex_ = nullptr; }
+  MemoryMonitor::getInstance().destroyTexture(hmTex_);
+  MemoryMonitor::getInstance().destroyTexture(secTex_);
   lastHM_.clear();
   lastSec_.clear();
 }
