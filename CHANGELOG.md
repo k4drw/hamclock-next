@@ -6,11 +6,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
-## [v1.4.0] — 2026-04-10
+## [v1.4.0] — 2026-04-11
 
 ### Added
 - **Native CCIR/VOACAP Engine** — high-fidelity HF propagation model directly ported from VOACAP Fortran, replacing the simplified PropEngine approximation with accurate, multi-path reliability and MUF calculations.
 - **Global Timezone Support** — choose a dashboard-wide UTC offset in the setup screen to localize time across all panels, including TimePanel, Calendar, and VOACAP charts.
+- **ONTAPanel Band Legend** — added a persistent band color legend to the "On The Air" widget when displayed in double-height mode (SidePanel Panes 5/6).
 - **DX Local Time** — displays the active DX station's local time (HH:MM UTC±N) via an asynchronous background lookup service.
 - **Interactive Map Zoom & Pan** — implemented mouse-wheel zooming and click-drag panning with automated coordinate transformation across all map projections.
 - **DX Cluster Band Filter** — click any band label in the cluster's color legend to filter spots to that band; click again to clear.
@@ -26,6 +27,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Pane 4 Restrictions** — centralized enforcement of compatible widgets for the small top-right pane to prevent layout collisions.
 - **Live-Web UI** — overhauled event sequencing to restore full mouse interaction for web-based remote control.
 - **Map View Menu** — Apply button uses the success (green) color for visual clarity.
+- **LiveSpotPanel 1-Column Layout** — optimized the "Live Spots" widget to use a single-column list when in double-height mode, improving readability in the SidePanel.
+- **Application Uptime** — updated the `TimePanel` display to track the uptime of the HamClock process (`hamclock-next`) instead of the underlying operating system.
 
 ### Fixed
 - **DX Timezone Deadlock** — resolved a critical application freeze caused by re-locking the location mutex during asynchronous data delivery.
@@ -44,6 +47,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **GPU Memory Stability** — capped the `FontManager` volatile text cache and implemented LRU pruning to prevent GPU buffer (BO) exhaustion during long-term operation on low-memory hardware (RPi 3B).
 - **GPU Texture Leaks** — resolved critical per-frame leaks in `WorldClockPanel` and hover-tooltip rendering paths (DashboardContext/EMEToolPanel) that caused OOM crashes on Linux/RPi. Corrected `MemoryMonitor` VRAM accounting for textures destroyed via standard SDL calls.
 - **MemoryMonitor Accounting Sweep** — proactive audit replaced bare `SDL_DestroyTexture` calls (which bypass VRAM tracking) with `MemoryMonitor::destroyTexture` in `ClockAuxPanel` (hmTex_/secTex_, destructor + render + resize — 5 sites) and `AsteroidPanel` icon render loop; eliminated a per-frame GPU texture allocation in `ONTAPanel` chip-label measurement, replacing `renderText`+`destroyTexture` with a CPU-only `getLogicalWidth` call.
+- **ListPanel Geometry** — standardized row and footer calculations in the base `ListPanel` to prevent overlap between scrollable content and legend footers (used by DX Cluster and ONTA panels).
 
 ---
 
