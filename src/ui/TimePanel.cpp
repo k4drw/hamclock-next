@@ -24,29 +24,24 @@ namespace {
 
 static constexpr Uint32 kInfoRotateMs = 3000;
 
-std::string getSystemUptime() {
-#ifdef _WIN32
-  uint64_t ms = GetTickCount64();
-  double sec = ms / 1000.0;
-#else
-  std::FILE *f = std::fopen("/proc/uptime", "r");
-  if (!f)
-    return "Up ?";
-  double sec = 0;
-  if (std::fscanf(f, "%lf", &sec) != 1)
-    sec = 0;
-  std::fclose(f);
-#endif
-  int days = static_cast<int>(sec / 86400);
-  int hours = static_cast<int>(sec / 3600) % 24;
-  int mins = static_cast<int>(sec / 60) % 60;
+std::string getUptime() {
+  static const auto startTime = std::chrono::steady_clock::now();
+  auto seconds = std::chrono::duration_cast<std::chrono::seconds>(
+                     std::chrono::steady_clock::now() - startTime)
+                     .count();
+  int days = static_cast<int>(seconds / 86400);
+  int hours = static_cast<int>(seconds / 3600) % 24;
+  int mins = static_cast<int>(seconds / 60) % 60;
+  int secs = seconds % 60;
   char buf[32];
   if (days > 0)
     std::snprintf(buf, sizeof(buf), "Up  %dd %dh", days, hours);
   else if (hours > 0)
     std::snprintf(buf, sizeof(buf), "Up  %dh %dm", hours, mins);
-  else
+  else if (mins > 0)
     std::snprintf(buf, sizeof(buf), "Up  %dm", mins);
+  else
+    std::snprintf(buf, sizeof(buf), "Up  %ds", secs);
   return buf;
 }
 
@@ -148,7 +143,7 @@ void TimePanel::update() {
   currentDate_ = buf;
 
   // System info: uptime every second, rotating values every 3 seconds
-  currentUptime_ = getSystemUptime();
+  currentUptime_ = getUptime();
 
   Uint32 ticks = SDL_GetTicks();
   if (ticks - lastInfoRotateMs_ >= kInfoRotateMs) {

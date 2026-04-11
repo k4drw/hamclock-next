@@ -116,7 +116,7 @@ void LiveSpotPanel::render(SDL_Renderer *renderer) {
     curY += subtitleH_ + 1;
   }
 
-  // --- Band count grid: 2 columns × 6 rows ---
+  // --- Band count grid ---
   // Reserve space for footer
   int footerH = cellFontSize_ + 4;
   int gridBottom = y_ + height_ - footerH - pad;
@@ -124,9 +124,12 @@ void LiveSpotPanel::render(SDL_Renderer *renderer) {
   if (gridH < 10)
     return;
 
-  int rows = kNumBands / 2;
+  // Determine layout: 1 column if double-height (SidePanel full height ~332)
+  bool isDoubleHeight = (height_ > 300);
+  int cols = isDoubleHeight ? 1 : 2;
+  int rows = kNumBands / cols;
   int cellH = gridH / rows;
-  int colW = (width_ - 2 * pad) / 2;
+  int colW = (width_ - 2 * pad) / cols;
   int gap = 1; // pixel gap between cells
 
   // Cache grid geometry for onMouseUp hit-testing
@@ -134,6 +137,8 @@ void LiveSpotPanel::render(SDL_Renderer *renderer) {
   gridBottom_ = gridBottom;
   gridCellH_ = cellH;
   gridColW_ = colW;
+  gridRows_ = rows;
+  gridCols_ = cols;
   gridPad_ = pad;
 
   if (cellFontChanged) {
@@ -151,7 +156,7 @@ void LiveSpotPanel::render(SDL_Renderer *renderer) {
   }
 
   for (int i = 0; i < kNumBands; ++i) {
-    int col = i / rows; // 0 = left, 1 = right
+    int col = i / rows;
     int row = i % rows;
     int cx = x_ + pad + col * colW;
     int cy = curY + row * cellH;
@@ -382,8 +387,6 @@ bool LiveSpotPanel::onMouseUp(int mx, int my, Uint16 /*mod*/, int clicks) {
   if (gridCellH_ <= 0 || gridColW_ <= 0)
     return false;
 
-  int rows = kNumBands / 2;
-
   int relX = mx - (x_ + gridPad_);
   int relY = my - gridTop_;
   if (relX < 0 || relY < 0)
@@ -391,10 +394,10 @@ bool LiveSpotPanel::onMouseUp(int mx, int my, Uint16 /*mod*/, int clicks) {
 
   int col = relX / gridColW_;
   int row = relY / gridCellH_;
-  if (col < 0 || col > 1 || row < 0 || row >= rows)
+  if (col < 0 || col >= gridCols_ || row < 0 || row >= gridRows_)
     return false;
 
-  int bandIdx = col * rows + row;
+  int bandIdx = col * gridRows_ + row;
   if (bandIdx < 0 || bandIdx >= kNumBands)
     return false;
 
@@ -498,14 +501,15 @@ SDL_Rect LiveSpotPanel::getActionRect(const std::string &action) const {
       if (idx >= 0 && idx < kNumBands) {
         // Re-calculate cell position based on verified grid logic from render()
         // Grid is 2 columns x (kNumBands/2) rows
-        int rows = kNumBands / 2;
+        int cols = (height_ > 300) ? 1 : 2;
+        int rows = kNumBands / cols;
         int col = idx / rows;
         int row = idx % rows;
 
         // We need to know gridTop_ etc, which are cached in render()
         // If render hasn't run, these might be 0.
         int pad = 2; // Hardcoded pad from render
-        int colW = (width_ - 2 * pad) / 2;
+        int colW = (width_ - 2 * pad) / cols;
         // height of grid area roughly
         int footerH = 14; // approx
         int gH = (height_ - footerH - pad) - gridTop_;

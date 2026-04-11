@@ -150,6 +150,8 @@ private:
   };
   std::vector<CachedOntaSpot> spotCache_;
   void clearSpotCache();
+  void renderBandLegend(SDL_Renderer *renderer, int maxY);
 
+  int legendH_ = 0;
   static constexpr int MAX_VISIBLE_ROWS = 12; // Adjusted for ONTA panel
 };
