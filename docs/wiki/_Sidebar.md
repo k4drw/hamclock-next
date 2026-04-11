@@ -2,11 +2,13 @@
 
 - [Home](Home.md)
 - [Getting Started](Getting-Started.md)
+- [Building from Source](Building-from-Source.md)
 
 ## Using HamClock-Next
 
 - [Screen Layout](Layout.md)
 - [Widgets Reference](Widgets.md)
+- [Widget Setup Guide](Widget-Setup.md)
 - [Widget Gallery](Widget-Gallery.md)
 - [Map & Overlays](Map-and-Overlays.md)
 - [Pane Customization](Pane-Customization.md)

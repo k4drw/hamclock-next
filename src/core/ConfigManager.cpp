@@ -196,6 +196,23 @@ static void addFactoryPresets(AppConfig &config) {
     p.pane6Rotation = {"env_humidity"};
     config.presets.push_back(std::move(p));
   }
+  // Propagation Firehose preset
+  {
+    ConfigPreset p;
+    p.name = "Prop Firehose";
+    p.pane1Rotation = {"solar", "solar_storm", "solar_cycle", "ionosonde"};
+    p.pane2Rotation = {"solar_timeline", "sfi_trend", "noaa_spacewx", "tropo"};
+    p.pane3Rotation = {"aurora", "aurora_graph", "voacap_dedx", "drap"};
+    p.pane4Rotation = {"solar", "band_conditions", "ncdxf"};
+    p.pane5Rotation = {"de_info"};
+    p.pane6Rotation = {"dx_info"};
+    p.propRotation = {PropOverlayType::Muf, PropOverlayType::Reliability,
+                      PropOverlayType::Heatmap, PropOverlayType::Drap,
+                      PropOverlayType::Aurora};
+    p.propOverlay = PropOverlayType::Muf;
+    p.rotationIntervalS = 30;
+    config.presets.push_back(std::move(p));
+  }
 }
 
 bool ConfigManager::load(AppConfig &config) {
@@ -220,6 +237,8 @@ bool ConfigManager::load(AppConfig &config) {
     config.grid = id.value("grid", "");
     config.lat = id.value("lat", 0.0);
     config.lon = id.value("lon", 0.0);
+    config.defaultTzOffset = id.value("default_tz_offset", 0);
+    config.defaultTzLabel = id.value("default_tz_label", "UTC");
   }
 
   // Appearance
@@ -234,6 +253,7 @@ bool ConfigManager::load(AppConfig &config) {
       config.callsignBgColor = hexToColor(hexBgColor, {0, 0, 0, 0});
     }
     config.theme = ap.value("theme", "default");
+    config.propColormap = ap.value("prop_colormap", "muted");
     config.mapNightLights = ap.value("map_night_lights", true);
     config.useMetric = ap.value("use_metric", true);
     config.projection = ap.value("projection", "equirectangular");
@@ -251,6 +271,14 @@ bool ConfigManager::load(AppConfig &config) {
           showMuf ? PropOverlayType::Muf : PropOverlayType::None;
     }
 
+    if (ap.contains("prop_rotation") && ap["prop_rotation"].is_array()) {
+      config.propRotation.clear();
+      for (auto &item : ap["prop_rotation"]) {
+        if (item.is_string())
+          config.propRotation.push_back(propOverlayFromStr(item.get<std::string>()));
+      }
+    }
+
     if (ap.contains("weather_overlay")) {
       config.weatherOverlay =
           weatherOverlayFromStr(ap.value("weather_overlay", "none"));
@@ -261,6 +289,7 @@ bool ConfigManager::load(AppConfig &config) {
     config.propPower = ap.value("prop_power", 100);
     config.propToa = ap.value("prop_toa", 3.0f);
     config.propPath = ap.value("prop_path", 0);
+    config.propAntGain = ap.value("prop_ant_gain", 3);
     config.mufRtOpacity = ap.value("muf_rt_opacity", 40);
     config.showSatTrack = ap.value("show_sat_track", true);
     config.showBeacons = ap.value("show_beacons", true);
@@ -315,9 +344,10 @@ bool ConfigManager::load(AppConfig &config) {
   if (json.contains("big_clock")) {
     auto &bc = json["big_clock"];
     config.bigClockDigital  = bc.value("digital",  true);
-    config.bigClock12h      = bc.value("twelve_h", false);
-    config.bigClockUtc      = bc.value("utc",       false);
-    config.bigClockShowSec  = bc.value("show_sec",  true);
+    config.bigClock12h = bc.value("12h", false);
+    config.bigClockUtc = bc.value("utc", false);
+    config.bigClockUseDefaultTz = bc.value("use_default_tz", false);
+    config.bigClockShowSec = bc.value("show_sec", true);
     config.bigClockShowDate = bc.value("show_date", true);
     config.bigClockHue      = static_cast<uint8_t>(bc.value("hue", 85));
   }
@@ -360,9 +390,8 @@ bool ConfigManager::load(AppConfig &config) {
     config.corsProxyUrl = n.value("cors_proxy_url", config.corsProxyUrl);
   }
 
-  // Color Overrides
+    // Color Overrides
   if (json.contains("color_overrides") && json["color_overrides"].is_object()) {
-    config.colorOverrides.clear();
     for (auto &el : json["color_overrides"].items()) {
       if (el.value().is_string()) {
         config.colorOverrides[el.key()] =
@@ -370,6 +399,18 @@ bool ConfigManager::load(AppConfig &config) {
       }
     }
   }
+
+  // Ensure default custom propagation colors exist
+  if (config.colorOverrides.find("prop_color_0") == config.colorOverrides.end())
+    config.colorOverrides["prop_color_0"] = {150, 0, 0, 255};
+  if (config.colorOverrides.find("prop_color_25") == config.colorOverrides.end())
+    config.colorOverrides["prop_color_25"] = {255, 150, 0, 255};
+  if (config.colorOverrides.find("prop_color_50") == config.colorOverrides.end())
+    config.colorOverrides["prop_color_50"] = {255, 255, 0, 255};
+  if (config.colorOverrides.find("prop_color_75") == config.colorOverrides.end())
+    config.colorOverrides["prop_color_75"] = {0, 255, 255, 255};
+  if (config.colorOverrides.find("prop_color_100") == config.colorOverrides.end())
+    config.colorOverrides["prop_color_100"] = {255, 255, 255, 255};
 
   // Local Data Hub
   if (json.contains("hub")) {
@@ -426,6 +467,15 @@ bool ConfigManager::load(AppConfig &config) {
     loadRotation("pane4_rotation", "pane4_widget", config.pane4Rotation, "band_conditions");
     loadRotation("pane5_rotation", "pane5_widget", config.pane5Rotation, "de_info");
     loadRotation("pane6_rotation", "pane6_widget", config.pane6Rotation, "dx_info", /*allowEmpty=*/true);
+    
+    if (pa.contains("prop_rotation") && pa["prop_rotation"].is_array()) {
+      config.propRotation.clear();
+      for (auto &item : pa["prop_rotation"]) {
+        if (item.is_string())
+          config.propRotation.push_back(propOverlayFromStr(item.get<std::string>()));
+      }
+    }
+
     config.rotationIntervalS = pa.value("rotation_interval_s", 30);
     config.syncRotation = pa.value("sync_rotation", false);
     if (pa.contains("watchlist") && pa["watchlist"].is_array()) {
@@ -509,8 +559,8 @@ bool ConfigManager::load(AppConfig &config) {
   // Marine
   if (json.contains("marine")) {
     auto &m = json["marine"];
-    config.marineStation = m.value("station", "8722670");
-    config.marineBuoy = m.value("buoy", "41114");
+    config.marineStation = m.value("station", "");
+    config.marineBuoy = m.value("buoy", "");
   }
 
   // Power
@@ -568,6 +618,11 @@ bool ConfigManager::load(AppConfig &config) {
       loadPresetRotation(jp, "pane6_rotation", p.pane6Rotation);
       p.rotationIntervalS = jp.value("rotation_interval_s", 30);
       p.propOverlay  = propOverlayFromStr(jp.value("prop_overlay", "none"));
+      if (jp.contains("prop_rotation") && jp["prop_rotation"].is_array()) {
+        for (auto &e : jp["prop_rotation"])
+          if (e.is_string())
+            p.propRotation.push_back(propOverlayFromStr(e.get<std::string>()));
+      }
       p.weatherOverlay = weatherOverlayFromStr(jp.value("weather_overlay", "none"));
       p.mapStyle     = jp.value("map_style", "nasa");
       p.mapNightLights = jp.value("map_night_lights", true);
@@ -578,8 +633,25 @@ bool ConfigManager::load(AppConfig &config) {
       p.propPower    = jp.value("prop_power", 100);
       p.propToa      = jp.value("prop_toa", 3.0f);
       p.propPath     = jp.value("prop_path", 0);
+      p.propAntGain  = jp.value("prop_ant_gain", 3);
       config.presets.push_back(std::move(p));
     }
+  }
+
+  // World Clock
+  config.worldClocks.clear();
+  if (json.contains("world_clocks") && json["world_clocks"].is_array()) {
+    for (auto &item : json["world_clocks"]) {
+      WorldClockEntry entry;
+      entry.label = item.value("label", "");
+      entry.offsetMinutes = item.value("offset_minutes", 0);
+      entry.active = item.value("active", false);
+      config.worldClocks.push_back(entry);
+    }
+  }
+  // Ensure we always have 4 entries
+  while (config.worldClocks.size() < 4) {
+    config.worldClocks.push_back({"", 0, false});
   }
 
   // Seed factory presets on first use
@@ -614,11 +686,14 @@ bool ConfigManager::save(const AppConfig &config) {
   json["identity"]["grid"] = config.grid;
   json["identity"]["lat"] = config.lat;
   json["identity"]["lon"] = config.lon;
+  json["identity"]["default_tz_offset"] = config.defaultTzOffset;
+  json["identity"]["default_tz_label"] = config.defaultTzLabel;
 
   json["appearance"]["callsign_color"] = colorToHex(config.callsignColor);
   if (config.callsignBgColor.a > 0)
     json["appearance"]["callsign_bg_color"] = colorToHex(config.callsignBgColor);
   json["appearance"]["theme"] = config.theme;
+  json["appearance"]["prop_colormap"] = config.propColormap;
   json["appearance"]["map_night_lights"] = config.mapNightLights;
   json["appearance"]["use_metric"] = config.useMetric;
   json["appearance"]["projection"] = config.projection;
@@ -626,12 +701,19 @@ bool ConfigManager::save(const AppConfig &config) {
   json["appearance"]["grid_type"] = config.gridType;
   json["appearance"]["center_map_on_de"] = config.centerMapOnDe;
   json["appearance"]["prop_overlay"] = propOverlayToStr(config.propOverlay);
+  {
+    auto arr = nlohmann::json::array();
+    for (auto t : config.propRotation)
+      arr.push_back(propOverlayToStr(t));
+    json["appearance"]["prop_rotation"] = arr;
+  }
   json["appearance"]["weather_overlay"] = weatherOverlayToStr(config.weatherOverlay);
   json["appearance"]["prop_band"] = config.propBand;
   json["appearance"]["prop_mode"] = config.propMode;
   json["appearance"]["prop_power"] = config.propPower;
   json["appearance"]["prop_toa"] = config.propToa;
   json["appearance"]["prop_path"] = config.propPath;
+  json["appearance"]["prop_ant_gain"] = config.propAntGain;
   // Legacy compat
   json["appearance"]["show_muf_rt"] =
       (config.propOverlay == PropOverlayType::Muf);
@@ -721,6 +803,12 @@ bool ConfigManager::save(const AppConfig &config) {
   saveRotation("pane5_rotation", config.pane5Rotation);
   saveRotation("pane6_rotation", config.pane6Rotation);
   json["panes"]["rotation_interval_s"] = config.rotationIntervalS;
+  {
+    auto arr = nlohmann::json::array();
+    for (auto t : config.propRotation)
+      arr.push_back(propOverlayToStr(t));
+    json["panes"]["prop_rotation"] = arr;
+  }
   json["panes"]["sync_rotation"] = config.syncRotation;
   {
     auto wl = nlohmann::json::array();
@@ -762,11 +850,23 @@ bool ConfigManager::save(const AppConfig &config) {
   json["aux_clock"]["star_mode"]  = config.auxClockStarMode;
 
   json["big_clock"]["digital"]   = config.bigClockDigital;
-  json["big_clock"]["twelve_h"]  = config.bigClock12h;
-  json["big_clock"]["utc"]       = config.bigClockUtc;
-  json["big_clock"]["show_sec"]  = config.bigClockShowSec;
+  json["big_clock"]["12h"] = config.bigClock12h;
+  json["big_clock"]["utc"] = config.bigClockUtc;
+  json["big_clock"]["use_default_tz"] = config.bigClockUseDefaultTz;
+  json["big_clock"]["show_sec"] = config.bigClockShowSec;
   json["big_clock"]["show_date"] = config.bigClockShowDate;
   json["big_clock"]["hue"]       = config.bigClockHue;
+  
+  // World Clock
+  auto wcArr = nlohmann::json::array();
+  for (const auto &entry : config.worldClocks) {
+    nlohmann::json item;
+    item["label"] = entry.label;
+    item["offset_minutes"] = entry.offsetMinutes;
+    item["active"] = entry.active;
+    wcArr.push_back(item);
+  }
+  json["world_clocks"] = wcArr;
 
   json["rss"]["enabled"] = config.rssEnabled;
   json["activity"]["onta_filter"] = config.ontaFilter;
@@ -806,6 +906,12 @@ bool ConfigManager::save(const AppConfig &config) {
       jp["pane6_rotation"]     = savePresetRotation(p.pane6Rotation);
       jp["rotation_interval_s"] = p.rotationIntervalS;
       jp["prop_overlay"]       = propOverlayToStr(p.propOverlay);
+      {
+        auto arr = nlohmann::json::array();
+        for (auto t : p.propRotation)
+          arr.push_back(propOverlayToStr(t));
+        jp["prop_rotation"] = arr;
+      }
       jp["weather_overlay"]    = weatherOverlayToStr(p.weatherOverlay);
       jp["map_style"]          = p.mapStyle;
       jp["map_night_lights"]   = p.mapNightLights;
@@ -816,6 +922,7 @@ bool ConfigManager::save(const AppConfig &config) {
       jp["prop_power"]         = p.propPower;
       jp["prop_toa"]           = p.propToa;
       jp["prop_path"]          = p.propPath;
+      jp["prop_ant_gain"]      = p.propAntGain;
       presetsArr.push_back(jp);
     }
     json["presets"] = presetsArr;
@@ -890,6 +997,7 @@ void ConfigManager::applyPreset(AppConfig &config, int index) {
   config.pane6Rotation = p.pane6Rotation;
   config.rotationIntervalS = p.rotationIntervalS;
   config.propOverlay = p.propOverlay;
+  config.propRotation = p.propRotation;
   config.weatherOverlay = p.weatherOverlay;
   config.mapStyle = p.mapStyle;
   config.mapNightLights = p.mapNightLights;
@@ -900,6 +1008,7 @@ void ConfigManager::applyPreset(AppConfig &config, int index) {
   config.propPower = p.propPower;
   config.propToa = p.propToa;
   config.propPath = p.propPath;
+  config.propAntGain = p.propAntGain;
 }
 
 void ConfigManager::savePreset(AppConfig &config, const std::string &name) {
@@ -913,6 +1022,7 @@ void ConfigManager::savePreset(AppConfig &config, const std::string &name) {
   p.pane6Rotation = config.pane6Rotation;
   p.rotationIntervalS = config.rotationIntervalS;
   p.propOverlay = config.propOverlay;
+  p.propRotation = config.propRotation;
   p.weatherOverlay = config.weatherOverlay;
   p.mapStyle = config.mapStyle;
   p.mapNightLights = config.mapNightLights;
@@ -923,6 +1033,7 @@ void ConfigManager::savePreset(AppConfig &config, const std::string &name) {
   p.propPower = config.propPower;
   p.propToa = config.propToa;
   p.propPath = config.propPath;
+  p.propAntGain = config.propAntGain;
   config.presets.push_back(std::move(p));
 }
 

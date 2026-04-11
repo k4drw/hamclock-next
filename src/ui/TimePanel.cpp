@@ -24,29 +24,24 @@ namespace {
 
 static constexpr Uint32 kInfoRotateMs = 3000;
 
-std::string getSystemUptime() {
-#ifdef _WIN32
-  uint64_t ms = GetTickCount64();
-  double sec = ms / 1000.0;
-#else
-  std::FILE *f = std::fopen("/proc/uptime", "r");
-  if (!f)
-    return "Up ?";
-  double sec = 0;
-  if (std::fscanf(f, "%lf", &sec) != 1)
-    sec = 0;
-  std::fclose(f);
-#endif
-  int days = static_cast<int>(sec / 86400);
-  int hours = static_cast<int>(sec / 3600) % 24;
-  int mins = static_cast<int>(sec / 60) % 60;
+std::string getUptime() {
+  static const auto startTime = std::chrono::steady_clock::now();
+  auto seconds = std::chrono::duration_cast<std::chrono::seconds>(
+                     std::chrono::steady_clock::now() - startTime)
+                     .count();
+  int days = static_cast<int>(seconds / 86400);
+  int hours = static_cast<int>(seconds / 3600) % 24;
+  int mins = static_cast<int>(seconds / 60) % 60;
+  int secs = seconds % 60;
   char buf[32];
   if (days > 0)
     std::snprintf(buf, sizeof(buf), "Up  %dd %dh", days, hours);
   else if (hours > 0)
     std::snprintf(buf, sizeof(buf), "Up  %dh %dm", hours, mins);
-  else
+  else if (mins > 0)
     std::snprintf(buf, sizeof(buf), "Up  %dm", mins);
+  else
+    std::snprintf(buf, sizeof(buf), "Up  %ds", secs);
   return buf;
 }
 
@@ -108,9 +103,9 @@ std::string getLocalIP() {
 } // namespace
 
 TimePanel::TimePanel(int x, int y, int w, int h, FontManager &fontMgr,
-                     TextureManager &texMgr, const std::string &callsign)
-    : Widget(x, y, w, h), fontMgr_(fontMgr), texMgr_(texMgr),
-      callsign_(callsign) {}
+                     TextureManager &texMgr, AppConfig &config)
+    : Widget(x, y, w, h), fontMgr_(fontMgr), texMgr_(texMgr), config_(config),
+      callsign_(config.callsign) {}
 
 void TimePanel::destroyCache() {
   MemoryMonitor::getInstance().destroyTexture(callTex_);
@@ -123,13 +118,19 @@ void TimePanel::destroyCache() {
 void TimePanel::update() {
   auto now = std::chrono::system_clock::now();
   std::time_t t = std::chrono::system_clock::to_time_t(now);
-  std::tm utc{};
-  Astronomy::portable_gmtime(&t, &utc);
+  std::tm display_tm{};
+
+  if (config_.defaultTzOffset == 999) {
+    Astronomy::portable_localtime(&t, &display_tm);
+  } else {
+    std::time_t offset_t = t + static_cast<std::time_t>(config_.defaultTzOffset) * 3600LL;
+    Astronomy::portable_gmtime(&offset_t, &display_tm);
+  }
 
   char buf[32];
-  currentHM_ = TimeUtils::hm(utc.tm_hour, utc.tm_min);
+  currentHM_ = TimeUtils::hm(display_tm.tm_hour, display_tm.tm_min);
 
-  std::snprintf(buf, sizeof(buf), "%02d", utc.tm_sec);
+  std::snprintf(buf, sizeof(buf), "%02d", display_tm.tm_sec);
   currentSec_ = buf;
 
   static constexpr const char *kDays[] = {"Sun", "Mon", "Tue", "Wed",
@@ -137,12 +138,12 @@ void TimePanel::update() {
   static constexpr const char *kMonths[] = {"Jan", "Feb", "Mar", "Apr",
                                             "May", "Jun", "Jul", "Aug",
                                             "Sep", "Oct", "Nov", "Dec"};
-  std::snprintf(buf, sizeof(buf), "%s, %d %s %04d", kDays[utc.tm_wday],
-                utc.tm_mday, kMonths[utc.tm_mon], 1900 + utc.tm_year);
+  std::snprintf(buf, sizeof(buf), "%s, %d %s %04d", kDays[display_tm.tm_wday],
+                display_tm.tm_mday, kMonths[display_tm.tm_mon], 1900 + display_tm.tm_year);
   currentDate_ = buf;
 
   // System info: uptime every second, rotating values every 3 seconds
-  currentUptime_ = getSystemUptime();
+  currentUptime_ = getUptime();
 
   Uint32 ticks = SDL_GetTicks();
   if (ticks - lastInfoRotateMs_ >= kInfoRotateMs) {
@@ -207,8 +208,8 @@ void TimePanel::render(SDL_Renderer *renderer) {
   // --- Gear icon + rotation transport controls (bottom-right corner) ---
   if (!editing_) {
     float gcx = gearRect_.x + gearRect_.w / 2.0f;
-    float gcy = gearRect_.y + gearRect_.h / 2.0f;
-    float r = gearSize_ / 2.0f;
+    float gcy = gearRect_.y + gearRect_.h / 1.5f;
+    float r = gearSize_ / 2.5f;
     SDL_Color gearColor = themes.textDim;
     SDL_Color bgColor = themes.bg;
     RenderUtils::drawGear(renderer, gcx, gcy, r, gearColor, bgColor);

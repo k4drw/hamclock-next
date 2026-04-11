@@ -43,15 +43,16 @@ void SetupScreen::renderTabRig(SDL_Renderer *renderer, int cx, int pad,
 
   // Auto-tune Toggle
   {
-    SDL_Rect r = {fieldX, y, 20, 20};
-    toggleRect_ = r;
+    int labelW = fontMgr_.getLogicalWidth("Auto-Tune on Spot click", cat->ptSize(FontStyle::SmallRegular));
+    toggleRect_ = {fieldX, y, 30 + labelW, 20};
+    SDL_Rect box = {fieldX, y, 20, 20};
     SDL_SetRenderDrawColor(renderer, themes.rowStripe1.r, themes.rowStripe1.g, themes.rowStripe1.b, 255);
-    SDL_RenderFillRect(renderer, &r);
+    SDL_RenderFillRect(renderer, &box);
     SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
-    SDL_RenderDrawRect(renderer, &r);
+    SDL_RenderDrawRect(renderer, &box);
     if (rigAutoTune_) {
       SDL_SetRenderDrawColor(renderer, themes.success.r, themes.success.g, themes.success.b, 255);
-      SDL_Rect check = {r.x + 4, r.y + 4, 12, 12};
+      SDL_Rect check = {fieldX + 4, y + 4, 12, 12};
       SDL_RenderFillRect(renderer, &check);
     }
     cat->drawText(renderer, "Auto-Tune on Spot click", fieldX + 30, y + 10,
@@ -87,15 +88,16 @@ void SetupScreen::renderTabRig(SDL_Renderer *renderer, int cx, int pad,
   // Auto-track and Upover Toggles
   {
     // Auto-track
-    SDL_Rect r1 = {rightX, y, 20, 20};
-    rotatorAutoTrackRect_ = r1;
+    int atLabelW = fontMgr_.getLogicalWidth("Auto-track Satellite", cat->ptSize(FontStyle::SmallRegular));
+    rotatorAutoTrackRect_ = {rightX, y, 30 + atLabelW, 20};
+    SDL_Rect atBox = {rightX, y, 20, 20};
     SDL_SetRenderDrawColor(renderer, themes.rowStripe1.r, themes.rowStripe1.g, themes.rowStripe1.b, 255);
-    SDL_RenderFillRect(renderer, &r1);
+    SDL_RenderFillRect(renderer, &atBox);
     SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
-    SDL_RenderDrawRect(renderer, &r1);
+    SDL_RenderDrawRect(renderer, &atBox);
     if (rotatorAutoTrack_) {
       SDL_SetRenderDrawColor(renderer, themes.success.r, themes.success.g, themes.success.b, 255);
-      SDL_Rect check = {r1.x + 4, r1.y + 4, 12, 12};
+      SDL_Rect check = {rightX + 4, y + 4, 12, 12};
       SDL_RenderFillRect(renderer, &check);
     }
     cat->drawText(renderer, "Auto-track Satellite", rightX + 30, y + 10, themes.text,
@@ -103,15 +105,16 @@ void SetupScreen::renderTabRig(SDL_Renderer *renderer, int cx, int pad,
     y += 24 + vSpace;
 
     // Upover
-    SDL_Rect r2 = {rightX, y, 20, 20};
-    rotatorUpoverRect_ = r2;
+    int uoLabelW = fontMgr_.getLogicalWidth("Upover Mode (Az flip)", cat->ptSize(FontStyle::SmallRegular));
+    rotatorUpoverRect_ = {rightX, y, 30 + uoLabelW, 20};
+    SDL_Rect uoBox = {rightX, y, 20, 20};
     SDL_SetRenderDrawColor(renderer, themes.rowStripe1.r, themes.rowStripe1.g, themes.rowStripe1.b, 255);
-    SDL_RenderFillRect(renderer, &r2);
+    SDL_RenderFillRect(renderer, &uoBox);
     SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
-    SDL_RenderDrawRect(renderer, &r2);
+    SDL_RenderDrawRect(renderer, &uoBox);
     if (rotatorUpover_) {
       SDL_SetRenderDrawColor(renderer, themes.success.r, themes.success.g, themes.success.b, 255);
-      SDL_Rect check = {r2.x + 4, r2.y + 4, 12, 12};
+      SDL_Rect check = {rightX + 4, y + 4, 12, 12};
       SDL_RenderFillRect(renderer, &check);
     }
     cat->drawText(renderer, "Upover Mode (Az flip)", rightX + 30, y + 10, themes.text,

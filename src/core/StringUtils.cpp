@@ -60,6 +60,19 @@ int safe_stoi(const std::string &s) {
   return 0;
 }
 
+long long safe_stoll(const std::string &s) {
+  if (s.empty()) {
+    return 0;
+  }
+  long long value = 0;
+  std::string_view sv(s);
+  auto [ptr, ec] = std::from_chars(sv.data(), sv.data() + sv.size(), value);
+  if (ec == std::errc()) {
+    return value;
+  }
+  return 0;
+}
+
 std::string trim(const std::string &s) {
   auto start = s.find_first_not_of(" \t\n\r");
   if (start == std::string::npos)

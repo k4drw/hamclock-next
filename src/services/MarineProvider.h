@@ -6,9 +6,12 @@
 #include <memory>
 #include <string>
 
+struct HamClockState;
+
 class MarineProvider : public ProviderBase {
 public:
-  MarineProvider(NetworkManager &net, std::shared_ptr<MarineStore> store);
+  MarineProvider(NetworkManager &net, std::shared_ptr<MarineStore> store,
+                 struct HamClockState *state);
 
   // Fetch tides for the configured station and buoy observations.
   // tideStation: NOAA station ID (e.g. "8722670" for Lake Worth, FL).
@@ -29,4 +32,5 @@ private:
 
   NetworkManager &net_;
   std::shared_ptr<MarineStore> store_;
+  struct HamClockState *state_;
 };

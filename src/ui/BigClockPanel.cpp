@@ -91,9 +91,17 @@ void BigClockPanel::onResize(int x, int y, int w, int h) {
 void BigClockPanel::renderDigital(SDL_Renderer *renderer) {
   auto now_c = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
   struct tm tmbuf;
-  struct tm *tp = config_.bigClockUtc
-                      ? gmtime_r(&now_c, &tmbuf)
-                      : localtime_r(&now_c, &tmbuf);
+  struct tm *tp;
+  if (config_.bigClockUseDefaultTz) {
+    if (config_.defaultTzOffset == 999) {
+      tp = localtime_r(&now_c, &tmbuf);
+    } else {
+      std::time_t tzTime = now_c + (config_.defaultTzOffset * 3600);
+      tp = gmtime_r(&tzTime, &tmbuf);
+    }
+  } else {
+    tp = config_.bigClockUtc ? gmtime_r(&now_c, &tmbuf) : localtime_r(&now_c, &tmbuf);
+  }
   if (!tp) return;
 
   SDL_Color clockColor = hueToColor(config_.bigClockHue);
@@ -169,9 +177,17 @@ void BigClockPanel::renderDigital(SDL_Renderer *renderer) {
 void BigClockPanel::renderAnalog(SDL_Renderer *renderer) {
   std::time_t now_c = std::time(nullptr);
   struct tm tmbuf;
-  struct tm *tp = config_.bigClockUtc
-                      ? gmtime_r(&now_c, &tmbuf)
-                      : localtime_r(&now_c, &tmbuf);
+  struct tm *tp;
+  if (config_.bigClockUseDefaultTz) {
+    if (config_.defaultTzOffset == 999) {
+      tp = localtime_r(&now_c, &tmbuf);
+    } else {
+      std::time_t tzTime = now_c + (config_.defaultTzOffset * 3600);
+      tp = gmtime_r(&tzTime, &tmbuf);
+    }
+  } else {
+    tp = config_.bigClockUtc ? gmtime_r(&now_c, &tmbuf) : localtime_r(&now_c, &tmbuf);
+  }
   if (!tp) return;
 
   SDL_Color clockColor = hueToColor(config_.bigClockHue);
@@ -382,11 +398,12 @@ void BigClockPanel::renderModalInternal(SDL_Renderer *renderer) {
       "Digital (off = Analog)",
       "12-hour format",
       "UTC time",
+      "Use Default TZ",
       "Show seconds",
       "Show date",
   };
   bool *tmpFlags[kNumOptions] = {
-      &tmpDigital_, &tmp12h_, &tmpUtc_, &tmpShowSec_, &tmpShowDate_
+      &tmpDigital_, &tmp12h_, &tmpUtc_, &tmpUseDefaultTz_, &tmpShowSec_, &tmpShowDate_
   };
 
   for (int i = 0; i < kNumOptions; ++i) {
@@ -469,6 +486,7 @@ bool BigClockPanel::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
     tmpDigital_  = config_.bigClockDigital;
     tmp12h_      = config_.bigClock12h;
     tmpUtc_      = config_.bigClockUtc;
+    tmpUseDefaultTz_ = config_.bigClockUseDefaultTz;
     tmpShowSec_  = config_.bigClockShowSec;
     tmpShowDate_ = config_.bigClockShowDate;
     tmpHue_      = config_.bigClockHue;
@@ -484,6 +502,7 @@ bool BigClockPanel::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
     config_.bigClockDigital  = tmpDigital_;
     config_.bigClock12h      = tmp12h_;
     config_.bigClockUtc      = tmpUtc_;
+    config_.bigClockUseDefaultTz = tmpUseDefaultTz_;
     config_.bigClockShowSec  = tmpShowSec_;
     config_.bigClockShowDate = tmpShowDate_;
     config_.bigClockHue      = tmpHue_;
@@ -499,7 +518,7 @@ bool BigClockPanel::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
   }
 
   bool *tmpFlags[kNumOptions] = {
-      &tmpDigital_, &tmp12h_, &tmpUtc_, &tmpShowSec_, &tmpShowDate_
+      &tmpDigital_, &tmp12h_, &tmpUtc_, &tmpUseDefaultTz_, &tmpShowSec_, &tmpShowDate_
   };
   for (int i = 0; i < kNumOptions; ++i) {
     if (pointInRect(mx, my, optRects_[i])) {

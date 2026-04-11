@@ -10,8 +10,10 @@
 #include "WidgetRegistry.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstdio>
+#include <ctime>
 
 DXInfo::DXInfo(int x, int y, int w, int h, FontManager &fontMgr,
                std::shared_ptr<HamClockState> state,
@@ -41,6 +43,21 @@ void DXInfo::update() {
     for (int i = 3; i < kNumLines; ++i)
       lineText_[i].clear();
     return;
+  }
+
+  // DX local time (line 9) — shown once async ZoneDetect lookup completes
+  if (state_->dxTzValid) {
+    auto now2 = std::chrono::system_clock::now();
+    std::time_t t2 = std::chrono::system_clock::to_time_t(now2);
+    std::time_t dxT = t2 + static_cast<std::time_t>(state_->dxTzOffset * 3600LL);
+    struct tm dxTm{};
+    Astronomy::portable_gmtime(&dxT, &dxTm);
+    char tbuf[32];
+    std::snprintf(tbuf, sizeof(tbuf), "%02d:%02d UTC%+d",
+                  dxTm.tm_hour, dxTm.tm_min, state_->dxTzOffset);
+    lineText_[9] = tbuf;
+  } else {
+    lineText_[9].clear();
   }
 
   if (!state_->dxCallsign.empty()) {
@@ -136,6 +153,7 @@ void DXInfo::render(SDL_Renderer *renderer) {
       {0, 255, 128, 255},   // Grid (panel-driven) green
       {0, 255, 0, 255},     // Weather 1 (Green)
       {0, 255, 0, 255},     // Weather 2 (Green)
+      {180, 130, 255, 255}, // DX local time — light purple
   };
 
   // Pane Title Label

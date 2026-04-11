@@ -22,6 +22,7 @@ public:
   bool requiresConfigKey() const override { return false; }
 
   void update() override;
+  bool onMouseWheel(int scrollY) override;
 
 protected:
   void renderRowText(SDL_Renderer *renderer, int index, int rx, int ry,
@@ -32,6 +33,10 @@ private:
   std::shared_ptr<ActivityDataStore> store_;
   std::chrono::system_clock::time_point lastUpdate_{};
   uint32_t lastFetch_ = 0;
+
+  std::vector<std::string> allRows_;
+  int scrollOffset_ = 0;
+  static constexpr int MAX_VISIBLE_ROWS = 12;
 };
 
 class ONTAPanel : public ListPanel {
@@ -47,6 +52,7 @@ public:
   void render(SDL_Renderer *renderer) override;
   void onResize(int x, int y, int w, int h) override;
   bool onMouseUp(int mx, int my, Uint16 mod, int clicks) override;
+  bool onMouseWheel(int scrollY) override;
 
   // Set initial filter from persisted config value ("all", "pota", "sota").
   void setFilter(const std::string &f);
@@ -123,7 +129,9 @@ private:
   std::function<void(int)> onMaxDistChanged_;
   std::function<void(const ONTASpot &)> onSpotActivated_;
   std::function<void()> onSpotDeactivated_;
+  std::vector<ONTASpot> allSpots_;
   std::vector<ONTASpot> currentSpots_;
+  int scrollOffset_ = 0;
 
   struct CachedOntaSpot {
     SDL_Texture *modeTex = nullptr;
@@ -142,6 +150,8 @@ private:
   };
   std::vector<CachedOntaSpot> spotCache_;
   void clearSpotCache();
+  void renderBandLegend(SDL_Renderer *renderer, int maxY);
 
+  int legendH_ = 0;
   static constexpr int MAX_VISIBLE_ROWS = 12; // Adjusted for ONTA panel
 };

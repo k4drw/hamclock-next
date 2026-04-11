@@ -418,28 +418,64 @@ void SpaceWeatherPanel::onResize(int x, int y, int w, int h) {
 }
 
 void SpaceWeatherPanel::onMouseMove(int mx, int my) {
+  tooltip_.visible = false;
+
   bool isNarrow = (width_ < 110);
+  int numCols = isNarrow ? 1 : 2;
   int numRows = isNarrow ? 4 : 2;
   int titleH = 20;
   bool showSparkline =
       (!isNarrow && xrayStore_ && !sparklineHistory_.empty() && height_ >= 80);
   int sparklineH = showSparkline ? 22 : 0;
+  int cellW = width_ / numCols;
   int cellH = (height_ - titleH - sparklineH - 10) / numRows;
 
+  // 1. Check label tooltips (SFI and K)
+  int startIdx = currentPage_ * kItemsPerPage;
+  int pad = std::max(1, static_cast<int>(cellH * 0.05f));
+  for (int i = 0; i < kItemsPerPage; ++i) {
+    int itemIdx = startIdx + i;
+    if (itemIdx >= kNumItems)
+      continue;
+    if (itemIdx != 0 && itemIdx != 3) // Only SFI and K
+      continue;
+
+    int col = i % numCols;
+    int row = i / numCols;
+    int cellX = x_ + col * cellW;
+    int cellY = y_ + titleH + row * cellH;
+
+    int lx = cellX + (cellW - items_[itemIdx].labelW) / 2;
+    int ly = cellY + pad;
+    SDL_Rect lblRect = {lx, ly, items_[itemIdx].labelW, items_[itemIdx].labelH};
+
+    if (mx >= lblRect.x && mx <= lblRect.x + lblRect.w && my >= lblRect.y &&
+        my <= lblRect.y + lblRect.h) {
+      if (itemIdx == 0) {
+        tooltip_.text = "Solar Flux Index: Higher improves 15m/10m bands";
+      } else {
+        tooltip_.text = "Geomag activity: Higher (storms) degrades prop.";
+      }
+      tooltip_.x = mx;
+      tooltip_.y = my;
+      tooltip_.visible = true;
+      tooltip_.timestamp = SDL_GetTicks();
+      return;
+    }
+  }
+
+  // 2. Check Sparkline tooltip
   if (!showSparkline || sparklineHistory_.empty()) {
-    tooltip_.visible = false;
     return;
   }
 
-  // Sparkline area (must match render() logic)
-  const int pad = 4;
-  const int slX = x_ + pad;
-  const int slW = width_ - 2 * pad;
+  const int slPad = 4;
+  const int slX = x_ + slPad;
+  const int slW = width_ - 2 * slPad;
   const int slY = y_ + titleH + numRows * cellH + 2;
   const int slH = sparklineH - 4;
 
   if (mx < slX || mx > slX + slW || my < slY || my > slY + slH) {
-    tooltip_.visible = false;
     return;
   }
 
@@ -469,7 +505,6 @@ void SpaceWeatherPanel::onMouseMove(int mx, int my) {
                        now - bestPoint->timestamp)
                        .count();
     char buf[64];
-    // Convert flux to Scientific notation
     if (ageMins < 5) {
       std::snprintf(buf, sizeof(buf), "%.1e W/m2 (Now)", bestPoint->flux);
     } else {
@@ -482,8 +517,6 @@ void SpaceWeatherPanel::onMouseMove(int mx, int my) {
     tooltip_.y = my;
     tooltip_.visible = true;
     tooltip_.timestamp = SDL_GetTicks();
-  } else {
-    tooltip_.visible = false;
   }
 }
 

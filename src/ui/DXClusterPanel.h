@@ -104,9 +104,10 @@ private:
   void clearSpotCache();
 
   int scrollOffset_ = 0;
+  int lastScrollOffset_ = -1;
+  std::string lastSelectionKey_;
   static constexpr int MAX_VISIBLE_ROWS = 15;
 
-  int contentY_ = 0;  // Y where spot rows begin — set in render(), used in onMouseUp()
-  int rowH_ = 14;     // Row height matching render — set in render(), used in onMouseUp()
   int legendH_ = 0;
+  int activeBandFilter_ = -1;
 };

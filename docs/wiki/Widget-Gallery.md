@@ -105,7 +105,7 @@ Widgets expanded to fill the map area (via the maximize button on each pane).
 | **Aurora Graph (maximized)**<br>![aurora_graph](images/widgets/aurora_graph_maximized.png) | **Aurora (maximized)**<br>![aurora](images/widgets/aurora_maximized.png) |
 | | |
 |---|---|
-| **Band Cond (maximized)**<br>![band_conditions](images/widgets/band_conditions_maximized.png) | **DX Cluster (maximized)**<br>![dx_cluster](images/widgets/dx_cluster_maximized.png) |
+| **Band Cond (maximized)**<br>![band_conditions](images/widgets/band_conditions_maximized.png) | **Big Clock (maximized)**<br>![big_clock](images/widgets/big_clock_maximized.png) |
 | | |
 |---|---|
 | **Live Spots (maximized)**<br>![live_spots](images/widgets/live_spots_maximized.png) | **Solar (maximized)**<br>![solar](images/widgets/solar_maximized.png) |

@@ -40,20 +40,44 @@ void DXPedPanel::update() {
 
   auto data = store_->get();
   if (data.lastUpdated != lastUpdate_) {
-    std::vector<std::string> rows;
+    allRows_.clear();
     for (const auto &de : data.dxpeds) {
       std::stringstream ss;
       ss << de.call << '\t' << de.location;
-      rows.push_back(ss.str());
-      if (rows.size() >= 10)
-        break;
+      allRows_.push_back(ss.str());
     }
-    if (rows.empty() && data.valid) {
-      rows.push_back("No upcoming expeditions");
+    if (allRows_.empty() && data.valid) {
+      allRows_.push_back("No upcoming expeditions");
     }
-    setRows(rows);
+    // Clamp scroll and rebuild visible slice
+    int maxScroll = std::max(0, (int)allRows_.size() - MAX_VISIBLE_ROWS);
+    scrollOffset_ = std::min(scrollOffset_, maxScroll);
+    int end = std::min(scrollOffset_ + MAX_VISIBLE_ROWS, (int)allRows_.size());
+    setRows(std::vector<std::string>(allRows_.begin() + scrollOffset_,
+                                     allRows_.begin() + end));
     lastUpdate_ = data.lastUpdated;
   }
+}
+
+bool DXPedPanel::onMouseWheel(int scrollY) {
+  if (allRows_.empty())
+    return false;
+
+  int maxScroll = std::max(0, (int)allRows_.size() - MAX_VISIBLE_ROWS);
+  int newOffset = scrollOffset_ - scrollY;
+  if (newOffset < 0)
+    newOffset = 0;
+  if (newOffset > maxScroll)
+    newOffset = maxScroll;
+
+  if (newOffset != scrollOffset_) {
+    scrollOffset_ = newOffset;
+    int end = std::min(scrollOffset_ + MAX_VISIBLE_ROWS, (int)allRows_.size());
+    setRows(std::vector<std::string>(allRows_.begin() + scrollOffset_,
+                                     allRows_.begin() + end));
+    return true;
+  }
+  return false;
 }
 
 void DXPedPanel::renderRowText(SDL_Renderer *renderer, int index, int rx, int ry,
@@ -77,6 +101,22 @@ void DXPedPanel::renderRowText(SDL_Renderer *renderer, int index, int rx, int ry
 }
 
 // --- ONTAPanel ---
+
+bool ONTAPanel::onMouseWheel(int scrollY) {
+  if (allSpots_.empty())
+    return false;
+  int maxScroll = std::max(0, (int)allSpots_.size() - MAX_VISIBLE_ROWS);
+  int newOffset = std::clamp(scrollOffset_ - scrollY, 0, maxScroll);
+  if (newOffset == scrollOffset_)
+    return false;
+  scrollOffset_ = newOffset;
+  int end = std::min(scrollOffset_ + MAX_VISIBLE_ROWS, (int)allSpots_.size());
+  currentSpots_ = std::vector<ONTASpot>(allSpots_.begin() + scrollOffset_,
+                                         allSpots_.begin() + end);
+  std::vector<std::string> rows(currentSpots_.size(), "");
+  setRows(rows);
+  return true;
+}
 
 ONTAPanel::ONTAPanel(int x, int y, int w, int h, FontManager &fontMgr,
                      ActivityProvider &provider,
@@ -127,9 +167,7 @@ void ONTAPanel::setFilter(const std::string &f) {
 }
 
 void ONTAPanel::rebuildRows(const ActivityData &data) {
-  currentSpots_.clear();
-  std::vector<std::string> rows; // Use this to pass empty strings to ListPanel
-
+  allSpots_.clear();
   for (const auto &os : data.ontaSpots) {
     if (filter_ == Filter::POTA && os.program != "POTA")
       continue;
@@ -140,12 +178,16 @@ void ONTAPanel::rebuildRows(const ActivityData &data) {
       if (dist > maxDistKm_)
         continue;
     }
-
-    currentSpots_.push_back(os);
-    rows.push_back(""); // Add empty string for ListPanel to draw stripes
-    if (currentSpots_.size() >= MAX_VISIBLE_ROWS)
-      break;
+    allSpots_.push_back(os);
   }
+
+  int maxScroll = std::max(0, (int)allSpots_.size() - MAX_VISIBLE_ROWS);
+  scrollOffset_ = std::min(scrollOffset_, maxScroll);
+  int end = std::min(scrollOffset_ + MAX_VISIBLE_ROWS, (int)allSpots_.size());
+  currentSpots_ = std::vector<ONTASpot>(allSpots_.begin() + scrollOffset_,
+                                         allSpots_.begin() + end);
+
+  std::vector<std::string> rows(currentSpots_.size(), "");
   if (currentSpots_.empty() && data.valid) {
     std::string prog = (filter_ == Filter::POTA)   ? "POTA"
                        : (filter_ == Filter::SOTA) ? "SOTA"
@@ -207,6 +249,9 @@ SDL_Color ONTAPanel::getRowColor(int index,
 }
 
 void ONTAPanel::render(SDL_Renderer *renderer) {
+  // Detect double height (SidePanel full height is ~332)
+  legendH_ = (height_ > 300) ? 28 : 0;
+
   // Let ListPanel draw background, border, title, and rows (empty strings)
   ListPanel::render(renderer);
 
@@ -222,12 +267,8 @@ void ONTAPanel::render(SDL_Renderer *renderer) {
 
   std::string chip = filterLabel(filter_);
   auto *cat = fontMgr_.catalog();
-  int cw = 0, ch = 0;
-  SDL_Texture *chipTex =
-      cat->renderText(renderer, chip, themes.text, FontStyle::Fast, &cw, &ch);
-  if (chipTex) {
-    cat->destroyTexture(chipTex);
-  }
+  // Measure chip label width without allocating a GPU texture on every frame.
+  int cw = fontMgr_.getLogicalWidth(chip, cat->ptSize(FontStyle::Fast));
 
   // Visual button background centered vertically in title area
   int btnH = 20;
@@ -253,14 +294,18 @@ void ONTAPanel::render(SDL_Renderer *renderer) {
   // Generous hit box spans full title height
   chipRect_ = {btnRect.x, y_, btnRect.w, titleAreaH};
 
+  // Render Band Legend at bottom if double-height
+  if (legendH_ > 0) {
+    renderBandLegend(renderer, y_ + height_ - 2);
+  }
+
   if (currentSpots_.empty()) {
     return;
   }
 
+  // Calculate row height, accounting for legend if present
   int curY = y_ + titleAreaH;
-
-  // Calculate row height
-  int remaining = (y_ + height_) - curY;
+  int remaining = (y_ + height_ - legendH_) - curY;
   int rowCount = static_cast<int>(currentSpots_.size());
   int rowH = std::max(rowFontSize_ + 4, remaining / rowCount);
 
@@ -629,6 +674,53 @@ bool ONTAPanel::handleSetupClick(int mx, int my) {
   }
   return false;
 }
+
+void ONTAPanel::renderBandLegend(SDL_Renderer *renderer, int maxY) {
+  int cellH = 14;           // Tiny font target 12px + 2px padding
+  int legendH = cellH * 2;  // 28px for 2 rows
+  int legendY = maxY - legendH;
+
+  ThemeColors themes = getThemeColors(theme_);
+
+  // Background for the legend area to prevent spot overlap (fully opaque)
+  SDL_Rect legendRect = {x_ + 1, legendY, width_ - 2, legendH};
+  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, 255);
+  SDL_RenderFillRect(renderer, &legendRect);
+
+  // Top border/separator line
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
+                         themes.border.b, 200);
+  SDL_RenderDrawLine(renderer, x_ + 1, legendY, x_ + width_ - 1, legendY);
+
+  int cols = 6;
+  int cellW = (width_ - 4) / cols;
+  int boxSize = 7;
+
+  for (int i = 0; i < kNumBands; ++i) {
+    int row = i / cols;
+    int col = i % cols;
+    int lx = x_ + 4 + col * cellW;
+    int midY = legendY + row * cellH + cellH / 2;
+
+    // Colored square, vertically centered in the row
+    SDL_Rect box = {lx + 1, midY - boxSize / 2, boxSize, boxSize};
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+    SDL_SetRenderDrawColor(renderer, kBands[i].color.r, kBands[i].color.g,
+                           kBands[i].color.b, 255);
+    SDL_RenderFillRect(renderer, &box);
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+
+    // Label right of box, vertically centered on the same midline (strip
+    // trailing 'm')
+    std::string label(kBands[i].name);
+    if (!label.empty() && label.back() == 'm')
+      label.pop_back();
+    fontMgr_.catalog()->drawText(
+        renderer, label, lx + boxSize + 1, midY, themes.text, FontStyle::Tiny,
+        /*centered=*/false, /*rightAlign=*/false, /*vertCentered=*/true);
+  }
+}
+
 
 REGISTER_WIDGET("dx_peditions", "DX Peditions", true, false, {
   return std::make_unique<DXPedPanel>(

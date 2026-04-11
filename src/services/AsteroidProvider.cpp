@@ -267,6 +267,8 @@ void AsteroidProvider::processElementsResponse(const std::string &des,
 
   {
     std::lock_guard<std::mutex> lock(mutex_);
+    if (orbitalElementsCache_.size() > 500)
+      orbitalElementsCache_.clear();
     orbitalElementsCache_[des] = elem;
   }
 

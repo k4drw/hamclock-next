@@ -48,11 +48,13 @@ void SetupScreen::renderTabDXCluster(SDL_Renderer *renderer, int cx, int pad,
   y += fieldH + vSpace;
 
   // Toggles row 1
-  SDL_Rect enableToggle = {fieldX, y, 20, 20};
+  int clusterLabelW = fontMgr_.getLogicalWidth("Enable DX Cluster", cat->ptSize(FontStyle::SmallRegular));
+  clusterToggleRect_ = {fieldX, y, 30 + clusterLabelW, 20};
+  SDL_Rect clusterBox = {fieldX, y, 20, 20};
   SDL_SetRenderDrawColor(renderer, themes.rowStripe1.r, themes.rowStripe1.g, themes.rowStripe1.b, 255);
-  SDL_RenderFillRect(renderer, &enableToggle);
+  SDL_RenderFillRect(renderer, &clusterBox);
   SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
-  SDL_RenderDrawRect(renderer, &enableToggle);
+  SDL_RenderDrawRect(renderer, &clusterBox);
   if (clusterEnabled_) {
     SDL_SetRenderDrawColor(renderer, themes.success.r, themes.success.g, themes.success.b, 255);
     SDL_Rect check = {fieldX + 4, y + 4, 12, 12};
@@ -60,15 +62,16 @@ void SetupScreen::renderTabDXCluster(SDL_Renderer *renderer, int cx, int pad,
   }
   cat->drawText(renderer, "Enable DX Cluster", fieldX + 30, y + 10, themes.text,
                 FontStyle::SmallRegular, false, false, true);
-  clusterToggleRect_ = enableToggle;
 
   y += 24;
 
-  SDL_Rect toggle = {fieldX, y, 20, 20};
+  int wsjtxLabelW = fontMgr_.getLogicalWidth("Use WSJT-X (UDP)", cat->ptSize(FontStyle::SmallRegular));
+  toggleRect_ = {fieldX, y, 30 + wsjtxLabelW, 20};
+  SDL_Rect wsjtxBox = {fieldX, y, 20, 20};
   SDL_SetRenderDrawColor(renderer, themes.rowStripe1.r, themes.rowStripe1.g, themes.rowStripe1.b, 255);
-  SDL_RenderFillRect(renderer, &toggle);
+  SDL_RenderFillRect(renderer, &wsjtxBox);
   SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
-  SDL_RenderDrawRect(renderer, &toggle);
+  SDL_RenderDrawRect(renderer, &wsjtxBox);
   if (clusterWSJTX_) {
     SDL_SetRenderDrawColor(renderer, themes.success.r, themes.success.g, themes.success.b, 255);
     SDL_Rect check = {fieldX + 4, y + 4, 12, 12};
@@ -76,7 +79,6 @@ void SetupScreen::renderTabDXCluster(SDL_Renderer *renderer, int cx, int pad,
   }
   cat->drawText(renderer, "Use WSJT-X (UDP)", fieldX + 30, y + 10, themes.text,
                 FontStyle::SmallRegular, false, false, true);
-  toggleRect_ = toggle;
   if (clusterWSJTX_) {
     int halfW = (fieldW - pad) / 2;
     int wPortW = std::min(120, halfW);
@@ -96,11 +98,13 @@ void SetupScreen::renderTabDXCluster(SDL_Renderer *renderer, int cx, int pad,
                 FontStyle::SmallBold, true);
   y += cat->ptSize(FontStyle::SmallBold) + vSpace;
 
-  SDL_Rect rbnToggle = {fieldX, y, 20, 20};
+  int rbnLabelW = fontMgr_.getLogicalWidth("Enable RBN (feeds DX Cluster panel)", cat->ptSize(FontStyle::SmallRegular));
+  rbnToggleRect_ = {fieldX, y, 30 + rbnLabelW, 20};
+  SDL_Rect rbnBox = {fieldX, y, 20, 20};
   SDL_SetRenderDrawColor(renderer, themes.rowStripe1.r, themes.rowStripe1.g, themes.rowStripe1.b, 255);
-  SDL_RenderFillRect(renderer, &rbnToggle);
+  SDL_RenderFillRect(renderer, &rbnBox);
   SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
-  SDL_RenderDrawRect(renderer, &rbnToggle);
+  SDL_RenderDrawRect(renderer, &rbnBox);
   if (rbnEnabled_) {
     SDL_SetRenderDrawColor(renderer, themes.success.r, themes.success.g, themes.success.b, 255);
     SDL_Rect check = {fieldX + 4, y + 4, 12, 12};
@@ -108,6 +112,5 @@ void SetupScreen::renderTabDXCluster(SDL_Renderer *renderer, int cx, int pad,
   }
   cat->drawText(renderer, "Enable RBN (feeds DX Cluster panel)", fieldX + 30,
                 y + 10, themes.text, FontStyle::SmallRegular, false, false, true);
-  rbnToggleRect_ = rbnToggle;
   y += 24;
 }

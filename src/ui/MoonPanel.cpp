@@ -1,4 +1,5 @@
 #include "MoonPanel.h"
+#include "../core/Constants.h"
 #include "../core/Theme.h"
 #include "../core/WorkerService.h"
 #include "FontCatalog.h"
@@ -76,8 +77,8 @@ void MoonPanel::drawMoon(SDL_Renderer *renderer, int cx, int cy, int r) {
     // Draw dark moon body first so the unlit side is visible on light themes.
     // The NASA image uses alpha=0 for the dark background, so without this
     // backing circle the unlit portion blends into a light panel background.
-    RenderUtils::drawCircle(renderer, (float)cx, (float)cy, (float)r,
-                            {30, 30, 45, 255});
+    RenderUtils::drawCircle(renderer, (float)cx, (float)cy, (float)r - 2.0f,
+                            {15, 15, 22, 255});
 
     // "Flip it for north up": Dial-a-Moon is usually upright,
     // but the user might want explicitly flipped or rotated based on posangle.
@@ -93,8 +94,8 @@ void MoonPanel::drawMoon(SDL_Renderer *renderer, int cx, int cy, int r) {
                      SDL_FLIP_NONE);
   } else {
     // Show a simple dark disk while loading NASA imagery
-    RenderUtils::drawCircle(renderer, (float)cx, (float)cy, (float)r,
-                            {30, 30, 45, 255});
+    RenderUtils::drawCircle(renderer, (float)cx, (float)cy, (float)r - 2.0f,
+                            {15, 15, 22, 255});
   }
 }
 

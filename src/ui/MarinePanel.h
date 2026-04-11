@@ -67,6 +67,7 @@ private:
   SDL_Rect lookupRect_ = {0, 0, 0, 0};
 
   bool isSearching_ = false;
+  bool autoLookupTriggered_ = false;
 
   int titleFontSize_ = 12;
 

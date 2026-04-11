@@ -612,6 +612,7 @@ int main(int argc, char *argv[]) {
   ctx.webServer->setRotationControl(&ctx.rotationCmd, &ctx.rotationCmdPane,
                                     &ctx.rotationCmdWidget);
   ctx.webServer->setMapReloadFlag(&ctx.mapUpdateRequested);
+  ctx.webServer->setMarineStore(ctx.marineStore);
   ctx.webServer->start();
 
   ctx.gpsProvider = std::make_unique<GPSProvider>(ctx.state.get(), ctx.appCfg);
@@ -682,6 +683,7 @@ void main_tick() {
       if (ctx.webServer) {
         ctx.webServer->setPanes(nullptr);
         ctx.webServer->setTimePanel(nullptr);
+        ctx.webServer->setRssBanner(nullptr);
         ctx.webServer->setSatelliteManager(nullptr);
         ctx.webServer->setRotatorService(nullptr);
         ctx.webServer->setStopwatch(nullptr);
@@ -926,13 +928,28 @@ void main_tick() {
       if (ctx.dashboard && ctx.dashboard->satMgr)
         ctx.dashboard->satMgr->setObserver(ctx.appCfg.lat, ctx.appCfg.lon);
 
-      // Re-apply theme, rotations and layout immediately
+      // Re-apply theme, font, rotations and layout immediately
       if (ctx.dashboard) {
-        // Propagate theme and metric to all dashboard widgets
+        // Re-apply custom font if configured
+        if (!ctx.appCfg.fontPath.empty()) {
+          if (!ctx.dashboard->fontMgr.loadFromFile(ctx.appCfg.fontPath,
+                                                   DEFAULT_FONT_SIZE))
+            ctx.dashboard->fontMgr.loadFromMemory(assets_font_ttf,
+                                                  assets_font_ttf_len,
+                                                  DEFAULT_FONT_SIZE);
+        } else {
+          ctx.dashboard->fontMgr.loadFromMemory(assets_font_ttf,
+                                                assets_font_ttf_len,
+                                                DEFAULT_FONT_SIZE);
+        }
+        ctx.dashboard->fontCatalog.recalculate(LOGICAL_WIDTH, LOGICAL_HEIGHT);
+
+        // Propagate theme, metric, and font changes to all dashboard widgets
         for (auto *w : ctx.dashboard->widgets) {
           if (w) {
             w->setTheme(ctx.appCfg.theme);
             w->setMetric(ctx.appCfg.useMetric);
+            w->onFontChanged();
           }
         }
         // Re-apply rotation interval and widget lists to top-bar panes (0-3).
@@ -966,12 +983,17 @@ void main_tick() {
                                                 assets_font_ttf_len,
                                                 DEFAULT_FONT_SIZE);
         ctx.dashboard->fontCatalog.recalculate(LOGICAL_WIDTH, LOGICAL_HEIGHT);
+        for (auto *w : ctx.dashboard->widgets) {
+          if (w)
+            w->onFontChanged();
+        }
       }
       if (ctx.webServer) {
         ctx.webServer->setSatelliteManager(ctx.dashboard->satMgr.get());
         ctx.webServer->setRotatorService(ctx.dashboard->rotatorService.get());
         ctx.webServer->setPanes(&ctx.dashboard->panes);
         ctx.webServer->setTimePanel(ctx.dashboard->timePanel.get());
+        ctx.webServer->setRssBanner(ctx.dashboard->rssBanner.get());
         ctx.webServer->setPaneExpandControl(&ctx.paneExpandCmd);
         ctx.webServer->setWeatherStore(ctx.deWeatherStore);
         ctx.webServer->setBMEProvider(ctx.bmeProvider.get());
@@ -1027,6 +1049,7 @@ void main_tick() {
         if (ctx.webServer) {
           ctx.webServer->setPanes(nullptr);
           ctx.webServer->setTimePanel(nullptr);
+          ctx.webServer->setRssBanner(nullptr);
           ctx.webServer->setSatelliteManager(nullptr);
           ctx.webServer->setRotatorService(nullptr);
           ctx.webServer->setStopwatch(nullptr);

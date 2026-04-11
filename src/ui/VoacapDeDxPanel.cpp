@@ -2,6 +2,7 @@
 #include "WidgetRegistry.h"
 #include "../core/Astronomy.h"
 #include "../core/Theme.h"
+#include "../core/VoacapEngine.h"
 #include <cmath>
 
 #ifndef M_PI
@@ -37,23 +38,18 @@ void VoacapDeDxPanel::recalculateMatrix() {
   if (!hasTarget_)
     return;
 
-  double marginDb =
-      PropEngine::calculateSignalMargin(config_.propMode, (double)config_.propPower);
-
   // Space weather
   double sfi = 70.0;
   double ssn = 50.0;
-  double kIndex = 0.0;
   if (solarStore_) {
     auto sw = solarStore_->get();
     if (sw.sfi > 0)
       sfi = sw.sfi;
     if (sw.sunspot_number > 0)
       ssn = sw.sunspot_number;
-    kIndex = sw.k_index;
   }
 
-  // Calculate mid-point
+  // Short-path great-circle distance and midpoint
   double phi1 = state_->deLocation.lat * M_PI / 180.0;
   double lam1 = state_->deLocation.lon * M_PI / 180.0;
   double phi2 = state_->dxLocation.lat * M_PI / 180.0;
@@ -66,38 +62,24 @@ void VoacapDeDxPanel::recalculateMatrix() {
       std::sqrt((std::cos(phi1) + Bx) * (std::cos(phi1) + Bx) + By * By));
   double midLam = lam1 + std::atan2(By, std::cos(phi1) + Bx);
 
+  // Widget always uses short path — independent of the overlay's path setting
+  double distKm = Astronomy::calculateDistance(state_->deLocation, state_->dxLocation);
   double midLatDeg = midPhi * 180.0 / M_PI;
   double midLonDeg = midLam * 180.0 / M_PI;
 
-  double distKm =
-      Astronomy::calculateDistance(state_->deLocation, state_->dxLocation);
-  if (config_.propPath == 1) {
-    // Long path
-    distKm = 40075.0 - distKm;
-    // Note: for long path, the "midpoint" should ideally be shifted 180 degrees
-    // along the great circle.
-  }
-
-  // Interpolate iono
-  InterpolatedIonosonde iono;
-  if (ionoProvider_) {
-    iono = ionoProvider_->interpolate(midLatDeg, midLonDeg);
-  }
-
   std::time_t t = std::time(nullptr);
   std::tm *ptm = std::gmtime(&t);
-  double currentHour = ptm->tm_hour + ptm->tm_min / 60.0;
+  int month = ptm->tm_mon + 1;
+  double minToa = (config_.propToa > 0.0f) ? (double)config_.propToa : 3.0;
 
-  // Compute 24 hours x 8 bands
+  // Compute 24 hours x 8 bands using CCIR/VOACAP engine
   for (int hour = 0; hour < 24; ++hour) {
     for (int b = 0; b < 8; ++b) {
-      double rel = PropEngine::calculateReliability(
-          BANDS_MHZ[b], distKm, midLatDeg, midLonDeg, hour, sfi, ssn, kIndex,
-          iono, currentHour, marginDb);
-      
-      // Apply TOA penalty if engine supported it directly, but for now we
-      // just pass the parameters we have.
-      
+      double rel = VoacapEngine::pathReliability(
+          BANDS_MHZ[b], distKm, midLatDeg, midLonDeg,
+          hour, month, ssn,
+          (double)config_.propPower, config_.propMode, minToa,
+          (double)config_.propAntGain);
       relMatrix_[hour][b] = (float)rel;
     }
   }
@@ -111,7 +93,7 @@ void VoacapDeDxPanel::recalculateMatrix() {
   lastMode_ = config_.propMode;
   lastPower_ = config_.propPower;
   lastToa_ = config_.propToa;
-  lastPath_ = config_.propPath;
+  lastAntGain_ = config_.propAntGain;
 }
 
 void VoacapDeDxPanel::update() {
@@ -133,7 +115,7 @@ void VoacapDeDxPanel::update() {
   bool propChanged = (config_.propMode != lastMode_) ||
                      (config_.propPower != lastPower_) ||
                      (config_.propToa != lastToa_) ||
-                     (config_.propPath != lastPath_);
+                     (config_.propAntGain != lastAntGain_);
 
   if (targetChanged || metricChanged || propChanged) {
     recalculateMatrix();
@@ -198,9 +180,8 @@ void VoacapDeDxPanel::render(SDL_Renderer *renderer) {
   std::tm *ptm = std::gmtime(&t);
   int utcHour = ptm->tm_hour;
 
-  // The matrix rendering
+  // The matrix rendering: column 0 = UTC 00:00, column 23 = UTC 23:00
   for (int hourOffset = 0; hourOffset < 24; ++hourOffset) {
-    int h = (utcHour + hourOffset) % 24;
     int px = x_ + pLeft + static_cast<int>(hourOffset * cellW);
     int nextPx = x_ + pLeft + static_cast<int>((hourOffset + 1) * cellW);
 
@@ -208,7 +189,7 @@ void VoacapDeDxPanel::render(SDL_Renderer *renderer) {
       int py = y_ + pTop + static_cast<int>((7 - b) * cellH);
       int nextPy = y_ + pTop + static_cast<int>((7 - b + 1) * cellH);
 
-      SDL_Color c = reliabilityColor(relMatrix_[h][b]);
+      SDL_Color c = reliabilityColor(relMatrix_[hourOffset][b]);
 
       SDL_Rect rect = {px, py, nextPx - px, nextPy - py};
       SDL_SetRenderDrawColor(renderer, c.r, c.g, c.b, c.a);
@@ -226,13 +207,12 @@ void VoacapDeDxPanel::render(SDL_Renderer *renderer) {
   // X-axis labels (Timeline)
   // Draw current UTC at offset 0
   int timelineY = y_ + pTop + pHeight + 8;
-  cat->drawText(renderer, "UTC", x_ + (pLeft / 2), timelineY, themes.textDim,
-                FontStyle::Tiny, false, true, true);
+  cat->drawText(renderer, "UTC", x_ + (pLeft / 2), timelineY,
+                themes.textDim, FontStyle::Tiny, false, true, true);
 
   for (int hourOffset = 0; hourOffset < 24; hourOffset += 4) {
-    int h = (utcHour + hourOffset) % 24;
     int px_center = x_ + pLeft + static_cast<int>((hourOffset + 0.5f) * cellW);
-    std::string hStr = std::to_string(h);
+    std::string hStr = std::to_string(hourOffset);
     cat->drawText(renderer, hStr, px_center, timelineY,
                   themes.textDim, FontStyle::Tiny, false, true, true);
   }
@@ -266,6 +246,13 @@ void VoacapDeDxPanel::render(SDL_Renderer *renderer) {
   for (int b = 0; b <= 8; ++b) {
     int pyy = y_ + pTop + static_cast<int>(b * cellH);
     SDL_RenderDrawLine(renderer, x_ + pLeft, pyy, x_ + pLeft + pWidth, pyy);
+  }
+
+  // "Now" cursor: white vertical line at the current UTC hour column
+  {
+    int nowPx = x_ + pLeft + static_cast<int>(utcHour * cellW);
+    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+    SDL_RenderDrawLine(renderer, nowPx, y_ + pTop, nowPx, y_ + pTop + pHeight);
   }
 }
 

@@ -86,8 +86,11 @@ bool LTR329Provider::initI2C() {
   uint8_t meas[2] = {kRegMeas, 0x03};
   write(fd_, meas, 2);
 
-  // Allow first measurement to complete
-  std::this_thread::sleep_for(std::chrono::milliseconds(600));
+  // Allow first measurement to complete — interruptible so stop() returns promptly
+  {
+    std::unique_lock<std::mutex> lk(stopMutex_);
+    stopCv_.wait_for(lk, std::chrono::milliseconds(600), [this] { return !running_.load(); });
+  }
   return true;
 #else
   return false;

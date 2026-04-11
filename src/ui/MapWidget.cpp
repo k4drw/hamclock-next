@@ -11,6 +11,7 @@
 #include "../core/LiveSpotData.h"
 #include "../core/Logger.h"
 #include "../core/PropEngine.h"
+#include "../core/VoacapEngine.h"
 #include "../core/StringUtils.h"
 #include "../core/WorkerService.h"
 #include "../core/WorldBorders.h"
@@ -23,6 +24,7 @@
 #include "FontCatalog.h"
 #include "PaneContainer.h"
 #include "RenderUtils.h"
+#include "../core/ConfigManager.h"
 #include <fmt/core.h>
 
 #include <algorithm>
@@ -55,6 +57,18 @@ static const RobinsonCoeff robinson_coeffs[] = {
     {0.7986, 0.7346}, {0.7597, 0.7903}, {0.7186, 0.8435}, {0.6732, 0.8936},
     {0.6213, 0.9394}, {0.5722, 0.9761}, {0.5322, 1.0000}};
 
+float MapWidget::getRobinsonXCoeff(double lat) {
+  double abs_lat = std::abs(lat);
+  if (abs_lat > 90.0)
+    abs_lat = 90.0;
+  int idx = static_cast<int>(abs_lat / 5.0);
+  if (idx >= 18)
+    idx = 17;
+  double remainder = (abs_lat - idx * 5.0) / 5.0;
+  return robinson_coeffs[idx].x +
+         (robinson_coeffs[idx + 1].x - robinson_coeffs[idx].x) * remainder;
+}
+
 static void projectRobinson(double lat, double lon, double &nx, double &ny) {
   double abs_lat = std::abs(lat);
   if (abs_lat > 90.0)
@@ -64,9 +78,7 @@ static void projectRobinson(double lat, double lon, double &nx, double &ny) {
     idx = 17;
   double remainder = (abs_lat - idx * 5.0) / 5.0;
 
-  double x_coeff =
-      robinson_coeffs[idx].x +
-      (robinson_coeffs[idx + 1].x - robinson_coeffs[idx].x) * remainder;
+  double x_coeff = MapWidget::getRobinsonXCoeff(lat);
   double y_coeff =
       robinson_coeffs[idx].y +
       (robinson_coeffs[idx + 1].y - robinson_coeffs[idx].y) * remainder;
@@ -75,7 +87,10 @@ static void projectRobinson(double lat, double lon, double &nx, double &ny) {
   ny = (lat < 0) ? -y_coeff : y_coeff;  // [-1, 1]
 }
 
-static void inverseRobinson(double nx, double ny, double &lat, double &lon) {
+static bool inverseRobinson(double nx, double ny, double &lat, double &lon) {
+  if (std::abs(ny) > 1.0)
+    return false;
+
   double low = -90.0, high = 90.0;
   for (int i = 0; i < 20; ++i) {
     double mid = (low + high) / 2.0;
@@ -92,17 +107,17 @@ static void inverseRobinson(double nx, double ny, double &lat, double &lon) {
   int idx = static_cast<int>(abs_lat / 5.0);
   if (idx >= 18)
     idx = 17;
-  double remainder = (abs_lat - idx * 5.0) / 5.0;
-  double x_coeff =
-      robinson_coeffs[idx].x +
-      (robinson_coeffs[idx + 1].x - robinson_coeffs[idx].x) * remainder;
+  double x_coeff = MapWidget::getRobinsonXCoeff(lat);
   if (x_coeff < 0.01)
     x_coeff = 0.01;
+
+  bool inside = (std::abs(nx) <= x_coeff);
   lon = (nx / x_coeff) * 180.0;
   if (lon > 180.0)
     lon = 180.0;
   if (lon < -180.0)
     lon = -180.0;
+  return inside;
 }
 
 // Azimuthal equidistant projection helpers (all angles in degrees)
@@ -209,6 +224,58 @@ void MapWidget::setTheme(const std::string &theme) {
   }
 }
 void MapWidget::setMetric(bool metric) { Widget::setMetric(metric); }
+void MapWidget::onFontChanged() {
+  if (mapViewMenu_) {
+    mapViewMenu_->onFontChanged();
+  }
+  // Invalidate tooltip cache to pick up new font metrics
+  if (tooltip_.cachedTexture) {
+    MemoryMonitor::getInstance().destroyTexture(tooltip_.cachedTexture);
+    tooltip_.cachedTexture = nullptr;
+    tooltip_.cachedText.clear();
+  }
+}
+
+void MapWidget::resetMap() {
+  config_.mapZoom = 1.0;
+  config_.mapPanX = 0;
+  config_.mapPanY = 0;
+  mapVerts_.clear();
+  gridDirty_ = true;
+  borderDirty_ = true;
+  greatCircleDirty_ = true;
+  satTrackDirty_ = true;
+  asteroidTrackDirty_ = true;
+  wxVerts_.clear();
+  if (wxmb_)
+    wxmb_->invalidate();
+}
+
+void MapWidget::showDEMenu(int mx, int my) {
+  if (mapViewMenu_->isVisible())
+    return;
+
+  double lat, lon;
+  if (!screenToLatLon(mx, my, lat, lon)) {
+    deMenuVisible_ = false;
+    return;
+  }
+
+  deMenuVisible_ = true;
+  deMenuLat_ = lat;
+  deMenuLon_ = lon;
+
+  // Size the menu
+  int menuW = 110;
+  int menuH = 30;
+  deMenuRect_ = {mx, my, menuW, menuH};
+
+  // Boundary check
+  if (deMenuRect_.x + deMenuRect_.w > HamClock::LOGICAL_WIDTH)
+    deMenuRect_.x -= deMenuRect_.w;
+  if (deMenuRect_.y + deMenuRect_.h > HamClock::LOGICAL_HEIGHT)
+    deMenuRect_.y -= deMenuRect_.h;
+}
 
 MapWidget::~MapWidget() {
   // Signal any in-flight WorkerService ground-track task to exit early rather
@@ -257,10 +324,17 @@ SDL_FPoint MapWidget::latLonToScreen(double lat, double lon) const {
     while (dLon > 180.0) dLon -= 360.0;
     while (dLon < -180.0) dLon += 360.0;
     // Clamp coordinates to [0, 1] range to avoid edge sampling artifacts
-    double nx = std::clamp((dLon + 180.0) / 360.0, 0.0, 1.0);
-    double ny = std::clamp((90.0 - lat) / 180.0, 0.0, 1.0);
-    return {static_cast<float>(mapRect_.x + nx * mapRect_.w),
-            static_cast<float>(mapRect_.y + ny * mapRect_.h)};
+    double nx = (dLon + 180.0) / 360.0;
+    double ny = (90.0 - lat) / 180.0;
+    float px = static_cast<float>(mapRect_.x + nx * mapRect_.w);
+    float py = static_cast<float>(mapRect_.y + ny * mapRect_.h);
+    if (config_.mapZoom > 1.0) {
+      float cx = mapRect_.x + mapRect_.w * 0.5f;
+      float cy = mapRect_.y + mapRect_.h * 0.5f;
+      px = (px - cx) * (float)config_.mapZoom + cx + (float)config_.mapPanX;
+      py = (py - cy) * (float)config_.mapZoom + cy + (float)config_.mapPanY;
+    }
+    return {px, py};
   }
   if (config_.projection == "robinson") {
     double centeredLon = lon - config_.mapCenterLon;
@@ -270,6 +344,12 @@ SDL_FPoint MapWidget::latLonToScreen(double lat, double lon) const {
     projectRobinson(lat, centeredLon, rnx, rny);
     float px = static_cast<float>(mapRect_.x + (rnx + 1.0) * 0.5 * mapRect_.w);
     float py = static_cast<float>(mapRect_.y + (1.0 - rny) * 0.5 * mapRect_.h);
+    if (config_.mapZoom > 1.0) {
+      float cx = mapRect_.x + mapRect_.w * 0.5f;
+      float cy = mapRect_.y + mapRect_.h * 0.5f;
+      px = (px - cx) * (float)config_.mapZoom + cx + (float)config_.mapPanX;
+      py = (py - cy) * (float)config_.mapZoom + cy + (float)config_.mapPanY;
+    }
     return {px, py};
   }
   if (config_.projection == "azimuthal") {
@@ -281,6 +361,12 @@ SDL_FPoint MapWidget::latLonToScreen(double lat, double lon) const {
     float scale = std::min(mapRect_.w, mapRect_.h);
     float px = mapRect_.x + (mapRect_.w * 0.5f) + (float)nx * (scale * 0.5f);
     float py = mapRect_.y + (mapRect_.h * 0.5f) - (float)ny * (scale * 0.5f);
+    if (config_.mapZoom > 1.0) {
+      float cx = mapRect_.x + mapRect_.w * 0.5f;
+      float cy = mapRect_.y + mapRect_.h * 0.5f;
+      px = (px - cx) * (float)config_.mapZoom + cx + (float)config_.mapPanX;
+      py = (py - cy) * (float)config_.mapZoom + cy + (float)config_.mapPanY;
+    }
     return {px, py};
   }
   if (config_.projection == "dual_azimuthal") {
@@ -289,12 +375,21 @@ SDL_FPoint MapWidget::latLonToScreen(double lat, double lon) const {
     int halfW = mapRect_.w / 2;
     float R = std::min(halfW, mapRect_.h) * 0.5f;
     // Left hemisphere: DE-centered
-    float cx = mapRect_.x + halfW * 0.5f;
+    float cxL = mapRect_.x + halfW * 0.5f;
     float cy = mapRect_.y + mapRect_.h * 0.5f;
     double nx, ny;
     projectAzimuthal(lat, lon, deLat, deLon, nx, ny);
-    float px = cx + (float)nx * R;
+    float px = cxL + (float)nx * R;
     float py = cy - (float)ny * R;
+
+    // TODO: if px > halfW, it should probably be in the other hemisphere?
+    // The existing logic doesn't seem to handle the split well for individual
+    // markers.
+    if (config_.mapZoom > 1.0) {
+      float cx = mapRect_.x + mapRect_.w * 0.5f;
+      px = (px - cx) * (float)config_.mapZoom + cx + (float)config_.mapPanX;
+      py = (py - cy) * (float)config_.mapZoom + cy + (float)config_.mapPanY;
+    }
     return {px, py};
   }
   if (config_.projection == "mercator") {
@@ -312,6 +407,12 @@ SDL_FPoint MapWidget::latLonToScreen(double lat, double lon) const {
     double nx = (centeredLon + 180.0) / 360.0;
     float px = static_cast<float>(mapRect_.x + nx * mapRect_.w);
     float py = static_cast<float>(mapRect_.y + ny * mapRect_.h);
+    if (config_.mapZoom > 1.0) {
+      float cx = mapRect_.x + mapRect_.w * 0.5f;
+      float cy = mapRect_.y + mapRect_.h * 0.5f;
+      px = (px - cx) * (float)config_.mapZoom + cx + (float)config_.mapPanX;
+      py = (py - cy) * (float)config_.mapZoom + cy + (float)config_.mapPanY;
+    }
     return {px, py};
   }
   double centeredLon = lon - config_.mapCenterLon;
@@ -321,28 +422,47 @@ SDL_FPoint MapWidget::latLonToScreen(double lat, double lon) const {
   double ny = (90.0 - lat) / 180.0;
   float px = static_cast<float>(mapRect_.x + nx * mapRect_.w);
   float py = static_cast<float>(mapRect_.y + ny * mapRect_.h);
+  if (config_.mapZoom > 1.0) {
+    float cx = mapRect_.x + mapRect_.w * 0.5f;
+    float cy = mapRect_.y + mapRect_.h * 0.5f;
+    px = (px - cx) * (float)config_.mapZoom + cx + (float)config_.mapPanX;
+    py = (py - cy) * (float)config_.mapZoom + cy + (float)config_.mapPanY;
+  }
   return {px, py};
 }
 
 bool MapWidget::screenToLatLon(int sx, int sy, double &lat, double &lon) const {
-  if (sx < mapRect_.x || sx > mapRect_.x + mapRect_.w || sy < mapRect_.y ||
-      sy > mapRect_.y + mapRect_.h)
+  float fx = (float)sx;
+  float fy = (float)sy;
+
+  if (config_.mapZoom > 1.0) {
+    float cx = mapRect_.x + mapRect_.w * 0.5f;
+    float cy = mapRect_.y + mapRect_.h * 0.5f;
+    fx = (fx - (float)config_.mapPanX - cx) / (float)config_.mapZoom + cx;
+    fy = (fy - (float)config_.mapPanY - cy) / (float)config_.mapZoom + cy;
+  }
+
+  if (fx < mapRect_.x || fx > mapRect_.x + mapRect_.w || fy < mapRect_.y ||
+      fy > mapRect_.y + mapRect_.h)
     return false;
 
   if (config_.projection == "robinson") {
     double rnx =
-        (static_cast<double>(sx - mapRect_.x) / mapRect_.w) * 2.0 - 1.0;
+        (static_cast<double>(fx - mapRect_.x) / mapRect_.w) * 2.0 - 1.0;
     double rny =
-        1.0 - (static_cast<double>(sy - mapRect_.y) / mapRect_.h) * 2.0;
-    inverseRobinson(rnx, rny, lat, lon);
+        1.0 - (static_cast<double>(fy - mapRect_.y) / mapRect_.h) * 2.0;
+    if (!inverseRobinson(rnx, rny, lat, lon))
+      return false;
     lon += config_.mapCenterLon;
-    while (lon > 180.0) lon -= 360.0;
-    while (lon < -180.0) lon += 360.0;
+    while (lon > 180.0)
+      lon -= 360.0;
+    while (lon < -180.0)
+      lon += 360.0;
     return true;
   }
   if (config_.projection == "azimuthal") {
-    double nx = (static_cast<double>(sx - mapRect_.x) / mapRect_.w) * 2.0 - 1.0;
-    double ny = 1.0 - (static_cast<double>(sy - mapRect_.y) / mapRect_.h) * 2.0;
+    double nx = (static_cast<double>(fx - mapRect_.x) / mapRect_.w) * 2.0 - 1.0;
+    double ny = 1.0 - (static_cast<double>(fy - mapRect_.y) / mapRect_.h) * 2.0;
     double deLat = state_ ? state_->deLocation.lat : 0.0;
     double deLon = state_ ? state_->deLocation.lon : 0.0;
     return inverseAzimuthal(nx, ny, deLat, deLon, lat, lon);
@@ -352,7 +472,7 @@ bool MapWidget::screenToLatLon(int sx, int sy, double &lat, double &lon) const {
     double deLon = state_ ? state_->deLocation.lon : 0.0;
     int halfW = mapRect_.w / 2;
     float R = std::min(halfW, mapRect_.h) * 0.5f;
-    bool rightHalf = (sx >= mapRect_.x + halfW);
+    bool rightHalf = (fx >= mapRect_.x + halfW);
     float cx, cy;
     double centerLat, centerLon;
     if (!rightHalf) {
@@ -367,13 +487,13 @@ bool MapWidget::screenToLatLon(int sx, int sy, double &lat, double &lon) const {
       centerLat = -deLat;
       centerLon = deLon + (deLon >= 0.0 ? -180.0 : 180.0);
     }
-    double nx = (sx - cx) / R;
-    double ny = (cy - sy) / R;
+    double nx = (fx - cx) / R;
+    double ny = (cy - fy) / R;
     return inverseAzimuthal(nx, ny, centerLat, centerLon, lat, lon);
   }
   if (config_.projection == "mercator") {
-    double nx = static_cast<double>(sx - mapRect_.x) / mapRect_.w;
-    double ny = static_cast<double>(sy - mapRect_.y) / mapRect_.h;
+    double nx = static_cast<double>(fx - mapRect_.x) / mapRect_.w;
+    double ny = static_cast<double>(fy - mapRect_.y) / mapRect_.h;
     lon = nx * 360.0 - 180.0 + config_.mapCenterLon;
     while (lon > 180.0) lon -= 360.0;
     while (lon < -180.0) lon += 360.0;
@@ -385,8 +505,8 @@ bool MapWidget::screenToLatLon(int sx, int sy, double &lat, double &lon) const {
     return true;
   }
 
-  double nx = static_cast<double>(sx - mapRect_.x) / mapRect_.w;
-  double ny = static_cast<double>(sy - mapRect_.y) / mapRect_.h;
+  double nx = static_cast<double>(fx - mapRect_.x) / mapRect_.w;
+  double ny = static_cast<double>(fy - mapRect_.y) / mapRect_.h;
   lon = nx * 360.0 - 180.0 + config_.mapCenterLon;
   while (lon > 180.0) lon -= 360.0;
   while (lon < -180.0) lon += 360.0;
@@ -406,11 +526,19 @@ void MapWidget::update() {
 
   uint32_t nowMs = SDL_GetTicks();
 
+  // Handle deferred DE menu display for right-click timing
+  if (deMenuPending_ && nowMs - rightClickTimeMs_ > 300) {
+    showDEMenu(deMenuX_, deMenuY_);
+    deMenuPending_ = false;
+  }
+
   // Auto-center on DE if enabled
   if (config_.centerMapOnDe) {
     if (std::abs(config_.mapCenterLon - state_->deLocation.lon) > 0.001) {
       config_.mapCenterLon = state_->deLocation.lon;
     }
+  } else if (std::abs(config_.mapCenterLon) > 0.001) {
+    config_.mapCenterLon = 0.0;
   }
 
   // Detect map shift and invalidate mesh/geometry
@@ -504,17 +632,38 @@ void MapWidget::update() {
     if (state_->deLocation.lat != lastDE_.lat ||
         state_->deLocation.lon != lastDE_.lon ||
         state_->dxLocation.lat != lastDX_.lat ||
-        state_->dxLocation.lon != lastDX_.lon) {
-      int segments = useCompatibilityRenderPath_ ? 100 : 250;
+        state_->dxLocation.lon != lastDX_.lon ||
+        config_.mapZoom != lastZoom_) {
+      int baseSegments = 250;
+      int segments = static_cast<int>(baseSegments * (1.0 + 0.8 * (config_.mapZoom - 1.0)));
       cachedGreatCircle_ = Astronomy::calculateGreatCirclePath(
           state_->deLocation, state_->dxLocation, segments);
       lastDE_ = state_->deLocation;
       lastDX_ = state_->dxLocation;
+      lastZoom_ = config_.mapZoom;
       greatCircleDirty_ = true;
     }
   } else if (!cachedGreatCircle_.empty()) {
     cachedGreatCircle_.clear();
     greatCircleDirty_ = true;
+  }
+
+  // Propagation Rotation
+  if (config_.propRotation.size() > 1 && config_.rotationIntervalS > 0) {
+    uint32_t intervalMs = static_cast<uint32_t>(config_.rotationIntervalS * 1000);
+    if (nowMs - lastPropRotateMs_ >= intervalMs || lastPropRotateMs_ == 0) {
+      if (lastPropRotateMs_ != 0) {
+        propRotationIdx_ = (propRotationIdx_ + 1) % config_.propRotation.size();
+      }
+      config_.propOverlay = config_.propRotation[propRotationIdx_];
+      lastPropRotateMs_ = nowMs;
+    }
+  } else if (!config_.propRotation.empty()) {
+    // If rotation set is defined but has 1 item, ensure it's synced
+    if (config_.propOverlay != config_.propRotation[0]) {
+      config_.propOverlay = config_.propRotation[0];
+      propRotationIdx_ = 0;
+    }
   }
 
   // Propagation Overlay updates (every 15 mins or on change)
@@ -524,7 +673,8 @@ void MapWidget::update() {
                    (lastMode_ != config_.propMode) ||
                    (lastPower_ != config_.propPower) ||
                    (lastToa_ != config_.propToa) ||
-                   (lastPath_ != config_.propPath);
+                   (lastPath_ != config_.propPath) ||
+                   (lastAntGain_ != config_.propAntGain);
 
     // DRAP reads a live data store: poll every 60s (2s until first data
     // arrives)
@@ -542,6 +692,7 @@ void MapWidget::update() {
       lastPower_ = config_.propPower;
       lastToa_ = config_.propToa;
       lastPath_ = config_.propPath;
+      lastAntGain_ = config_.propAntGain;
     }
   }
 
@@ -727,6 +878,13 @@ void MapWidget::render(SDL_Renderer *renderer) {
       greatCircleDirty_ = true;
       satTrackDirty_ = true;
       asteroidTrackDirty_ = true;
+      // Invalidate overlay meshes for the new projection
+      shadowVerts_.clear();
+      lightVerts_.clear();
+      nightIndices_.clear();
+      nightLightIndices_.clear();
+      auroraVerts_.clear();
+      propVerts_.clear();
       // Clear WX GPU buffers — will be re-projected on next getSegments() call.
       wxVerts_.clear();
       wxIndices_.clear();
@@ -766,6 +924,12 @@ void MapWidget::render(SDL_Renderer *renderer) {
               int idx = j * (gridW + 1) + i;
               double nx = (sx - cx) / R;
               double ny = (cy - sy) / R;
+
+              if (config_.mapZoom > 1.0) {
+                nx = (nx * R - (float)config_.mapPanX) / (float)config_.mapZoom / R;
+                ny = (ny * R + (float)config_.mapPanY) / (float)config_.mapZoom / R;
+              }
+
               double lat, lon;
               if (inverseAzimuthal(nx, ny, deLat, deLon, lat, lon)) {
                 float u = static_cast<float>((lon + 180.0) / 360.0);
@@ -798,10 +962,18 @@ void MapWidget::render(SDL_Renderer *renderer) {
               if (sx < mapRect_.x + halfW) {
                 double nx = (sx - cxL) / R;
                 double ny = (cy - sy) / R;
+                if (config_.mapZoom > 1.0) {
+                  nx = (nx * R - (float)config_.mapPanX) / (float)config_.mapZoom / R;
+                  ny = (ny * R + (float)config_.mapPanY) / (float)config_.mapZoom / R;
+                }
                 valid = inverseAzimuthal(nx, ny, deLat, deLon, lat, lon);
               } else {
                 double nx = (sx - cxR) / R;
                 double ny = (cy - sy) / R;
+                if (config_.mapZoom > 1.0) {
+                  nx = (nx * R - (float)config_.mapPanX) / (float)config_.mapZoom / R;
+                  ny = (ny * R + (float)config_.mapPanY) / (float)config_.mapZoom / R;
+                }
                 valid = inverseAzimuthal(nx, ny, antiLat, antiLon, lat, lon);
               }
               if (valid) {
@@ -888,9 +1060,13 @@ void MapWidget::render(SDL_Renderer *renderer) {
 
   renderWxMbOverlay(renderer);
   renderGribCloudOverlay(renderer);
-  renderPropagationOverlay(renderer);
   renderMufRtOverlay(renderer);
   renderNightOverlay(renderer);
+  renderPropagationOverlay(renderer);
+  
+  // Overlays (clipped to mapRect_)
+  SDL_Rect clipRect = mapRect_;
+  SDL_RenderSetClipRect(renderer, &clipRect);
 
   // Render global references and boundaries
   renderAuroraOverlay(renderer);
@@ -901,8 +1077,6 @@ void MapWidget::render(SDL_Renderer *renderer) {
   // Render paths and dynamic markers
   renderGreatCircle(renderer);
 
-  renderGreatCircle(renderer);
-
   renderSatellite(renderer);
   renderAsteroidOverlay(renderer);
   renderSpotOverlay(renderer);
@@ -910,6 +1084,8 @@ void MapWidget::render(SDL_Renderer *renderer) {
   renderADIFPins(renderer);
   renderONTASpots(renderer);
   renderBeacons(renderer);
+
+  SDL_RenderSetClipRect(renderer, nullptr);
 
   renderMarker(renderer, state_->deLocation.lat, state_->deLocation.lon,
                themes.accent.r, themes.accent.g, themes.accent.b);
@@ -929,6 +1105,15 @@ void MapWidget::render(SDL_Renderer *renderer) {
 
     renderMarker(renderer, state_->dxLocation.lat, state_->dxLocation.lon,
                  r, g, b, MarkerShape::CircleWithDot);
+
+    // If manual map selection (no callsign), show the grid square label
+    if (state_->dxCallsign.empty() && !state_->dxGrid.empty()) {
+      SDL_FPoint sp = latLonToScreen(state_->dxLocation.lat, state_->dxLocation.lon);
+      SDL_Color color = {r, g, b, 255};
+      fontMgr_.catalog()->drawText(renderer, state_->dxGrid, static_cast<int>(sp.x) + 8,
+                                   static_cast<int>(sp.y), color, FontStyle::Tiny,
+                                   /*centered=*/false, /*rightAlign=*/false, /*vertCentered=*/true);
+    }
   }
 
   renderMarker(renderer, sunLat_, sunLon_, themes.warning.r, themes.warning.g,
@@ -987,14 +1172,14 @@ void MapWidget::renderDeMenu(SDL_Renderer *renderer) {
 
 // DRAP absorption color: SDL_PIXELFORMAT_RGBA32 little-endian packing
 // pixels[i] = (a << 24) | (b << 16) | (g << 8) | r
-static uint32_t drapColor(float mhz) {
-  if (mhz < 0.1f)
-    return 0;  // fully transparent
-  if (mhz < 5.0f)
-    return (80u << 24) | (0u << 16) | (255u << 8) | 255u;  // yellow, 80 alpha
-  if (mhz < 15.0f)
-    return (160u << 24) | (0u << 16) | (140u << 8) | 255u;  // orange, 160 alpha
-  return (200u << 24) | (50u << 16) | (50u << 8) | 220u;  // red, 200 alpha
+static uint32_t drapColor(float mhz, const std::string &variant) {
+  float t = std::min(mhz / 30.0f, 1.0f);
+  SDL_Color c = MapWidget::getPropColor(PropOverlayType::Drap, t, variant);
+  uint8_t a = (mhz < 0.1f) ? 0 : (mhz < 5.0f ? 80 : (mhz < 15.0f ? 160 : 200));
+  return (static_cast<uint32_t>(a) << 24) |
+         (static_cast<uint32_t>(c.b) << 16) |
+         (static_cast<uint32_t>(c.g) << 8) |
+         static_cast<uint32_t>(c.r);
 }
 
 void MapWidget::updatePropagationOverlay() {
@@ -1048,7 +1233,7 @@ void MapWidget::updatePropagationOverlay() {
 
     std::vector<uint32_t> pixels(grid.cells.size());
     for (int i = 0; i < (int)grid.cells.size(); i++)
-      pixels[i] = drapColor(grid.cells[i]);
+      pixels[i] = drapColor(grid.cells[i], config_.propColormap);
     SDL_UpdateTexture(propTexture_, nullptr, pixels.data(),
                       grid.cols * sizeof(uint32_t));
     return;
@@ -1099,19 +1284,21 @@ void MapWidget::updatePropagationOverlay() {
   params.mode = config_.propMode;
   params.toa = (int)config_.propToa;
   params.path = config_.propPath;
+  params.antGainDB = config_.propAntGain;
 
   SolarData sw{};
   if (solar_) {
     sw = solar_->get();
   }
 
-  // outputType: 0=MUF, 1=Reliability, 2=TOA
+  // outputType: 0=MUF (foF2×M3000 at pixel location), 1=Reliability, 2=TOA
   int outputType = 0;
   if (config_.propOverlay == PropOverlayType::Reliability) {
     outputType = 1;
   } else if (config_.propOverlay == PropOverlayType::Toa) {
     outputType = 2;
   }
+  // Voacap → outputType=0 (CCIR-predicted MUF, matches original CM_MUF_V)
 
   PropOverlayType overlayType = config_.propOverlay;
 
@@ -1119,10 +1306,16 @@ void MapWidget::updatePropagationOverlay() {
   std::shared_ptr<IonosondeProvider> provider =
       (overlayType == PropOverlayType::Muf) ? iono_ : nullptr;
 
+  // Use VoacapEngine for CCIR-model overlays; PropEngine for real-time MUF (ionosonde)
+  bool useVoacap = (overlayType == PropOverlayType::Voacap  ||
+                    overlayType == PropOverlayType::Reliability ||
+                    overlayType == PropOverlayType::Toa);
+
   WorkerService::getInstance().submitTask(
-      [params, sw, provider, outputType, overlayType]() {
-        auto grid =
-            PropEngine::generateGrid(params, sw, provider.get(), outputType);
+      [params, sw, provider, outputType, overlayType, useVoacap]() {
+        auto grid = useVoacap
+            ? VoacapEngine::generateGrid(params, sw, nullptr, outputType)
+            : PropEngine::generateGrid(params, sw, provider.get(), outputType);
 
         auto *result = new std::vector<float>(std::move(grid));
         SDL_Event event;
@@ -1138,6 +1331,9 @@ void MapWidget::onPropDataReady(PropOverlayType type,
                                 const std::vector<float> &grid) {
   if (grid.size() != PropEngine::MAP_W * PropEngine::MAP_H)
     return;
+
+  lastPropType_ = type;
+  lastPropGrid_ = grid;
 
   // Use the renderer cached during the last render() call.
   SDL_Renderer *renderer = cachedRenderer_;
@@ -1157,90 +1353,24 @@ void MapWidget::onPropDataReady(PropOverlayType type,
   float maxVal;
   if (type == PropOverlayType::Reliability)
     maxVal = 100.0f;
+  else if (type == PropOverlayType::Voacap)
+    maxVal = 35.0f;  // MUF(3000) in MHz, same scale as MUF-RT
   else if (type == PropOverlayType::Toa)
     maxVal = 40.0f;
   else if (type == PropOverlayType::Heatmap)
     maxVal = 1.0f;  // ReachProvider normalizes grid to 0..1
   else
-    maxVal = 50.0f;  // MUF
+    maxVal = 35.0f;  // MUF (matches original HamClock CM_MUF_V scale)
 
   for (size_t i = 0; i < grid.size(); ++i) {
     float val = grid[i];
     float t = val / maxVal;
     t = std::max(0.0f, std::min(t, 1.0f));
 
-    uint8_t r = 0, g = 0, b = 0;
-    if (type == PropOverlayType::Reliability) {
-      // Reliability: Grey -> Yellow -> Green
-      if (t < 0.5f) {
-        float f = t / 0.5f;
-        r = (uint8_t)(100 + f * 155);
-        g = (uint8_t)(100 + f * 155);
-        b = 100;
-      } else {
-        float f = (t - 0.5f) / 0.5f;
-        r = (uint8_t)(255 * (1.0f - f));
-        g = 255;
-        b = (uint8_t)(100 * (1.0f - f));
-      }
-    } else if (type == PropOverlayType::Toa) {
-      // TOA: low angle = green (favorable long DX), high angle = red
-      // (steep/local) t=0 → transparent (no path); t>0 rendered
-      // green→yellow→red
-      if (t < 0.5f) {
-        float f = t * 2.0f;
-        r = (uint8_t)(f * 255.0f);
-        g = 200;
-        b = 0;
-      } else {
-        float f = (t - 0.5f) * 2.0f;
-        r = 255;
-        g = (uint8_t)((1.0f - f) * 200.0f);
-        b = 0;
-      }
-    } else if (type == PropOverlayType::Heatmap) {
-      // Heatmap: Purple -> Red -> Orange -> Yellow -> White
-      if (t < 0.25f) {  // Purple -> Red
-        float f = t / 0.25f;
-        r = (uint8_t)(128 + f * 127);
-        g = 0;
-        b = (uint8_t)(128 * (1.0f - f));
-      } else if (t < 0.5f) {  // Red -> Orange
-        float f = (t - 0.25f) / 0.25f;
-        r = 255;
-        g = (uint8_t)(f * 128);
-        b = 0;
-      } else if (t < 0.75f) {  // Orange -> Yellow
-        float f = (t - 0.5f) / 0.25f;
-        r = 255;
-        g = (uint8_t)(128 + f * 127);
-        b = 0;
-      } else {  // Yellow -> White
-        float f = (t - 0.75f) / 0.25f;
-        r = 255;
-        g = 255;
-        b = (uint8_t)(f * 255);
-      }
-    } else {
-      // Jet-like colormap for MUF
-      if (t < 0.25f) {  // Blue -> Cyan
-        float f = t / 0.25f;
-        b = 255;
-        g = (uint8_t)(f * 255.0f);
-      } else if (t < 0.5f) {  // Cyan -> Green
-        float f = (t - 0.25f) / 0.25f;
-        g = 255;
-        b = (uint8_t)((1.0f - f) * 255.0f);
-      } else if (t < 0.75f) {  // Green -> Yellow
-        float f = (t - 0.5f) / 0.25f;
-        g = 255;
-        r = (uint8_t)(f * 255.0f);
-      } else {  // Yellow -> Red
-        float f = (t - 0.75f) / 0.25f;
-        r = 255;
-        g = (uint8_t)((1.0f - f) * 255.0f);
-      }
-    }
+    SDL_Color c = getPropColor(type, t, config_.propColormap);
+    uint8_t r = c.r;
+    uint8_t g = c.g;
+    uint8_t b = c.b;
 
     uint8_t a = (val > 0.1f) ? 200 : 0;
     pixels[i] = (a << 24) | (b << 16) | (g << 8) | r;
@@ -1248,6 +1378,229 @@ void MapWidget::onPropDataReady(PropOverlayType type,
 
   SDL_UpdateTexture(propTexture_, nullptr, pixels.data(),
                     PropEngine::MAP_W * sizeof(uint32_t));
+}
+
+void MapWidget::forcePropUpdate() {
+  if (lastPropGrid_.empty())
+    return;
+  onPropDataReady(lastPropType_, lastPropGrid_);
+}
+
+SDL_Color MapWidget::getPropColor(PropOverlayType type, float t,
+                                 const std::string &variant) {
+  t = std::max(0.0f, std::min(t, 1.0f));
+  uint8_t r = 0, g = 0, b = 0;
+  bool vibrant = (variant == "vibrant");
+
+  if (variant == "custom") {
+    const auto &ovr = ConfigManager::instance().getConfig().colorOverrides;
+    auto getOvrColor = [&](const std::string &key, SDL_Color fallback) {
+      auto it = ovr.find(key);
+      return (it != ovr.end()) ? it->second : fallback;
+    };
+
+    SDL_Color c0 = getOvrColor("prop_color_0", {150, 0, 0, 255});
+    SDL_Color c25 = getOvrColor("prop_color_25", {255, 150, 0, 255});
+    SDL_Color c50 = getOvrColor("prop_color_50", {255, 255, 0, 255});
+    SDL_Color c75 = getOvrColor("prop_color_75", {0, 255, 255, 255});
+    SDL_Color c100 = getOvrColor("prop_color_100", {255, 255, 255, 255});
+
+    SDL_Color ca, cb;
+    float f;
+    if (t < 0.25f) {
+      ca = c0; cb = c25; f = t / 0.25f;
+    } else if (t < 0.5f) {
+      ca = c25; cb = c50; f = (t - 0.25f) / 0.25f;
+    } else if (t < 0.75f) {
+      ca = c50; cb = c75; f = (t - 0.5f) / 0.25f;
+    } else {
+      ca = c75; cb = c100; f = (t - 0.75f) / 0.25f;
+    }
+    r = (uint8_t)(ca.r + f * (cb.r - ca.r));
+    g = (uint8_t)(ca.g + f * (cb.g - ca.g));
+    b = (uint8_t)(ca.b + f * (cb.b - ca.b));
+    return {r, g, b, 255};
+  }
+
+  if (type == PropOverlayType::Reliability) {
+    if (vibrant) {
+      // Vibrant Reliability: Red -> Yellow -> Green -> Cyan -> White
+      if (t < 0.25f) {
+        float f = t / 0.25f;
+        r = (uint8_t)(150 + f * 105);
+        g = (uint8_t)(f * 150);
+        b = 0;
+      } else if (t < 0.5f) {
+        float f = (t - 0.25f) / 0.25f;
+        r = 255;
+        g = (uint8_t)(150 + f * 105);
+        b = 0;
+      } else if (t < 0.75f) {
+        float f = (t - 0.5f) / 0.25f;
+        r = (uint8_t)(255 * (1.0f - f));
+        g = 255;
+        b = (uint8_t)(f * 255);
+      } else {
+        float f = (t - 0.75f) / 0.25f;
+        r = (uint8_t)(f * 255);
+        g = 255;
+        b = 255;
+      }
+    } else {
+      // Muted Reliability: Soft Grey -> Pastel Yellow -> Soft Green
+      if (t < 0.5f) {
+        float f = t / 0.5f;
+        r = (uint8_t)(80 + f * 100);
+        g = (uint8_t)(80 + f * 100);
+        b = 80;
+      } else {
+        float f = (t - 0.5f) / 0.5f;
+        r = (uint8_t)(180 * (1.0f - f));
+        g = (uint8_t)(180 + f * 20); // soft green-cyan
+        b = (uint8_t)(80 * (1.0f - f));
+      }
+    }
+  } else if (type == PropOverlayType::Toa) {
+    if (vibrant) {
+      if (t < 0.5f) {
+        float f = t * 2.0f;
+        r = (uint8_t)(f * 255);
+        g = 255;
+        b = 0;
+      } else {
+        float f = (t - 0.5f) * 2.0f;
+        r = 255;
+        g = (uint8_t)((1.0f - f) * 255);
+        b = 0;
+      }
+    } else {
+      // Muted TOA: Soft Yellow -> Dusty Orange
+      if (t < 0.5f) {
+        float f = t * 2.0f;
+        r = (uint8_t)(160 + f * 40);
+        g = 180;
+        b = 120;
+      } else {
+        float f = (t - 0.5f) * 2.0f;
+        r = 200;
+        g = (uint8_t)(180 - f * 80);
+        b = (uint8_t)(120 - f * 40);
+      }
+    }
+  } else if (type == PropOverlayType::Heatmap) {
+    if (vibrant) {
+      if (t < 0.25f) {
+        float f = t / 0.25f;
+        r = (uint8_t)(f * 255);
+        g = 0;
+        b = (uint8_t)((1.0f - f) * 100);
+      } else if (t < 0.5f) {
+        float f = (t - 0.25f) / 0.25f;
+        r = 255;
+        g = (uint8_t)(f * 150);
+        b = 0;
+      } else if (t < 0.75f) {
+        float f = (t - 0.5f) / 0.25f;
+        r = 255;
+        g = (uint8_t)(150 + f * 105);
+        b = (uint8_t)(f * 100);
+      } else {
+        float f = (t - 0.75f) / 0.25f;
+        r = 255;
+        g = 255;
+        b = (uint8_t)(100 + f * 155);
+      }
+    } else {
+      // Muted Heatmap: Dusty Purple/Red -> Pastel Yellow -> Pale Cyan
+      if (t < 0.25f) {
+        float f = t / 0.25f;
+        r = (uint8_t)(100 + f * 50);
+        g = 100;
+        b = (uint8_t)(150 - f * 50);
+      } else if (t < 0.5f) {
+        float f = (t - 0.25f) / 0.25f;
+        r = (uint8_t)(150 + f * 50);
+        g = (uint8_t)(100 + f * 50);
+        b = 100;
+      } else if (t < 0.75f) {
+        float f = (t - 0.5f) / 0.25f;
+        r = 200;
+        g = (uint8_t)(150 + f * 50);
+        b = (uint8_t)(100 + f * 50);
+      } else {
+        float f = (t - 0.75f) / 0.25f;
+        r = (uint8_t)(200 - f * 50);
+        g = (uint8_t)(200 + f * 30);
+        b = (uint8_t)(150 + f * 80);
+      }
+    }
+  } else if (type == PropOverlayType::Drap) {
+    if (vibrant) {
+      if (t < 0.33f) { // yellow
+        r = 255; g = 255; b = 0;
+      } else if (t < 0.66f) { // orange
+        r = 255; g = 140; b = 0;
+      } else { // red
+        r = 220; g = 50; b = 50;
+      }
+    } else {
+      // Muted DRAP: Soft Gold -> Terracotta -> Brick
+      if (t < 0.33f) {
+        r = 170; g = 170; b = 80;
+      } else if (t < 0.66f) {
+        r = 180; g = 120; b = 70;
+      } else {
+        r = 160; g = 80; b = 80;
+      }
+    }
+  } else {
+    if (vibrant) {
+      // Vibrant MUF: original HamClock d_scale ramp (0-35 MHz)
+      // black → purple → blue → cyan → green → yellow → orange → red
+      struct { float t; uint8_t r, g, b; } stops[] = {
+        {0.000f,   0,   0,   0},
+        {0.114f,  78,  19, 138},
+        {0.257f,   0,  30, 245},
+        {0.429f, 120, 251, 214},
+        {0.571f, 120, 250,  77},
+        {0.771f, 254, 253,  84},
+        {0.857f, 236, 111,  45},
+        {1.000f, 233,  51,  35},
+      };
+      constexpr int N = 8;
+      int i = N - 2;
+      for (int k = 0; k < N - 1; ++k) {
+        if (t <= stops[k + 1].t) { i = k; break; }
+      }
+      float span = stops[i + 1].t - stops[i].t;
+      float f = (span > 0.0f) ? (t - stops[i].t) / span : 1.0f;
+      r = (uint8_t)(stops[i].r + f * (stops[i+1].r - stops[i].r));
+      g = (uint8_t)(stops[i].g + f * (stops[i+1].g - stops[i].g));
+      b = (uint8_t)(stops[i].b + f * (stops[i+1].b - stops[i].b));
+    } else {
+      // Muted MUF: Pastel rainbow with greyish base
+      struct { float t; uint8_t r, g, b; } stops[] = {
+        {0.000f,  40,  40,  60}, // Dark Grey-Blue
+        {0.200f,  80,  90, 160}, // Muted Indigo
+        {0.400f,  90, 160, 150}, // Muted Teal
+        {0.600f, 100, 170,  90}, // Muted Green
+        {0.800f, 180, 170,  80}, // Muted Yellow-Gold
+        {1.000f, 180,  90,  80}, // Muted Red-Brick
+      };
+      constexpr int N = 6;
+      int i = N - 2;
+      for (int k = 0; k < N - 1; ++k) {
+        if (t <= stops[k + 1].t) { i = k; break; }
+      }
+      float span = stops[i + 1].t - stops[i].t;
+      float f = (span > 0.0f) ? (t - stops[i].t) / span : 1.0f;
+      r = (uint8_t)(stops[i].r + f * (stops[i+1].r - stops[i].r));
+      g = (uint8_t)(stops[i].g + f * (stops[i+1].g - stops[i].g));
+      b = (uint8_t)(stops[i].b + f * (stops[i+1].b - stops[i].b));
+    }
+  }
+
+  return {r, g, b, 255};
 }
 
 void MapWidget::onResize(int x, int y, int w, int h) {

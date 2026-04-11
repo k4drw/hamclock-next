@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../core/ConfigManager.h"
 #include "../core/SpaceWeatherAlertData.h"
 #include "FontManager.h"
 #include "Widget.h"
@@ -11,6 +12,7 @@ struct SDL_Renderer;
 class SpaceWeatherAlertsPanel : public Widget {
 public:
   SpaceWeatherAlertsPanel(int x, int y, int w, int h, FontManager &fontMgr,
+                          AppConfig &config,
                           std::shared_ptr<SpaceWeatherAlertStore> store);
 
   std::string getName() const override { return "SpaceWxAlerts"; }
@@ -26,6 +28,7 @@ private:
   SDL_Color alertColor(SpaceWxAlertType type) const;
 
   FontManager &fontMgr_;
+  AppConfig &config_;
   std::shared_ptr<SpaceWeatherAlertStore> store_;
   SpaceWxAlertData currentData_;
   int scrollOffset_ = 0;

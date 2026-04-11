@@ -128,6 +128,11 @@ void SetupScreen::setConfig(const AppConfig &cfg) {
   }
 #endif
 
+  defaultTzOffset_ = cfg.defaultTzOffset;
+  defaultTzLabel_ = cfg.defaultTzLabel;
+  tzCustomOffsetInput_.setValue(std::to_string(defaultTzOffset_ == 999 ? 0 : defaultTzOffset_));
+  tzCustomLabelInput_.setValue(defaultTzLabel_);
+
   callsignInput_.setCursorToEnd();
 }
 
@@ -221,6 +226,8 @@ AppConfig SetupScreen::getConfig(const AppConfig& base) const {
 
   cfg.colorOverrides = colorOverrides_;
   cfg.fontPath = fontPath_;
+  cfg.defaultTzOffset = defaultTzOffset_;
+  cfg.defaultTzLabel = defaultTzLabel_;
 
   return cfg;
 }

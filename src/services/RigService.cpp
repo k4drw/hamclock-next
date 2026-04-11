@@ -304,7 +304,10 @@ void RigService::commandWorker() {
         }
       } else {
         LOG_E("Rig", "Reconnection failed, dropping command");
-        std::this_thread::sleep_for(5s);
+        // Interruptible wait: stop() notifies queueCV_ so shutdown exits immediately
+        // rather than blocking the full 5 s on a bare sleep_for.
+        { std::unique_lock<std::mutex> lk(queueMutex_);
+          queueCV_.wait_for(lk, 5s, [this] { return !running_.load(); }); }
         continue;
       }
     }

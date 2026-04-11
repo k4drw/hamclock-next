@@ -31,9 +31,10 @@ private:
   void cancelSave();
   void applyPreset(int index);
   void deletePreset(int index);
+  void applyPropFirehose();
 
   static constexpr int kModalW    = 420;
-  static constexpr int kModalH    = 330;  // +30 for built-in Contest row
+  static constexpr int kModalH    = 360;  // +30 for Contest row, +30 for Firehose row
   static constexpr int kRowH      = 30;
   static constexpr int kVisibleRows = 5;
   static constexpr int kLogicalW  = 800;
@@ -61,8 +62,9 @@ private:
   SDL_Rect listRect_     = {};
   SDL_Rect doneBtnRect_  = {};
 
-  // Built-in Contest Mode row
+  // Built-in Contest Mode / Prop Firehose rows
   SDL_Rect contestApplyRect_ = {};
+  SDL_Rect propFirehoseApplyRect_ = {};
 
   // Populated each render call — bounding rects for each visible row's buttons
   struct RowRects { SDL_Rect apply; SDL_Rect del; };

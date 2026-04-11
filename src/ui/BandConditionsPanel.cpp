@@ -81,8 +81,13 @@ void BandConditionsPanel::render(SDL_Renderer *renderer) {
   }
 
   int pad = 4;
+  int tableWidth = width_ - 2 * pad;
+  bool maximized = (width_ > 300);
+  if (maximized) {
+    tableWidth = width_ / 2 - 2 * pad;
+  }
 
-  int colWidth = (width_ - 2 * pad) / 3;
+  int colWidth = tableWidth / 3;
   int numRows =
       static_cast<int>(currentData_.statuses.size()) + 1; // +1 for header
   int availableH = height_ - titleH - 2 * pad;
@@ -106,7 +111,7 @@ void BandConditionsPanel::render(SDL_Renderer *renderer) {
   };
 
   // Header
-  bool useShort = (width_ < 100);
+  bool useShort = (tableWidth < 100);
   if (!useShort) {
     drawInCol("Band", 0, headerColor, headerStyle, -2);
     drawInCol("Day", 1, headerColor, headerStyle, -2);
@@ -118,7 +123,7 @@ void BandConditionsPanel::render(SDL_Renderer *renderer) {
     SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
                            themes.border.b, themes.border.a);
     SDL_RenderDrawLine(renderer, x_ + pad, curY + rowHeight - 2,
-                       x_ + width_ - pad, curY + rowHeight - 2);
+                       x_ + tableWidth + pad, curY + rowHeight - 2);
     curY += rowHeight;
   }
 
@@ -131,6 +136,75 @@ void BandConditionsPanel::render(SDL_Renderer *renderer) {
               colorForCondition(status.night, themes), cellStyle);
     curY += rowHeight;
   }
+
+  if (maximized) {
+    renderPropagationLogic(renderer, themes);
+  }
+}
+
+void BandConditionsPanel::renderPropagationLogic(SDL_Renderer *renderer,
+                                                 const ThemeColors &themes) {
+  auto *cat = fontMgr_.catalog();
+  int pad = 10;
+  int startX = x_ + width_ / 2 + pad;
+  int startY = y_ + 28; // Below "Band Conditions" title
+  int lineH = 13;
+
+  cat->drawText(renderer, "How it works (N0NBH standards):", startX, startY,
+                themes.accent, FontStyle::MicroBold);
+  startY += lineH;
+  cat->drawText(renderer, "Simplified propagation model for HF.", startX,
+                startY, themes.textDim, FontStyle::Tiny);
+  startY += lineH + 5;
+
+  cat->drawText(renderer, "Current Activity Indices:", startX, startY,
+                themes.accent, FontStyle::MicroBold);
+  startY += lineH;
+  std::string sfiText = "SFI: " + std::to_string(currentData_.sfi) +
+                        " (Higher improves 15m/10m)";
+  cat->drawText(renderer, sfiText, startX, startY, themes.text, FontStyle::Tiny);
+  startY += lineH;
+
+  char kStr[64];
+  std::snprintf(kStr, sizeof(kStr), "K: %.1f (High K degrades prop.)",
+                currentData_.k_index);
+  cat->drawText(renderer, std::string(kStr), startX, startY, themes.text,
+                FontStyle::Tiny);
+
+  startY += lineH + 8;
+  cat->drawText(renderer, "Logic Thresholds:", startX, startY, themes.accent,
+                FontStyle::MicroBold);
+  startY += lineH;
+
+  struct LogicPoint {
+    std::string label;
+    std::string desc;
+    SDL_Color color;
+  };
+
+  std::vector<LogicPoint> points = {
+      {"Excellent", "SFI > 250 (10m) / >150 (20m) & K < 3", themes.info},
+      {"Good", "SFI > 180 (10m) / >100 (20m) & K < 3", themes.success},
+      {"Fair", "SFI > 140 (10m) / >70 (20m) & K < 5", themes.warning},
+      {"Poor", "High K-index (> 5) or Low SFI", themes.danger}};
+
+  for (const auto &p : points) {
+    cat->drawText(renderer, p.label + ":", startX, startY, p.color,
+                  FontStyle::MicroBold);
+    cat->drawText(renderer, p.desc, startX + 60, startY, themes.textDim,
+                  FontStyle::Tiny);
+    startY += lineH;
+  }
+
+  startY += 5;
+  cat->drawText(renderer, "Nuances:", startX, startY, themes.accent,
+                FontStyle::MicroBold);
+  startY += lineH;
+  cat->drawText(renderer, "* 80/40m: Better at Night (Low absorption)", startX,
+                startY, themes.textDim, FontStyle::Tiny);
+  startY += lineH;
+  cat->drawText(renderer, "* 15/10m: Daytime only (Requires ionization)",
+                startX, startY, themes.textDim, FontStyle::Tiny);
 }
 
 void BandConditionsPanel::onResize(int x, int y, int w, int h) {

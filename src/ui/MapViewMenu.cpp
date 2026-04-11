@@ -30,14 +30,32 @@ void MapViewMenu::show(AppConfig &config, std::function<void()> onApply) {
   propPower_ = config.propPower;
   propToa_ = config.propToa;
   propPath_ = config.propPath;
+  propAntGain_ = config.propAntGain;
+  propColormap_ = config.propColormap;
+
+  propRotation_ = config.propRotation;
+  rotatingProp_ = !propRotation_.empty();
 
   char buf[32];
   std::snprintf(buf, sizeof(buf), "%d", static_cast<int>(propToa_));
   propToaInput_.setValue(buf);
   propToaInput_.setActive(false);
 
+  std::snprintf(buf, sizeof(buf), "%d", propAntGain_);
+  propAntGainInput_.setValue(buf);
+  propAntGainInput_.setActive(false);
+
   openCombo_ = -1;
 
+  // Initialize customizer sub-modal
+  propCustomizer_ = std::make_unique<HamClock::PropColorCustomizer>(
+      HamClock::LOGICAL_WIDTH / 2 - 250, HamClock::LOGICAL_HEIGHT / 2 - 190, 500, 380,
+      fontMgr_, config.theme, config.colorOverrides, [onApply]() { onApply(); });
+
+  recalcLayout();
+}
+
+void MapViewMenu::recalcLayout() {
   // Center the menu
   int menuW = 500;
   int menuH = 480;
@@ -46,14 +64,14 @@ void MapViewMenu::show(AppConfig &config, std::function<void()> onApply) {
 
   int col1X = menuRect_.x + 20;
   int col2X = menuRect_.x + menuW / 2 + 10;
-  int colW = menuW / 2 - 30;  // 220
+  int colW = menuW / 2 - 30; // 220
 
-  int y = menuRect_.y + 45;  // Start below title
+  int y = menuRect_.y + 45; // Start below title
 
   // Row 1
   projRec_ = {col1X, y + 25, colW, 30};
   styleRec_ = {col2X, y + 25, colW, 30};
-  projHeaderY_ = y;  // Label Y
+  projHeaderY_ = y; // Label Y
   styleHeaderY_ = y;
 
   // Row 2
@@ -67,31 +85,65 @@ void MapViewMenu::show(AppConfig &config, std::function<void()> onApply) {
   y += 60;
   weatherRec_ = {col1X, y + 25, colW, 30};
   weatherHeaderY_ = y;
+  propColormapRec_ = {col2X, y + 25, colW - 50, 30};
+  editPropColorsRec_ = {col2X + colW - 45, y + 25, 45, 30};
+  propColorHeaderY_ = y;
 
-  beaconsRec_ = {col2X + 10, y + 25, 20, 20};
-  bordersRec_ = {col2X + 110, y + 25, 20, 20};
-  centerDeCheckRect_ = {col2X + 10, y + 55, 20, 20};
+  // Row 4 (Toggles)
+  y += 70;
+  auto *cat = fontMgr_.catalog();
+  int beaconsLabelW =
+      fontMgr_.getLogicalWidth("Beacons", cat->ptSize(FontStyle::UI));
+  beaconsRec_ = {col1X + 10, y, 20 + 10 + beaconsLabelW, 20};
+  int bordersLabelW =
+      fontMgr_.getLogicalWidth("Borders", cat->ptSize(FontStyle::UI));
+  bordersRec_ = {col1X + 110, y, 20 + 10 + bordersLabelW, 20};
+  int centerDeLabelW =
+      fontMgr_.getLogicalWidth("Center on DE", cat->ptSize(FontStyle::UI));
+  centerDeCheckRect_ = {col2X + 10, y, 20 + 10 + centerDeLabelW, 20};
 
-  // Row 4 (VOACAP) - 3 columns
-  y += 80;
+  // Row 5 (VOACAP) - 3 columns
+  y += 35;
   voacapHeaderY_ = y;
-  int col3W = (menuW - 40) / 3 - 10;  // ~143
+  int col3W = (menuW - 40) / 3;
   int c1 = menuRect_.x + 20;
-  int c2 = c1 + col3W + 15;
-  int c3 = c2 + col3W + 15;
+  int c2 = c1 + col3W + 10;
+  int c3 = c2 + col3W + 10;
 
-  bandRec_ = {c1, y + 45, col3W, 30};
-  modeRec_ = {c2, y + 45, col3W, 30};
-  powerRec_ = {c3, y + 45, col3W, 30};
+  bandRec_ = {c1, y + 35, col3W, 30};
+  modeRec_ = {c2, y + 35, col3W, 30};
+  powerRec_ = {c3, y + 35, col3W, 30};
 
-  // Row 5 (TOA and Path)
+  // Row 5b (TOA, Path stacked, Ant Gain)
   y += 90;
   toaRec_ = {c1, y + 10, 80, 26};
   toaUpRec_ = {c1 + 82, y + 10, 24, 12};
   toaDnRec_ = {c1 + 82, y + 24, 24, 12};
 
-  spRec_ = {c2, y + 13, 16, 16};
-  lpRec_ = {c3, y + 13, 16, 16};
+  // Path radios stacked vertically under c2
+  int spLabelW =
+      fontMgr_.getLogicalWidth("Short", cat->ptSize(FontStyle::Fast));
+  spRec_ = {c2, y + 8, 16 + 10 + spLabelW, 16};
+  int lpLabelW =
+      fontMgr_.getLogicalWidth("Long", cat->ptSize(FontStyle::Fast));
+  lpRec_ = {c2, y + 30, 16 + 10 + lpLabelW, 16};
+
+  // Ant Gain spinner at c3 (same geometry as TOA)
+  antGainRec_ = {c3, y + 10, 80, 26};
+  antGainUpRec_ = {c3 + 82, y + 10, 24, 12};
+  antGainDnRec_ = {c3 + 82, y + 24, 24, 12};
+
+  // Rotation checklist rects (2 columns)
+  propRotationHeaderY_ = voacapHeaderY_;
+  propRotationCheckRects_.clear();
+
+  for (int i = 0; i < 6; ++i) { // Only 6 now
+    int row = i % 3;
+    int col = i / 3;
+    int cx = menuRect_.x + 30 + col * (menuW / 2 - 20);
+    int cy = propRotationHeaderY_ + 25 + row * 26;
+    propRotationCheckRects_.push_back({cx, cy, menuW / 2 - 40, 20});
+  }
 
   // Footer buttons
   int btnFooterW = 100;
@@ -102,24 +154,39 @@ void MapViewMenu::show(AppConfig &config, std::function<void()> onApply) {
   applyRect_ = {menuRect_.x + menuW / 2 + 10, btnY, btnFooterW, btnH};
 }
 
+void MapViewMenu::onFontChanged() {
+    recalcLayout();
+}
+
 void MapViewMenu::hide() { visible_ = false; }
 
 void MapViewMenu::update() {
-  if (!visible_ || repeatDir_ == 0)
+  if (!visible_)
+    return;
+
+  if (propCustomizer_ && propCustomizer_->isActive()) {
+    propCustomizer_->update();
+    return;
+  }
+
+  if (repeatDir_ == 0)
     return;
 
   uint32_t now = SDL_GetTicks();
   if (now - repeatStartMs_ > 500) {  // Initial delay
     if (now - repeatLastMs_ > 50) {  // Repeat interval
-      propToa_ += (repeatDir_ * 1.0f);
-      if (propToa_ < 0.0f)
-        propToa_ = 0.0f;
-      if (propToa_ > 90.0f)
-        propToa_ = 90.0f;
-
       char buf[32];
-      std::snprintf(buf, sizeof(buf), "%d", static_cast<int>(propToa_));
-      propToaInput_.setValue(buf);
+      if (repeatTarget_ == 0) {
+        propToa_ += (repeatDir_ * 1.0f);
+        if (propToa_ < 0.0f) propToa_ = 0.0f;
+        if (propToa_ > 90.0f) propToa_ = 90.0f;
+        std::snprintf(buf, sizeof(buf), "%d", static_cast<int>(propToa_));
+        propToaInput_.setValue(buf);
+      } else {
+        propAntGain_ = std::max(-10, std::min(30, propAntGain_ + repeatDir_));
+        std::snprintf(buf, sizeof(buf), "%d", propAntGain_);
+        propAntGainInput_.setValue(buf);
+      }
       repeatLastMs_ = now;
     }
   }
@@ -187,19 +254,21 @@ void MapViewMenu::render(SDL_Renderer *renderer) {
                 themes.text, FontStyle::UI);
   std::string propLabel = "None";
   if (propOverlay_ == PropOverlayType::Muf)
-    propLabel = "MUF";
+    propLabel = "MUF-RT";
   else if (propOverlay_ == PropOverlayType::Voacap)
     propLabel = "VOACAP";
   else if (propOverlay_ == PropOverlayType::Reliability)
     propLabel = "Reliability";
-  else if (propOverlay_ == PropOverlayType::Toa)
-    propLabel = "TOA";
   else if (propOverlay_ == PropOverlayType::Heatmap)
     propLabel = "Heatmap";
   else if (propOverlay_ == PropOverlayType::Drap)
     propLabel = "DRAP";
   else if (propOverlay_ == PropOverlayType::Aurora)
     propLabel = "Aurora";
+  
+  if (rotatingProp_)
+    propLabel = "Rotating...";
+
   drawDropdown(renderer, overlayRec_, propLabel, openCombo_ == COMBO_OVERLAY);
 
   // Weather Section
@@ -213,6 +282,26 @@ void MapViewMenu::render(SDL_Renderer *renderer) {
   drawDropdown(renderer, weatherRec_, weatherLabel,
                openCombo_ == COMBO_WEATHER);
 
+  // Prop Color Section
+  cat->drawText(renderer, "Prop Colors", propColormapRec_.x, propColorHeaderY_,
+                themes.text, FontStyle::UI);
+  std::string propColorLabel = "Muted";
+  if (propColormap_ == "vibrant")
+    propColorLabel = "Vibrant";
+  else if (propColormap_ == "custom")
+    propColorLabel = "Custom";
+    
+  drawDropdown(renderer, propColormapRec_, propColorLabel,
+               openCombo_ == COMBO_PROP_COLOR);
+
+  if (propColormap_ == "custom") {
+    SDL_SetRenderDrawColor(renderer, themes.accent.r, themes.accent.g, themes.accent.b, 255);
+    SDL_RenderFillRect(renderer, &editPropColorsRec_);
+    cat->drawText(renderer, "Edit...", editPropColorsRec_.x + editPropColorsRec_.w / 2,
+                  editPropColorsRec_.y + editPropColorsRec_.h / 2, themes.bg,
+                  FontStyle::UI, true, false, true);
+  }
+
   // Beacons & Borders Toggles
   renderRadioButton(renderer, beaconsRec_, showBeacons_, "Beacons",
                     themes.text);
@@ -221,10 +310,9 @@ void MapViewMenu::render(SDL_Renderer *renderer) {
   renderRadioButton(renderer, centerDeCheckRect_, centerMapOnDe_,
                     "Center on DE", themes.text);
 
-  // VOACAP Extras (Used for VOACAP, Reliability, and TOA)
+  // VOACAP Extras (Used for VOACAP and Reliability)
   if (propOverlay_ == PropOverlayType::Voacap ||
-      propOverlay_ == PropOverlayType::Reliability ||
-      propOverlay_ == PropOverlayType::Toa) {
+      propOverlay_ == PropOverlayType::Reliability) {
     cat->drawText(renderer, "VOACAP Settings", menuRect_.x + 20, voacapHeaderY_,
                   themes.text, FontStyle::UI);
     // Draw separator line
@@ -276,10 +364,53 @@ void MapViewMenu::render(SDL_Renderer *renderer) {
 
     cat->drawText(renderer, "Path", spRec_.x, toaRec_.y - 20, themes.text,
                   FontStyle::Fast);
-    renderRadioButton(renderer, spRec_, propPath_ == 0, "Short Path",
-                      themes.text);
-    renderRadioButton(renderer, lpRec_, propPath_ == 1, "Long Path",
-                      themes.text);
+    renderRadioButton(renderer, spRec_, propPath_ == 0, "Short", themes.text);
+    renderRadioButton(renderer, lpRec_, propPath_ == 1, "Long", themes.text);
+
+    // Antenna Gain spinner (mirrors TOA)
+    cat->drawText(renderer, "Ant Gain (dBi)", antGainRec_.x, antGainRec_.y - 20,
+                  themes.text, FontStyle::Fast);
+    propAntGainInput_.render(renderer, fontMgr_, antGainRec_.x, antGainRec_.y,
+                             antGainRec_.w, antGainRec_.h, FontStyle::UI, 5,
+                             propAntGainInput_.isActive(), true, themes.accent,
+                             themes.border, themes.text, themes.text,
+                             themes.textDim);
+
+    SDL_SetRenderDrawColor(renderer, themes.rowStripe2.r, themes.rowStripe2.g,
+                           themes.rowStripe2.b, 255);
+    SDL_RenderFillRect(renderer, &antGainUpRec_);
+    SDL_RenderFillRect(renderer, &antGainDnRec_);
+    SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
+                           themes.border.b, 255);
+    SDL_RenderDrawRect(renderer, &antGainUpRec_);
+    SDL_RenderDrawRect(renderer, &antGainDnRec_);
+    RenderUtils::drawTriangle(
+        renderer, antGainUpRec_.x + 4, antGainUpRec_.y + antGainUpRec_.h - 4,
+        antGainUpRec_.x + antGainUpRec_.w - 4, antGainUpRec_.y + antGainUpRec_.h - 4,
+        antGainUpRec_.x + antGainUpRec_.w / 2, antGainUpRec_.y + 4, themes.text);
+    RenderUtils::drawTriangle(
+        renderer, antGainDnRec_.x + 4, antGainDnRec_.y + 4,
+        antGainDnRec_.x + antGainDnRec_.w - 4, antGainDnRec_.y + 4,
+        antGainDnRec_.x + antGainDnRec_.w / 2, antGainDnRec_.y + antGainDnRec_.h - 4,
+        themes.text);
+  } else if (rotatingProp_) {
+    // Render Rotation Checklist
+    cat->drawText(renderer, "Rotation Set", menuRect_.x + 20, propRotationHeaderY_,
+                  themes.text, FontStyle::UI);
+    SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
+                           themes.border.b, 80);
+    SDL_RenderDrawLine(renderer, menuRect_.x + 20, propRotationHeaderY_ + 18,
+                       menuRect_.x + menuRect_.w - 20, propRotationHeaderY_ + 18);
+
+    PropOverlayType types[] = {
+        PropOverlayType::Muf,  PropOverlayType::Voacap, PropOverlayType::Reliability,
+        PropOverlayType::Heatmap, PropOverlayType::Drap, PropOverlayType::Aurora};
+    const char* labels[] = {"MUF-RT", "VOACAP", "Reliability", "Heatmap", "DRAP", "Aurora"};
+
+    for (int i = 0; i < 6; ++i) {
+      bool isSelected = std::find(propRotation_.begin(), propRotation_.end(), types[i]) != propRotation_.end();
+      renderRadioButton(renderer, propRotationCheckRects_[i], isSelected, labels[i], themes.text);
+    }
   }
 
   // Footer Buttons
@@ -297,8 +428,8 @@ void MapViewMenu::render(SDL_Renderer *renderer) {
                 true, false, true);
 
   // Apply button
-  SDL_SetRenderDrawColor(renderer, themes.rowStripe2.r, themes.rowStripe2.g,
-                         themes.rowStripe2.b, 255);
+  SDL_SetRenderDrawColor(renderer, themes.success.r, themes.success.g,
+                         themes.success.b, 255);
   SDL_RenderFillRect(renderer, &applyRect_);
   SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
                          themes.border.b, 255);
@@ -325,16 +456,29 @@ void MapViewMenu::render(SDL_Renderer *renderer) {
       drawDropdownList(renderer, modeRec_, modeOpts_);
     else if (openCombo_ == COMBO_POWER)
       drawDropdownList(renderer, powerRec_, powerOpts_);
+    else if (openCombo_ == COMBO_PROP_COLOR)
+      drawDropdownList(renderer, propColormapRec_, propColorOpts_);
+  }
+
+  // Customizer sub-modal
+  if (propCustomizer_ && propCustomizer_->isActive()) {
+    propCustomizer_->render(renderer);
   }
 }
 
-bool MapViewMenu::onMouseDown(int mx, int my, Uint16 /*mod*/, int clicks) {
+bool MapViewMenu::onMouseDown(int mx, int my, Uint16 mod, int clicks) {
   if (!visible_)
     return false;
+
+  if (propCustomizer_ && propCustomizer_->isActive()) {
+    return propCustomizer_->onMouseDown(mx, my, mod, clicks);
+  }
+
   SDL_Point pt = {mx, my};
 
   if (SDL_PointInRect(&pt, &toaRec_)) {
     if (!propToaInput_.isActive()) {
+      propAntGainInput_.setActive(false);
       propToaInput_.setActive(true);
       SDL_StartTextInput();
     }
@@ -343,45 +487,83 @@ bool MapViewMenu::onMouseDown(int mx, int my, Uint16 /*mod*/, int clicks) {
     return true;
   }
 
-  if (propToaInput_.isActive()) {
-    propToaInput_.setActive(false);
-    SDL_StopTextInput();
-    // Parse the value back
-    try {
-      propToa_ = std::round(std::stof(propToaInput_.getValue()));
-      if (propToa_ < 0.0f)
-        propToa_ = 0.0f;
-      if (propToa_ > 90.0f)
-        propToa_ = 90.0f;
-    } catch (...) {
+  if (SDL_PointInRect(&pt, &antGainRec_)) {
+    if (!propAntGainInput_.isActive()) {
+      propToaInput_.setActive(false);
+      propAntGainInput_.setActive(true);
+      SDL_StartTextInput();
     }
-    char buf[32];
-    std::snprintf(buf, sizeof(buf), "%d", static_cast<int>(propToa_));
-    propToaInput_.setValue(buf);
+    propAntGainInput_.onMouseDown(mx, my, clicks, fontMgr_, antGainRec_.x,
+                                  antGainRec_.y, antGainRec_.w, antGainRec_.h,
+                                  FontStyle::UI, 5);
+    return true;
   }
 
-  if (SDL_PointInRect(&pt, &toaUpRec_)) {
-    repeatDir_ = 1;
-    repeatStartMs_ = repeatLastMs_ = SDL_GetTicks();
+  auto commitInputs = [&]() {
+    if (propToaInput_.isActive()) {
+      propToaInput_.setActive(false);
+      SDL_StopTextInput();
+      try {
+        propToa_ = std::round(std::stof(propToaInput_.getValue()));
+        if (propToa_ < 0.0f) propToa_ = 0.0f;
+        if (propToa_ > 90.0f) propToa_ = 90.0f;
+      } catch (...) {}
+      char buf[32];
+      std::snprintf(buf, sizeof(buf), "%d", static_cast<int>(propToa_));
+      propToaInput_.setValue(buf);
+    }
+    if (propAntGainInput_.isActive()) {
+      propAntGainInput_.setActive(false);
+      SDL_StopTextInput();
+      try {
+        propAntGain_ = std::stoi(propAntGainInput_.getValue());
+        if (propAntGain_ < -10) propAntGain_ = -10;
+        if (propAntGain_ > 30)  propAntGain_ = 30;
+      } catch (...) {}
+      char buf[32];
+      std::snprintf(buf, sizeof(buf), "%d", propAntGain_);
+      propAntGainInput_.setValue(buf);
+    }
+  };
+  commitInputs();
 
+  if (SDL_PointInRect(&pt, &toaUpRec_)) {
+    repeatDir_ = 1; repeatTarget_ = 0;
+    repeatStartMs_ = repeatLastMs_ = SDL_GetTicks();
     propToa_ += 1.0f;
-    if (propToa_ > 90.0f)
-      propToa_ = 90.0f;
+    if (propToa_ > 90.0f) propToa_ = 90.0f;
     char buf[32];
     std::snprintf(buf, sizeof(buf), "%d", static_cast<int>(propToa_));
     propToaInput_.setValue(buf);
     return true;
   }
   if (SDL_PointInRect(&pt, &toaDnRec_)) {
-    repeatDir_ = -1;
+    repeatDir_ = -1; repeatTarget_ = 0;
     repeatStartMs_ = repeatLastMs_ = SDL_GetTicks();
-
     propToa_ -= 1.0f;
-    if (propToa_ < 0.0f)
-      propToa_ = 0.0f;
+    if (propToa_ < 0.0f) propToa_ = 0.0f;
     char buf[32];
     std::snprintf(buf, sizeof(buf), "%d", static_cast<int>(propToa_));
     propToaInput_.setValue(buf);
+    return true;
+  }
+
+  if (SDL_PointInRect(&pt, &antGainUpRec_)) {
+    repeatDir_ = 1; repeatTarget_ = 1;
+    repeatStartMs_ = repeatLastMs_ = SDL_GetTicks();
+    propAntGain_ = std::min(30, propAntGain_ + 1);
+    char buf[32];
+    std::snprintf(buf, sizeof(buf), "%d", propAntGain_);
+    propAntGainInput_.setValue(buf);
+    return true;
+  }
+  if (SDL_PointInRect(&pt, &antGainDnRec_)) {
+    repeatDir_ = -1; repeatTarget_ = 1;
+    repeatStartMs_ = repeatLastMs_ = SDL_GetTicks();
+    propAntGain_ = std::max(-10, propAntGain_ - 1);
+    char buf[32];
+    std::snprintf(buf, sizeof(buf), "%d", propAntGain_);
+    propAntGainInput_.setValue(buf);
     return true;
   }
 
@@ -450,7 +632,7 @@ void MapViewMenu::drawDropdownList(SDL_Renderer *renderer,
     // Divider
     if (i < visibleCount - 1) {
       SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
-                             themes.border.b, 100);
+                         themes.border.b, 100);
       SDL_RenderDrawLine(renderer, itemRec.x, itemRec.y + 29,
                          itemRec.x + itemRec.w, itemRec.y + 29);
     }
@@ -483,11 +665,26 @@ void MapViewMenu::drawDropdownList(SDL_Renderer *renderer,
 }
 
 bool MapViewMenu::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
-  repeatDir_ = 0;
-  propToaInput_.onMouseUp();
-
   if (!visible_)
     return false;
+
+  if (propCustomizer_ && propCustomizer_->isActive()) {
+    return propCustomizer_->onMouseUp(mx, my, mod, clicks);
+  }
+
+  // Edit Colors button
+  if (propColormap_ == "custom" && mx >= editPropColorsRec_.x &&
+      mx < editPropColorsRec_.x + editPropColorsRec_.w &&
+      my >= editPropColorsRec_.y &&
+      my < editPropColorsRec_.y + editPropColorsRec_.h) {
+    propCustomizer_->setActive(true);
+    return true;
+  }
+
+  repeatDir_ = 0;
+  propToaInput_.onMouseUp();
+  propAntGainInput_.onMouseUp();
+
   SDL_Point pt = {mx, my};
 
   // Helper for combo handling
@@ -546,7 +743,21 @@ bool MapViewMenu::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
             PropOverlayType::Voacap, PropOverlayType::Reliability,
             PropOverlayType::Heatmap, PropOverlayType::Drap,
             PropOverlayType::Aurora};
-        propOverlay_ = t[idx];
+        if (idx < 7) {
+          propOverlay_ = t[idx];
+          rotatingProp_ = false;
+          propRotation_.clear();
+        } else {
+          // "Rotating..." selected
+          rotatingProp_ = true;
+          if (propRotation_.empty()) {
+            // Default to current overlay if it was valid
+            if (propOverlay_ != PropOverlayType::None)
+              propRotation_.push_back(propOverlay_);
+            else
+              propRotation_.push_back(PropOverlayType::Muf);
+          }
+        }
       }))
     return true;
 
@@ -555,6 +766,13 @@ bool MapViewMenu::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
                                   WeatherOverlayType::WxMb,
                                   WeatherOverlayType::CloudsGrib};
         weatherOverlay_ = t[idx];
+      }))
+    return true;
+
+  if (handleCombo(propColormapRec_, COMBO_PROP_COLOR, propColorOpts_, [&](int idx) {
+        if (idx == 0) propColormap_ = "vibrant";
+        else if (idx == 1) propColormap_ = "muted";
+        else if (idx == 2) propColormap_ = "custom";
       }))
     return true;
 
@@ -574,8 +792,7 @@ bool MapViewMenu::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
 
   // VOACAP Settings
   if (propOverlay_ == PropOverlayType::Voacap ||
-      propOverlay_ == PropOverlayType::Reliability ||
-      propOverlay_ == PropOverlayType::Toa) {
+      propOverlay_ == PropOverlayType::Reliability) {
     if (handleCombo(bandRec_, COMBO_BAND, bandOpts_,
                     [&](int idx) { propBand_ = bandOpts_[idx]; }))
       return true;
@@ -593,11 +810,27 @@ bool MapViewMenu::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
       propPath_ = 0;
       return true;
     }
-    if (SDL_PointInRect(&pt, &lpRec_)) {
-      propPath_ = 1;
-      return true;
+      if (SDL_PointInRect(&pt, &lpRec_)) {
+        propPath_ = 1;
+        return true;
+      }
+    } else if (rotatingProp_) {
+      PropOverlayType types[] = {
+          PropOverlayType::Muf,  PropOverlayType::Voacap, PropOverlayType::Reliability,
+          PropOverlayType::Heatmap, PropOverlayType::Drap, PropOverlayType::Aurora};
+      for (int i = 0; i < 6; ++i) {
+        if (SDL_PointInRect(&pt, &propRotationCheckRects_[i])) {
+          auto it = std::find(propRotation_.begin(), propRotation_.end(), types[i]);
+          if (it != propRotation_.end()) {
+            if (propRotation_.size() > 1)
+              propRotation_.erase(it);
+          } else {
+            propRotation_.push_back(types[i]);
+          }
+          return true;
+        }
+      }
     }
-  }
 
   // Close any open combo if clicking elsewhere in menu
   if (openCombo_ != -1) {
@@ -610,18 +843,6 @@ bool MapViewMenu::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
     return true;
   }
   if (SDL_PointInRect(&pt, &applyRect_)) {
-    // Commit current TOA input if active
-    if (propToaInput_.isActive()) {
-      try {
-        propToa_ = std::round(std::stof(propToaInput_.getValue()));
-        if (propToa_ < 0.0f)
-          propToa_ = 0.0f;
-        if (propToa_ > 90.0f)
-          propToa_ = 90.0f;
-      } catch (...) {
-      }
-    }
-
     config_->projection = projection_;
     config_->mapStyle = mapStyle_;
     config_->showGrid = showGrid_;
@@ -635,7 +856,10 @@ bool MapViewMenu::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
     config_->propPower = propPower_;
     config_->propToa = propToa_;
     config_->propPath = propPath_;
+    config_->propAntGain = propAntGain_;
+    config_->propColormap = propColormap_;
     config_->centerMapOnDe = centerMapOnDe_;
+    config_->propRotation = propRotation_;
     hide();
     if (onApply_)
       onApply_();
@@ -655,18 +879,32 @@ bool MapViewMenu::onKeyDown(SDL_Keycode key, Uint16 mod) {
       SDL_StopTextInput();
       try {
         propToa_ = std::round(std::stof(propToaInput_.getValue()));
-        if (propToa_ < 0.0f)
-          propToa_ = 0.0f;
-        if (propToa_ > 90.0f)
-          propToa_ = 90.0f;
-      } catch (...) {
-      }
+        if (propToa_ < 0.0f) propToa_ = 0.0f;
+        if (propToa_ > 90.0f) propToa_ = 90.0f;
+      } catch (...) {}
       char buf[32];
       std::snprintf(buf, sizeof(buf), "%d", static_cast<int>(propToa_));
       propToaInput_.setValue(buf);
       return true;
     }
     return propToaInput_.onKeyDown(key, mod);
+  }
+
+  if (propAntGainInput_.isActive()) {
+    if (key == SDLK_RETURN || key == SDLK_KP_ENTER) {
+      propAntGainInput_.setActive(false);
+      SDL_StopTextInput();
+      try {
+        propAntGain_ = std::stoi(propAntGainInput_.getValue());
+        if (propAntGain_ < -10) propAntGain_ = -10;
+        if (propAntGain_ > 30)  propAntGain_ = 30;
+      } catch (...) {}
+      char buf[32];
+      std::snprintf(buf, sizeof(buf), "%d", propAntGain_);
+      propAntGainInput_.setValue(buf);
+      return true;
+    }
+    return propAntGainInput_.onKeyDown(key, mod);
   }
 
   if (key == SDLK_ESCAPE) {
@@ -682,13 +920,9 @@ bool MapViewMenu::onKeyDown(SDL_Keycode key, Uint16 mod) {
 bool MapViewMenu::onTextInput(const char *text) {
   if (!visible_)
     return false;
-  if (propToaInput_.isActive()) {
-    return propToaInput_.onTextInput(text);
-  }
   return false;
 }
 
-// Dummy helper just in case
 void MapViewMenu::renderRadioButton(SDL_Renderer *renderer,
                                     const SDL_Rect &rect, bool selected,
                                     const std::string &label,
@@ -696,25 +930,32 @@ void MapViewMenu::renderRadioButton(SDL_Renderer *renderer,
   auto *cat = fontMgr_.catalog();
   ThemeColors themes = getThemeColors(theme_);
 
-  // Draw the outer square
+  // Draw the outer square (fixed size based on rect.h)
+  SDL_Rect box = {rect.x, rect.y, rect.h, rect.h};
   SDL_SetRenderDrawColor(renderer, themes.rowStripe1.r, themes.rowStripe1.g,
                          themes.rowStripe1.b, 255);
-  SDL_RenderFillRect(renderer, &rect);
+  SDL_RenderFillRect(renderer, &box);
   SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
                          themes.border.b, 255);
-  SDL_RenderDrawRect(renderer, &rect);
+  SDL_RenderDrawRect(renderer, &box);
 
   // If selected, draw the inner "checked" square
   if (selected) {
-    SDL_Rect check = {rect.x + 4, rect.y + 4, rect.w - 8, rect.h - 8};
+    SDL_Rect check = {box.x + 4, box.y + 4, box.w - 8, box.h - 8};
     SDL_SetRenderDrawColor(renderer, themes.success.r, themes.success.g,
                            themes.success.b, 255);
     SDL_RenderFillRect(renderer, &check);
   }
 
   // Draw the label
-  cat->drawText(renderer, label, rect.x + rect.w + 10, rect.y + rect.h / 2,
+  cat->drawText(renderer, label, box.x + box.w + 10, box.y + box.h / 2,
                 textColor, FontStyle::UI, false, false, true);
+}
+
+void MapViewMenu::onMouseMove(int mx, int my) {
+  if (visible_ && propCustomizer_ && propCustomizer_->isActive()) {
+    propCustomizer_->onMouseMove(mx, my);
+  }
 }
 
 bool MapViewMenu::onMouseWheel(int scrollY) {
@@ -744,6 +985,9 @@ bool MapViewMenu::onMouseWheel(int scrollY) {
       break;
     case COMBO_POWER:
       totalItems = powerOpts_.size();
+      break;
+    case COMBO_PROP_COLOR:
+      totalItems = propColorOpts_.size();
       break;
   }
 

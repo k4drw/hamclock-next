@@ -1,4 +1,4 @@
-# HamClock-Next (v1.3)
+# HamClock-Next (v1.4)
 
 > **HamClock-Next** is a modern, multi-platform rewrite of the original HamClock
 > by **Elwood Downey, WB0OEW** (SK 29 January 2026).
@@ -107,7 +107,36 @@ Every external data fetch is cached both in memory and on disk with ETag / HTTP 
 
 ---
 
-## Requirements & Dependencies
+## Download & Install
+
+**Pre-built packages are available for all platforms — no compiler required.**
+
+| Platform | Download |
+|----------|---------|
+| Linux (deb/rpm/AppImage) | [GitHub Releases](https://github.com/k4drw/hamclock-next/releases) · [SourceForge mirror](https://sourceforge.net/projects/hamclock-next/files/) |
+| macOS (.dmg) | [GitHub Releases](https://github.com/k4drw/hamclock-next/releases) |
+| Windows (installer) | [GitHub Releases](https://github.com/k4drw/hamclock-next/releases) |
+| Browser / WASM | Self-host via `--live-web` flag, or use the downloadable WASM build |
+
+```bash
+# Debian / Ubuntu
+sudo dpkg -i hamclock-next_*.deb && hamclock-next
+
+# OpenSUSE / Fedora
+sudo rpm -i hamclock-next-*.rpm && hamclock-next
+
+# AppImage (any Linux)
+chmod +x HamClock-Next-*.AppImage && ./HamClock-Next-*.AppImage
+```
+
+---
+
+## Building from Source
+
+> **Only needed if you want a custom build or are contributing to development.**
+> See the [Building from Source](docs/wiki/Building-from-Source.md) wiki page for full instructions.
+
+### System Libraries Required
 
 To compile HamClock-Next, you will need the following libraries and tools installed on your system:
 
@@ -129,7 +158,7 @@ To compile HamClock-Next, you will need the following libraries and tools instal
 
 ---
 
-## Build Instructions
+### Build Steps
 
 1. **Install dependencies** (Example for Ubuntu/Debian):
    ```bash
@@ -230,12 +259,6 @@ HamClock-Next is designed for AI-assisted development using the **Model Context 
 To get started with AI-assisted contributions, see the **[MCP_GUIDE.md](MCP_GUIDE.md)** for setup and usage instructions.
 
 ---
-
-## Get HamClock-Next
-
-Releases, installers, and WASM builds are available at:
-
-**https://github.com/k4drw/hamclock-next/releases**
 
 HamClock-Next is free and open source under the GPL license, in the spirit of the original work by Elwood Downey, WB0OEW.
 

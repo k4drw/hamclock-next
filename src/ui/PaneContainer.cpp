@@ -6,7 +6,8 @@
 PaneContainer::PaneContainer(int x, int y, int w, int h,
                              const std::string &initialType,
                              FontManager &fontMgr)
-    : Widget(x, y, w, h), currentType_(initialType), fontMgr_(fontMgr) {}
+    : Widget(x, y, w, h), currentType_(initialType), fontMgr_(fontMgr),
+      mouseX_(-1), mouseY_(-1) {}
 
 void PaneContainer::setRotation(const std::vector<std::string> &types,
                                 int intervalS, bool syncRotation) {
@@ -181,27 +182,41 @@ void PaneContainer::render(SDL_Renderer *renderer) {
   }
 
   // Draw manual navigation arrows when rotation has multiple widgets
-  // Hide if widget is configuring
-  if (rotation_.size() > 1 &&
-      !(activeWidget_ && activeWidget_->isConfiguring())) {
+  // Hide if widget is configuring. ALSO: Hide unless mouse is near edges.
+  if (rotation_.size() > 1 && !(activeWidget_ && activeWidget_->isConfiguring())) {
     int arrowW = std::min(18, width_ / 8);
     int arrowH = std::min(36, height_ / 5);
     int cy = y_ + height_ / 2;
     SDL_Rect lArr = {x_, cy - arrowH / 2, arrowW, arrowH};
     SDL_Rect rArr = {x_ + width_ - arrowW, cy - arrowH / 2, arrowW, arrowH};
 
-    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-    SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, 140);
-    SDL_RenderFillRect(renderer, &lArr);
-    SDL_RenderFillRect(renderer, &rArr);
-    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+    // Determine if we should show arrows based on mouse proximity
+    bool showArrows = false;
+    SDL_Rect bounds = getRect();
+    if (mouseX_ >= bounds.x && mouseX_ < bounds.x + bounds.w &&
+        mouseY_ >= bounds.y && mouseY_ < bounds.y + bounds.h) {
+      // Mouse is in bounds. Show if near left or right.
+      int hoverThreshold = arrowW * 2;
+      if (mouseX_ < bounds.x + hoverThreshold ||
+          mouseX_ >= bounds.x + bounds.w - hoverThreshold) {
+        showArrows = true;
+      }
+    }
 
-    fontMgr_.catalog()->drawText(renderer, "<", lArr.x + lArr.w / 2,
-                                 lArr.y + lArr.h / 2, themes.text,
-                                 FontStyle::Fast, true, false, true);
-    fontMgr_.catalog()->drawText(renderer, ">", rArr.x + rArr.w / 2,
-                                 rArr.y + rArr.h / 2, themes.text,
-                                 FontStyle::Fast, true, false, true);
+    if (showArrows) {
+      SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+      SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, 140);
+      SDL_RenderFillRect(renderer, &lArr);
+      SDL_RenderFillRect(renderer, &rArr);
+      SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+
+      fontMgr_.catalog()->drawText(renderer, "<", lArr.x + lArr.w / 2,
+                                   lArr.y + lArr.h / 2, themes.text,
+                                   FontStyle::Fast, true, false, true);
+      fontMgr_.catalog()->drawText(renderer, ">", rArr.x + rArr.w / 2,
+                                   rArr.y + rArr.h / 2, themes.text,
+                                   FontStyle::Fast, true, false, true);
+    }
   }
 }
 
@@ -213,6 +228,8 @@ void PaneContainer::onResize(int x, int y, int w, int h) {
 }
 
 void PaneContainer::onMouseMove(int mx, int my) {
+  mouseX_ = mx;
+  mouseY_ = my;
   if (activeWidget_) {
     activeWidget_->onMouseMove(mx, my);
   }

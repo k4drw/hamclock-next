@@ -1,23 +1,26 @@
 #include "ClockAuxPanel.h"
 #include "WidgetRegistry.h"
 
+#include "../core/Astronomy.h"
 #include "../core/Constants.h"
 #include "../core/StringUtils.h"
 #include "../core/Theme.h"
 #include "FontCatalog.h"
 
 #include <algorithm>
-#include <chrono>
 #include <cstdio>
-#include <cstdlib>
 #include <ctime>
+#include <memory>
 
 // Sentinel value 999 means "use system local time (std::localtime)" —
 // DST-aware.
 static constexpr int kLocalSentinel = 999;
+// Sentinel value 998 means "use global default timezone"
+static constexpr int kDefaultSentinel = 998;
 
 const ClockAuxPanel::TzPreset ClockAuxPanel::kPresets[] = {
-    {kLocalSentinel, "Local"}, // system local time, DST-aware
+    {kDefaultSentinel, "Default"}, // use global default
+    {kLocalSentinel, "Local"},   // system local time, DST-aware
     {0, "UTC"},
     {-5, "EST"},
     {-6, "CST"},
@@ -50,8 +53,8 @@ void ClockAuxPanel::syncFromConfig() {
 }
 
 ClockAuxPanel::~ClockAuxPanel() {
-  if (hmTex_)  SDL_DestroyTexture(hmTex_);
-  if (secTex_) SDL_DestroyTexture(secTex_);
+  MemoryMonitor::getInstance().destroyTexture(hmTex_);
+  MemoryMonitor::getInstance().destroyTexture(secTex_);
 }
 
 void ClockAuxPanel::update() {}
@@ -67,17 +70,27 @@ void ClockAuxPanel::render(SDL_Renderer *renderer) {
   auto now = std::chrono::system_clock::now();
   std::time_t now_c = std::chrono::system_clock::to_time_t(now);
 
+  struct tm localTm{};
   struct tm *gmt;
-  if (config_.auxClockTzOffset == kLocalSentinel) {
-    gmt = std::localtime(&now_c);
+  int offset = config_.auxClockTzOffset;
+  std::string label = config_.auxClockTzLabel;
+  if (offset == kDefaultSentinel) {
+    offset = config_.defaultTzOffset;
+    label = config_.defaultTzLabel;
+  }
+
+  if (offset == kLocalSentinel) {
+    Astronomy::portable_localtime(&now_c, &localTm);
+    gmt = &localTm;
+    label = Astronomy::portable_tzabbr(localTm);
   } else {
-    std::time_t tzTime = now_c + (config_.auxClockTzOffset * 3600);
+    std::time_t tzTime = now_c + (offset * 3600);
     gmt = std::gmtime(&tzTime);
   }
   auto *cat = fontMgr_.catalog();
 
   int titleH = 20;
-  std::string title = config_.auxClockTzLabel + " Time";
+  std::string title = label + " Time";
   renderTitle(renderer, fontMgr_, title);
 
   int curY = y_ + titleH + 4;
@@ -93,13 +106,13 @@ void ClockAuxPanel::render(SDL_Renderer *renderer) {
 
   // Rebuild textures only when string changes
   if (hmStr != lastHM_ || !hmTex_) {
-    if (hmTex_) { SDL_DestroyTexture(hmTex_); hmTex_ = nullptr; }
+    MemoryMonitor::getInstance().destroyTexture(hmTex_);
     hmTex_ = fontMgr_.renderText(renderer, hmStr, themes.text, hmFontSize_,
                                  &hmW_, &hmH_, true);
     lastHM_ = hmStr;
   }
   if (secStr != lastSec_ || !secTex_) {
-    if (secTex_) { SDL_DestroyTexture(secTex_); secTex_ = nullptr; }
+    MemoryMonitor::getInstance().destroyTexture(secTex_);
     secTex_ = fontMgr_.renderText(renderer, secStr, themes.text, secFontSize_,
                                   &secW_, &secH_, true);
     lastSec_ = secStr;
@@ -175,8 +188,8 @@ void ClockAuxPanel::onResize(int x, int y, int w, int h) {
   secFontSize_   = cat->ptSize(FontStyle::FastBold);
   infoFontSize_  = cat->ptSize(FontStyle::Fast);
   // Invalidate cached textures on resize
-  if (hmTex_)  { SDL_DestroyTexture(hmTex_);  hmTex_  = nullptr; }
-  if (secTex_) { SDL_DestroyTexture(secTex_); secTex_ = nullptr; }
+  MemoryMonitor::getInstance().destroyTexture(hmTex_);
+  MemoryMonitor::getInstance().destroyTexture(secTex_);
   lastHM_.clear();
   lastSec_.clear();
 }

@@ -90,6 +90,8 @@ private:
   int gridBottom_ = 0;
   int gridCellH_ = 0;
   int gridColW_ = 0;
+  int gridRows_ = 0;
+  int gridCols_ = 0;
   int gridPad_ = 2;
   SDL_Rect footerRect_ = {};
 };

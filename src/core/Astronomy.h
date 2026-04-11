@@ -68,6 +68,21 @@ public:
 #endif
   }
 
+  // Portable timezone abbreviation (e.g. "EDT", "PST") from a local struct tm.
+  // Returns the short abbreviation used by the OS for the current timezone/DST state.
+  static std::string portable_tzabbr(const struct tm &local) {
+#if defined(_WIN32)
+    // _tzname[0] = standard, _tzname[1] = DST
+    return (local.tm_isdst > 0) ? _tzname[1] : _tzname[0];
+#else
+#if defined(__GLIBC__) || defined(__APPLE__)
+    if (local.tm_zone && local.tm_zone[0])
+      return local.tm_zone;
+#endif
+    return tzname[local.tm_isdst > 0 ? 1 : 0];
+#endif
+  }
+
   // Portable UTC offset in seconds (positive = east of GMT)
   static long portable_utcoffset(const std::time_t *t, struct tm *local) {
 #if defined(_WIN32)

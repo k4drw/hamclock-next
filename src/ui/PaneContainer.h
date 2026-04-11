@@ -100,6 +100,8 @@ private:
   SDL_Rect maxBtnRect_ = {0, 0, 0, 0};
   std::function<void(int)> onMaximizeRequested_;
   SDL_Texture *lineAATex_ = nullptr;
+  int mouseX_ = -1;
+  int mouseY_ = -1;
 
   void activateRotationIndex(size_t idx);
 };

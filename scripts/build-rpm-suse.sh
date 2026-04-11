@@ -43,7 +43,8 @@ docker run --rm \
             libXrandr-devel libXss-devel libXxf86vm-devel libXinerama-devel \
             libcurl-devel libopenssl-devel libdrm-devel libgbm-devel \
             Mesa-libEGL-devel Mesa-libGLESv2-devel alsa-devel flite-devel \
-            desktop-file-utils update-desktop-files tar gzip && \
+            desktop-file-utils update-desktop-files tar gzip libopenssl-3-devel \
+            libopenssl3 && \
         
         # Setup RPM build tree
         mkdir -p /root/rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS} && \

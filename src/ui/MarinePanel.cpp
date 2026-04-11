@@ -24,11 +24,27 @@ void MarinePanel::onLookupReady(const MarineLookupResult &res) {
   if (!res.closestBuoyId.empty()) {
     buoyInput_.setValue(res.closestBuoyId);
   }
+  // Auto-save when lookup was triggered automatically (modal not open).
+  if (!menuVisible_) {
+    saveSettings();
+  }
 }
 
 
 
-void MarinePanel::update() { currentData_ = store_->get(); }
+void MarinePanel::update() {
+  currentData_ = store_->get();
+
+  if (!autoLookupTriggered_ && provider_ && !isSearching_) {
+    auto &cfg = ConfigManager::instance().getConfig();
+    if (cfg.marineStation.empty() && cfg.marineBuoy.empty() &&
+        (cfg.lat != 0.0 || cfg.lon != 0.0)) {
+      autoLookupTriggered_ = true;
+      isSearching_ = true;
+      provider_->lookupClosestStations(cfg.lat, cfg.lon);
+    }
+  }
+}
 
 void MarinePanel::render(SDL_Renderer *renderer) {
   if (!fontMgr_.ready())
@@ -371,6 +387,10 @@ void MarinePanel::saveSettings() {
   cfg.marineStation = stationInput_.getValue();
   cfg.marineBuoy = buoyInput_.getValue();
   ConfigManager::instance().save(cfg);
+  
+  if (provider_) {
+    provider_->fetch(cfg.marineStation, cfg.marineBuoy, true);
+  }
   
   // No direct way to trigger fetch in provider from here without a pointer or observer.
   // The next update() loop or rotation will naturally pick up the new ID in main.cpp if we were to change how fetch is called,

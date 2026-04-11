@@ -63,7 +63,12 @@ public:
     size_ = 0;
     filePath_ = path;
     defaultSize_ = defaultPtSize;
-    return getFont(defaultPtSize) != nullptr;
+    if (getFont(defaultPtSize) == nullptr) {
+      std::fprintf(stderr, "FontManager: failed to load font from file '%s'\n",
+                   path.c_str());
+      return false;
+    }
+    return true;
   }
 
   bool ready() const { return data_ != nullptr || !filePath_.empty(); }
@@ -265,6 +270,12 @@ public:
       // If an old texture was here, destroy it.
       if (it != volatileCache_.end()) {
         MemoryMonitor::getInstance().destroyTexture(it->second.texture);
+      }
+
+      // Prune volatile cache if it gets too large (no size cap previously
+      // caused unbounded GPU BO growth on long-running embedded devices).
+      if (volatileCache_.size() > volatileCacheLimit_) {
+        pruneVolatileCache();
       }
 
       // Store the new texture and its text content in the volatile cache.
@@ -493,6 +504,27 @@ private:
     }
   }
 
+  void pruneVolatileCache() {
+    // Evict the oldest 50% of volatile cache entries by LRU.
+    // Keys include (x,y) so stale positions from layout changes accumulate
+    // as ghost GPU BOs — this keeps the cache bounded.
+    if (volatileCache_.empty())
+      return;
+
+    std::vector<std::pair<VolatileCacheKey, CachedTextureWithText>> entries(
+        volatileCache_.begin(), volatileCache_.end());
+
+    std::sort(entries.begin(), entries.end(), [](const auto &a, const auto &b) {
+      return a.second.lastUsed < b.second.lastUsed;
+    });
+
+    size_t evictCount = std::max((size_t)1, volatileCache_.size() / 2);
+    for (size_t i = 0; i < evictCount; ++i) {
+      MemoryMonitor::getInstance().destroyTexture(entries[i].second.texture);
+      volatileCache_.erase(entries[i].first);
+    }
+  }
+
   void closeAll() {
     for (auto &[size, font] : cache_) {
       TTF_CloseFont(font);
@@ -562,6 +594,7 @@ private:
   int defaultSize_ = 24;
   float renderScale_ = 1.0f;
   size_t textCacheLimit_ = 300;
+  size_t volatileCacheLimit_ = 100;
   std::map<int, TTF_Font *> cache_;
   std::map<TextCacheKey, CachedTexture> textCache_;
   std::map<VolatileCacheKey, CachedTextureWithText> volatileCache_;

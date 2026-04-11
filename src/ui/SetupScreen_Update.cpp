@@ -36,6 +36,14 @@ void SetupScreen::renderTabUpdate(SDL_Renderer *renderer, int cx, int pad,
                                       cat->ptSize(FontStyle::SmallRegular));
   cat->drawText(renderer, HAMCLOCK_INSTALL_TYPE, fieldX + fieldW - lenI, y,
                 themes.textDim, FontStyle::SmallRegular);
+  y += cat->ptSize(FontStyle::SmallRegular) + 8;
+
+  cat->drawText(renderer, "Build Date:", fieldX, y, themes.text,
+                FontStyle::SmallRegular);
+  int lenB = fontMgr_.getLogicalWidth(HAMCLOCK_BUILD_DATETIME,
+                                      cat->ptSize(FontStyle::SmallRegular));
+  cat->drawText(renderer, HAMCLOCK_BUILD_DATETIME, fieldX + fieldW - lenB, y,
+                themes.textDim, FontStyle::SmallRegular);
   y += cat->ptSize(FontStyle::SmallRegular) + pad * 2;
   // Implementation-specific instructions
   std::string instr;

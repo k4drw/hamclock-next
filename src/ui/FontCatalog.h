@@ -1,6 +1,5 @@
 #pragma once
 
-#include "../core/Constants.h"
 #include "../core/MemoryMonitor.h"
 #include "FontManager.h"
 #include <SDL.h>
@@ -48,7 +47,7 @@ public:
     // Evict texture cache: cached textures were rasterized at the old
     // renderScale_; on resize renderScale_ changes so they are all stale.
     for (auto &kv : textCache_)
-      SDL_DestroyTexture(kv.second.tex);
+      destroyTexture(kv.second.tex);
     textCache_.clear();
 
     // We now keep all point sizes logical (800x480).
@@ -95,7 +94,7 @@ public:
   // Destructor: release all cached textures.
   ~FontCatalog() {
     for (auto &kv : textCache_)
-      SDL_DestroyTexture(kv.second.tex);
+      destroyTexture(kv.second.tex);
   }
 
   // Convenience: render + blit, using an internal LRU texture cache.
@@ -115,7 +114,7 @@ public:
     if (nowMs - lastCachePruneMs_ > 5000) {
       for (auto it = textCache_.begin(); it != textCache_.end();) {
         if (nowMs - it->second.lastUsedMs > 5000) {
-          SDL_DestroyTexture(it->second.tex);
+          destroyTexture(it->second.tex);
           it = textCache_.erase(it);
         } else {
           ++it;
@@ -141,7 +140,7 @@ public:
         h = e.h;
       } else {
         // Collision: evict old entry and fall through to recreate
-        SDL_DestroyTexture(e.tex);
+        destroyTexture(e.tex);
         textCache_.erase(it);
       }
     }
@@ -157,7 +156,7 @@ public:
           if (jt->second.lastUsedMs < oldest->second.lastUsedMs)
             oldest = jt;
         }
-        SDL_DestroyTexture(oldest->second.tex);
+        destroyTexture(oldest->second.tex);
         textCache_.erase(oldest);
       }
       textCache_.emplace(hash, TextCacheEntry{text, color, sIdx, ptSz, tex, w, h, nowMs});
@@ -246,6 +245,12 @@ private:
   static constexpr int kMediumBasePt = 24;
   static constexpr int kLargeBasePt = 60;
   static constexpr int kFastBasePt = 12;
+
+  void clearCache() {
+    for (auto &kv : textCache_)
+      destroyTexture(kv.second.tex);
+    textCache_.clear();
+  }
 
   static int idx(FontStyle s) { return static_cast<int>(s); }
   static int clampPt(float v) {

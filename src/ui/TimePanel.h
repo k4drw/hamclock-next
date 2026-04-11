@@ -18,7 +18,7 @@ class TextureManager;
 class TimePanel : public Widget {
 public:
   TimePanel(int x, int y, int w, int h, FontManager &fontMgr,
-            TextureManager &texMgr, const std::string &callsign);
+            TextureManager &texMgr, AppConfig &config);
   ~TimePanel() override { destroyCache(); }
 
   void update() override;
@@ -95,6 +95,7 @@ private:
 
   FontManager &fontMgr_;
   TextureManager &texMgr_;
+  AppConfig &config_;
   std::string callsign_;
   SDL_Color callColor_ = {255, 165, 0, 255}; // default orange
   SDL_Color callBgColor_ = {0, 0, 0, 0};     // default transparent (no bg)

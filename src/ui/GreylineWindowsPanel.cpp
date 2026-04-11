@@ -10,8 +10,10 @@
 
 GreylineWindowsPanel::GreylineWindowsPanel(int x, int y, int w, int h,
                                            FontManager &fontMgr,
-                                           std::shared_ptr<HamClockState> state)
-    : Widget(x, y, w, h), fontMgr_(fontMgr), state_(std::move(state)) {}
+                                           std::shared_ptr<HamClockState> state,
+                                           AppConfig &config)
+    : Widget(x, y, w, h), fontMgr_(fontMgr), state_(std::move(state)),
+      config_(config) {}
 
 void GreylineWindowsPanel::update() {
   auto now = std::chrono::system_clock::now();
@@ -147,14 +149,15 @@ void GreylineWindowsPanel::render(SDL_Renderer *renderer) {
                          themes.border.b, 255);
   SDL_RenderDrawRect(renderer, &bg);
 
-  // Hour tick marks (0, 6, 12, 18, 24)
+  // Hour tick marks (0, 6, 12, 18, 24) shifted to configured timezone
+  int tzOff = (config_.defaultTzOffset == 999) ? 0 : config_.defaultTzOffset;
   for (int h = 0; h <= 24; h += 6) {
     int tx = barX + h * barW / 24;
     SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
                            themes.border.b, 180);
     SDL_RenderDrawLine(renderer, tx, barY + barH, tx, barY + barH + 3);
     char hbuf[4];
-    std::snprintf(hbuf, sizeof(hbuf), "%d", h);
+    std::snprintf(hbuf, sizeof(hbuf), "%d", (h + tzOff + 48) % 24);
     cat->drawText(renderer, hbuf, tx, barY + barH + 4, themes.textDim,
                   FontStyle::Tiny,
                   (h > 0 && h < 24) /* centered */ ? true : false);
@@ -251,5 +254,6 @@ void GreylineWindowsPanel::onResize(int x, int y, int w, int h) {
 }
 
 REGISTER_WIDGET("greyline_windows", "Greyline Win.", false, false, {
-  return std::make_unique<GreylineWindowsPanel>(0, 0, 0, 0, deps.fontMgr, deps.state);
+  return std::make_unique<GreylineWindowsPanel>(0, 0, 0, 0, deps.fontMgr, deps.state,
+                                                deps.appCfg);
 })

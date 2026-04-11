@@ -52,11 +52,13 @@ void ListPanel::render(SDL_Renderer *renderer) {
   if (titleTex_) {
     SDL_Rect dst = {x_ + 10, y_ + 5, titleW_, titleH_};
     SDL_RenderCopy(renderer, titleTex_, nullptr, &dst);
+    // Dynamic height if the title is larger than default 20px
+    titleAreaH_ = std::max(20, titleH_ + 10); 
   }
 
   // Start rows below title area
-  int titleAreaH = 20;
-  int curY = y_ + titleAreaH;
+  contentY_ = y_ + titleAreaH_;
+  int curY = contentY_;
 
   // Rebuild row cache on font change or row count change
   if (rowCache_.size() != rows_.size() || rowFontChanged) {
@@ -74,10 +76,10 @@ void ListPanel::render(SDL_Renderer *renderer) {
   if (rows_.empty())
     return;
 
-  // Divide remaining space evenly among rows
-  int remaining = (y_ + height_) - curY;
-  int rowH =
-      std::max(rowFontSize_ + 4, remaining / static_cast<int>(rows_.size()));
+  // Divide remaining space evenly among rows (accounting for any footer/legend)
+  int remaining = (y_ + height_ - footerH_) - curY;
+  rowH_ = std::max(rowFontSize_ + 4, remaining / static_cast<int>(rows_.size()));
+  int rowH = rowH_;
 
   SDL_Color rowColor = themes.text;
   for (size_t i = 0; i < rows_.size(); ++i) {

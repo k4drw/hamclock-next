@@ -45,7 +45,11 @@ bool MapWidget::onMouseDown(int mx, int my, Uint16 mod, int clicks) {
       return true;
   }
   if (mx >= x_ && mx < x_ + width_ && my >= y_ && my < y_ + height_) {
+    // Left click only tracks for drag
     mouseDown_ = true;
+    lastMouseX_ = mx;
+    lastMouseY_ = my;
+    dragThresholdMet_ = false;
     return true;
   }
   return false;
@@ -65,6 +69,12 @@ bool MapWidget::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
   if (!mouseDown_)
     return false;
   mouseDown_ = false;
+
+  // If we were panning, don't trigger a map click
+  if (dragThresholdMet_) {
+    dragThresholdMet_ = false;
+    return true;
+  }
 
   // Calendar alert dismissal
   if (calendarAlert_.active) {
@@ -126,6 +136,7 @@ bool MapWidget::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
       mapVerts_.clear();
       shadowVerts_.clear();  // force night overlay recompute for new projection
       lightVerts_.clear();
+      forcePropUpdate();
     });
     return true;
   }
@@ -168,26 +179,20 @@ bool MapWidget::onRightClick(int mx, int my, Uint16 /*mod*/) {
   if (mapViewMenu_->isVisible())
     return false;
 
-  double lat, lon;
-  if (!screenToLatLon(mx, my, lat, lon)) {
-    deMenuVisible_ = false;
-    return false;
+  uint32_t now = SDL_GetTicks();
+  if (now - rightClickTimeMs_ < 300) {
+    // Reset map
+    resetMap();
+    rightClickTimeMs_ = 0;
+    deMenuPending_ = false; // Cancel any pending menu
+    return true;
   }
+  rightClickTimeMs_ = now;
 
-  deMenuVisible_ = true;
-  deMenuLat_ = lat;
-  deMenuLon_ = lon;
-
-  // Size the menu
-  int menuW = 110;
-  int menuH = 30;
-  deMenuRect_ = {mx, my, menuW, menuH};
-
-  // Boundary check
-  if (deMenuRect_.x + deMenuRect_.w > HamClock::LOGICAL_WIDTH)
-    deMenuRect_.x -= deMenuRect_.w;
-  if (deMenuRect_.y + deMenuRect_.h > HamClock::LOGICAL_HEIGHT)
-    deMenuRect_.y -= deMenuRect_.h;
+  // Defer menu display to check for double click
+  deMenuPending_ = true;
+  deMenuX_ = mx;
+  deMenuY_ = my;
 
   return true;
 }
@@ -196,10 +201,91 @@ bool MapWidget::onMouseWheel(int scrollY) {
   if (mapViewMenu_->isVisible()) {
     return mapViewMenu_->onMouseWheel(scrollY);
   }
+
+  // Zoom handling
+  double oldZoom = config_.mapZoom;
+  if (scrollY > 0) {
+    config_.mapZoom *= 1.1;
+  } else if (scrollY < 0) {
+    config_.mapZoom /= 1.1;
+  }
+
+  // Clamp zoom
+  if (config_.mapZoom < 1.0)
+    config_.mapZoom = 1.0;
+  if (config_.mapZoom > 10.0)
+    config_.mapZoom = 10.0;
+
+  if (oldZoom != config_.mapZoom) {
+    if (config_.mapZoom == 1.0) {
+      config_.mapPanX = 0;
+      config_.mapPanY = 0;
+    } else {
+      // Adjust pan to keep point under mouse stationary
+      // This is a bit tricky since the mouse is in screen space.
+      // We essentially want (screen_pos - (cx + pan)) / oldZoom == (screen_pos - (cx + new_pan)) / newZoom
+      float cx = mapRect_.x + mapRect_.w * 0.5f;
+      float cy = mapRect_.y + mapRect_.h * 0.5f;
+      
+      // Get mouse pos relative to center and current pan
+      float rx = (float)lastMouseX_ - cx - (float)config_.mapPanX;
+      float ry = (float)lastMouseY_ - cy - (float)config_.mapPanY;
+      
+      float zoomRatio = (float)config_.mapZoom / (float)oldZoom;
+      config_.mapPanX = (int)((float)lastMouseX_ - cx - rx * zoomRatio);
+      config_.mapPanY = (int)((float)lastMouseY_ - cy - ry * zoomRatio);
+    }
+
+    // Invalidate everything
+    mapVerts_.clear();
+    gridDirty_ = true;
+    borderDirty_ = true;
+    greatCircleDirty_ = true;
+    satTrackDirty_ = true;
+    asteroidTrackDirty_ = true;
+    wxVerts_.clear();
+    if (wxmb_)
+      wxmb_->invalidate();
+    return true;
+  }
+
   return false;
 }
 
 void MapWidget::onMouseMove(int mx, int my) {
+  if (mouseDown_ && config_.mapZoom > 1.0) {
+    int dx = mx - lastMouseX_;
+    int dy = my - lastMouseY_;
+
+    if (!dragThresholdMet_) {
+      if (std::abs(dx) > 5 || std::abs(dy) > 5) {
+        dragThresholdMet_ = true;
+      }
+    }
+
+    if (dragThresholdMet_) {
+      config_.mapPanX += dx;
+      config_.mapPanY += dy;
+      lastMouseX_ = mx;
+      lastMouseY_ = my;
+
+      // Invalidate everything
+      mapVerts_.clear();
+      gridDirty_ = true;
+      borderDirty_ = true;
+      greatCircleDirty_ = true;
+      satTrackDirty_ = true;
+      asteroidTrackDirty_ = true;
+      wxVerts_.clear();
+      if (wxmb_)
+        wxmb_->invalidate();
+      return;
+    }
+  }
+
+  // Store mouse pos for next move or for wheel zoom centering
+  lastMouseX_ = mx;
+  lastMouseY_ = my;
   // Named-star hover: check BEFORE screenToLatLon so that stars right at the
   // projection boundary are still reachable even if the mouse is 1-2 px inside
   // the oval edge. The inMap test uses the STAR's position (not the mouse).

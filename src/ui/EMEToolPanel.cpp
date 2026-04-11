@@ -10,8 +10,9 @@
 
 EMEToolPanel::EMEToolPanel(int x, int y, int w, int h, FontManager &fontMgr,
                            TextureManager &texMgr,
-                           std::shared_ptr<MoonStore> store)
-    : Widget(x, y, w, h), fontMgr_(fontMgr), texMgr_(texMgr), store_(store) {}
+                           std::shared_ptr<MoonStore> store, AppConfig &config)
+    : Widget(x, y, w, h), fontMgr_(fontMgr), texMgr_(texMgr), store_(store),
+      config_(config) {}
 
 void EMEToolPanel::recomputeCurve() {
   curveBase_ = std::time(nullptr);
@@ -144,16 +145,21 @@ void EMEToolPanel::render(SDL_Renderer *renderer) {
     SDL_RenderDrawLine(renderer, (int)tx, chartY, (int)tx, chartY + chartH);
 
     std::time_t t = curveBase_ + idx * kIntervalSec;
-    std::tm utc{};
-    Astronomy::portable_gmtime(&t, &utc);
+    std::tm display{};
+    if (config_.defaultTzOffset == 999) {
+      Astronomy::portable_localtime(&t, &display);
+    } else {
+      std::time_t ot = t + static_cast<std::time_t>(config_.defaultTzOffset) * 3600LL;
+      Astronomy::portable_gmtime(&ot, &display);
+    }
 
     char tbuf[64];
-    std::snprintf(tbuf, sizeof(tbuf), "%02d:%02dZ DE:%.0f DX:%.0f", utc.tm_hour,
-                  utc.tm_min, curve_[idx].deEl, curve_[idx].dxEl);
+    std::snprintf(tbuf, sizeof(tbuf), "%02d:%02d%s DE:%.0f DX:%.0f",
+                  display.tm_hour, display.tm_min, config_.defaultTzLabel.c_str(),
+                  curve_[idx].deEl, curve_[idx].dxEl);
 
     int tw, th;
-    cat->renderText(renderer, tbuf, themes.text, FontStyle::Micro, &tw,
-                    &th);
+    SDL_Texture *tipTex = cat->renderText(renderer, tbuf, themes.text, FontStyle::Micro, &tw, &th);
     SDL_Rect tipRect = {tooltip_.x + 10, tooltip_.y - th - 5, tw + 10, th + 6};
     if (tipRect.x + tipRect.w > x_ + width_)
       tipRect.x = tooltip_.x - tipRect.w - 10;
@@ -165,8 +171,11 @@ void EMEToolPanel::render(SDL_Renderer *renderer) {
     SDL_RenderFillRect(renderer, &tipRect);
     SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, themes.border.a);
     SDL_RenderDrawRect(renderer, &tipRect);
-    cat->drawText(renderer, tbuf, tipRect.x + 5, tipRect.y + tipRect.h / 2,
-                  themes.text, FontStyle::Micro, false, false, true);
+    if (tipTex) {
+      SDL_Rect dst = {tipRect.x + 5, tipRect.y + (tipRect.h - th) / 2, tw, th};
+      SDL_RenderCopy(renderer, tipTex, nullptr, &dst);
+      cat->destroyTexture(tipTex);
+    }
   }
 
   // --- Info section ---
@@ -224,5 +233,6 @@ nlohmann::json EMEToolPanel::getDebugData() const {
 }
 
 REGISTER_WIDGET("eme_tool", "EME Tool", false, false, {
-  return std::make_unique<EMEToolPanel>(0, 0, 0, 0, deps.fontMgr, deps.texMgr, deps.moonStore);
+  return std::make_unique<EMEToolPanel>(0, 0, 0, 0, deps.fontMgr, deps.texMgr,
+                                        deps.moonStore, deps.appCfg);
 })

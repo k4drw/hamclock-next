@@ -106,7 +106,17 @@ void DXClusterPanel::update() {
   }
 
   // Sync scroll offset and visible rows
-  if (dataChanged || true) { // Always update visible slice if needed
+  bool scrollChanged = (scrollOffset_ != lastScrollOffset_);
+  std::string selectionKey;
+  if (data->hasSelection)
+    selectionKey = data->selectedSpot.txCall + ":" +
+                   std::to_string(data->selectedSpot.freqKhz) + ":" +
+                   std::to_string(data->selectedSpot.spottedAt.time_since_epoch().count());
+  bool selectionChanged = (selectionKey != lastSelectionKey_);
+  if (dataChanged || scrollChanged || selectionChanged) {
+    lastScrollOffset_ = scrollOffset_;
+    lastSelectionKey_ = selectionKey;
+
     if (allRows_.empty()) {
       scrollOffset_ = 0;
     } else {
@@ -145,13 +155,13 @@ void DXClusterPanel::update() {
     // Update Highlight
     int highlighted = -1;
     if (data->hasSelection) {
-      // Find selected spot in current visible slice
+      // Find selected spot in current visible slice. In rebuildRows we reverse
+      // the spots, so DXClusterData::spots is not directly indexed — compare
+      // values against the reversed copy.
+      auto spots = data->spots;
+      std::reverse(spots.begin(), spots.end());
       for (int i = 0; i < (int)visibleFreqs_.size(); ++i) {
         int idx = scrollOffset_ + i;
-        // In rebuildRows we reverse the spots, so DXClusterData::spots is not
-        // directly indexed. We compare values.
-        auto spots = data->spots;
-        std::reverse(spots.begin(), spots.end());
         if (idx < (int)spots.size()) {
           const auto &spot = spots[idx];
           if (spot.txCall == data->selectedSpot.txCall &&
@@ -170,23 +180,30 @@ void DXClusterPanel::update() {
 void DXClusterPanel::onResize(int x, int y, int w, int h) {
   ListPanel::onResize(x, y, w, h);
   clearSpotCache();
+  lastScrollOffset_ = -1; // force visible-slice rebuild on next update
 }
 
 void DXClusterPanel::render(SDL_Renderer *renderer) {
-  // Base render for BG, Title, Border
-  ListPanel::render(renderer);
+  // Calculate legend height once so ListPanel can account for it
+  legendH_ = (height_ >= 120) ? 28 : 0;
+  this->footerH_ = legendH_;
 
-  if (visibleSpots_.empty())
-    return;
+  // Base render for BG, Title, Border, Stripes, and Highlights
+  ListPanel::render(renderer);
 
   if (!fontMgr_.ready())
     return;
 
-  int pad = std::max(2, static_cast<int>(width_ * 0.03f));
-  int curY = y_ + pad;
-  if (titleTex_) {
-    curY += titleH_ + pad;
+  // Band Legend at bottom (drawn first to ensure it stays visible even if list is empty)
+  if (legendH_ > 0) {
+    int dummy = contentY_;
+    renderBandLegend(renderer, dummy, y_ + height_ - 2);
   }
+
+  if (visibleSpots_.empty())
+    return;
+
+  int pad = std::max(2, static_cast<int>(width_ * 0.03f));
 
   // Column layout: Freq | [Mode] | [Badge] | Call | Age
   // Mode badge (CW/FT8/SSB…) shown at ≥140px; DXCC badge (N/B) shown at ≥120px.
@@ -204,24 +221,15 @@ void DXClusterPanel::render(SDL_Renderer *renderer) {
   int callX = badgeX + badgeColW + (showBadge ? 3 : (showMode ? 0 : 2));
   int ageX = x_ + width_ - pad - ageColW;
 
-  // Band Legend at bottom
-  int legendH = (height_ >= 120) ? 28 : 0;
-  legendH_ = legendH;
-  // spdlog::info("DXCluster: height_={}, legendH_={}", height_, legendH_);
-
-  // Calculate row height (compact remaining space)
-  int remaining = (y_ + height_ - legendH) - curY;
-  int rowH = std::max(rowFontSize_ + 4,
-                      remaining / static_cast<int>(visibleSpots_.size()));
-  contentY_ = curY;
-  rowH_ = rowH;
+  int curY = contentY_;
+  int rowH = rowH_;
 
   for (size_t i = 0; i < visibleSpots_.size(); ++i) {
     if (i >= spotCache_.size())
       break;
 
     int rowY = curY + static_cast<int>(i) * rowH;
-    if (rowY + rowH > y_ + height_ - legendH)
+    if (rowY + rowH > y_ + height_ - legendH_)
       break;
     const auto &spot = visibleSpots_[i];
     auto &cache = spotCache_[i];
@@ -353,11 +361,6 @@ void DXClusterPanel::render(SDL_Renderer *renderer) {
     }
   }
 
-  // Band Legend at bottom (drawn last to ensure it borders the scrollable
-  // content)
-  if (legendH_ > 0) {
-    renderBandLegend(renderer, curY, y_ + height_ - 2);
-  }
 }
 
 void DXClusterPanel::rebuildRows(const DXClusterData &data) {
@@ -369,6 +372,10 @@ void DXClusterPanel::rebuildRows(const DXClusterData &data) {
   std::reverse(spots.begin(), spots.end());
 
   for (const auto &spot : spots) {
+    if (activeBandFilter_ >= 0) {
+      if (freqToBandIndex(spot.freqKhz) != activeBandFilter_)
+        continue;
+    }
     std::stringstream ss;
     // Format: "14025.0 K1ABC      5m"
     ss << std::fixed << std::setprecision(1) << std::setw(8) << spot.freqKhz
@@ -425,6 +432,28 @@ bool DXClusterPanel::onMouseWheel(int scrollY) {
 }
 
 bool DXClusterPanel::onMouseUp(int mx, int my, Uint16 /*mod*/, int clicks) {
+  // Check legend clicks first
+  if (my >= y_ + height_ - legendH_ && legendH_ > 0) {
+    int cellH = 14;
+    int cols = 6;
+    int cellW = (width_ - 4) / cols;
+    int legY = y_ + height_ - legendH_;
+    int row = (my - legY) / cellH;
+    int col = (mx - (x_ + 4)) / cellW;
+    if (row >= 0 && row < 2 && col >= 0 && col < cols) {
+      int bandIdx = row * cols + col;
+      if (bandIdx >= 0 && bandIdx < kNumBands) {
+        if (activeBandFilter_ == bandIdx)
+          activeBandFilter_ = -1;
+        else
+          activeBandFilter_ = bandIdx;
+        lastUpdate_ = std::chrono::system_clock::time_point{}; // force update
+        update();
+        return true;
+      }
+    }
+  }
+
   // Use cached geometry from render() so click rows match visual rows exactly.
   // Return false for clicks above content area — PaneContainer handles those
   // (widget selector fires if click is in top 10% of the pane).
@@ -542,11 +571,23 @@ void DXClusterPanel::renderBandLegend(SDL_Renderer *renderer, int & /*curY*/,
     int lx = x_ + 4 + col * cellW;
     int midY = legendY + row * cellH + cellH / 2;
 
+    bool isSelected = (activeBandFilter_ == i);
+    bool isDimmed = (activeBandFilter_ != -1 && !isSelected);
+    Uint8 alpha = isDimmed ? 100 : 255;
+
     // Colored square, vertically centered in the row
     SDL_Rect box = {lx + 1, midY - boxSize / 2, boxSize, boxSize};
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
     SDL_SetRenderDrawColor(renderer, kBands[i].color.r, kBands[i].color.g,
-                           kBands[i].color.b, 255);
+                           kBands[i].color.b, alpha);
     SDL_RenderFillRect(renderer, &box);
+
+    if (isSelected) {
+      SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+      SDL_Rect border = {box.x - 1, box.y - 1, box.w + 2, box.h + 2};
+      SDL_RenderDrawRect(renderer, &border);
+    }
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
 
     // Label right of box, vertically centered on the same midline (strip
     // trailing 'm')

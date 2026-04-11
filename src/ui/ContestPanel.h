@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../core/ConfigManager.h"
 #include "../core/ContestData.h"
 #include "FontManager.h"
 #include "Widget.h"
@@ -11,7 +12,7 @@ struct SDL_Renderer;
 class ContestPanel : public Widget {
 public:
   ContestPanel(int x, int y, int w, int h, FontManager &fontMgr,
-               std::shared_ptr<ContestStore> store);
+               std::shared_ptr<ContestStore> store, AppConfig &config);
 
   void update() override;
   void render(SDL_Renderer *renderer) override;
@@ -30,6 +31,7 @@ private:
 
   FontManager &fontMgr_;
   std::shared_ptr<ContestStore> store_;
+  AppConfig &config_;
   ContestData currentData_;
   bool dataValid_ = false;
 

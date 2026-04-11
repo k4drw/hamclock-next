@@ -7,6 +7,7 @@
 #include "../core/CalendarData.h"
 #include "../ui/StopwatchPanel.h"
 #include "../ui/TimePanel.h"
+#include "../ui/RSSBanner.h"
 #include "NetworkManager.h"
 #include <SDL.h>
 #include "../core/ConfigManager.h"
@@ -28,10 +29,32 @@
 #include "../core/BrightnessManager.h"
 #include "../core/ContestData.h"
 #include "../core/Theme.h"
+#include "../core/PaneRestrictions.h"
 #include "../core/DXClusterData.h"
 #include "../core/LiveSpotData.h"
 #include "../core/SatelliteManager.h"
+#include "../core/MarineData.h"
 #include "../ui/WidgetRegistry.h"
+#include <cstdio>
+#include <cstdlib>
+
+using namespace HamClock;
+
+static std::string colorToHex(SDL_Color c) {
+  char buf[8];
+  std::snprintf(buf, sizeof(buf), "#%02x%02x%02x", c.r, c.g, c.b);
+  return buf;
+}
+
+static SDL_Color hexToColor(const std::string &hex) {
+  if (hex.size() != 7 || hex[0] != '#')
+    return {255, 255, 255, 255};
+  int r, g, b;
+  if (std::sscanf(hex.c_str() + 1, "%02x%02x%02x", &r, &g, &b) == 3) {
+    return {(Uint8)r, (Uint8)g, (Uint8)b, 255};
+  }
+  return {255, 255, 255, 255};
+}
 #include "../network/FrameCapture.h"
 #include "../services/ADIFProvider.h"
 #include "../services/BME280Provider.h"
@@ -44,23 +67,6 @@
 
 using namespace HamClock;
 
-static SDL_Color hexToColor(const std::string &hex) {
-  SDL_Color c = {255, 255, 255, 255};
-  if (hex.empty())
-    return c;
-  std::string s = hex;
-  if (s[0] == '#')
-    s = s.substr(1);
-  if (s.length() == 6) {
-    unsigned int r, g, b;
-    if (std::sscanf(s.c_str(), "%02x%02x%02x", &r, &g, &b) == 3) {
-      c.r = (uint8_t)r;
-      c.g = (uint8_t)g;
-      c.b = (uint8_t)b;
-    }
-  }
-  return c;
-}
 
 [[maybe_unused]] static std::string propOverlayToString(PropOverlayType t) {
   switch (t) {
@@ -340,6 +346,43 @@ void WebServer::registerRoutes(httplib::Server &svr) {
             res.set_content(j.dump(), "application/json");
           });
 
+  svr.Get("/get_rss_rect",
+          [this](const httplib::Request &, httplib::Response &res) {
+            std::lock_guard<std::mutex> lk(dataMutex_);
+            if (!rssBanner_) {
+              res.status = 503;
+              return;
+            }
+            SDL_Rect r = rssBanner_->getRect();
+            int outW = 0, outH = 0;
+            int logW = 0, logH = 0;
+            if (renderer_) {
+              SDL_GetRendererOutputSize(renderer_, &outW, &outH);
+              SDL_RenderGetLogicalSize(renderer_, &logW, &logH);
+            }
+            if (logW == 0)
+              logW = 800;
+            if (logH == 0)
+              logH = 480;
+            nlohmann::json j;
+            j["x"] = r.x;
+            j["y"] = r.y;
+            j["w"] = r.w;
+            j["h"] = r.h;
+            float scale = (logW > 0 && logH > 0)
+                              ? std::min((float)outW / logW, (float)outH / logH)
+                              : 1.0f;
+            j["px"] = (int)(r.x * scale);
+            j["py"] = (int)(r.y * scale);
+            j["pw"] = (int)(r.w * scale);
+            j["ph"] = (int)(r.h * scale);
+            j["renderer_w"] = outW;
+            j["renderer_h"] = outH;
+            j["logical_w"] = logW;
+            j["logical_h"] = logH;
+            res.set_content(j.dump(), "application/json");
+          });
+
   svr.Get("/api/panes/toggle", [this](const httplib::Request &req,
                                       httplib::Response &res) {
     int pIdx = StringUtils::safe_stoi(req.get_param_value("pane"));
@@ -351,8 +394,14 @@ void WebServer::registerRoutes(httplib::Server &svr) {
       auto it = std::find(rot.begin(), rot.end(), wId);
       if (it != rot.end())
         rot.erase(it);
-      else
+      else {
+        if (!HamClock::PaneRestrictions::isWidgetAllowed(pIdx, wId)) {
+          res.status = 400;
+          res.set_content("Widget " + wId + " not allowed in pane " + std::to_string(pIdx + 1), "text/plain");
+          return;
+        }
         rot.push_back(wId);
+      }
       if (rot.empty())
         rot.push_back("solar");
       pane->setRotation(rot, cfg_->rotationIntervalS, cfg_->syncRotation);
@@ -493,6 +542,7 @@ void WebServer::registerRoutes(httplib::Server &svr) {
     j["version"] = HAMCLOCK_VERSION;
     j["arch"] = HAMCLOCK_ARCH;
     j["installType"] = HAMCLOCK_INSTALL_TYPE;
+    j["buildDate"] = HAMCLOCK_BUILD_DATETIME;
 
     nlohmann::json panes = nlohmann::json::array();
     auto addPane = [&](const std::vector<std::string> &rot) {
@@ -527,7 +577,45 @@ void WebServer::registerRoutes(httplib::Server &svr) {
     j["propPower"] = cfg_->propPower;
     j["propToa"] = cfg_->propToa;
     j["propPath"] = cfg_->propPath;
+    j["propAntGain"] = cfg_->propAntGain;
     j["selectedSatellite"] = cfg_->selectedSatellite;
+    j["corsProxyUrl"] = cfg_->corsProxyUrl;
+    j["pskrProxyUrl"] = cfg_->pskrProxyUrl;
+    j["alarmArmed"] = cfg_->alarmArmed;
+    j["alarmTimeHH"] = cfg_->alarmTimeHH;
+    j["alarmTimeMM"] = cfg_->alarmTimeMM;
+    j["alarmUtc"] = cfg_->alarmUtc;
+    j["onceAlarmArmed"] = cfg_->onceAlarmArmed;
+    j["onceAlarmTime"] = cfg_->onceAlarmTime;
+    j["calendarNotifyMinutes"] = cfg_->calendarNotifyMinutes;
+    j["calendarAllDayNotifyHour"] = cfg_->calendarAllDayNotifyHour;
+    j["calendarDismissMinutes"] = cfg_->calendarDismissMinutes;
+    j["marineStation"] = cfg_->marineStation;
+    j["marineBuoy"] = cfg_->marineBuoy;
+    if (marineStore_) {
+      j["marineStationName"] = marineStore_->get().tideStationName;
+    }
+    j["sdoWavelength"] = cfg_->sdoWavelength;
+    j["sdoRotating"] = cfg_->sdoRotating;
+    j["sdoPfss"] = cfg_->sdoPfss;
+    j["sdoShowMovie"] = cfg_->sdoShowMovie;
+    j["idleMinutes"] = cfg_->idleMinutes;
+    j["ltr329AutoDim"] = cfg_->ltr329AutoDim;
+    j["callsignColor"] = colorToHex(cfg_->callsignColor);
+    j["callsignBgColor"] = colorToHex(cfg_->callsignBgColor);
+    j["mufRtOpacity"] = cfg_->mufRtOpacity;
+    j["logLevel"] = cfg_->logLevel;
+    j["ontaMaxDistKm"] = cfg_->ontaMaxDistKm;
+    j["asteroidIcon"] = cfg_->asteroidIcon;
+    j["asteroidColor"] = colorToHex(cfg_->asteroidColor);
+    j["bigClockDigital"] = cfg_->bigClockDigital;
+    j["bigClock12h"] = cfg_->bigClock12h;
+    j["bigClockUtc"] = cfg_->bigClockUtc;
+    j["bigClockShowSec"] = cfg_->bigClockShowSec;
+    j["bigClockShowDate"] = cfg_->bigClockShowDate;
+    j["bigClockHue"] = cfg_->bigClockHue;
+    j["preventSleep"] = cfg_->preventSleep;
+    j["skippedVersion"] = cfg_->skippedVersion;
 
     res.set_content(j.dump(2), "application/json");
   });
@@ -693,6 +781,8 @@ void WebServer::registerRoutes(httplib::Server &svr) {
           req.get_param_value("live_spots_use_call") == "1";
     if (req.has_param("pskr_proxy_url"))
       cfg_->pskrProxyUrl = req.get_param_value("pskr_proxy_url");
+    if (req.has_param("cors_proxy_url"))
+      cfg_->corsProxyUrl = req.get_param_value("cors_proxy_url");
     if (req.has_param("brightness"))
       cfg_->brightness =
           StringUtils::safe_stoi(req.get_param_value("brightness"));
@@ -727,29 +817,36 @@ void WebServer::registerRoutes(httplib::Server &svr) {
       }
     }
 
-    auto parsePane = [&](const std::string &val, std::vector<std::string> &rot) {
+    auto parsePane = [&](const std::string &val, std::vector<std::string> &rot,
+                         int paneIdx) {
       rot.clear();
-      if (val.empty())
+      if (val.empty()) {
+        rot.push_back("solar");
         return;
+      }
       std::stringstream ss(val);
       std::string id;
       while (std::getline(ss, id, ',')) {
-        if (!id.empty())
-          rot.push_back(id);
+        if (!id.empty()) {
+          if (HamClock::PaneRestrictions::isWidgetAllowed(paneIdx, id))
+            rot.push_back(id);
+        }
       }
+      if (rot.empty())
+        rot.push_back("solar");
     };
     if (req.has_param("pane0"))
-      parsePane(req.get_param_value("pane0"), cfg_->pane1Rotation);
+      parsePane(req.get_param_value("pane0"), cfg_->pane1Rotation, 0);
     if (req.has_param("pane1"))
-      parsePane(req.get_param_value("pane1"), cfg_->pane2Rotation);
+      parsePane(req.get_param_value("pane1"), cfg_->pane2Rotation, 1);
     if (req.has_param("pane2"))
-      parsePane(req.get_param_value("pane2"), cfg_->pane3Rotation);
+      parsePane(req.get_param_value("pane2"), cfg_->pane3Rotation, 2);
     if (req.has_param("pane3"))
-      parsePane(req.get_param_value("pane3"), cfg_->pane4Rotation);
+      parsePane(req.get_param_value("pane3"), cfg_->pane4Rotation, 3);
     if (req.has_param("pane4"))
-      parsePane(req.get_param_value("pane4"), cfg_->pane5Rotation);
+      parsePane(req.get_param_value("pane4"), cfg_->pane5Rotation, 4);
     if (req.has_param("pane5"))
-      parsePane(req.get_param_value("pane5"), cfg_->pane6Rotation);
+      parsePane(req.get_param_value("pane5"), cfg_->pane6Rotation, 5);
 
     if (req.has_param("aux_tz_offset"))
       cfg_->auxClockTzOffset =
@@ -778,6 +875,8 @@ void WebServer::registerRoutes(httplib::Server &svr) {
       cfg_->propToa = (float)std::round(StringUtils::safe_stod(req.get_param_value("prop_toa")));
     if (req.has_param("prop_path"))
       cfg_->propPath = StringUtils::safe_stoi(req.get_param_value("prop_path"));
+    if (req.has_param("prop_ant_gain"))
+      cfg_->propAntGain = StringUtils::safe_stoi(req.get_param_value("prop_ant_gain"));
     if (req.has_param("display_power_method"))
       cfg_->displayPowerMethod = req.get_param_value("display_power_method");
     if (req.has_param("lat"))
@@ -788,6 +887,84 @@ void WebServer::registerRoutes(httplib::Server &svr) {
       cfg_->audioMuted = req.get_param_value("audio_muted") == "1";
     if (req.has_param("font_path"))
       cfg_->fontPath = req.get_param_value("font_path");
+
+    // Alarms
+    if (req.has_param("alarm_armed"))
+      cfg_->alarmArmed = req.get_param_value("alarm_armed") == "1";
+    if (req.has_param("alarm_hour"))
+      cfg_->alarmTimeHH = StringUtils::safe_stoi(req.get_param_value("alarm_hour"));
+    if (req.has_param("alarm_min"))
+      cfg_->alarmTimeMM = StringUtils::safe_stoi(req.get_param_value("alarm_min"));
+    if (req.has_param("alarm_utc"))
+      cfg_->alarmUtc = req.get_param_value("alarm_utc") == "1";
+    if (req.has_param("once_alarm_armed"))
+      cfg_->onceAlarmArmed = req.get_param_value("once_alarm_armed") == "1";
+    if (req.has_param("once_alarm_time"))
+      cfg_->onceAlarmTime = (time_t)StringUtils::safe_stoll(req.get_param_value("once_alarm_time"));
+
+    // Calendar
+    if (req.has_param("cal_notify_min"))
+      cfg_->calendarNotifyMinutes = StringUtils::safe_stoi(req.get_param_value("cal_notify_min"));
+    if (req.has_param("cal_allday_hour"))
+      cfg_->calendarAllDayNotifyHour = StringUtils::safe_stoi(req.get_param_value("cal_allday_hour"));
+    if (req.has_param("cal_dismiss_min"))
+      cfg_->calendarDismissMinutes = StringUtils::safe_stoi(req.get_param_value("cal_dismiss_min"));
+
+    // Marine
+    if (req.has_param("marine_station"))
+      cfg_->marineStation = req.get_param_value("marine_station");
+    if (req.has_param("marine_buoy"))
+      cfg_->marineBuoy = req.get_param_value("marine_buoy");
+
+    // SDO
+    if (req.has_param("sdo_wavelength"))
+      cfg_->sdoWavelength = req.get_param_value("sdo_wavelength");
+    if (req.has_param("sdo_rotating"))
+      cfg_->sdoRotating = req.get_param_value("sdo_rotating") == "1";
+    if (req.has_param("sdo_pfss"))
+      cfg_->sdoPfss = req.get_param_value("sdo_pfss") == "1";
+    if (req.has_param("sdo_show_movie"))
+      cfg_->sdoShowMovie = req.get_param_value("sdo_show_movie") == "1";
+
+    // Display / Idle
+    if (req.has_param("idle_minutes"))
+      cfg_->idleMinutes = StringUtils::safe_stoi(req.get_param_value("idle_minutes"));
+    if (req.has_param("ltr329_auto_dim"))
+      cfg_->ltr329AutoDim = req.get_param_value("ltr329_auto_dim") == "1";
+    if (req.has_param("prevent_sleep"))
+      cfg_->preventSleep = req.get_param_value("prevent_sleep") == "1";
+
+    // Big Clock
+    if (req.has_param("bc_digital"))
+      cfg_->bigClockDigital = req.get_param_value("bc_digital") == "1";
+    if (req.has_param("bc_12h"))
+      cfg_->bigClock12h = req.get_param_value("bc_12h") == "1";
+    if (req.has_param("bc_utc"))
+      cfg_->bigClockUtc = req.get_param_value("bc_utc") == "1";
+    if (req.has_param("bc_sec"))
+      cfg_->bigClockShowSec = req.get_param_value("bc_sec") == "1";
+    if (req.has_param("bc_date"))
+      cfg_->bigClockShowDate = req.get_param_value("bc_date") == "1";
+    if (req.has_param("bc_hue"))
+      cfg_->bigClockHue = StringUtils::safe_stoi(req.get_param_value("bc_hue"));
+
+    // Colors
+    if (req.has_param("callsign_color"))
+      cfg_->callsignColor = hexToColor(req.get_param_value("callsign_color"));
+    if (req.has_param("callsign_bg_color"))
+      cfg_->callsignBgColor = hexToColor(req.get_param_value("callsign_bg_color"));
+    if (req.has_param("asteroid_color"))
+      cfg_->asteroidColor = hexToColor(req.get_param_value("asteroid_color"));
+
+    // Misc
+    if (req.has_param("muf_opacity"))
+      cfg_->mufRtOpacity = (float)StringUtils::safe_stod(req.get_param_value("muf_opacity"));
+    if (req.has_param("onta_max_dist"))
+      cfg_->ontaMaxDistKm = StringUtils::safe_stoi(req.get_param_value("onta_max_dist"));
+    if (req.has_param("log_level"))
+      cfg_->logLevel = req.get_param_value("log_level");
+    if (req.has_param("skipped_version"))
+      cfg_->skippedVersion = req.get_param_value("skipped_version");
 
     if (cfgMgr_)
       cfgMgr_->save(*cfg_);
@@ -2677,24 +2854,9 @@ void WebServer::registerRoutes(httplib::Server &svr) {
             res.set_content(oss.str(), "text/plain");
           });
 
-#ifdef ENABLE_DEBUG_API
-  svr.Get("/debug/widgets",
-          [](const httplib::Request &, httplib::Response &res) {
-            nlohmann::json j = nlohmann::json::array();
-            auto snapshot = UIRegistry::getInstance().getSnapshot();
-            for (const auto &[id, info] : snapshot) {
-              nlohmann::json w;
-              w["id"] = id;
-              w["name"] = info.name;
-              w["rect"] = {{"x", info.rect.x},
-                           {"y", info.rect.y},
-                           {"w", info.rect.w},
-                           {"h", info.rect.h}};
-              j.push_back(w);
-            }
-            res.set_content(j.dump(2), "application/json");
-          });
-
+  // /debug/click and /debug/keypress are available in all builds (not gated by
+  // ENABLE_DEBUG_API) because they serve the automation/screenshot use case.
+  // They are runtime-gated by liveWebEnabled_ (requires --live-web flag).
   svr.Get("/debug/click",
           [this](const httplib::Request &req, httplib::Response &res) {
             if (!liveWebEnabled_) {
@@ -2740,6 +2902,24 @@ void WebServer::registerRoutes(httplib::Server &svr) {
             SDL_PushEvent(&down);
             SDL_PushEvent(&up);
             res.set_content("ok", "text/plain");
+          });
+
+#ifdef ENABLE_DEBUG_API
+  svr.Get("/debug/widgets",
+          [](const httplib::Request &, httplib::Response &res) {
+            nlohmann::json j = nlohmann::json::array();
+            auto snapshot = UIRegistry::getInstance().getSnapshot();
+            for (const auto &[id, info] : snapshot) {
+              nlohmann::json w;
+              w["id"] = id;
+              w["name"] = info.name;
+              w["rect"] = {{"x", info.rect.x},
+                           {"y", info.rect.y},
+                           {"w", info.rect.w},
+                           {"h", info.rect.h}};
+              j.push_back(w);
+            }
+            res.set_content(j.dump(2), "application/json");
           });
 
   svr.Get("/debug/watchlist/add",

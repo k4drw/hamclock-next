@@ -249,16 +249,38 @@ PropEngine::generateGrid(const PropPathParams &params, const SolarData &sw,
     for (int x = 0; x < MAP_W; ++x) {
       double lon = (x * 360.0 / MAP_W) - 180.0;
 
-      // Should we skip our own location? (dist=0)
+      // MUF-RT: show local foF2 × M(3000)F2 at this map point.
+      // TX-independent — matches original HamClock CM_MUF_RT (location-based).
+      if (outputType == 0) {
+        InterpolatedIonosonde ionoLocal;
+        if (ionoProvider)
+          ionoLocal = ionoProvider->interpolate(lat, lon);
+        double muf3000;
+        if (ionoLocal.stationsUsed > 0 && ionoLocal.foF2 > 0) {
+          // Use foF2 × M(3000) — matches original HamClock d_scale values.
+          // Do NOT use mufd: that is path-dependent (DE→DX distance), not a
+          // local ionospheric quantity suitable for a global MUF map.
+          muf3000 = ionoLocal.foF2 * ionoLocal.md;
+        } else {
+          // Solar model fallback for areas with no ionosonde coverage.
+          // Use LOCAL solar time (UTC + lon/15) so nightside areas get low values.
+          double localSolarHour = std::fmod(utcHour + lon / 15.0 + 24.0, 24.0);
+          double hourFactor = 1.0 + 0.4 * std::cos((localSolarHour - 14.0) * M_PI / 12.0);
+          double latFactor = std::max(0.1, 1.0 - std::abs(lat) / 150.0);
+          double foF2_est = 0.9 * std::sqrt(ssn + 15.0) * hourFactor * latFactor;
+          muf3000 = foF2_est * 3.0;
+        }
+        grid[y * MAP_W + x] = (float)std::max(0.0, std::min(35.0, muf3000));
+        continue;
+      }
+
+      // Path-based calculations (reliability, TOA)
       double dist = haversineKm(params.txLat, params.txLon, lat, lon);
       if (params.path == 1) {
         dist = 40075.0 - dist;
       }
       if (dist < 10.0) {
-        // At TX location, 100% reliable or max MUF?
-        grid[y * MAP_W + x] = (outputType == 0) ? 50.0f
-                             : (outputType == 2) ? 0.0f
-                             : 100.0f;
+        grid[y * MAP_W + x] = (outputType == 2) ? 0.0f : 100.0f;
         continue;
       }
 

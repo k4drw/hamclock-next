@@ -1,5 +1,6 @@
-// DashboardContext.cpp — implementations for AppContext and DashboardContext methods.
-// All method bodies extracted from main.cpp; struct definitions are in DashboardContext.h.
+#include "DashboardContext.h"
+#include "PaneRestrictions.h"
+#include "../ui/RenderUtils.h"
 
 #include "core/ActivityLocationManager.h"
 #include "core/AuroraHistoryStore.h"
@@ -123,6 +124,7 @@
 #include "ui/WeatherPanel.h"
 #include "ui/WidgetSelector.h"
 #include "ui/WinlinkPanel.h"
+#include "ui/WorldClockPanel.h"
 #include "ui/icon_png.h"
 
 #include "core/Constants.h"
@@ -146,6 +148,7 @@
 #include "ui/SpaceWeatherAlertsPanel.h"
 #include "ui/NOAASpaceWxPanel.h"
 #include "ui/BigClockPanel.h"
+#include "ui/CallsignClock.h"
 #include "ui/VoacapDeDxPanel.h"
 #include <SDL.h>
 #include <SDL_image.h>
@@ -199,7 +202,19 @@ using namespace HamClock;
 class DisplayPower;
 void preventRPiSleep(bool prevent, DisplayPower *dp = nullptr);
 
-AppContext::~AppContext() = default;
+AppContext::~AppContext() {
+#ifndef __EMSCRIPTEN__
+  // Stop the WebServer thread before any member destructors run.
+  // dashboard (DashboardContext) is declared after webServer in AppContext, so it
+  // would normally be destroyed first by reverse member-destruction order — leaving
+  // the HTTP thread holding dangling raw pointers to timePanel_, rssBanner_,
+  // adifProvider_, satMgr_, etc. that live inside DashboardContext.
+  // Explicitly stopping here ensures the thread is joined before anything it
+  // references can be freed.
+  if (webServer)
+    webServer->stop();
+#endif
+}
 
 void AppContext::updateLayoutMetrics() {
   SDL_GetWindowSize(window, &globalWinW, &globalWinH);
@@ -457,7 +472,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
     hurricaneProvider->fetch();
 
   marineProvider =
-      std::make_unique<MarineProvider>(netManager, ctx.marineStore);
+      std::make_unique<MarineProvider>(netManager, ctx.marineStore, state.get());
   if (isMasterMode || isWidgetConfigured("marine"))
     marineProvider->fetch(appCfg.marineStation, appCfg.marineBuoy);
 
@@ -550,7 +565,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
   });
 
   timePanel =
-      std::make_unique<TimePanel>(0, 0, 0, 0, fontMgr, texMgr, appCfg.callsign);
+      std::make_unique<TimePanel>(0, 0, 0, 0, fontMgr, texMgr, appCfg);
   timePanel->setCallColor(appCfg.callsignColor);
   timePanel->setCallBgColor(appCfg.callsignBgColor);
   timePanel->setOnConfigChanged(
@@ -646,7 +661,13 @@ DashboardContext::DashboardContext(AppContext &ctx)
           std::make_unique<BandConditionsPanel>(0, 0, 0, 0, fontMgr, bandStore);
     } else if (type == "contests") {
       widgetPool[type] =
-          std::make_unique<ContestPanel>(0, 0, 0, 0, fontMgr, contestStore);
+          std::make_unique<ContestPanel>(0, 0, 0, 0, fontMgr, contestStore, appCfg);
+    } else if (type == "world_clock") {
+      widgetPool[type] = std::make_unique<WorldClockPanel>(
+          0, 0, 0, 0, ctx.cfgMgr, fontMgr);
+    } else if (type == "callsign_clock") {
+      widgetPool[type] =
+          std::make_unique<CallsignClock>(0, 0, 0, 0, fontMgr, appCfg.callsign, appCfg);
     } else if (type == "callbook") {
       widgetPool[type] =
           std::make_unique<CallbookPanel>(0, 0, 0, 0, fontMgr, callbookStore);
@@ -659,7 +680,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
           0, 0, 0, 0, fontMgr, watchlistStore, watchlistHitStore);
     } else if (type == "eme_tool") {
       widgetPool[type] = std::make_unique<EMEToolPanel>(0, 0, 0, 0, fontMgr,
-                                                        texMgr, moonStore);
+                                                        texMgr, moonStore, appCfg);
     } else if (type == "santa_tracker") {
       widgetPool[type] =
           std::make_unique<SantaPanel>(0, 0, 0, 0, fontMgr, santaStore);
@@ -779,7 +800,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
       widgetPool[type] = std::make_unique<SolarTimelinePanel>(
           0, 0, 0, 0, fontMgr, netManager);
     } else if (type == "calendar") {
-      auto *calPanel = new CalendarPanel(0, 0, 0, 0, fontMgr, ctx.calendarStore);
+      auto *calPanel = new CalendarPanel(0, 0, 0, 0, fontMgr, appCfg, ctx.calendarStore);
       calPanel->setNotifyMinutes(appCfg.calendarNotifyMinutes);
       calPanel->setAllDayNotifyHour(appCfg.calendarAllDayNotifyHour);
       calPanel->setDismissMinutes(appCfg.calendarDismissMinutes);
@@ -845,13 +866,13 @@ DashboardContext::DashboardContext(AppContext &ctx)
           0, 0, 0, 0, fontMgr, texMgr, historyStore);
     } else if (type == "greyline_windows") {
       widgetPool[type] = std::make_unique<GreylineWindowsPanel>(
-          0, 0, 0, 0, fontMgr, state);
+          0, 0, 0, 0, fontMgr, state, appCfg);
     } else if (type == "dxcc_progress") {
       widgetPool[type] = std::make_unique<DXCCProgressPanel>(
           0, 0, 0, 0, fontMgr, adifStore, ctx.prefixMgr);
     } else if (type == "spacewx_alerts") {
       widgetPool[type] = std::make_unique<SpaceWeatherAlertsPanel>(
-          0, 0, 0, 0, fontMgr, spaceWxAlertStore);
+          0, 0, 0, 0, fontMgr, appCfg, spaceWxAlertStore);
     } else if (type == "noaa_spacewx") {
       widgetPool[type] = std::make_unique<NOAASpaceWxPanel>(
           0, 0, 0, 0, fontMgr, ctx.solarStore);
@@ -950,6 +971,27 @@ DashboardContext::DashboardContext(AppContext &ctx)
         [this](const std::string &t) { return widgetFactory_(t); });
   }
 
+  // Scrub configuration to ensure restricted panes (like Pane 4) don't have prohibited widgets.
+  auto scrubRotation = [](int paneIdx, std::vector<std::string> &rot) {
+    auto allowed = PaneRestrictions::getAllowedWidgets(paneIdx);
+    if (allowed.empty())
+      return;
+    auto it = std::remove_if(rot.begin(), rot.end(), [&](const std::string &t) {
+      return std::find(allowed.begin(), allowed.end(), t) == allowed.end();
+    });
+    if (it != rot.end()) {
+      rot.erase(it, rot.end());
+      if (rot.empty())
+        rot.push_back("solar");
+    }
+  };
+  scrubRotation(0, appCfg.pane1Rotation);
+  scrubRotation(1, appCfg.pane2Rotation);
+  scrubRotation(2, appCfg.pane3Rotation);
+  scrubRotation(3, appCfg.pane4Rotation);
+  scrubRotation(4, appCfg.pane5Rotation);
+  scrubRotation(5, appCfg.pane6Rotation);
+
   panes[0]->setRotation(appCfg.pane1Rotation, appCfg.rotationIntervalS,
                         appCfg.syncRotation);
   panes[1]->setRotation(appCfg.pane2Rotation, appCfg.rotationIntervalS,
@@ -977,8 +1019,9 @@ DashboardContext::DashboardContext(AppContext &ctx)
                                      }),
                       available.end());
     }
-    if (paneIdx == 3) { // Pane 4 (top-right small pane)
-      available = {"ncdxf", "solar", "dx_weather", "de_weather", "band_conditions"};
+    auto allowedForPane = PaneRestrictions::getAllowedWidgets(paneIdx);
+    if (!allowedForPane.empty()) {
+      available = allowedForPane;
     }
     std::vector<std::string> current = panes[paneIdx]->getRotation();
     std::vector<std::string> forbidden;
@@ -1007,11 +1050,15 @@ DashboardContext::DashboardContext(AppContext &ctx)
 
     widgetSelector->show(
         paneIdx, available, current, forbidden,
-        [&ctx, this](int idx, const std::vector<std::string> &finalSelection, bool fullHeightSelected) {
+        [&ctx, this, isFullHeight](int idx, const std::vector<std::string> &finalSelection, bool fullHeightSelected) {
           int targetIdx = idx;
           if (fullHeightSelected) {
             targetIdx = 4; // Always use pane 5 for full height widgets
             panes[5]->setRotation({}, ctx.appCfg.rotationIntervalS, ctx.appCfg.syncRotation);
+          } else if (isFullHeight) {
+            // Transitioning out of full-height: restore pane 6 with a default
+            // widget so it becomes visible and clickable in the split layout
+            panes[5]->setRotation({"solar"}, ctx.appCfg.rotationIntervalS, ctx.appCfg.syncRotation);
           }
           panes[targetIdx]->setRotation(finalSelection, ctx.appCfg.rotationIntervalS,
                                   ctx.appCfg.syncRotation);
@@ -1274,6 +1321,34 @@ void DashboardContext::restorePane(AppContext &ctx) {
     layout.recalculate(ctx.globalWinW, ctx.globalWinH);
 }
 
+// Compute integer UTC offset for an IANA timezone ID.
+// Linux/macOS: uses POSIX TZ env-var + localtime (DST-aware), serialised by a
+// static mutex so it is safe to call from the NetworkManager callback thread.
+// WASM / Windows: falls back to longitude-based solar time (every 15° ≈ 1 hr).
+static int tzIdToOffset(const std::string &tzId, double fallbackLon) {
+#if defined(__EMSCRIPTEN__) || defined(_WIN32)
+  int off = static_cast<int>(std::round(fallbackLon / 15.0));
+  return std::clamp(off, -12, 14);
+#else
+  static std::mutex gTzMutex;
+  std::lock_guard<std::mutex> lock(gTzMutex);
+  const char *saved = getenv("TZ");
+  std::string savedStr = saved ? saved : "";
+  setenv("TZ", tzId.c_str(), 1);
+  tzset();
+  std::time_t now = std::time(nullptr);
+  struct tm local{};
+  Astronomy::portable_localtime(&now, &local);
+  int off = static_cast<int>(Astronomy::portable_utcoffset(&now, &local) / 3600);
+  if (!savedStr.empty())
+    setenv("TZ", savedStr.c_str(), 1);
+  else
+    unsetenv("TZ");
+  tzset();
+  return off;
+#endif
+}
+
 void DashboardContext::update(AppContext &ctx) {
   auto &appCfg = ctx.appCfg;
 
@@ -1518,7 +1593,69 @@ void DashboardContext::update(AppContext &ctx) {
         asteroidProvider->isStale(now, kCooldown)) {
       asteroidProvider->update();
     }
+
+    // Marine (fetch periodically if widget active)
+    if (isWidgetActive("marine") &&
+        marineProvider->isStale(now, 15 * 60 * 1000) &&
+        marineProvider->isStale(now, kCooldown)) {
+      marineProvider->fetch(appCfg.marineStation, appCfg.marineBuoy);
+    }
+
+    // DX timezone lookup via ZoneDetect API — fires once per DX location change.
+    // locationMutex is held by the main thread (main.cpp) for the entire
+    // update+render tick.  The callback MUST NOT re-acquire it: NetworkManager
+    // delivers cache-hit callbacks synchronously on the calling thread, so
+    // attempting std::lock_guard(locationMutex) here would deadlock.
+    // dxTzOffset (int) and dxTzValid (bool) are the only fields the callback
+    // writes; DXInfo::update() reads them without holding locationMutex, so
+    // omitting the lock in the callback does not change the thread-safety
+    // contract for those two fields.
+    if (ctx.state->dxActive) {
+      bool changed =
+          (ctx.state->dxLocation.lat != ctx.state->dxTzQueryLoc.lat ||
+           ctx.state->dxLocation.lon != ctx.state->dxTzQueryLoc.lon);
+      if (changed) {
+        ctx.state->dxTzValid    = false;
+        ctx.state->dxTzQueryLoc = ctx.state->dxLocation;
+        double dxLat = ctx.state->dxLocation.lat;
+        double dxLon = ctx.state->dxLocation.lon;
+        char url[128];
+        std::snprintf(url, sizeof(url),
+            "https://timezone.bertold.org/timezone?lat=%.4f&lon=%.4f&c=1",
+            dxLat, dxLon);
+        auto dashLive = dashboardLive_;
+        auto stateRef = ctx.state;
+        ctx.netManager->fetchAsync(url, [dashLive, stateRef, dxLon](std::string body) {
+          if (!dashLive->load(std::memory_order_acquire)) return;
+          auto pos = body.find("\"TimezoneId\"");
+          if (pos == std::string::npos) return;
+          auto q1 = body.find('"', pos + 13);
+          if (q1 == std::string::npos) return;
+          auto q2 = body.find('"', q1 + 1);
+          if (q2 == std::string::npos) return;
+          std::string tzId = body.substr(q1 + 1, q2 - q1 - 1);
+          int offset = tzIdToOffset(tzId, dxLon);
+          stateRef->dxTzId     = tzId;
+          stateRef->dxTzOffset = offset;
+          stateRef->dxTzValid  = true;
+        }, 86400, false);
+      }
+    }
   }
+
+  // --- Late-start DX Cluster / RBN providers ---
+  // dxcProvider and rbnProvider are only started at build time when
+  // isWidgetConfigured() finds dx_cluster/watchlist in the saved pane rotations.
+  // If the widget is added mid-session (e.g. set_pane?action=solo), the provider
+  // must be started now so the panel receives data without requiring a restart.
+#ifndef __EMSCRIPTEN__
+  if (!dxcProvider->isRunning() &&
+      (isMaster || isWidgetActive("dx_cluster") || isWidgetActive("watchlist")))
+    dxcProvider->start(appCfg);
+  if (!rbnProvider->isRunning() && appCfg.rbnEnabled &&
+      (isMaster || isWidgetActive("dx_cluster") || isWidgetActive("watchlist")))
+    rbnProvider->start(appCfg);
+#endif
 
   // --- DRAP fetch: immediate when overlay active and store empty (60s
   // cooldown) ---
@@ -2164,57 +2301,42 @@ void DashboardContext::update(AppContext &ctx) {
           break;
         }
         case AE_TOUCH: {
-          int mx =
-              static_cast<int>(reinterpret_cast<intptr_t>(event.user.data1));
-          int my =
-              static_cast<int>(reinterpret_cast<intptr_t>(event.user.data2));
-          // If setup active, send to setup widget
-          if (ctx.activeSetup != AppContext::SetupMode::None &&
-              ctx.setupWidget) {
-            ctx.setupWidget->onMouseDown(mx, my, 0, 1);
-            ctx.setupWidget->onMouseUp(mx, my, 0, 1);
+          int mx = static_cast<int>(reinterpret_cast<intptr_t>(event.user.data1));
+          int my = static_cast<int>(reinterpret_cast<intptr_t>(event.user.data2));
+
+          if (focusedWidget) {
+            focusedWidget->onMouseDown(mx, my, 0, 1);
+            focusedWidget->onMouseUp(mx, my, 0, 1);
           } else {
-            // Scan all eventWidgets for an active modal/config, mirroring
-            // the SDL_MOUSEBUTTONUP focusedWidget logic so every modal
-            // (not just mapArea's MapViewMenu) receives web touch events.
-            Widget *focused = nullptr;
-            for (auto *w : ctx.dashboard->eventWidgets) {
-              if (w->isModalActive() || w->isConfiguring()) {
-                focused = w;
-                break;
+            bool isFS = (expandedPaneIdx_ >= 0 &&
+                         panes[expandedPaneIdx_]->getActiveType() == "big_clock");
+            for (auto *w : eventWidgets) {
+              if (expandedPaneIdx_ >= 0) {
+                if (isFS) {
+                  if (w != panes[expandedPaneIdx_].get() && w != widgetSelector.get())
+                    continue;
+                } else if (w == mapArea.get()) {
+                  continue;
+                }
               }
-            }
-            if (focused) {
-              focused->onMouseUp(mx, my, 0, 1);
-            } else {
-              for (auto *w : ctx.dashboard->eventWidgets)
+              SDL_Rect r = w->getRect();
+              if (mx >= r.x && mx < r.x + r.w && my >= r.y && my < r.y + r.h) {
+                w->onMouseDown(mx, my, 0, 1);
                 if (w->onMouseUp(mx, my, 0, 1))
                   break;
+              }
             }
           }
           break;
         }
         case AE_WHEEL: {
-          int dy =
-              static_cast<int>(reinterpret_cast<intptr_t>(event.user.data1));
-          if (ctx.activeSetup != AppContext::SetupMode::None &&
-              ctx.setupWidget) {
-            ctx.setupWidget->onMouseWheel(dy);
+          int dy = static_cast<int>(reinterpret_cast<intptr_t>(event.user.data1));
+          if (focusedWidget) {
+            focusedWidget->onMouseWheel(dy);
           } else {
-            // Same fix: scan all eventWidgets for active modal/config.
-            Widget *focused = nullptr;
-            for (auto *w : ctx.dashboard->eventWidgets) {
-              if (w->isModalActive() || w->isConfiguring()) {
-                focused = w;
+            for (auto *w : eventWidgets) {
+              if (w->onMouseWheel(dy))
                 break;
-              }
-            }
-            if (focused) {
-              focused->onMouseWheel(dy);
-            } else {
-              for (auto *w : ctx.dashboard->eventWidgets)
-                if (w->onMouseWheel(dy))
-                  break;
             }
           }
           break;
@@ -2577,8 +2699,8 @@ void DashboardContext::render(AppContext &ctx) {
       auto *cat = &fontCatalog;
       if (cat) {
         int tw, th;
-        cat->renderText(ctx.renderer, hoverTooltip, {255, 255, 255, 255},
-                        FontStyle::Micro, &tw, &th);
+        SDL_Texture *tipTex = cat->renderText(ctx.renderer, hoverTooltip,
+                        {255, 255, 255, 255}, FontStyle::Micro, &tw, &th);
         int pad = 4;
         SDL_Rect box = {mx + 12, my + 12, tw + pad * 2, th + pad * 2};
         // Keep tooltip on screen
@@ -2591,8 +2713,11 @@ void DashboardContext::render(AppContext &ctx) {
         SDL_RenderFillRect(ctx.renderer, &box);
         SDL_SetRenderDrawColor(ctx.renderer, 255, 255, 255, 180);
         SDL_RenderDrawRect(ctx.renderer, &box);
-        cat->drawText(ctx.renderer, hoverTooltip, box.x + pad, box.y + pad,
-                      {255, 255, 255, 255}, FontStyle::Micro);
+        if (tipTex) {
+          SDL_Rect dst = {box.x + pad, box.y + pad, tw, th};
+          SDL_RenderCopy(ctx.renderer, tipTex, nullptr, &dst);
+          cat->destroyTexture(tipTex);
+        }
       }
     }
   }

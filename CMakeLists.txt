@@ -72,6 +72,8 @@ endif()
 add_compile_definitions(HAMCLOCK_VERSION="v${HAMCLOCK_DISPLAY_VERSION}")
 add_compile_definitions(HAMCLOCK_INSTALL_TYPE="${HAMCLOCK_INSTALL_TYPE}")
 add_compile_definitions(HAMCLOCK_ARCH="${HAMCLOCK_ARCH}")
+string(TIMESTAMP HAMCLOCK_BUILD_DATETIME "%Y-%m-%d %H:%M UTC" UTC)
+add_compile_definitions(HAMCLOCK_BUILD_DATETIME="${HAMCLOCK_BUILD_DATETIME}")
 
 # Pthreads are not enabled for WASM: the app is single-threaded in that
 # context and enabling them would require SharedArrayBuffer + COOP/COEP HTTP
@@ -163,6 +165,7 @@ if(NOT EMSCRIPTEN)
             GIT_REPOSITORY https://github.com/libsdl-org/SDL_image.git
             GIT_TAG        release-2.8.2
             GIT_SHALLOW    TRUE
+            GIT_SUBMODULES ""
         )
     endif()
 endif()
@@ -526,6 +529,7 @@ set(HAMCLOCK_SOURCES
     src/core/OrbitPredictor.cpp
     src/core/DXClusterData.cpp
     src/core/DisplayPower.cpp
+    src/core/PaneRestrictions.cpp
     src/core/GreylineCalculator.cpp
     src/core/BrightnessManager.cpp
     src/core/CPUMonitor.cpp
@@ -536,6 +540,7 @@ set(HAMCLOCK_SOURCES
     src/core/SoundManager.cpp
     src/core/WorkerService.cpp
     src/core/PropEngine.cpp
+    src/core/VoacapEngine.cpp
     src/core/ActivityLocationManager.cpp
     src/network/FrameCapture.cpp
     src/network/NetworkManager.cpp
@@ -592,6 +597,7 @@ set(HAMCLOCK_SOURCES
     src/ui/ADIFPanel.cpp
     src/ui/AlertsPanel.cpp
     src/ui/BigClockPanel.cpp
+    src/ui/CallsignClock.cpp
     src/ui/SolarCyclePanel.cpp
     src/ui/GreylineWindowsPanel.cpp
     src/ui/DXCCProgressPanel.cpp
@@ -638,6 +644,7 @@ set(HAMCLOCK_SOURCES
     src/ui/MapViewMenu.cpp
     src/ui/PaneContainer.cpp
     src/ui/PlaceholderWidget.cpp
+    src/ui/PropColorCustomizer.cpp
     src/ui/WidgetRegistry.cpp
     src/ui/ColorPicker.cpp
     src/ui/RenderUtils.cpp
@@ -674,6 +681,7 @@ set(HAMCLOCK_SOURCES
     src/ui/CallbookPanel.cpp
     src/ui/DstPanel.cpp
     src/ui/WatchlistPanel.cpp
+    src/ui/WorldClockPanel.cpp
     src/ui/EMEToolPanel.cpp
     src/ui/SantaPanel.cpp
 )

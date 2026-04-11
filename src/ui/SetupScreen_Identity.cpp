@@ -1,7 +1,9 @@
 #include "SetupScreen.h"
+#include "../core/Astronomy.h"
 #include "../core/Theme.h"
 #include <SDL.h>
 #include <algorithm>
+#include <ctime>
 
 void SetupScreen::renderTabIdentity(SDL_Renderer *renderer, int cx, int pad,
                                     int fieldW, int fieldH, int fieldX,
@@ -67,11 +69,13 @@ void SetupScreen::renderTabIdentity(SDL_Renderer *renderer, int cx, int pad,
                    themes.textDim, themes.text, themes.text, themes.textDim, "e.g. -82.64", &themes.rowStripe1);
   y = std::max(latY, lonY) + pad / 2 + pad;
 
-  gpsToggleRect_ = {fieldX, y, 20, 20};
+  int gpsLabelW = fontMgr_.getLogicalWidth("Synchronize with GPS (gpsd)", cat->ptSize(FontStyle::SmallRegular));
+  gpsToggleRect_ = {fieldX, y, 30 + gpsLabelW, 20};
+  SDL_Rect gpsBox = {fieldX, y, 20, 20};
   SDL_SetRenderDrawColor(renderer, themes.rowStripe1.r, themes.rowStripe1.g, themes.rowStripe1.b, 255);
-  SDL_RenderFillRect(renderer, &gpsToggleRect_);
+  SDL_RenderFillRect(renderer, &gpsBox);
   SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
-  SDL_RenderDrawRect(renderer, &gpsToggleRect_);
+  SDL_RenderDrawRect(renderer, &gpsBox);
   if (gpsEnabled_) {
     SDL_SetRenderDrawColor(renderer, themes.success.r, themes.success.g, themes.success.b, 255);
     SDL_Rect check = {fieldX + 4, y + 4, 12, 12};
@@ -81,11 +85,13 @@ void SetupScreen::renderTabIdentity(SDL_Renderer *renderer, int cx, int pad,
                 themes.text, FontStyle::SmallRegular, false, false, true);
   y += 28;
 
-  audioMuteToggleRect_ = {fieldX, y, 20, 20};
+  int muteLabelW = fontMgr_.getLogicalWidth("Mute all audio (TTS + alarm)", cat->ptSize(FontStyle::SmallRegular));
+  audioMuteToggleRect_ = {fieldX, y, 30 + muteLabelW, 20};
+  SDL_Rect muteBox = {fieldX, y, 20, 20};
   SDL_SetRenderDrawColor(renderer, themes.rowStripe1.r, themes.rowStripe1.g, themes.rowStripe1.b, 255);
-  SDL_RenderFillRect(renderer, &audioMuteToggleRect_);
+  SDL_RenderFillRect(renderer, &muteBox);
   SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
-  SDL_RenderDrawRect(renderer, &audioMuteToggleRect_);
+  SDL_RenderDrawRect(renderer, &muteBox);
   if (audioMuted_) {
     SDL_SetRenderDrawColor(renderer, themes.success.r, themes.success.g, themes.success.b, 255);
     SDL_Rect check = {fieldX + 4, y + 4, 12, 12};
@@ -93,6 +99,29 @@ void SetupScreen::renderTabIdentity(SDL_Renderer *renderer, int cx, int pad,
   }
   cat->drawText(renderer, "Mute all audio (TTS + alarm)", fieldX + 30, y + 10,
                 themes.text, FontStyle::SmallRegular, false, false, true);
-  y += 28;
+  y += 28 + vSpace;
 
+  cat->drawText(renderer, "Default Timezone:", fieldX, y, themes.text, FontStyle::SmallBold);
+  y += labelH;
+  defaultTzRect_ = {fieldX, y, fieldW, fieldH};
+  SDL_SetRenderDrawColor(renderer, themes.rowStripe1.r, themes.rowStripe1.g, themes.rowStripe1.b, 255);
+  SDL_RenderFillRect(renderer, &defaultTzRect_);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
+  SDL_RenderDrawRect(renderer, &defaultTzRect_);
+  
+  char tzBuf[64];
+  if (defaultTzOffset_ == 999) {
+    std::time_t now = std::time(nullptr);
+    struct tm local{};
+    Astronomy::portable_localtime(&now, &local);
+    std::string abbr = Astronomy::portable_tzabbr(local);
+    std::snprintf(tzBuf, sizeof(tzBuf), "%s", abbr.c_str());
+  } else std::snprintf(tzBuf, sizeof(tzBuf), "%s (UTC%+d)", defaultTzLabel_.c_str(), defaultTzOffset_);
+  cat->drawText(renderer, tzBuf, fieldX + textPad, y + fieldH / 2, themes.text, FontStyle::SmallRegular, false, false, true);
+  
+  // "Change" hint
+  int hintW = fontMgr_.getLogicalWidth("Change...", cat->ptSize(FontStyle::Tiny));
+  cat->drawText(renderer, "Change...", fieldX + fieldW - hintW - textPad, y + fieldH / 2, themes.accent, FontStyle::Tiny, false, false, true);
+
+  y += fieldH + vSpace;
 }

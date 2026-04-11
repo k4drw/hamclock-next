@@ -38,6 +38,7 @@ struct ConfigPreset {
   std::vector<std::string> pane6Rotation;
   int rotationIntervalS = 30;
   PropOverlayType propOverlay = PropOverlayType::None;
+  std::vector<PropOverlayType> propRotation;
   WeatherOverlayType weatherOverlay = WeatherOverlayType::None;
   std::string mapStyle = "nasa";
   bool mapNightLights = true;
@@ -48,6 +49,13 @@ struct ConfigPreset {
   int propPower = 100;
   float propToa = 3.0f;
   int propPath = 0; // 0=Short, 1=Long
+  int propAntGain = 3; // Antenna gain (dBi)
+};
+
+struct WorldClockEntry {
+  std::string label;
+  int offsetMinutes = 0; // minutes from UTC
+  bool active = false;
 };
 
 struct AppConfig {
@@ -56,10 +64,13 @@ struct AppConfig {
   std::string grid;
   double lat = 0.0;
   double lon = 0.0;
+  int defaultTzOffset = 0;              // Global default TZ offset (0 = UTC)
+  std::string defaultTzLabel = "UTC";   // Global default TZ label
   // Appearance
   SDL_Color callsignColor = {255, 165, 0, 255}; // default orange
   SDL_Color callsignBgColor = {0, 0, 0, 0};     // default transparent (no bg)
   std::string theme = "default";
+  std::string propColormap = "vibrant";       // "vibrant" (Original) or "muted" (Next)
   bool mapNightLights = true;
   bool useMetric = true;
   std::string projection = "equirectangular"; // or "robinson"
@@ -67,12 +78,14 @@ struct AppConfig {
   bool showGrid = false;
   std::string gridType = "latlon"; // "latlon" or "maidenhead"
   PropOverlayType propOverlay = PropOverlayType::None;
+  std::vector<PropOverlayType> propRotation;
   WeatherOverlayType weatherOverlay = WeatherOverlayType::None;
   std::string propBand = "20m";
   std::string propMode = "SSB";
   int propPower = 100;      // Watts
   float propToa = 3.0f;     // Take-off angle (degrees)
   int propPath = 0;         // 0=Short, 1=Long
+  int propAntGain = 3;      // Antenna gain (dBi)
   int mufRtOpacity = 40;    // percentage
   bool showSatTrack = true; // Show satellite ground track line on world map
   bool showBeacons = true;  // Show NCDXF beacons on world map
@@ -127,8 +140,8 @@ struct AppConfig {
   bool sdoShowMovie = false;
 
   // Marine Widget settings
-  std::string marineStation = "8722670"; // NOAA Tide station (Lake Worth FL)
-  std::string marineBuoy = "41114";      // NDBC Buoy ID (FL Atlantic)
+  std::string marineStation;
+  std::string marineBuoy;
 
   // Power / Screen
   bool preventSleep = true; // true to call SDL_DisableScreenSaver()
@@ -220,9 +233,13 @@ struct AppConfig {
   bool bigClockDigital  = true;
   bool bigClock12h      = false;
   bool bigClockUtc      = false;
+  bool bigClockUseDefaultTz = false;
   bool bigClockShowSec  = true;
   bool bigClockShowDate = true;
   uint8_t bigClockHue   = 85; // default green (matches original NV_SWHUE default)
+
+  // World Clock
+  std::vector<WorldClockEntry> worldClocks;
 
   // Update
   std::string skippedVersion;

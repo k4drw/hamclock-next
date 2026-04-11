@@ -23,20 +23,29 @@ void CallsignClock::destroyCache() {
 void CallsignClock::update() {
   auto now = std::chrono::system_clock::now();
   std::time_t t = std::chrono::system_clock::to_time_t(now);
-  std::tm utc{};
-  Astronomy::portable_gmtime(&t, &utc);
+  std::tm display{};
+  if (config_.defaultTzOffset == 999) {
+    Astronomy::portable_localtime(&t, &display);
+  } else {
+    std::time_t ot = t + static_cast<std::time_t>(config_.defaultTzOffset) * 3600LL;
+    Astronomy::portable_gmtime(&ot, &display);
+  }
 
   char buf[32];
-  currentTime_ = TimeUtils::hms(utc.tm_hour, utc.tm_min, utc.tm_sec) + " UTC";
+  std::string tzLabel = (config_.defaultTzOffset == 999)
+                        ? Astronomy::portable_tzabbr(display)
+                        : config_.defaultTzLabel;
+  currentTime_ = TimeUtils::hms(display.tm_hour, display.tm_min, display.tm_sec)
+                 + " " + tzLabel;
 
   std::snprintf(buf, sizeof(buf), "%s %02d %s %04d",
                 (const char *[]){"Sun", "Mon", "Tue", "Wed", "Thu", "Fri",
-                                 "Sat"}[utc.tm_wday],
-                utc.tm_mday,
+                                 "Sat"}[display.tm_wday],
+                display.tm_mday,
                 (const char *[]){"Jan", "Feb", "Mar", "Apr", "May", "Jun",
                                  "Jul", "Aug", "Sep", "Oct", "Nov",
-                                 "Dec"}[utc.tm_mon],
-                1900 + utc.tm_year);
+                                 "Dec"}[display.tm_mon],
+                1900 + display.tm_year);
   currentDate_ = buf;
 }
 
@@ -47,14 +56,14 @@ void CallsignClock::render(SDL_Renderer *renderer) {
   ThemeColors themes = getThemeColors(theme_);
   auto *cat = fontMgr_.catalog();
 
-  // Draw pane border
-  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
-  SDL_Rect border = {x_, y_, width_, height_};
-  SDL_RenderDrawRect(renderer, &border);
+  renderChrome(renderer);
+  renderTitle(renderer, fontMgr_, getDisplayName());
 
-  // Row layout: callsign ~40%, time ~35%, date ~25% of height
-  int callRowH = static_cast<int>(height_ * 0.40f);
-  int timeRowH = static_cast<int>(height_ * 0.35f);
+  // Row layout below title bar: callsign ~40%, time ~35%, date ~25%
+  const int titleH = 20;
+  int contentH = height_ - titleH;
+  int callRowH = static_cast<int>(contentH * 0.40f);
+  int timeRowH = static_cast<int>(contentH * 0.35f);
   int pad = static_cast<int>(width_ * 0.05f);
 
   // Callsign (large, colored)
@@ -63,7 +72,7 @@ void CallsignClock::render(SDL_Renderer *renderer) {
                                FontStyle::MediumBold, &callW_, &callH_);
   }
   if (callTex_) {
-    int dy = y_ + (callRowH - callH_) / 2;
+    int dy = y_ + titleH + (callRowH - callH_) / 2;
     SDL_Rect dst = {x_ + pad, dy, callW_, callH_};
     SDL_RenderCopy(renderer, callTex_, nullptr, &dst);
   }
@@ -78,7 +87,7 @@ void CallsignClock::render(SDL_Renderer *renderer) {
     lastTime_ = currentTime_;
   }
   if (timeTex_) {
-    int dy = y_ + callRowH + (timeRowH - timeH_) / 2;
+    int dy = y_ + titleH + callRowH + (timeRowH - timeH_) / 2;
     SDL_Rect dst = {x_ + pad, dy, timeW_, timeH_};
     SDL_RenderCopy(renderer, timeTex_, nullptr, &dst);
   }
@@ -93,7 +102,7 @@ void CallsignClock::render(SDL_Renderer *renderer) {
     lastDate_ = currentDate_;
   }
   if (dateTex_) {
-    int dy = y_ + callRowH + timeRowH;
+    int dy = y_ + titleH + callRowH + timeRowH;
     SDL_Rect dst = {x_ + pad, dy, dateW_, dateH_};
     SDL_RenderCopy(renderer, dateTex_, nullptr, &dst);
   }
@@ -103,3 +112,9 @@ void CallsignClock::onResize(int x, int y, int w, int h) {
   Widget::onResize(x, y, w, h);
   destroyCache();
 }
+
+#include "WidgetRegistry.h"
+REGISTER_WIDGET("callsign_clock", "Callsign/Clock", false, false, {
+  return std::make_unique<CallsignClock>(0, 0, 0, 0, deps.fontMgr,
+                                        deps.appCfg.callsign, deps.appCfg);
+})

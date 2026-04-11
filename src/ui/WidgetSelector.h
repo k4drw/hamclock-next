@@ -33,6 +33,7 @@ private:
   int paneIndex_ = 0;
   bool fullHeightMode_ = false;
 
+  std::vector<std::string> allAvailable_; // full list from show(), before full-height filter
   std::vector<std::string> available_;
   std::vector<std::string> selection_;
   std::vector<std::string> forbidden_;

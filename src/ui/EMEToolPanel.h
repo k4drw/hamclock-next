@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../core/ConfigManager.h"
 #include "../core/MoonData.h"
 #include "FontManager.h"
 #include "TextureManager.h"
@@ -14,7 +15,8 @@ struct SDL_Renderer;
 class EMEToolPanel : public Widget {
 public:
   EMEToolPanel(int x, int y, int w, int h, FontManager &fontMgr,
-               TextureManager &texMgr, std::shared_ptr<MoonStore> store);
+               TextureManager &texMgr, std::shared_ptr<MoonStore> store,
+               AppConfig &config);
 
   void update() override;
   void render(SDL_Renderer *renderer) override;
@@ -40,6 +42,7 @@ private:
   FontManager &fontMgr_;
   TextureManager &texMgr_;
   std::shared_ptr<MoonStore> store_;
+  AppConfig &config_;
   MoonData currentData_;
 
   double deLat_ = 0.0, deLon_ = 0.0;
