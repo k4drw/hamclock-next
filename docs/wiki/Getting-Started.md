@@ -26,10 +26,11 @@ sudo rpm -i hamclock-next-*.rpm
 hamclock-next
 ```
 
-**Raspberry Pi:** The Linux packages above work on Raspberry Pi OS. For console/framebuffer use (no desktop):
+**Raspberry Pi:** The Linux packages above work on Raspberry Pi OS. For console use (Pi boots to text, no desktop):
 ```bash
 SDL_VIDEODRIVER=kmsdrm hamclock-next --fullscreen
 ```
+> The `SDL_VIDEODRIVER=kmsdrm` part tells HamClock-Next to draw directly to the screen without a window manager. Use this when your Pi boots to the command line instead of a graphical desktop.
 
 ### macOS
 

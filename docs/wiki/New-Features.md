@@ -8,36 +8,44 @@ Features are grouped by category. Each entry includes a brief description and, w
 
 ## Platform & Rendering
 
-### SDL2-Based Rendering (Multi-Platform)
+### Multi-Platform Support
 
-The original HamClock used a custom framebuffer/X11 rendering stack that limited it to Linux. HamClock-Next is built on **SDL2**, which enables:
+The original HamClock was limited to Linux. HamClock-Next runs on:
 
 - **Linux** — framebuffer and native window, including Raspberry Pi (ARM)
 - **macOS** — native window (Apple Silicon)
 - **Windows** — native x64 binary and NSIS installer (`HamClock-Next-Setup.exe`)
-- **Browser** — via WebAssembly (Emscripten), runs in any modern browser with no installation
+- **Browser** — runs in any modern browser with no installation
 
-### Browser / WebAssembly Build
+### Browser Build
 
-Run HamClock-Next entirely in a browser tab. Build with `./scripts/build-wasm.sh` (or the Docker variant). The browser build is functionally identical to the native build — all widgets, overlays, and configuration work the same way.
+Run HamClock-Next entirely in a browser tab with no installation. The browser version is functionally identical to the desktop build — all widgets, overlays, and configuration work the same way.
 
-A CORS proxy setting (`corsProxyUrl`) routes network requests through a same-origin proxy to satisfy browser security restrictions.
+If you are hosting it on your own server, see `corsProxyUrl` in [Setup & Configuration](Configuration.md) and the [Glossary](Glossary.md#cors-proxy).
 
 ### High-DPI / Letterbox Mode
 
 On wide or 4K displays, HamClock-Next renders at the native logical resolution and letterboxes within the physical window, keeping all UI elements correctly proportioned regardless of window size or display scale.
 
-### CI/CD Build Targets
+### Available Packages
 
-Automated builds are produced for: **x86-64**, **ARM64**, **ARMhf**, and **WASM**. An OpenSuSE Tumbleweed **RPM package** is also produced.
+Pre-built packages are available for: **64-bit PC** (Linux and Windows), **Raspberry Pi** (64-bit and 32-bit ARM), and **Browser**. An OpenSUSE Tumbleweed RPM package is also available.
+
+### RPi3B Stability
+
+Memory use has been substantially reduced for low-resource devices like the Raspberry Pi 3B. HamClock-Next now runs reliably on boards that previously ran out of memory and crashed.
 
 ---
 
-## Major Architectural Enhancements
+## Stability & Network Improvements
 
-### Local Data Hub (LAN Rate-Limit Sharing)
+### Remote Control Stability
 
-HamClock-Next instances can share a common data cache on a local network. One instance acts as the **Master** and proxies API requests for other **Client** instances. This reduces external network traffic and prevents multiple instances from hitting API rate limits. Clients fall back silently to direct fetching if the Hub is unavailable.
+Remote control commands sent via the [REST API](REST-API.md) are now synchronized with the display. This prevents visual glitches when commands arrive faster than the screen can update — useful for logging software or automation scripts that drive HamClock-Next programmatically.
+
+### Network Data Sharing (LAN Hub)
+
+If you run multiple HamClock-Next instances on the same local network, one can act as the **Master** and share its downloaded data with the others. This reduces internet traffic and prevents all instances from hammering the same data sources simultaneously. Client instances fall back to fetching directly if the Master is unavailable.
 
 ---
 
@@ -59,16 +67,16 @@ See the [Presets](#presets-system) section below for details.
 
 ### Side Panel Mode
 
-The right column (normally Panes 4 and 5) can be switched to a **full-height side panel** mode. Options:
+The **left column** (normally Panes 5 and 6) can be switched to a **full-height side panel** mode. Options:
 
 | Mode                                        | Description                                         |
 | ------------------------------------------- | --------------------------------------------------- |
 | DE Info + DX/Sat (two panes, original-like) | Standard two-pane layout                            |
-| DX Cluster (full height)                    | DX cluster spot list fills the full right column    |
-| On The Air (full height)                    | POTA/SOTA activations fill the full right column    |
-| Live Spots (full height)                    | PSK Reporter / RBN spots fill the full right column |
+| DX Cluster (full height)                    | DX cluster spot list fills the full left column     |
+| On The Air (full height)                    | POTA/SOTA activations fill the full left column     |
+| Live Spots (full height)                    | PSK Reporter / RBN spots fill the full left column  |
 
-Side panel mode is selectable from Setup → Widgets, or by clicking the title bar of the side pane.
+Side panel mode is selectable from Setup → Widgets, or by clicking the title bar of the side column.
 
 ---
 
@@ -85,6 +93,11 @@ The following widgets have **no equivalent** in the original HamClock:
 | **Solar Storm**   | Current NOAA geomagnetic storm watch / warning / alert status                                                                                                                                  |
 | **Tropo**         | Tropospheric ducting forecast index                                                                                                                                                            |
 | **Sys Info**      | System resource display — CPU, memory, network, uptime                                                                                                                                         |
+| **World Clock**   | Up to 4 configurable timezones with city labels and UTC offsets; includes an integrated configuration UI (gear icon).                                                                          |
+| **Big Clock**     | High-visibility digital or analog clock with user-selectable color themes.                                                                                                                     |
+| **Solar (Basic)** | A condensed version of the Solar widget for users who prefer simplified space weather monitoring.                                                                                              |
+| **DE Info (Basic)**| Standalone home-station details (callsign, grid, lat/lon) without additional propagation metrics.                                                                                              |
+| **DX Info (Basic)**| Standalone target-station details.                                                                                                                                                             |
 | **Santa Tracker** | Tracks Santa's position on Christmas Eve — in the original this was a hidden easter egg that auto-activated on the map with no user control; in HamClock-Next it is a proper selectable widget |
 
 ---
@@ -103,7 +116,11 @@ HamClock-Next adds several propagation overlays not present in the original:
 | **Propagation Heatmap** | Live PSK Reporter spot density heat map — shows where your signal is actually being heard right now                             |
 | **DRAP**                | D-Region Absorption Prediction map (also available as a standalone widget)                                                      |
 
-All overlays are configurable by **band**, **mode**, and **power** (watts).
+All overlays are configurable by **band**, **mode**, **power**, **Take-Off Angle (TOA)**, and **path (Short/Long)**.
+
+### Custom Propagation Colormaps
+
+User-defined colormaps allow full control over map rendering for MUF, Reliability, and TOA overlays. Choose between **Muted** (safe for overlays), **Vibrant** (high visibility), or **Custom** (a 5-point linear gradient editor).
 
 ---
 
@@ -112,7 +129,7 @@ All overlays are configurable by **band**, **mode**, and **power** (watts).
 | Overlay                | Description                                                                                                                                                                                                                               |
 | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Cloud Cover (GFS)**  | High-fidelity layered cloud system from NOAA GFS model (GRIB2, 0.25° / 1440x721). Blends Low, Middle, and High altitude data with transparency tuning. Features "Seam Stitching" to ensure gap-free viewing at the Date Line antimeridian. |
-| **WX Pressure (WxMb)** | Surface pressure contours from NOAA NOMADS GRIB2 data, rendered with Marching Squares |
+| **WX Pressure (WxMb)** | Surface pressure contours from NOAA NOMADS GRIB2 data, rendered with high-fidelity Marching Squares contours. |
 
 ---
 
@@ -120,6 +137,7 @@ All overlays are configurable by **band**, **mode**, and **power** (watts).
 
 - **Robinson projection** — an additional map projection option alongside Mercator (equirectangular) and Azimuthal
 - **Single Azimuthal projection** — DE-centered azimuthal equidistant circle; the original HamClock only offered the dual-hemisphere variant
+- **Interactive Zoom & Pan** — Use the mouse wheel to zoom (clamped 1x–10x) and left-drag to pan the map. Double-right-click to instantly reset zoom and pan settings.
 - **POTA activator map pins** — lime-green pins on the map for active POTA activations (requires On The Air widget in a pane)
 - **ADIF QSO map pins** — plots your logged QSOs from an ADIF file on the map (requires ADIF widget)
 - **Satellite ground track** — the selected satellite's orbital path is drawn as an arc on the map (`showSatTrack`)
@@ -128,6 +146,10 @@ All overlays are configurable by **band**, **mode**, and **power** (watts).
 ---
 
 ## DX Cluster & Live Spots Enhancements
+
+### Duplicate Spot Hiding
+
+The DX Cluster panel can be configured to "Hide duplicates (one per call/band)". When enabled, only the most recent spot for a station on a given amateur band is displayed, significantly cleaning up the view during contests or pileups.
 
 - **DX panel spot selection** — clicking a spot row in the DX Cluster or On The Air panel drives the DX Info panel (callsign, grid, DXCC entity details); mutual exclusion between panels
 - **Inline spot label on map** — when a DX cluster spot is selected, the callsign, frequency, and band are shown inline next to the map bubble (no hover required)
@@ -173,19 +195,22 @@ Presets make it simple to switch between operating contexts (contest, casual DX,
 - **Brightness schedule** — configure dim and bright times (hour:minute) for automatic display brightness control
 - **Color overrides** — per-element color customization via `colorOverrides` map
 - **RSS ticker** — optional scrolling RSS feed display
-- **CORS proxy** — configurable proxy URL for browser (WASM) builds where direct cross-origin requests are blocked
+- **CORS proxy** — configurable relay URL for browser builds; see [Glossary](Glossary.md#cors-proxy)
 
 ---
 
 ## UI & UX Improvements
 
-- **K key highlight mode** — press K to draw cyan bounding boxes around every interactive region on screen with tooltip labels; press K again to dismiss
+- **K key highlight mode** — press K to draw cyan bounding boxes around every interactive region on screen with tooltip labels; hovering over a widget body now also shows the widget's description in a blue tooltip.
+- **? Help Panel** — Press **?** (Shift+/) to open a full-screen scrollable help panel listing all keyboard shortcuts, mouse/touch controls, and a complete gallery of widgets with descriptions.
 - **Large Kp number overlay** — current Planetary K-index rendered as a large color-coded number over the bar chart in the Aurora Graph widget (storm level colors)
 - **Contest detail popup** — clicking a contest row in the Contests widget opens a detail panel with exchange, rules link, and category summary
-- **On The Air filter chip** — the original On The Air widget showed all POTA and SOTA activations with no way to separate them; HamClock-Next adds a filter chip (All / POTA / SOTA) so you can focus on one program at a time (`ontaFilter` config field)
-- **Scrollable widget list in Setup** — the 45-widget checklist in Setup → Widgets scrolls with mouse wheel and `^`/`v` arrows when it overflows
+- **On The Air / DX Cluster Refinements** — Band color legends added to ONTAPanel in double-height mode; Live Spots switches to efficient 1-column layout in double-height mode.
+- **Marine Auto-Lookup** — The Marine widget now features a "Find Closest" button that automatically identifies and selects the nearest NOAA tide and buoy stations.
+- **Global Timezone Picker** — A centralized timezone modal (accessible from Setup) allows setting a default timezone that is respected by the Time, Calendar, Big Clock, Contest, EME, and Greyline widgets.
+- **Scrollable widget list in Setup** — the full widget checklist in Setup → Widgets scrolls with mouse wheel and `^`/`v` arrows when it overflows
 - **Greyline DX scroll** — the Greyline DX widget list now scrolls with mouse wheel when more entities are active than fit in the pane
-- **Worker thread pool** — background tasks (propagation engine computation, RSS parsing) run in a thread pool so the UI never blocks
+- **Background data fetching** — propagation calculations and news feed updates run in the background so the display stays smooth and responsive
 - **QRZ premium callbook** — in addition to free Callook and HamDB lookups, QRZ.com XML API is supported for subscribers
 - **Aux Clock timezone cycling** — click the Aux Clock widget to cycle through preset timezones (UTC, EST, CST, MST, PST, CET, JST, AEST). The selected timezone persists across restarts. Useful for running a local-time clock alongside a full-pane DX Cluster so meetings are not missed. Can also be set via API: `/set_config?aux_tz_offset=-5&aux_tz_label=EST`
 

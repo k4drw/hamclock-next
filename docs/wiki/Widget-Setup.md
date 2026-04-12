@@ -44,10 +44,11 @@ Setup → **Spotting** tab → DX Cluster section → enter the hostname and por
 **To include spots from WSJT-X on your own computer:**
 Setup → **Spotting** tab → enable **WSJT-X Mode**. HamClock listens for UDP packets on port 2237 (the WSJT-X default).
 
-**To filter by band:**
-Click a band label in the color legend at the bottom of the DX Cluster panel. Click it again to clear the filter.
+**Filtering and Performance:**
+- **Band filter**: Click a band label in the color legend at the bottom of the DX Cluster panel. Click it again to clear the filter.
+- **Duplicate Hiding**: (New) Go to Setup → **Spotting** tab and enable **Hide Duplicates**. Only the latest spot for any given callsign on a specific band will be shown, reducing clutter during busy events.
 
-**Tip:** The cluster shows mode badges (CW, SSB, FT8, FT4, RTTY) based on the spot frequency so you know what mode is being used even if the spotter didn't say.
+**Tip:** The cluster shows mode badges (CW, SSB, FT8, FT4, RTTY) based on the spot frequency.
 
 ---
 
@@ -55,87 +56,74 @@ Click a band label in the color legend at the bottom of the DX Cluster panel. Cl
 
 Live Spots shows you signals being heard around the world, updated continuously.
 
-**It works immediately** — the default source is PSK Reporter, which requires no account.
+**It works immediately** — the default source is PSK Reporter.
 
-**To filter by band:**
-Setup → **Spotting** tab → Live Spots section → check or uncheck the bands you want to see.
+**In-Widget Configuration:**
+- Click a **band label** directly in the widget header to toggle that band on/off.
+- Click the **Source** name (e.g., PSK) to cycle between PSK Reporter, RBN (Reverse Beacon Network), and WSPR.
 
-**To switch sources:**
-Same section — use the radio buttons to pick PSK Reporter, RBN (Reverse Beacon Network), or WSPR.
-
-**Grid squares vs. callsigns:**
-The "Use Callsign" toggle in the Spotting tab switches between showing grid locators and actual callsigns on the spots.
-
-**Age limit:**
-"Max Age" controls how many minutes old a spot can be before it disappears. Default is 30 minutes.
+**Configuration Screen Options:**
+Setup → **Spotting** tab → Live Spots section:
+- **Use Callsign**: Show actual callsigns instead of grid locators.
+- **Max Age**: Controls how many minutes old a spot can be before it disappears.
 
 ---
 
 ## On The Air (ONTA) — POTA & SOTA Activators
 
-ONTA shows amateur radio operators who are currently activating parks (POTA) or summits (SOTA). Clicking a spot plots the great-circle path to them on the map.
+ONTA shows operators activating parks (POTA) or summits (SOTA). Clicking a spot plots the path on the map.
 
-**By default, it shows all active activations worldwide.** To narrow it down:
+- **Filters**: Click the gear icon on the ONTA panel to choose **POTA**, **SOTA**, or **All**.
+- **Distance**: Set a maximum distance filter in the ONTA settings to only see activators within range of your QTH.
+- **Legend**: Double-height mode shows a band color legend at the bottom for quick reference.
 
-1. Click the gear icon on the ONTA panel, or go to Setup → **Watchlist** tab → ONTA section.
-2. Choose **POTA**, **SOTA**, or **All**.
-3. Set a **max distance in kilometers** to only show activators within range of your QTH. Leave it at 0 for no limit.
+---
 
-**Tip:** ONTA now shows all activators without a cap — scroll the list with your mouse wheel if there are more than fit on screen.
+## World Clock
+
+Display up to four specific timezones with labels.
+
+1. Add **World Clock** to a pane.
+2. Click the **gear icon** inside the widget.
+3. For each of the 4 slots:
+   - Enter a **City Label** (e.g., "London").
+   - Set the **UTC Offset** (e.g., 0, -5, +1).
+4. Save to see the new times.
+
+---
+
+## Big Clock
+
+A full-pane clock for high visibility from across the room.
+
+1. Add **Big Clock** to a pane.
+2. Click the **gear icon** to configure:
+   - **Mode**: Digital or Analog.
+   - **Format**: 12-hour or 24-hour.
+   - **UTC**: Lock to UTC or use your default local timezone.
+   - **Sec/Date**: Toggle seconds and date display.
+   - **Color**: Adjust the hue slider to match your theme.
 
 ---
 
 ## Marine (Tides & Buoys)
 
-The Marine widget shows tidal data and sea conditions from the nearest NOAA station to your QTH.
+The Marine widget shows tidal data and sea conditions from the nearest NOAA station.
 
-**When you first add it, Marine automatically finds and saves the nearest tide station and buoy.** You don't need to do anything.
-
-**To switch to a specific station manually:**
-Click the gear icon in the Marine panel → enter a NOAA tide station ID or NDBC buoy number → Save. The widget fetches new data immediately.
-
----
-
-## Watchlist
-
-The Watchlist monitors the DX Cluster for specific callsigns and alerts you when they appear.
-
-1. Go to Setup → **Watchlist** tab.
-2. Type a callsign → click **Add**. Repeat for each call you want to watch.
-3. Optionally paste a comma-separated or space-separated list of callsigns all at once.
-
-When a watched callsign appears in the cluster, the Watchlist panel highlights it. If audio is enabled, you'll also hear a voice alert.
-
-**The list supports 30+ entries** — scroll with your mouse wheel when it gets long.
-
-**Global alerts:** Watchlist notifications fire even if the Watchlist widget isn't currently visible in a pane.
+- **Auto-Lookup**: Click the **Find Closest** button in the Marine setup (gear icon) to automatically identify and select the nearest NOAA tide station and buoy.
+- **Manual Entry**: Enter specific NOAA station or buoy IDs if you prefer a different location.
 
 ---
 
 ## SDO (Solar Dynamics Observatory)
 
-SDO shows near-real-time images of the sun captured by NASA's Solar Dynamics Observatory satellite.
+SDO shows live solar imagery in various wavelengths.
 
 Click the **gear icon** in the SDO panel to:
-- Choose a **wavelength** (each shows different solar features):
-  - 193 Å — hot plasma, active regions, flares
-  - 171 Å — corona, quiet sun
-  - 304 Å — chromosphere, prominences
-  - 1600 Å — UV, sunspot regions
-  - 1700 Å — photosphere, sunspot contrast
-- Enable **Rotating Display** to cycle through wavelengths automatically.
-- Enable **PFSS Overlay** to show magnetic field lines.
-- Enable **Movie Mode** for an animated loop.
-
----
-
-## Asteroid
-
-The Asteroid widget tracks near-Earth objects from the JPL Close Approach database. It uses your QTH location to show each asteroid's current position in your sky (azimuth and elevation).
-
-**No setup needed.** When you add it to a pane, it fetches data automatically. Scroll the list with your mouse wheel — there's no cap on how many asteroids are shown.
-
-Click an asteroid in the list to select it; the polar plot updates to show its sky position.
+- Choose a **wavelength** (0193, 0171, 0304, 1600, 1700, HMIB, HMIIC).
+- Enable **Rotating Display** to cycle wavelengths automatically.
+- Enable **PFSS Overlay** for magnetic field lines.
+- Enable **Movie Mode** for a time-lapse loop.
 
 ---
 
@@ -143,90 +131,34 @@ Click an asteroid in the list to select it; the polar plot updates to show its s
 
 1. Add the Satellite widget to a pane.
 2. Click the **gear icon** in the panel → select a satellite from the list.
-3. The map shows the satellite's ground track and footprint automatically.
+3. The map shows the ground track and footprint automatically.
 
-**With a rotator (antenna controller):** If you have `rotctld` (Hamlib) set up (see below), enable **Auto-Track** in the rotator settings to automatically point your antenna at the satellite as it passes.
-
----
-
-## Callbook Lookup (DX Info / DX Cluster)
-
-When you click a callsign in the DX Cluster or DX Info panel, HamClock looks up that call in a callbook database.
-
-**Free options (no account needed):** HamDB and Callook work automatically with no configuration.
-
-**QRZ (enhanced data, requires subscription):**
-Setup → **Services** tab → enter your QRZ username and password.
+**Rotator Control:** If using a rotator via `rotctld`, enable **Auto-Track** in the Rotator settings (Setup → Network) to point your antenna at the target automatically during a pass.
 
 ---
 
-## RepeaterBook
+## Rig Control (Hamlib)
 
-Shows local repeaters from the RepeaterBook directory.
+Shows your rig's frequency and mode, and allows tuning from HamClock.
 
-**Requires a free API key:**
-1. Get a key at [repeaterbook.com](https://www.repeaterbook.com)
-2. Setup → **Services** tab → enter the key in the RepeaterBook field.
-
----
-
-## Winlink
-
-Shows Winlink gateway status near your QTH.
-
-**Requires an API key:**
-Setup → **Services** tab → enter your Winlink API key.
-
----
-
-## Rig Control (CAT — frequency/mode display)
-
-Shows your rig's current frequency and mode, and optionally lets you tune from HamClock.
-
-**Requires `rigctld` from Hamlib** running on your system or network:
-
-```bash
-# Example for a Yaesu FT-991A on /dev/ttyUSB0:
-rigctld -m 1035 -r /dev/ttyUSB0 -s 38400
-```
-
-Then in HamClock: Setup → **Rig** tab → set Host (`localhost` if local) and Port (default `4532`).
-
-Enable **Auto-Tune** to allow HamClock to change your rig's frequency when you click a DX Cluster spot.
-
----
-
-## Rotator Control
-
-Controls your antenna rotator so it tracks a selected satellite automatically.
-
-**Requires `rotctld` from Hamlib** running on your system or network:
-
-```bash
-# Example for a Yaesu G-450A rotator:
-rotctld -m 601 -r /dev/ttyUSB1
-```
-
-Then in HamClock: Setup → **Network** tab → Rotator section → set Host and Port (default `4533`).
-
-Enable **Auto-Track** to automatically point your antenna at the selected satellite. Enable **Up-Over** if your rotator can handle passes through the zenith.
+- **Requirements**: Requires `rigctld` (Hamlib) running on your system.
+- **Sync**: Enable **Auto-Tune** in Setup → Rig to automatically set your rig's frequency when you click a DX Cluster spot or band button.
 
 ---
 
 ## Aux Clock
 
-The Aux Clock widget shows a second timezone alongside your local time.
+Shows a second clock next to your local time.
 
-Click the **Aux Clock widget** itself to cycle through preset timezones (UTC, EST, CST, MST, PST, CET, JST, AEST). The label updates automatically.
-
-To set a custom timezone: Setup → **Appearance** tab → Aux Clock section → enter the offset in hours and a label.
+- **Quick Cycle**: Click the widget itself to cycle through common timezones (UTC, EST, CST, MST, PST, CET, JST, AEST).
+- **Custom Offset**: Set a custom offset and label in Setup → Appearance → Aux Clock.
+- **Sidereal Mode**: Advanced users can enable Sidereal time display through the configuration menu.
 
 ---
 
-## Countdown Timer
+## Map Navigation
 
-Shows a countdown to a specific date and time — useful for contest start times, DXpedition windows, or satellite passes.
-
-Click the **gear icon** in the Countdown panel to set:
-- A label (e.g., "CQ WW SSB")
-- Target date and time (UTC)
+- **Zoom**: Use the **mouse wheel** to zoom in (up to 10x) and out.
+- **Pan**: **Left-click and drag** the map while zoomed.
+- **Reset**: **Double-right-click** anywhere on the map to reset zoom/pan.
+- **Pins**: Spotting pins (DX Cluster, PSK) are only visible when the corresponding widget is active in a pane.

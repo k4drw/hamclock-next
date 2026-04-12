@@ -51,21 +51,21 @@ Click the indicator arrows (if present) to manually advance or retreat through t
 | Pane 2 | DX Cluster      | Top bar, 2nd slot        |
 | Pane 3 | Live Spots      | Top bar, 3rd slot        |
 | Pane 4 | Band Conditions | Top bar, 4th slot (62px) |
-| Pane 5 | DE Info         | Left side, top           |
-| Pane 6 | DX Info         | Left side, bottom        |
+| Pane 5 | DE Info         | Left column, top         |
+| Pane 6 | DX Info         | Left column, bottom      |
 
 ---
 
 ## Side Panel Mode
 
-In **side panel mode**, the right column changes from standard panes to a tall panel that displays either DX entity information or satellite tracking data.
+In **side panel mode**, the **left column** (which normally contains Panes 5 and 6) is replaced by a single tall panel. This is useful for widgets that benefit from vertical space, such as a long DX Cluster list or a detailed Satellite track.
 
 | Mode  | Description                                                                             |
 | ----- | --------------------------------------------------------------------------------------- |
 | `dx`  | Shows a tall DX Info panel with entity details, bearing, distance, and propagation info |
 | `sat` | Shows satellite ground track and pass timing for the selected satellite                 |
 
-Set `panelMode` in Configuration to switch modes. In side panel mode, Pane 5 is hidden (the tall panel replaces it).
+Set `panelMode` in Configuration to switch modes. In side panel mode, Panes 5 and 6 are merged/replaced by the tall panel.
 
 ---
 
@@ -79,12 +79,12 @@ The relevant configuration fields are:
 
 ```json
 {
-  "pane1Rotation": ["SOLAR", "SDO"],
-  "pane2Rotation": ["DX_CLUSTER"],
-  "pane3Rotation": ["LIVE_SPOTS", "BAND_CONDITIONS"],
-  "pane4Rotation": ["AURORA", "HISTORY_KP"],
-  "pane5Rotation": ["DE_INFO"],
-  "pane6Rotation": ["DX_INFO"],
+  "pane1Rotation": ["solar", "sdo"],
+  "pane2Rotation": ["dx_cluster"],
+  "pane3Rotation": ["live_spots", "band_conditions"],
+  "pane4Rotation": ["aurora", "history_kp"],
+  "pane5Rotation": ["de_info"],
+  "pane6Rotation": ["dx_info"],
   "rotationIntervalS": 30,
   "syncRotation": false
 }

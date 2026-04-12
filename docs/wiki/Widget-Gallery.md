@@ -24,16 +24,19 @@ Visual reference for all HamClock-Next widgets. Run `capture_wiki_screenshots.sh
 | **Contests**<br>![contests](images/widgets/contests.png) | **Countdown**<br>![countdown](images/widgets/countdown.png) |
 | | |
 |---|---|
-| **DE Info**<br>![de_info](images/widgets/de_info.png) | **DE Weather**<br>![de_weather](images/widgets/de_weather.png) |
+| **DE Info**<br>![de_info](images/widgets/de_info.png) | **DE Info (Basic)**<br>![de_info_basic](images/widgets/de_info_basic.png) |
 | | |
 |---|---|
-| **DRAP**<br>![drap](images/widgets/drap.png) | **Dst Index**<br>![dst_index](images/widgets/dst_index.png) |
+| **DE Weather**<br>![de_weather](images/widgets/de_weather.png) | **DRAP**<br>![drap](images/widgets/drap.png) |
 | | |
 |---|---|
-| **DXCC Progress**<br>![dxcc_progress](images/widgets/dxcc_progress.png) | **DX Cluster**<br>![dx_cluster](images/widgets/dx_cluster.png) |
+| **Dst Index**<br>![dst_index](images/widgets/dst_index.png) | **DXCC Progress**<br>![dxcc_progress](images/widgets/dxcc_progress.png) |
 | | |
 |---|---|
-| **DX Info**<br>![dx_info](images/widgets/dx_info.png) | **DX Peditions**<br>![dx_peditions](images/widgets/dx_peditions.png) |
+| **DX Cluster**<br>![dx_cluster](images/widgets/dx_cluster.png) | **DX Info**<br>![dx_info](images/widgets/dx_info.png) |
+| | |
+|---|---|
+| **DX Info (Basic)**<br>![dx_info_basic](images/widgets/dx_info_basic.png) | **DX Peditions**<br>![dx_peditions](images/widgets/dx_peditions.png) |
 | | |
 |---|---|
 | **DX Weather**<br>![dx_weather](images/widgets/dx_weather.png) | **EME Tool**<br>![eme_tool](images/widgets/eme_tool.png) |
@@ -54,7 +57,7 @@ Visual reference for all HamClock-Next widgets. Run `capture_wiki_screenshots.sh
 | **Ionosonde**<br>![ionosonde](images/widgets/ionosonde.png) | **K-Index Alert**<br>![kindex_trend](images/widgets/kindex_trend.png) |
 | | |
 |---|---|
-| **K-Index**<br>![history_kp](images/widgets/history_kp.png) | **Lightning**<br>![lightning](images/widgets/lightning.png) |
+| **K-Index Trend**<br>![history_kp](images/widgets/history_kp.png) | **Lightning**<br>![lightning](images/widgets/lightning.png) |
 | | |
 |---|---|
 | **Live Spots**<br>![live_spots](images/widgets/live_spots.png) | **Marine**<br>![marine](images/widgets/marine.png) |
@@ -69,13 +72,19 @@ Visual reference for all HamClock-Next widgets. Run `capture_wiki_screenshots.sh
 | **On The Air**<br>![on_the_air](images/widgets/on_the_air.png) | **Reminders**<br>![reminders](images/widgets/reminders.png) |
 | | |
 |---|---|
-| **Santa Tracker**<br>![santa_tracker](images/widgets/santa_tracker.png) | **Satellite**<br>![satellite](images/widgets/satellite.png) |
+| **RepeaterBook**<br>![repeater](images/widgets/repeater.png) | **Rig**<br>![rig](images/widgets/rig.png) |
 | | |
 |---|---|
-| **SDO**<br>![sdo](images/widgets/sdo.png) | **SFI 30-Day**<br>![sfi_trend](images/widgets/sfi_trend.png) |
+| **Rotator**<br>![rotator](images/widgets/rotator.png) | **Santa Tracker**<br>![santa_tracker](images/widgets/santa_tracker.png) |
 | | |
 |---|---|
-| **Solar Cycle**<br>![solar_cycle](images/widgets/solar_cycle.png) | **Solar Flux**<br>![history_flux](images/widgets/history_flux.png) |
+| **Satellite**<br>![satellite](images/widgets/satellite.png) | **SDO**<br>![sdo](images/widgets/sdo.png) |
+| | |
+|---|---|
+| **SFI 30-Day**<br>![sfi_trend](images/widgets/sfi_trend.png) | **Solar Basic**<br>![solar_basic](images/widgets/solar_basic.png) |
+| | |
+|---|---|
+| **Solar Cycle 25**<br>![solar_cycle](images/widgets/solar_cycle.png) | **Solar Flux**<br>![history_flux](images/widgets/history_flux.png) |
 | | |
 |---|---|
 | **Solar Impact**<br>![solar_timeline](images/widgets/solar_timeline.png) | **Solar**<br>![solar](images/widgets/solar.png) |
@@ -93,10 +102,10 @@ Visual reference for all HamClock-Next widgets. Run `capture_wiki_screenshots.sh
 | **Tropo**<br>![tropo](images/widgets/tropo.png) | **Voacap DE-DX**<br>![voacap_dedx](images/widgets/voacap_dedx.png) |
 | | |
 |---|---|
-| **Watchlist**<br>![watchlist](images/widgets/watchlist.png) | **World Clock**<br>![world_clock](images/widgets/world_clock.png) |
+| **Watchlist**<br>![watchlist](images/widgets/watchlist.png) | **Winlink**<br>![winlink](images/widgets/winlink.png) |
 | | |
 |---|---|
-| **WX Alerts**<br>![alerts](images/widgets/alerts.png) |  |
+| **World Clock**<br>![world_clock](images/widgets/world_clock.png) | **WX Alerts**<br>![alerts](images/widgets/alerts.png) |
 
 
 ## Maximized Widgets

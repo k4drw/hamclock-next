@@ -20,6 +20,7 @@
 - [REST API](REST-API.md)
 - [Data Sources & Network](Data-Sources.md)
 - [Keyboard Shortcuts](Keyboard-Shortcuts.md)
+- [Glossary](Glossary.md)
 
 ## Migration
 
