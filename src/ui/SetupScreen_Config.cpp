@@ -41,6 +41,7 @@ void SetupScreen::setConfig(const AppConfig &cfg) {
   clusterLoginInput_.setValue(cfg.dxClusterLogin);
   clusterEnabled_ = cfg.dxClusterEnabled;
   clusterWSJTX_ = cfg.dxClusterUseWSJTX;
+  clusterHideDuplicates_ = cfg.dxClusterHideDuplicates;
   wsjtxPortInput_.setValue(std::to_string(cfg.wsjtxPort));
   rbnEnabled_ = cfg.rbnEnabled;
   pskOfDe_ = cfg.liveSpotsOfDe;
@@ -152,6 +153,7 @@ AppConfig SetupScreen::getConfig(const AppConfig& base) const {
   cfg.dxClusterLogin = clusterLoginInput_.getValue();
   cfg.dxClusterEnabled = clusterEnabled_;
   cfg.dxClusterUseWSJTX = clusterWSJTX_;
+  cfg.dxClusterHideDuplicates = clusterHideDuplicates_;
   cfg.wsjtxPort = StringUtils::safe_stoi(wsjtxPortInput_.getValue());
   if (cfg.wsjtxPort == 0)
     cfg.wsjtxPort = 2237;

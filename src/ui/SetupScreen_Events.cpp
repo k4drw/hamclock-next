@@ -414,6 +414,13 @@ bool SetupScreen::onMouseDown(int mx, int my, Uint16 mod, int clicks) {
       clusterWSJTX_ = !clusterWSJTX_;
       return true;
     }
+    if (mx >= clusterHideDuplicatesRect_.x &&
+        mx <= clusterHideDuplicatesRect_.x + clusterHideDuplicatesRect_.w &&
+        my >= clusterHideDuplicatesRect_.y &&
+        my <= clusterHideDuplicatesRect_.y + clusterHideDuplicatesRect_.h) {
+      clusterHideDuplicates_ = !clusterHideDuplicates_;
+      return true;
+    }
     if (mx >= rbnToggleRect_.x && mx <= rbnToggleRect_.x + rbnToggleRect_.w &&
         my >= rbnToggleRect_.y && my <= rbnToggleRect_.y + rbnToggleRect_.h) {
       rbnEnabled_ = !rbnEnabled_;

@@ -96,6 +96,7 @@ private:
   TextInput clusterLoginInput_;
   bool clusterEnabled_ = true;
   bool clusterWSJTX_ = false;
+  bool clusterHideDuplicates_ = true;
   TextInput wsjtxPortInput_;
   SDL_Rect wsjtxPortRect_ = {0, 0, 0, 0};
   SDL_Rect clusterHostRect_ = {0, 0, 0, 0};
@@ -187,6 +188,7 @@ private:
   std::string defaultTzLabel_ = "UTC";
   SDL_Rect toggleRect_ = {0, 0, 0, 0};
   SDL_Rect clusterToggleRect_ = {0, 0, 0, 0};
+  SDL_Rect clusterHideDuplicatesRect_ = {0, 0, 0, 0};
   SDL_Rect rbnToggleRect_ = {0, 0, 0, 0};
   SDL_Rect gpsToggleRect_ = {0, 0, 0, 0};
   SDL_Rect audioMuteToggleRect_ = {0, 0, 0, 0};

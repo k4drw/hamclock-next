@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <iomanip>
 #include <sstream>
+#include <set>
 
 // Returns IARU Region 2 sub-band mode label for a given frequency in kHz.
 static const char *modeFromFreq(double khz) {
@@ -371,7 +372,16 @@ void DXClusterPanel::rebuildRows(const DXClusterData &data) {
   // Most recent first
   std::reverse(spots.begin(), spots.end());
 
+  std::set<std::pair<std::string, int>> seen;
+
   for (const auto &spot : spots) {
+    int bandIdx = freqToBandIndex(spot.freqKhz);
+    if (config_ && config_->dxClusterHideDuplicates) {
+      if (seen.count({spot.txCall, bandIdx}))
+        continue;
+      seen.insert({spot.txCall, bandIdx});
+    }
+
     if (activeBandFilter_ >= 0) {
       if (freqToBandIndex(spot.freqKhz) != activeBandFilter_)
         continue;

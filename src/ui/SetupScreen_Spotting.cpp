@@ -91,6 +91,22 @@ void SetupScreen::renderTabDXCluster(SDL_Renderer *renderer, int cx, int pad,
   } else {
     wsjtxPortRect_ = {0, 0, 0, 0};
   }
+  y += 24;
+
+  int dupeLabelW = fontMgr_.getLogicalWidth("Hide duplicates (one per call/band)", cat->ptSize(FontStyle::SmallRegular));
+  clusterHideDuplicatesRect_ = {fieldX, y, 30 + dupeLabelW, 20};
+  SDL_Rect dupeBox = {fieldX, y, 20, 20};
+  SDL_SetRenderDrawColor(renderer, themes.rowStripe1.r, themes.rowStripe1.g, themes.rowStripe1.b, 255);
+  SDL_RenderFillRect(renderer, &dupeBox);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
+  SDL_RenderDrawRect(renderer, &dupeBox);
+  if (clusterHideDuplicates_) {
+    SDL_SetRenderDrawColor(renderer, themes.success.r, themes.success.g, themes.success.b, 255);
+    SDL_Rect check = {fieldX + 4, y + 4, 12, 12};
+    SDL_RenderFillRect(renderer, &check);
+  }
+  cat->drawText(renderer, "Hide duplicates (one per call/band)", fieldX + 30, y + 10, themes.text,
+                FontStyle::SmallRegular, false, false, true);
   y += 30;
 
   // --- RBN SECTION ---

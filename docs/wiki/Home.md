@@ -10,12 +10,13 @@ It is a community continuation of the original HamClock created by Elwood Downey
 
 ## Key Features
 
-- **45 widgets** covering space weather, propagation, DX spots, maps, weather, tracking, and utilities
+- **64 widgets** covering space weather, propagation, DX spots, maps, weather, tracking, clocks, and utilities
 - **Six rotatable panes** — each pane cycles through any list of widgets on a configurable interval
 - **Map overlays** — MUF, VOACAP, cloud cover, aurora, and more drawn live on the world map
 - **Presets** — save and recall complete dashboard configurations with one click
 - **Runs everywhere** — native Linux/macOS/Windows framebuffer and browser (WASM) builds
-- **K key** — highlight every interactive region on screen with a tooltip
+- **K key** — highlight every interactive region on screen with tooltips
+- **? key** — built-in scrollable help panel with all shortcuts and widget descriptions
 
 ---
 
@@ -23,7 +24,7 @@ It is a community continuation of the original HamClock created by Elwood Downey
 
 - [Getting Started](Getting-Started.md) — build, install, first launch
 - [Screen Layout](Layout.md) — what each region of the screen does
-- [Widgets Reference](Widgets.md) — all 45 widgets described
+- [Widgets Reference](Widgets.md) — all 64 widgets described
 - [Map & Overlays](Map-and-Overlays.md) — map projections and overlay layers
 - [Pane Customization](Pane-Customization.md) — configure pane widget rotations
 - [Configuration Presets](Presets.md) — save and recall configurations

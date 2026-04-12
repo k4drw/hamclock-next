@@ -646,6 +646,7 @@ set(HAMCLOCK_SOURCES
     src/ui/PlaceholderWidget.cpp
     src/ui/PropColorCustomizer.cpp
     src/ui/WidgetRegistry.cpp
+    src/ui/WidgetDescriptions.cpp
     src/ui/ColorPicker.cpp
     src/ui/RenderUtils.cpp
     src/ui/RSSBanner.cpp

@@ -2564,23 +2564,18 @@ void WebServer::registerRoutes(httplib::Server &svr) {
         }
         std::string action = req.get_param_value("action");
         std::string widget = req.get_param_value("widget");
-        auto &pane = (*panes_)[idx];
-        if (action == "next") {
-          pane->forceAdvance();
-        } else if (action == "add" && !widget.empty()) {
-          auto rot = pane->getRotation();
-          if (std::find(rot.begin(), rot.end(), widget) == rot.end()) {
-            rot.push_back(widget);
-            pane->setRotation(rot, cfg_->rotationIntervalS, cfg_->syncRotation);
-          }
-        } else if (action == "remove" && !widget.empty()) {
-          auto rot = pane->getRotation();
-          rot.erase(std::remove(rot.begin(), rot.end(), widget), rot.end());
-          if (!rot.empty())
-            pane->setRotation(rot, cfg_->rotationIntervalS, cfg_->syncRotation);
-        } else if (action == "solo" && !widget.empty()) {
-          pane->setRotation({widget}, cfg_->rotationIntervalS, cfg_->syncRotation);
-          pane->forceAdvance();
+        // All pane mutations are queued to the main/render thread.
+        // setRotation() calls onResize() which may destroy SDL textures
+        // (e.g. DXClusterPanel → ListPanel::destroyCache). SDL texture ops
+        // must happen on the render thread only.
+        int actionCode = 0;
+        if (action == "next") actionCode = 1;
+        else if (action == "add"    && !widget.empty()) actionCode = 2;
+        else if (action == "remove" && !widget.empty()) actionCode = 3;
+        else if (action == "solo"   && !widget.empty()) actionCode = 4;
+        if (actionCode) {
+          std::lock_guard<std::mutex> lk(dataMutex_);
+          pendingPaneSets_.push_back({idx, actionCode, widget});
         }
         res.set_content("ok", "text/plain");
       });
@@ -2614,11 +2609,13 @@ void WebServer::registerRoutes(httplib::Server &svr) {
         tArr.push_back(t);
     j["themes"] = tArr;
 
+    // "none" is intentionally excluded — it is a meta-value meaning "no overlay",
+    // not an actual overlay type.  Clients should always accept "none" as valid.
     j["prop_overlays"] =
-        nlohmann::json::array({"none", "muf", "voacap", "reliability", "toa",
+        nlohmann::json::array({"muf", "voacap", "reliability", "toa",
                                "heatmap", "drap", "aurora"});
 
-    j["wx_overlays"] = nlohmann::json::array({"none", "wxmb", "clouds_grib"});
+    j["wx_overlays"] = nlohmann::json::array({"wxmb", "clouds_grib"});
 
     res.set_content(j.dump(), "application/json");
   });

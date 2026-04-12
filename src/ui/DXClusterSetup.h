@@ -38,11 +38,13 @@ private:
   TextInput portInput_;
   TextInput loginInput_;
   bool useWSJTX_ = false;
+  bool hideDuplicates_ = true;
 
   bool complete_ = false;
   bool saved_ = false;
 
   SDL_Rect toggleRect_ = {0, 0, 0, 0};
+  SDL_Rect hideDuplicatesRect_ = {0, 0, 0, 0};
   SDL_Rect saveRect_ = {0, 0, 0, 0};
   SDL_Rect cancelRect_ = {0, 0, 0, 0};
 };

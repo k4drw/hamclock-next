@@ -75,7 +75,9 @@ hc_get() {
   if ! curl -sf "${BASE_URL}/$1" > /dev/null; then
     echo "  WARN: API call failed: /$1" >&2
     FAILED+=("API:/$1")
+    return 1
   fi
+  return 0
 }
 capture() {
   local path="$1"
@@ -96,7 +98,10 @@ skip_or_capture() {
   capture "$path"
 }
 has_value() {
-  # has_value <jq_key> <value> — returns 0 if value is in capabilities array
+  # has_value <jq_key> <value> — returns 0 if value is in capabilities array.
+  # "none" is always accepted (it means "no overlay" and is not listed in
+  # capabilities, but is always a valid input to set_prop_overlay / set_wx_overlay).
+  [ "$2" = "none" ] && return 0
   echo "$CAPS" | jq -e --arg v "$2" ".${1}[] | select(. == \$v)" > /dev/null 2>&1
 }
 is_scrollable() {
@@ -506,6 +511,21 @@ if part_enabled maximized; then
   MAXIMIZED_WIDGETS=(solar dx_cluster aurora_graph band_conditions big_clock)
   MAX_COUNT=0
 
+  # Safe fallback widget for each non-target pane.  These are widgets that:
+  #   - Are not in MAXIMIZED_WIDGETS (so clearing W from a pane never removes
+  #     the fallback we just added)
+  #   - Are distinct across panes (no exclusive-widget conflicts between them)
+  #   - Are pane-4 compatible for pane 4 (restricted to the short allowed list)
+  pane_safe_widget() {
+    case "$1" in
+      2) echo "history_kp" ;;
+      3) echo "asteroid"   ;;
+      4) echo "ncdxf"      ;;
+      5) echo "de_info"    ;;
+      6) echo "dx_info"    ;;
+    esac
+  }
+
   for W in "${MAXIMIZED_WIDGETS[@]}"; do
     OUT="${OUTPUT_DIR}/widgets/${W}_maximized.png"
     if [ "$FORCE" = "0" ] && [ -f "$OUT" ]; then
@@ -514,7 +534,21 @@ if part_enabled maximized; then
       continue
     fi
     echo "  ${W} (maximized)"
-    hc_get "set_pane?pane=1&action=solo&widget=${W}"
+    # Before soloing W on pane 1, evict W from all other panes.
+    # Use add-then-remove so the pane always has at least one widget (the
+    # server rejects remove when it would leave the rotation empty).
+    for P in 2 3 4 5 6; do
+      SAFE=$(pane_safe_widget "$P")
+      hc_get "set_pane?pane=${P}&action=add&widget=${SAFE}"
+      hc_get "set_pane?pane=${P}&action=remove&widget=${W}"
+    done
+    sleep 2  # allow render-thread queue to drain before issuing solo
+    # If solo fails (e.g. server rejects widget), skip — a failed set_pane would
+    # capture whatever the pane was already showing, producing a wrong image.
+    if ! hc_get "set_pane?pane=1&action=solo&widget=${W}"; then
+      echo "  SKIP ${W}: set_pane failed, not capturing"
+      continue
+    fi
     sleep "${DELAY}"  # wait for widget to fully render before expanding
     hc_get "api/panes/expand?pane=1"
     sleep 2

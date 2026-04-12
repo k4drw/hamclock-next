@@ -1,4 +1,4 @@
-# HamClock-Next (v1.4)
+# HamClock-Next (v1.5)
 
 > **HamClock-Next** is a modern, multi-platform rewrite of the original HamClock
 > by **Elwood Downey, WB0OEW** (SK 29 January 2026).
@@ -113,7 +113,7 @@ Every external data fetch is cached both in memory and on disk with ETag / HTTP 
 
 | Platform | Download |
 |----------|---------|
-| Linux (deb/rpm/AppImage) | [GitHub Releases](https://github.com/k4drw/hamclock-next/releases) · [SourceForge mirror](https://sourceforge.net/projects/hamclock-next/files/) |
+| Linux (deb/rpm) | [GitHub Releases](https://github.com/k4drw/hamclock-next/releases) · [SourceForge mirror](https://sourceforge.net/projects/hamclock-next/files/) |
 | macOS (.dmg) | [GitHub Releases](https://github.com/k4drw/hamclock-next/releases) |
 | Windows (installer) | [GitHub Releases](https://github.com/k4drw/hamclock-next/releases) |
 | Browser / WASM | Self-host via `--live-web` flag, or use the downloadable WASM build |
@@ -125,8 +125,6 @@ sudo dpkg -i hamclock-next_*.deb && hamclock-next
 # OpenSUSE / Fedora
 sudo rpm -i hamclock-next-*.rpm && hamclock-next
 
-# AppImage (any Linux)
-chmod +x HamClock-Next-*.AppImage && ./HamClock-Next-*.AppImage
 ```
 
 ---

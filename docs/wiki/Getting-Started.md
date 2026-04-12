@@ -26,12 +26,6 @@ sudo rpm -i hamclock-next-*.rpm
 hamclock-next
 ```
 
-**AppImage (any Linux distribution):**
-```bash
-chmod +x HamClock-Next-*.AppImage
-./HamClock-Next-*.AppImage
-```
-
 **Raspberry Pi:** The Linux packages above work on Raspberry Pi OS. For console/framebuffer use (no desktop):
 ```bash
 SDL_VIDEODRIVER=kmsdrm hamclock-next --fullscreen

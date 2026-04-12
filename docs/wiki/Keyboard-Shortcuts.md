@@ -8,12 +8,26 @@ HamClock-Next uses minimal keyboard shortcuts at the global level. Most interact
 
 | Key | Action |
 |-----|--------|
+| `?` | Toggle **in-app help panel** — scrollable overlay of all shortcuts and widget descriptions. |
 | `K` | Toggle **highlight mode** — draws cyan bounding boxes around all interactive regions. |
 | `O` | Toggle **debug overlay** — shows real-time FPS, CPU, and network statistics. |
 | `F11` | Toggle **fullscreen mode**. |
 | `Ctrl+Q` | Quit HamClock-Next (native builds). |
 
 Closing the window (SDL_QUIT / OS close button) also exits cleanly.
+
+---
+
+## ? Key — In-App Help Panel
+
+Pressing **?** (Shift+/) with no modal open toggles the built-in help panel.
+
+When open:
+- A scrollable overlay lists all **keyboard shortcuts**, **mouse/touch controls**, and every **widget** with its one-line description
+- Scroll with **↑ / ↓ arrow keys** or the **mouse wheel**
+- Press **?** again or **Escape** to close
+
+The help panel is always up-to-date — widget descriptions are loaded directly from the widget registry at runtime.
 
 ---
 
@@ -25,17 +39,19 @@ Pressing **K** with no modal open toggles highlight mode.
 
 When active:
 - Every interactive region on screen is outlined in **cyan**
-- Each box displays a **tooltip label** identifying what it is (e.g., "Open Setup", "Next Widget", "DX Cluster Toggle")
+- Hovering over an action region shows a **yellow tooltip** with the action name (e.g., "Open Setup", "Next Widget")
+- Hovering over a widget body shows its **description** as a second tooltip line in blue
 - Press **K** again to dismiss
 
 This mode is especially useful for:
 - Discovering hidden controls on unfamiliar widgets
+- Learning what each widget does at a glance
 - Orientation when first setting up the dashboard
 - Debugging widget action coverage (developer use)
 
 ### Coverage Note
 
-Not all widgets currently return full action lists — some show empty or partial tooltips in K mode. Improving tooltip coverage is an ongoing effort. See the stretch goal in the project roadmap.
+Not all widgets currently return full action lists — some show empty or partial action tooltips in K mode. All widgets do show their description tooltip when hovered. Improving action coverage is an ongoing effort.
 
 ---
 

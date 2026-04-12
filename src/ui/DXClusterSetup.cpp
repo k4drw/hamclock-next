@@ -99,6 +99,24 @@ void DXClusterSetup::render(SDL_Renderer *renderer) {
   }
   cat->drawText(renderer, "UDP Mode (receive from WSJT-X / JTDX)",
                 fieldX + 35, y + 2, white, FontStyle::UI);
+  y += fieldH + pad / 2;
+
+  // --- Hide Duplicates ---
+  int dupeLabelW = fontMgr_.getLogicalWidth("Hide duplicates (one per call/band)", cat->ptSize(FontStyle::UI));
+  hideDuplicatesRect_ = {fieldX, y, 35 + dupeLabelW, 24};
+  SDL_Rect dupeBox = {fieldX, y, 24, 24};
+  SDL_SetRenderDrawColor(renderer, themes.rowStripe1.r, themes.rowStripe1.g, themes.rowStripe1.b, 255);
+  SDL_RenderFillRect(renderer, &dupeBox);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
+  SDL_RenderDrawRect(renderer, &dupeBox);
+  if (hideDuplicates_) {
+    SDL_SetRenderDrawColor(renderer, themes.success.r, themes.success.g, themes.success.b, 255);
+    SDL_Rect inner = {dupeBox.x + 4, dupeBox.y + 4, 16, 16};
+    SDL_RenderFillRect(renderer, &inner);
+  }
+  cat->drawText(renderer, "Hide duplicates (one per call/band)",
+                fieldX + 35, y + 2, white, FontStyle::UI);
+
   y += pad * 2;
 
   // --- Buttons ---
@@ -201,6 +219,12 @@ bool DXClusterSetup::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
     return true;
   }
 
+  if (mx >= hideDuplicatesRect_.x && mx < hideDuplicatesRect_.x + hideDuplicatesRect_.w &&
+      my >= hideDuplicatesRect_.y && my < hideDuplicatesRect_.y + hideDuplicatesRect_.h) {
+    hideDuplicates_ = !hideDuplicates_;
+    return true;
+  }
+
   if (mx >= saveRect_.x && mx < saveRect_.x + saveRect_.w &&
       my >= saveRect_.y && my < saveRect_.y + saveRect_.h) {
     complete_ = true;
@@ -278,6 +302,7 @@ void DXClusterSetup::setConfig(const AppConfig &cfg) {
   portInput_.setValue(std::to_string(cfg.dxClusterPort));
   loginInput_.setValue(cfg.dxClusterLogin);
   useWSJTX_ = cfg.dxClusterUseWSJTX;
+  hideDuplicates_ = cfg.dxClusterHideDuplicates;
   hostInput_.setCursorToEnd();
   hostInput_.setActive(true);
   portInput_.setActive(false);
@@ -292,5 +317,6 @@ AppConfig DXClusterSetup::updateConfig(AppConfig cfg) const {
     cfg.dxClusterPort = 7300;
   cfg.dxClusterLogin = loginInput_.getValue();
   cfg.dxClusterUseWSJTX = useWSJTX_;
+  cfg.dxClusterHideDuplicates = hideDuplicates_;
   return cfg;
 }

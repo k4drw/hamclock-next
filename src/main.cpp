@@ -1101,6 +1101,38 @@ void main_tick() {
     else if (ecmd == -2 && ctx.dashboard)
       ctx.dashboard->restorePane(ctx);
 
+    // Process set_pane commands queued from the REST API network thread.
+    // These must run here (main/render thread) because setRotation() calls
+    // onResize() which may call SDL_DestroyTexture (e.g. DXClusterPanel).
+    // Drain the entire queue each frame — rapid-fire API calls (e.g. resetting
+    // all 6 panes at once) must all land, not collapse to the last one.
+    if (ctx.webServer && ctx.dashboard) {
+      auto cmds = ctx.webServer->drainPendingPaneSets();
+      const int intS  = ctx.appCfg.rotationIntervalS;
+      const bool sync = ctx.appCfg.syncRotation;
+      for (const auto &psc : cmds) {
+        if (psc.pane < 0 || psc.pane >= (int)ctx.dashboard->panes.size())
+          continue;
+        auto &p = ctx.dashboard->panes[psc.pane];
+        if (psc.action == 1) {
+          p->forceAdvance();
+        } else if (psc.action == 2 && !psc.widget.empty()) {
+          auto rot = p->getRotation();
+          if (std::find(rot.begin(), rot.end(), psc.widget) == rot.end()) {
+            rot.push_back(psc.widget);
+            p->setRotation(rot, intS, sync);
+          }
+        } else if (psc.action == 3 && !psc.widget.empty()) {
+          auto rot = p->getRotation();
+          rot.erase(std::remove(rot.begin(), rot.end(), psc.widget), rot.end());
+          if (!rot.empty())
+            p->setRotation(rot, intS, sync);
+        } else if (psc.action == 4 && !psc.widget.empty()) {
+          p->setRotation({psc.widget}, intS, sync);
+        }
+      }
+    }
+
     // Always call update() — this processes SDL events and keeps interaction
     // responsive. Only render() is throttled.
     ctx.dashboard->update(ctx);
