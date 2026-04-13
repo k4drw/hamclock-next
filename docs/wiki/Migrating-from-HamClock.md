@@ -101,28 +101,22 @@ The original On The Air widget showed all POTA and SOTA activations together wit
 | Fixed rotation interval                  | User-configurable rotation interval (default 30 s)                      |
 | No manual pane advance                   | Left/right arrows advance pane immediately, reset timer                 |
 | Binary/EEPROM config                     | JSON configuration file                                                 |
-| X11 / framebuffer rendering              | SDL2 (native + WASM browser)                                            |
+| X11 / framebuffer rendering              | SDL2 (native + WASM browser), X11/framebuffer/Windows/Mac/iOS           |
 | Live Spots band filter in config menu    | Band filter toggled by clicking bands directly in the widget            |
-| K key highlight                          | K key highlight (same, improved coverage)                               |
 | No presets                               | Presets modal (★ button) — widget + map groups                          |
 
 ---
 
 ## What Is Not Yet in HamClock-Next
 
-HamClock-Next is a work in progress. Some original HamClock features may not yet be implemented or may have reduced functionality:
-
-- **Repeater directory** — requires a RepeaterBook API key; fetch is disabled until configured
-- **Winlink gateway listing** — requires Winlink API access; disabled until configured
-- Some widget tooltip coverage in K mode is incomplete (stretch goal)
-
+HamClock-Next is a work in progress. Some original HamClock features may not yet be implemented or may have reduced functionality.
 If you find a feature gap, please open an issue on the project repository.
 
 ---
 
 ## Migration Steps
 
-1. Install and build HamClock-Next (see [Getting Started](Getting-Started.md))
+1. Install or build HamClock-Next (see [Getting Started](Getting-Started.md))
 2. On first launch, enter your callsign, grid, and location in the Setup screen
 3. Open each pane's widget picker (click top strip of pane) and add your preferred widgets
 4. Configure DX cluster in Setup → DX Cluster tab

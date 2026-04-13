@@ -510,33 +510,19 @@ bool DXClusterPanel::onMouseUp(int mx, int my, Uint16 /*mod*/, int clicks) {
 }
 
 std::vector<std::string> DXClusterPanel::getActions() const {
-  return {"open_setup", "scroll_up", "scroll_down"};
+  return {"select item"};
 }
 
 SDL_Rect DXClusterPanel::getActionRect(const std::string &action) const {
-  if (action == "open_setup") {
-    // Title area triggers setup?
-    return {x_, y_, width_, 20};
+  if (action == "select item") {
+    int listH = height_ - (contentY_ - y_) - legendH_;
+    if (listH > 0)
+      return {x_, contentY_, width_, listH};
   }
   return {0, 0, 0, 0};
 }
 
-bool DXClusterPanel::performAction(const std::string &action) {
-  if (action == "scroll_up") {
-    if (scrollOffset_ > 0) {
-      scrollOffset_--;
-      return true;
-    }
-  } else if (action == "scroll_down") {
-    int maxScroll = std::max(0, (int)allRows_.size() - MAX_VISIBLE_ROWS);
-    if (scrollOffset_ < maxScroll) {
-      scrollOffset_++;
-      return true;
-    }
-  } else if (action == "open_setup") {
-    setupRequested_ = true;
-    return true;
-  }
+bool DXClusterPanel::performAction(const std::string & /*action*/) {
   return false;
 }
 

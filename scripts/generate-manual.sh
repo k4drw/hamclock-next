@@ -2,7 +2,10 @@
 # generate-manual.sh — Build a single-file PDF user manual from the wiki markdown.
 #
 # Usage:
-#   ./scripts/generate-manual.sh [output.pdf]
+#   ./scripts/generate-manual.sh [output.pdf] [--cover-image=PATH] [--prepend=FILE]
+#
+#   --cover-image=PATH   PNG/JPG to use as the cover page (e.g. packaging/icon.png)
+#   --prepend=FILE       Markdown file prepended as chapter 1 (e.g. release notes)
 #
 # Requirements:
 #   pandoc   https://pandoc.org/installing.html
@@ -22,7 +25,17 @@
 
 set -euo pipefail
 
-OUTPUT="${1:-HamClock-Next-Manual.pdf}"
+OUTPUT="HamClock-Next-Manual.pdf"
+COVER_IMAGE=""
+PREPEND_FILE=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --cover-image=*) COVER_IMAGE="${1#*=}"; shift ;;
+    --prepend=*)     PREPEND_FILE="${1#*=}";  shift ;;
+    *)               OUTPUT="$1";             shift ;;
+  esac
+done
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 WIKI="$REPO_ROOT/docs/wiki"
@@ -129,6 +142,7 @@ echo "Wiki source: $WIKI"
 CHAPTERS=(
   "$WIKI/Home.md"
   "$WIKI/Getting-Started.md"
+  "$WIKI/Migrating-from-HamClock.md"
   "$WIKI/Layout.md"
   "$WIKI/Widgets.md"
   "$WIKI/Widget-Setup.md"
@@ -139,8 +153,12 @@ CHAPTERS=(
   "$WIKI/Keyboard-Shortcuts.md"
   "$WIKI/REST-API.md"
   "$WIKI/Data-Sources.md"
-  "$WIKI/Migrating-from-HamClock.md"
+  "$WIKI/Glossary.md"
 )
+
+if [[ -n "$PREPEND_FILE" ]]; then
+  CHAPTERS=("$PREPEND_FILE" "${CHAPTERS[@]}")
+fi
 
 # Verify all source files exist before starting
 MISSING=0
@@ -154,11 +172,43 @@ if [[ $MISSING -gt 0 ]]; then
   echo "WARNING: $MISSING chapter file(s) not found — they will be skipped."
 fi
 
+# ── Cover page ────────────────────────────────────────────────────────────────
+COVER_FILE=""
+if [[ -n "$COVER_IMAGE" ]]; then
+  if [[ ! -f "$COVER_IMAGE" ]]; then
+    echo "WARNING: --cover-image file not found: $COVER_IMAGE (skipping cover page)"
+    COVER_IMAGE=""
+  else
+    VERSION_LABEL=$(cat "$REPO_ROOT/VERSION" 2>/dev/null || echo "")
+    DATE_LABEL=$(date "+%B %Y")
+    COVER_FILE="$(mktemp /tmp/hc-cover-XXXXXX.tex)"
+    VERSION_LINE=""
+    if [[ -n "$VERSION_LABEL" ]]; then
+      VERSION_LINE="{\\large Version ${VERSION_LABEL}}\\\\[0.5cm]"
+    fi
+    cat > "$COVER_FILE" << LATEX_EOF
+\begin{titlepage}
+\centering
+\vspace*{2.5cm}
+\includegraphics[width=5cm]{${COVER_IMAGE}}\\\\[2cm]
+{\Huge\bfseries HamClock-Next}\\\\[0.5cm]
+{\Large\itshape User Manual}\\\\[1.5cm]
+${VERSION_LINE}
+{\large ${DATE_LABEL}}
+\vfill
+{\normalsize HamClock-Next Contributors}
+\end{titlepage}
+\setcounter{page}{2}
+LATEX_EOF
+    echo "Cover page : $COVER_IMAGE"
+  fi
+fi
+
 # ── Build ─────────────────────────────────────────────────────────────────────
 # Pass font variables if using a Unicode engine
 PANDOC_ARGS=(
-  --metadata title="HamClock-Next User Manual"
-  --metadata author="HamClock-Next Contributors"
+  -V title-meta="HamClock-Next User Manual"
+  -V author-meta="HamClock-Next Contributors"
   --metadata date="$(date +%Y-%m-%d)"
   --metadata lang="en-US"
   --pdf-engine="$PDF_ENGINE"
@@ -180,6 +230,9 @@ fi
 if [[ -n "$MONO_FONT" ]]; then
   PANDOC_ARGS+=(-V monofont="$MONO_FONT")
 fi
+if [[ -n "$COVER_FILE" ]]; then
+  PANDOC_ARGS+=(--include-before-body="$COVER_FILE")
+fi
 
 # Run pandoc
 set +e
@@ -188,7 +241,7 @@ EXIT_CODE=$?
 set -e
 
 # Cleanup
-rm -f "$HEADER_FILE"
+rm -f "$HEADER_FILE" "${COVER_FILE:-}"
 
 if [[ $EXIT_CODE -eq 0 ]]; then
   echo ""

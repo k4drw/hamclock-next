@@ -765,7 +765,15 @@ void TimePanel::renderEditOverlay(SDL_Renderer *renderer) {
 }
 
 std::vector<std::string> TimePanel::getActions() const {
-  std::vector<std::string> actions = {"setup", "edit_callsign"};
+  std::vector<std::string> actions = {"settings", "edit callsign"};
+  if (!editing_) {
+    if (presetsRect_.w > 0)
+      actions.push_back("presets");
+    if (pauseRect_.w > 0)
+      actions.push_back("pause rotation");
+    if (nextRect_.w > 0)
+      actions.push_back("skip widget");
+  }
   if (editing_) {
     actions.push_back("ok");
     actions.push_back("cancel");
@@ -777,12 +785,21 @@ std::vector<std::string> TimePanel::getActions() const {
 }
 
 SDL_Rect TimePanel::getActionRect(const std::string &action) const {
-  if (action == "setup") {
+  if (action == "settings") {
     return gearRect_;
   }
-  if (action == "edit_callsign") {
+  if (action == "edit callsign") {
     int callRowH = height_ * 50 / 148;
     return {x_, y_, width_, callRowH};
+  }
+  if (action == "presets") {
+    return presetsRect_;
+  }
+  if (action == "pause rotation") {
+    return pauseRect_;
+  }
+  if (action == "skip widget") {
+    return nextRect_;
   }
 
   if (editing_) {

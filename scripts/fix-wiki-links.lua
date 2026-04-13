@@ -17,6 +17,7 @@ local WIKI_MAP = {
   ["Configuration.md"]          = "setup-configuration",
   ["Data-Sources.md"]           = "data-sources-network",
   ["Getting-Started.md"]        = "getting-started",
+  ["Glossary.md"]               = "glossary",
   ["Home.md"]                   = "hamclock-next",
   ["Keyboard-Shortcuts.md"]     = "keyboard-shortcuts",
   ["Layout.md"]                 = "screen-layout",

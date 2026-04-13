@@ -1056,9 +1056,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
       if (i == paneIdx)
         continue;
       for (const auto &t : panes[i]->getRotation()) {
-        // dx_cluster may appear in multiple panes simultaneously
-        if (t != "dx_cluster")
-          forbidden.push_back(t);
+        forbidden.push_back(t);
       }
     }
     bool isFullHeight = false;
@@ -1115,14 +1113,6 @@ DashboardContext::DashboardContext(AppContext &ctx)
   };
   for (int i = 0; i < 6; ++i) {
     panes[i]->setOnSelectionRequested(onPaneSelectionRequested, i);
-    panes[i]->setOnConfigRequested([&ctx](const std::string &type) {
-      if (type == "dx_cluster") {
-        ctx.activeSetup = AppContext::SetupMode::DXCluster;
-      } else {
-        // Most widgets handle internal setup or don't have one.
-        // Don't open global setup generically.
-      }
-    });
     panes[i]->setOnMaximizeRequested([this, &ctx](int idx) {
       if (expandedPaneIdx_ == idx)
         restorePane(ctx);

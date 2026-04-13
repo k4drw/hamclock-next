@@ -77,7 +77,7 @@ After saving, HamClock-Next starts fetching data and displays the main dashboard
 
 Once the dashboard is running:
 
-1. **Time Panel** (top-left) — shows UTC and local time, your callsign and grid, sunrise/sunset. Click the **gear icon** to reopen Setup.
+1. **Time Panel** (top-left) — shows UTC or local time, your callsign and grid, sunrise/sunset. Click the **gear icon** to reopen Setup.
 2. **Six panes** — the dashboard is divided into six rotatable panes, each cycling through one or more widgets.
 3. **Map** — the large center area shows the world map with configurable overlays.
 4. **Click the top strip of any pane** — opens the widget picker so you can choose what that pane displays.
