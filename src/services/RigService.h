@@ -86,6 +86,7 @@ private:
   bool executeGetRIT(long long &ritHz);
   bool executeSetSplit(bool on);
   bool executeGetSplit(bool &split);
+  bool executeGetPTT(bool &on);
   bool executeGetLevel(float &dbm);
   bool executeVFOSwap();
   bool executeGetSpectrum(std::vector<float> &data); // Placeholder

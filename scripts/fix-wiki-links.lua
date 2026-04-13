@@ -17,7 +17,7 @@ local WIKI_MAP = {
   ["Configuration.md"]          = "setup-configuration",
   ["Data-Sources.md"]           = "data-sources-network",
   ["Getting-Started.md"]        = "getting-started",
-  ["Glossary.md"]               = "glossary",
+  ["Glossary.md"]               = "glossary-of-technical-terms",
   ["Home.md"]                   = "hamclock-next",
   ["Keyboard-Shortcuts.md"]     = "keyboard-shortcuts",
   ["Layout.md"]                 = "screen-layout",
@@ -32,11 +32,26 @@ local WIKI_MAP = {
   ["Widgets.md"]                = "widgets-reference",
 }
 
+-- Normalize heading identifiers: collapse -- (and longer runs) to a single -
+-- to avoid LaTeX hyperref's -- -> en-dash ligature mangling anchor names.
+function Header(el)
+  if el.identifier and el.identifier ~= "" then
+    el.identifier = el.identifier:gsub("%-%-+", "-")
+  end
+  return el
+end
+
 function Link(el)
   local target = el.target
 
   -- Leave absolute URLs alone
-  if target:match("^https?://") or target:match("^#") then
+  if target:match("^https?://") then
+    return el
+  end
+
+  -- For internal #anchor links, normalize -- to - for the same reason.
+  if target:match("^#") then
+    el.target = target:gsub("%-%-+", "-")
     return el
   end
 

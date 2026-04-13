@@ -445,6 +445,11 @@ void RigService::pollRigState() {
   if (executeGetLevel(level))
     store_->setSignalLevel(level);
 
+  // Optional: PTT state (non-fatal; not all rigs/stubs support 't' command)
+  bool ptt = false;
+  if (executeGetPTT(ptt))
+    store_->setPTT(ptt);
+
   // Spectrum: probe once after connect; subsequent reads only if supported
   if (!spectrumProbed_) {
     std::vector<float> specData;
@@ -761,6 +766,28 @@ bool RigService::executeGetSplit(bool &split) {
   return false;
 #else
   (void)split;
+  return false;
+#endif
+}
+
+bool RigService::executeGetPTT(bool &on) {
+#ifndef __EMSCRIPTEN__
+  // Hamlib 't' (get_ptt): "PTT: 0\nRPRT 0\n"  (0=RX, 1=TX)
+  std::string response;
+  if (!sendCommand("t\n", response))
+    return false;
+  // A non-zero RPRT means unsupported or error
+  if (response.find("RPRT") != std::string::npos &&
+      response.find("RPRT 0") == std::string::npos)
+    return false;
+  int val = 0;
+  if (std::sscanf(response.c_str(), "PTT: %d", &val) == 1) {
+    on = (val != 0);
+    return true;
+  }
+  return false;
+#else
+  (void)on;
   return false;
 #endif
 }

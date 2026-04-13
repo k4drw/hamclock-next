@@ -595,6 +595,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
       std::make_unique<TimePanel>(0, 0, 0, 0, fontMgr, texMgr, appCfg);
   timePanel->setCallColor(appCfg.callsignColor);
   timePanel->setCallBgColor(appCfg.callsignBgColor);
+  timePanel->setRigDataStore(ctx.rigStore.get());
   timePanel->setOnConfigChanged(
       [&ctx](const std::string &call, SDL_Color fgColor, SDL_Color bgColor) {
         ctx.appCfg.callsign = call;

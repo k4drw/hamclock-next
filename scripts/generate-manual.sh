@@ -142,6 +142,7 @@ echo "Wiki source: $WIKI"
 CHAPTERS=(
   "$WIKI/Home.md"
   "$WIKI/Getting-Started.md"
+  "$WIKI/Building-from-Source.md"
   "$WIKI/Migrating-from-HamClock.md"
   "$WIKI/Layout.md"
   "$WIKI/Widgets.md"

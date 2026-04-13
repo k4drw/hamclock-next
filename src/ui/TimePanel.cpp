@@ -159,6 +159,16 @@ void TimePanel::update() {
     infoTexts_[1] = getDiskUsage();
     infoTexts_[2] = getLocalIP();
   }
+
+  // OTA state from rig (rigctld PTT polling, updated every 2 sec by RigService)
+  if (rigStore_) {
+    RigData rd = rigStore_->get();
+    bool newOnAir = rd.connected && rd.ptt;
+    if (newOnAir != onAir_) {
+      onAir_ = newOnAir;
+      MemoryMonitor::getInstance().destroyTexture(callTex_);
+    }
+  }
 }
 
 void TimePanel::render(SDL_Renderer *renderer) {
@@ -183,20 +193,34 @@ void TimePanel::render(SDL_Renderer *renderer) {
   int dateBaseY = timeBaseY + timeRowH;
   int dateRowH = y_ + height_ - dateBaseY;
 
-  // --- Callsign (large, user-selected color, centered) ---
-  if (callBgColor_.a > 0) {
-    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+  // --- Callsign / On The Air area ---
+  if (onAir_) {
+    // Red background
     SDL_Rect bgRect = {x_ + 1, callBaseY + 1, width_ - 2, callRowH - 2};
-    SDL_SetRenderDrawColor(renderer, callBgColor_.r, callBgColor_.g,
-                           callBgColor_.b, callBgColor_.a);
+    SDL_SetRenderDrawColor(renderer, 200, 0, 0, 255);
     SDL_RenderFillRect(renderer, &bgRect);
-    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
-  }
-  if (callFontSize_ != lastCallFontSize_ || !callTex_) {
-    MemoryMonitor::getInstance().destroyTexture(callTex_);
-    callTex_ = fontMgr_.renderText(renderer, callsign_, callColor_,
-                                   callFontSize_, &callW_, &callH_, true);
-    lastCallFontSize_ = callFontSize_;
+    // "ON THE AIR" text (white, bold) — callTex_ invalidated on state toggle
+    if (!callTex_) {
+      callTex_ = fontMgr_.renderText(renderer, "ON THE AIR",
+                                     {255, 255, 255, 255},
+                                     callFontSize_, &callW_, &callH_, true);
+      lastCallFontSize_ = callFontSize_;
+    }
+  } else {
+    if (callBgColor_.a > 0) {
+      SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+      SDL_Rect bgRect = {x_ + 1, callBaseY + 1, width_ - 2, callRowH - 2};
+      SDL_SetRenderDrawColor(renderer, callBgColor_.r, callBgColor_.g,
+                             callBgColor_.b, callBgColor_.a);
+      SDL_RenderFillRect(renderer, &bgRect);
+      SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+    }
+    if (callFontSize_ != lastCallFontSize_ || !callTex_) {
+      MemoryMonitor::getInstance().destroyTexture(callTex_);
+      callTex_ = fontMgr_.renderText(renderer, callsign_, callColor_,
+                                     callFontSize_, &callW_, &callH_, true);
+      lastCallFontSize_ = callFontSize_;
+    }
   }
   if (callTex_) {
     int dy = callBaseY + (callRowH - callH_) / 2;

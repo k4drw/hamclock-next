@@ -14,7 +14,42 @@ Download the latest release from:
 
 ### Linux
 
-**Debian / Ubuntu (.deb):**
+**Step 1 — Pick your package**
+
+Release filenames follow this pattern:
+
+```
+hamclock-next_<version>_<variant>_<arch>.deb
+hamclock-next-<version>-<variant>.<arch>.rpm
+```
+
+**Architecture (`<arch>`)** — which CPU your machine has:
+
+| If `uname -m` prints… | Download the… | Typical hardware |
+|---|---|---|
+| `x86_64` | `amd64` package | Desktop PC, laptop, Intel NUC |
+| `aarch64` | `arm64` package | Raspberry Pi 4 / 5, modern ARM SBCs |
+| `armv7l` | `armhf` package | Raspberry Pi 3 (32-bit OS), Pi Zero 2W |
+
+Not sure? Open a terminal and run:
+```bash
+uname -m
+```
+
+**Build variant (`<variant>`)** — how the app talks to your display:
+
+| Variant | Use when… |
+|---|---|
+| `unified` | Your system has a graphical desktop (X11 or Wayland) *or* you want the flexibility to run on the console later — this build works in both environments |
+| `fb0` | Your Pi boots straight to a text prompt with no desktop, and you want HamClock-Next to start automatically on boot (includes a systemd service that handles this) |
+
+**When in doubt, choose `unified`.** It works everywhere.
+
+---
+
+**Step 2 — Install**
+
+**Debian / Ubuntu / Raspberry Pi OS (.deb):**
 ```bash
 sudo dpkg -i hamclock-next_*.deb
 hamclock-next
@@ -26,11 +61,19 @@ sudo rpm -i hamclock-next-*.rpm
 hamclock-next
 ```
 
-**Raspberry Pi:** The Linux packages above work on Raspberry Pi OS. For console use (Pi boots to text, no desktop):
+---
+
+**Step 3 — Raspberry Pi console mode**
+
+If your Pi boots to the command line (no graphical desktop), tell SDL2 to draw directly to the screen:
+
 ```bash
 SDL_VIDEODRIVER=kmsdrm hamclock-next --fullscreen
 ```
-> The `SDL_VIDEODRIVER=kmsdrm` part tells HamClock-Next to draw directly to the screen without a window manager. Use this when your Pi boots to the command line instead of a graphical desktop.
+
+> `SDL_VIDEODRIVER=kmsdrm` bypasses X11 and Wayland and writes directly to the display hardware. Required when there is no window manager running.
+
+If you installed the `fb0` package, a systemd service handles this automatically — HamClock-Next starts on boot with no extra configuration needed.
 
 ### macOS
 
