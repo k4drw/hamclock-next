@@ -15,6 +15,12 @@ The map can be navigated using a mouse or touch screen:
 - **Pan**: **Left-click and drag** to pan the map in any direction while zoomed in.
 - **Reset**: **Double-right-click** anywhere on the map to instantly reset the zoom level to 1x and re-center the pan coordinates.
 
+### Center the Map on Your Home Location
+
+By default the map is centered on the prime meridian (0° longitude). You can set it to always center on your home location instead — useful in Azimuthal projection, where your QTH looks best at the middle of the circle.
+
+Set `mapCenterLon` in [Setup & Configuration](Configuration.md) to your home longitude (e.g., `-97.0` for central US). The map will use this as its center longitude across all projections and after restarts.
+
 ---
 
 ## Map Projections
@@ -89,7 +95,7 @@ Select the active overlay and configure band/mode/power from the Configuration s
 | **Reliability**     | Circuit reliability percentage map                                                                                              |
 | **TOA**             | Take-Off Angle prediction                                                                                                       |
 | **Aurora**          | Live aurora oval intensity forecast (NOAA OVATION)                                                                              |
-| **Heatmap**         | Live spot density heat map from PSK Reporter data                                                                               |
+| **Heatmap**         | Live spot density heat map drawn from PSK Reporter, RBN, and WSPR data — shows where signals from your area are actually being received right now |
 | **DRAP**            | D-Region Absorption Prediction (also available as a widget)                                                                     |
 
 ![MUF propagation overlay](images/map_looks/robinson_muf_dark.png)

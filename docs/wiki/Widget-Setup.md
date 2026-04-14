@@ -32,6 +32,15 @@ These widgets fetch data on their own the moment you add them to a pane. No conf
 
 ---
 
+## Band Conditions
+
+Shows a color-coded summary of HF band conditions from 160m to 10m. It works automatically — no configuration needed.
+
+**Expanded detail view:**
+Click the pane's expand arrow (or double-click the pane title bar) to maximize the Band Conditions tile. In the maximized view, a detailed propagation logic breakdown appears below the band summary — it shows the specific factors (solar flux index, K-index, time of day, path geometry) that produced each band's rating. This is useful if you want to understand *why* a band is shown as open or closed, not just that it is.
+
+---
+
 ## DX Cluster
 
 The DX Cluster connects to a global spotting network and shows you who's working what, right now.
@@ -49,6 +58,14 @@ Setup → **Spotting** tab → enable **WSJT-X Mode**. HamClock listens for UDP 
 - **Duplicate Hiding**: (New) Go to Setup → **Spotting** tab and enable **Hide Duplicates**. Only the latest spot for any given callsign on a specific band will be shown, reducing clutter during busy events.
 
 **Tip:** The cluster shows mode badges (CW, SSB, FT8, FT4, RTTY) based on the spot frequency.
+
+**DXCC Award Tracking (N / B / W badges):**
+If you have an ADIF log loaded (see the ADIF widget), each cluster spot is automatically tagged:
+- **N** — you have *never* worked that DXCC entity. New one for your log.
+- **B** — you've worked that entity before, but not on this band.
+- **W** — you've worked it on this band but it's not yet confirmed (unworked/unconfirmed).
+
+No badge means you have a confirmed QSO with that entity on this band already. This makes it easy to spot what's worth chasing at a glance without checking a separate log.
 
 ---
 
@@ -76,6 +93,35 @@ ONTA shows operators activating parks (POTA) or summits (SOTA). Clicking a spot 
 - **Filters**: Click the gear icon on the ONTA panel to choose **POTA**, **SOTA**, or **All**.
 - **Distance**: Set a maximum distance filter in the ONTA settings to only see activators within range of your QTH.
 - **Legend**: Double-height mode shows a band color legend at the bottom for quick reference.
+
+---
+
+## Watchlist & Alerts
+
+The Watchlist lets you monitor specific callsigns in the DX cluster stream and get notified when they appear.
+
+**Setting it up:**
+1. Open Setup → **Spotting** tab → Watchlist section.
+2. Enter the callsigns you want to watch, separated by commas or spaces (e.g., `VK2TT, JA1ABC, VP9GE`). You can paste up to 256 characters at once.
+3. Save.
+
+**What happens when a watched callsign is spotted:**
+- An on-screen alert fires in the Alerts tile (if you have it in a pane).
+- A voice alert plays if `flite` is installed (see [Voice Alerts](#voice-alerts-text-to-speech) below).
+
+**You do not need the Watchlist tile visible for alerts to fire.** Monitoring runs in the background at all times — even if you have no pane showing the Watchlist widget. This means you can run a DX Cluster in your main pane while still receiving alerts for your watched callsigns without keeping a separate tile for it.
+
+**Paste in bulk:** You can paste a full list of callsigns directly into the Watchlist setup field — commas, spaces, or a mix both work as separators.
+
+---
+
+## Greyline DX
+
+Shows DXCC entities whose sunrise or sunset is happening right now — the moments when HF propagation to that country is most likely to be open.
+
+Each row shows a countdown in minutes to the greyline peak. As the window gets close, the row changes color to draw your attention. Entities near peak are the highest priority for a contact — the window is only about 30 minutes wide.
+
+The tile works automatically as soon as you add it to a pane. It uses your QTH and astronomical calculations — no configuration needed.
 
 ---
 
@@ -153,6 +199,61 @@ Shows a second clock next to your local time.
 - **Quick Cycle**: Click the widget itself to cycle through common timezones (UTC, EST, CST, MST, PST, CET, JST, AEST).
 - **Custom Offset**: Set a custom offset and label in Setup → Appearance → Aux Clock.
 - **Sidereal Mode**: Advanced users can enable Sidereal time display through the configuration menu.
+
+---
+
+## RSS News Ticker
+
+A scrolling news headline strip can appear along the bottom edge of the screen, pulling headlines from any RSS feed (amateur radio news sites, space weather alerts, etc.).
+
+**To enable it:**
+- REST API: `GET /set_rss?enabled=1`
+- Or add `"rssEnabled": true` to your config file manually.
+
+**To choose a feed:** Set `"rssUrl"` in your config file to the URL of any RSS feed. The default feed covers amateur radio news headlines.
+
+**To disable it:** `GET /set_rss?enabled=0` or set `"rssEnabled": false`.
+
+The ticker is silent — it only shows text. If the feed can't be reached, the strip disappears rather than showing an error.
+
+---
+
+## Alarms
+
+HamClock-Next can play an audio alert at a time you choose — useful as a morning reminder to check into a net, or to mark the start of a contest.
+
+**Daily alarm** — fires every day at the same time:
+1. Open Setup → **Timers** tab.
+2. Set the hour and minute.
+3. Choose **UTC** or **local time**.
+4. Enable the alarm and save.
+
+**One-time alarm** — fires once at a specific date and time, then disables itself:
+1. Open Setup → **Timers** tab.
+2. Enable the one-time alarm and enter the target date/time.
+3. Save.
+
+If no sound plays when the alarm fires, check that your system audio is working and that HamClock-Next was not built with `--no-audio`. See [Building from Source](Building-from-Source.md) if you built it yourself.
+
+---
+
+## Voice Alerts (Text-to-Speech)
+
+HamClock-Next can speak alerts out loud using your computer's speakers.
+
+Spoken alerts fire for:
+- **Watchlist hits** — a callsign you're monitoring appears in the DX cluster
+- **Solar flares** — a significant X-ray event is detected
+- **Countdown reaching zero** — your Countdown timer expires
+- **Calendar reminders** — a Calendar event you've set is due
+
+**To enable voice alerts:**
+1. Install `flite` on your system:
+   - **Linux / Raspberry Pi**: `sudo apt install flite`
+   - **macOS**: `brew install flite`
+   - **Windows**: voice alerts are not available on Windows at this time.
+2. Restart HamClock-Next. If `flite` is found, voice alerts are active automatically.
+3. To silence all voice alerts temporarily, use the global **audio mute** setting (Setup → **Audio** tab or REST API `/set_config?audio_mute=1`).
 
 ---
 

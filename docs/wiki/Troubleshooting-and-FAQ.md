@@ -47,10 +47,12 @@ HamClock-Next includes specialized compatibility paths for artifact-free renderi
 ### ⚙️ Resetting Configuration
 **Symptom**: Corrupt settings or failed startup.
 
-**Solution**: Delete the configuration directory to start fresh:
-- **Linux**: `rm -rf ~/.local/share/HamClock/HamClock-Next/`
-- **macOS**: `rm -rf ~/Library/Application\ Support/HamClock/HamClock-Next/`
-- **Windows**: `rmdir /s /q %APPDATA%\HamClock\HamClock-Next\`
+**Solution**: Delete the configuration file to start fresh:
+- **Linux / Raspberry Pi**: `rm ~/.config/hamclock-next/config.json`
+- **macOS**: `rm ~/Library/Application\ Support/hamclock-next/config.json`
+- **Windows**: `del %APPDATA%\hamclock-next\config.json`
+
+HamClock-Next will recreate the file and open the Setup screen on the next launch.
 
 ---
 

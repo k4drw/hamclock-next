@@ -34,6 +34,26 @@ If you installed the `FB0` (Framebuffer/Kiosk) debian package, a robust systemd 
 
 *(Note: If you built from source instead of using the FB0 package, you will need to manually create a `/etc/systemd/system/hamclock.service` file that launches `/usr/bin/hamclock-next --fullscreen` with `Environment=SDL_VIDEODRIVER=kmsdrm` set).*
 
+## Automatic Screen Brightness
+
+HamClock-Next can control the screen brightness automatically. There are two ways to do this:
+
+### Schedule-based dimming
+
+Set dim and bright times (hour and minute) in Setup → **Appearance** → Brightness Schedule. HamClock-Next will reduce the brightness at the dim time and restore it at the bright time every day. You can also set an idle timeout — the screen blanks after a set number of minutes with no interaction.
+
+See `brightnessSchedule`, `dimHour`, `brightHour`, and `idleMinutes` in [Setup & Configuration](Configuration.md).
+
+### Light sensor auto-dimming (LTR329)
+
+For truly automatic dimming without a fixed schedule, you can connect an **LTR329** ambient light sensor to your Pi's I²C pins (GPIO 2 / SDA and GPIO 3 / SCL). HamClock-Next detects the sensor on startup and adjusts display brightness continuously based on room lighting — bright in daylight, dimmed in the dark.
+
+No software configuration is needed beyond wiring the sensor. If HamClock-Next finds the sensor, it takes over brightness control automatically.
+
+> Note: The LTR329 is a small, inexpensive I²C sensor available from many electronics suppliers. It does not require any additional drivers on Raspberry Pi OS.
+
+---
+
 ## Performance Tips
 
 **Low Memory Boards (Pi 3 or older):**

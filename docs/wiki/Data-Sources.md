@@ -38,8 +38,9 @@ All network requests are made by the HamClock-Next process itself. In browser (W
 
 | Data | Endpoint | Interval | Used By |
 |------|----------|----------|---------|
-| PSK Reporter spots | `https://retrieve.pskreporter.info/query?...` | 15 min | Live Spots, HEATMAP overlay |
-| RBN (Reverse Beacon Network) | `telnet://telnet.reversebeacon.net:7000` | Real-time | Live Spots (RBN mode) |
+| PSK Reporter spots | `https://retrieve.pskreporter.info/query?...` | 15 min | Live Spots, Heatmap overlay |
+| RBN (Reverse Beacon Network) | `telnet://telnet.reversebeacon.net:7000` | Real-time | Live Spots (RBN mode), Heatmap overlay |
+| WSPR spots | `https://db1.wspr.live/...` | 15 min | Heatmap overlay |
 | DX Cluster (telnet) | Configured host:port | Real-time | DX Cluster |
 | WSJT-X UDP feed | UDP port 2237 (configurable) | Real-time | DX Cluster (WSJT-X mode) |
 

@@ -49,7 +49,7 @@ If `lat`/`lon` are omitted, they are derived from the center of your grid square
 | `useMetric`          | bool   | `true`              | Use metric units for weather and distance                   |
 | `callsignColor`      | color  | orange              | Display color for your callsign                             |
 | `showBorders`        | bool   | `false`             | Show country borders on map                                 |
-| `mapCenterLon`       | number | `0.0`               | Center longitude of the map view                            |
+| `mapCenterLon`       | number | `0.0`               | Center longitude of the map view — set to your home longitude to keep your QTH near the middle of the map in all projections |
 | `mapZoom`            | number | `1.0`               | Map zoom level (1.0 = world; up to 10.0)                    |
 | `mapPanX`            | number | `0.0`               | Map horizontal pan offset                                   |
 | `mapPanY`            | number | `0.0`               | Map vertical pan offset                                     |
@@ -198,6 +198,10 @@ If `lat`/`lon` are omitted, they are derived from the center of your grid square
 
 ## Alarms
 
+HamClock-Next has two alarm types: a **daily repeating alarm** and a **one-time alarm**. Both play an audio alert at the set time.
+
+Configure alarms in Setup → **Timers** tab, or by editing the fields below directly.
+
 | Field            | Type    | Default | Description                                 |
 | ---------------- | ------- | ------- | ------------------------------------------- |
 | `alarmArmed`     | bool    | `false` | Enable daily alarm                          |
@@ -206,6 +210,8 @@ If `lat`/`lon` are omitted, they are derived from the center of your grid square
 | `alarmUtc`       | bool    | `true`  | Alarm time is in UTC (vs local)             |
 | `onceAlarmArmed` | bool    | `false` | Enable one-time alarm                       |
 | `onceAlarmTime`  | string  | `""`    | One-time alarm date (seconds since epoch)   |
+
+**Tip:** Set `alarmUtc` to `false` if you want the alarm to fire at local time (e.g., 07:00 your morning) rather than UTC.
 
 ---
 

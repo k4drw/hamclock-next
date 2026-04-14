@@ -67,6 +67,26 @@ The preset is removed immediately. This action cannot be undone.
 
 ---
 
+## Built-in Presets
+
+HamClock-Next ships with one built-in preset that you can apply immediately from the Presets modal:
+
+### Prop Firehose
+
+The **Prop Firehose** preset fills all your panes with propagation and space weather tiles at once. It's the fastest way to turn HamClock-Next into a dedicated propagation monitoring station.
+
+What it loads:
+- **Pane 1**: Solar → Solar Storm → Solar Cycle → Ionosonde
+- **Pane 2**: Solar Impact Timeline → SFI 30-Day Trend → NOAA Space Wx → Tropo
+- **Pane 3**: Aurora → Aurora Graph → VOACAP DE-DX → DRAP
+- **Pane 4**: Solar (compact) → Band Conditions → NCDXF Beacons
+- **Pane 5**: DE Info
+- **Pane 6**: DX Info
+
+Apply it the same way as any other preset: click **★** in the Time Panel → select **Prop Firehose** → click **Apply**.
+
+---
+
 ## Presets in Configuration
 
 Presets are stored in the JSON configuration file under the `presets` array:

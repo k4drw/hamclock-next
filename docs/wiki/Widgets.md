@@ -77,7 +77,7 @@ To add a widget to a pane, click the **top strip** of the pane to open the widge
 | Widget           | Description                                               | Data Source                       |
 | ---------------- | --------------------------------------------------------- | --------------------------------- |
 | **DX Cluster**   | Live DX spots from a telnet DX cluster or WSJT-X UDP feed          | Configured cluster host or WSJT-X |
-| **Greyline DX**  | DXCC entities currently in the greyline with minutes to peak offset | Internal / Astronomical calculation |
+| **Greyline DX**  | DXCC entities currently in the greyline, with a live countdown to the peak propagation moment and a color warning as the window narrows | Internal / Astronomical calculation |
 | **DX Peditions** | Upcoming and active DXpeditions list                                | ng3k.com                          |
 | **On The Air**   | Active POTA and SOTA activations worldwide                | POTA / SOTA APIs                  |
 | **ADIF**         | Displays recent QSOs from a local ADIF log file           | Local file                        |
