@@ -158,9 +158,6 @@ When `mapNightLights` is enabled (default: on), the nightside of the map shows c
 | **Glass**<br>![glass](images/themes/glass.png) | **Matrix**<br>![matrix](images/themes/matrix.png) |
 | | |
 |---|---|
-| **Glass**<br>![glass](images/themes/glass.png) | **Matrix**<br>![matrix](images/themes/matrix.png) |
-| | |
-|---|---|
 | **Midnight**<br>![midnight](images/themes/midnight.png) | **Paper**<br>![paper](images/themes/paper.png) |
 
 <!-- END THEME GALLERY -->

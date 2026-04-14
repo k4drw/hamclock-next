@@ -89,7 +89,7 @@ SDL_VIDEODRIVER=kmsdrm ./build/hamclock-next --fullscreen
 
 ```bash
 ./build/hamclock-next --live-web
-# Then open: http://localhost:8080/live.html
+# Then open: http://localhost:8080/live
 ```
 
 ### Command-Line Options

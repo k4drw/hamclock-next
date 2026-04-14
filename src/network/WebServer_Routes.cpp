@@ -1241,12 +1241,17 @@ void WebServer::registerRoutes(httplib::Server &svr) {
             std::string key = req.get_param_value("key");
             bool ctrl = req.get_param_value("ctrl") == "1";
             bool shift = req.get_param_value("shift") == "1";
-            SDL_Scancode sc = SDL_GetScancodeFromName(key.c_str());
+            SDL_Keycode sym = SDL_GetKeyFromName(key.c_str());
+            if (sym == SDLK_UNKNOWN && key.length() == 1) {
+              sym = key[0];
+            }
+            SDL_Scancode sc = SDL_GetScancodeFromKey(sym);
             SDL_Keymod mod = static_cast<SDL_Keymod>((ctrl ? KMOD_CTRL : 0) |
                                                      (shift ? KMOD_SHIFT : 0));
             SDL_Event down{}, up{};
             down.type = SDL_KEYDOWN;
             down.key.keysym.scancode = sc;
+            down.key.keysym.sym = sym;
             down.key.keysym.mod = mod;
             up = down;
             up.type = SDL_KEYUP;
@@ -2862,20 +2867,21 @@ void WebServer::registerRoutes(httplib::Server &svr) {
             }
             int x = StringUtils::safe_stoi(req.get_param_value("x"));
             int y = StringUtils::safe_stoi(req.get_param_value("y"));
-            int outW = LOGICAL_WIDTH, outH = LOGICAL_HEIGHT;
-            if (renderer_)
-              SDL_GetRendererOutputSize(renderer_, &outW, &outH);
-            int px = (outW > 0) ? (x * outW / LOGICAL_WIDTH) : x;
-            int py = (outH > 0) ? (y * outH / LOGICAL_HEIGHT) : y;
-            SDL_Event down{}, up{};
-            down.type = SDL_MOUSEBUTTONDOWN;
-            down.button.button = SDL_BUTTON_LEFT;
-            down.button.x = px;
-            down.button.y = py;
-            up = down;
-            up.type = SDL_MOUSEBUTTONUP;
-            SDL_PushEvent(&down);
-            SDL_PushEvent(&up);
+            bool hoverOnly = req.has_param("hover") && req.get_param_value("hover") == "1";
+
+            SDL_Event motion{};
+            motion.type = SDL_MOUSEMOTION;
+            motion.motion.x = x;
+            motion.motion.y = y;
+            SDL_PushEvent(&motion);
+
+            if (!hoverOnly) {
+              SDL_Event e{};
+              e.type = AE_BASE_EVENT + AE_TOUCH;
+              e.user.data1 = reinterpret_cast<void *>(static_cast<intptr_t>(x));
+              e.user.data2 = reinterpret_cast<void *>(static_cast<intptr_t>(y));
+              SDL_PushEvent(&e);
+            }
             res.set_content("ok", "text/plain");
           });
 
@@ -2886,14 +2892,16 @@ void WebServer::registerRoutes(httplib::Server &svr) {
               return;
             }
             std::string key = req.get_param_value("key");
-            SDL_Scancode sc = SDL_GetScancodeFromName(key.c_str());
-            if (sc == SDL_SCANCODE_UNKNOWN && key.length() == 1) {
-              // Fallback for single characters if name doesn't match
-              sc = SDL_GetScancodeFromKey(key[0]);
+            LOG_D("WEBSERVER_ROUTES", "keypress: {}", key);
+            SDL_Keycode sym = SDL_GetKeyFromName(key.c_str());
+            if (sym == SDLK_UNKNOWN && key.length() == 1) {
+              sym = key[0];
             }
+            SDL_Scancode sc = SDL_GetScancodeFromKey(sym);
             SDL_Event down{}, up{};
             down.type = SDL_KEYDOWN;
             down.key.keysym.scancode = sc;
+            down.key.keysym.sym = sym;
             up = down;
             up.type = SDL_KEYUP;
             SDL_PushEvent(&down);

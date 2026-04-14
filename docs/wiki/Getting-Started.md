@@ -85,7 +85,7 @@ Run `HamClock-Next-Setup.exe` and follow the installer. A shortcut is placed on 
 
 ### Browser / Web (no installation)
 
-Launch HamClock-Next with the `--live-web` flag, then open `http://localhost:8080/live.html` in any browser. This also enables remote control from another device on your network.
+Launch HamClock-Next with the `--live-web` flag, then open `http://localhost:8080/live` in any browser. This also enables remote control from another device on your network.
 
 ---
 
