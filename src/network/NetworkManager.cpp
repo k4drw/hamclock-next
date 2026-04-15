@@ -505,7 +505,45 @@ NetworkManager::NetworkManager(const std::filesystem::path &cacheDir)
     std::error_code ec;
     std::filesystem::create_directories(cacheDir_, ec);
     if (!ec) {
-      loadCache();
+      // loadCache() does directory iteration + per-file I/O which is expensive
+      // on SD cards (RPi) and Windows (NTFS + AV scanning).  Run it on a
+      // worker thread so the startup thread is not blocked.  inflight_ is
+      // pre-incremented here (before the thread starts) so the destructor's
+      // wait correctly stalls if the thread has not finished yet.
+      // cacheLoadDone_ is set false so waitForCacheLoad() blocks until the
+      // thread signals completion — preventing a race where DashboardContext
+      // provider fetchAsync() calls arrive before the cache index is ready.
+      {
+        std::lock_guard<std::mutex> lk(inflightMutex_);
+        ++inflight_;
+      }
+      {
+        std::lock_guard<std::mutex> lk(cacheLoadMutex_);
+        cacheLoadDone_ = false;
+      }
+      std::thread([this, alive = alive_]() {
+        {
+          std::lock_guard<std::mutex> lk(inflightMutex_);
+          if (!alive->load(std::memory_order_relaxed)) {
+            if (--inflight_ == 0) inflightCv_.notify_all();
+            // Signal done (thread aborted) so waitForCacheLoad() doesn't hang
+            std::lock_guard<std::mutex> lk2(cacheLoadMutex_);
+            cacheLoadDone_ = true;
+            cacheLoadCv_.notify_all();
+            return;
+          }
+        }
+        loadCache();
+        {
+          std::lock_guard<std::mutex> lk(cacheLoadMutex_);
+          cacheLoadDone_ = true;
+        }
+        cacheLoadCv_.notify_all();
+        {
+          std::lock_guard<std::mutex> lk(inflightMutex_);
+          if (--inflight_ == 0) inflightCv_.notify_all();
+        }
+      }).detach();
     } else {
       LOG_E("NetworkManager", "Failed to create cache dir {}: {}",
             cacheDir_.string(), ec.message());
@@ -598,6 +636,11 @@ void NetworkManager::saveToDisk(const std::string &url, const CacheEntry &entry,
   }
 }
 
+void NetworkManager::waitForCacheLoad() {
+  std::unique_lock<std::mutex> lk(cacheLoadMutex_);
+  cacheLoadCv_.wait(lk, [this] { return cacheLoadDone_; });
+}
+
 void NetworkManager::loadCache() {
   if (cacheDir_.empty())
     return;
@@ -636,20 +679,11 @@ void NetworkManager::loadCache() {
             if (!std::getline(ifs, etag))
               continue;
 
-            auto currentPos = ifs.tellg();
-            ifs.seekg(0, std::ios::end);
-            size_t dataSize = (size_t)ifs.tellg() - (size_t)currentPos;
-            ifs.seekg(currentPos, std::ios::beg);
-
-            std::string data;
-            if (dataSize <= 512 * 1024) {
-              // Read rest of file as data
-              data.assign((std::istreambuf_iterator<char>(ifs)),
-                          (std::istreambuf_iterator<char>()));
-            }
-
+            // Body is loaded lazily from disk on first access (see the
+            // empty-data path in fetchAsync).  Only metadata is loaded here so
+            // loadCache() stays fast regardless of how many URLs are cached.
             std::lock_guard<std::mutex> lock(cacheMutex_);
-            cache_[url] = {std::move(data), ts, serverTs, lm, etag};
+            cache_[url] = {"", ts, serverTs, lm, etag};
           } catch (const std::exception &ex) {
             LOG_W("NetworkManager", "Cache parse error for {}: {}",
                   entry.path().string(), ex.what());
