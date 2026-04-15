@@ -140,6 +140,24 @@ If `lat`/`lon` are omitted, they are derived from the center of your grid square
 
 ---
 
+## World Clock Widget
+
+| Field         | Type  | Default | Description                                      |
+| ------------- | ----- | ------- | ------------------------------------------------ |
+| `worldClocks` | array | `[]`    | List of clock objects with `label`, `offsetMinutes`, and `active` status |
+
+---
+
+## Calendar Widget
+
+| Field                      | Type | Default | Description                                             |
+| -------------------------- | ---- | ------- | ------------------------------------------------------- |
+| `calendarNotifyMinutes`    | int  | `10`    | Minutes before an event to show an alert notification   |
+| `calendarAllDayNotifyHour` | int  | `8`     | Hour (UTC) to alert for all-day events                  |
+| `calendarDismissMinutes`   | int  | `10`    | Minutes before an alert is automatically dismissed      |
+
+---
+
 ## SDO Widget
 
 | Field           | Type   | Default  | Description                                                                                         |

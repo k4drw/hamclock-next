@@ -23,11 +23,19 @@ Closing the window (SDL_QUIT / OS close button) also exits cleanly.
 Pressing **?** (Shift+/) with no modal open toggles the built-in help panel.
 
 When open:
-- A scrollable overlay lists all **keyboard shortcuts**, **mouse/touch controls**, and every **widget** with its one-line description
-- Scroll with **↑ / ↓ arrow keys** or the **mouse wheel**
-- Press **?** again or **Escape** to close
+- A scrollable overlay lists all **keyboard shortcuts**, **mouse/touch controls**, and every **widget** with its one-line description.
+- Scroll with **↑ / ↓ arrow keys**, **PageUp / PageDown**, or the **mouse wheel**.
+- Press **?** again or **Escape** to close.
 
 The help panel is always up-to-date — widget descriptions are loaded directly from the widget registry at runtime.
+
+---
+
+## Satellite Tracking Shortcuts
+
+When the **Satellite** widget is active (not the map overlay):
+- Use **↑ / ↓ arrow keys** or the **mouse wheel** to scroll through the list of upcoming passes.
+- Use **PageUp / PageDown** to jump by full pages.
 
 ---
 
@@ -73,6 +81,7 @@ These apply inside:
 - DX Cluster Setup (host, port, login)
 - Preset name entry
 - Countdown label / target time
+- In-widget configuration (World Clock labels, Marine station IDs, etc.)
 
 ---
 

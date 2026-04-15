@@ -103,7 +103,7 @@ To add a widget to a pane, click the **top strip** of the pane to open the widge
 | **DX Weather** | Current weather conditions at the selected DX entity location | Open-Meteo    |
 | **Forecast**   | Multi-day weather forecast for DE location                    | Open-Meteo    |
 | **Hurricane**  | Active tropical storm / hurricane tracks                      | NHC / NOAA    |
-| **Marine**     | Marine weather and sea state                                  | NOAA marine   |
+| **Marine**     | Marine weather and sea state. Includes a "Find Closest" button in the settings to automatically select the nearest NOAA tide and buoy stations. | NOAA marine   |
 | **Lightning**  | Real-time lightning strike activity map                       | Blitzortung   |
 | **Tropo**      | Tropospheric ducting forecast index                           | APRS / custom |
 | **Meteor**     | Meteor scatter activity / upcoming shower calendar            | IMO           |
@@ -174,5 +174,9 @@ These widgets require a BME280 temperature/pressure/humidity sensor connected vi
 | Widget       | Description                                | Data Source          |
 | ------------ | ------------------------------------------ | -------------------- |
 | **Contests** | Upcoming and active amateur radio contests | Contest calendar API |
+
+![Contests widget](images/widgets/contests.png)
+ntests.png)
+
 
 ![Contests widget](images/widgets/contests.png)
