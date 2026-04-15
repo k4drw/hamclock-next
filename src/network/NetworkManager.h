@@ -111,4 +111,7 @@ private:
 public:
   // Get the server-reported last modified time for a cached URL
   std::time_t getCacheServerTime(const std::string &url);
+
+  // Get the local IPv4 address (excluding loopback).
+  static std::string getLocalIP();
 };

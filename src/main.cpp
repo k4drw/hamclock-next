@@ -749,6 +749,10 @@ void main_tick() {
           s->setStartTab(SetupScreen::Tab::Services);
           ctx.startOnServicesTab = false;
         }
+        if (ctx.webServer && ctx.webServer->isLiveWebEnabled()) {
+          std::string url = "Live Web Control: http://" + NetworkManager::getLocalIP() + ":" + std::to_string(HamClock::DEFAULT_WEB_SERVER_PORT);
+          s->setLiveWebUrl(url);
+        }
         ctx.setupWidget = std::move(s);
       } else if (ctx.activeSetup == AppContext::SetupMode::DXCluster) {
         auto s = std::make_unique<DXClusterSetup>(setupX, setupY, setupW,

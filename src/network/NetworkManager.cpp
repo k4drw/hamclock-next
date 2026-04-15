@@ -17,6 +17,25 @@
 #include <dirent.h>
 #endif
 
+#if defined(_WIN32) && !defined(__EMSCRIPTEN__)
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef _WIN32_WINNT
+#define _WIN32_WINNT 0x0600
+#endif
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#include <windows.h>
+#include <iphlpapi.h>
+#endif
+
+#if !defined(_WIN32) && !defined(__EMSCRIPTEN__)
+#include <arpa/inet.h>
+#include <ifaddrs.h>
+#include <netinet/in.h>
+#endif
+
 static size_t writeCallback(char *ptr, size_t size, size_t nmemb,
                             void *userdata) {
   auto *response = static_cast<std::string *>(userdata);
@@ -692,4 +711,66 @@ void NetworkManager::loadCache() {
       }
     }
   }
+}
+
+std::string NetworkManager::getLocalIP() {
+#if defined(_WIN32) && !defined(__EMSCRIPTEN__)
+  ULONG bufLen = 15000;
+  std::vector<BYTE> buf(bufLen);
+  PIP_ADAPTER_ADDRESSES pAddrs = nullptr;
+  ULONG ret;
+  for (int attempt = 0; attempt < 2; ++attempt) {
+    buf.resize(bufLen);
+    pAddrs = reinterpret_cast<PIP_ADAPTER_ADDRESSES>(buf.data());
+    ret = GetAdaptersAddresses(AF_INET,
+                               GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_MULTICAST |
+                                   GAA_FLAG_SKIP_DNS_SERVER,
+                               nullptr, pAddrs, &bufLen);
+    if (ret != ERROR_BUFFER_OVERFLOW)
+      break;
+  }
+  if (ret != NO_ERROR)
+    return "--";
+
+  for (PIP_ADAPTER_ADDRESSES a = pAddrs; a; a = a->Next) {
+    if (a->IfType == IF_TYPE_SOFTWARE_LOOPBACK)
+      continue;
+    if (a->IfType == IF_TYPE_TUNNEL)
+      continue;
+    if (a->OperStatus != IfOperStatusUp)
+      continue;
+    for (PIP_ADAPTER_UNICAST_ADDRESS u = a->FirstUnicastAddress; u;
+         u = u->Next) {
+      auto *sa = u->Address.lpSockaddr;
+      if (sa->sa_family != AF_INET)
+        continue;
+      char ipBuf[INET_ADDRSTRLEN];
+      auto *sin = reinterpret_cast<struct sockaddr_in *>(sa);
+      if (inet_ntop(AF_INET, &sin->sin_addr, ipBuf, sizeof(ipBuf))) {
+        return std::string(ipBuf);
+      }
+    }
+  }
+  return "--";
+#elif defined(__EMSCRIPTEN__)
+  return "WASM";
+#else
+  struct ifaddrs *addrs = nullptr;
+  if (getifaddrs(&addrs) != 0)
+    return "--";
+  std::string result = "--";
+  for (struct ifaddrs *ifa = addrs; ifa; ifa = ifa->ifa_next) {
+    if (!ifa->ifa_addr || ifa->ifa_addr->sa_family != AF_INET)
+      continue;
+    if (std::strcmp(ifa->ifa_name, "lo") == 0)
+      continue;
+    auto *sin = reinterpret_cast<struct sockaddr_in *>(ifa->ifa_addr);
+    char ip[INET_ADDRSTRLEN];
+    inet_ntop(AF_INET, &sin->sin_addr, ip, sizeof(ip));
+    result = ip;
+    break;
+  }
+  freeifaddrs(addrs);
+  return result;
+#endif
 }

@@ -830,7 +830,7 @@ else()
         # macOS App Bundle Configuration
         set_target_properties(hamclock-next PROPERTIES
             MACOSX_BUNDLE TRUE
-            MACOSX_BUNDLE_GUI_IDENTIFIER com.hamclock.next
+            MACOSX_BUNDLE_GUI_IDENTIFIER com.k4drw.hcn
             MACOSX_BUNDLE_BUNDLE_NAME "HamClock-Next"
             MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
             MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
@@ -853,7 +853,7 @@ else()
     if(IOS)
         set_target_properties(hamclock-next PROPERTIES
             MACOSX_BUNDLE TRUE
-            MACOSX_BUNDLE_GUI_IDENTIFIER "com.hamclock.next"
+            MACOSX_BUNDLE_GUI_IDENTIFIER "com.k4drw.hcn"
             MACOSX_BUNDLE_BUNDLE_NAME "HamClock-Next"
             MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
             MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"

@@ -1,4 +1,6 @@
 #include "ConfigManager.h"
+#include "EEPROMMigrator.h"
+#include "Logger.h"
 
 #include <SDL.h>
 #include <nlohmann/json.hpp>
@@ -219,16 +221,13 @@ bool ConfigManager::load(AppConfig &config) {
   if (configPath_.empty())
     return false;
 
+  bool loadedJson = false;
   std::ifstream ifs(configPath_);
-  if (!ifs)
-    return false;
-
-  auto json = nlohmann::json::parse(ifs, nullptr, false);
-  if (json.is_discarded()) {
-    std::fprintf(stderr, "ConfigManager: invalid JSON in %s\n",
-                 configPath_.string().c_str());
-    return false;
-  }
+  if (ifs) {
+    auto json = nlohmann::json::parse(ifs, nullptr, false);
+    if (!json.is_discarded()) {
+      loadedJson = true;
+      // ... (existing parsing logic)
 
   // Identity
   if (json.contains("identity")) {
@@ -649,6 +648,16 @@ bool ConfigManager::load(AppConfig &config) {
       config.worldClocks.push_back(entry);
     }
   }
+    }
+  }
+
+  if (!loadedJson) {
+    if (!EEPROMMigrator::migrate(config)) {
+      return false;
+    }
+    save(config); // Persist migrated settings immediately
+  }
+
   // Ensure we always have 4 entries
   while (config.worldClocks.size() < 4) {
     config.worldClocks.push_back({"", 0, false});

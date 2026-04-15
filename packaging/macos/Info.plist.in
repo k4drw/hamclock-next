@@ -7,7 +7,7 @@
     <key>CFBundleDisplayName</key>
     <string>HamClock-Next</string>
     <key>CFBundleIdentifier</key>
-    <string>com.hamclock.next</string>
+    <string>com.k4drw.hcn</string>
     <key>CFBundleVersion</key>
     <string>@HAMCLOCK_VERSION@</string>
     <key>CFBundleShortVersionString</key>

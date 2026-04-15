@@ -40,6 +40,8 @@ public:
   bool wasCancelled() const { return cancelled_; }
   AppConfig getConfig(const AppConfig& base = AppConfig{}) const;
 
+  void setLiveWebUrl(const std::string &url) { liveWebUrl_ = url; }
+
   enum class Tab {
     Identity,
     Spotting,
@@ -80,6 +82,7 @@ private:
   FontManager &fontMgr_;
   BrightnessManager &brightnessMgr_;
   std::shared_ptr<DisplayPower> displayPower_;
+  std::string liveWebUrl_;
 
   // Appearance tab absorbs the old Display tab (brightness/schedule now live
   // there)

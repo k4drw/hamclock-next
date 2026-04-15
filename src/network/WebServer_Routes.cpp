@@ -1448,15 +1448,26 @@ void WebServer::registerRoutes(httplib::Server &svr) {
       const y = Math.round((e.clientY - r.top) * img.naturalHeight / r.height);
       fetch('/live/touch?x=' + x + '&y=' + y + '&button=1&shift=' + (e.shiftKey ? 1 : 0));
     });
+
+    let lastWheel = 0;
     img.addEventListener('wheel', e => {
       e.preventDefault();
+      const now = Date.now();
+      if (now - lastWheel < 400) return;
+      lastWheel = now;
       fetch('/live/wheel?y=' + (e.deltaY > 0 ? -1 : 1));
     }, {passive: false});
+
     document.addEventListener('keydown', e => {
       fetch('/live/key?key=' + encodeURIComponent(e.key) +
             '&ctrl=' + (e.ctrlKey ? 1 : 0) + '&shift=' + (e.shiftKey ? 1 : 0));
     });
+
+    let lastMove = 0;
     img.addEventListener('mousemove', e => {
+      const now = Date.now();
+      if (now - lastMove < 200) return; // 5 fps
+      lastMove = now;
       const r = img.getBoundingClientRect();
       const x = Math.round((e.clientX - r.left) * img.naturalWidth / r.width);
       const y = Math.round((e.clientY - r.top) * img.naturalHeight / r.height);
