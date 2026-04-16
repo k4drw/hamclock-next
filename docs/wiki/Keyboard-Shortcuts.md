@@ -75,6 +75,8 @@ Within modals and setup screens, standard text-editing keys apply:
 | `Backspace` | Delete character before cursor |
 | `Left` / `Right` | Move cursor in text field |
 | `Home` / `End` | Jump to start/end of field |
+| `Arrows` | (In Widget Picker) Navigate the 4-column grid of tiles |
+| `Space` | (In Widget Picker) Toggle or select the highlighted tile |
 
 These apply inside:
 - Setup screen (callsign, grid, lat/lon fields)

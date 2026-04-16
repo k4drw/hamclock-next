@@ -76,13 +76,13 @@ To add a widget to a pane, click the **top strip** of the pane to open the widge
 
 | Widget           | Description                                               | Data Source                       |
 | ---------------- | --------------------------------------------------------- | --------------------------------- |
-| **DX Cluster**   | Live DX spots from a telnet DX cluster or WSJT-X UDP feed          | Configured cluster host or WSJT-X |
+| **DX Cluster**   | Live DX spots from a telnet cluster or WSJT-X. Includes mode badges (CW, SSB, etc.) and 'needed' markers (New DXCC or Band). Click a band in the color legend to filter the list. | Configured cluster host or WSJT-X |
 | **Greyline DX**  | DXCC entities currently in the greyline, with a live countdown to the peak propagation moment and a color warning as the window narrows | Internal / Astronomical calculation |
 | **DX Peditions** | Upcoming and active DXpeditions list                                | ng3k.com                          |
 | **On The Air**   | Active POTA and SOTA activations worldwide                | POTA / SOTA APIs                  |
 | **ADIF**         | Displays recent QSOs from a local ADIF log file           | Local file                        |
 | **Callbook**     | Callsign lookup results (name, QTH, grid)                 | Callook / HamDB / QRZ             |
-| **Watchlist**       | Monitor specific callsigns in the DX cluster stream                              | DX Cluster (filtered)             |
+| **Watchlist**       | Monitor specific callsigns in the DX cluster. Alerts show up even when this tile is hidden. | DX Cluster (filtered)             |
 | **Alerts**          | Triggered alerts based on watchlist hits or band activity thresholds             | Internal                          |
 | **Greyline Win.**   | Daily greyline opening and closing times for configured DXCC entities            | Astronomical calculation          |
 | **DXCC Progress**   | DXCC award progress tracker — worked vs. confirmed entities by band and mode     | Local ADIF log                    |
@@ -139,7 +139,7 @@ To add a widget to a pane, click the **top strip** of the pane to open the widge
 | **World Clock**     | Up to four configurable world clocks with city labels and UTC offsets                           | Internal                 |
 | **Calendar**        | Current month calendar with today highlighted; scrollable by month                              | Internal                 |
 | **DE Info**         | Your DE location details: callsign, grid, lat/lon, ITU zone, CQ zone, DXCC entity, bearing to DX | Internal config        |
-| **DX Info**         | Details on the current DX target entity: name, prefix, zones, bearing/distance from DE          | Internal / DXCC database |
+| **DX Info**         | Details on the current target station: name, prefix, zones, local time, and bearing/distance from your location | Internal / DXCC database |
 | **Countdown**       | Configurable countdown timer to a named event                                                   | Internal                 |
 | **Stopwatch**       | Simple stopwatch with lap timer                                                                  | Internal                 |
 | **Reminder**        | License expiry reminder and configurable date reminders                                         | Internal / FCC database  |

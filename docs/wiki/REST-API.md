@@ -109,6 +109,9 @@ Use these endpoints to determine exactly where elements are on the screen (usefu
 
 - `GET /get_spacewx.txt` : Current solar data (SN, SFI, K, etc).
 - `GET /get_sys.txt` : Current system resources (CPU, Memory, Uptime).
+- `GET /get_build.txt` : Version, architecture, and compile-time features.
+- `GET /get_env.txt` : Operating system environment variables.
+- `GET /get_sensors.txt` : Raw data from connected hardware sensors (BME280, GPS).
 - `GET /get_contests.txt` : Active ham contests list.
 - `GET /get_dxspots.txt` : Recent DX Cluster spots (plaintext).
 - `GET /get_dxpeds.txt` : Recent and upcoming DXpeditions list (plaintext).
@@ -117,6 +120,8 @@ Use these endpoints to determine exactly where elements are on the screen (usefu
 - `GET /get_ontheair.txt` : Recent POTA/SOTA spots.
 - `GET /get_de.txt` : DE location and DXCC info.
 - `GET /get_dx.txt` : DX location and bearing/distance.
+- `GET /get_stopwatch.txt` : Current status of the stopwatch (running state and time).
+- `GET /debug/logs` : Returns the last 100 lines of application logs.
 
 ---
 

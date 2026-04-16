@@ -248,7 +248,7 @@ Configure alarms in Setup → **Timers** tab, or by editing the fields below dir
 | Field            | Type   | Default | Description                                                 |
 | ---------------- | ------ | ------- | ----------------------------------------------------------- |
 | `colorOverrides` | object | `{}`    | Per-element color overrides (advanced)                      |
-| `watchlist`      | array  | `[]`    | List of callsigns to monitor in the DX cluster stream       |
+| `watchlist`      | array  | `[]`    | List of callsigns to monitor. In the setup screen, you can paste a list of callsigns separated by commas or spaces to add them all at once. |
 | `ontaFilter`     | string | `"all"` | Filter activations: `all`, `pota`, or `sota`                |
 | `corsProxyUrl`   | string | `"/proxy/"` | CORS proxy URL prefix for browser builds                |
 | `skippedVersion` | string | `""`    | Version string to suppress update nag                       |
