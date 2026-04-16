@@ -3,6 +3,11 @@
 #include "../network/NetworkManager.h"
 #include "../core/Constants.h"
 #include <nlohmann/json.hpp>
+#include <curl/curl.h>
+#include <filesystem>
+#include <fstream>
+#include <thread>
+#include <cstring>
 
 static constexpr const char *kApiUrl =
     "https://api.github.com/repos/k4drw/hamclock-next/releases/latest";
@@ -75,6 +80,94 @@ static bool isVersionNewer(std::string remote, std::string local) {
   return versionToUint32(remote) > versionToUint32(local);
 }
 
+// --- Asset matching ---------------------------------------------------------
+// Given the compile-time install type, arch, and build variant, score each
+// release asset name and return the URL of the best match (or "" if none).
+
+static std::string pickDownloadUrl(const nlohmann::json &assets) {
+  const std::string type    = HAMCLOCK_INSTALL_TYPE;   // DEB, RPM, BIN, WASM
+  const std::string arch    = HAMCLOCK_ARCH;            // x86_64, aarch64, arm, …
+  const std::string variant = HAMCLOCK_BUILD_VARIANT;  // unified, fb0, ""
+
+  if (type == "WASM")
+    return "";  // browser reload, no artifact to download
+
+  // Translate cmake arch to Debian arch naming used in asset filenames
+  std::string debArch;
+  if (arch == "x86_64")        debArch = "amd64";
+  else if (arch == "aarch64")  debArch = "arm64";
+  else if (arch == "arm" || arch.rfind("armv", 0) == 0)
+                               debArch = "armhf";
+
+  // Helper: case-insensitive substring check
+  auto contains = [](const std::string &s, const std::string &sub) -> bool {
+    if (sub.empty()) return true;
+    std::string sl = s, subl = sub;
+    std::transform(sl.begin(), sl.end(), sl.begin(), ::tolower);
+    std::transform(subl.begin(), subl.end(), subl.begin(), ::tolower);
+    return sl.find(subl) != std::string::npos;
+  };
+
+  std::string bestUrl;
+  int bestScore = -1;
+
+  for (const auto &asset : assets) {
+    if (!asset.contains("name") || !asset.contains("browser_download_url"))
+      continue;
+    const std::string name = asset["name"];
+    const std::string url  = asset["browser_download_url"];
+    int score = 0;
+
+    if (type == "RPM" || (type == "BIN" && !debArch.empty())) {
+      // For RPM: prefer .rpm files
+      if (type == "RPM" && contains(name, ".rpm")) {
+        score = 1;
+        if (!arch.empty() && (contains(name, arch) || contains(name, debArch)))
+          score = 2;
+      }
+      // For BIN (source-compiled): fall through to DEB matching below
+    }
+
+    if ((type == "DEB" || type == "BIN") && !debArch.empty()) {
+      if (contains(name, ".deb") && contains(name, debArch)) {
+        score = 2;
+        // Prefer variant match if we have one baked in
+        if (!variant.empty() && contains(name, variant))
+          score = 3;
+      }
+    }
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestUrl = url;
+    }
+  }
+
+  return bestUrl;
+}
+
+// --- libcurl download helpers -----------------------------------------------
+
+static size_t writeData(void *ptr, size_t size, size_t nmemb, void *userdata) {
+  auto *file = static_cast<std::ofstream *>(userdata);
+  file->write(static_cast<const char *>(ptr),
+              static_cast<std::streamsize>(size * nmemb));
+  return size * nmemb;
+}
+
+// userdata is a pointer to the atomic<float> progress member so the static
+// callback can update it without needing access to UpdateChecker internals.
+static int progressCallback(void *userdata, curl_off_t dlTotal,
+                             curl_off_t dlNow, curl_off_t, curl_off_t) {
+  if (dlTotal > 0) {
+    auto *progress = static_cast<std::atomic<float> *>(userdata);
+    progress->store(static_cast<float>(dlNow) / static_cast<float>(dlTotal));
+  }
+  return 0;  // returning non-zero would abort the transfer
+}
+
+// ---------------------------------------------------------------------------
+
 UpdateChecker::UpdateChecker(NetworkManager &net) : net_(net) {}
 
 void UpdateChecker::fetch() {
@@ -106,14 +199,25 @@ void UpdateChecker::onDataReady(const std::string &data) {
       std::string notes = j.value("body", "");
       const bool available = isVersionNewer(tag, current);
 
+      // Pick the best download URL from the release assets
+      std::string dlUrl;
+      if (available && j.contains("assets") && j["assets"].is_array()) {
+        dlUrl = pickDownloadUrl(j["assets"]);
+      }
+
       std::lock_guard<std::mutex> lock(mutex_);
       latestVersion_ = tag;
       releaseNotes_ = notes;
       updateAvailable_ = available;
+      downloadUrl_ = dlUrl;
 
       if (available) {
         LOG_I("UpdateChecker", "Update available: {} → {} (current: {})",
               current, tag, current);
+        if (!dlUrl.empty())
+          LOG_D("UpdateChecker", "Download URL: {}", dlUrl);
+        else
+          LOG_D("UpdateChecker", "No matching download asset for this build");
       } else {
         LOG_D("UpdateChecker", "Up to date ({})", current);
       }
@@ -138,4 +242,95 @@ std::string UpdateChecker::latestVersion() const {
 std::string UpdateChecker::releaseNotes() const {
   std::lock_guard<std::mutex> lock(mutex_);
   return releaseNotes_;
+}
+
+std::string UpdateChecker::downloadUrl() const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  return downloadUrl_;
+}
+
+UpdateChecker::DownloadState UpdateChecker::downloadState() const {
+  return downloadState_.load();
+}
+
+float UpdateChecker::downloadProgress() const {
+  return downloadProgress_.load();
+}
+
+std::string UpdateChecker::downloadedPath() const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  return downloadedPath_;
+}
+
+void UpdateChecker::startDownload() {
+  // Guard against double-click / re-entry
+  DownloadState expected = DownloadState::Idle;
+  if (!downloadState_.compare_exchange_strong(expected, DownloadState::InProgress)) {
+    // Also allow retry from Failed state
+    expected = DownloadState::Failed;
+    if (!downloadState_.compare_exchange_strong(expected, DownloadState::InProgress))
+      return;
+  }
+
+  std::string url;
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    url = downloadUrl_;
+  }
+
+  if (url.empty()) {
+    downloadState_.store(DownloadState::Failed);
+    return;
+  }
+
+  downloadProgress_.store(0.0f);
+
+  // Determine temp file extension from URL
+  auto ext = std::filesystem::path(url).extension().string();
+  if (ext.empty()) ext = ".bin";
+  auto tmpPath = std::filesystem::temp_directory_path() /
+                 ("hamclock-next-update" + ext);
+
+  std::thread([this, url, tmpPath]() {
+    std::ofstream outFile(tmpPath, std::ios::binary | std::ios::trunc);
+    if (!outFile) {
+      LOG_W("UpdateChecker", "Cannot open temp file for download: {}",
+            tmpPath.string());
+      downloadState_.store(DownloadState::Failed);
+      return;
+    }
+
+    CURL *curl = curl_easy_init();
+    if (!curl) {
+      LOG_W("UpdateChecker", "curl_easy_init failed");
+      downloadState_.store(DownloadState::Failed);
+      return;
+    }
+
+    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeData);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &outFile);
+    curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION, progressCallback);
+    curl_easy_setopt(curl, CURLOPT_XFERINFODATA, &downloadProgress_);
+    curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L);
+    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 300L);  // 5-minute cap
+    curl_easy_setopt(curl, CURLOPT_USERAGENT,
+                     "HamClock-Next/" HAMCLOCK_VERSION);
+
+    CURLcode res = curl_easy_perform(curl);
+    curl_easy_cleanup(curl);
+    outFile.close();
+
+    if (res == CURLE_OK) {
+      LOG_I("UpdateChecker", "Download complete: {}", tmpPath.string());
+      std::lock_guard<std::mutex> lock(mutex_);
+      downloadedPath_ = tmpPath.string();
+      downloadState_.store(DownloadState::Complete);
+    } else {
+      LOG_W("UpdateChecker", "Download failed: {}", curl_easy_strerror(res));
+      std::filesystem::remove(tmpPath);
+      downloadState_.store(DownloadState::Failed);
+    }
+  }).detach();
 }

@@ -15,6 +15,7 @@
 
 class BrightnessManager;
 class DisplayPower;
+class UpdateChecker;
 
 class SetupScreen : public Widget {
 public:
@@ -41,6 +42,7 @@ public:
   AppConfig getConfig(const AppConfig& base = AppConfig{}) const;
 
   void setLiveWebUrl(const std::string &url) { liveWebUrl_ = url; }
+  void setUpdateChecker(UpdateChecker *uc) { updateChecker_ = uc; }
 
   enum class Tab {
     Identity,
@@ -83,6 +85,8 @@ private:
   BrightnessManager &brightnessMgr_;
   std::shared_ptr<DisplayPower> displayPower_;
   std::string liveWebUrl_;
+  UpdateChecker *updateChecker_ = nullptr;
+  SDL_Rect downloadBtnRect_ = {0, 0, 0, 0};
 
   // Appearance tab absorbs the old Display tab (brightness/schedule now live
   // there)

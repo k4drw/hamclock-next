@@ -753,6 +753,8 @@ void main_tick() {
           std::string url = "Live Web Control: http://" + NetworkManager::getLocalIP() + ":" + std::to_string(HamClock::DEFAULT_WEB_SERVER_PORT);
           s->setLiveWebUrl(url);
         }
+        if (ctx.updateChecker)
+          s->setUpdateChecker(ctx.updateChecker.get());
         ctx.setupWidget = std::move(s);
       } else if (ctx.activeSetup == AppContext::SetupMode::DXCluster) {
         auto s = std::make_unique<DXClusterSetup>(setupX, setupY, setupW,

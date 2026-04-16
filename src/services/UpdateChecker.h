@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <mutex>
 #include <string>
 
@@ -30,9 +31,26 @@ public:
   // Returns the release notes (GitHub release body)
   std::string releaseNotes() const;
 
+  // Returns the direct download URL for the best-matching release asset,
+  // or "" if no suitable asset was found or update check hasn't run yet.
+  std::string downloadUrl() const;
+
   // Returns system info strings defined at compile time
   std::string installType() const { return HAMCLOCK_INSTALL_TYPE; }
   std::string arch() const { return HAMCLOCK_ARCH; }
+  std::string buildVariant() const { return HAMCLOCK_BUILD_VARIANT; }
+
+  // --- In-app download ---
+
+  enum class DownloadState { Idle, InProgress, Complete, Failed };
+
+  // Kick off a background download of the matched release asset.
+  // Safe to call from the UI thread; no-op if already in progress.
+  void startDownload();
+
+  DownloadState downloadState() const;
+  float downloadProgress() const;        // 0.0–1.0 while InProgress
+  std::string downloadedPath() const;    // Non-empty when Complete
 
 private:
   NetworkManager &net_;
@@ -40,4 +58,9 @@ private:
   bool updateAvailable_{false};
   std::string latestVersion_;
   std::string releaseNotes_;
+  std::string downloadUrl_;
+
+  std::atomic<DownloadState> downloadState_{DownloadState::Idle};
+  std::atomic<float> downloadProgress_{0.0f};
+  std::string downloadedPath_;  // guarded by mutex_
 };

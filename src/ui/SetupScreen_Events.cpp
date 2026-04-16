@@ -3,6 +3,7 @@
 #include "../core/ContestModeManager.h"
 #include "../core/DisplayPower.h"
 #include "../core/StringUtils.h"
+#include "../services/UpdateChecker.h"
 #include <SDL.h>
 #include <algorithm>
 
@@ -573,6 +574,15 @@ bool SetupScreen::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
 #endif
     cancelled_ = true;
     complete_ = true;
+    return true;
+  }
+
+  // Update tab — download button
+  if (activeTab_ == Tab::Update && updateChecker_ &&
+      downloadBtnRect_.w > 0 &&
+      mx >= downloadBtnRect_.x && mx < downloadBtnRect_.x + downloadBtnRect_.w &&
+      my >= downloadBtnRect_.y && my < downloadBtnRect_.y + downloadBtnRect_.h) {
+    updateChecker_->startDownload();
     return true;
   }
 
