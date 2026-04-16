@@ -69,9 +69,15 @@ if(NOT HAMCLOCK_INSTALL_TYPE)
     endif()
 endif()
 
+# Build variant (unified = desktop/X11+Wayland, fb0 = kiosk/framebuffer, "" = not applicable)
+if(NOT HAMCLOCK_BUILD_VARIANT)
+    set(HAMCLOCK_BUILD_VARIANT "")
+endif()
+
 add_compile_definitions(HAMCLOCK_VERSION="v${HAMCLOCK_DISPLAY_VERSION}")
 add_compile_definitions(HAMCLOCK_INSTALL_TYPE="${HAMCLOCK_INSTALL_TYPE}")
 add_compile_definitions(HAMCLOCK_ARCH="${HAMCLOCK_ARCH}")
+add_compile_definitions(HAMCLOCK_BUILD_VARIANT="${HAMCLOCK_BUILD_VARIANT}")
 string(TIMESTAMP HAMCLOCK_BUILD_DATETIME "%Y-%m-%d %H:%M UTC" UTC)
 add_compile_definitions(HAMCLOCK_BUILD_DATETIME="${HAMCLOCK_BUILD_DATETIME}")
 
