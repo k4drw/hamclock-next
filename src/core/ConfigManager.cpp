@@ -648,16 +648,15 @@ bool ConfigManager::load(AppConfig &config) {
       config.worldClocks.push_back(entry);
     }
   }
-    }
-  }
+}
+}
 
-  if (!loadedJson) {
-    if (!EEPROMMigrator::migrate(config)) {
-      return false;
-    }
-    save(config); // Persist migrated settings immediately
+if (!loadedJson) {
+  if (!EEPROMMigrator::migrate(config)) {
+    return false;
   }
-
+  save(config); // Persist migrated settings immediately
+}
   // Ensure we always have 4 entries
   while (config.worldClocks.size() < 4) {
     config.worldClocks.push_back({"", 0, false});

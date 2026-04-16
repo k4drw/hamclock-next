@@ -13,8 +13,6 @@
 #include <unistd.h>
 #endif
 
-namespace HamClock {
-
 // Original HamClock NV_ sizes mapping (indices 0..79)
 // Values confirmed from original HamClock HamClock.h and nvram.cpp
 static const uint8_t NV_SIZES[] = {
@@ -33,7 +31,11 @@ static const uint8_t NV_SIZES[] = {
     1,  1,  1,  64, 1,  // 60..64 (UseGPSD, LogUsage, LblStyle, WIFI_PW, NTPSet)
     18, 1,  2,  2,  2,  // 65..69 (NTPHostOld, GPIOOK, Sat1Color, Sat2Color, X11Flags)
     2,  28, 4,  4,  2,  // 70..74 (BCFlags, DailyOnOff, TempCorr77, PresCorr77, ShortPathCol)
-    2,  2,  1,  7,  7   // 75..79 (LongPathCol, PlotOpsOld, NightOn, DEGrid, DXGrid)
+    2,  2,  1,  7,  7,  // 75..79 (LongPathCol, PlotOpsOld, NightOn, DEGrid, DXGrid)
+    2,  2,  1,  4,  4,  // 80..84 (ShortPathWid, LongPathWid, MapGridChoice, PanX, PanY)
+    4,  1,  2,  1,  1,  // 85..89 (Zoom, MapRotOn, MapRotInt, BRBRotSet, BRBMode)
+    1,  1,  1,  18, 2,  // 90..94 (Plot1, Plot2, Plot3, RotHost, RotPort)
+    1,  18, 2,  26      // 95..98 (RigAutoTune, RigHost, RigPort, DXLogin)
 };
 
 bool EEPROMMigrator::migrate(AppConfig &config) {
@@ -170,6 +172,10 @@ bool EEPROMMigrator::migrate(AppConfig &config) {
         config.grid = readString(dataOffset, size);
         migratedCount++;
         break;
+      case 98: // NV_DXLOGIN
+        config.dxClusterLogin = readString(dataOffset, size);
+        migratedCount++;
+        break;
       }
     }
     offset += 1 + size;
@@ -183,5 +189,3 @@ bool EEPROMMigrator::migrate(AppConfig &config) {
 
   return false;
 }
-
-} // namespace HamClock

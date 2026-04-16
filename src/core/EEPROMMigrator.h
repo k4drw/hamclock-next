@@ -3,8 +3,6 @@
 #include "ConfigManager.h"
 #include <string>
 
-namespace HamClock {
-
 class EEPROMMigrator {
 public:
   /**
@@ -16,5 +14,3 @@ public:
    */
   static bool migrate(AppConfig &config);
 };
-
-} // namespace HamClock

@@ -525,6 +525,7 @@ set(HAMCLOCK_SOURCES
     src/core/Theme.cpp
     src/core/Logger.cpp
     src/core/ConfigManager.cpp
+    src/core/EEPROMMigrator.cpp
     src/core/DatabaseManager.cpp
     src/core/OrbitPredictor.cpp
     src/core/DXClusterData.cpp
