@@ -71,18 +71,30 @@ No badge means you have a confirmed QSO with that entity on this band already. T
 
 ## Live Spots (PSK Reporter / RBN / WSPR)
 
-Live Spots shows you signals being heard around the world, updated continuously.
+Live Spots shows real-time decoded signal spots from PSK Reporter, WSPR, or the Reverse Beacon Network, displayed per band and plotted on the map.
 
-**It works immediately** — the default source is PSK Reporter.
+**No login required.** PSK Reporter is a free, open service. HamClock-Next queries it using the callsign you configured in Setup → **Station** — there are no PSK Reporter credentials to enter anywhere.
 
-**In-Widget Configuration:**
-- Click a **band label** directly in the widget header to toggle that band on/off.
-- Click the **Source** name (e.g., PSK) to cycle between PSK Reporter, RBN (Reverse Beacon Network), and WSPR.
+**Opening the configuration overlay:**
+Click the **Counts** label at the bottom of the Live Spots widget. This opens an in-widget setup screen where you can change all options below.
 
-**Configuration Screen Options:**
-Setup → **Spotting** tab → Live Spots section:
-- **Use Callsign**: Show actual callsigns instead of grid locators.
-- **Max Age**: Controls how many minutes old a spot can be before it disappears.
+**Source:**
+Choose **PSK Reporter**, **WSPR**, or **RBN** (Reverse Beacon Network).
+
+**Mode — "of DE" vs "by DE":**
+This is the most important setting and the most common source of confusion about zero spots.
+
+- **of DE** (default): *Who heard me?* — Queries PSK Reporter for stations that decoded **your** transmissions. Results are zero if you haven't been on the air recently, or if no stations decoded you during the selected time window.
+- **by DE**: *What did I hear?* — Queries for signals decoded at your location (by callsign or grid square). This shows activity near you even when you're not transmitting.
+
+**Filter (by DE mode only):**
+When in *by DE* mode, choose whether to filter by **Callsign** (your call) or **Grid** (your 4-character grid locator). Grid mode can show a broader picture of activity in your area.
+
+**Band toggles:**
+Click any band cell in the widget to toggle it on (colored) or off (dark) for map plotting. A band with a colored background is active; spots on that band appear as pins on the map.
+
+**Max Age:**
+Controls the time window in minutes. Spots older than this value are excluded. Default is 30 minutes; increase it if you're seeing very few spots.
 
 ---
 

@@ -44,6 +44,26 @@ HamClock-Next includes specialized compatibility paths for artifact-free renderi
 1. Check your internet connection.
 2. Verify that your system time is accurate. SSL/TLS requires a correct system clock for certificate validation. Without valid time, API requests will fail.
 
+### 📡 Live Spots / PSK Reporter Shows Zero Spots
+
+**Symptom**: The Live Spots widget shows all zeros and nothing appears on the map.
+
+**Things to check:**
+
+1. **No login is needed.** PSK Reporter has no credentials in HamClock-Next. It queries the open PSK Reporter API using the callsign set in Setup → **Station**. If you think you need to "sign in" somewhere, you don't — just make sure your callsign is set.
+
+2. **Check the mode.** The default mode is *of DE* — "who heard me?" This shows stations that decoded *your* transmissions. If you haven't been transmitting recently, or no one decoded you during the time window, the count will be zero. Try switching to **by DE** mode (click **Counts** at the bottom of the widget to open settings) to see signals decoded in your area instead.
+
+3. **Check your band toggles.** Click any band cell to make sure at least one band is colored (active). All-dark cells mean no bands are enabled for map plotting, though the counts will still show.
+
+4. **PSK Reporter results are cached for ~10 minutes.** After changing settings, wait up to 10 minutes for the next fetch cycle before concluding spots are missing.
+
+5. **Widen Max Age.** In the Counts overlay, try increasing Max Age to 60 or 90 minutes to capture a broader time window.
+
+6. **Band activity.** Zero spots can simply mean no activity on those bands in that time window from your location. PSK Reporter only reports what was actually decoded — if the bands are quiet, the widget will be quiet too.
+
+---
+
 ### ⚙️ Resetting Configuration
 **Symptom**: Corrupt settings or failed startup.
 
