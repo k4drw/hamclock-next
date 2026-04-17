@@ -114,7 +114,7 @@ Use these endpoints to determine exactly where elements are on the screen (usefu
 - `GET /get_sensors.txt` : Raw data from connected hardware sensors (BME280, GPS).
 - `GET /get_contests.txt` : Active ham contests list.
 - `GET /get_dxspots.txt` : Recent DX Cluster spots (plaintext).
-- `GET /get_dxpeds.txt` : Recent and upcoming DXpeditions list (plaintext).
+- `GET /get_dxpeds.txt` : Recent and upcoming DX Peditions list (plaintext).
 - `GET /get_livespots.txt` : Recent Live Spots.
 - `GET /get_satellites.txt` : Full array of trackable satellites (JSON).
 - `GET /get_ontheair.txt` : Recent POTA/SOTA spots.
@@ -122,15 +122,6 @@ Use these endpoints to determine exactly where elements are on the screen (usefu
 - `GET /get_dx.txt` : DX location and bearing/distance.
 - `GET /get_stopwatch.txt` : Current status of the stopwatch (running state and time).
 - `GET /debug/logs` : Returns the last 100 lines of application logs.
-
----
-
-## 8. Propagation & Solar Data
-
-- `GET /api/propagation/voacap` : Raw VOACAP reliability/MUF map for the current configuration.
-- `GET /api/propagation/muf_rt` : Near-real-time MUF map data.
-- `GET /api/solar/sdo` : Information about available SDO wavelengths and state.
-/get_dx.txt` : DX location and bearing/distance.
 
 ---
 

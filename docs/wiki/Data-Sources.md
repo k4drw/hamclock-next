@@ -60,7 +60,7 @@ All network requests are made by the HamClock-Next process itself. In browser (W
 
 | Data | Endpoint | Interval | Used By |
 |------|----------|----------|---------|
-| DXpeditions list | `https://ng3k.com/misc/adxo.html` | 4 hours | DX Peditions |
+| DX Peditions list | `https://ng3k.com/misc/adxo.html` | 4 hours | DX Peditions |
 | POTA activations | POTA API | 15 min | On The Air |
 | SOTA activations | SOTA API | 15 min | On The Air |
 | Contest calendar | Contest API | Daily | Contests |

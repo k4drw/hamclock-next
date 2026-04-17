@@ -24,6 +24,8 @@ local WIKI_MAP = {
   ["Map-and-Overlays.md"]       = "map-overlays",
   ["Migrating-from-HamClock.md"]= "migrating-from-original-hamclock",
   ["New-Features.md"]           = "new-features-in-hamclock-next",
+  ["Raspberry-Pi-Guide.md"]     = "raspberry-pi-setup-guide",
+  ["Troubleshooting-and-FAQ.md"]= "troubleshooting-faq",
   ["Pane-Customization.md"]     = "pane-customization-rotation",
   ["Presets.md"]                = "configuration-presets",
   ["REST-API.md"]               = "hamclock-next-rest-api",
@@ -65,8 +67,8 @@ function Link(el)
   local basename = file:match("([^/]+)$") or file
 
   if anchor and anchor ~= "" then
-    -- Explicit in-page anchor: use it directly
-    el.target = "#" .. anchor
+    -- Explicit in-page anchor: normalize -- (and longer runs) to -
+    el.target = "#" .. anchor:gsub("%-%-+", "-")
   elseif WIKI_MAP[basename] then
     el.target = "#" .. WIKI_MAP[basename]
   else

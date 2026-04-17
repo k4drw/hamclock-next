@@ -27,8 +27,8 @@ To access the Setup screen at any time, click the **gear icon (⚙)** in the Tim
 | `grid`           | string | `""`    | Your Maidenhead grid locator (4 or 6 characters) |
 | `lat`            | number | `0.0`   | Your latitude in decimal degrees                 |
 | `lon`            | number | `0.0`   | Your longitude in decimal degrees                |
-| `defaultTzOffset`| int    | `0`     | Default timezone offset in hours from UTC        |
-| `defaultTzLabel` | string | `"UTC"` | Default timezone label (e.g., "EST")             |
+| `defaultTzOffset`| int    | `0`     | Default time zone offset in hours from UTC       |
+| `defaultTzLabel` | string | `"UTC"` | Default time zone label (e.g., "EST")            |
 
 If `lat`/`lon` are omitted, they are derived from the center of your grid square.
 
@@ -136,7 +136,7 @@ If `lat`/`lon` are omitted, they are derived from the center of your grid square
 | `bigClockShowSec`    | bool    | `true`  | Show seconds                                   |
 | `bigClockShowDate`   | bool    | `true`  | Show current date                              |
 | `bigClockHue`        | integer | `85`    | Color hue for clock segments (0–255)           |
-| `bigClockUseDefaultTz` | bool  | `false` | Use global default timezone instead of UTC     |
+| `bigClockUseDefaultTz` | bool  | `false` | Use global default time zone instead of UTC    |
 
 ---
 

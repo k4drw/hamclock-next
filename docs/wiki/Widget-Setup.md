@@ -1,14 +1,14 @@
 # Widget Setup Guide
 
-This guide explains how to configure each widget in plain language. If you know amateur radio but don't consider yourself a computer expert, start here.
+This guide explains how to set up the main widgets in plain language. If you know amateur radio but do not consider yourself a computer expert, start here.
 
-**Before anything else:** Open Setup (click the ⚙ gear icon in the top-left corner) and go to the **Identity** tab. Enter your callsign, grid locator, and location. Many widgets use your QTH automatically — if this isn't set, weather, distance filters, tides, and tracking widgets won't know where you are.
+**Before anything else:** Open Setup (click the ⚙ gear icon in the top-left corner) and go to the **Identity** tab. Enter your callsign and [home station location](Glossary.md#qth). Many widgets use your [QTH](Glossary.md#qth) automatically, so if this is blank the weather, distance, tide, and tracking widgets will not know where you are.
 
 ---
 
 ## Widgets That Work Automatically
 
-These widgets fetch data on their own the moment you add them to a pane. No configuration needed.
+These widgets start working as soon as you add them to a pane. No extra setup is needed.
 
 **Space Weather**
 - Solar, Aurora, Aurora Graph, DRAP, Solar Storm, DST Index, Ionosonde
@@ -19,7 +19,7 @@ These widgets fetch data on their own the moment you add them to a pane. No conf
 **Weather & Environment**
 - DE Weather, DX Weather, Forecast, Hurricane, Lightning, Tropo, Meteor
 
-**Tracking** *(uses your QTH location)*
+**Tracking** *(uses your home location)*
 - Moon, EME Tool, Greyline DX, Greyline Windows, Santa Tracker
 
 **Info & Utilities**
@@ -27,53 +27,53 @@ These widgets fetch data on their own the moment you add them to a pane. No conf
 - Solar Cycle 25 Tracker, DXCC Progress
 
 **Timers** *(configure once inside the widget)*
-- Countdown — click the gear icon in the panel to set a label and target time
-- Reminder — click the gear icon to set reminder text and time
+- Countdown - click the gear icon in the panel to set a label and target time
+- Reminder - click the gear icon to set reminder text and time
 
 ---
 
 ## Band Conditions
 
-Shows a color-coded summary of HF band conditions from 160m to 10m. It works automatically — no configuration needed.
+Shows a color-coded summary of HF band conditions from 160m to 10m. It works automatically - no configuration needed.
 
 **Expanded detail view:**
-Click the pane's expand arrow (or double-click the pane title bar) to maximize the Band Conditions tile. In the maximized view, a detailed propagation logic breakdown appears below the band summary — it shows the specific factors (solar flux index, K-index, time of day, path geometry) that produced each band's rating. This is useful if you want to understand *why* a band is shown as open or closed, not just that it is.
+Click the pane's expand arrow or double-click the pane title bar to enlarge the Band Conditions tile. The expanded view shows more detail about why each band is rated the way it is.
 
 ---
 
 ## DX Cluster
 
-The DX Cluster connects to a global spotting network and shows you who's working what, right now.
+The DX Cluster connects to a global spotting network and shows you who's working what, right now. See [DX Cluster](Glossary.md#dx--dx-cluster--spot) if the term is new.
 
-**It works immediately** using a public cluster (dxusa.net) — just add it to a pane.
+**It works immediately** using a public cluster (`dxusa.net`) - just add it to a pane.
 
 **To use your club's cluster or a preferred server:**
 Setup → **Spotting** tab → DX Cluster section → enter the hostname and port number.
 
-**To include spots from WSJT-X on your own computer:**
+**To include spots from [WSJT-X](Glossary.md#wsjt-x) on your own computer:**
 Setup → **Spotting** tab → enable **WSJT-X Mode**. HamClock listens for UDP packets on port 2237 (the WSJT-X default).
 
-**Filtering and Performance:**
+**Filtering and performance:**
 - **Band filter**: Click a band label in the color legend at the bottom of the DX Cluster panel. Click it again to clear the filter.
-- **Duplicate Hiding**: (New) Go to Setup → **Spotting** tab and enable **Hide Duplicates**. Only the latest spot for any given callsign on a specific band will be shown, reducing clutter during busy events.
+- **Duplicate hiding**: Go to Setup → **Spotting** tab and enable **Hide Duplicates**. Only the latest spot for each callsign on a given band will be shown.
 
 **Tip:** The cluster shows mode badges (CW, SSB, FT8, FT4, RTTY) based on the spot frequency.
 
 **DXCC Award Tracking (N / B / W badges):**
-If you have an ADIF log loaded (see the ADIF widget), each cluster spot is automatically tagged:
-- **N** — you have *never* worked that DXCC entity. New one for your log.
-- **B** — you've worked that entity before, but not on this band.
-- **W** — you've worked it on this band but it's not yet confirmed (unworked/unconfirmed).
+If you have an ADIF log loaded (see the ADIF widget), each cluster spot is tagged:
+- **N** - you have never worked that DXCC entity
+- **B** - you have worked that entity before, but not on this band
+- **W** - you have worked it on this band but it is not yet confirmed
 
-No badge means you have a confirmed QSO with that entity on this band already. This makes it easy to spot what's worth chasing at a glance without checking a separate log.
+No badge means you already have a confirmed QSO with that entity on this band.
 
 ---
 
 ## Live Spots (PSK Reporter / RBN / WSPR)
 
-Live Spots shows real-time decoded signal spots from PSK Reporter, WSPR, or the Reverse Beacon Network, displayed per band and plotted on the map.
+Live Spots shows real-time decoded signal spots from [PSK Reporter](Glossary.md#psk-reporter--rbn--wspr), [WSPR](Glossary.md#psk-reporter--rbn--wspr), or the [Reverse Beacon Network](Glossary.md#psk-reporter--rbn--wspr), displayed per band and plotted on the map.
 
-**No login required.** PSK Reporter is a free, open service. HamClock-Next queries it using the callsign you configured in Setup → **Station** — there are no PSK Reporter credentials to enter anywhere.
+**No login required.** PSK Reporter is free. HamClock-Next queries it using the callsign you set in Setup.
 
 **Opening the configuration overlay:**
 Click the **Counts** label at the bottom of the Live Spots widget. This opens an in-widget setup screen where you can change all options below.
@@ -81,14 +81,14 @@ Click the **Counts** label at the bottom of the Live Spots widget. This opens an
 **Source:**
 Choose **PSK Reporter**, **WSPR**, or **RBN** (Reverse Beacon Network).
 
-**Mode — "of DE" vs "by DE":**
+**Mode - "of DE" vs "by DE":**
 This is the most important setting and the most common source of confusion about zero spots.
 
-- **of DE** (default): *Who heard me?* — Queries PSK Reporter for stations that decoded **your** transmissions. Results are zero if you haven't been on the air recently, or if no stations decoded you during the selected time window.
-- **by DE**: *What did I hear?* — Queries for signals decoded at your location (by callsign or grid square). This shows activity near you even when you're not transmitting.
+- **of DE** (default): *Who heard me?* - Queries PSK Reporter for stations that decoded **your** transmissions. Results are zero if you have not been on the air recently, or if nobody decoded you during the selected time window.
+- **by DE**: *What did I hear?* - Queries for signals decoded at your location. This shows activity near you even when you are not transmitting.
 
 **Filter (by DE mode only):**
-When in *by DE* mode, choose whether to filter by **Callsign** (your call) or **Grid** (your 4-character grid locator). Grid mode can show a broader picture of activity in your area.
+When in *by DE* mode, choose whether to filter by **Callsign** or **Grid**. Grid mode can show a broader picture of activity near you.
 
 **Band toggles:**
 Click any band cell in the widget to toggle it on (colored) or off (dark) for map plotting. A band with a colored background is active; spots on that band appear as pins on the map.
@@ -100,17 +100,17 @@ Controls the time window in minutes. Spots older than this value are excluded. D
 
 ## On The Air (ONTA) — POTA & SOTA Activators
 
-ONTA shows operators activating parks (POTA) or summits (SOTA). Clicking a spot plots the path on the map.
+ONTA shows operators activating parks ([POTA](Glossary.md#pota--sota)) or summits ([SOTA](Glossary.md#pota--sota)). Clicking a spot plots the path on the map.
 
 - **Filters**: Click the gear icon on the ONTA panel to choose **POTA**, **SOTA**, or **All**.
-- **Distance**: Set a maximum distance filter in the ONTA settings to only see activators within range of your QTH.
+- **Distance**: Set a maximum distance filter in the ONTA settings to only see activators within range of your home location.
 - **Legend**: Double-height mode shows a band color legend at the bottom for quick reference.
 
 ---
 
 ## Watchlist & Alerts
 
-The Watchlist lets you monitor specific callsigns in the DX cluster stream and get notified when they appear.
+The Watchlist lets you monitor specific callsigns in the [DX cluster](Glossary.md#dx--dx-cluster--spot) stream and get notified when they appear.
 
 **Setting it up:**
 1. Open Setup → **Spotting** tab → Watchlist section.
@@ -121,7 +121,7 @@ The Watchlist lets you monitor specific callsigns in the DX cluster stream and g
 - An on-screen alert fires in the Alerts tile (if you have it in a pane).
 - A voice alert plays if `flite` is installed (see [Voice Alerts](#voice-alerts-text-to-speech) below).
 
-**You do not need the Watchlist tile visible for alerts to fire.** Monitoring runs in the background at all times — even if you have no pane showing the Watchlist widget. This means you can run a DX Cluster in your main pane while still receiving alerts for your watched callsigns without keeping a separate tile for it.
+**You do not need the Watchlist tile visible for alerts to fire.** Monitoring runs in the background at all times, even if you do not have the Watchlist widget on screen.
 
 **Paste in bulk:** You can paste a full list of callsigns directly into the Watchlist setup field — commas, spaces, or a mix both work as separators.
 
@@ -129,17 +129,17 @@ The Watchlist lets you monitor specific callsigns in the DX cluster stream and g
 
 ## Greyline DX
 
-Shows DXCC entities whose sunrise or sunset is happening right now — the moments when HF propagation to that country is most likely to be open.
+Shows DXCC entities whose sunrise or sunset is happening now. These are often the best times for long-distance contacts.
 
-Each row shows a countdown in minutes to the greyline peak. As the window gets close, the row changes color to draw your attention. Entities near peak are the highest priority for a contact — the window is only about 30 minutes wide.
+Each row shows a countdown in minutes to the gray line peak. As the window gets close, the row changes color to draw your attention. Entities near peak are the highest priority for a contact — the window is only about 30 minutes wide.
 
-The tile works automatically as soon as you add it to a pane. It uses your QTH and astronomical calculations — no configuration needed.
+The tile works automatically as soon as you add it to a pane. It uses your home location and astronomical calculations, so no extra setup is needed.
 
 ---
 
 ## World Clock
 
-Display up to four specific timezones with labels.
+Display up to four time zones with labels.
 
 1. Add **World Clock** to a pane.
 2. Click the **gear icon** inside the widget.
@@ -152,13 +152,13 @@ Display up to four specific timezones with labels.
 
 ## Big Clock
 
-A full-pane clock for high visibility from across the room.
+A full-pane clock that is easy to read from across the room.
 
 1. Add **Big Clock** to a pane.
 2. Click the **gear icon** to configure:
    - **Mode**: Digital or Analog.
    - **Format**: 12-hour or 24-hour.
-   - **UTC**: Lock to UTC or use your default local timezone.
+   - **UTC**: Lock to UTC or use your default local time zone.
    - **Sec/Date**: Toggle seconds and date display.
    - **Color**: Adjust the hue slider to match your theme.
 
@@ -175,7 +175,7 @@ The Marine widget shows tidal data and sea conditions from the nearest NOAA stat
 
 ## SDO (Solar Dynamics Observatory)
 
-SDO shows live solar imagery in various wavelengths.
+SDO shows live solar imagery in various wavelengths. See [SDO](Glossary.md#sdo-solar-dynamics-observatory) if the acronym is new.
 
 Click the **gear icon** in the SDO panel to:
 - Choose a **wavelength** (0193, 0171, 0304, 1600, 1700, HMIB, HMIIC).
@@ -191,7 +191,7 @@ Click the **gear icon** in the SDO panel to:
 2. Click the **gear icon** in the panel → select a satellite from the list.
 3. The map shows the ground track and footprint automatically.
 
-**Rotator Control:** If using a rotator via `rotctld`, enable **Auto-Track** in the Rotator settings (Setup → Network) to point your antenna at the target automatically during a pass.
+**Rotator Control:** If using a rotator via [rotctld](Glossary.md#rotctld--rigctld), enable **Auto-Track** in the Rotator settings (Setup → Network) to point your antenna at the target automatically during a pass.
 
 ---
 
@@ -199,7 +199,7 @@ Click the **gear icon** in the SDO panel to:
 
 Shows your rig's frequency and mode, and allows tuning from HamClock.
 
-- **Requirements**: Requires `rigctld` (Hamlib) running on your system.
+- **Requirements**: Requires [`rigctld`](Glossary.md#rotctld--rigctld) (Hamlib) running on your system.
 - **Sync**: Enable **Auto-Tune** in Setup → Rig to automatically set your rig's frequency when you click a DX Cluster spot or band button.
 
 ---
@@ -208,7 +208,7 @@ Shows your rig's frequency and mode, and allows tuning from HamClock.
 
 Shows a second clock next to your local time.
 
-- **Quick Cycle**: Click the widget itself to cycle through common timezones (UTC, EST, CST, MST, PST, CET, JST, AEST).
+- **Quick Cycle**: Click the widget itself to cycle through common time zones (UTC, EST, CST, MST, PST, CET, JST, AEST).
 - **Custom Offset**: Set a custom offset and label in Setup → Appearance → Aux Clock.
 - **Sidereal Mode**: Advanced users can enable Sidereal time display through the configuration menu.
 
@@ -232,7 +232,7 @@ The ticker is silent — it only shows text. If the feed can't be reached, the s
 
 ## Alarms
 
-HamClock-Next can play an audio alert at a time you choose — useful as a morning reminder to check into a net, or to mark the start of a contest.
+HamClock-Next can play an audio alert at a time you choose. It is useful as a morning reminder to check into a net or to mark the start of a contest.
 
 **Daily alarm** — fires every day at the same time:
 1. Open Setup → **Timers** tab.
@@ -254,10 +254,10 @@ If no sound plays when the alarm fires, check that your system audio is working 
 HamClock-Next can speak alerts out loud using your computer's speakers.
 
 Spoken alerts fire for:
-- **Watchlist hits** — a callsign you're monitoring appears in the DX cluster
-- **Solar flares** — a significant X-ray event is detected
-- **Countdown reaching zero** — your Countdown timer expires
-- **Calendar reminders** — a Calendar event you've set is due
+- **Watchlist hits** - a callsign you are monitoring appears in the DX cluster
+- **Solar flares** - a significant X-ray event is detected
+- **Countdown reaching zero** - your Countdown timer expires
+- **Calendar reminders** - a Calendar event you set is due
 
 **To enable voice alerts:**
 1. Install `flite` on your system:

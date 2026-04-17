@@ -37,7 +37,7 @@ To add a widget to a pane, click the **top strip** of the pane to open the widge
 | **SDO**          | Live solar imagery from the Solar Dynamics Observatory in selectable wavelengths; optional movie loop         | NASA SDO                 |
 | **Aurora**       | Global aurora forecast map from the NOAA OVATION model                                                        | NOAA SWPC                |
 | **Aurora Graph** | Time-series graph of geomagnetic Kp index and aurora activity                                                 | NOAA SWPC                |
-| **DRAP**         | D-Region Absorption Prediction \u2014 HF absorption map showing where ionospheric absorption degrades propagation  | NOAA SWPC                |
+| **DRAP**         | D-Region Absorption Prediction — HF absorption map showing where ionospheric absorption degrades propagation  | NOAA SWPC                |
 | **Solar Storm**  | Current geomagnetic storm watch/warning/alert status                                                          | NOAA SWPC                |
 | **History Flux** | Historical solar flux (SFI) graph over multiple days                                                          | NOAA SWPC                |
 | **History KP**   | Historical Kp geomagnetic index graph                                                                         | NOAA SWPC                |
@@ -174,9 +174,5 @@ These widgets require a BME280 temperature/pressure/humidity sensor connected vi
 | Widget       | Description                                | Data Source          |
 | ------------ | ------------------------------------------ | -------------------- |
 | **Contests** | Upcoming and active amateur radio contests | Contest calendar API |
-
-![Contests widget](images/widgets/contests.png)
-ntests.png)
-
 
 ![Contests widget](images/widgets/contests.png)

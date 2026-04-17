@@ -1,6 +1,6 @@
 # Screen Layout
 
-HamClock-Next divides the screen into a fixed set of regions. Understanding the layout is the first step to customizing your dashboard.
+HamClock-Next divides the screen into a few fixed areas. Understanding the layout is the first step to customizing your dashboard.
 
 ![Full dashboard with labeled regions](images/layout-annotated.png)
 
@@ -8,7 +8,7 @@ HamClock-Next divides the screen into a fixed set of regions. Understanding the 
 
 ## Regions at a Glance
 
-HamClock-Next uses a **Top Bar** and a **Left Side Panel** to maximize map area.
+HamClock-Next uses a top bar and a left-side panel to leave as much room as possible for the map.
 
 ```
 +----------+----------+----------+----------+-------+
@@ -27,9 +27,9 @@ HamClock-Next uses a **Top Bar** and a **Left Side Panel** to maximize map area.
 +---------------------------------------------------+
 ```
 
-> **Note on Pane 4**: This is a narrow status pane (62px) typically used for the NCDXF Beacon widget or system status.
+> **Note on Pane 4**: This is a narrow status pane, usually used for the NCDXF Beacon widget or simple status information.
 
-> Layout proportions vary by screen resolution and panel mode. The exact arrangement is determined at startup based on the window dimensions.
+> Layout proportions vary by screen size and panel mode. The exact arrangement is chosen when the app starts.
 
 ---
 
@@ -45,10 +45,10 @@ Contents:
 | Element              | Description                                  |
 | -------------------- | -------------------------------------------- |
 | **UTC clock**        | Current UTC time, large digits               |
-| **Local clock**      | Local time based on your configured timezone |
+| **Local clock**      | Local time based on your configured time zone |
 | **DE callsign**      | Your callsign as entered in Setup            |
-| **DE grid**          | Your Maidenhead grid locator                 |
-| **Sunrise / Sunset** | Today's SR/SS times for your location        |
+| **DE grid**          | Your [Maidenhead grid locator](Glossary.md#maidenhead-grid-square) |
+| **Sunrise / Sunset** | Today's sunrise and sunset times for your location |
 | **Gear icon (⚙)**    | Opens the Setup modal                        |
 | **Star icon (★)**    | Opens the [Presets modal](Presets.md)        |
 
@@ -56,11 +56,11 @@ Contents:
 
 ## The Six Panes
 
-Panes 1–6 are rotatable widget containers. Each pane independently cycles through a configured list of widgets.
+Panes 1-6 are widget areas that can cycle through a list of widgets.
 
 - **Click the top strip** of any pane to open the widget picker
-- **Rotation** advances automatically on a configurable timer (default 30 seconds)
-- Panes can be configured to rotate in sync with each other
+- **Rotation** advances automatically on a configurable timer, usually every 30 seconds
+- Panes can be set to rotate together if you want them synchronized
 
 See [Pane Customization](Pane-Customization.md) for details.
 
@@ -87,13 +87,13 @@ In **side panel mode**, the left column (Panes 5 and 6) is replaced by a tall pa
 - **DX Info** — information about your current DX entity target
 - **Satellite** — ground track and pass information for a tracked satellite
 
-The panel mode is controlled by the `panelMode` configuration field.
+The panel mode is controlled by the `panelMode` setting.
 
 ---
 
 ## Interactive Regions and the K Key
 
-Pressing **K** toggles highlight mode. All interactive screen regions light up with cyan bounding boxes and a tooltip label.
+Pressing **K** turns on highlight mode. All interactive screen regions light up with cyan boxes and a tooltip label.
 
 ![K key highlight mode active](images/key-highlight-mode.png)
 

@@ -1,12 +1,16 @@
 # Raspberry Pi Setup Guide
 
-HamClock-Next is fully optimized to run on the Raspberry Pi family (Pi 3, 4, 400, and 5) natively or without an X11 windowing environment.
+HamClock-Next runs well on the Raspberry Pi family (Pi 3, 4, 400, and 5), with or without a desktop.
 
 ## Installation
 
-The easiest way to install HamClock-Next on a Raspberry Pi is using the provided `.deb` package. Download it from the [Releases page](https://github.com/k4drw/hamclock-next/releases).
+The easiest way to install HamClock-Next on a Raspberry Pi is to use the provided `.deb` package. Download it from the [Releases page](https://github.com/k4drw/hamclock-next/releases).
 
-1. Determine your architecture (`uname -m`). Use `arm64` for 64-bit Pi OS, or `armhf` for 32-bit Pi OS.
+1. Determine your architecture:
+   ```bash
+   uname -m
+   ```
+   Use `arm64` for 64-bit Pi OS, or `armhf` for 32-bit Pi OS.
 2. Install via `apt`:
    ```bash
    sudo apt install ./hamclock-next_*.deb
@@ -14,14 +18,14 @@ The easiest way to install HamClock-Next on a Raspberry Pi is using the provided
 
 ## Running Without a Desktop (Headless / Kiosk Mode)
 
-HamClock-Next uses SDL2, meaning it doesn't require X11 or Wayland. It can write directly to the screen via the Linux Direct Rendering Manager (DRM).
+HamClock-Next can run without X11 or Wayland. It can draw directly to the screen with [KMSDRM](Glossary.md#kmsdrm).
 
 1. Add your user to the `video` and `render` groups:
    ```bash
    sudo usermod -aG video,render $USER
    ```
 2. Log out and back in to apply the group changes.
-3. Run with the KMSDRM driver:
+3. Run with the [KMSDRM](Glossary.md#kmsdrm) driver:
    ```bash
    SDL_VIDEODRIVER=kmsdrm hamclock-next --fullscreen
    ```
@@ -46,7 +50,7 @@ See `brightnessSchedule`, `dimHour`, `brightHour`, and `idleMinutes` in [Setup &
 
 ### Light sensor auto-dimming (LTR329)
 
-For truly automatic dimming without a fixed schedule, you can connect an **LTR329** ambient light sensor to your Pi's I²C pins (GPIO 2 / SDA and GPIO 3 / SCL). HamClock-Next detects the sensor on startup and adjusts display brightness continuously based on room lighting — bright in daylight, dimmed in the dark.
+For automatic dimming without a fixed schedule, you can connect an **LTR329** ambient light sensor to your Pi's [I²C](Glossary.md#i2c) pins (GPIO 2 / SDA and GPIO 3 / SCL). HamClock-Next detects the sensor on startup and adjusts display brightness based on room lighting.
 
 No software configuration is needed beyond wiring the sensor. If HamClock-Next finds the sensor, it takes over brightness control automatically.
 

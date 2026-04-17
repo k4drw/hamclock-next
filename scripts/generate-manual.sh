@@ -136,14 +136,17 @@ echo "Building HamClock-Next User Manual → $OUTPUT"
 echo "Wiki source: $WIKI"
 
 # ── Ordered chapter list ──────────────────────────────────────────────────────
-# Widget-Gallery.md and _Sidebar.md are intentionally excluded:
+# Intentionally excluded:
 #   Widget-Gallery.md  — screenshot-only page, inline images make PDF too large
 #   _Sidebar.md        — GitHub wiki navigation, not prose content
+#   Developer-Guide.md — internal architecture/MCP docs, not user-facing
 CHAPTERS=(
   "$WIKI/Home.md"
   "$WIKI/Getting-Started.md"
   "$WIKI/Building-from-Source.md"
+  "$WIKI/Raspberry-Pi-Guide.md"
   "$WIKI/Migrating-from-HamClock.md"
+  "$WIKI/New-Features.md"
   "$WIKI/Layout.md"
   "$WIKI/Widgets.md"
   "$WIKI/Widget-Setup.md"
@@ -154,6 +157,7 @@ CHAPTERS=(
   "$WIKI/Keyboard-Shortcuts.md"
   "$WIKI/REST-API.md"
   "$WIKI/Data-Sources.md"
+  "$WIKI/Troubleshooting-and-FAQ.md"
   "$WIKI/Glossary.md"
 )
 

@@ -1,6 +1,6 @@
 # Map & Overlays
 
-The large center area of HamClock-Next displays an interactive world map with configurable projections and overlay layers. Map options are controlled via the **Map View Options** modal.
+The large center area of HamClock-Next displays an interactive world map with configurable projections and overlays. Map options are controlled from the map settings window.
 
 ![Map View Options](images/map_looks/robinson_clouds_dark.png)
 
@@ -10,22 +10,22 @@ The large center area of HamClock-Next displays an interactive world map with co
 
 ### Zoom and Pan
 
-The map can be navigated using a mouse or touch screen:
-- **Zoom**: Use the **mouse wheel** to zoom in (up to 10x) and out.
-- **Pan**: **Left-click and drag** to pan the map in any direction while zoomed in.
-- **Reset**: **Double-right-click** anywhere on the map to instantly reset the zoom level to 1x and re-center the pan coordinates.
+You can move around the map with a mouse or touch screen:
+- **Zoom**: Use the mouse wheel to zoom in and out.
+- **Pan**: Left-click and drag to move the map while zoomed in.
+- **Reset**: Double-right-click anywhere on the map to return to the default view.
 
 ### Center the Map on Your Home Location
 
-By default the map is centered on the prime meridian (0° longitude). You can set it to always center on your home location instead — useful in Azimuthal projection, where your QTH looks best at the middle of the circle.
+By default the map is centered on the prime meridian (0° longitude). You can set it to center on your [QTH](Glossary.md#qth) instead. That is especially helpful in Azimuthal view.
 
-Set `mapCenterLon` in [Setup & Configuration](Configuration.md) to your home longitude (e.g., `-97.0` for central US). The map will use this as its center longitude across all projections and after restarts.
+Set `mapCenterLon` in [Setup & Configuration](Configuration.md) to your home longitude, for example `-97.0` for central US. The map will keep using that setting after restart.
 
 ---
 
 ## Map Projections
 
-HamClock-Next supports five map projections, selectable from the Setup or map controls:
+HamClock-Next supports five map projections:
 
 ### Equirectangular
 
@@ -37,7 +37,7 @@ A compromise projection that balances distortion of area, shape, distance, and d
 
 ### Azimuthal (Great Circle) *(new in HamClock-Next)*
 
-Centered on your DE location. Shows true bearing and distance in all directions as straight lines from your QTH. Useful for antenna pointing. The original HamClock only offered the dual-hemisphere variant; this single-circle view is a HamClock-Next addition.
+Centered on your [QTH](Glossary.md#qth). Shows true bearing and distance in all directions as straight lines from your station. Useful for antenna pointing. The original HamClock only offered the dual-hemisphere version.
 
 ![Azimuthal projection](images/map_looks/azimuthal_aurora_midnight.png)
 
@@ -47,7 +47,7 @@ A cylindrical projection that preserves angles and shapes locally. Useful for na
 
 ### Dual Azimuthal
 
-Displays two side-by-side azimuthal equidistant circles: the left centered on DE and the right centered on the antipodal point. Together they show the complete globe — every location on Earth appears in one of the two circles with no clipping. Great-circle paths remain straight within each hemisphere.
+Displays two side-by-side azimuthal circles: one centered on your location and one centered on the opposite side of the Earth. Together they show the whole globe with no clipping.
 
 ---
 
@@ -89,13 +89,13 @@ Select the active overlay and configure band/mode/power from the Configuration s
 | Overlay             | Description                                                                                                                     |
 | ------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
 | **None**            | No propagation overlay                                                                                                          |
-| **MUF (Real-time)** | Maximum Usable Frequency derived from real-time NOAA ionospheric data — shows areas where the selected band is likely open       |
-| **VOACAP Area**     | VOACAP-based propagation reliability prediction from DE to all areas of the map on the selected band                            |
-| **VOACAP Point**    | VOACAP prediction from DE to a specific DX target point                                                                         |
+| **MUF (Real-time)** | [Maximum Usable Frequency](Glossary.md#muf-maximum-usable-frequency) derived from real-time NOAA ionospheric data — shows areas where the selected band is likely open       |
+| **VOACAP Area**     | [VOACAP](Glossary.md#voacap) based propagation reliability prediction from your location to all areas of the map on the selected band                  |
+| **VOACAP Point**    | [VOACAP](Glossary.md#voacap) prediction from your location to a specific target point                                                                  |
 | **Reliability**     | Circuit reliability percentage map                                                                                              |
 | **TOA**             | Take-Off Angle prediction                                                                                                       |
 | **Aurora**          | Live aurora oval intensity forecast (NOAA OVATION)                                                                              |
-| **Heatmap**         | Live spot density heat map drawn from PSK Reporter, RBN, and WSPR data — shows where signals from your area are actually being received right now |
+| **Heatmap**         | Live spot density heat map drawn from [PSK Reporter / RBN / WSPR](Glossary.md#psk-reporter--rbn--wspr) data — shows where signals from your area are actually being received right now |
 | **DRAP**            | D-Region Absorption Prediction (also available as a widget)                                                                     |
 
 ![MUF propagation overlay](images/map_looks/robinson_muf_dark.png)

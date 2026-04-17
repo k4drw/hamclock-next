@@ -21,11 +21,9 @@ File locations:
 
 ---
 
-## CORS Proxy
+## DE
 
-When HamClock-Next runs inside a web browser, the browser's security rules prevent it from fetching data directly from the internet. A CORS proxy is a relay program on the same server that forwards those requests on behalf of the browser. Think of it as a mail forwarder.
-
-If you are running the pre-packaged browser build, this is already handled. You only need to configure `corsProxyUrl` if you are hosting your own instance.
+Ham shorthand for **your own station** or **home station**. HamClock-Next uses DE to label your location on the screen, map, and related widgets.
 
 ---
 
@@ -43,15 +41,29 @@ A **DX Cluster** is a worldwide network of servers where operators report ("spot
 
 ---
 
+## QTH
+
+Your operating location or station location. In plain language, it means "where you are." HamClock-Next uses your QTH to center maps, calculate bearings, and fill in weather and propagation widgets.
+
+---
+
+## CORS Proxy
+
+When HamClock-Next runs inside a web browser, the browser may block direct requests to some websites. A CORS proxy is a small relay program that forwards those requests for the browser. Think of it as a mail forwarder.
+
+If you are running the pre-packaged browser build, this is already handled. You only need to configure `corsProxyUrl` if you are hosting your own instance.
+
+---
+
 ## FT8
 
-A digital weak-signal radio mode developed for amateur HF communication. FT8 exchanges happen in 15-second intervals and can be decoded at very low signal levels, making it popular for propagation testing and DX contacts. HamClock-Next can receive FT8 spots from **WSJT-X** and display them on the map.
+A digital weak-signal radio mode used for amateur HF communication. FT8 exchanges happen in 15-second intervals and can be decoded at very low signal levels, making it popular for propagation testing and DX contacts. HamClock-Next can receive FT8 spots from **WSJT-X** and display them on the map.
 
 ---
 
 ## Hamlib
 
-A free, open-source software package that lets computer programs talk to amateur radio equipment. HamClock-Next uses Hamlib to communicate with your transceiver (rig) and antenna rotator.
+A free, open-source package that lets computer programs talk to amateur radio equipment. HamClock-Next uses Hamlib to communicate with your transceiver (rig) and antenna rotator.
 
 Hamlib works through two small helper programs that run in the background:
 - `rigctld` — talks to your radio
@@ -61,13 +73,25 @@ See also: [rotctld / rigctld](#rotctld--rigctld).
 
 ---
 
+## KMSDRM
+
+The Linux graphics path HamClock-Next can use to draw directly to the screen without a desktop window system. This is mainly relevant on Raspberry Pi systems running in console mode.
+
+---
+
+## SDL2
+
+The cross-platform graphics library HamClock-Next uses to draw its interface. SDL2 lets the app run on Linux, macOS, Windows, and in a browser build.
+
+---
+
 ## Hostname
 
 The human-readable name of a computer on a network (e.g., `dxusa.net` or `raspberrypi.local`). You enter a hostname — or an IP address — when configuring HamClock-Next to connect to an external service such as a DX Cluster server, `rigctld`, or `rotctld`. A hostname is always paired with a **[port number](#port--port-number)** to form a complete network address.
 
 ---
 
-## I²C
+## I²C {#i2c}
 
 A short-distance electrical connection standard used between a Raspberry Pi and a sensor (such as a BME280 temperature/humidity/pressure sensor). The sensor connects directly to the Pi's GPIO header with just two signal wires. You won't encounter this unless you are adding a hardware sensor.
 
@@ -101,7 +125,7 @@ A global location system used by amateur radio operators. The world is divided i
 
 ## MUF (Maximum Usable Frequency)
 
-The highest radio frequency that can be reflected back to Earth by the ionosphere at a given moment between two locations. Signals above the MUF pass through the ionosphere and are lost to space. HamClock-Next's propagation overlay can display the MUF so you can quickly see which bands are open for a given path.
+The highest radio frequency that can make it through the ionosphere for a given path. Signals above the MUF pass through the ionosphere and are lost to space. HamClock-Next's propagation overlay can display the MUF so you can quickly see which bands are open for a given path.
 
 ---
 
@@ -120,6 +144,12 @@ Three real-time networks that collect automatically decoded radio signals and sh
 - **WSPR** (Weak Signal Propagation Reporter) — a dedicated weak-signal network used to map propagation
 
 HamClock-Next can pull spots from these networks to populate the DX Cluster display and map overlays.
+
+---
+
+## POTA / SOTA
+
+**POTA** is *Parks On The Air* and **SOTA** is *Summits On The Air*. These are amateur radio programs for portable operating from parks or summits. HamClock-Next uses them in the On The Air widget.
 
 ---
 
@@ -150,6 +180,12 @@ A standard format for publishing regularly updated content — such as news head
 
 ---
 
+## SDO (Solar Dynamics Observatory)
+
+A NASA solar observatory that provides the live solar images shown in the SDO widget.
+
+---
+
 ## Telnet
 
 An old-fashioned text-based connection method, like a telephone call between two computers. HamClock-Next uses telnet to connect to [DX Cluster](#dx--dx-cluster--spot) servers (such as `dxusa.net`) to receive live spot feeds.
@@ -174,12 +210,18 @@ If you change the port in WSJT-X, update the matching number in HamClock-Next's 
 
 ## VOACAP
 
-**Voice of America Coverage Analysis Program** — a propagation prediction model originally developed for shortwave broadcasting. It calculates the probability that a radio signal on a given frequency will successfully travel between two points, based on the time of day, season, solar activity, and antenna characteristics. HamClock-Next uses VOACAP data to draw its propagation overlay, showing which bands are likely open to different parts of the world from your location.
+**Voice of America Coverage Analysis Program** — a propagation prediction model originally developed for shortwave broadcasting. It estimates whether a radio signal on a given frequency is likely to travel between two points, based on time of day, season, solar activity, and antenna characteristics. HamClock-Next uses VOACAP data to draw its propagation overlay, showing which bands are likely open to different parts of the world from your location.
 
 ---
 
 ## WebAssembly (WASM)
 
-A technology that allows programs written for desktop operating systems to run inside a web browser, with no installation required. The HamClock-Next browser version uses WebAssembly. It behaves identically to the desktop version — all widgets, overlays, and configuration work the same way.
+A technology that lets programs written for desktop operating systems run inside a web browser, with no installation required. The HamClock-Next browser version uses WebAssembly. It behaves like the desktop version — all widgets, overlays, and configuration work the same way.
 
 You may see "WASM" used as a shorthand for WebAssembly in technical discussions and release notes.
+
+---
+
+## WSJT-X
+
+A popular digital-mode program used by amateur radio operators. HamClock-Next can use WSJT-X as a source of DX Cluster spots.

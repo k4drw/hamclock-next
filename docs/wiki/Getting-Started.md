@@ -1,6 +1,6 @@
 # Getting Started
 
-This page covers installing HamClock-Next on your system and completing initial setup.
+This page covers installing HamClock-Next and completing the first setup.
 
 > **Developers and advanced users:** For build-from-source instructions, see [Building from Source](Building-from-Source.md).
 
@@ -23,7 +23,7 @@ hamclock-next_<version>_<variant>_<arch>.deb
 hamclock-next-<version>-<variant>.<arch>.rpm
 ```
 
-**Architecture (`<arch>`)** — which CPU your machine has:
+**Architecture (`<arch>`)** - which kind of processor your machine has:
 
 | If `uname -m` prints… | Download the… | Typical hardware |
 |---|---|---|
@@ -36,14 +36,14 @@ Not sure? Open a terminal and run:
 uname -m
 ```
 
-**Build variant (`<variant>`)** — how the app talks to your display:
+**Build variant (`<variant>`)** - how the app talks to your display:
 
 | Variant | Use when… |
 |---|---|
-| `unified` | Your system has a graphical desktop (X11 or Wayland) *or* you want the flexibility to run on the console later — this build works in both environments |
-| `fb0` | Your Pi boots straight to a text prompt with no desktop, and you want HamClock-Next to start automatically on boot (includes a systemd service that handles this) |
+| `unified` | Use this if you have a normal desktop or want one package that also works on the console later |
+| `fb0` | Use this if your Pi boots straight to a text prompt and you want HamClock-Next to start automatically |
 
-**When in doubt, choose `unified`.** It works everywhere.
+**When in doubt, choose `unified`.** It is the easiest option.
 
 ---
 
@@ -63,15 +63,15 @@ hamclock-next
 
 ---
 
-**Step 3 — Raspberry Pi console mode**
+**Step 3 - Raspberry Pi console mode**
 
-If your Pi boots to the command line (no graphical desktop), tell SDL2 to draw directly to the screen:
+If your Pi boots to the command line with no desktop, tell HamClock-Next to draw directly to the screen:
 
 ```bash
 SDL_VIDEODRIVER=kmsdrm hamclock-next --fullscreen
 ```
 
-> `SDL_VIDEODRIVER=kmsdrm` bypasses X11 and Wayland and writes directly to the display hardware. Required when there is no window manager running.
+> `SDL_VIDEODRIVER=kmsdrm` tells the program to draw straight to the screen instead of using a desktop window system.
 
 If you installed the `fb0` package, a systemd service handles this automatically — HamClock-Next starts on boot with no extra configuration needed.
 
@@ -91,9 +91,9 @@ Launch HamClock-Next with the `--live-web` flag, then open `http://localhost:808
 
 ## First Launch
 
-On first launch, the application opens directly to the **Setup screen** where you enter your station information.
+On first launch, the app opens the **Setup screen** so you can enter your station information.
 
-If the Setup screen doesn't appear, click the **gear icon (⚙)** in the top-left corner of the Time Panel at any time.
+If the Setup screen does not appear, click the **gear icon (⚙)** in the top-left corner of the Time Panel.
 
 ---
 
@@ -106,13 +106,13 @@ Fill in these fields on the **Identity** tab:
 | Field | Description |
 |-------|-------------|
 | **Callsign** | Your amateur radio callsign (e.g., `W1AW`) |
-| **Grid** | Your Maidenhead grid locator (e.g., `FN31`) |
+| **Grid** | Your [Maidenhead grid locator](Glossary.md#maidenhead-grid-square) (e.g., `FN31`) |
 | **Latitude** | Decimal degrees — auto-filled if you entered a grid locator |
 | **Longitude** | Decimal degrees — auto-filled if you entered a grid locator |
 
-After saving, HamClock-Next starts fetching data and displays the main dashboard.
+After saving, HamClock-Next starts fetching data and shows the main dashboard.
 
-**Why this matters:** Your callsign and location are used by weather widgets, the ONTA distance filter, the Marine tide widget, the Moon and Asteroid trackers, and propagation overlays. Set them first and everything else falls into place.
+**Why this matters:** Your callsign and location are used by weather widgets, distance filters, tide and tracking widgets, and propagation overlays.
 
 ---
 
@@ -120,11 +120,11 @@ After saving, HamClock-Next starts fetching data and displays the main dashboard
 
 Once the dashboard is running:
 
-1. **Time Panel** (top-left) — shows UTC or local time, your callsign and grid, sunrise/sunset. Click the **gear icon** to reopen Setup.
-2. **Six panes** — the dashboard is divided into six rotatable panes, each cycling through one or more widgets.
-3. **Map** — the large center area shows the world map with configurable overlays.
-4. **Click the top strip of any pane** — opens the widget picker so you can choose what that pane displays.
-5. **Press K** — highlights every interactive region on screen with cyan boxes and tooltips.
+1. **Time Panel** (top-left) - shows UTC or local time, your callsign and grid, and sunrise/sunset. Click the **gear icon** to reopen Setup.
+2. **Six panes** - the dashboard is divided into six areas, and each one can show one or more widgets.
+3. **Map** - the large center area shows the world map with optional overlays.
+4. **Click the top strip of any pane** - opens the widget picker for that pane.
+5. **Press K** - highlights every clickable region on screen.
 
 See [Screen Layout](Layout.md) for a detailed annotated diagram.
 
