@@ -20,22 +20,10 @@ echo "Cleaning old build artifacts..."
 rm -rf "$BUILD_DIR"
 mkdir -p "$BUILD_DIR"
 
-# Common cmake flags (everything except HAMCLOCK_BUILD_VARIANT)
-COMMON_FLAGS="
-    -DCMAKE_BUILD_TYPE=Release
-    -DENABLE_DEBUG_API=OFF
-    -DCURL_DISABLE_INSTALL=ON
-    -DSDL_STATIC=ON
-    -DSDL_SHARED=OFF
-    -DSDL_X11=ON
-    -DSDL_X11_DYNAMIC=libX11.so.6
-    -DSDL_WAYLAND=ON
-    -DSDL_WAYLAND_DYNAMIC=libwayland-client.so.0
-    -DSDL_KMSDRM=ON
-    -DSDL_GLES=ON
-    -DSDL2IMAGE_VENDORED=ON
-    -DSDL2IMAGE_SAMPLES=OFF
-    -DHAMCLOCK_INSTALL_TYPE=DEB"
+# Common cmake flags (everything except HAMCLOCK_BUILD_VARIANT).
+# Must be a single line — expanded inside docker bash -c "...", newlines would
+# be treated as command separators, not line continuations.
+COMMON_FLAGS="-DCMAKE_BUILD_TYPE=Release -DENABLE_DEBUG_API=OFF -DCURL_DISABLE_INSTALL=ON -DSDL_STATIC=ON -DSDL_SHARED=OFF -DSDL_X11=ON -DSDL_X11_DYNAMIC=libX11.so.6 -DSDL_WAYLAND=ON -DSDL_WAYLAND_DYNAMIC=libwayland-client.so.0 -DSDL_KMSDRM=ON -DSDL_GLES=ON -DSDL2IMAGE_VENDORED=ON -DSDL2IMAGE_SAMPLES=OFF -DHAMCLOCK_INSTALL_TYPE=DEB"
 
 echo "Starting Linux x64 DEB Build (v${VERSION}) — unified + fb0 variants..."
 

@@ -55,6 +55,7 @@ models, satellite tracking, and more.
 
 %build
 %cmake \
+    -DHAMCLOCK_INSTALL_TYPE=RPM \
     -DENABLE_DEBUG_API=OFF \
     -DBUILD_SHARED_LIBS=OFF \
     -DCURL_DISABLE_INSTALL=ON \

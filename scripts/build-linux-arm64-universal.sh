@@ -20,32 +20,10 @@ echo "Cleaning old build artifacts..."
 rm -rf "$BUILD_DIR"
 mkdir -p "$BUILD_DIR"
 
-# Common cmake flags shared by both variants
-COMMON_FLAGS="
-    -DCMAKE_SYSTEM_NAME=Linux
-    -DCMAKE_SYSTEM_PROCESSOR=aarch64
-    -DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc
-    -DCMAKE_CXX_COMPILER=aarch64-linux-gnu-g++
-    -DCMAKE_BUILD_TYPE=Release
-    -DENABLE_DEBUG_API=OFF
-    -DBUILD_SHARED_LIBS=OFF
-    -DCURL_DISABLE_INSTALL=ON
-    -DSDL_STATIC=ON
-    -DSDL_SHARED=OFF
-    -DSDL_X11=ON
-    -DSDL_X11_DYNAMIC=libX11.so.6
-    -DSDL_WAYLAND=ON
-    -DSDL_WAYLAND_DYNAMIC=libwayland-client.so.0
-    -DSDL_KMSDRM=ON
-    -DSDL_OPENGL=OFF
-    -DSDL_GLES=ON
-    -DSDL2IMAGE_VENDORED=ON
-    -DSDL2IMAGE_SAMPLES=OFF
-    -DSDL2IMAGE_WEBP=OFF
-    -DSDL2IMAGE_TIF=OFF
-    -DSDL2IMAGE_JXL=OFF
-    -DSDL2IMAGE_AVIF=OFF
-    -DHAMCLOCK_INSTALL_TYPE=DEB"
+# Common cmake flags shared by both variants.
+# Must be a single line — expanded inside docker bash -c "...", newlines would
+# be treated as command separators, not line continuations.
+COMMON_FLAGS="-DCMAKE_SYSTEM_NAME=Linux -DCMAKE_SYSTEM_PROCESSOR=aarch64 -DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc -DCMAKE_CXX_COMPILER=aarch64-linux-gnu-g++ -DCMAKE_BUILD_TYPE=Release -DENABLE_DEBUG_API=OFF -DBUILD_SHARED_LIBS=OFF -DCURL_DISABLE_INSTALL=ON -DSDL_STATIC=ON -DSDL_SHARED=OFF -DSDL_X11=ON -DSDL_X11_DYNAMIC=libX11.so.6 -DSDL_WAYLAND=ON -DSDL_WAYLAND_DYNAMIC=libwayland-client.so.0 -DSDL_KMSDRM=ON -DSDL_OPENGL=OFF -DSDL_GLES=ON -DSDL2IMAGE_VENDORED=ON -DSDL2IMAGE_SAMPLES=OFF -DSDL2IMAGE_WEBP=OFF -DSDL2IMAGE_TIF=OFF -DSDL2IMAGE_JXL=OFF -DSDL2IMAGE_AVIF=OFF -DHAMCLOCK_INSTALL_TYPE=DEB"
 
 echo "Starting ARM64 DEB Build — unified + fb0 variants..."
 
