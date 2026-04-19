@@ -920,7 +920,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
       auto *dxcPanel = dynamic_cast<DXClusterPanel *>(widgetPool[type].get());
       if (dxcPanel) {
         dxcPanel->setOnSpotActivated(
-            [state, activityStore](const DXClusterSpot &spot) {
+            [state, activityStore, &appCfg](const DXClusterSpot &spot) {
               state->dxCallsign = spot.txCall;
               state->dxLocation = {spot.txLat, spot.txLon};
               state->dxGrid = spot.txGrid;
@@ -929,6 +929,17 @@ DashboardContext::DashboardContext(AppContext &ctx)
               auto ad = activityStore->get();
               ad.hasSelection = false;
               activityStore->set(ad);
+              if (appCfg.propOverlay != PropOverlayType::None) {
+                int bi = freqToBandIndex(spot.freqKhz);
+                if (bi >= 0) {
+                  static constexpr const char *kPropBands[] = {
+                      "80m","60m","40m","30m","20m","17m","15m","12m","10m","6m"
+                  };
+                  const std::string &name = kBands[bi].name;
+                  for (auto *b : kPropBands)
+                    if (name == b) { appCfg.propBand = name; break; }
+                }
+              }
             });
         dxcPanel->setOnSpotDeactivated([state]() {
           if (state->mapDxActive) {
