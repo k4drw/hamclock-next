@@ -150,14 +150,16 @@ When `mapNightLights` is enabled (default: on), the nightside of the map shows c
 ## Theme Gallery
 
 <!-- BEGIN THEME GALLERY -->
-| | |
-|---|---|
-| **Amber**<br>![amber](images/themes/amber.png) | **Dark**<br>![dark](images/themes/dark.png) |
-| | |
-|---|---|
-| **Glass**<br>![glass](images/themes/glass.png) | **Matrix**<br>![matrix](images/themes/matrix.png) |
-| | |
-|---|---|
-| **Midnight**<br>![midnight](images/themes/midnight.png) | **Paper**<br>![paper](images/themes/paper.png) |
+| Amber                                    | Dark                                    |
+|------------------------------------------|-----------------------------------------|
+| ![amber](images/themes/amber.png)        | ![dark](images/themes/dark.png)         |
+
+| Glass                                    | Matrix                                  |
+|------------------------------------------|-----------------------------------------|
+| ![glass](images/themes/glass.png)        | ![matrix](images/themes/matrix.png)     |
+
+| Midnight                                 | Paper                                   |
+|------------------------------------------|-----------------------------------------|
+| ![midnight](images/themes/midnight.png)  | ![paper](images/themes/paper.png)       |
 
 <!-- END THEME GALLERY -->

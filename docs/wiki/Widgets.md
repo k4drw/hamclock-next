@@ -115,7 +115,7 @@ To add a widget to a pane, click the **top strip** of the pane to open the widge
 ## Tracking
 
 | Widget            | Description                                                                                                                                                   | Data Source                 |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------- |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------- |
 | **Satellite**     | Next-pass predictions for selected satellites with AOS/LOS time and max elevation                                                                             | SGP4 / TLE data             |
 | **Moon**          | Moon phase, rise/set times, azimuth/elevation, distance, and EME Doppler shift                                                                                | Astronomical calculation    |
 | **Gimbal**        | Antenna rotator position display (requires Hamlib rotctld)                                                                                                    | Hamlib rotctld              |

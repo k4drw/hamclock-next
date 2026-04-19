@@ -101,7 +101,7 @@ The original On The Air widget showed all POTA and SOTA activations together wit
 | Fixed rotation interval                  | User-configurable rotation interval (default 30 s)                      |
 | No manual pane advance                   | Left/right arrows advance pane immediately, reset timer                 |
 | Binary/EEPROM config                     | JSON configuration file                                                 |
-| X11 / framebuffer rendering              | SDL2 (native + WASM browser), X11/framebuffer/Windows/Mac/iOS           |
+| X11 / framebuffer rendering              | SDL2 (native + WASM browser), X11/framebuffer/Windows/Mac/iOS/Android   |
 | Live Spots band filter in config menu    | Band filter toggled by clicking bands directly in the widget            |
 | No presets                               | Presets modal (★ button) — widget + map groups                          |
 

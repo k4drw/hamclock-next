@@ -85,7 +85,7 @@ Side panel mode is selectable from Setup → Widgets, or by clicking the title b
 The following widgets have no equivalent in the original HamClock:
 
 | Widget            | Description                                                                                                                                                                                    |
-| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Asteroid**      | Lists the next 5 close Earth approaches from the JPL Small Solar System Bodies Database                                                                                                        |
 | **Ionosonde**     | Live ionospheric sounding data from a remote ionosonde network                                                                                                                                 |
 | **Lightning**     | Real-time lightning strike activity map (Blitzortung)                                                                                                                                          |

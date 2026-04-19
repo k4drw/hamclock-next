@@ -117,6 +117,7 @@ fi
 # ── Preamble for line-breaking and microtype ──────────────────────────────────
 HEADER_FILE="/tmp/hc-manual-header.tex"
 cat <<EOF > "$HEADER_FILE"
+\usepackage{float}
 \usepackage{microtype}
 \sloppy
 % Widen TOC number columns for multi-digit section/subsection numbers
@@ -223,6 +224,8 @@ PANDOC_ARGS=(
   --metadata lang="en-US"
   --pdf-engine="$PDF_ENGINE"
   --lua-filter="$SCRIPT_DIR/fix-wiki-links.lua"
+  --lua-filter="$SCRIPT_DIR/fix-image-widths.lua"
+  --lua-filter="$SCRIPT_DIR/clearpage-chapters.lua"
   --include-in-header="$HEADER_FILE"
   --resource-path="$WIKI:$WIKI/images"
   --toc
@@ -232,6 +235,7 @@ PANDOC_ARGS=(
   -V colorlinks=true
   -V linkcolor=blue
   -V urlcolor=blue
+  -V fig-pos=H
 )
 
 if [[ -n "$MAIN_FONT" ]]; then
