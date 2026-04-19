@@ -956,7 +956,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
     } else if (type == "on_the_air") {
       auto *ontaPanel = dynamic_cast<ONTAPanel *>(widgetPool[type].get());
       if (ontaPanel) {
-        ontaPanel->setOnSpotActivated([state, dxcStore](const ONTASpot &spot) {
+        ontaPanel->setOnSpotActivated([state, dxcStore, &appCfg](const ONTASpot &spot) {
           state->dxCallsign = spot.call;
           state->dxLocation = {spot.lat, spot.lon};
           state->dxGrid = (spot.lat != 0.0 || spot.lon != 0.0)
@@ -965,6 +965,17 @@ DashboardContext::DashboardContext(AppContext &ctx)
           state->dxFreqKhz = spot.freqKhz;
           state->dxActive = (spot.lat != 0.0 || spot.lon != 0.0);
           dxcStore->clearSelection();
+          if (appCfg.propOverlay != PropOverlayType::None) {
+            int bi = freqToBandIndex(spot.freqKhz);
+            if (bi >= 0) {
+              static constexpr const char *kPropBands[] = {
+                  "80m","60m","40m","30m","20m","17m","15m","12m","10m","6m"
+              };
+              const std::string &name = kBands[bi].name;
+              for (auto *b : kPropBands)
+                if (name == b) { appCfg.propBand = name; break; }
+            }
+          }
         });
         ontaPanel->setOnSpotDeactivated([state]() {
           if (state->mapDxActive) {
