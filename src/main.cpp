@@ -77,7 +77,6 @@
 #include "ui/CountdownPanel.h"
 #include "ui/DRAPPanel.h"
 #include "ui/DXClusterPanel.h"
-#include "ui/DXClusterSetup.h"
 #include "ui/DXInfo.h"
 #include "ui/DebugOverlay.h"
 #include "ui/DstPanel.h"
@@ -756,11 +755,6 @@ void main_tick() {
         if (ctx.updateChecker)
           s->setUpdateChecker(ctx.updateChecker.get());
         ctx.setupWidget = std::move(s);
-      } else if (ctx.activeSetup == AppContext::SetupMode::DXCluster) {
-        auto s = std::make_unique<DXClusterSetup>(setupX, setupY, setupW,
-                                                  setupH, *ctx.setupFontMgr);
-        s->setConfig(ctx.appCfg);
-        ctx.setupWidget = std::move(s);
       }
 #ifndef __ANDROID__
       SDL_StartTextInput();
@@ -906,9 +900,6 @@ void main_tick() {
     if (ctx.activeSetup == AppContext::SetupMode::Main) {
       if (static_cast<SetupScreen *>(ctx.setupWidget.get())->isComplete())
         setupDone = true;
-    } else if (ctx.activeSetup == AppContext::SetupMode::DXCluster) {
-      if (static_cast<DXClusterSetup *>(ctx.setupWidget.get())->isComplete())
-        setupDone = true;
     }
 
     if (setupDone) {
@@ -930,10 +921,6 @@ void main_tick() {
           for (const auto &c : ctx.appCfg.watchlist)
             ctx.watchlistStore->add(c);
         }
-      } else if (ctx.activeSetup == AppContext::SetupMode::DXCluster) {
-        if (static_cast<DXClusterSetup *>(ctx.setupWidget.get())->isSaved())
-          ctx.appCfg = static_cast<DXClusterSetup *>(ctx.setupWidget.get())
-                           ->updateConfig(ctx.appCfg);
       }
       ctx.cfgMgr.save(ctx.appCfg);
       if (ctx.dashboard && ctx.dashboard->spotProvider)

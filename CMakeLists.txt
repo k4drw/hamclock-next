@@ -623,7 +623,6 @@ set(HAMCLOCK_SOURCES
     src/ui/KIndexAlertPanel.cpp
     src/ui/SFITrendPanel.cpp
     src/ui/DXClusterPanel.cpp
-    src/ui/DXClusterSetup.cpp
     src/ui/BandConditionsPanel.cpp
     src/ui/BeaconPanel.cpp
     src/ui/ContestPanel.cpp

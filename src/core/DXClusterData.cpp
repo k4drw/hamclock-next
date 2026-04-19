@@ -87,7 +87,7 @@ void DXClusterDataStore::addSpot(const DXClusterSpot &spot) {
 
     // 2. Prune old spots from the same copy (in-place)
     auto now = std::chrono::system_clock::now();
-    auto maxAge = std::chrono::minutes(60);
+    auto maxAge = std::chrono::minutes(maxAgeMinutes_);
     newData->spots.erase(
         std::remove_if(newData->spots.begin(), newData->spots.end(),
                        [&](const DXClusterSpot &spot_to_prune) {
@@ -157,10 +157,15 @@ void DXClusterDataStore::clear() {
   DatabaseManager::instance().exec("DELETE FROM dx_spots");
 }
 
+void DXClusterDataStore::setMaxAgeMinutes(int minutes) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  maxAgeMinutes_ = std::clamp(minutes, 10, 60);
+}
+
 void DXClusterDataStore::pruneOldSpots() {
   // Prune DB only. In-memory pruning is now done in addSpot.
   auto now = std::chrono::system_clock::now();
-  auto maxAge = std::chrono::minutes(60);
+  auto maxAge = std::chrono::minutes(maxAgeMinutes_);
 
   int64_t cutoffTs = std::chrono::duration_cast<std::chrono::seconds>(
                          (now - maxAge).time_since_epoch())

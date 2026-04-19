@@ -81,6 +81,7 @@ void DXClusterProvider::start(const AppConfig &config) {
     stop();
 
   config_ = config;
+  store_->setMaxAgeMinutes(config_.dxClusterMaxAgeMinutes);
   if (!config_.dxClusterEnabled)
     return;
 
@@ -597,10 +598,12 @@ void DXClusterProvider::processLine(const std::string &line) {
         spot.spottedAt = std::chrono::system_clock::now(); // Default to now if
                                                            // time parsing fails
 
-        // Extract time if possible (fixed position in standard cluster output)
-        if (line.length() >= 74 && line[74] == 'Z') {
+        // Extract time: find trailing HHMMZ anywhere in the line
+        size_t z_pos = line.rfind('Z');
+        if (z_pos != std::string::npos && z_pos >= 4) {
           int hr, mn;
-          if (sscanf(line.c_str() + 70, "%2d%2d", &hr, &mn) == 2) {
+          if (sscanf(line.c_str() + z_pos - 4, "%2d%2d", &hr, &mn) == 2 &&
+              hr >= 0 && hr <= 23 && mn >= 0 && mn <= 59) {
             auto now = std::chrono::system_clock::now();
             std::time_t now_c = std::chrono::system_clock::to_time_t(now);
             struct tm tm_buf{};

@@ -335,7 +335,7 @@ struct AppContext {
   std::unique_ptr<LTR329Provider> ltr329Provider;
 
   // Setup State
-  enum class SetupMode { None, Loading, Main, DXCluster };
+  enum class SetupMode { None, Loading, Main };
   SetupMode activeSetup = SetupMode::None;
   std::unique_ptr<Widget> setupWidget;
   std::unique_ptr<FontManager> setupFontMgr;

@@ -422,6 +422,18 @@ bool SetupScreen::onMouseDown(int mx, int my, Uint16 mod, int clicks) {
       clusterHideDuplicates_ = !clusterHideDuplicates_;
       return true;
     }
+    {
+      static constexpr int kAgeChoices[4] = {10, 20, 40, 60};
+      for (int i = 0; i < 4; i++) {
+        if (mx >= clusterAgeRects_[i].x &&
+            mx <= clusterAgeRects_[i].x + clusterAgeRects_[i].w &&
+            my >= clusterAgeRects_[i].y &&
+            my <= clusterAgeRects_[i].y + clusterAgeRects_[i].h) {
+          clusterMaxAgeMinutes_ = kAgeChoices[i];
+          return true;
+        }
+      }
+    }
     if (mx >= rbnToggleRect_.x && mx <= rbnToggleRect_.x + rbnToggleRect_.w &&
         my >= rbnToggleRect_.y && my <= rbnToggleRect_.y + rbnToggleRect_.h) {
       rbnEnabled_ = !rbnEnabled_;

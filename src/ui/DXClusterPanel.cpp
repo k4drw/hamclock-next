@@ -185,9 +185,10 @@ void DXClusterPanel::onResize(int x, int y, int w, int h) {
 }
 
 void DXClusterPanel::render(SDL_Renderer *renderer) {
-  // Calculate legend height once so ListPanel can account for it
-  legendH_ = (height_ >= 120) ? 28 : 0;
-  this->footerH_ = legendH_;
+  // Calculate legend heights once so ListPanel can account for them
+  legendH_    = (height_ >= 120) ? 28 : 0;
+  modeFilterH_ = (height_ >= 200) ? 14 : 0;
+  this->footerH_ = legendH_ + modeFilterH_;
 
   // Base render for BG, Title, Border, Stripes, and Highlights
   ListPanel::render(renderer);
@@ -195,10 +196,15 @@ void DXClusterPanel::render(SDL_Renderer *renderer) {
   if (!fontMgr_.ready())
     return;
 
-  // Band Legend at bottom (drawn first to ensure it stays visible even if list is empty)
+  // Footer legends at bottom (drawn first so they're never obscured by spots)
+  int footerTop = y_ + height_ - 2;
   if (legendH_ > 0) {
     int dummy = contentY_;
-    renderBandLegend(renderer, dummy, y_ + height_ - 2);
+    renderBandLegend(renderer, dummy, footerTop);
+    footerTop -= legendH_;
+  }
+  if (modeFilterH_ > 0) {
+    renderModeFilter(renderer, footerTop);
   }
 
   if (visibleSpots_.empty())
@@ -386,6 +392,10 @@ void DXClusterPanel::rebuildRows(const DXClusterData &data) {
       if (freqToBandIndex(spot.freqKhz) != activeBandFilter_)
         continue;
     }
+    if (!activeModeFilter_.empty()) {
+      if (activeModeFilter_ != modeFromFreq(spot.freqKhz))
+        continue;
+    }
     std::stringstream ss;
     // Format: "14025.0 K1ABC      5m"
     ss << std::fixed << std::setprecision(1) << std::setw(8) << spot.freqKhz
@@ -442,7 +452,25 @@ bool DXClusterPanel::onMouseWheel(int scrollY) {
 }
 
 bool DXClusterPanel::onMouseUp(int mx, int my, Uint16 /*mod*/, int clicks) {
-  // Check legend clicks first
+  // Mode filter row (above band legend)
+  if (modeFilterH_ > 0) {
+    int modeY = y_ + height_ - 2 - legendH_ - modeFilterH_;
+    if (my >= modeY && my < modeY + modeFilterH_) {
+      static const char *kModes[] = {"CW", "SSB", "FT8", "FT4", "RTTY", "WSPR"};
+      int cols = 6;
+      int cellW = (width_ - 4) / cols;
+      int col = (mx - (x_ + 4)) / cellW;
+      if (col >= 0 && col < cols) {
+        const char *clicked = kModes[col];
+        activeModeFilter_ = (activeModeFilter_ == clicked) ? "" : clicked;
+        lastUpdate_ = std::chrono::system_clock::time_point{};
+        update();
+        return true;
+      }
+    }
+  }
+
+  // Check band legend clicks
   if (my >= y_ + height_ - legendH_ && legendH_ > 0) {
     int cellH = 14;
     int cols = 6;
@@ -537,6 +565,52 @@ nlohmann::json DXClusterPanel::getDebugData() const {
     j["selectedSpot"] = data->selectedSpot.txCall;
   }
   return j;
+}
+
+void DXClusterPanel::renderModeFilter(SDL_Renderer *renderer, int maxY) {
+  static const char *kModes[] = {"CW", "SSB", "FT8", "FT4", "RTTY", "WSPR"};
+  static constexpr int kNumModes = 6;
+  int cellH = modeFilterH_;
+  int rowY  = maxY - cellH;
+
+  ThemeColors themes = getThemeColors(theme_);
+
+  // Background + separator
+  SDL_Rect bg = {x_ + 1, rowY, width_ - 2, cellH};
+  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, 255);
+  SDL_RenderFillRect(renderer, &bg);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 200);
+  SDL_RenderDrawLine(renderer, x_ + 1, rowY, x_ + width_ - 1, rowY);
+
+  int cols   = kNumModes;
+  int cellW  = (width_ - 4) / cols;
+  int boxSz  = 7;
+  int midY   = rowY + cellH / 2;
+
+  for (int i = 0; i < kNumModes; ++i) {
+    const char *mode = kModes[i];
+    bool isSelected  = (activeModeFilter_ == mode);
+    bool isDimmed    = (!activeModeFilter_.empty() && !isSelected);
+    Uint8 alpha      = isDimmed ? 100 : 255;
+
+    int lx = x_ + 4 + i * cellW;
+    SDL_Color mc = modeColor(mode);
+
+    SDL_Rect box = {lx + 1, midY - boxSz / 2, boxSz, boxSz};
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+    SDL_SetRenderDrawColor(renderer, mc.r, mc.g, mc.b, alpha);
+    SDL_RenderFillRect(renderer, &box);
+    if (isSelected) {
+      SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+      SDL_Rect border = {box.x - 1, box.y - 1, box.w + 2, box.h + 2};
+      SDL_RenderDrawRect(renderer, &border);
+    }
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+
+    SDL_Color tc = {mc.r, mc.g, mc.b, alpha};
+    fontMgr_.catalog()->drawText(renderer, mode, lx + boxSz + 1, midY, tc,
+                                 FontStyle::Tiny, false, false, true);
+  }
 }
 
 void DXClusterPanel::renderBandLegend(SDL_Renderer *renderer, int & /*curY*/,

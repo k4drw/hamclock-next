@@ -107,7 +107,34 @@ void SetupScreen::renderTabDXCluster(SDL_Renderer *renderer, int cx, int pad,
   }
   cat->drawText(renderer, "Hide duplicates (one per call/band)", fieldX + 30, y + 10, themes.text,
                 FontStyle::SmallRegular, false, false, true);
-  y += 30;
+  y += 28;
+
+  // Age filter row
+  cat->drawText(renderer, "Max age:", fieldX, y + 4, themes.text, FontStyle::SmallRegular);
+  static constexpr int kAgeChoices[4] = {10, 20, 40, 60};
+  int ageRadioX = fieldX + fontMgr_.getLogicalWidth("Max age:  ", cat->ptSize(FontStyle::SmallRegular));
+  int ageR = 7;
+  int ageSpacing = fontMgr_.getLogicalWidth("  60m  ", cat->ptSize(FontStyle::SmallRegular));
+  for (int i = 0; i < 4; i++) {
+    std::string lbl = std::to_string(kAgeChoices[i]) + "m";
+    int cx_r = ageRadioX + i * ageSpacing + ageR;
+    int cy_r = y + ageR + 2;
+    bool selected = (clusterMaxAgeMinutes_ == kAgeChoices[i]);
+    SDL_Color rc = selected ? themes.success : themes.textDim;
+    SDL_Rect outerBox = {cx_r - ageR, cy_r - ageR, ageR * 2, ageR * 2};
+    SDL_SetRenderDrawColor(renderer, themes.rowStripe1.r, themes.rowStripe1.g, themes.rowStripe1.b, 255);
+    SDL_RenderFillRect(renderer, &outerBox);
+    SDL_SetRenderDrawColor(renderer, rc.r, rc.g, rc.b, 255);
+    SDL_RenderDrawRect(renderer, &outerBox);
+    if (selected) {
+      SDL_Rect inner = {cx_r - ageR + 3, cy_r - ageR + 3, (ageR - 3) * 2, (ageR - 3) * 2};
+      SDL_RenderFillRect(renderer, &inner);
+    }
+    int lblW = fontMgr_.getLogicalWidth(lbl, cat->ptSize(FontStyle::SmallRegular));
+    cat->drawText(renderer, lbl, cx_r + ageR + 3, y + 4, rc, FontStyle::SmallRegular);
+    clusterAgeRects_[i] = {cx_r - ageR, cy_r - ageR, ageR * 2 + 3 + lblW, ageR * 2};
+  }
+  y += 26;
 
   // --- RBN SECTION ---
   cat->drawText(renderer, "--- Reverse Beacon Network ---", cx, y, themes.accent,

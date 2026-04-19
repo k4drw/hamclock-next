@@ -84,7 +84,6 @@ void populateWidgetDescriptions();
 #include "ui/CountdownPanel.h"
 #include "ui/DRAPPanel.h"
 #include "ui/DXClusterPanel.h"
-#include "ui/DXClusterSetup.h"
 #include "ui/DXInfo.h"
 #include "ui/SatWidget.h"
 #include "ui/DebugOverlay.h"
@@ -2549,15 +2548,6 @@ void DashboardContext::update(AppContext &ctx) {
     timePanel->clearSetupRequest();
     ctx.activeSetup = AppContext::SetupMode::Main;
     return; // Next main_tick will switch
-  }
-
-  // Check DXCluster setup
-  DXClusterPanel *dxc =
-      dynamic_cast<DXClusterPanel *>(widgetPool["dx_cluster"].get());
-  if (dxc && dxc->isSetupRequested()) {
-    dxc->clearSetupRequest();
-    ctx.activeSetup = AppContext::SetupMode::DXCluster;
-    return;
   }
 
   // Sync predictor from standalone SatWidget if in pool

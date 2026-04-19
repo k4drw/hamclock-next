@@ -45,6 +45,7 @@ public:
   std::shared_ptr<const DXClusterData> snapshot() const;
   void addSpot(const DXClusterSpot &spot);
   void setConnected(bool connected, const std::string &status = "");
+  void setMaxAgeMinutes(int minutes);
   void clear();
 
   void setSpots(const std::vector<DXClusterSpot> &spots);
@@ -61,4 +62,5 @@ private:
 
   mutable std::mutex mutex_;
   std::shared_ptr<DXClusterData> data_;
+  int maxAgeMinutes_ = 20;
 };

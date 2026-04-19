@@ -119,6 +119,11 @@ HEADER_FILE="/tmp/hc-manual-header.tex"
 cat <<EOF > "$HEADER_FILE"
 \usepackage{microtype}
 \sloppy
+% Widen TOC number columns for multi-digit section/subsection numbers
+\usepackage{tocloft}
+\setlength{\cftsecnumwidth}{2.8em}
+\setlength{\cftsubsecnumwidth}{4.0em}
+\setlength{\cftsubsecindent}{2.8em}
 % Symbol fallback for specific wiki icons (requires Symbola font)
 \usepackage{newunicodechar}
 \usepackage{fontspec}
