@@ -27,24 +27,29 @@ void DXClusterDataStore::loadPersisted() {
 
   static const char *kSelectSql =
       "SELECT tx_call, tx_grid, rx_call, rx_grid, mode, freq_khz, snr, tx_lat, "
-      "tx_lon, rx_lat, rx_lon, spotted_at FROM dx_spots WHERE spotted_at > ?";
+      "tx_lon, rx_lat, rx_lon, spotted_at FROM dx_spots WHERE spotted_at > ? ORDER BY spotted_at ASC";
 
   db.execPrepared(kSelectSql, [cutoffTs, &newData](sqlite3_stmt *stmt) {
     sqlite3_bind_int64(stmt, 1, cutoffTs);
 
+    auto col_str = [&](int col) -> std::string {
+      const char *p = reinterpret_cast<const char *>(sqlite3_column_text(stmt, col));
+      return p ? p : "";
+    };
+
     while (sqlite3_step(stmt) == SQLITE_ROW) {
       DXClusterSpot s;
-      s.txCall = reinterpret_cast<const char *>(sqlite3_column_text(stmt, 0));
-      s.txGrid = reinterpret_cast<const char *>(sqlite3_column_text(stmt, 1));
-      s.rxCall = reinterpret_cast<const char *>(sqlite3_column_text(stmt, 2));
-      s.rxGrid = reinterpret_cast<const char *>(sqlite3_column_text(stmt, 3));
-      s.mode = reinterpret_cast<const char *>(sqlite3_column_text(stmt, 4));
+      s.txCall  = col_str(0);
+      s.txGrid  = col_str(1);
+      s.rxCall  = col_str(2);
+      s.rxGrid  = col_str(3);
+      s.mode    = col_str(4);
       s.freqKhz = sqlite3_column_double(stmt, 5);
-      s.snr = sqlite3_column_double(stmt, 6);
-      s.txLat = sqlite3_column_double(stmt, 7);
-      s.txLon = sqlite3_column_double(stmt, 8);
-      s.rxLat = sqlite3_column_double(stmt, 9);
-      s.rxLon = sqlite3_column_double(stmt, 10);
+      s.snr     = sqlite3_column_double(stmt, 6);
+      s.txLat   = sqlite3_column_double(stmt, 7);
+      s.txLon   = sqlite3_column_double(stmt, 8);
+      s.rxLat   = sqlite3_column_double(stmt, 9);
+      s.rxLon   = sqlite3_column_double(stmt, 10);
       int64_t ts = sqlite3_column_int64(stmt, 11);
       s.spottedAt =
           std::chrono::system_clock::time_point(std::chrono::seconds(ts));
@@ -160,6 +165,22 @@ void DXClusterDataStore::clear() {
 void DXClusterDataStore::setMaxAgeMinutes(int minutes) {
   std::lock_guard<std::mutex> lock(mutex_);
   maxAgeMinutes_ = std::clamp(minutes, 10, 60);
+}
+
+void DXClusterDataStore::pruneInMemory() {
+  auto now = std::chrono::system_clock::now();
+  std::lock_guard<std::mutex> lock(mutex_);
+  auto maxAge = std::chrono::minutes(maxAgeMinutes_);
+  auto newData = std::make_shared<DXClusterData>(*data_);
+  auto before = newData->spots.size();
+  newData->spots.erase(
+      std::remove_if(newData->spots.begin(), newData->spots.end(),
+                     [&](const DXClusterSpot &s) {
+                       return (now - s.spottedAt) > maxAge;
+                     }),
+      newData->spots.end());
+  if (newData->spots.size() != before)
+    data_ = newData;
 }
 
 void DXClusterDataStore::pruneOldSpots() {

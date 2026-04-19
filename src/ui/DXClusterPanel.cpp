@@ -160,7 +160,9 @@ void DXClusterPanel::update() {
       // the spots, so DXClusterData::spots is not directly indexed — compare
       // values against the reversed copy.
       auto spots = data->spots;
-      std::reverse(spots.begin(), spots.end());
+      std::sort(spots.begin(), spots.end(), [](const DXClusterSpot &a, const DXClusterSpot &b) {
+        return a.spottedAt > b.spottedAt;
+      });
       for (int i = 0; i < (int)visibleFreqs_.size(); ++i) {
         int idx = scrollOffset_ + i;
         if (idx < (int)spots.size()) {
@@ -376,7 +378,9 @@ void DXClusterPanel::rebuildRows(const DXClusterData &data) {
   allSpots_.clear();
   auto spots = data.spots;
   // Most recent first
-  std::reverse(spots.begin(), spots.end());
+  std::sort(spots.begin(), spots.end(), [](const DXClusterSpot &a, const DXClusterSpot &b) {
+    return a.spottedAt > b.spottedAt;
+  });
 
   std::set<std::pair<std::string, int>> seen;
 
@@ -422,14 +426,16 @@ SDL_Color DXClusterPanel::getRowColor(int index,
 std::string DXClusterPanel::formatAge(
     const std::chrono::system_clock::time_point &spottedAt) const {
   auto now = std::chrono::system_clock::now();
-  auto age =
-      std::chrono::duration_cast<std::chrono::minutes>(now - spottedAt).count();
+  auto secs = std::chrono::duration_cast<std::chrono::seconds>(now - spottedAt).count();
 
-  if (age < 0)
-    return "0m";
-  if (age < 60)
-    return std::to_string(age) + "m";
-  return std::to_string(age / 60) + "h";
+  if (secs < 0)
+    return "0s";
+  if (secs < 60)
+    return std::to_string(secs) + "s";
+  auto mins = secs / 60;
+  if (mins < 60)
+    return std::to_string(mins) + "m";
+  return std::to_string(mins / 60) + "h";
 }
 
 bool DXClusterPanel::onMouseWheel(int scrollY) {
@@ -502,7 +508,9 @@ bool DXClusterPanel::onMouseUp(int mx, int my, Uint16 /*mod*/, int clicks) {
 
   auto data = store_->snapshot();
   auto spots = data->spots;
-  std::reverse(spots.begin(), spots.end());
+  std::sort(spots.begin(), spots.end(), [](const DXClusterSpot &a, const DXClusterSpot &b) {
+    return a.spottedAt > b.spottedAt;
+  });
 
   if (clickedRow >= 0 && clickedRow < (int)visibleFreqs_.size()) {
     int idx = scrollOffset_ + clickedRow;

@@ -53,6 +53,10 @@ public:
   void selectSpot(const DXClusterSpot &spot);
   void clearSelection();
 
+  // Prune in-memory spots older than maxAgeMinutes — call periodically even
+  // when no new spots arrive (telnet dropped, rate-limited, etc.)
+  void pruneInMemory();
+
   // Load persisted spots from DB.
   void loadPersisted();
 
