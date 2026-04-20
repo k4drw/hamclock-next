@@ -379,7 +379,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
   rotatorService =
       std::make_unique<RotatorService>(rotatorStore, appCfg, state.get());
   rotatorService->start();
-  rigService = std::make_unique<RigService>(rigStore, appCfg, state.get());
+  rigService = std::make_unique<RigService>(rigStore, appCfg, state);
   rigService->start();
 #endif
 

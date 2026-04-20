@@ -1,0 +1,75 @@
+name: Build PDF Manual
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-manual:
+    name: Generate PDF User Manual
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install pandoc and LaTeX
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            pandoc \
+            texlive-xetex \
+            texlive-fonts-recommended \
+            texlive-latex-extra \
+            texlive-pictures \
+            fonts-dejavu \
+            fonts-freefont-ttf
+
+      - name: Extract release notes for this version
+        run: |
+          VERSION=$(cat VERSION)
+          # Extract the section for current version from CHANGELOG.md.
+          # Prints from the matching "## [vX.Y.Z]" header until the next version header.
+          awk -v ver="[${VERSION}]" '
+            /^## \[v[0-9]/ { if (found) exit; if (index($0, ver)) found=1 }
+            found { print }
+          ' CHANGELOG.md > /tmp/release-notes.md
+          if [[ ! -s /tmp/release-notes.md ]]; then
+            printf "## Release Notes\n\nSee the [full changelog](https://github.com/${{ github.repository }}/blob/master/CHANGELOG.md) for details.\n" \
+              > /tmp/release-notes.md
+          fi
+
+      - name: Generate PDF
+        run: |
+          chmod +x scripts/generate-manual.sh
+          ./scripts/generate-manual.sh \
+            HamClock-Next-Manual.pdf \
+            --cover-image="$(pwd)/packaging/icon.png" \
+            --prepend=/tmp/release-notes.md
+
+      - name: Build QuickStart PDF
+        run: |
+          cd docs/quickstart
+          pdflatex -interaction=nonstopmode HamClock-Next-QuickStart.tex
+          cp HamClock-Next-QuickStart.pdf ../../HamClock-Next-QuickStart.pdf
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: hamclock-pdfs
+          path: |
+            HamClock-Next-Manual.pdf
+            HamClock-Next-QuickStart.pdf
+
+      - name: Attach to GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/v')
+        with:
+          files: |
+            HamClock-Next-Manual.pdf
+            HamClock-Next-QuickStart.pdf

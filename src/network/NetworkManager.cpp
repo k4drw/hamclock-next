@@ -243,23 +243,26 @@ void NetworkManager::fetchAsync(const std::string &url,
   attr.requestMethod[sizeof(attr.requestMethod) - 1] = '\0';
   attr.attributes = EMSCRIPTEN_FETCH_LOAD_TO_MEMORY;
 
-  // Capture callback in a heap-allocated wrapper
+  // Capture callback in a heap-allocated wrapper. Ownership is handed to
+  // emscripten via attr.userData and reclaimed as a unique_ptr at the top of
+  // whichever callback fires, so an early return (or an added throw site)
+  // still frees it.
   struct FetchCtx {
     NetworkManager *mgr;
     std::string url;
     std::function<void(std::string)> cb;
   };
-  auto *ctx = new FetchCtx{this, url, std::move(safeCallback)};
-  attr.userData = ctx;
+  auto ctx = std::make_unique<FetchCtx>(
+      FetchCtx{this, url, std::move(safeCallback)});
 
   attr.onsuccess = [](emscripten_fetch_t *fetch) {
-    auto *ctx = static_cast<FetchCtx *>(fetch->userData);
+    std::unique_ptr<FetchCtx> owned(static_cast<FetchCtx *>(fetch->userData));
     if (fetch->data && fetch->numBytes > 0) {
       std::string response(fetch->data, fetch->numBytes);
 
       // Update in-memory cache
       {
-        std::lock_guard<std::mutex> lock(ctx->mgr->cacheMutex_);
+        std::lock_guard<std::mutex> lock(owned->mgr->cacheMutex_);
         CacheEntry entry;
         entry.timestamp = std::time(nullptr);
         // We don't have header headers easily in simple fetch on WASM,
@@ -267,25 +270,24 @@ void NetworkManager::fetchAsync(const std::string &url,
         if (response.size() < 512 * 1024) {
           entry.data = response;
         }
-        ctx->mgr->cache_[ctx->url] = entry;
+        owned->mgr->cache_[owned->url] = entry;
       }
 
-      ctx->cb(std::move(response));
+      owned->cb(std::move(response));
     } else {
-      ctx->cb("");
+      owned->cb("");
     }
-    delete ctx;
     emscripten_fetch_close(fetch);
   };
   attr.onerror = [](emscripten_fetch_t *fetch) {
-    auto *ctx = static_cast<FetchCtx *>(fetch->userData);
-    LOG_E("NetworkManager", "WASM fetch failed for {} (status {})", ctx->url,
+    std::unique_ptr<FetchCtx> owned(static_cast<FetchCtx *>(fetch->userData));
+    LOG_E("NetworkManager", "WASM fetch failed for {} (status {})", owned->url,
           fetch->status);
-    ctx->cb(""); // empty string = failure
-    delete ctx;
+    owned->cb(""); // empty string = failure
     emscripten_fetch_close(fetch);
   };
 
+  attr.userData = ctx.release();
   emscripten_fetch(&attr, fetchUrl.c_str());
 #else
   // --- Hub client proxy ---

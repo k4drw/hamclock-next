@@ -15,8 +15,9 @@
 #include <thread>
 
 RigService::RigService(std::shared_ptr<RigDataStore> store,
-                       const AppConfig &config, HamClockState *state)
-    : store_(std::move(store)), config_(config), state_(state) {}
+                       const AppConfig &config,
+                       std::weak_ptr<HamClockState> state)
+    : store_(std::move(store)), config_(config), state_(std::move(state)) {}
 
 RigService::~RigService() { stop(); }
 
@@ -245,19 +246,19 @@ void RigService::commandWorker() {
     LOG_I("Rig", "Connected to rigctld");
     connected_ = true;
     store_->setConnected(true);
-    if (state_) {
-      std::lock_guard<std::mutex> lk(state_->servicesMutex);
-      state_->services["Rig"].ok = true;
-      state_->services["Rig"].lastError = "";
+    if (auto s = state_.lock()) {
+      std::lock_guard<std::mutex> lk(s->servicesMutex);
+      s->services["Rig"].ok = true;
+      s->services["Rig"].lastError = "";
     }
   } else {
     LOG_W("Rig", "Initial connection failed");
     connected_ = false;
     store_->setConnected(false);
-    if (state_) {
-      std::lock_guard<std::mutex> lk(state_->servicesMutex);
-      state_->services["Rig"].ok = false;
-      state_->services["Rig"].lastError = "Connection failed";
+    if (auto s = state_.lock()) {
+      std::lock_guard<std::mutex> lk(s->servicesMutex);
+      s->services["Rig"].ok = false;
+      s->services["Rig"].lastError = "Connection failed";
     }
   }
 
@@ -297,10 +298,10 @@ void RigService::commandWorker() {
         connected_ = true;
         store_->setConnected(true);
         spectrumProbed_ = false;
-        if (state_) {
-          std::lock_guard<std::mutex> lk(state_->servicesMutex);
-          state_->services["Rig"].ok = true;
-          state_->services["Rig"].lastError = "";
+        if (auto s = state_.lock()) {
+          std::lock_guard<std::mutex> lk(s->servicesMutex);
+          s->services["Rig"].ok = true;
+          s->services["Rig"].lastError = "";
         }
       } else {
         LOG_E("Rig", "Reconnection failed, dropping command");
@@ -387,10 +388,10 @@ void RigService::commandWorker() {
       disconnectFromRig();
       connected_ = false;
       store_->setConnected(false);
-      if (state_) {
-        std::lock_guard<std::mutex> lk(state_->servicesMutex);
-        state_->services["Rig"].ok = false;
-        state_->services["Rig"].lastError = "Command execution failed";
+      if (auto s = state_.lock()) {
+        std::lock_guard<std::mutex> lk(s->servicesMutex);
+        s->services["Rig"].ok = false;
+        s->services["Rig"].lastError = "Command execution failed";
       }
     }
 
