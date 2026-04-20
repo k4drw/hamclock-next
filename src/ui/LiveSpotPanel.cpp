@@ -413,6 +413,7 @@ bool LiveSpotPanel::onMouseUp(int mx, int my, Uint16 /*mod*/, int clicks) {
   // Persist the change
   config_.liveSpotsBands = store_->getSelectedBandsMask();
   cfgMgr_.save(config_);
+  if (onBandSelected_) onBandSelected_(bandIdx);
   return true;
 }
 
@@ -550,6 +551,7 @@ bool LiveSpotPanel::performAction(const std::string &action) {
         }
         config_.liveSpotsBands = store_->getSelectedBandsMask();
         cfgMgr_.save(config_);
+        if (onBandSelected_) onBandSelected_(idx);
         return true;
       }
     } catch (...) {

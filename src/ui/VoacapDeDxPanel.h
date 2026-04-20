@@ -38,8 +38,8 @@ private:
   std::shared_ptr<IonosondeProvider> ionoProvider_;
   AppConfig &config_;
 
-  // 24 UTC hours x 8 bands (80, 40, 30, 20, 17, 15, 12, 10m)
-  float relMatrix_[24][8];
+  // 24 UTC hours x 9 bands (80, 40, 30, 20, 17, 15, 12, 10, 6m)
+  float relMatrix_[24][9];
   bool hasTarget_ = false;
 
   // Caching to avoid recalculating unnecessarily
@@ -56,6 +56,6 @@ private:
 
   void recalculateMatrix();
 
-  static constexpr double BANDS_MHZ[8] = {3.5, 7.0, 10.1, 14.0, 18.1, 21.0, 24.9, 28.0};
-  static constexpr const char* BANDS_STR[8] = {"80m", "40m", "30m", "20m", "17m", "15m", "12m", "10m"};
+  static constexpr double BANDS_MHZ[9] = {3.5, 7.0, 10.1, 14.0, 18.1, 21.0, 24.9, 28.0, 50.1};
+  static constexpr const char* BANDS_STR[9] = {"80m", "40m", "30m", "20m", "17m", "15m", "12m", "10m", "6m"};
 };

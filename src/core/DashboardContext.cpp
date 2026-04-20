@@ -989,6 +989,16 @@ DashboardContext::DashboardContext(AppContext &ctx)
           state->dxFreqKhz = 0.0;
         });
       }
+    } else if (type == "live_spots") {
+      auto *lsPanel = dynamic_cast<LiveSpotPanel *>(widgetPool[type].get());
+      if (lsPanel) {
+        lsPanel->setOnBandSelected([state](int bandIdx) {
+          if (bandIdx < 0 || bandIdx >= kNumBands)
+            return;
+          state->dxFreqKhz =
+              (kBands[bandIdx].minKhz + kBands[bandIdx].maxKhz) / 2.0;
+        });
+      }
     }
 
     if (widgetPool[type]) {
