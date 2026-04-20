@@ -748,12 +748,14 @@ void main_tick() {
           s->setStartTab(SetupScreen::Tab::Services);
           ctx.startOnServicesTab = false;
         }
+#ifndef __EMSCRIPTEN__
         if (ctx.webServer && ctx.webServer->isLiveWebEnabled()) {
           std::string url = "Live Web Control: http://" + NetworkManager::getLocalIP() + ":" + std::to_string(HamClock::DEFAULT_WEB_SERVER_PORT);
           s->setLiveWebUrl(url);
         }
         if (ctx.updateChecker)
           s->setUpdateChecker(ctx.updateChecker.get());
+#endif
         ctx.setupWidget = std::move(s);
       }
 #ifndef __ANDROID__
@@ -1122,6 +1124,7 @@ void main_tick() {
     // onResize() which may call SDL_DestroyTexture (e.g. DXClusterPanel).
     // Drain the entire queue each frame — rapid-fire API calls (e.g. resetting
     // all 6 panes at once) must all land, not collapse to the last one.
+#ifndef __EMSCRIPTEN__
     if (ctx.webServer && ctx.dashboard) {
       auto cmds = ctx.webServer->drainPendingPaneSets();
       const int intS  = ctx.appCfg.rotationIntervalS;
@@ -1148,6 +1151,7 @@ void main_tick() {
         }
       }
     }
+#endif // __EMSCRIPTEN__
 
     // Always call update() — this processes SDL events and keeps interaction
     // responsive. Only render() is throttled.

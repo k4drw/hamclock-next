@@ -1,3 +1,5 @@
+#ifndef __EMSCRIPTEN__
+
 #include "UpdateChecker.h"
 #include "../core/Logger.h"
 #include "../network/NetworkManager.h"
@@ -334,3 +336,5 @@ void UpdateChecker::startDownload() {
     }
   }).detach();
 }
+
+#endif // __EMSCRIPTEN__
