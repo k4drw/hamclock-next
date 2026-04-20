@@ -269,6 +269,45 @@ Spoken alerts fire for:
 
 ---
 
+## ADIF Log
+
+The ADIF Log tile shows a scrollable list of your recent QSOs and a summary of your log (total contacts, bands worked, entities confirmed).
+
+It works as soon as you load a log file. There are two ways to do that:
+
+**Option 1 — REST API (recommended for automation):**
+```
+POST /set_adif
+```
+Send your ADIF file as the request body. For example, using curl:
+```bash
+curl -X POST --data-binary @yourlog.adi http://localhost:8080/set_adif
+```
+
+**Option 2 — Direct file placement:**
+Copy your ADIF file to `~/.config/hamclock-next/log.adi` (Linux/Raspberry Pi) or the equivalent config folder on your platform, then restart the app.
+
+Once a log is loaded, **DXCC award tracking** activates for the DX Cluster tile as well — spots for new entities or unconfirmed bands will show N/B/W badges automatically. See [DX Cluster](#dx-cluster) above.
+
+**Filtering inside the tile:** Click the band or mode label in the tile header to filter the log view to that band or mode. Click again to cycle through options.
+
+---
+
+## Winlink
+
+The Winlink tile shows nearby [Winlink](Glossary.md#winlink) gateway stations — useful for checking which digital relay nodes are reachable from your location.
+
+**Requirements:** You need a free Winlink API key. Register at `winlink.org` and note your access key.
+
+**Setting it up:**
+1. Open Setup → **Services** tab.
+2. Enter your Winlink API key in the **Winlink Key** field.
+3. Save.
+
+The Winlink tile now becomes available in the widget picker. Once added to a pane, it queries for gateways near your home location automatically.
+
+---
+
 ## Map Navigation
 
 - **Zoom**: Use the **mouse wheel** to zoom in (up to 10x) and out.

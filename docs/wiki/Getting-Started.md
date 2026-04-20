@@ -95,6 +95,12 @@ On first launch, the app opens the **Setup screen** so you can enter your statio
 
 If the Setup screen does not appear, click the **gear icon (⚙)** in the top-left corner of the Time Panel.
 
+The Setup screen shows the **Live Web URL** where you can access HamClock-Next from a browser on another device. For example: `http://192.168.1.xxx:8080/live`. This makes it easy to set up remote control without looking up your IP address manually.
+
+### PDF Manual
+
+A printable PDF manual is available with each release on GitHub: `HamClock-Next-Manual.pdf`. It includes all the documentation in a single downloadable file. Find it on the [Releases](https://github.com/k4drw/hamclock-next/releases) page.
+
 ---
 
 ## Initial Setup
@@ -127,6 +133,18 @@ Once the dashboard is running:
 5. **Press K** - highlights every clickable region on screen.
 
 See [Screen Layout](Layout.md) for a detailed annotated diagram.
+
+---
+
+## Keeping HamClock-Next Up to Date
+
+HamClock-Next checks for updates automatically at startup. When a newer version is available, a notification appears on screen. You have three choices:
+
+- **Update** — downloads the new package in the background. When it finishes, you can install it with the same `dpkg -i` or `rpm -i` command you used the first time.
+- **Not Now** — dismisses the notification until next launch.
+- **Skip** — suppresses the reminder for that specific version.
+
+To check for updates manually at any time, open Setup → **Updates** tab.
 
 ---
 

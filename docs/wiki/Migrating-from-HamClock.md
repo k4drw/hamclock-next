@@ -114,10 +114,24 @@ If you find a feature gap, please open an issue on the project repository.
 
 ---
 
+## First Launch — Automatic Settings Import
+
+If you have used the original HamClock on the same machine, HamClock-Next can import your settings automatically on first launch.
+
+It looks in two places for your old settings file:
+- `~/.hamclock/eeprom`
+- `/home/pi/.hamclock/eeprom`
+
+If it finds one, it copies your callsign, grid, location, and other compatible settings into the new JSON format — so you do not need to re-enter them. The Setup screen will already show your information.
+
+If no old settings are found, the Setup screen opens blank as usual.
+
+---
+
 ## Migration Steps
 
 1. Install or build HamClock-Next (see [Getting Started](Getting-Started.md))
-2. On first launch, enter your callsign, grid, and location in the Setup screen
+2. On first launch, your old settings are imported automatically if HamClock was installed on the same machine (see above). Otherwise, enter your callsign, grid, and location in the Setup screen.
 3. Open each pane's widget picker (click top strip of pane) and add your preferred widgets
 4. Configure DX cluster in Setup → DX Cluster tab
 5. Set up propagation overlay and band/mode/power to match your operating style

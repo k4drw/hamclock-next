@@ -54,6 +54,17 @@ Click the indicator arrows, if present, to move forward or backward through the 
 | Pane 5 | DE Info         | Left column, top         |
 | Pane 6 | DX Info         | Left column, bottom      |
 
+### Pane 4 — Limited Widget List
+
+Pane 4 is the compact slot at the far right of the top bar. Because it is short, only a small set of widgets that fit in tight vertical space can go there:
+
+- NCDXF Beacons
+- Solar
+- DE/DX Weather
+- Band Conditions
+
+If a widget you expect to see is missing from the Pane 4 picker, this is why — it simply needs more vertical space than that slot provides. Add it to one of the other five panes instead.
+
 ---
 
 ## Side Panel Mode

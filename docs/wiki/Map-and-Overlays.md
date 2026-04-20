@@ -93,7 +93,6 @@ Select the active overlay and configure band/mode/power from the Configuration s
 | **VOACAP Area**     | [VOACAP](Glossary.md#voacap) based propagation reliability prediction from your location to all areas of the map on the selected band                  |
 | **VOACAP Point**    | [VOACAP](Glossary.md#voacap) prediction from your location to a specific target point                                                                  |
 | **Reliability**     | Circuit reliability percentage map                                                                                              |
-| **TOA**             | Take-Off Angle prediction                                                                                                       |
 | **Aurora**          | Live aurora oval intensity forecast (NOAA OVATION)                                                                              |
 | **Heatmap**         | Live spot density heat map drawn from [PSK Reporter / RBN / WSPR](Glossary.md#psk-reporter--rbn--wspr) data — shows where signals from your area are actually being received right now |
 | **DRAP**            | D-Region Absorption Prediction (also available as a widget)                                                                     |
@@ -112,6 +111,36 @@ Configure these fields in [Setup & Configuration](Configuration.md):
 | `propMode`     | Emission mode (`SSB`, `CW`, `FT8`, etc.)          |
 | `propPower`    | Transmitter power in watts                        |
 | `mufRtOpacity` | Opacity of the MUF real-time overlay (0–100)      |
+
+### Propagation Colour Schemes
+
+The propagation map uses a colour scale to show signal strength or reliability — typically from deep red (poor) through yellow to green (excellent).
+
+Three colour schemes are available. Select one in the map settings window (right-click the map to open it), then choose from the **Colormap** dropdown:
+
+| Scheme      | Description                                                             |
+| ----------- | ----------------------------------------------------------------------- |
+| **Vibrant** | Bold, saturated colours. Good for bright rooms. (Default)               |
+| **Muted**   | Softer, desaturated colours. Easier on the eyes in dark environments.   |
+| **Custom**  | You choose each colour in the gradient from scratch.                    |
+
+**Setting up a custom colour scheme:**
+1. Open the map settings window (right-click the map).
+2. In the **Colormap** dropdown, choose **Custom**.
+3. An **Edit…** button appears. Click it.
+4. A colour picker opens with five gradient points: Very Poor, Poor, Fair, Good, Excellent.
+5. Click each point and choose your preferred colour.
+6. Click **OK** when done. The map updates immediately.
+
+### Auto Band Switch
+
+When a propagation overlay is active, HamClock-Next automatically switches the overlay band to match the spot you select. For example:
+
+- Clicking a **DX Cluster** spot on 40m switches the overlay to 40m
+- Clicking an **On The Air** activation on 20m switches the overlay to 20m
+- Clicking a **Live Spot** on 15m switches the overlay to 15m
+
+This works for MUF, VOACAP, and Reliability overlays. The overlay type stays the same — only the band changes to match your selection.
 
 ---
 

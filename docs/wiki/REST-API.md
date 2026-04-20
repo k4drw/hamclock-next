@@ -4,6 +4,10 @@
 
 HamClock-Next provides a comprehensive [REST API](Glossary.md#rest-api) over HTTP for querying status, fetching current data, and remote-controlling the application. The API runs on the same port as the Live Web Interface (default: `8081`). There are over **100 registered endpoints** available.
 
+### Thread-Safe Command Queuing
+
+API commands are queued and applied on the next render frame. This prevents display glitches when automation scripts send rapid commands — you can send commands quickly without breaking the display.
+
 ---
 
 ## 1. Live Web & Streaming Endpoints

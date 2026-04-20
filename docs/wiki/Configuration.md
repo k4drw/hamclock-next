@@ -27,8 +27,10 @@ To access the Setup screen at any time, click the **gear icon (⚙)** in the Tim
 | `grid`           | string | `""`    | Your Maidenhead grid locator (4 or 6 characters) |
 | `lat`            | number | `0.0`   | Your latitude in decimal degrees                 |
 | `lon`            | number | `0.0`   | Your longitude in decimal degrees                |
-| `defaultTzOffset`| int    | `0`     | Default time zone offset in hours from UTC       |
-| `defaultTzLabel` | string | `"UTC"` | Default time zone label (e.g., "EST")            |
+| `defaultTzOffset`| int    | `0`     | Default time zone offset in hours from UTC — sets local time for all clocks at once (see note below) |
+| `defaultTzLabel` | string | `"UTC"` | Display label for the default time zone (e.g., `"EST"`, `"CET"`)                                    |
+
+**Setting your default time zone** changes local time across all tiles that display local time at once — the Aux Clock, Calendar, Big Clock (when not locked to UTC), and World Clock slots. Set it once in Setup → **Identity** instead of configuring each clock widget individually.
 
 If `lat`/`lon` are omitted, they are derived from the center of your grid square.
 
@@ -239,7 +241,27 @@ Configure alarms in Setup → **Timers** tab, or by editing the fields below dir
 | ------------------ | ------ | ------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
 | `auxClockTzOffset` | int    | `0`     | Hours offset from UTC (-12 to +14).                                                                                                        |
 | `auxClockTzLabel`  | string | `"UTC"` | Display label shown in the widget title.                                                                                                   |
-| `auxClockStarMode` | int    | `0`     | Sidereal mode index for the Aux Clock.                                                                                                     |
+| `auxClockStarMode` | int    | `0`     | Sidereal mode index for the Aux Clock.                                                                                                   |
+
+---
+
+## Updates & Migration
+
+### Automatic Updates
+
+HamClock-Next can check for and download updates automatically. When a new version is available, you'll see a notification in the app.
+
+| Field            | Type   | Default | Description                                                 |
+| ---------------- | ------ | ------- | ----------------------------------------------------------- |
+| `skippedVersion` | string | `""`    | Version string to skip the update reminder                  |
+
+To check for updates manually, go to the Settings → Updates tab in the app.
+
+### EEPROM Migration
+
+When upgrading from an older HamClock installation (original HamClock), your settings are automatically carried forward:
+
+- **Original HamClock** — settings stored in EEPROM are detected and migrated to the JSON format
 
 ---
 
@@ -251,4 +273,3 @@ Configure alarms in Setup → **Timers** tab, or by editing the fields below dir
 | `watchlist`      | array  | `[]`    | List of callsigns to monitor. In the setup screen, you can paste a list of callsigns separated by commas or spaces to add them all at once. |
 | `ontaFilter`     | string | `"all"` | Filter activations: `all`, `pota`, or `sota`                |
 | `corsProxyUrl`   | string | `"/proxy/"` | CORS proxy URL prefix for browser builds                |
-| `skippedVersion` | string | `""`    | Version string to suppress update nag                       |
