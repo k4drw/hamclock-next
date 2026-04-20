@@ -81,6 +81,7 @@ void SetupScreen::renderTabUpdate(SDL_Renderer *renderer, int cx, int pad,
   // --- Download UI (only when updateChecker is wired in) ---
   downloadBtnRect_ = {0, 0, 0, 0};  // reset each frame
 
+#ifndef __EMSCRIPTEN__
   if (!updateChecker_ || type == "WASM")
     return;
 
@@ -184,4 +185,5 @@ void SetupScreen::renderTabUpdate(SDL_Renderer *renderer, int cx, int pad,
     cat->drawText(renderer, installCmd.c_str(), cx, y, themes.accent,
                   FontStyle::SmallBold, true);
   }
+#endif  // __EMSCRIPTEN__
 }

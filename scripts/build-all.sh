@@ -45,6 +45,9 @@ run_build "Linux ARMhf Universal" "scripts/build-linux-armhf-universal.sh" || FA
 # 4. WASM Build
 run_build "WASM (Docker)" "scripts/build-wasm-docker.sh" || FAILED_BUILDS+=("WASM")
 
+#5. Build for Android
+run_build "Android" "scripts/build-android-docker.sh" || FAILED_BUILDS+=("Android")
+
 echo "=================================================="
 if [ ${#FAILED_BUILDS[@]} -eq 0 ]; then
     echo "   ALL BUILDS COMPLETED SUCCESSFULLY"

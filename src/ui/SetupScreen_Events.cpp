@@ -590,6 +590,7 @@ bool SetupScreen::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
   }
 
   // Update tab — download button
+#ifndef __EMSCRIPTEN__
   if (activeTab_ == Tab::Update && updateChecker_ &&
       downloadBtnRect_.w > 0 &&
       mx >= downloadBtnRect_.x && mx < downloadBtnRect_.x + downloadBtnRect_.w &&
@@ -597,6 +598,7 @@ bool SetupScreen::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
     updateChecker_->startDownload();
     return true;
   }
+#endif
 
   return true;
 }
