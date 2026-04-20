@@ -42,7 +42,7 @@ docker run --rm -v "$(pwd)":/work:z -w /work $IMAGE bash -c "
     echo '--- Building fb0 variant ---' && \
     cmake -B$BUILD_DIR/fb0 -H. $COMMON_FLAGS -DHAMCLOCK_BUILD_VARIANT=fb0 && \
     cmake --build $BUILD_DIR/fb0 -j\$(nproc) && \
-    chown -R \$(id -u):\$(id -g) $BUILD_DIR
+    chown -R $(id -u):$(id -g) $BUILD_DIR
 "
 
 if [ $? -eq 0 ]; then
@@ -54,9 +54,11 @@ if [ $? -eq 0 ]; then
     export VERSION="${VERSION}"
 
     echo "Packaging Unified (Desktop) DEB..."
+    cp $BUILD_DIR/unified/hamclock-next $BUILD_DIR/hamclock-next.unified.${VERSION}.linux-x64
     ./packaging/linux/create_deb.sh "$BUILD_DIR/unified/hamclock-next" "amd64" "unified" "$BUILD_DIR"
 
     echo "Packaging Lean (Kiosk/Headless) DEB..."
+    cp $BUILD_DIR/fb0/hamclock-next $BUILD_DIR/hamclock-next.fb0.${VERSION}.linux-x64
     ./packaging/linux/create_deb.sh "$BUILD_DIR/fb0/hamclock-next" "amd64" "fb0" "$BUILD_DIR"
 
     echo "--------------------------------------------------"
