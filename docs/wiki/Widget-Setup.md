@@ -56,6 +56,7 @@ Setup → **Spotting** tab → enable **WSJT-X Mode**. HamClock listens for UDP 
 **Filtering and performance:**
 - **Band filter**: Click a band label in the color legend at the bottom of the DX Cluster panel. Click it again to clear the filter.
 - **Duplicate hiding**: Go to Setup → **Spotting** tab and enable **Hide Duplicates**. Only the latest spot for each callsign on a given band will be shown.
+- **Max Age**: In Setup → **Spotting** tab, pick how old a spot is allowed to be before it drops off the list — **10, 20, 40, or 60 minutes**. Shorter windows keep the view focused on "right now" activity; longer windows are useful on quiet bands where spots are infrequent. The default is 20 minutes.
 
 **Tip:** The cluster shows mode badges (CW, SSB, FT8, FT4, RTTY) based on the spot frequency.
 
@@ -210,7 +211,7 @@ Shows a second clock next to your local time.
 
 - **Quick Cycle**: Click the widget itself to cycle through common time zones (UTC, EST, CST, MST, PST, CET, JST, AEST).
 - **Custom Offset**: Set a custom offset and label in Setup → Appearance → Aux Clock.
-- **Sidereal Mode**: Advanced users can enable Sidereal time display through the configuration menu.
+- **Sidereal Mode**: Switches the Aux Clock from a regular zone clock to [sidereal time](Glossary.md#sidereal-time) — the "clock of the stars" used in astronomy. It is useful for radio astronomy, meteor-scatter timing, and planning EME (moon-bounce) sessions against a fixed star background. Set `auxClockStarMode` in the config to enable it; leave at `0` for a normal zone clock.
 
 ---
 

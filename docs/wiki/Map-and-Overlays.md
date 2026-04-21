@@ -15,6 +15,14 @@ You can move around the map with a mouse or touch screen:
 - **Pan**: Left-click and drag to move the map while zoomed in.
 - **Reset**: Double-right-click anywhere on the map to return to the default view.
 
+### Clicking on Spots
+
+When you click the map close to a Live Spot pin or a DX Cluster marker, HamClock-Next snaps to that spot instead of taking the plain coordinates where you clicked. The callsign and frequency for the spot are filled in automatically, so the DX Info panel and any propagation overlay update to match the station you picked.
+
+If you click on open water or empty land far from any pin, the click is treated as a plain location pick, as before.
+
+---
+
 ### Center the Map on Your Home Location
 
 By default the map is centered on the prime meridian (0° longitude). You can set it to center on your [QTH](Glossary.md#qth) instead. That is especially helpful in Azimuthal view.
@@ -105,12 +113,18 @@ Select the active overlay and configure band/mode/power from the Configuration s
 
 Configure these fields in [Setup & Configuration](Configuration.md):
 
-| Field          | Description                                       |
-| -------------- | ------------------------------------------------- |
-| `propBand`     | Amateur band to model (e.g., `20m`, `40m`, `10m`) |
-| `propMode`     | Emission mode (`SSB`, `CW`, `FT8`, etc.)          |
-| `propPower`    | Transmitter power in watts                        |
-| `mufRtOpacity` | Opacity of the MUF real-time overlay (0–100)      |
+| Field           | Description                                                                 |
+| --------------- | --------------------------------------------------------------------------- |
+| `propBand`      | Amateur band to model (e.g., `20m`, `40m`, `10m`)                           |
+| `propMode`      | Emission mode (`SSB`, `CW`, `FT8`, etc.)                                    |
+| `propPower`     | Transmitter power in watts                                                  |
+| `propToa`       | Take-Off Angle used in VOACAP modelling, in degrees (default `3`)           |
+| `propPath`      | Signal path — `0` for Short Path, `1` for Long Path                         |
+| `propAntGain`   | Antenna gain in dBi (default `3`) — tunes the model to your station         |
+| `propColormap`  | Colour scheme for the overlay (`muted`, `vibrant`, or `custom`)             |
+| `mufRtOpacity`  | Opacity of the MUF real-time overlay (0–100)                                |
+
+All of these are also available in the map view menu (right-click the map) and the "VOACAP Options" sub-menu, so you do not need to edit the config file directly.
 
 ### Propagation Colour Schemes
 

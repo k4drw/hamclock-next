@@ -186,6 +186,19 @@ A NASA solar observatory that provides the live solar images shown in the SDO wi
 
 ---
 
+## Sidereal Time
+
+A clock tied to the stars rather than the Sun. A sidereal day is about 3 minutes 56 seconds shorter than the 24-hour solar day you use every day — which means the stars appear in the same position in the sky at the same sidereal time, any day of the year.
+
+HamClock-Next's Aux Clock can display sidereal time instead of a regular zone clock. It is useful for:
+- **Radio astronomy** — pointing dishes at fixed-position sky sources.
+- **Meteor scatter** — timing observations against known shower radiants.
+- **Moon-bounce (EME) planning** — cross-checking antenna aim against star background.
+
+If you do not do any of the above, you can safely leave sidereal mode turned off.
+
+---
+
 ## Telnet
 
 An old-fashioned text-based connection method, like a telephone call between two computers. HamClock-Next uses telnet to connect to [DX Cluster](#dx--dx-cluster--spot) servers (such as `dxusa.net`) to receive live spot feeds.

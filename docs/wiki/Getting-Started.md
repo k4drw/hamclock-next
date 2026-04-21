@@ -97,9 +97,14 @@ If the Setup screen does not appear, click the **gear icon (⚙)** in the top-le
 
 The Setup screen shows the **Live Web URL** where you can access HamClock-Next from a browser on another device. For example: `http://192.168.1.xxx:8080/live`. This makes it easy to set up remote control without looking up your IP address manually.
 
-### PDF Manual
+### PDF Documents
 
-A printable PDF manual is available with each release on GitHub: `HamClock-Next-Manual.pdf`. It includes all the documentation in a single downloadable file. Find it on the [Releases](https://github.com/k4drw/hamclock-next/releases) page.
+Two printable PDFs are attached to each release on GitHub:
+
+- **`HamClock-Next-QuickStart.pdf`** — a 2-page summary covering the first launch, the six panes, and the most common keys. Print it and keep it next to the radio.
+- **`HamClock-Next-Manual.pdf`** — the full wiki in one file, useful for offline reading or as a searchable reference.
+
+Find both on the [Releases](https://github.com/k4drw/hamclock-next/releases) page.
 
 ---
 
@@ -133,6 +138,24 @@ Once the dashboard is running:
 5. **Press K** - highlights every clickable region on screen.
 
 See [Screen Layout](Layout.md) for a detailed annotated diagram.
+
+---
+
+## Remote Control from a Browser
+
+HamClock-Next can also be controlled from any browser on your local network — useful for a Raspberry Pi in the shack that you operate from a laptop or tablet.
+
+Start HamClock-Next with the `--live-web` flag, then open:
+
+```
+http://<your-hamclock-host>:8080/live
+```
+
+Replace `<your-hamclock-host>` with the IP address or hostname of the machine running HamClock-Next. The Setup screen shows this address for you on first launch, so you don't have to look it up.
+
+The `/live` page shows a live view of the HamClock screen and forwards mouse clicks, scrolls, and key presses back to the application in real time. It replaces the older "Live View" tab that used to be embedded in the setup window.
+
+> **Tip:** If the page does not load, check that the port is open in your firewall. On Windows this is usually the first thing that blocks it — see [Troubleshooting & FAQ](Troubleshooting-and-FAQ.md#web-server-not-accessible).
 
 ---
 

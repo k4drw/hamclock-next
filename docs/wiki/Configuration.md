@@ -112,6 +112,7 @@ If `lat`/`lon` are omitted, they are derived from the center of your grid square
 | `dxClusterLogin`           | string  | `""`          | Login callsign for the cluster                         |
 | `dxClusterUseWSJTX`        | bool    | `false`       | Use WSJT-X UDP feed instead of telnet                  |
 | `dxClusterHideDuplicates`  | bool    | `true`        | Hide redundant spots for same call/band                |
+| `dxClusterMaxAgeMinutes`   | integer | `20`          | Drop spots older than this (allowed: `10`, `20`, `40`, `60`) |
 | `wsjtxPort`                | integer | `2237`        | UDP port for WSJT-X feed                               |
 
 ---
@@ -262,6 +263,27 @@ To check for updates manually, go to the Settings → Updates tab in the app.
 When upgrading from an older HamClock installation (original HamClock), your settings are automatically carried forward:
 
 - **Original HamClock** — settings stored in EEPROM are detected and migrated to the JSON format
+
+---
+
+## Local Data Hub (LAN sharing)
+
+If you run more than one HamClock-Next instance on the same local network, one of them can fetch data from the internet and share it with the others. The sharing instance is the **Master**; the rest are **Clients**. The benefits are lower internet traffic and a lighter load on the public data services.
+
+You only need this if you have two or more copies running — for a single HamClock-Next, leave it off.
+
+| Field     | Type    | Default | Description                                                                                       |
+| --------- | ------- | ------- | ------------------------------------------------------------------------------------------------- |
+| `hubMode` | string  | `"off"` | Role of this instance. `"off"` = normal, `"master"` = share data with others, `"client"` = fetch from a Master |
+| `hubIp`   | string  | `""`    | (Client only) Hostname or IP address of the Master instance                                       |
+| `hubPort` | integer | `8080`  | (Client only) HTTP port the Master is listening on                                                |
+
+**Typical setup:**
+1. On the machine that has the most reliable internet connection, set `hubMode` to `"master"`.
+2. On every other HamClock-Next on your network, set `hubMode` to `"client"` and fill in `hubIp` (and `hubPort` if the Master is on a non-default port).
+3. Save and restart each instance.
+
+If a Client cannot reach the Master, it falls back to fetching from the internet directly — so a Master going offline does not break the other clocks.
 
 ---
 

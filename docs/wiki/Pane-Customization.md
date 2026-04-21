@@ -67,6 +67,19 @@ If a widget you expect to see is missing from the Pane 4 picker, this is why —
 
 ---
 
+## Making a Widget Fill the Map
+
+Any tile can be enlarged to cover the map area temporarily — useful when you want a bigger view of a chart, the DX Cluster list, or the Big Clock.
+
+- **Click the maximize arrow** in the top-right corner of a pane, or
+- **Double-click the pane's title bar.**
+
+The pane expands to fill the map. Click the same control again (or press **Escape**) to shrink it back to normal size. Rotation pauses while a pane is maximized so the tile you are viewing does not cycle out from under you.
+
+Not every widget benefits from being maximized. Ones that do — Aurora Graph, Band Conditions, Big Clock, DX Cluster, Live Spots, and Solar — have a dedicated maximized layout with bigger text and extra detail.
+
+---
+
 ## Side Panel Mode
 
 In **side panel mode**, the left column is replaced by a single tall panel. This is useful for widgets that benefit from vertical space, such as a long DX Cluster list or a detailed Satellite track.

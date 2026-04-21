@@ -64,7 +64,7 @@ To add a widget to a pane, click the **top strip** of the pane to open the widge
 | **Band Conditions** | Color-coded HF band condition summary (160m–10m) by path type                               | NOAA SWPC derived  |
 | **Live Spots**      | Real-time decoded signal spots from PSK Reporter or Reverse Beacon Network, plotted by band | PSK Reporter / RBN |
 | **NCDXF**           | NCDXF/IBP international beacon schedule and current beacon on air                           | NCDXF              |
-| **Voacap DE-DX**    | VOACAP short-path propagation prediction between DE and DX by band and hour                 | VOACAP (local)     |
+| **Voacap DE-DX**    | VOACAP short-path propagation prediction between DE and DX. Covers nine bands — 80m, 40m, 30m, 20m, 17m, 15m, 12m, 10m, and 6m — across all 24 UTC hours. A horizontal white line highlights the band that matches the DX spot you currently have selected, so you can see predicted conditions for that band at a glance. | VOACAP (local)     |
 
 ![Band Conditions widget](images/widgets/band_conditions.png)
 
@@ -173,6 +173,6 @@ These widgets require a BME280 temperature/pressure/humidity sensor connected vi
 
 | Widget       | Description                                | Data Source          |
 | ------------ | ------------------------------------------ | -------------------- |
-| **Contests** | Upcoming and active amateur radio contests | Contest calendar API |
+| **Contests** | Upcoming and active amateur radio contests. Click a row to open a detail popup with the exchange format, category summary, and a link to the contest's rules. | Contest calendar API |
 
 ![Contests widget](images/widgets/contests.png)
