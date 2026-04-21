@@ -181,6 +181,17 @@ bool MapWidget::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
       state_->dxActive = true;
       state_->dxCallsign = hitSpot->senderCallsign;
       state_->dxFreqKhz = hitSpot->freqKhz;
+      if (config_.propOverlay != PropOverlayType::None) {
+        int bi = freqToBandIndex(hitSpot->freqKhz);
+        if (bi >= 0) {
+          static constexpr const char *kPropBands[] = {
+              "80m","60m","40m","30m","20m","17m","15m","12m","10m","6m"
+          };
+          const std::string &name = kBands[bi].name;
+          for (auto *b : kPropBands)
+            if (name == b) { config_.propBand = name; break; }
+        }
+      }
     } else {
       state_->dxLocation = {lat, lon};
       state_->dxGrid = Astronomy::latLonToGrid(lat, lon);

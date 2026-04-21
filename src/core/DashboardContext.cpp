@@ -992,11 +992,19 @@ DashboardContext::DashboardContext(AppContext &ctx)
     } else if (type == "live_spots") {
       auto *lsPanel = dynamic_cast<LiveSpotPanel *>(widgetPool[type].get());
       if (lsPanel) {
-        lsPanel->setOnBandSelected([state](int bandIdx) {
+        lsPanel->setOnBandSelected([state, &appCfg](int bandIdx) {
           if (bandIdx < 0 || bandIdx >= kNumBands)
             return;
           state->dxFreqKhz =
               (kBands[bandIdx].minKhz + kBands[bandIdx].maxKhz) / 2.0;
+          if (appCfg.propOverlay != PropOverlayType::None) {
+            static constexpr const char *kPropBands[] = {
+                "80m","60m","40m","30m","20m","17m","15m","12m","10m","6m"
+            };
+            const std::string &name = kBands[bandIdx].name;
+            for (auto *b : kPropBands)
+              if (name == b) { appCfg.propBand = name; break; }
+          }
         });
       }
     }
