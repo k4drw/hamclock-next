@@ -135,7 +135,7 @@ static std::vector<FccLicense> fetchFrnSync(const std::string &frn) {
   curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, fccWriteCallback);
   curl_easy_setopt(curl, CURLOPT_WRITEDATA, &htmlBuffer);
   curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
-  curl_easy_setopt(curl, CURLOPT_TIMEOUT, 25L);
+  curl_easy_setopt(curl, CURLOPT_TIMEOUT, 45L);
   // Accept-Encoding: br/gzip sent above — let libcurl decompress automatically
   curl_easy_setopt(curl, CURLOPT_ACCEPT_ENCODING, "");
   // In-memory cookie jar (empty string enables it without writing a file)
