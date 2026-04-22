@@ -109,6 +109,16 @@ ONTA shows operators activating parks ([POTA](Glossary.md#pota--sota)) or summit
 
 ---
 
+## DX Peditions
+
+Shows upcoming and currently active DX expeditions — special operations by stations traveling to rare or desirable locations.
+
+**Automatic setup:** No configuration needed. Just add it to a pane.
+
+**Click to set DX location:** Click any row in the DX Peditions widget to instantly set that expedition's location as your DX target. The DX Info panel updates immediately, and propagation overlays (if active) recalculate for that path. This is faster than using the Setup screen for quick DX target switching.
+
+---
+
 ## Watchlist & Alerts
 
 The Watchlist lets you monitor specific callsigns in the [DX cluster](Glossary.md#dx--dx-cluster--spot) stream and get notified when they appear.
