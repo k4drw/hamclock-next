@@ -159,6 +159,16 @@ void TimePanel::update() {
     infoTexts_[1] = getDiskUsage();
     infoTexts_[2] = getLocalIP();
   }
+
+  // OTA state from rig (rigctld PTT polling, updated every 2 sec by RigService)
+  if (rigStore_) {
+    RigData rd = rigStore_->get();
+    bool newOnAir = rd.connected && rd.ptt;
+    if (newOnAir != onAir_) {
+      onAir_ = newOnAir;
+      MemoryMonitor::getInstance().destroyTexture(callTex_);
+    }
+  }
 }
 
 void TimePanel::render(SDL_Renderer *renderer) {
@@ -183,20 +193,34 @@ void TimePanel::render(SDL_Renderer *renderer) {
   int dateBaseY = timeBaseY + timeRowH;
   int dateRowH = y_ + height_ - dateBaseY;
 
-  // --- Callsign (large, user-selected color, centered) ---
-  if (callBgColor_.a > 0) {
-    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+  // --- Callsign / On The Air area ---
+  if (onAir_) {
+    // Red background
     SDL_Rect bgRect = {x_ + 1, callBaseY + 1, width_ - 2, callRowH - 2};
-    SDL_SetRenderDrawColor(renderer, callBgColor_.r, callBgColor_.g,
-                           callBgColor_.b, callBgColor_.a);
+    SDL_SetRenderDrawColor(renderer, 200, 0, 0, 255);
     SDL_RenderFillRect(renderer, &bgRect);
-    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
-  }
-  if (callFontSize_ != lastCallFontSize_ || !callTex_) {
-    MemoryMonitor::getInstance().destroyTexture(callTex_);
-    callTex_ = fontMgr_.renderText(renderer, callsign_, callColor_,
-                                   callFontSize_, &callW_, &callH_, true);
-    lastCallFontSize_ = callFontSize_;
+    // "ON THE AIR" text (white, bold) — callTex_ invalidated on state toggle
+    if (!callTex_) {
+      callTex_ = fontMgr_.renderText(renderer, "ON THE AIR",
+                                     {255, 255, 255, 255},
+                                     callFontSize_, &callW_, &callH_, true);
+      lastCallFontSize_ = callFontSize_;
+    }
+  } else {
+    if (callBgColor_.a > 0) {
+      SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+      SDL_Rect bgRect = {x_ + 1, callBaseY + 1, width_ - 2, callRowH - 2};
+      SDL_SetRenderDrawColor(renderer, callBgColor_.r, callBgColor_.g,
+                             callBgColor_.b, callBgColor_.a);
+      SDL_RenderFillRect(renderer, &bgRect);
+      SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+    }
+    if (callFontSize_ != lastCallFontSize_ || !callTex_) {
+      MemoryMonitor::getInstance().destroyTexture(callTex_);
+      callTex_ = fontMgr_.renderText(renderer, callsign_, callColor_,
+                                     callFontSize_, &callW_, &callH_, true);
+      lastCallFontSize_ = callFontSize_;
+    }
   }
   if (callTex_) {
     int dy = callBaseY + (callRowH - callH_) / 2;
@@ -765,7 +789,15 @@ void TimePanel::renderEditOverlay(SDL_Renderer *renderer) {
 }
 
 std::vector<std::string> TimePanel::getActions() const {
-  std::vector<std::string> actions = {"setup", "edit_callsign"};
+  std::vector<std::string> actions = {"settings", "edit callsign"};
+  if (!editing_) {
+    if (presetsRect_.w > 0)
+      actions.push_back("presets");
+    if (pauseRect_.w > 0)
+      actions.push_back("pause rotation");
+    if (nextRect_.w > 0)
+      actions.push_back("skip widget");
+  }
   if (editing_) {
     actions.push_back("ok");
     actions.push_back("cancel");
@@ -777,12 +809,21 @@ std::vector<std::string> TimePanel::getActions() const {
 }
 
 SDL_Rect TimePanel::getActionRect(const std::string &action) const {
-  if (action == "setup") {
+  if (action == "settings") {
     return gearRect_;
   }
-  if (action == "edit_callsign") {
+  if (action == "edit callsign") {
     int callRowH = height_ * 50 / 148;
     return {x_, y_, width_, callRowH};
+  }
+  if (action == "presets") {
+    return presetsRect_;
+  }
+  if (action == "pause rotation") {
+    return pauseRect_;
+  }
+  if (action == "skip widget") {
+    return nextRect_;
   }
 
   if (editing_) {

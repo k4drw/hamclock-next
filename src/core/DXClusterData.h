@@ -45,12 +45,17 @@ public:
   std::shared_ptr<const DXClusterData> snapshot() const;
   void addSpot(const DXClusterSpot &spot);
   void setConnected(bool connected, const std::string &status = "");
+  void setMaxAgeMinutes(int minutes);
   void clear();
 
   void setSpots(const std::vector<DXClusterSpot> &spots);
 
   void selectSpot(const DXClusterSpot &spot);
   void clearSelection();
+
+  // Prune in-memory spots older than maxAgeMinutes — call periodically even
+  // when no new spots arrive (telnet dropped, rate-limited, etc.)
+  void pruneInMemory();
 
   // Load persisted spots from DB.
   void loadPersisted();
@@ -61,4 +66,5 @@ private:
 
   mutable std::mutex mutex_;
   std::shared_ptr<DXClusterData> data_;
+  int maxAgeMinutes_ = 20;
 };

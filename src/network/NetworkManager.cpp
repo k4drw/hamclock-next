@@ -17,6 +17,25 @@
 #include <dirent.h>
 #endif
 
+#if defined(_WIN32) && !defined(__EMSCRIPTEN__)
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef _WIN32_WINNT
+#define _WIN32_WINNT 0x0600
+#endif
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#include <windows.h>
+#include <iphlpapi.h>
+#endif
+
+#if !defined(_WIN32) && !defined(__EMSCRIPTEN__)
+#include <arpa/inet.h>
+#include <ifaddrs.h>
+#include <netinet/in.h>
+#endif
+
 static size_t writeCallback(char *ptr, size_t size, size_t nmemb,
                             void *userdata) {
   auto *response = static_cast<std::string *>(userdata);
@@ -97,7 +116,7 @@ std::string NetworkManager::fetchFromHubSync(const std::string &hubUrl) {
   if (!curl)
     return "";
   curl_easy_setopt(curl, CURLOPT_URL, hubUrl.c_str());
-  curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10L);
+  curl_easy_setopt(curl, CURLOPT_TIMEOUT, 20L);
   curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
   curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeCallback);
   curl_easy_setopt(curl, CURLOPT_WRITEDATA, &result);
@@ -224,23 +243,26 @@ void NetworkManager::fetchAsync(const std::string &url,
   attr.requestMethod[sizeof(attr.requestMethod) - 1] = '\0';
   attr.attributes = EMSCRIPTEN_FETCH_LOAD_TO_MEMORY;
 
-  // Capture callback in a heap-allocated wrapper
+  // Capture callback in a heap-allocated wrapper. Ownership is handed to
+  // emscripten via attr.userData and reclaimed as a unique_ptr at the top of
+  // whichever callback fires, so an early return (or an added throw site)
+  // still frees it.
   struct FetchCtx {
     NetworkManager *mgr;
     std::string url;
     std::function<void(std::string)> cb;
   };
-  auto *ctx = new FetchCtx{this, url, std::move(safeCallback)};
-  attr.userData = ctx;
+  auto ctx = std::make_unique<FetchCtx>(
+      FetchCtx{this, url, std::move(safeCallback)});
 
   attr.onsuccess = [](emscripten_fetch_t *fetch) {
-    auto *ctx = static_cast<FetchCtx *>(fetch->userData);
+    std::unique_ptr<FetchCtx> owned(static_cast<FetchCtx *>(fetch->userData));
     if (fetch->data && fetch->numBytes > 0) {
       std::string response(fetch->data, fetch->numBytes);
 
       // Update in-memory cache
       {
-        std::lock_guard<std::mutex> lock(ctx->mgr->cacheMutex_);
+        std::lock_guard<std::mutex> lock(owned->mgr->cacheMutex_);
         CacheEntry entry;
         entry.timestamp = std::time(nullptr);
         // We don't have header headers easily in simple fetch on WASM,
@@ -248,25 +270,24 @@ void NetworkManager::fetchAsync(const std::string &url,
         if (response.size() < 512 * 1024) {
           entry.data = response;
         }
-        ctx->mgr->cache_[ctx->url] = entry;
+        owned->mgr->cache_[owned->url] = entry;
       }
 
-      ctx->cb(std::move(response));
+      owned->cb(std::move(response));
     } else {
-      ctx->cb("");
+      owned->cb("");
     }
-    delete ctx;
     emscripten_fetch_close(fetch);
   };
   attr.onerror = [](emscripten_fetch_t *fetch) {
-    auto *ctx = static_cast<FetchCtx *>(fetch->userData);
-    LOG_E("NetworkManager", "WASM fetch failed for {} (status {})", ctx->url,
+    std::unique_ptr<FetchCtx> owned(static_cast<FetchCtx *>(fetch->userData));
+    LOG_E("NetworkManager", "WASM fetch failed for {} (status {})", owned->url,
           fetch->status);
-    ctx->cb(""); // empty string = failure
-    delete ctx;
+    owned->cb(""); // empty string = failure
     emscripten_fetch_close(fetch);
   };
 
+  attr.userData = ctx.release();
   emscripten_fetch(&attr, fetchUrl.c_str());
 #else
   // --- Hub client proxy ---
@@ -352,7 +373,7 @@ void NetworkManager::fetchDirect(const std::string &url,
 
   std::unordered_map<std::string, std::string> headers;
   curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-  curl_easy_setopt(curl, CURLOPT_TIMEOUT, 15L);
+  curl_easy_setopt(curl, CURLOPT_TIMEOUT, 45L);
   curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
   
   if (url.find("pskreporter.info") != std::string::npos) {
@@ -505,7 +526,45 @@ NetworkManager::NetworkManager(const std::filesystem::path &cacheDir)
     std::error_code ec;
     std::filesystem::create_directories(cacheDir_, ec);
     if (!ec) {
-      loadCache();
+      // loadCache() does directory iteration + per-file I/O which is expensive
+      // on SD cards (RPi) and Windows (NTFS + AV scanning).  Run it on a
+      // worker thread so the startup thread is not blocked.  inflight_ is
+      // pre-incremented here (before the thread starts) so the destructor's
+      // wait correctly stalls if the thread has not finished yet.
+      // cacheLoadDone_ is set false so waitForCacheLoad() blocks until the
+      // thread signals completion — preventing a race where DashboardContext
+      // provider fetchAsync() calls arrive before the cache index is ready.
+      {
+        std::lock_guard<std::mutex> lk(inflightMutex_);
+        ++inflight_;
+      }
+      {
+        std::lock_guard<std::mutex> lk(cacheLoadMutex_);
+        cacheLoadDone_ = false;
+      }
+      std::thread([this, alive = alive_]() {
+        {
+          std::lock_guard<std::mutex> lk(inflightMutex_);
+          if (!alive->load(std::memory_order_relaxed)) {
+            if (--inflight_ == 0) inflightCv_.notify_all();
+            // Signal done (thread aborted) so waitForCacheLoad() doesn't hang
+            std::lock_guard<std::mutex> lk2(cacheLoadMutex_);
+            cacheLoadDone_ = true;
+            cacheLoadCv_.notify_all();
+            return;
+          }
+        }
+        loadCache();
+        {
+          std::lock_guard<std::mutex> lk(cacheLoadMutex_);
+          cacheLoadDone_ = true;
+        }
+        cacheLoadCv_.notify_all();
+        {
+          std::lock_guard<std::mutex> lk(inflightMutex_);
+          if (--inflight_ == 0) inflightCv_.notify_all();
+        }
+      }).detach();
     } else {
       LOG_E("NetworkManager", "Failed to create cache dir {}: {}",
             cacheDir_.string(), ec.message());
@@ -598,6 +657,11 @@ void NetworkManager::saveToDisk(const std::string &url, const CacheEntry &entry,
   }
 }
 
+void NetworkManager::waitForCacheLoad() {
+  std::unique_lock<std::mutex> lk(cacheLoadMutex_);
+  cacheLoadCv_.wait(lk, [this] { return cacheLoadDone_; });
+}
+
 void NetworkManager::loadCache() {
   if (cacheDir_.empty())
     return;
@@ -636,20 +700,11 @@ void NetworkManager::loadCache() {
             if (!std::getline(ifs, etag))
               continue;
 
-            auto currentPos = ifs.tellg();
-            ifs.seekg(0, std::ios::end);
-            size_t dataSize = (size_t)ifs.tellg() - (size_t)currentPos;
-            ifs.seekg(currentPos, std::ios::beg);
-
-            std::string data;
-            if (dataSize <= 512 * 1024) {
-              // Read rest of file as data
-              data.assign((std::istreambuf_iterator<char>(ifs)),
-                          (std::istreambuf_iterator<char>()));
-            }
-
+            // Body is loaded lazily from disk on first access (see the
+            // empty-data path in fetchAsync).  Only metadata is loaded here so
+            // loadCache() stays fast regardless of how many URLs are cached.
             std::lock_guard<std::mutex> lock(cacheMutex_);
-            cache_[url] = {std::move(data), ts, serverTs, lm, etag};
+            cache_[url] = {"", ts, serverTs, lm, etag};
           } catch (const std::exception &ex) {
             LOG_W("NetworkManager", "Cache parse error for {}: {}",
                   entry.path().string(), ex.what());
@@ -658,4 +713,66 @@ void NetworkManager::loadCache() {
       }
     }
   }
+}
+
+std::string NetworkManager::getLocalIP() {
+#if defined(_WIN32) && !defined(__EMSCRIPTEN__)
+  ULONG bufLen = 15000;
+  std::vector<BYTE> buf(bufLen);
+  PIP_ADAPTER_ADDRESSES pAddrs = nullptr;
+  ULONG ret;
+  for (int attempt = 0; attempt < 2; ++attempt) {
+    buf.resize(bufLen);
+    pAddrs = reinterpret_cast<PIP_ADAPTER_ADDRESSES>(buf.data());
+    ret = GetAdaptersAddresses(AF_INET,
+                               GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_MULTICAST |
+                                   GAA_FLAG_SKIP_DNS_SERVER,
+                               nullptr, pAddrs, &bufLen);
+    if (ret != ERROR_BUFFER_OVERFLOW)
+      break;
+  }
+  if (ret != NO_ERROR)
+    return "--";
+
+  for (PIP_ADAPTER_ADDRESSES a = pAddrs; a; a = a->Next) {
+    if (a->IfType == IF_TYPE_SOFTWARE_LOOPBACK)
+      continue;
+    if (a->IfType == IF_TYPE_TUNNEL)
+      continue;
+    if (a->OperStatus != IfOperStatusUp)
+      continue;
+    for (PIP_ADAPTER_UNICAST_ADDRESS u = a->FirstUnicastAddress; u;
+         u = u->Next) {
+      auto *sa = u->Address.lpSockaddr;
+      if (sa->sa_family != AF_INET)
+        continue;
+      char ipBuf[INET_ADDRSTRLEN];
+      auto *sin = reinterpret_cast<struct sockaddr_in *>(sa);
+      if (inet_ntop(AF_INET, &sin->sin_addr, ipBuf, sizeof(ipBuf))) {
+        return std::string(ipBuf);
+      }
+    }
+  }
+  return "--";
+#elif defined(__EMSCRIPTEN__)
+  return "WASM";
+#else
+  struct ifaddrs *addrs = nullptr;
+  if (getifaddrs(&addrs) != 0)
+    return "--";
+  std::string result = "--";
+  for (struct ifaddrs *ifa = addrs; ifa; ifa = ifa->ifa_next) {
+    if (!ifa->ifa_addr || ifa->ifa_addr->sa_family != AF_INET)
+      continue;
+    if (std::strcmp(ifa->ifa_name, "lo") == 0)
+      continue;
+    auto *sin = reinterpret_cast<struct sockaddr_in *>(ifa->ifa_addr);
+    char ip[INET_ADDRSTRLEN];
+    inet_ntop(AF_INET, &sin->sin_addr, ip, sizeof(ip));
+    result = ip;
+    break;
+  }
+  freeifaddrs(addrs);
+  return result;
+#endif
 }

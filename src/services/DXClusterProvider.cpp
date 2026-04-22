@@ -1,8 +1,7 @@
 // DXClusterProvider — Intentional architectural exception to the Store-Push pattern.
 // This provider maintains its own background thread because it owns a persistent
-// streaming TCP connection (Telnet to a DX cluster). The read loop blocks on recv()
-// waiting for the next spot, which is intrinsic to the transport protocol. Polling
-// or a non-blocking loop would add latency and complexity for no benefit.
+// streaming TCP connection (Telnet to a DX cluster). The read loop uses select()
+// with a 500ms timeout to stay responsive to stop requests and send heartbeats.
 // All other HTTP-based providers use Store-Push.
 #include "DXClusterProvider.h"
 #include "../core/Astronomy.h"
@@ -81,6 +80,7 @@ void DXClusterProvider::start(const AppConfig &config) {
     stop();
 
   config_ = config;
+  store_->setMaxAgeMinutes(config_.dxClusterMaxAgeMinutes);
   if (!config_.dxClusterEnabled)
     return;
 
@@ -124,6 +124,10 @@ void DXClusterProvider::run() {
 
     if (stopClicked_)
       break;
+
+    // Prune stale in-memory spots even when no new spots arrive (connection
+    // dropped, rate-limited, etc.) so the display doesn't show ancient data.
+    store_->pruneInMemory();
 
     // Retry delay (increased to 60s to avoid hammering and IP bans)
     // Interruptible: stop() will wake this immediately via sleepCv_.notify_one()
@@ -261,7 +265,13 @@ void DXClusterProvider::runTelnet(const std::string &host, int port,
 #else
     if (errno != EINPROGRESS) {
 #endif
-      LOG_E("DXCluster", "Connect to {} failed: {}", host, std::strerror(errno));
+      LOG_E("DXCluster", "Connect to {} failed: {}", host,
+#ifdef _WIN32
+            std::to_string(WSAGetLastError())
+#else
+            std::strerror(errno)
+#endif
+      );
       if (state_) {
         std::lock_guard<std::mutex> lk(state_->servicesMutex);
         state_->services["DXCluster"].lastError = "Connect failed";
@@ -313,137 +323,195 @@ void DXClusterProvider::runTelnet(const std::string &host, int port,
   }
   store_->setConnected(true, "Connected to " + host);
 
+  // Keep non-blocking mode (already set for connect). Use select() for the
+  // recv loop timeout — SO_RCVTIMEO on Windows TCP sockets resets the
+  // connection when the timeout fires (MSDN: "indeterminate state"), which
+  // caused the 2-second disconnect Bob N2ESP reported.
+
   std::string buffer;
   bool loggedIn = login.empty();
+  bool loginSent = false;   // track whether callsign has been sent
   bool initialRequestSent = false;
   auto lastHeartbeat = std::chrono::system_clock::now();
 
-  // Elwood's 500ms delay (DXCMSG_DT) to let the server breathe — interruptible
+  // Elwood's DXCMSG_DT: 500ms pause before first send to let server settle.
   {
     std::unique_lock<std::mutex> lk(sleepMutex_);
     sleepCv_.wait_for(lk, std::chrono::milliseconds(500),
                       [this] { return stopClicked_.load(); });
   }
 
+  // Send login once. loginSent prevents the reactive path below from
+  // re-sending if the server also issues a "login:" prompt (double-send
+  // confuses servers that DO prompt and causes immediate disconnect).
   if (!login.empty() && !stopClicked_) {
+    LOG_D("DXCluster", "<<< callsign (preemptive)");
     std::string cmd = login + "\r\n";
     if (send(sock, cmd.c_str(), cmd.length(), 0) < 0) {
       LOG_W("DXCluster", "Failed to send login");
       close(sock);
       return;
     }
+    loginSent = true;
   }
 
   while (!stopClicked_) {
+    // select() with 500ms timeout — safe on Windows (SO_RCVTIMEO is not).
+    fd_set rfds;
+    FD_ZERO(&rfds);
+    FD_SET((unsigned)sock, &rfds);
+    struct timeval tv{0, 500000};
+    int sel = select(sock + 1, &rfds, nullptr, nullptr, &tv);
+    if (sel < 0) {
 #ifdef _WIN32
-    WSAPOLLFD pfd{};
-    pfd.fd = sock;
-    pfd.events = POLLIN;
-    int poll_ret = WSAPoll(&pfd, 1, 500);
+      LOG_W("DXCluster", "select() error {}", WSAGetLastError());
 #else
-    struct pollfd pfd{};
-    pfd.fd = sock;
-    pfd.events = POLLIN;
-    int poll_ret = poll(&pfd, 1, 500); // 500ms timeout
+      LOG_W("DXCluster", "select() error: {}", std::strerror(errno));
 #endif
-    if (poll_ret < 0)
       break;
-
-    if (poll_ret > 0) {
-      char tmp[1024];
-      ssize_t n = recv(sock, tmp, sizeof(tmp) - 1, 0);
-      if (n <= 0) {
-        LOG_W("DXCluster", "Connection lost");
-        if (state_) {
-          std::lock_guard<std::mutex> lk(state_->servicesMutex);
-          state_->services["DXCluster"].ok = false;
-          state_->services["DXCluster"].lastError = "Connection lost";
+    }
+    if (sel == 0) {
+      // Timeout — no data yet. Send heartbeat if needed.
+      auto now = std::chrono::system_clock::now();
+      if (now - lastHeartbeat > std::chrono::seconds(60)) {
+        if (send(sock, "\r\n", 2, 0) < 0) {
+          LOG_W("DXCluster", "Heartbeat failed, closing connection");
+          break;
         }
-        break; // Error or closed
+        lastHeartbeat = now;
       }
+      continue;
+    }
 
-      tmp[n] = '\0';
-      buffer.append(tmp, n);
+    char tmp[1024];
+    ssize_t n = recv(sock, tmp, sizeof(tmp) - 1, 0);
+    if (n < 0) {
+#ifdef _WIN32
+      int e = WSAGetLastError();
+      if (e == WSAEWOULDBLOCK) continue; // spurious wakeup, safe to retry
+      LOG_W("DXCluster", "Connection lost (recv error {})", e);
+#else
+      if (errno == EAGAIN || errno == EWOULDBLOCK) continue;
+      LOG_W("DXCluster", "Connection lost (recv error: {})", std::strerror(errno));
+#endif
+      if (state_) {
+        std::lock_guard<std::mutex> lk(state_->servicesMutex);
+        state_->services["DXCluster"].ok = false;
+        state_->services["DXCluster"].lastError = "Connection lost";
+      }
+      break;
+    }
+    if (n == 0) {
+      LOG_W("DXCluster", "Connection closed by server");
+      if (state_) {
+        std::lock_guard<std::mutex> lk(state_->servicesMutex);
+        state_->services["DXCluster"].ok = false;
+        state_->services["DXCluster"].lastError = "Connection lost";
+      }
+      break;
+    }
 
-      size_t pos;
-      while ((pos = buffer.find('\n')) != std::string::npos) {
-        std::string line = buffer.substr(0, pos);
-        buffer.erase(0, pos + 1);
-        while (!line.empty() && (line.back() == '\r' || line.back() == '\n'))
-          line.pop_back();
+    // Strip Telnet IAC sequences (0xFF + 1–2 bytes) — prevents them from
+    // corrupting line parsing and avoids stalling servers that send option
+    // negotiation and expect a timed-out response before proceeding.
+    char clean[1024];
+    int ci = 0;
+    for (int i = 0; i < n; ) {
+      unsigned char c = (unsigned char)tmp[i];
+      if (c == 0xFF && i + 1 < n) {           // IAC
+        unsigned char cmd2 = (unsigned char)tmp[i + 1];
+        if (cmd2 == 0xFF) {                   // escaped 0xFF literal
+          clean[ci++] = (char)0xFF;
+          i += 2;
+        } else if (cmd2 >= 0xFB && i + 2 < n) { // WILL/WONT/DO/DONT + option
+          i += 3;
+        } else {                              // 2-byte IAC command
+          i += 2;
+        }
+      } else {
+        clean[ci++] = tmp[i++];
+      }
+    }
+    n = ci;
 
-        if (!line.empty()) {
-          processLine(line);
+    clean[n] = '\0';
+    LOG_D("DXCluster", "srv>>> {}", std::string(clean, n));
+    buffer.append(clean, n);
 
-          // Check for common indicators that we are in
-          if (line.find("Welcome") != std::string::npos ||
-              line.find("connected") != std::string::npos ||
-              line.find("Nodes") != std::string::npos ||
-              line.find(">") != std::string::npos ||
-              line.find("DX de ") !=
-                  std::string::npos) { // Spot line also means we are in
-            if (!loggedIn) {
-              loggedIn = true;
-              // Reset connection attempt count on successful login
-              connectionAttempts_ = 0;
-              if (state_) {
-                std::lock_guard<std::mutex> lk(state_->servicesMutex);
-                auto &s = state_->services["DXCluster"];
-                s.ok = true;
-                s.lastSuccess = std::chrono::system_clock::now();
-              }
-              store_->setConnected(true, "Logged in as " + login);
-            }
-            if (!initialRequestSent) {
-              const char *req = "sh/dx 30\r\n";
-              if (send(sock, req, std::strlen(req), 0) < 0) {
-                LOG_W("DXCluster", "Failed to send initial request");
-                break;
-              }
-              initialRequestSent = true;
-            }
-          }
+    size_t pos;
+    while ((pos = buffer.find('\n')) != std::string::npos) {
+      std::string line = buffer.substr(0, pos);
+      buffer.erase(0, pos + 1);
+      while (!line.empty() && (line.back() == '\r' || line.back() == '\n'))
+        line.pop_back();
 
+      if (!line.empty()) {
+        LOG_D("DXCluster", "line [loggedIn={} loginSent={} initSent={}]: {}", loggedIn, loginSent, initialRequestSent, line);
+        processLine(line);
+
+        if (line.find("Welcome") != std::string::npos ||
+            line.find("connected") != std::string::npos ||
+            line.find("Nodes") != std::string::npos ||
+            line.find(">") != std::string::npos ||
+            line.find("DX de ") != std::string::npos) {
           if (!loggedIn) {
-            if (line.find("login:") != std::string::npos ||
-                line.find("callsign:") != std::string::npos ||
-                line.find("Please enter your call:") != std::string::npos) {
-              std::string cmd = login + "\r\n";
-              if (send(sock, cmd.c_str(), cmd.length(), 0) < 0) {
-                LOG_W("DXCluster", "Failed to send callsign");
-                break;
-              }
+            loggedIn = true;
+            connectionAttempts_ = 0;
+            if (state_) {
+              std::lock_guard<std::mutex> lk(state_->servicesMutex);
+              auto &s = state_->services["DXCluster"];
+              s.ok = true;
+              s.lastSuccess = std::chrono::system_clock::now();
             }
+            store_->setConnected(true, "Logged in as " + login);
+          }
+          if (!initialRequestSent) {
+            LOG_D("DXCluster", "<<< sh/dx 30 (triggered by: {})", line.substr(0, 40));
+            const char *req = "sh/dx 30\r\n";
+            if (send(sock, req, std::strlen(req), 0) < 0) {
+              LOG_W("DXCluster", "Failed to send initial request");
+              break;
+            }
+            initialRequestSent = true;
+          }
+        }
+
+        if (!loggedIn && !loginSent) {
+          if (line.find("login:") != std::string::npos ||
+              line.find("callsign:") != std::string::npos ||
+              line.find("Please enter your call:") != std::string::npos) {
+            LOG_D("DXCluster", "<<< callsign (reactive, line)");
+            std::string cmd = login + "\r\n";
+            if (send(sock, cmd.c_str(), cmd.length(), 0) < 0) {
+              LOG_W("DXCluster", "Failed to send callsign");
+              break;
+            }
+            loginSent = true;
           }
         }
       }
+    }
 
-      // Prompt without newline logic
-      if (!loggedIn && !buffer.empty()) {
-        if (buffer.find("login:") != std::string::npos ||
-            buffer.find("callsign:") != std::string::npos ||
-            buffer.find("Please enter your call:") != std::string::npos) {
-          std::string cmd = login + "\r\n";
-          if (send(sock, cmd.c_str(), cmd.length(), 0) < 0) {
-            LOG_W("DXCluster", "Failed to send callsign for prompt");
-            break;
-          }
-          buffer.clear();
+    // Prompt without newline (prompt arrived without trailing newline)
+    if (!loggedIn && !loginSent && !buffer.empty()) {
+      if (buffer.find("login:") != std::string::npos ||
+          buffer.find("callsign:") != std::string::npos ||
+          buffer.find("Please enter your call:") != std::string::npos) {
+        LOG_D("DXCluster", "<<< callsign (reactive, buf={})", buffer.substr(0, 60));
+        std::string cmd = login + "\r\n";
+        if (send(sock, cmd.c_str(), cmd.length(), 0) < 0) {
+          LOG_W("DXCluster", "Failed to send callsign for prompt");
+          break;
         }
-      }
-
-      if (buffer.length() > 4096)
+        loginSent = true;
         buffer.clear();
-    }
-
-    auto now = std::chrono::system_clock::now();
-    if (now - lastHeartbeat > std::chrono::seconds(60)) {
-      if (send(sock, "\r\n", 2, 0) < 0) {
-        LOG_W("DXCluster", "Heartbeat failed, closing connection");
-        break;
       }
-      lastHeartbeat = now;
     }
+    if (!buffer.empty())
+      LOG_D("DXCluster", "buf remainder [loggedIn={}]: {}", loggedIn, buffer.substr(0, 80));
+
+    if (buffer.length() > 4096)
+      buffer.clear();
   }
 
   std::fprintf(stderr, "DXCluster: telnet session ended\n");
@@ -597,10 +665,12 @@ void DXClusterProvider::processLine(const std::string &line) {
         spot.spottedAt = std::chrono::system_clock::now(); // Default to now if
                                                            // time parsing fails
 
-        // Extract time if possible (fixed position in standard cluster output)
-        if (line.length() >= 74 && line[74] == 'Z') {
+        // Extract time: find trailing HHMMZ anywhere in the line
+        size_t z_pos = line.rfind('Z');
+        if (z_pos != std::string::npos && z_pos >= 4) {
           int hr, mn;
-          if (sscanf(line.c_str() + 70, "%2d%2d", &hr, &mn) == 2) {
+          if (sscanf(line.c_str() + z_pos - 4, "%2d%2d", &hr, &mn) == 2 &&
+              hr >= 0 && hr <= 23 && mn >= 0 && mn <= 59) {
             auto now = std::chrono::system_clock::now();
             std::time_t now_c = std::chrono::system_clock::to_time_t(now);
             struct tm tm_buf{};
@@ -613,7 +683,13 @@ void DXClusterProvider::processLine(const std::string &line) {
             std::time_t spot_c = Astronomy::portable_timegm(tm);
             if (spot_c > now_c)
               spot_c -= 86400;
-            spot.spottedAt = std::chrono::system_clock::from_time_t(spot_c);
+            // HHMMZ has only minute precision. If the spot is from the current
+            // minute, use the actual receipt time so fresh spots show distinct
+            // elapsed seconds rather than all collapsing to the same value.
+            if (now_c - spot_c < 60)
+              spot.spottedAt = now;
+            else
+              spot.spottedAt = std::chrono::system_clock::from_time_t(spot_c);
           }
         }
 

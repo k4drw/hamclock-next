@@ -150,17 +150,60 @@ bool MapWidget::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
     state_->deLocation = {lat, lon};
     state_->deGrid = Astronomy::latLonToGrid(lat, lon);
   } else {
-    // Normal click: set DX (target)
-    state_->dxLocation = {lat, lon};
-    state_->dxGrid = Astronomy::latLonToGrid(lat, lon);
-    state_->dxActive = true;
+    // Normal click: set DX (target). If the click lands on a Live Spot
+    // marker, adopt its callsign and frequency so VOACAP DE-DX shows the
+    // current-band line for that spot (matches the hover tooltip data).
+    const SpotRecord *hitSpot = nullptr;
+    double hitLat = 0.0, hitLon = 0.0;
+    if (spotStore_) {
+      auto data = spotStore_->snapshot();
+      float bestDist = 10.0f;  // matches hover kHitRadius
+      for (const auto &spot : data->spots) {
+        double rLat, rLon;
+        if (!Astronomy::gridToLatLon(spot.receiverGrid, rLat, rLon))
+          continue;
+        SDL_FPoint pt = latLonToScreen(rLat, rLon);
+        float ddx = pt.x - mx;
+        float ddy = pt.y - my;
+        float d = std::sqrt(ddx * ddx + ddy * ddy);
+        if (d < bestDist) {
+          bestDist = d;
+          hitSpot = &spot;
+          hitLat = rLat;
+          hitLon = rLon;
+        }
+      }
+    }
+
+    if (hitSpot) {
+      state_->dxLocation = {hitLat, hitLon};
+      state_->dxGrid = Astronomy::latLonToGrid(hitLat, hitLon);
+      state_->dxActive = true;
+      state_->dxCallsign = hitSpot->senderCallsign;
+      state_->dxFreqKhz = hitSpot->freqKhz;
+      if (config_.propOverlay != PropOverlayType::None) {
+        int bi = freqToBandIndex(hitSpot->freqKhz);
+        if (bi >= 0) {
+          static constexpr const char *kPropBands[] = {
+              "80m","60m","40m","30m","20m","17m","15m","12m","10m","6m"
+          };
+          const std::string &name = kBands[bi].name;
+          for (auto *b : kPropBands)
+            if (name == b) { config_.propBand = name; break; }
+        }
+      }
+    } else {
+      state_->dxLocation = {lat, lon};
+      state_->dxGrid = Astronomy::latLonToGrid(lat, lon);
+      state_->dxActive = true;
+      state_->dxCallsign.clear();
+      state_->dxFreqKhz = 0.0;
+    }
 
     // Save as map-click state and clear any panel-driven selection
     state_->mapDxLocation = state_->dxLocation;
     state_->mapDxGrid = state_->dxGrid;
     state_->mapDxActive = true;
-    state_->dxCallsign.clear();
-    state_->dxFreqKhz = 0.0;
 
     // Clear both panel selections so they don't conflict
     if (dxcStore_)

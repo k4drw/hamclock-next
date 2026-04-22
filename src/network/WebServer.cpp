@@ -200,6 +200,7 @@ void WebServer::run() {
     <div class="tab" onclick="showTab('widget-config')">Widget Config</div>
     <div class="tab" onclick="showTab('watchlist')">Watchlist</div>
     <div class="tab" onclick="showTab('update')">Update</div>
+    <a class="tab" href="/live" target="_blank" style="text-decoration:none">Live View ↗</a>
   </div>
 
   <div id="identity" class="panel active">

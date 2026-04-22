@@ -1,9 +1,11 @@
 #include "VoacapDeDxPanel.h"
 #include "WidgetRegistry.h"
 #include "../core/Astronomy.h"
+#include "../core/LiveSpotData.h"
 #include "../core/Theme.h"
 #include "../core/VoacapEngine.h"
 #include <cmath>
+#include <cstring>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -11,8 +13,8 @@
 
 // BANDS_MHZ and BANDS_STR are defined in the header, now we explicitly
 // instantiate
-constexpr double VoacapDeDxPanel::BANDS_MHZ[8];
-constexpr const char *VoacapDeDxPanel::BANDS_STR[8];
+constexpr double VoacapDeDxPanel::BANDS_MHZ[9];
+constexpr const char *VoacapDeDxPanel::BANDS_STR[9];
 
 VoacapDeDxPanel::VoacapDeDxPanel(
     int x, int y, int w, int h, FontManager &fontMgr,
@@ -27,7 +29,7 @@ VoacapDeDxPanel::VoacapDeDxPanel(
       ionoProvider_(std::move(ionoProvider)),
       config_(config) {
   for (int i = 0; i < 24; ++i) {
-    for (int j = 0; j < 8; ++j) {
+    for (int j = 0; j < 9; ++j) {
       relMatrix_[i][j] = 0.0f;
     }
   }
@@ -72,9 +74,9 @@ void VoacapDeDxPanel::recalculateMatrix() {
   int month = ptm->tm_mon + 1;
   double minToa = (config_.propToa > 0.0f) ? (double)config_.propToa : 3.0;
 
-  // Compute 24 hours x 8 bands using CCIR/VOACAP engine
+  // Compute 24 hours x 9 bands using CCIR/VOACAP engine
   for (int hour = 0; hour < 24; ++hour) {
-    for (int b = 0; b < 8; ++b) {
+    for (int b = 0; b < 9; ++b) {
       double rel = VoacapEngine::pathReliability(
           BANDS_MHZ[b], distKm, midLatDeg, midLonDeg,
           hour, month, ssn,
@@ -158,7 +160,7 @@ void VoacapDeDxPanel::render(SDL_Renderer *renderer) {
 
   // Draw matrix
   // X axis: 24 hours
-  // Y axis: 8 bands (0=80m at bottom, 7=10m at top)
+  // Y axis: 9 bands (0=80m at bottom, 8=6m at top)
 
   int pLeft = 48;
   int pRight = 16;
@@ -169,7 +171,7 @@ void VoacapDeDxPanel::render(SDL_Renderer *renderer) {
   int pHeight = height_ - pTop - pBot;
 
   float cellW = static_cast<float>(pWidth) / 24.0f;
-  float cellH = static_cast<float>(pHeight) / 8.0f;
+  float cellH = static_cast<float>(pHeight) / 9.0f;
 
   if (cellW < 1.0f)
     cellW = 1.0f;
@@ -185,9 +187,9 @@ void VoacapDeDxPanel::render(SDL_Renderer *renderer) {
     int px = x_ + pLeft + static_cast<int>(hourOffset * cellW);
     int nextPx = x_ + pLeft + static_cast<int>((hourOffset + 1) * cellW);
 
-    for (int b = 0; b < 8; ++b) {
-      int py = y_ + pTop + static_cast<int>((7 - b) * cellH);
-      int nextPy = y_ + pTop + static_cast<int>((7 - b + 1) * cellH);
+    for (int b = 0; b < 9; ++b) {
+      int py = y_ + pTop + static_cast<int>((8 - b) * cellH);
+      int nextPy = y_ + pTop + static_cast<int>((8 - b + 1) * cellH);
 
       SDL_Color c = reliabilityColor(relMatrix_[hourOffset][b]);
 
@@ -198,8 +200,8 @@ void VoacapDeDxPanel::render(SDL_Renderer *renderer) {
   }
 
   // Y-axis labels (Bands)
-  for (int b = 0; b < 8; ++b) {
-    int py = y_ + pTop + static_cast<int>((7 - b + 0.5f) * cellH);
+  for (int b = 0; b < 9; ++b) {
+    int py = y_ + pTop + static_cast<int>((8 - b + 0.5f) * cellH);
     cat->drawText(renderer, BANDS_STR[b], x_ + (pLeft / 2), py, themes.textDim,
                   FontStyle::Tiny, false, true, true);
   }
@@ -232,8 +234,8 @@ void VoacapDeDxPanel::render(SDL_Renderer *renderer) {
     SDL_SetRenderDrawColor(renderer, c.r, c.g, c.b, c.a);
     SDL_RenderFillRect(renderer, &boxRect);
 
-    cat->drawText(renderer, legendText[i], lx + 12, legendY + 6, themes.textDim,
-                  FontStyle::Tiny, false, false, true); // not horizontally centered
+    cat->drawText(renderer, legendText[i], lx, legendY + 6, themes.textDim,
+                  FontStyle::Tiny, true, false, true); // centered under box
   }
 
   // Grid lines mapping
@@ -243,7 +245,7 @@ void VoacapDeDxPanel::render(SDL_Renderer *renderer) {
     int px = x_ + pLeft + static_cast<int>(hourOffset * cellW);
     SDL_RenderDrawLine(renderer, px, y_ + pTop, px, y_ + pTop + pHeight);
   }
-  for (int b = 0; b <= 8; ++b) {
+  for (int b = 0; b <= 9; ++b) {
     int pyy = y_ + pTop + static_cast<int>(b * cellH);
     SDL_RenderDrawLine(renderer, x_ + pLeft, pyy, x_ + pLeft + pWidth, pyy);
   }
@@ -253,6 +255,29 @@ void VoacapDeDxPanel::render(SDL_Renderer *renderer) {
     int nowPx = x_ + pLeft + static_cast<int>(utcHour * cellW);
     SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
     SDL_RenderDrawLine(renderer, nowPx, y_ + pTop, nowPx, y_ + pTop + pHeight);
+  }
+
+  // Current-band cursor: white horizontal line at the VOACAP band matching
+  // the selected DX spot's frequency. dxFreqKhz is populated by DX Cluster,
+  // On The Air, and Live Spots panel selections; zero for map-click DX.
+  if (state_->dxFreqKhz > 0.0) {
+    int bi = freqToBandIndex(state_->dxFreqKhz);
+    int voacapIdx = -1;
+    if (bi >= 0) {
+      for (int b = 0; b < 9; ++b) {
+        if (std::strcmp(kBands[bi].name, BANDS_STR[b]) == 0) {
+          voacapIdx = b;
+          break;
+        }
+      }
+    }
+    if (voacapIdx >= 0) {
+      int bandPy = y_ + pTop +
+                   static_cast<int>((8 - voacapIdx + 0.5f) * cellH);
+      SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+      SDL_RenderDrawLine(renderer, x_ + pLeft, bandPy,
+                         x_ + pLeft + pWidth, bandPy);
+    }
   }
 }
 

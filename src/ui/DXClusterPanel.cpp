@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <iomanip>
 #include <sstream>
+#include <set>
 
 // Returns IARU Region 2 sub-band mode label for a given frequency in kHz.
 static const char *modeFromFreq(double khz) {
@@ -159,7 +160,9 @@ void DXClusterPanel::update() {
       // the spots, so DXClusterData::spots is not directly indexed — compare
       // values against the reversed copy.
       auto spots = data->spots;
-      std::reverse(spots.begin(), spots.end());
+      std::sort(spots.begin(), spots.end(), [](const DXClusterSpot &a, const DXClusterSpot &b) {
+        return a.spottedAt > b.spottedAt;
+      });
       for (int i = 0; i < (int)visibleFreqs_.size(); ++i) {
         int idx = scrollOffset_ + i;
         if (idx < (int)spots.size()) {
@@ -184,9 +187,10 @@ void DXClusterPanel::onResize(int x, int y, int w, int h) {
 }
 
 void DXClusterPanel::render(SDL_Renderer *renderer) {
-  // Calculate legend height once so ListPanel can account for it
-  legendH_ = (height_ >= 120) ? 28 : 0;
-  this->footerH_ = legendH_;
+  // Calculate legend heights once so ListPanel can account for them
+  legendH_    = (height_ >= 120) ? 28 : 0;
+  modeFilterH_ = (height_ >= 200) ? 14 : 0;
+  this->footerH_ = legendH_ + modeFilterH_;
 
   // Base render for BG, Title, Border, Stripes, and Highlights
   ListPanel::render(renderer);
@@ -194,10 +198,15 @@ void DXClusterPanel::render(SDL_Renderer *renderer) {
   if (!fontMgr_.ready())
     return;
 
-  // Band Legend at bottom (drawn first to ensure it stays visible even if list is empty)
+  // Footer legends at bottom (drawn first so they're never obscured by spots)
+  int footerTop = y_ + height_ - 2;
   if (legendH_ > 0) {
     int dummy = contentY_;
-    renderBandLegend(renderer, dummy, y_ + height_ - 2);
+    renderBandLegend(renderer, dummy, footerTop);
+    footerTop -= legendH_;
+  }
+  if (modeFilterH_ > 0) {
+    renderModeFilter(renderer, footerTop);
   }
 
   if (visibleSpots_.empty())
@@ -369,11 +378,26 @@ void DXClusterPanel::rebuildRows(const DXClusterData &data) {
   allSpots_.clear();
   auto spots = data.spots;
   // Most recent first
-  std::reverse(spots.begin(), spots.end());
+  std::sort(spots.begin(), spots.end(), [](const DXClusterSpot &a, const DXClusterSpot &b) {
+    return a.spottedAt > b.spottedAt;
+  });
+
+  std::set<std::pair<std::string, int>> seen;
 
   for (const auto &spot : spots) {
+    int bandIdx = freqToBandIndex(spot.freqKhz);
+    if (config_ && config_->dxClusterHideDuplicates) {
+      if (seen.count({spot.txCall, bandIdx}))
+        continue;
+      seen.insert({spot.txCall, bandIdx});
+    }
+
     if (activeBandFilter_ >= 0) {
       if (freqToBandIndex(spot.freqKhz) != activeBandFilter_)
+        continue;
+    }
+    if (!activeModeFilter_.empty()) {
+      if (activeModeFilter_ != modeFromFreq(spot.freqKhz))
         continue;
     }
     std::stringstream ss;
@@ -402,14 +426,16 @@ SDL_Color DXClusterPanel::getRowColor(int index,
 std::string DXClusterPanel::formatAge(
     const std::chrono::system_clock::time_point &spottedAt) const {
   auto now = std::chrono::system_clock::now();
-  auto age =
-      std::chrono::duration_cast<std::chrono::minutes>(now - spottedAt).count();
+  auto secs = std::chrono::duration_cast<std::chrono::seconds>(now - spottedAt).count();
 
-  if (age < 0)
-    return "0m";
-  if (age < 60)
-    return std::to_string(age) + "m";
-  return std::to_string(age / 60) + "h";
+  if (secs < 0)
+    return "0s";
+  if (secs < 60)
+    return std::to_string(secs) + "s";
+  auto mins = secs / 60;
+  if (mins < 60)
+    return std::to_string(mins) + "m";
+  return std::to_string(mins / 60) + "h";
 }
 
 bool DXClusterPanel::onMouseWheel(int scrollY) {
@@ -432,7 +458,25 @@ bool DXClusterPanel::onMouseWheel(int scrollY) {
 }
 
 bool DXClusterPanel::onMouseUp(int mx, int my, Uint16 /*mod*/, int clicks) {
-  // Check legend clicks first
+  // Mode filter row (above band legend)
+  if (modeFilterH_ > 0) {
+    int modeY = y_ + height_ - 2 - legendH_ - modeFilterH_;
+    if (my >= modeY && my < modeY + modeFilterH_) {
+      static const char *kModes[] = {"CW", "SSB", "FT8", "FT4", "RTTY", "WSPR"};
+      int cols = 6;
+      int cellW = (width_ - 4) / cols;
+      int col = (mx - (x_ + 4)) / cellW;
+      if (col >= 0 && col < cols) {
+        const char *clicked = kModes[col];
+        activeModeFilter_ = (activeModeFilter_ == clicked) ? "" : clicked;
+        lastUpdate_ = std::chrono::system_clock::time_point{};
+        update();
+        return true;
+      }
+    }
+  }
+
+  // Check band legend clicks
   if (my >= y_ + height_ - legendH_ && legendH_ > 0) {
     int cellH = 14;
     int cols = 6;
@@ -464,7 +508,9 @@ bool DXClusterPanel::onMouseUp(int mx, int my, Uint16 /*mod*/, int clicks) {
 
   auto data = store_->snapshot();
   auto spots = data->spots;
-  std::reverse(spots.begin(), spots.end());
+  std::sort(spots.begin(), spots.end(), [](const DXClusterSpot &a, const DXClusterSpot &b) {
+    return a.spottedAt > b.spottedAt;
+  });
 
   if (clickedRow >= 0 && clickedRow < (int)visibleFreqs_.size()) {
     int idx = scrollOffset_ + clickedRow;
@@ -500,33 +546,19 @@ bool DXClusterPanel::onMouseUp(int mx, int my, Uint16 /*mod*/, int clicks) {
 }
 
 std::vector<std::string> DXClusterPanel::getActions() const {
-  return {"open_setup", "scroll_up", "scroll_down"};
+  return {"select item"};
 }
 
 SDL_Rect DXClusterPanel::getActionRect(const std::string &action) const {
-  if (action == "open_setup") {
-    // Title area triggers setup?
-    return {x_, y_, width_, 20};
+  if (action == "select item") {
+    int listH = height_ - (contentY_ - y_) - legendH_;
+    if (listH > 0)
+      return {x_, contentY_, width_, listH};
   }
   return {0, 0, 0, 0};
 }
 
-bool DXClusterPanel::performAction(const std::string &action) {
-  if (action == "scroll_up") {
-    if (scrollOffset_ > 0) {
-      scrollOffset_--;
-      return true;
-    }
-  } else if (action == "scroll_down") {
-    int maxScroll = std::max(0, (int)allRows_.size() - MAX_VISIBLE_ROWS);
-    if (scrollOffset_ < maxScroll) {
-      scrollOffset_++;
-      return true;
-    }
-  } else if (action == "open_setup") {
-    setupRequested_ = true;
-    return true;
-  }
+bool DXClusterPanel::performAction(const std::string & /*action*/) {
   return false;
 }
 
@@ -541,6 +573,52 @@ nlohmann::json DXClusterPanel::getDebugData() const {
     j["selectedSpot"] = data->selectedSpot.txCall;
   }
   return j;
+}
+
+void DXClusterPanel::renderModeFilter(SDL_Renderer *renderer, int maxY) {
+  static const char *kModes[] = {"CW", "SSB", "FT8", "FT4", "RTTY", "WSPR"};
+  static constexpr int kNumModes = 6;
+  int cellH = modeFilterH_;
+  int rowY  = maxY - cellH;
+
+  ThemeColors themes = getThemeColors(theme_);
+
+  // Background + separator
+  SDL_Rect bg = {x_ + 1, rowY, width_ - 2, cellH};
+  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, 255);
+  SDL_RenderFillRect(renderer, &bg);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 200);
+  SDL_RenderDrawLine(renderer, x_ + 1, rowY, x_ + width_ - 1, rowY);
+
+  int cols   = kNumModes;
+  int cellW  = (width_ - 4) / cols;
+  int boxSz  = 7;
+  int midY   = rowY + cellH / 2;
+
+  for (int i = 0; i < kNumModes; ++i) {
+    const char *mode = kModes[i];
+    bool isSelected  = (activeModeFilter_ == mode);
+    bool isDimmed    = (!activeModeFilter_.empty() && !isSelected);
+    Uint8 alpha      = isDimmed ? 100 : 255;
+
+    int lx = x_ + 4 + i * cellW;
+    SDL_Color mc = modeColor(mode);
+
+    SDL_Rect box = {lx + 1, midY - boxSz / 2, boxSz, boxSz};
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+    SDL_SetRenderDrawColor(renderer, mc.r, mc.g, mc.b, alpha);
+    SDL_RenderFillRect(renderer, &box);
+    if (isSelected) {
+      SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+      SDL_Rect border = {box.x - 1, box.y - 1, box.w + 2, box.h + 2};
+      SDL_RenderDrawRect(renderer, &border);
+    }
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+
+    SDL_Color tc = {mc.r, mc.g, mc.b, alpha};
+    fontMgr_.catalog()->drawText(renderer, mode, lx + boxSz + 1, midY, tc,
+                                 FontStyle::Tiny, false, false, true);
+  }
 }
 
 void DXClusterPanel::renderBandLegend(SDL_Renderer *renderer, int & /*curY*/,

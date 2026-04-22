@@ -39,8 +39,8 @@ sed -i 's/path "jni\/Android.mk"/path "jni\/CMakeLists.txt"/g' app/build.gradle
 sed -i '/arguments/d' app/build.gradle
 
 # Update app ID to hamclock's package
-sed -i 's/org.libsdl.app/com.hamclock.next/g' app/build.gradle
-sed -i 's/org.libsdl.app/com.hamclock.next/g' app/src/main/AndroidManifest.xml
+sed -i 's/org.libsdl.app/com.k4drw.hcn/g' app/build.gradle
+sed -i 's/org.libsdl.app/com.k4drw.hcn/g' app/src/main/AndroidManifest.xml
 
 # Bump minSdkVersion to 24 (Android 7.0) to get native 'getifaddrs' support in Bionic libc
 sed -i 's/minSdkVersion 16/minSdkVersion 24/g' app/build.gradle
@@ -68,10 +68,10 @@ for d in app/src/main/res/mipmap-*/; do
     cp ../packaging/icon.png "${d}ic_launcher.png"
 done
 
-# AndroidManifest expects com.hamclock.next.SDLActivity, creating wrapper for libmain.so
+# AndroidManifest expects com.k4drw.hcn.SDLActivity, creating wrapper for libmain.so
 mkdir -p app/src/main/java/com/hamclock/next
 cat << 'JAVA_EOF' > app/src/main/java/com/hamclock/next/SDLActivity.java
-package com.hamclock.next;
+package com.k4drw.hcn;
 
 import android.Manifest;
 import android.content.pm.PackageManager;

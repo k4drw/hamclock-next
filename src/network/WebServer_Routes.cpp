@@ -1241,12 +1241,17 @@ void WebServer::registerRoutes(httplib::Server &svr) {
             std::string key = req.get_param_value("key");
             bool ctrl = req.get_param_value("ctrl") == "1";
             bool shift = req.get_param_value("shift") == "1";
-            SDL_Scancode sc = SDL_GetScancodeFromName(key.c_str());
+            SDL_Keycode sym = SDL_GetKeyFromName(key.c_str());
+            if (sym == SDLK_UNKNOWN && key.length() == 1) {
+              sym = key[0];
+            }
+            SDL_Scancode sc = SDL_GetScancodeFromKey(sym);
             SDL_Keymod mod = static_cast<SDL_Keymod>((ctrl ? KMOD_CTRL : 0) |
                                                      (shift ? KMOD_SHIFT : 0));
             SDL_Event down{}, up{};
             down.type = SDL_KEYDOWN;
             down.key.keysym.scancode = sc;
+            down.key.keysym.sym = sym;
             down.key.keysym.mod = mod;
             up = down;
             up.type = SDL_KEYUP;
@@ -1443,15 +1448,26 @@ void WebServer::registerRoutes(httplib::Server &svr) {
       const y = Math.round((e.clientY - r.top) * img.naturalHeight / r.height);
       fetch('/live/touch?x=' + x + '&y=' + y + '&button=1&shift=' + (e.shiftKey ? 1 : 0));
     });
+
+    let lastWheel = 0;
     img.addEventListener('wheel', e => {
       e.preventDefault();
+      const now = Date.now();
+      if (now - lastWheel < 400) return;
+      lastWheel = now;
       fetch('/live/wheel?y=' + (e.deltaY > 0 ? -1 : 1));
     }, {passive: false});
+
     document.addEventListener('keydown', e => {
       fetch('/live/key?key=' + encodeURIComponent(e.key) +
             '&ctrl=' + (e.ctrlKey ? 1 : 0) + '&shift=' + (e.shiftKey ? 1 : 0));
     });
+
+    let lastMove = 0;
     img.addEventListener('mousemove', e => {
+      const now = Date.now();
+      if (now - lastMove < 200) return; // 5 fps
+      lastMove = now;
       const r = img.getBoundingClientRect();
       const x = Math.round((e.clientX - r.left) * img.naturalWidth / r.width);
       const y = Math.round((e.clientY - r.top) * img.naturalHeight / r.height);
@@ -2564,23 +2580,18 @@ void WebServer::registerRoutes(httplib::Server &svr) {
         }
         std::string action = req.get_param_value("action");
         std::string widget = req.get_param_value("widget");
-        auto &pane = (*panes_)[idx];
-        if (action == "next") {
-          pane->forceAdvance();
-        } else if (action == "add" && !widget.empty()) {
-          auto rot = pane->getRotation();
-          if (std::find(rot.begin(), rot.end(), widget) == rot.end()) {
-            rot.push_back(widget);
-            pane->setRotation(rot, cfg_->rotationIntervalS, cfg_->syncRotation);
-          }
-        } else if (action == "remove" && !widget.empty()) {
-          auto rot = pane->getRotation();
-          rot.erase(std::remove(rot.begin(), rot.end(), widget), rot.end());
-          if (!rot.empty())
-            pane->setRotation(rot, cfg_->rotationIntervalS, cfg_->syncRotation);
-        } else if (action == "solo" && !widget.empty()) {
-          pane->setRotation({widget}, cfg_->rotationIntervalS, cfg_->syncRotation);
-          pane->forceAdvance();
+        // All pane mutations are queued to the main/render thread.
+        // setRotation() calls onResize() which may destroy SDL textures
+        // (e.g. DXClusterPanel → ListPanel::destroyCache). SDL texture ops
+        // must happen on the render thread only.
+        int actionCode = 0;
+        if (action == "next") actionCode = 1;
+        else if (action == "add"    && !widget.empty()) actionCode = 2;
+        else if (action == "remove" && !widget.empty()) actionCode = 3;
+        else if (action == "solo"   && !widget.empty()) actionCode = 4;
+        if (actionCode) {
+          std::lock_guard<std::mutex> lk(dataMutex_);
+          pendingPaneSets_.push_back({idx, actionCode, widget});
         }
         res.set_content("ok", "text/plain");
       });
@@ -2614,11 +2625,13 @@ void WebServer::registerRoutes(httplib::Server &svr) {
         tArr.push_back(t);
     j["themes"] = tArr;
 
+    // "none" is intentionally excluded — it is a meta-value meaning "no overlay",
+    // not an actual overlay type.  Clients should always accept "none" as valid.
     j["prop_overlays"] =
-        nlohmann::json::array({"none", "muf", "voacap", "reliability", "toa",
+        nlohmann::json::array({"muf", "voacap", "reliability", "toa",
                                "heatmap", "drap", "aurora"});
 
-    j["wx_overlays"] = nlohmann::json::array({"none", "wxmb", "clouds_grib"});
+    j["wx_overlays"] = nlohmann::json::array({"wxmb", "clouds_grib"});
 
     res.set_content(j.dump(), "application/json");
   });
@@ -2865,20 +2878,21 @@ void WebServer::registerRoutes(httplib::Server &svr) {
             }
             int x = StringUtils::safe_stoi(req.get_param_value("x"));
             int y = StringUtils::safe_stoi(req.get_param_value("y"));
-            int outW = LOGICAL_WIDTH, outH = LOGICAL_HEIGHT;
-            if (renderer_)
-              SDL_GetRendererOutputSize(renderer_, &outW, &outH);
-            int px = (outW > 0) ? (x * outW / LOGICAL_WIDTH) : x;
-            int py = (outH > 0) ? (y * outH / LOGICAL_HEIGHT) : y;
-            SDL_Event down{}, up{};
-            down.type = SDL_MOUSEBUTTONDOWN;
-            down.button.button = SDL_BUTTON_LEFT;
-            down.button.x = px;
-            down.button.y = py;
-            up = down;
-            up.type = SDL_MOUSEBUTTONUP;
-            SDL_PushEvent(&down);
-            SDL_PushEvent(&up);
+            bool hoverOnly = req.has_param("hover") && req.get_param_value("hover") == "1";
+
+            SDL_Event motion{};
+            motion.type = SDL_MOUSEMOTION;
+            motion.motion.x = x;
+            motion.motion.y = y;
+            SDL_PushEvent(&motion);
+
+            if (!hoverOnly) {
+              SDL_Event e{};
+              e.type = AE_BASE_EVENT + AE_TOUCH;
+              e.user.data1 = reinterpret_cast<void *>(static_cast<intptr_t>(x));
+              e.user.data2 = reinterpret_cast<void *>(static_cast<intptr_t>(y));
+              SDL_PushEvent(&e);
+            }
             res.set_content("ok", "text/plain");
           });
 
@@ -2889,14 +2903,16 @@ void WebServer::registerRoutes(httplib::Server &svr) {
               return;
             }
             std::string key = req.get_param_value("key");
-            SDL_Scancode sc = SDL_GetScancodeFromName(key.c_str());
-            if (sc == SDL_SCANCODE_UNKNOWN && key.length() == 1) {
-              // Fallback for single characters if name doesn't match
-              sc = SDL_GetScancodeFromKey(key[0]);
+            LOG_D("WEBSERVER_ROUTES", "keypress: {}", key);
+            SDL_Keycode sym = SDL_GetKeyFromName(key.c_str());
+            if (sym == SDLK_UNKNOWN && key.length() == 1) {
+              sym = key[0];
             }
+            SDL_Scancode sc = SDL_GetScancodeFromKey(sym);
             SDL_Event down{}, up{};
             down.type = SDL_KEYDOWN;
             down.key.keysym.scancode = sc;
+            down.key.keysym.sym = sym;
             up = down;
             up.type = SDL_KEYUP;
             SDL_PushEvent(&down);

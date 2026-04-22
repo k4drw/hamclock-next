@@ -32,6 +32,10 @@ struct WidgetDescriptor {
   // Factory: called once per widget type; result is cached in the widget pool.
   // deps holds non-owning references to all long-lived app resources.
   std::function<std::unique_ptr<Widget>(const WidgetDeps &deps)> factory;
+
+  // One-sentence help text (~80 chars). nullptr until populateWidgetDescriptions() runs.
+  // Must be AFTER factory so existing REGISTER_WIDGET brace-init lists are unaffected.
+  const char *description = nullptr;
 };
 
 // ---------------------------------------------------------------------------
@@ -55,6 +59,14 @@ public:
   // Create a new widget instance via its registered factory.
   // Returns nullptr if typeId is unknown.
   std::unique_ptr<Widget> create(const std::string &typeId, const WidgetDeps &deps) const;
+
+  // Set the help description for a registered widget by typeId.
+  // Safe to call any time after the widget's REGISTER_WIDGET has run.
+  // No-op (silent) if typeId is not found.
+  void setDescription(const std::string &typeId, const char *desc) {
+    for (auto &w : widgets_)
+      if (w.typeId == typeId) { w.description = desc; return; }
+  }
 
 private:
   WidgetRegistry() = default;

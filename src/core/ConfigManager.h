@@ -119,6 +119,8 @@ struct AppConfig {
   std::string dxClusterLogin = "";
   bool dxClusterUseWSJTX = false; // If true, ignore host and use UDP port
   int wsjtxPort = 2237;           // UDP port for WSJT-X listener
+  bool dxClusterHideDuplicates = true;
+  int dxClusterMaxAgeMinutes = 20;    // 10, 20, 40, or 60
 
   // Live Spots (Combined RBN, PSK Reporter, WSPR)
   LiveSpotSource liveSpotSource = LiveSpotSource::PSK;

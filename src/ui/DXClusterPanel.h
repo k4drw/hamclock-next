@@ -28,9 +28,6 @@ public:
   bool onMouseUp(int mx, int my, Uint16 mod, int clicks) override;
   bool onMouseWheel(int scrollY) override;
 
-  bool isSetupRequested() const { return setupRequested_; }
-  void clearSetupRequest() { setupRequested_ = false; }
-
   void setOnSpotActivated(std::function<void(const DXClusterSpot &)> cb) {
     onSpotActivated_ = std::move(cb);
   }
@@ -58,6 +55,7 @@ private:
                         const SDL_Color &defaultColor) const override;
 
   void renderBandLegend(SDL_Renderer *renderer, int &curY, int maxY);
+  void renderModeFilter(SDL_Renderer *renderer, int maxY);
 
   std::function<void(const DXClusterSpot &)> onSpotActivated_;
   std::function<void()> onSpotDeactivated_;
@@ -68,8 +66,6 @@ private:
   RigService *rigService_;
   const AppConfig *config_;
   std::chrono::system_clock::time_point lastUpdate_{};
-  bool setupRequested_ = false;
-
   std::vector<std::string> allRows_;
   std::vector<double> allFreqs_;
   std::vector<double> visibleFreqs_;
@@ -109,5 +105,7 @@ private:
   static constexpr int MAX_VISIBLE_ROWS = 15;
 
   int legendH_ = 0;
+  int modeFilterH_ = 0;
   int activeBandFilter_ = -1;
+  std::string activeModeFilter_;   // empty = no filter
 };

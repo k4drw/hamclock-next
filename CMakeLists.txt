@@ -69,9 +69,15 @@ if(NOT HAMCLOCK_INSTALL_TYPE)
     endif()
 endif()
 
+# Build variant (unified = desktop/X11+Wayland, fb0 = kiosk/framebuffer, "" = not applicable)
+if(NOT HAMCLOCK_BUILD_VARIANT)
+    set(HAMCLOCK_BUILD_VARIANT "")
+endif()
+
 add_compile_definitions(HAMCLOCK_VERSION="v${HAMCLOCK_DISPLAY_VERSION}")
 add_compile_definitions(HAMCLOCK_INSTALL_TYPE="${HAMCLOCK_INSTALL_TYPE}")
 add_compile_definitions(HAMCLOCK_ARCH="${HAMCLOCK_ARCH}")
+add_compile_definitions(HAMCLOCK_BUILD_VARIANT="${HAMCLOCK_BUILD_VARIANT}")
 string(TIMESTAMP HAMCLOCK_BUILD_DATETIME "%Y-%m-%d %H:%M UTC" UTC)
 add_compile_definitions(HAMCLOCK_BUILD_DATETIME="${HAMCLOCK_BUILD_DATETIME}")
 
@@ -525,6 +531,7 @@ set(HAMCLOCK_SOURCES
     src/core/Theme.cpp
     src/core/Logger.cpp
     src/core/ConfigManager.cpp
+    src/core/EEPROMMigrator.cpp
     src/core/DatabaseManager.cpp
     src/core/OrbitPredictor.cpp
     src/core/DXClusterData.cpp
@@ -616,7 +623,6 @@ set(HAMCLOCK_SOURCES
     src/ui/KIndexAlertPanel.cpp
     src/ui/SFITrendPanel.cpp
     src/ui/DXClusterPanel.cpp
-    src/ui/DXClusterSetup.cpp
     src/ui/BandConditionsPanel.cpp
     src/ui/BeaconPanel.cpp
     src/ui/ContestPanel.cpp
@@ -646,6 +652,7 @@ set(HAMCLOCK_SOURCES
     src/ui/PlaceholderWidget.cpp
     src/ui/PropColorCustomizer.cpp
     src/ui/WidgetRegistry.cpp
+    src/ui/WidgetDescriptions.cpp
     src/ui/ColorPicker.cpp
     src/ui/RenderUtils.cpp
     src/ui/RSSBanner.cpp
@@ -829,7 +836,7 @@ else()
         # macOS App Bundle Configuration
         set_target_properties(hamclock-next PROPERTIES
             MACOSX_BUNDLE TRUE
-            MACOSX_BUNDLE_GUI_IDENTIFIER com.hamclock.next
+            MACOSX_BUNDLE_GUI_IDENTIFIER com.k4drw.hcn
             MACOSX_BUNDLE_BUNDLE_NAME "HamClock-Next"
             MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
             MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
@@ -852,7 +859,7 @@ else()
     if(IOS)
         set_target_properties(hamclock-next PROPERTIES
             MACOSX_BUNDLE TRUE
-            MACOSX_BUNDLE_GUI_IDENTIFIER "com.hamclock.next"
+            MACOSX_BUNDLE_GUI_IDENTIFIER "com.k4drw.hcn"
             MACOSX_BUNDLE_BUNDLE_NAME "HamClock-Next"
             MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
             MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"

@@ -6,6 +6,21 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [v1.5.0] — 2026-04-12
+
+### Added
+- **Thread-safe REST API** — API commands are queued and applied on the next render frame, eliminating display glitches when automation scripts send rapid commands.
+- **DX Cluster Duplicate Hiding** — option to show only the most recent spot per callsign/band, cleaning up cluster view during contests.
+- **Glossary** — new plain-language reference page defining JSON, REST API, Hamlib, Telnet, CORS proxy, and other terms for non-technical users.
+- **PDF User Manual** — automated CI generation of `HamClock-Next-Manual.pdf` with cover sheet and release notes, attached to each GitHub release.
+
+### Changed
+- **Wiki overhaul** — all documentation pages updated for v1.5.0; platform/rendering sections rewritten to remove software-architecture jargon for the ham radio audience.
+- **Configuration.md** — added plain-English intro explaining JSON format and config file location on each OS.
+- **REST-API.md** — added "for programmers" audience callout at the top.
+
+---
+
 ## [v1.4.0] — 2026-04-11
 
 ### Added

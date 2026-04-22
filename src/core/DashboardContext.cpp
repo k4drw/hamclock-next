@@ -23,6 +23,9 @@
 #include "core/WorkerService.h"
 #include "ui/WidgetRegistry.h"
 
+// Forward declaration — implemented in ui/WidgetDescriptions.cpp
+void populateWidgetDescriptions();
+
 #include "network/FrameCapture.h"
 #include "network/NetworkManager.h"
 #include "network/WebServer.h"
@@ -81,7 +84,6 @@
 #include "ui/CountdownPanel.h"
 #include "ui/DRAPPanel.h"
 #include "ui/DXClusterPanel.h"
-#include "ui/DXClusterSetup.h"
 #include "ui/DXInfo.h"
 #include "ui/SatWidget.h"
 #include "ui/DebugOverlay.h"
@@ -198,6 +200,26 @@ using namespace HamClock;
 
 using namespace HamClock;
 
+// ── In-app help panel ──────────────────────────────────────────────────────────
+namespace {
+
+// Panel dimensions (logical pixels, 800×480 space)
+static constexpr int kHelpPanelW  = 700;
+static constexpr int kHelpPanelH  = 370;
+static constexpr int kHelpPadX    = 8;
+static constexpr int kHelpPadY    = 6;
+static constexpr int kHelpViewH   = kHelpPanelH - kHelpPadY * 2 - 18; // minus footer
+static constexpr int kHelpLineH   = 13; // logical pixel line height (Fast font ~12pt)
+
+struct HelpPanelState {
+  bool visible  = false;
+  int  scrollY  = 0;
+  int  contentH = 0; // total rendered height; computed on first render pass
+};
+HelpPanelState g_help;
+
+} // namespace
+
 // Forward declaration — defined in main.cpp (non-static, shared across TUs)
 class DisplayPower;
 void preventRPiSleep(bool prevent, DisplayPower *dp = nullptr);
@@ -260,6 +282,10 @@ DashboardContext::DashboardContext(AppContext &ctx)
     std::fprintf(stderr, "Warning: text rendering disabled\n");
   }
   fontMgr.setCatalog(&fontCatalog);
+
+  // Populate per-widget help descriptions (safe: all REGISTER_WIDGET static
+  // initializers have already run before the constructor executes).
+  populateWidgetDescriptions();
 
   // Compute render scale
   int drawW, drawH;
@@ -353,7 +379,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
   rotatorService =
       std::make_unique<RotatorService>(rotatorStore, appCfg, state.get());
   rotatorService->start();
-  rigService = std::make_unique<RigService>(rigStore, appCfg, state.get());
+  rigService = std::make_unique<RigService>(rigStore, appCfg, state);
   rigService->start();
 #endif
 
@@ -363,8 +389,8 @@ DashboardContext::DashboardContext(AppContext &ctx)
 #endif
   satMgr->setObserver(appCfg.lat, appCfg.lon);
 
-  activityProvider =
-      std::make_unique<ActivityProvider>(netManager, activityStore);
+  activityProvider = std::make_unique<ActivityProvider>(
+      netManager, activityStore, ctx.prefixMgr);
   activityProvider->fetch();
 
   // Re-fetch POTA spots once the parks CSV is parsed so spots get coordinates.
@@ -568,6 +594,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
       std::make_unique<TimePanel>(0, 0, 0, 0, fontMgr, texMgr, appCfg);
   timePanel->setCallColor(appCfg.callsignColor);
   timePanel->setCallBgColor(appCfg.callsignBgColor);
+  timePanel->setRigDataStore(ctx.rigStore.get());
   timePanel->setOnConfigChanged(
       [&ctx](const std::string &call, SDL_Color fgColor, SDL_Color bgColor) {
         ctx.appCfg.callsign = call;
@@ -893,7 +920,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
       auto *dxcPanel = dynamic_cast<DXClusterPanel *>(widgetPool[type].get());
       if (dxcPanel) {
         dxcPanel->setOnSpotActivated(
-            [state, activityStore](const DXClusterSpot &spot) {
+            [state, activityStore, &appCfg](const DXClusterSpot &spot) {
               state->dxCallsign = spot.txCall;
               state->dxLocation = {spot.txLat, spot.txLon};
               state->dxGrid = spot.txGrid;
@@ -902,6 +929,17 @@ DashboardContext::DashboardContext(AppContext &ctx)
               auto ad = activityStore->get();
               ad.hasSelection = false;
               activityStore->set(ad);
+              if (appCfg.propOverlay != PropOverlayType::None) {
+                int bi = freqToBandIndex(spot.freqKhz);
+                if (bi >= 0) {
+                  static constexpr const char *kPropBands[] = {
+                      "80m","60m","40m","30m","20m","17m","15m","12m","10m","6m"
+                  };
+                  const std::string &name = kBands[bi].name;
+                  for (auto *b : kPropBands)
+                    if (name == b) { appCfg.propBand = name; break; }
+                }
+              }
             });
         dxcPanel->setOnSpotDeactivated([state]() {
           if (state->mapDxActive) {
@@ -918,7 +956,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
     } else if (type == "on_the_air") {
       auto *ontaPanel = dynamic_cast<ONTAPanel *>(widgetPool[type].get());
       if (ontaPanel) {
-        ontaPanel->setOnSpotActivated([state, dxcStore](const ONTASpot &spot) {
+        ontaPanel->setOnSpotActivated([state, dxcStore, &appCfg](const ONTASpot &spot) {
           state->dxCallsign = spot.call;
           state->dxLocation = {spot.lat, spot.lon};
           state->dxGrid = (spot.lat != 0.0 || spot.lon != 0.0)
@@ -927,6 +965,17 @@ DashboardContext::DashboardContext(AppContext &ctx)
           state->dxFreqKhz = spot.freqKhz;
           state->dxActive = (spot.lat != 0.0 || spot.lon != 0.0);
           dxcStore->clearSelection();
+          if (appCfg.propOverlay != PropOverlayType::None) {
+            int bi = freqToBandIndex(spot.freqKhz);
+            if (bi >= 0) {
+              static constexpr const char *kPropBands[] = {
+                  "80m","60m","40m","30m","20m","17m","15m","12m","10m","6m"
+              };
+              const std::string &name = kBands[bi].name;
+              for (auto *b : kPropBands)
+                if (name == b) { appCfg.propBand = name; break; }
+            }
+          }
         });
         ontaPanel->setOnSpotDeactivated([state]() {
           if (state->mapDxActive) {
@@ -938,6 +987,46 @@ DashboardContext::DashboardContext(AppContext &ctx)
           }
           state->dxCallsign.clear();
           state->dxFreqKhz = 0.0;
+        });
+      }
+    } else if (type == "dx_peditions") {
+      auto *dxpPanel = dynamic_cast<DXPedPanel *>(widgetPool[type].get());
+      if (dxpPanel) {
+        dxpPanel->setOnPeditionActivated(
+            [state, dxcStore](const DXPedition &p) {
+              state->dxCallsign = p.call;
+              state->dxLocation = {p.lat, p.lon};
+              state->dxGrid = Astronomy::latLonToGrid(p.lat, p.lon);
+              state->dxActive = true;
+              dxcStore->clearSelection();
+            });
+        dxpPanel->setOnPeditionDeactivated([state]() {
+          if (state->mapDxActive) {
+            state->dxLocation = state->mapDxLocation;
+            state->dxGrid = state->mapDxGrid;
+            state->dxActive = true;
+          } else {
+            state->dxActive = false;
+          }
+          state->dxCallsign.clear();
+        });
+      }
+    } else if (type == "live_spots") {
+      auto *lsPanel = dynamic_cast<LiveSpotPanel *>(widgetPool[type].get());
+      if (lsPanel) {
+        lsPanel->setOnBandSelected([state, &appCfg](int bandIdx) {
+          if (bandIdx < 0 || bandIdx >= kNumBands)
+            return;
+          state->dxFreqKhz =
+              (kBands[bandIdx].minKhz + kBands[bandIdx].maxKhz) / 2.0;
+          if (appCfg.propOverlay != PropOverlayType::None) {
+            static constexpr const char *kPropBands[] = {
+                "80m","60m","40m","30m","20m","17m","15m","12m","10m","6m"
+            };
+            const std::string &name = kBands[bandIdx].name;
+            for (auto *b : kPropBands)
+              if (name == b) { appCfg.propBand = name; break; }
+          }
         });
       }
     }
@@ -1029,9 +1118,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
       if (i == paneIdx)
         continue;
       for (const auto &t : panes[i]->getRotation()) {
-        // dx_cluster may appear in multiple panes simultaneously
-        if (t != "dx_cluster")
-          forbidden.push_back(t);
+        forbidden.push_back(t);
       }
     }
     bool isFullHeight = false;
@@ -1088,14 +1175,6 @@ DashboardContext::DashboardContext(AppContext &ctx)
   };
   for (int i = 0; i < 6; ++i) {
     panes[i]->setOnSelectionRequested(onPaneSelectionRequested, i);
-    panes[i]->setOnConfigRequested([&ctx](const std::string &type) {
-      if (type == "dx_cluster") {
-        ctx.activeSetup = AppContext::SetupMode::DXCluster;
-      } else {
-        // Most widgets handle internal setup or don't have one.
-        // Don't open global setup generically.
-      }
-    });
     panes[i]->setOnMaximizeRequested([this, &ctx](int idx) {
       if (expandedPaneIdx_ == idx)
         restorePane(ctx);
@@ -1818,11 +1897,38 @@ void DashboardContext::update(AppContext &ctx) {
       return;
     case SDL_KEYDOWN: {
       bool consumed = false;
+      const SDL_Keycode sym = event.key.keysym.sym;
+      const SDL_Keymod  mod = static_cast<SDL_Keymod>(event.key.keysym.mod);
+
+      // Help panel: intercept scroll / dismiss keys when visible (before widget dispatch)
+      if (g_help.visible && !consumed) {
+        if (sym == SDLK_ESCAPE ||
+            (sym == SDLK_SLASH && (mod & KMOD_SHIFT))) {
+          g_help.visible = false;
+          consumed = true;
+        } else if (sym == SDLK_UP || sym == SDLK_PAGEUP) {
+          g_help.scrollY = std::max(0, g_help.scrollY - kHelpLineH * 3);
+          consumed = true;
+        } else if (sym == SDLK_DOWN || sym == SDLK_PAGEDOWN) {
+          int maxS = std::max(0, g_help.contentH - kHelpViewH);
+          g_help.scrollY = std::min(g_help.scrollY + kHelpLineH * 3, maxS);
+          consumed = true;
+        } else {
+          consumed = true; // swallow all other keys while panel is open
+        }
+      }
+
+      if (!consumed) {
       if (focusedWidget) {
         consumed = focusedWidget->onKeyDown(event.key.keysym.sym,
                                             event.key.keysym.mod);
       } else {
-        if (event.key.keysym.sym == SDLK_k) {
+        // ? (Shift+/) toggles the in-app help panel
+        if (sym == SDLK_SLASH && (mod & KMOD_SHIFT)) {
+          g_help.visible = !g_help.visible;
+          if (g_help.visible) g_help.scrollY = 0;
+          consumed = true;
+        } else if (sym == SDLK_k) {
           ctx.showActionHighlights = !ctx.showActionHighlights;
           consumed = true;
         } else if (event.key.keysym.sym == SDLK_o && ctx.dashboard) {
@@ -1848,6 +1954,7 @@ void DashboardContext::update(AppContext &ctx) {
           }
         }
       }
+      } // end if (!consumed) [help panel guard]
       if (!consumed) {
         if (event.key.keysym.sym == SDLK_q &&
             (event.key.keysym.mod & KMOD_CTRL)) {
@@ -2441,7 +2548,13 @@ void DashboardContext::update(AppContext &ctx) {
         if (event.wheel.direction == SDL_MOUSEWHEEL_FLIPPED)
           scrollY = -scrollY;
 #endif
-        if (ctx.dashboard->mapArea->isModalActive()) {
+        // Help panel captures mouse wheel when visible
+        if (g_help.visible) {
+          int maxS = std::max(0, g_help.contentH - kHelpViewH);
+          g_help.scrollY = std::clamp(g_help.scrollY - scrollY * kHelpLineH * 2,
+                                      0, maxS);
+          // consumed — don't fall through to widget scroll
+        } else if (ctx.dashboard->mapArea->isModalActive()) {
           ctx.dashboard->mapArea->onMouseWheel(scrollY);
         } else {
           int mx, my;
@@ -2497,15 +2610,6 @@ void DashboardContext::update(AppContext &ctx) {
     timePanel->clearSetupRequest();
     ctx.activeSetup = AppContext::SetupMode::Main;
     return; // Next main_tick will switch
-  }
-
-  // Check DXCluster setup
-  DXClusterPanel *dxc =
-      dynamic_cast<DXClusterPanel *>(widgetPool["dx_cluster"].get());
-  if (dxc && dxc->isSetupRequested()) {
-    dxc->clearSetupRequest();
-    ctx.activeSetup = AppContext::SetupMode::DXCluster;
-    return;
   }
 
   // Sync predictor from standalone SatWidget if in pool
@@ -2586,6 +2690,154 @@ void DashboardContext::update(AppContext &ctx) {
       w->update();
     // satMgr->update(); // Deprecated: Auto-tracking handled by RotatorService
     ctx.brightnessMgr->update();
+  }
+}
+
+// Renders the in-app help panel overlay.
+// Panel origin is centered in the 800×480 logical space.
+// Caller is responsible for calling only when g_help.visible is true.
+static void renderHelpPanel(SDL_Renderer *renderer, FontCatalog &cat) {
+  using namespace HamClock;
+
+  const int panelX = (LOGICAL_WIDTH  - kHelpPanelW) / 2;
+  const int panelY = (LOGICAL_HEIGHT - kHelpPanelH) / 2;
+
+  // Dim background
+  SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+  SDL_SetRenderDrawColor(renderer, 0, 0, 0, 180);
+  SDL_Rect full = {0, 0, LOGICAL_WIDTH, LOGICAL_HEIGHT};
+  SDL_RenderFillRect(renderer, &full);
+
+  // Panel background
+  SDL_SetRenderDrawColor(renderer, 18, 18, 28, 240);
+  SDL_Rect panel = {panelX, panelY, kHelpPanelW, kHelpPanelH};
+  SDL_RenderFillRect(renderer, &panel);
+  SDL_SetRenderDrawColor(renderer, 80, 160, 255, 200);
+  SDL_RenderDrawRect(renderer, &panel);
+
+  // Title bar
+  SDL_SetRenderDrawColor(renderer, 30, 60, 120, 220);
+  SDL_Rect titleBar = {panelX, panelY, kHelpPanelW, kHelpLineH + kHelpPadY * 2};
+  SDL_RenderFillRect(renderer, &titleBar);
+  cat.drawText(renderer, "HamClock-Next  —  Help  (? or Esc to close)",
+               panelX + kHelpPadX, panelY + kHelpPadY,
+               {200, 220, 255, 255}, FontStyle::Fast, false, false, false);
+
+  // Content viewport: clip to [panelY + titleH, panelY + panelH - footerH]
+  const int contentTop    = panelY + kHelpLineH + kHelpPadY * 2 + 2;
+  const int contentBottom = panelY + kHelpPanelH - kHelpLineH - kHelpPadY * 2;
+  const int contentLeft   = panelX + kHelpPadX;
+
+  // Build content lines and measure; also render when y is in viewport.
+  auto drawLine = [&](int &y, const std::string &text, SDL_Color col, FontStyle fs) {
+    const int screenY = contentTop + y - g_help.scrollY;
+    if (screenY + kHelpLineH >= contentTop && screenY < contentBottom) {
+      cat.drawText(renderer, text, contentLeft, screenY, col, fs);
+    }
+    y += kHelpLineH;
+  };
+  auto drawSep = [&](int &y) { y += kHelpLineH / 2; };
+  auto drawSection = [&](int &y, const std::string &title) {
+    y += kHelpLineH / 2;
+    drawLine(y, title, {120, 190, 255, 255}, FontStyle::FastBold);
+    // Underline
+    const int screenY = contentTop + y - g_help.scrollY - kHelpLineH + kHelpLineH - 2;
+    if (screenY >= contentTop && screenY < contentBottom) {
+      SDL_SetRenderDrawColor(renderer, 60, 100, 180, 180);
+      SDL_RenderDrawLine(renderer, contentLeft, screenY,
+                         panelX + kHelpPanelW - kHelpPadX, screenY);
+    }
+  };
+
+  int y = 0;
+  const SDL_Color kWhite  = {220, 220, 220, 255};
+  const SDL_Color kDim    = {150, 150, 150, 255};
+  const SDL_Color kYellow = {230, 200,  80, 255};
+
+  // ── Keyboard Shortcuts ──────────────────────────────────────────────────────
+  drawSection(y, "KEYBOARD SHORTCUTS");
+  drawSep(y);
+
+  struct KBRow { const char *key; const char *desc; };
+  static const KBRow kShortcuts[] = {
+    { "K",       "Toggle interactive region highlights (K mode)" },
+    { "?",       "Toggle this help panel" },
+    { "O",       "Toggle debug overlay (FPS, CPU, network stats)" },
+    { "F11",     "Toggle fullscreen" },
+    { "Ctrl+Q",  "Quit HamClock-Next" },
+  };
+  for (auto &row : kShortcuts) {
+    const int screenY = contentTop + y - g_help.scrollY;
+    if (screenY + kHelpLineH >= contentTop && screenY < contentBottom) {
+      cat.drawText(renderer, row.key,  contentLeft,      screenY, kYellow, FontStyle::Fast);
+      cat.drawText(renderer, row.desc, contentLeft + 72, screenY, kWhite,  FontStyle::Fast);
+    }
+    y += kHelpLineH;
+  }
+  drawSep(y);
+
+  // ── Mouse / Touch ───────────────────────────────────────────────────────────
+  drawSection(y, "MOUSE / TOUCH");
+  drawSep(y);
+  struct MouseRow { const char *action; const char *desc; };
+  static const MouseRow kMouse[] = {
+    { "Click pane strip",    "Open widget picker for that pane" },
+    { "Click \xe2\x98\x85 (star)",    "Open Presets modal" },
+    { "Click \xe2\x9a\x99 (gear)",    "Open Setup modal" },
+    { "Pane arrows",         "Advance or retreat widget rotation" },
+    { "Scroll wheel",        "Scroll list widgets; this panel" },
+  };
+  for (auto &row : kMouse) {
+    const int screenY = contentTop + y - g_help.scrollY;
+    if (screenY + kHelpLineH >= contentTop && screenY < contentBottom) {
+      cat.drawText(renderer, row.action, contentLeft,       screenY, kYellow, FontStyle::Fast);
+      cat.drawText(renderer, row.desc,   contentLeft + 110, screenY, kWhite,  FontStyle::Fast);
+    }
+    y += kHelpLineH;
+  }
+  drawSep(y);
+
+  // ── Widgets ─────────────────────────────────────────────────────────────────
+  drawSection(y, "WIDGETS  (press K to highlight interactive regions)");
+  drawSep(y);
+
+  auto &reg = WidgetRegistry::instance();
+  auto allWidgets = reg.getAll(/*includeKeyRequired=*/true);
+  for (auto *desc : allWidgets) {
+    if (!desc) continue;
+    const int screenY = contentTop + y - g_help.scrollY;
+    if (screenY + kHelpLineH >= contentTop && screenY < contentBottom) {
+      std::string nameStr = desc->displayName;
+      std::string descStr = desc->description ? desc->description : "";
+      cat.drawText(renderer, nameStr, contentLeft,       screenY, kYellow, FontStyle::Fast);
+      cat.drawText(renderer, descStr, contentLeft + 110, screenY, kDim,    FontStyle::Fast);
+    }
+    y += kHelpLineH;
+  }
+  drawSep(y);
+
+  // Save content height for scroll clamping
+  g_help.contentH = y;
+
+  // Footer
+  const SDL_Color kFooter = {100, 100, 130, 255};
+  cat.drawText(renderer, "\xe2\x86\x91\xe2\x86\x93 / wheel to scroll",
+               panelX + kHelpPadX,
+               panelY + kHelpPanelH - kHelpLineH - kHelpPadY,
+               kFooter, FontStyle::Fast);
+
+  // Scroll indicator
+  if (g_help.contentH > kHelpViewH) {
+    const int trackH   = contentBottom - contentTop;
+    const int thumbH   = std::max(20, trackH * kHelpViewH / std::max(1, g_help.contentH));
+    const int thumbY   = contentTop + (trackH - thumbH) * g_help.scrollY /
+                         std::max(1, g_help.contentH - kHelpViewH);
+    const int trackX   = panelX + kHelpPanelW - 5;
+    SDL_SetRenderDrawColor(renderer, 50, 60, 90, 180);
+    SDL_RenderDrawLine(renderer, trackX, contentTop, trackX, contentBottom);
+    SDL_SetRenderDrawColor(renderer, 100, 140, 220, 220);
+    SDL_Rect thumb = {trackX - 2, thumbY, 4, thumbH};
+    SDL_RenderFillRect(renderer, &thumb);
   }
 }
 
@@ -2672,8 +2924,17 @@ void DashboardContext::render(AppContext &ctx) {
 
     SDL_SetRenderDrawBlendMode(ctx.renderer, SDL_BLENDMODE_BLEND);
     std::string hoverTooltip;
+    const char *hoverWidgetDesc = nullptr; // description of widget under the cursor
 
     for (auto *w : widgets) {
+      // Track which widget body the cursor is inside (for description tooltip)
+      SDL_Rect wr = w->getRect();
+      if (mx >= wr.x && mx < wr.x + wr.w && my >= wr.y && my < wr.y + wr.h) {
+        auto *wdesc = WidgetRegistry::instance().find(w->typeId());
+        if (wdesc && wdesc->description)
+          hoverWidgetDesc = wdesc->description;
+      }
+
       auto actions = w->getActions();
       for (const auto &action : actions) {
         SDL_Rect r = w->getActionRect(action);
@@ -2695,31 +2956,52 @@ void DashboardContext::render(AppContext &ctx) {
       }
     }
 
-    if (!hoverTooltip.empty()) {
+    // Render tooltip: action name (if hovering action) + widget description
+    if (!hoverTooltip.empty() || hoverWidgetDesc) {
       auto *cat = &fontCatalog;
       if (cat) {
-        int tw, th;
-        SDL_Texture *tipTex = cat->renderText(ctx.renderer, hoverTooltip,
-                        {255, 255, 255, 255}, FontStyle::Micro, &tw, &th);
         int pad = 4;
-        SDL_Rect box = {mx + 12, my + 12, tw + pad * 2, th + pad * 2};
-        // Keep tooltip on screen
-        if (box.x + box.w > LOGICAL_WIDTH)
-          box.x = mx - box.w - 4;
-        if (box.y + box.h > LOGICAL_HEIGHT)
-          box.y = my - box.h - 4;
+        int tw1 = 0, th1 = 0, tw2 = 0, th2 = 0;
+        SDL_Texture *tipTex1 = nullptr;
+        SDL_Texture *tipTex2 = nullptr;
+
+        if (!hoverTooltip.empty())
+          tipTex1 = cat->renderText(ctx.renderer, hoverTooltip,
+                    {255, 255, 200, 255}, FontStyle::Micro, &tw1, &th1);
+        if (hoverWidgetDesc)
+          tipTex2 = cat->renderText(ctx.renderer, hoverWidgetDesc,
+                    {160, 200, 255, 255}, FontStyle::Micro, &tw2, &th2);
+
+        int boxW = std::max(tw1, tw2) + pad * 2;
+        int boxH = (th1 > 0 ? th1 + 2 : 0) + (th2 > 0 ? th2 : 0) + pad * 2;
+        SDL_Rect box = {mx + 12, my + 12, boxW, boxH};
+        if (box.x + box.w > LOGICAL_WIDTH)  box.x = mx - box.w - 4;
+        if (box.y + box.h > LOGICAL_HEIGHT) box.y = my - box.h - 4;
 
         SDL_SetRenderDrawColor(ctx.renderer, 20, 20, 20, 220);
         SDL_RenderFillRect(ctx.renderer, &box);
         SDL_SetRenderDrawColor(ctx.renderer, 255, 255, 255, 180);
         SDL_RenderDrawRect(ctx.renderer, &box);
-        if (tipTex) {
-          SDL_Rect dst = {box.x + pad, box.y + pad, tw, th};
-          SDL_RenderCopy(ctx.renderer, tipTex, nullptr, &dst);
-          cat->destroyTexture(tipTex);
+
+        int ty = box.y + pad;
+        if (tipTex1) {
+          SDL_Rect dst = {box.x + pad, ty, tw1, th1};
+          SDL_RenderCopy(ctx.renderer, tipTex1, nullptr, &dst);
+          cat->destroyTexture(tipTex1);
+          ty += th1 + 2;
+        }
+        if (tipTex2) {
+          SDL_Rect dst = {box.x + pad, ty, tw2, th2};
+          SDL_RenderCopy(ctx.renderer, tipTex2, nullptr, &dst);
+          cat->destroyTexture(tipTex2);
         }
       }
     }
+  }
+
+  // In-app help panel (rendered topmost, above everything else)
+  if (g_help.visible) {
+    renderHelpPanel(ctx.renderer, fontCatalog);
   }
 
 #ifndef __EMSCRIPTEN__

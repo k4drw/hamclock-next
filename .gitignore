@@ -1,5 +1,6 @@
 # Build artifacts
 build*/
+*.pdf
 
 # Android signing key — never commit; store as a GitHub repo secret for CI/CD.
 # Generated locally on first run of scripts/build-android-docker.sh.

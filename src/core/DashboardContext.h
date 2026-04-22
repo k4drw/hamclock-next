@@ -210,6 +210,19 @@ struct DashboardContext {
   LayoutManager layout;
 
   // Collections
+  //
+  // Ownership invariant (load-bearing — do not rearrange):
+  //   • widgetPool is the sole owner of every Widget. Entries are only ever
+  //     inserted (see getOrCreateWidget in DashboardContext.cpp); they are
+  //     never erased during the DashboardContext lifetime.
+  //   • widgets and eventWidgets hold non-owning raw Widget* aliases into
+  //     widgetPool. They stay valid because (a) the pool is insert-only, and
+  //     (b) the member declaration order below places widgetPool first, so
+  //     reverse-order destruction tears down the alias vectors before the
+  //     owning map frees the Widget objects.
+  //   • If future code ever erases from widgetPool mid-life, it MUST also
+  //     remove the corresponding raw pointers from widgets and eventWidgets
+  //     in the same step, or both vectors will alias freed memory.
   std::map<std::string, std::unique_ptr<Widget>> widgetPool;
   std::vector<Widget *> widgets;
   std::vector<Widget *> eventWidgets;
@@ -335,7 +348,7 @@ struct AppContext {
   std::unique_ptr<LTR329Provider> ltr329Provider;
 
   // Setup State
-  enum class SetupMode { None, Loading, Main, DXCluster };
+  enum class SetupMode { None, Loading, Main };
   SetupMode activeSetup = SetupMode::None;
   std::unique_ptr<Widget> setupWidget;
   std::unique_ptr<FontManager> setupFontMgr;

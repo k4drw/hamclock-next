@@ -15,6 +15,7 @@
 
 class BrightnessManager;
 class DisplayPower;
+class UpdateChecker;
 
 class SetupScreen : public Widget {
 public:
@@ -39,6 +40,9 @@ public:
   bool isComplete() const { return complete_; }
   bool wasCancelled() const { return cancelled_; }
   AppConfig getConfig(const AppConfig& base = AppConfig{}) const;
+
+  void setLiveWebUrl(const std::string &url) { liveWebUrl_ = url; }
+  void setUpdateChecker(UpdateChecker *uc) { updateChecker_ = uc; }
 
   enum class Tab {
     Identity,
@@ -80,6 +84,9 @@ private:
   FontManager &fontMgr_;
   BrightnessManager &brightnessMgr_;
   std::shared_ptr<DisplayPower> displayPower_;
+  std::string liveWebUrl_;
+  UpdateChecker *updateChecker_ = nullptr;
+  SDL_Rect downloadBtnRect_ = {0, 0, 0, 0};
 
   // Appearance tab absorbs the old Display tab (brightness/schedule now live
   // there)
@@ -96,6 +103,8 @@ private:
   TextInput clusterLoginInput_;
   bool clusterEnabled_ = true;
   bool clusterWSJTX_ = false;
+  bool clusterHideDuplicates_ = true;
+  int clusterMaxAgeMinutes_ = 20;
   TextInput wsjtxPortInput_;
   SDL_Rect wsjtxPortRect_ = {0, 0, 0, 0};
   SDL_Rect clusterHostRect_ = {0, 0, 0, 0};
@@ -187,6 +196,8 @@ private:
   std::string defaultTzLabel_ = "UTC";
   SDL_Rect toggleRect_ = {0, 0, 0, 0};
   SDL_Rect clusterToggleRect_ = {0, 0, 0, 0};
+  SDL_Rect clusterHideDuplicatesRect_ = {0, 0, 0, 0};
+  SDL_Rect clusterAgeRects_[4] = {};
   SDL_Rect rbnToggleRect_ = {0, 0, 0, 0};
   SDL_Rect gpsToggleRect_ = {0, 0, 0, 0};
   SDL_Rect audioMuteToggleRect_ = {0, 0, 0, 0};

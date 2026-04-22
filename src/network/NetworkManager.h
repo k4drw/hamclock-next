@@ -47,6 +47,13 @@ public:
   // Configure Local Data Hub mode. Called at startup and on config reload.
   void setHubConfig(HubMode mode, const std::string &ip, int port);
 
+  // Block until the background loadCache() thread has finished populating the
+  // in-memory cache index.  Call this once, just before DashboardContext is
+  // created, so provider fetchAsync() calls always find their cache entries.
+  // Returns immediately if loadCache() already completed (the common case once
+  // SDL init has consumed most of the time budget).
+  void waitForCacheLoad();
+
 private:
   struct CacheEntry {
     std::string data;
@@ -79,6 +86,12 @@ private:
   std::condition_variable inflightCv_;
   int inflight_ = 0;
 
+  // Tracks whether the background loadCache() thread has finished.
+  // Separate from inflight_ so waitForCacheLoad() has a dedicated signal.
+  bool cacheLoadDone_ = true; // true means either not started or complete
+  std::mutex cacheLoadMutex_;
+  std::condition_variable cacheLoadCv_;
+
   // Helper to compute safe filename for a URL (e.g. simple hash)
   std::string hashUrl(const std::string &url);
   void loadCache();
@@ -98,4 +111,7 @@ private:
 public:
   // Get the server-reported last modified time for a cached URL
   std::time_t getCacheServerTime(const std::string &url);
+
+  // Get the local IPv4 address (excluding loopback).
+  static std::string getLocalIP();
 };

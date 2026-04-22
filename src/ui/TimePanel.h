@@ -2,6 +2,7 @@
 
 #include "../core/ConfigManager.h"
 #include "../core/MemoryMonitor.h"
+#include "../core/RigData.h"
 #include "FontManager.h"
 #include "PresetsModal.h"
 #include "TextInput.h"
@@ -78,6 +79,7 @@ public:
   void clearUpdateRequest() { updateRequested_ = false; }
 
   void setCallBgColor(SDL_Color color) { callBgColor_ = color; }
+  void setRigDataStore(RigDataStore *store) { rigStore_ = store; }
 
   // Callback invoked when callsign text or colors are changed via the editor.
   using ConfigChangedCb =
@@ -156,6 +158,10 @@ private:
   std::function<void()> onPauseRotation_;
   std::function<void()> onNextRotation_;
   bool rotationPaused_ = false;
+
+  // On The Air (PTT via rigctld)
+  RigDataStore *rigStore_ = nullptr;
+  bool onAir_ = false;
   SDL_Rect pauseRect_ = {};
   SDL_Rect nextRect_ = {};
   bool setupRequested_ = false;

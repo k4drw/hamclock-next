@@ -1,6 +1,6 @@
 # Getting Started
 
-This page covers installing HamClock-Next on your system and completing initial setup.
+This page covers installing HamClock-Next and completing the first setup.
 
 > **Developers and advanced users:** For build-from-source instructions, see [Building from Source](Building-from-Source.md).
 
@@ -14,7 +14,42 @@ Download the latest release from:
 
 ### Linux
 
-**Debian / Ubuntu (.deb):**
+**Step 1 — Pick your package**
+
+Release filenames follow this pattern:
+
+```
+hamclock-next_<version>_<variant>_<arch>.deb
+hamclock-next-<version>-<variant>.<arch>.rpm
+```
+
+**Architecture (`<arch>`)** - which kind of processor your machine has:
+
+| If `uname -m` prints… | Download the… | Typical hardware |
+|---|---|---|
+| `x86_64` | `amd64` package | Desktop PC, laptop, Intel NUC |
+| `aarch64` | `arm64` package | Raspberry Pi 4 / 5, modern ARM SBCs |
+| `armv7l` | `armhf` package | Raspberry Pi 3 (32-bit OS), Pi Zero 2W |
+
+Not sure? Open a terminal and run:
+```bash
+uname -m
+```
+
+**Build variant (`<variant>`)** - how the app talks to your display:
+
+| Variant | Use when… |
+|---|---|
+| `unified` | Use this if you have a normal desktop or want one package that also works on the console later |
+| `fb0` | Use this if your Pi boots straight to a text prompt and you want HamClock-Next to start automatically |
+
+**When in doubt, choose `unified`.** It is the easiest option.
+
+---
+
+**Step 2 — Install**
+
+**Debian / Ubuntu / Raspberry Pi OS (.deb):**
 ```bash
 sudo dpkg -i hamclock-next_*.deb
 hamclock-next
@@ -26,16 +61,19 @@ sudo rpm -i hamclock-next-*.rpm
 hamclock-next
 ```
 
-**AppImage (any Linux distribution):**
-```bash
-chmod +x HamClock-Next-*.AppImage
-./HamClock-Next-*.AppImage
-```
+---
 
-**Raspberry Pi:** The Linux packages above work on Raspberry Pi OS. For console/framebuffer use (no desktop):
+**Step 3 - Raspberry Pi console mode**
+
+If your Pi boots to the command line with no desktop, tell HamClock-Next to draw directly to the screen:
+
 ```bash
 SDL_VIDEODRIVER=kmsdrm hamclock-next --fullscreen
 ```
+
+> `SDL_VIDEODRIVER=kmsdrm` tells the program to draw straight to the screen instead of using a desktop window system.
+
+If you installed the `fb0` package, a systemd service handles this automatically — HamClock-Next starts on boot with no extra configuration needed.
 
 ### macOS
 
@@ -47,15 +85,26 @@ Run `HamClock-Next-Setup.exe` and follow the installer. A shortcut is placed on 
 
 ### Browser / Web (no installation)
 
-Launch HamClock-Next with the `--live-web` flag, then open `http://localhost:8080/live.html` in any browser. This also enables remote control from another device on your network.
+Launch HamClock-Next with the `--live-web` flag, then open `http://localhost:8080/live` in any browser. This also enables remote control from another device on your network.
 
 ---
 
 ## First Launch
 
-On first launch, the application opens directly to the **Setup screen** where you enter your station information.
+On first launch, the app opens the **Setup screen** so you can enter your station information.
 
-If the Setup screen doesn't appear, click the **gear icon (⚙)** in the top-left corner of the Time Panel at any time.
+If the Setup screen does not appear, click the **gear icon (⚙)** in the top-left corner of the Time Panel.
+
+The Setup screen shows the **Live Web URL** where you can access HamClock-Next from a browser on another device. For example: `http://192.168.1.xxx:8080/live`. This makes it easy to set up remote control without looking up your IP address manually.
+
+### PDF Documents
+
+Two printable PDFs are attached to each release on GitHub:
+
+- **`HamClock-Next-QuickStart.pdf`** — a 2-page summary covering the first launch, the six panes, and the most common keys. Print it and keep it next to the radio.
+- **`HamClock-Next-Manual.pdf`** — the full wiki in one file, useful for offline reading or as a searchable reference.
+
+Find both on the [Releases](https://github.com/k4drw/hamclock-next/releases) page.
 
 ---
 
@@ -68,13 +117,13 @@ Fill in these fields on the **Identity** tab:
 | Field | Description |
 |-------|-------------|
 | **Callsign** | Your amateur radio callsign (e.g., `W1AW`) |
-| **Grid** | Your Maidenhead grid locator (e.g., `FN31`) |
+| **Grid** | Your [Maidenhead grid locator](Glossary.md#maidenhead-grid-square) (e.g., `FN31`) |
 | **Latitude** | Decimal degrees — auto-filled if you entered a grid locator |
 | **Longitude** | Decimal degrees — auto-filled if you entered a grid locator |
 
-After saving, HamClock-Next starts fetching data and displays the main dashboard.
+After saving, HamClock-Next starts fetching data and shows the main dashboard.
 
-**Why this matters:** Your callsign and location are used by weather widgets, the ONTA distance filter, the Marine tide widget, the Moon and Asteroid trackers, and propagation overlays. Set them first and everything else falls into place.
+**Why this matters:** Your callsign and location are used by weather widgets, distance filters, tide and tracking widgets, and propagation overlays.
 
 ---
 
@@ -82,13 +131,43 @@ After saving, HamClock-Next starts fetching data and displays the main dashboard
 
 Once the dashboard is running:
 
-1. **Time Panel** (top-left) — shows UTC and local time, your callsign and grid, sunrise/sunset. Click the **gear icon** to reopen Setup.
-2. **Six panes** — the dashboard is divided into six rotatable panes, each cycling through one or more widgets.
-3. **Map** — the large center area shows the world map with configurable overlays.
-4. **Click the top strip of any pane** — opens the widget picker so you can choose what that pane displays.
-5. **Press K** — highlights every interactive region on screen with cyan boxes and tooltips.
+1. **Time Panel** (top-left) - shows UTC or local time, your callsign and grid, and sunrise/sunset. Click the **gear icon** to reopen Setup.
+2. **Six panes** - the dashboard is divided into six areas, and each one can show one or more widgets.
+3. **Map** - the large center area shows the world map with optional overlays.
+4. **Click the top strip of any pane** - opens the widget picker for that pane.
+5. **Press K** - highlights every clickable region on screen.
 
 See [Screen Layout](Layout.md) for a detailed annotated diagram.
+
+---
+
+## Remote Control from a Browser
+
+HamClock-Next can also be controlled from any browser on your local network — useful for a Raspberry Pi in the shack that you operate from a laptop or tablet.
+
+Start HamClock-Next with the `--live-web` flag, then open:
+
+```
+http://<your-hamclock-host>:8080/live
+```
+
+Replace `<your-hamclock-host>` with the IP address or hostname of the machine running HamClock-Next. The Setup screen shows this address for you on first launch, so you don't have to look it up.
+
+The `/live` page shows a live view of the HamClock screen and forwards mouse clicks, scrolls, and key presses back to the application in real time. It replaces the older "Live View" tab that used to be embedded in the setup window.
+
+> **Tip:** If the page does not load, check that the port is open in your firewall. On Windows this is usually the first thing that blocks it — see [Troubleshooting & FAQ](Troubleshooting-and-FAQ.md#web-server-not-accessible).
+
+---
+
+## Keeping HamClock-Next Up to Date
+
+HamClock-Next checks for updates automatically at startup. When a newer version is available, a notification appears on screen. You have three choices:
+
+- **Update** — downloads the new package in the background. When it finishes, you can install it with the same `dpkg -i` or `rpm -i` command you used the first time.
+- **Not Now** — dismisses the notification until next launch.
+- **Skip** — suppresses the reminder for that specific version.
+
+To check for updates manually at any time, open Setup → **Updates** tab.
 
 ---
 

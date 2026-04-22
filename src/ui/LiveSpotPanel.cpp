@@ -402,9 +402,18 @@ bool LiveSpotPanel::onMouseUp(int mx, int my, Uint16 /*mod*/, int clicks) {
     return false;
 
   store_->toggleBand(bandIdx);
+  if (config_.propOverlay != PropOverlayType::None && bandIdx < kNumBands) {
+    static constexpr const char *kPropBands[] = {
+        "80m","60m","40m","30m","20m","17m","15m","12m","10m","6m"
+    };
+    const std::string &name = kBands[bandIdx].name;
+    for (auto *b : kPropBands)
+      if (name == b) { config_.propBand = name; break; }
+  }
   // Persist the change
   config_.liveSpotsBands = store_->getSelectedBandsMask();
   cfgMgr_.save(config_);
+  if (onBandSelected_) onBandSelected_(bandIdx);
   return true;
 }
 
@@ -532,8 +541,17 @@ bool LiveSpotPanel::performAction(const std::string &action) {
       int idx = StringUtils::safe_stoi(action.substr(12));
       if (idx >= 0 && idx < kNumBands) {
         store_->toggleBand(idx);
+        if (config_.propOverlay != PropOverlayType::None) {
+          static constexpr const char *kPropBands[] = {
+              "80m","60m","40m","30m","20m","17m","15m","12m","10m","6m"
+          };
+          const std::string &name = kBands[idx].name;
+          for (auto *b : kPropBands)
+            if (name == b) { config_.propBand = name; break; }
+        }
         config_.liveSpotsBands = store_->getSelectedBandsMask();
         cfgMgr_.save(config_);
+        if (onBandSelected_) onBandSelected_(idx);
         return true;
       }
     } catch (...) {

@@ -1,4 +1,6 @@
 #include "ConfigManager.h"
+#include "EEPROMMigrator.h"
+#include "Logger.h"
 
 #include <SDL.h>
 #include <nlohmann/json.hpp>
@@ -219,16 +221,13 @@ bool ConfigManager::load(AppConfig &config) {
   if (configPath_.empty())
     return false;
 
+  bool loadedJson = false;
   std::ifstream ifs(configPath_);
-  if (!ifs)
-    return false;
-
-  auto json = nlohmann::json::parse(ifs, nullptr, false);
-  if (json.is_discarded()) {
-    std::fprintf(stderr, "ConfigManager: invalid JSON in %s\n",
-                 configPath_.string().c_str());
-    return false;
-  }
+  if (ifs) {
+    auto json = nlohmann::json::parse(ifs, nullptr, false);
+    if (!json.is_discarded()) {
+      loadedJson = true;
+      // ... (existing parsing logic)
 
   // Identity
   if (json.contains("identity")) {
@@ -510,6 +509,8 @@ bool ConfigManager::load(AppConfig &config) {
     config.dxClusterLogin = dxc.value("login", "");
     config.dxClusterUseWSJTX = dxc.value("use_wsjtx", false);
     config.wsjtxPort = dxc.value("wsjtx_port", 2237);
+    config.dxClusterHideDuplicates = dxc.value("hide_duplicates", true);
+    config.dxClusterMaxAgeMinutes = dxc.value("max_age_minutes", 20);
   }
 
   // Live Spots (Combined RBN, PSK Reporter, WSPR)
@@ -649,6 +650,15 @@ bool ConfigManager::load(AppConfig &config) {
       config.worldClocks.push_back(entry);
     }
   }
+}
+}
+
+if (!loadedJson) {
+  if (!EEPROMMigrator::migrate(config)) {
+    return false;
+  }
+  save(config); // Persist migrated settings immediately
+}
   // Ensure we always have 4 entries
   while (config.worldClocks.size() < 4) {
     config.worldClocks.push_back({"", 0, false});
@@ -833,6 +843,8 @@ bool ConfigManager::save(const AppConfig &config) {
   json["dx_cluster"]["login"] = config.dxClusterLogin;
   json["dx_cluster"]["use_wsjtx"] = config.dxClusterUseWSJTX;
   json["dx_cluster"]["wsjtx_port"] = config.wsjtxPort;
+  json["dx_cluster"]["hide_duplicates"] = config.dxClusterHideDuplicates;
+  json["dx_cluster"]["max_age_minutes"] = config.dxClusterMaxAgeMinutes;
 
   json["live_spots"]["source"] =
       (config.liveSpotSource == LiveSpotSource::RBN)    ? "rbn"

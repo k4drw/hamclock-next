@@ -20,7 +20,7 @@
 class RigService {
 public:
   RigService(std::shared_ptr<RigDataStore> store, const AppConfig &config,
-             HamClockState *state = nullptr);
+             std::weak_ptr<HamClockState> state = {});
   ~RigService();
 
   void start();
@@ -46,7 +46,11 @@ public:
 private:
   std::shared_ptr<RigDataStore> store_;
   const AppConfig &config_;
-  HamClockState *state_;
+  // Non-owning handle to the app-wide HamClockState (owned by AppContext as a
+  // shared_ptr).  weak_ptr makes the non-ownership explicit and degrades
+  // gracefully if that ownership ever changes; the current invariant is that
+  // AppContext::state outlives DashboardContext (and therefore this service).
+  std::weak_ptr<HamClockState> state_;
 
   std::atomic<bool> running_{false};
   std::atomic<bool> connected_{false};
@@ -86,6 +90,7 @@ private:
   bool executeGetRIT(long long &ritHz);
   bool executeSetSplit(bool on);
   bool executeGetSplit(bool &split);
+  bool executeGetPTT(bool &on);
   bool executeGetLevel(float &dbm);
   bool executeVFOSwap();
   bool executeGetSpectrum(std::vector<float> &data); // Placeholder

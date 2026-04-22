@@ -75,7 +75,9 @@ hc_get() {
   if ! curl -sf "${BASE_URL}/$1" > /dev/null; then
     echo "  WARN: API call failed: /$1" >&2
     FAILED+=("API:/$1")
+    return 1
   fi
+  return 0
 }
 capture() {
   local path="$1"
@@ -96,7 +98,10 @@ skip_or_capture() {
   capture "$path"
 }
 has_value() {
-  # has_value <jq_key> <value> — returns 0 if value is in capabilities array
+  # has_value <jq_key> <value> — returns 0 if value is in capabilities array.
+  # "none" is always accepted (it means "no overlay" and is not listed in
+  # capabilities, but is always a valid input to set_prop_overlay / set_wx_overlay).
+  [ "$2" = "none" ] && return 0
   echo "$CAPS" | jq -e --arg v "$2" ".${1}[] | select(. == \$v)" > /dev/null 2>&1
 }
 is_scrollable() {
@@ -217,13 +222,28 @@ fi
 # SCALE is no longer used by get_phys_rect (API provides px, py, pw, ph)
 # but we keep it here for any manual math if needed.
 compute_scale() {
-  PANE1_RECT=$(curl -sf "${BASE_URL}/get_pane_rect?pane=1") || { echo "  WARN: Could not fetch pane 1 rect — scale defaults to 1.0" >&2; SCALE=1; return; }
+  local ATTEMPT=0
+  local MAX_ATTEMPTS=5
+  while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+    PANE1_RECT=$(curl -sf "${BASE_URL}/get_pane_rect?pane=1") && break
+    echo "  WARN: API for compute_scale not ready, retrying ($((ATTEMPT+1))/$MAX_ATTEMPTS)..." >&2
+    ATTEMPT=$((ATTEMPT + 1))
+    sleep 2
+  done
+  if [ $ATTEMPT -eq $MAX_ATTEMPTS ] || [ -z "$PANE1_RECT" ]; then
+    echo "  ERROR: Could not fetch pane 1 rect for scale — defaults to 1.0" >&2
+    SCALE=1; MARGIN_X=0; MARGIN_Y=0
+    return
+  fi
+
   REND_W=$(echo "$PANE1_RECT" | jq -r '.renderer_w')
   REND_H=$(echo "$PANE1_RECT" | jq -r '.renderer_h')
   LOG_W=$(echo  "$PANE1_RECT" | jq -r '.logical_w')
   LOG_H=$(echo  "$PANE1_RECT" | jq -r '.logical_h')
   SCALE=$(awk "BEGIN { print ($REND_W/$LOG_W < $REND_H/$LOG_H) ? $REND_W/$LOG_W : $REND_H/$LOG_H }")
-  echo "  Scale: ${SCALE}x"
+  MARGIN_X=$(awk "BEGIN { printf \"%d\", ($REND_W - ($LOG_W * $SCALE)) / 2 }")
+  MARGIN_Y=$(awk "BEGIN { printf \"%d\", ($REND_H - ($LOG_H * $SCALE)) / 2 }")
+  echo "  Scale: ${SCALE}x, Margins: ${MARGIN_X}x${MARGIN_Y}"
 }
 
 get_phys_rect() {
@@ -247,8 +267,10 @@ get_phys_rect() {
     return 1
   fi
 
-  local PX; PX=$(echo "$RECT" | jq -r '.px')
-  local PY; PY=$(echo "$RECT" | jq -r '.py')
+  local BX; BX=$(echo "$RECT" | jq -r '.x')
+  local BY; BY=$(echo "$RECT" | jq -r '.y')
+  local PX; PX=$(awk "BEGIN { printf \"%d\", $MARGIN_X + ($BX * $SCALE) }")
+  local PY; PY=$(awk "BEGIN { printf \"%d\", $MARGIN_Y + ($BY * $SCALE) }")
   local PW; PW=$(echo "$RECT" | jq -r '.pw')
   local PH; PH=$(echo "$RECT" | jq -r '.ph')
 
@@ -506,6 +528,21 @@ if part_enabled maximized; then
   MAXIMIZED_WIDGETS=(solar dx_cluster aurora_graph band_conditions big_clock)
   MAX_COUNT=0
 
+  # Safe fallback widget for each non-target pane.  These are widgets that:
+  #   - Are not in MAXIMIZED_WIDGETS (so clearing W from a pane never removes
+  #     the fallback we just added)
+  #   - Are distinct across panes (no exclusive-widget conflicts between them)
+  #   - Are pane-4 compatible for pane 4 (restricted to the short allowed list)
+  pane_safe_widget() {
+    case "$1" in
+      2) echo "history_kp" ;;
+      3) echo "asteroid"   ;;
+      4) echo "ncdxf"      ;;
+      5) echo "de_info"    ;;
+      6) echo "dx_info"    ;;
+    esac
+  }
+
   for W in "${MAXIMIZED_WIDGETS[@]}"; do
     OUT="${OUTPUT_DIR}/widgets/${W}_maximized.png"
     if [ "$FORCE" = "0" ] && [ -f "$OUT" ]; then
@@ -514,7 +551,21 @@ if part_enabled maximized; then
       continue
     fi
     echo "  ${W} (maximized)"
-    hc_get "set_pane?pane=1&action=solo&widget=${W}"
+    # Before soloing W on pane 1, evict W from all other panes.
+    # Use add-then-remove so the pane always has at least one widget (the
+    # server rejects remove when it would leave the rotation empty).
+    for P in 2 3 4 5 6; do
+      SAFE=$(pane_safe_widget "$P")
+      hc_get "set_pane?pane=${P}&action=add&widget=${SAFE}"
+      hc_get "set_pane?pane=${P}&action=remove&widget=${W}"
+    done
+    sleep 2  # allow render-thread queue to drain before issuing solo
+    # If solo fails (e.g. server rejects widget), skip — a failed set_pane would
+    # capture whatever the pane was already showing, producing a wrong image.
+    if ! hc_get "set_pane?pane=1&action=solo&widget=${W}"; then
+      echo "  SKIP ${W}: set_pane failed, not capturing"
+      continue
+    fi
     sleep "${DELAY}"  # wait for widget to fully render before expanding
     hc_get "api/panes/expand?pane=1"
     sleep 2
@@ -638,7 +689,7 @@ if part_enabled ui_docs; then
     sleep 1
     capture "$OUT_SETUP"
     debug_key "Escape"
-    sleep 0.5
+    sleep 3
   fi
 
   # 2. Presets Modal — star icon is left side of date row (bottom 22% of TimePanel)
@@ -655,8 +706,8 @@ if part_enabled ui_docs; then
     FULL="${OUTPUT_DIR}/.full_presets.png"
     if capture "$FULL"; then
       # Presets modal is centered, 420x330 logical
-      PX=$(awk "BEGIN { printf \"%d\", (800-420)/2 * $SCALE }")
-      PY=$(awk "BEGIN { printf \"%d\", (480-330)/2 * $SCALE }")
+      PX=$(awk "BEGIN { printf \"%d\", $MARGIN_X + ((800-420)/2 * $SCALE) }")
+      PY=$(awk "BEGIN { printf \"%d\", $MARGIN_Y + ((480-330)/2 * $SCALE) }")
       PW=$(awk "BEGIN { printf \"%d\", 420 * $SCALE }")
       PH=$(awk "BEGIN { printf \"%d\", 330 * $SCALE }")
       magick "$FULL" -crop "${PW}x${PH}+${PX}+${PY}" +repage "$OUT_PRESETS"
@@ -678,8 +729,8 @@ if part_enabled ui_docs; then
     sleep 1
     FULL="${OUTPUT_DIR}/.full_selector.png"
     if capture "$FULL"; then
-      PX=$(awk "BEGIN { printf \"%d\", 20 * $SCALE }")
-      PY=$(awk "BEGIN { printf \"%d\", 20 * $SCALE }")
+      PX=$(awk "BEGIN { printf \"%d\", $MARGIN_X + (20 * $SCALE) }")
+      PY=$(awk "BEGIN { printf \"%d\", $MARGIN_Y + (20 * $SCALE) }")
       PW=$(awk "BEGIN { printf \"%d\", 760 * $SCALE }")
       PH=$(awk "BEGIN { printf \"%d\", 440 * $SCALE }")
       magick "$FULL" -crop "${PW}x${PH}+${PX}+${PY}" +repage "$OUT_SELECTOR"
@@ -689,30 +740,43 @@ if part_enabled ui_docs; then
     sleep 0.5
   fi
 
-  # 4. Pane rotation indicator — top strip of pane 1 when it has 2+ widgets
+  # 4. Pane rotation indicator — pane 1 with 2+ widgets, hover near left edge to show arrows
   OUT_ROT="${OUTPUT_DIR}/pane-rotation-indicator.png"
   if [ "$FORCE" = "1" ] || [ ! -f "$OUT_ROT" ]; then
     echo "  pane-rotation-indicator"
     hc_get "set_pane?pane=1&action=solo&widget=solar"
     hc_get "set_pane?pane=1&action=add&widget=band_conditions"
     sleep 2
+    P1_RECT=$(curl -sf "${BASE_URL}/get_pane_rect?pane=1" || echo '{"x":235,"y":0,"w":160,"h":148,"px":235,"py":0,"pw":160,"ph":148}')
+    # Hover near left edge to trigger rotation arrows (hover=1 → SDL_MOUSEMOTION only, no click)
+    HOVER_X=$(echo "$P1_RECT" | jq '.x + 4 | floor')
+    HOVER_Y=$(echo "$P1_RECT" | jq '.y + (.h / 2) | floor')
+    hc_get "debug/click?x=${HOVER_X}&y=${HOVER_Y}&hover=1"
+    sleep 0.5
     FULL="${OUTPUT_DIR}/.full_rot.png"
     if capture "$FULL"; then
-      P1_RECT=$(curl -sf "${BASE_URL}/get_pane_rect?pane=1" || echo '{"x":235,"y":0,"w":160,"h":148,"px":235,"py":0,"pw":160,"ph":148}')
-      # Indicator strip is at the very top of pane 1 (first ~10px logical)
-      IND_PX=$(echo "$P1_RECT" | jq '.px')
-      IND_PY=$(echo "$P1_RECT" | jq '.py')
+      BX=$(echo "$P1_RECT" | jq '.x')
+      BY=$(echo "$P1_RECT" | jq '.y')
+      IND_PX=$(awk "BEGIN { printf \"%d\", $MARGIN_X + ($BX * $SCALE) }")
+      IND_PY=$(awk "BEGIN { printf \"%d\", $MARGIN_Y + ($BY * $SCALE) }")
       IND_PW=$(echo "$P1_RECT" | jq '.pw')
-      IND_PH=$(awk "BEGIN { printf \"%d\", 12 * $SCALE }")
+      IND_PH=$(echo "$P1_RECT" | jq '.ph')
       magick "$FULL" -crop "${IND_PW}x${IND_PH}+${IND_PX}+${IND_PY}" +repage "$OUT_ROT"
       rm -f "$FULL"
     fi
+    sleep 10
   fi
 
   # 5. K-mode highlight
   OUT_K="${OUTPUT_DIR}/key-highlight-mode.png"
   if [ "$FORCE" = "1" ] || [ ! -f "$OUT_K" ]; then
     echo "  key-highlight-mode"
+    # Hover over Pane 1 center so that K-mode has a target to highlight
+    P1_RECT=$(curl -sf "${BASE_URL}/get_pane_rect?pane=1" || echo '{"x":235,"y":0,"w":160,"h":148}')
+    P1_X=$(echo "$P1_RECT" | jq '.x + .w / 2 | floor')
+    P1_Y=$(echo "$P1_RECT" | jq '.y + .h / 2 | floor')
+    debug_click "$P1_X" "$P1_Y"
+    sleep 1
     debug_key "K"
     sleep 0.5
     capture "$OUT_K"
@@ -733,22 +797,29 @@ if part_enabled ui_docs; then
       #   Map:         x=139, y=149, w=660, h=330
       magick "$FULL" \
         -fill none -stroke red -strokewidth 3 \
-        -draw "rectangle $(awk "BEGIN { printf \"%d,%d %d,%d\", 0*$SCALE, 0*$SCALE, 235*$SCALE, 148*$SCALE }")" \
+        -draw "rectangle $(awk "BEGIN { printf \"%d,%d %d,%d\", $MARGIN_X + 0*$SCALE, $MARGIN_Y + 0*$SCALE, $MARGIN_X + 235*$SCALE, $MARGIN_Y + 148*$SCALE }")" \
         -fill white -pointsize 14 \
-        -annotate +$(awk "BEGIN { printf \"%d\", 5*$SCALE }")+$(awk "BEGIN { printf \"%d\", 20*$SCALE }") "Time Panel" \
+        -annotate +$(awk "BEGIN { printf \"%d\", $MARGIN_X + 5*$SCALE }")+$(awk "BEGIN { printf \"%d\", $MARGIN_Y + 20*$SCALE }") "Time Panel" \
         -fill none -stroke orange -strokewidth 3 \
-        -draw "rectangle $(awk "BEGIN { printf \"%d,%d %d,%d\", 236*$SCALE, 0*$SCALE, 799*$SCALE, 148*$SCALE }")" \
+        -draw "rectangle $(awk "BEGIN { printf \"%d,%d %d,%d\", $MARGIN_X + 236*$SCALE, $MARGIN_Y + 0*$SCALE, $MARGIN_X + 799*$SCALE, $MARGIN_Y + 148*$SCALE }")" \
         -fill white \
-        -annotate +$(awk "BEGIN { printf \"%d\", 240*$SCALE }")+$(awk "BEGIN { printf \"%d\", 20*$SCALE }") "Data Panes" \
+        -annotate +$(awk "BEGIN { printf \"%d\", $MARGIN_X + 240*$SCALE }")+$(awk "BEGIN { printf \"%d\", $MARGIN_Y + 20*$SCALE }") "Data Panes" \
         -fill none -stroke green -strokewidth 3 \
-        -draw "rectangle $(awk "BEGIN { printf \"%d,%d %d,%d\", 0*$SCALE, 149*$SCALE, 139*$SCALE, 479*$SCALE }")" \
+        -draw "rectangle $(awk "BEGIN { printf \"%d,%d %d,%d\", $MARGIN_X + 0*$SCALE, $MARGIN_Y + 149*$SCALE, $MARGIN_X + 139*$SCALE, $MARGIN_Y + 479*$SCALE }")" \
         -fill white \
-        -annotate +$(awk "BEGIN { printf \"%d\", 3*$SCALE }")+$(awk "BEGIN { printf \"%d\", 175*$SCALE }") "Side Panel" \
+        -annotate +$(awk "BEGIN { printf \"%d\", $MARGIN_X + 3*$SCALE }")+$(awk "BEGIN { printf \"%d\", $MARGIN_Y + 175*$SCALE }") "Side Panel" \
         -fill none -stroke "#4488FF" -strokewidth 3 \
-        -draw "rectangle $(awk "BEGIN { printf \"%d,%d %d,%d\", 140*$SCALE, 149*$SCALE, 799*$SCALE, 479*$SCALE }")" \
+        -draw "rectangle $(awk "BEGIN { printf \"%d,%d %d,%d\", $MARGIN_X + 140*$SCALE, $MARGIN_Y + 149*$SCALE, $MARGIN_X + 799*$SCALE, $MARGIN_Y + 479*$SCALE }")" \
         -fill white \
-        -annotate +$(awk "BEGIN { printf \"%d\", 145*$SCALE }")+$(awk "BEGIN { printf \"%d\", 175*$SCALE }") "Map & Overlays" \
+        -annotate +$(awk "BEGIN { printf \"%d\", $MARGIN_X + 145*$SCALE }")+$(awk "BEGIN { printf \"%d\", $MARGIN_Y + 175*$SCALE }") "Map & Overlays" \
         "$OUT_LAYOUT"
+      
+      # Crop out letterboxing
+      PX=$(awk "BEGIN { printf \"%d\", $MARGIN_X }")
+      PY=$(awk "BEGIN { printf \"%d\", $MARGIN_Y }")
+      PW=$(awk "BEGIN { printf \"%d\", 800 * $SCALE }")
+      PH=$(awk "BEGIN { printf \"%d\", 480 * $SCALE }")
+      magick "$OUT_LAYOUT" -crop "${PW}x${PH}+${PX}+${PY}" +repage "$OUT_LAYOUT"
       rm -f "$FULL"
     fi
   fi

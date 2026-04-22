@@ -23,6 +23,14 @@ public:
 
   void update() override;
   bool onMouseWheel(int scrollY) override;
+  bool onMouseUp(int mx, int my, Uint16 mod, int clicks) override;
+
+  void setOnPeditionActivated(std::function<void(const DXPedition &)> cb) {
+    onPeditionActivated_ = std::move(cb);
+  }
+  void setOnPeditionDeactivated(std::function<void()> cb) {
+    onPeditionDeactivated_ = std::move(cb);
+  }
 
 protected:
   void renderRowText(SDL_Renderer *renderer, int index, int rx, int ry,
@@ -35,6 +43,11 @@ private:
   uint32_t lastFetch_ = 0;
 
   std::vector<std::string> allRows_;
+  std::vector<DXPedition> allPeds_;
+  std::vector<DXPedition> currentPeds_;
+  std::string selectedCall_;
+  std::function<void(const DXPedition &)> onPeditionActivated_;
+  std::function<void()> onPeditionDeactivated_;
   int scrollOffset_ = 0;
   static constexpr int MAX_VISIBLE_ROWS = 12;
 };

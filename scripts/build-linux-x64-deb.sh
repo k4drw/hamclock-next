@@ -1,6 +1,7 @@
 #!/bin/bash
 # Generic Linux x86_64 DEB Build (Ubuntu 22.04 base)
 # This script spins up an Ubuntu container to build the DEB package.
+# Two separate binaries are built (unified and fb0) so each knows its own variant.
 
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 REPO_ROOT=$(dirname "$SCRIPT_DIR")
@@ -19,7 +20,12 @@ echo "Cleaning old build artifacts..."
 rm -rf "$BUILD_DIR"
 mkdir -p "$BUILD_DIR"
 
-echo "Starting Linux x64 DEB Build (v${VERSION})..."
+# Common cmake flags (everything except HAMCLOCK_BUILD_VARIANT).
+# Must be a single line — expanded inside docker bash -c "...", newlines would
+# be treated as command separators, not line continuations.
+COMMON_FLAGS="-DCMAKE_BUILD_TYPE=Release -DENABLE_DEBUG_API=OFF -DCURL_DISABLE_INSTALL=ON -DSDL_STATIC=ON -DSDL_SHARED=OFF -DSDL_X11=ON -DSDL_X11_DYNAMIC=libX11.so.6 -DSDL_WAYLAND=ON -DSDL_WAYLAND_DYNAMIC=libwayland-client.so.0 -DSDL_KMSDRM=ON -DSDL_GLES=ON -DSDL2IMAGE_VENDORED=ON -DSDL2IMAGE_SAMPLES=OFF -DHAMCLOCK_INSTALL_TYPE=DEB"
+
+echo "Starting Linux x64 DEB Build (v${VERSION}) — unified + fb0 variants..."
 
 docker run --rm -v "$(pwd)":/work:z -w /work $IMAGE bash -c "
     export DEBIAN_FRONTEND=noninteractive && \
@@ -30,46 +36,36 @@ docker run --rm -v "$(pwd)":/work:z -w /work $IMAGE bash -c "
         libwayland-dev libxkbcommon-dev wayland-protocols \
         libdrm-dev libgbm-dev libegl-dev libgles-dev \
         libdbus-1-dev libudev-dev libasound2-dev flite1-dev curl && \
-    cmake -B$BUILD_DIR -H. \
-        -DCMAKE_BUILD_TYPE=Release \
-        -DENABLE_DEBUG_API=OFF \
-        -DCURL_DISABLE_INSTALL=ON \
-        -DSDL_STATIC=ON \
-        -DSDL_SHARED=OFF \
-        -DSDL_X11=ON \
-        -DSDL_X11_DYNAMIC=libX11.so.6 \
-        -DSDL_WAYLAND=ON \
-        -DSDL_WAYLAND_DYNAMIC=libwayland-client.so.0 \
-        -DSDL_KMSDRM=ON \
-        -DSDL_GLES=ON \
-        -DSDL2IMAGE_VENDORED=ON \
-        -DSDL2IMAGE_SAMPLES=OFF && \
-    cmake --build $BUILD_DIR -j$(nproc) && \
+    echo '--- Building unified variant ---' && \
+    cmake -B$BUILD_DIR/unified -H. $COMMON_FLAGS -DHAMCLOCK_BUILD_VARIANT=unified && \
+    cmake --build $BUILD_DIR/unified -j\$(nproc) && \
+    echo '--- Building fb0 variant ---' && \
+    cmake -B$BUILD_DIR/fb0 -H. $COMMON_FLAGS -DHAMCLOCK_BUILD_VARIANT=fb0 && \
+    cmake --build $BUILD_DIR/fb0 -j\$(nproc) && \
     chown -R $(id -u):$(id -g) $BUILD_DIR
 "
 
 if [ $? -eq 0 ]; then
     echo "--------------------------------------------------"
     echo "SUCCESS: Linux x64 Build finished!"
-    echo "Binary: $BUILD_DIR/hamclock-next"
+    echo "Binaries: $BUILD_DIR/unified/hamclock-next  $BUILD_DIR/fb0/hamclock-next"
 
-    # Packaging - We create two packages with the same binary but different dependencies
-    echo "Packaging Unified (Desktop) DEB..."
     chmod +x packaging/linux/create_deb.sh
-    
-    # We export VERSION so create_deb.sh can use it
     export VERSION="${VERSION}"
-    ./packaging/linux/create_deb.sh "$BUILD_DIR/hamclock-next" "amd64" "unified" "$BUILD_DIR"
+
+    echo "Packaging Unified (Desktop) DEB..."
+    cp $BUILD_DIR/unified/hamclock-next $BUILD_DIR/hamclock-next.unified.${VERSION}.linux-x64
+    ./packaging/linux/create_deb.sh "$BUILD_DIR/unified/hamclock-next" "amd64" "unified" "$BUILD_DIR"
 
     echo "Packaging Lean (Kiosk/Headless) DEB..."
-    ./packaging/linux/create_deb.sh "$BUILD_DIR/hamclock-next" "amd64" "fb0" "$BUILD_DIR"
-    
+    cp $BUILD_DIR/fb0/hamclock-next $BUILD_DIR/hamclock-next.fb0.${VERSION}.linux-x64
+    ./packaging/linux/create_deb.sh "$BUILD_DIR/fb0/hamclock-next" "amd64" "fb0" "$BUILD_DIR"
+
     echo "--------------------------------------------------"
 
-    # Cleanup intermediate artifacts if successful
+    # Cleanup intermediate artifacts
     echo "Cleaning up intermediate build artifacts (saving disk space)..."
-    find "$BUILD_DIR" -maxdepth 1 -type f ! -name "hamclock-next*" -delete
-    find "$BUILD_DIR" -maxdepth 1 -type d ! -name "$BUILD_DIR" -exec rm -rf {} + 2>/dev/null
+    rm -rf "$BUILD_DIR/unified" "$BUILD_DIR/fb0"
 else
     echo "ERROR: Build failed!"
     exit 1

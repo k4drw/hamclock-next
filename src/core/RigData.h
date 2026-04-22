@@ -120,6 +120,11 @@ public:
     data_.split = split;
   }
 
+  void setPTT(bool ptt) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    data_.ptt = ptt;
+  }
+
   void setSpectrum(const std::vector<float> &data, bool supported) {
     std::lock_guard<std::mutex> lock(mutex_);
     data_.spectrum = data;

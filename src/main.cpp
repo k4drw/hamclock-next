@@ -77,7 +77,6 @@
 #include "ui/CountdownPanel.h"
 #include "ui/DRAPPanel.h"
 #include "ui/DXClusterPanel.h"
-#include "ui/DXClusterSetup.h"
 #include "ui/DXInfo.h"
 #include "ui/DebugOverlay.h"
 #include "ui/DstPanel.h"
@@ -151,6 +150,7 @@
 #include <fcntl.h>
 #include <nlohmann/json.hpp>
 
+#include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -281,10 +281,18 @@ int main(int argc, char *argv[]) {
 #ifndef __EMSCRIPTEN__
   // Native: IDBFS does not exist; init log and DB immediately.
   Log::init(ctx.cfgMgr.configDir().string());
+  auto s_startupT0 = std::chrono::steady_clock::now();
+  auto logStartupPhase = [&](const char *phase) {
+    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                  std::chrono::steady_clock::now() - s_startupT0)
+                  .count();
+    LOG_I("Startup", "{}: +{}ms", phase, ms);
+  };
   if (!DatabaseManager::instance().init(ctx.cfgMgr.configDir() /
                                         "hamclock.db")) {
     LOG_E("Main", "Failed to initialize database");
   }
+  logStartupPhase("core init (log+db)");
 #else
   // WASM: Log::init and DatabaseManager::init are called AFTER IDBFS sync
   // completes inside hamclock_after_idbfs().  If we init them here the log
@@ -363,14 +371,6 @@ int main(int argc, char *argv[]) {
   bool preventSleep = ctx.appCfg.preventSleep;
 
   // --- Init SDL2 ---
-  int numDrivers = SDL_GetNumVideoDrivers();
-  std::fprintf(stderr, "SDL Video Drivers available: ");
-  for (int i = 0; i < numDrivers; ++i) {
-    std::fprintf(stderr, "%s%s", SDL_GetVideoDriver(i),
-                 (i == numDrivers - 1) ? "" : ", ");
-  }
-  std::fprintf(stderr, "\n");
-
 #ifdef _WIN32
   WSADATA wsaData;
   if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
@@ -394,6 +394,9 @@ int main(int argc, char *argv[]) {
   if (!(IMG_Init(imgFlags) & imgFlags)) {
     LOG_ERROR("IMG_Init failed: {}", IMG_GetError());
   }
+#ifndef __EMSCRIPTEN__
+  logStartupPhase("SDL ready");
+#endif
 
   if (preventSleep) {
     SDL_DisableScreenSaver();
@@ -453,6 +456,9 @@ int main(int argc, char *argv[]) {
                                   SDL_WINDOWPOS_CENTERED, ctx.globalWinW,
                                   ctx.globalWinH, windowFlags);
   }
+#ifndef __EMSCRIPTEN__
+  logStartupPhase("window created");
+#endif
 
   if (!ctx.window) {
     LOG_ERROR("SDL_CreateWindow failed: {}", SDL_GetError());
@@ -514,6 +520,9 @@ int main(int argc, char *argv[]) {
     LOG_ERROR("SDL_CreateRenderer failed");
     return EXIT_FAILURE;
   }
+#ifndef __EMSCRIPTEN__
+  logStartupPhase("renderer created");
+#endif
 
   if (TTF_Init() != 0) {
     LOG_ERROR("TTF_Init failed");
@@ -521,6 +530,7 @@ int main(int argc, char *argv[]) {
   }
 #ifndef __EMSCRIPTEN__
   FontManager::setGlyphFont(glyphs_subset_ttf, glyphs_subset_ttf_len);
+  logStartupPhase("fonts loaded");
 #endif
 
   // --- Initialize Persistent State ---
@@ -531,6 +541,9 @@ int main(int argc, char *argv[]) {
   ctx.netManager->setCorsProxyUrl(ctx.appCfg.corsProxyUrl);
   ctx.netManager->setHubConfig(ctx.appCfg.hubMode, ctx.appCfg.hubIp,
                                ctx.appCfg.hubPort);
+#ifndef __EMSCRIPTEN__
+  logStartupPhase("network manager ready");
+#endif
 
   ActivityLocationManager::getInstance().init(*ctx.netManager,
                                               ctx.cfgMgr.configDir() / "cache");
@@ -627,6 +640,7 @@ int main(int argc, char *argv[]) {
     ctx.brightnessMgr->setLtr329Provider(ctx.ltr329Provider.get());
     ctx.brightnessMgr->setLtr329AutoDim(true);
   }
+  logStartupPhase("managers ready (entering main loop)");
 #endif
 
   // Audio device is opened lazily on first playAlarm() call.
@@ -734,11 +748,14 @@ void main_tick() {
           s->setStartTab(SetupScreen::Tab::Services);
           ctx.startOnServicesTab = false;
         }
-        ctx.setupWidget = std::move(s);
-      } else if (ctx.activeSetup == AppContext::SetupMode::DXCluster) {
-        auto s = std::make_unique<DXClusterSetup>(setupX, setupY, setupW,
-                                                  setupH, *ctx.setupFontMgr);
-        s->setConfig(ctx.appCfg);
+#ifndef __EMSCRIPTEN__
+        if (ctx.webServer && ctx.webServer->isLiveWebEnabled()) {
+          std::string url = "Live Web Control: http://" + NetworkManager::getLocalIP() + ":" + std::to_string(HamClock::DEFAULT_WEB_SERVER_PORT);
+          s->setLiveWebUrl(url);
+        }
+        if (ctx.updateChecker)
+          s->setUpdateChecker(ctx.updateChecker.get());
+#endif
         ctx.setupWidget = std::move(s);
       }
 #ifndef __ANDROID__
@@ -885,9 +902,6 @@ void main_tick() {
     if (ctx.activeSetup == AppContext::SetupMode::Main) {
       if (static_cast<SetupScreen *>(ctx.setupWidget.get())->isComplete())
         setupDone = true;
-    } else if (ctx.activeSetup == AppContext::SetupMode::DXCluster) {
-      if (static_cast<DXClusterSetup *>(ctx.setupWidget.get())->isComplete())
-        setupDone = true;
     }
 
     if (setupDone) {
@@ -909,10 +923,6 @@ void main_tick() {
           for (const auto &c : ctx.appCfg.watchlist)
             ctx.watchlistStore->add(c);
         }
-      } else if (ctx.activeSetup == AppContext::SetupMode::DXCluster) {
-        if (static_cast<DXClusterSetup *>(ctx.setupWidget.get())->isSaved())
-          ctx.appCfg = static_cast<DXClusterSetup *>(ctx.setupWidget.get())
-                           ->updateConfig(ctx.appCfg);
       }
       ctx.cfgMgr.save(ctx.appCfg);
       if (ctx.dashboard && ctx.dashboard->spotProvider)
@@ -973,6 +983,14 @@ void main_tick() {
   } else {
     // Dashboard
     if (!ctx.dashboard) {
+      // Ensure the background loadCache() thread has finished before providers
+      // start calling fetchAsync() — otherwise cache entries are not yet in the
+      // memory map and every provider falls through to a live network fetch.
+      // SDL init typically consumes more time than loadCache() needs, so this
+      // returns immediately in the common case.
+#ifndef __EMSCRIPTEN__
+      ctx.netManager->waitForCacheLoad();
+#endif
       ctx.dashboard = std::make_unique<DashboardContext>(ctx);
 #ifndef __EMSCRIPTEN__
       // Apply custom font if configured (embedded font used by default)
@@ -1100,6 +1118,40 @@ void main_tick() {
       ctx.dashboard->expandPane(ecmd, ctx);
     else if (ecmd == -2 && ctx.dashboard)
       ctx.dashboard->restorePane(ctx);
+
+    // Process set_pane commands queued from the REST API network thread.
+    // These must run here (main/render thread) because setRotation() calls
+    // onResize() which may call SDL_DestroyTexture (e.g. DXClusterPanel).
+    // Drain the entire queue each frame — rapid-fire API calls (e.g. resetting
+    // all 6 panes at once) must all land, not collapse to the last one.
+#ifndef __EMSCRIPTEN__
+    if (ctx.webServer && ctx.dashboard) {
+      auto cmds = ctx.webServer->drainPendingPaneSets();
+      const int intS  = ctx.appCfg.rotationIntervalS;
+      const bool sync = ctx.appCfg.syncRotation;
+      for (const auto &psc : cmds) {
+        if (psc.pane < 0 || psc.pane >= (int)ctx.dashboard->panes.size())
+          continue;
+        auto &p = ctx.dashboard->panes[psc.pane];
+        if (psc.action == 1) {
+          p->forceAdvance();
+        } else if (psc.action == 2 && !psc.widget.empty()) {
+          auto rot = p->getRotation();
+          if (std::find(rot.begin(), rot.end(), psc.widget) == rot.end()) {
+            rot.push_back(psc.widget);
+            p->setRotation(rot, intS, sync);
+          }
+        } else if (psc.action == 3 && !psc.widget.empty()) {
+          auto rot = p->getRotation();
+          rot.erase(std::remove(rot.begin(), rot.end(), psc.widget), rot.end());
+          if (!rot.empty())
+            p->setRotation(rot, intS, sync);
+        } else if (psc.action == 4 && !psc.widget.empty()) {
+          p->setRotation({psc.widget}, intS, sync);
+        }
+      }
+    }
+#endif // __EMSCRIPTEN__
 
     // Always call update() — this processes SDL events and keeps interaction
     // responsive. Only render() is throttled.

@@ -98,6 +98,22 @@ public:
   void setTimePanel(TimePanel *tp) { std::lock_guard<std::mutex> lk(dataMutex_); timePanel_ = tp; }
   void setRssBanner(RSSBanner *rb) { std::lock_guard<std::mutex> lk(dataMutex_); rssBanner_ = rb; }
   void setPaneExpandControl(std::atomic<int> *cmd) { std::lock_guard<std::mutex> lk(dataMutex_); paneExpandCmd_ = cmd; }
+
+  // Pane set commands (solo/add/remove/next) must be applied on the main/render
+  // thread because setRotation() → onResize() may destroy SDL textures.
+  struct PendingPaneSet {
+    int pane = -1;          // 0-based pane index
+    int action = 0;         // 1=next, 2=add, 3=remove, 4=solo
+    std::string widget;     // widget typeId (empty for action=next)
+  };
+  // Called from the main thread: swaps out the entire pending queue in one
+  // lock acquisition so rapid-fire API calls (e.g. 6 pane resets) all land.
+  std::vector<PendingPaneSet> drainPendingPaneSets() {
+    std::lock_guard<std::mutex> lk(dataMutex_);
+    std::vector<PendingPaneSet> out;
+    out.swap(pendingPaneSets_);
+    return out;
+  }
   void setBMEProvider(BME280Provider *bme) { std::lock_guard<std::mutex> lk(dataMutex_); bmeProvider_ = bme; }
   void setMarineStore(std::shared_ptr<MarineStore> s) {
     std::lock_guard<std::mutex> lk(dataMutex_);
@@ -140,6 +156,7 @@ private:
   TimePanel *timePanel_ = nullptr;
   RSSBanner *rssBanner_ = nullptr;
   std::atomic<int> *paneExpandCmd_ = nullptr;
+  std::vector<PendingPaneSet> pendingPaneSets_;  // guarded by dataMutex_
   std::shared_ptr<MarineStore> marineStore_;
   bool screenLocked_ = false;
   bool liveWebEnabled_ = false;

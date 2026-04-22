@@ -6,6 +6,7 @@
 #include "Widget.h"
 
 #include <SDL.h>
+#include <functional>
 #include <memory>
 #include <string>
 
@@ -31,6 +32,10 @@ public:
   bool performAction(const std::string &action) override;
   SDL_Rect getActionRect(const std::string &action) const override;
   nlohmann::json getDebugData() const override;
+
+  void setOnBandSelected(std::function<void(int bandIdx)> cb) {
+    onBandSelected_ = std::move(cb);
+  }
 
 private:
   void renderSetup(SDL_Renderer *renderer);
@@ -94,4 +99,6 @@ private:
   int gridCols_ = 0;
   int gridPad_ = 2;
   SDL_Rect footerRect_ = {};
+
+  std::function<void(int)> onBandSelected_;
 };

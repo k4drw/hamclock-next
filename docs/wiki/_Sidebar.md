@@ -3,6 +3,7 @@
 - [Home](Home.md)
 - [Getting Started](Getting-Started.md)
 - [Building from Source](Building-from-Source.md)
+- [Raspberry Pi Setup Guide](Raspberry-Pi-Guide.md)
 
 ## Using HamClock-Next
 
@@ -20,6 +21,12 @@
 - [REST API](REST-API.md)
 - [Data Sources & Network](Data-Sources.md)
 - [Keyboard Shortcuts](Keyboard-Shortcuts.md)
+- [Glossary](Glossary.md)
+- [Troubleshooting & FAQ](Troubleshooting-and-FAQ.md)
+
+## Development
+
+- [Developer Guide & MCP](Developer-Guide.md)
 
 ## Migration
 

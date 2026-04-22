@@ -2,6 +2,7 @@
 
 #include "ProviderBase.h"
 #include "../core/ActivityData.h"
+#include "../core/PrefixManager.h"
 #include "../network/NetworkManager.h"
 #include <memory>
 
@@ -10,7 +11,8 @@ public:
   enum class UpdateType { DXPeds, POTA, SOTA };
 
   ActivityProvider(NetworkManager &net,
-                   std::shared_ptr<ActivityDataStore> store);
+                   std::shared_ptr<ActivityDataStore> store,
+                   PrefixManager &prefixMgr);
 
   void fetch();
 
@@ -21,6 +23,7 @@ private:
 
   NetworkManager &net_;
   std::shared_ptr<ActivityDataStore> store_;
+  PrefixManager &prefixMgr_;
 
   static constexpr const char *DX_PEDS_URL =
       "https://www.ng3k.com/Misc/adxo.html";

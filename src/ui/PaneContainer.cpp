@@ -348,7 +348,14 @@ bool PaneContainer::onMouseWheel(int scrollY) {
 }
 
 std::vector<std::string> PaneContainer::getActions() const {
-  std::vector<std::string> actions = {"change_rotation", "tap", "rotate"};
+  std::vector<std::string> actions = {"select widget"};
+  if (!(activeWidget_ && activeWidget_->isConfiguring())) {
+    actions.push_back(expanded_ ? "restore" : "maximize");
+    if (rotation_.size() > 1) {
+      actions.push_back("prev pane");
+      actions.push_back("next pane");
+    }
+  }
   if (activeWidget_) {
     for (const auto &a : activeWidget_->getActions()) {
       actions.push_back(a);
@@ -368,16 +375,25 @@ std::string PaneContainer::getDisplayName() const {
 }
 
 SDL_Rect PaneContainer::getActionRect(const std::string &action) const {
-  if (action == "change_rotation") {
+  if (action == "select widget") {
     return {x_, y_, width_, height_ / 10};
   }
-  if (action == "tap") {
-    return {x_, y_ + height_ / 10, width_, height_ * 9 / 10};
+  if (action == "maximize" || action == "restore") {
+    int btnSz = std::min(14, std::min(width_, height_) / 6);
+    btnSz = std::max(btnSz, 8);
+    return {x_ + width_ - btnSz - 2, y_ + 2, btnSz, btnSz};
   }
-  if (action == "rotate") {
-    // Manual rotation could be anywhere, but let's map it to the
-    // change_rotation area for simplicity
-    return {x_, y_, width_, height_ / 10};
+  if (action == "prev pane") {
+    int arrowW = std::min(18, width_ / 8);
+    int arrowH = std::min(36, height_ / 5);
+    int cy = y_ + height_ / 2;
+    return {x_, cy - arrowH / 2, arrowW, arrowH};
+  }
+  if (action == "next pane") {
+    int arrowW = std::min(18, width_ / 8);
+    int arrowH = std::min(36, height_ / 5);
+    int cy = y_ + height_ / 2;
+    return {x_ + width_ - arrowW, cy - arrowH / 2, arrowW, arrowH};
   }
 
   if (activeWidget_) {

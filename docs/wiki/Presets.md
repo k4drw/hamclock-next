@@ -1,12 +1,12 @@
 # Configuration Presets
 
-Presets let you save a complete dashboard configuration and recall it instantly with a single click. Use presets to switch between operating modes — for example, a "Contest" preset with different overlays and widget rotations versus an "Evening DX" preset.
+Presets let you save a complete dashboard setup and bring it back with one click. Use them to switch between operating modes, such as a contest setup and an evening DX setup.
 
 ---
 
 ## Opening the Presets Modal
 
-Click the **star icon (★)** in the Time Panel (top-left corner of the screen) to open the Presets modal.
+Click the **star icon (★)** in the Time Panel to open the Presets window.
 
 ![Presets modal](images/timepanel-presets-modal.png)
 
@@ -14,7 +14,7 @@ Click the **star icon (★)** in the Time Panel (top-left corner of the screen) 
 
 ## What a Preset Saves
 
-Each preset captures a complete snapshot of the visual configuration:
+Each preset saves a snapshot of the parts of the screen most people adjust often:
 
 | Field | Description |
 |-------|-------------|
@@ -30,7 +30,7 @@ Each preset captures a complete snapshot of the visual configuration:
 | `propMode` | Propagation mode (e.g., SSB) |
 | `propPower` | Transmitter power in watts |
 
-Presets do **not** save identity fields (callsign, grid, lat/lon) or service credentials.
+Presets do **not** save identity fields such as callsign, grid, latitude/longitude, or service credentials.
 
 ---
 
@@ -42,7 +42,7 @@ Presets do **not** save identity fields (callsign, grid, lat/lon) or service cre
 4. Enter a name for the preset (e.g., `Contest`, `Evening DX`, `Morning Check`)
 5. Click **OK**
 
-The preset appears in the list and is immediately available for recall.
+The preset appears in the list and is ready to use right away.
 
 ---
 
@@ -53,7 +53,7 @@ The preset appears in the list and is immediately available for recall.
 3. Click the preset row to select it
 4. Click **Apply**
 
-HamClock-Next immediately switches all panes, overlays, and map settings to match the preset.
+HamClock-Next switches all panes, overlays, and map settings to match the preset.
 
 ---
 
@@ -64,6 +64,26 @@ HamClock-Next immediately switches all panes, overlays, and map settings to matc
 3. Click **Delete**
 
 The preset is removed immediately. This action cannot be undone.
+
+---
+
+## Built-in Presets
+
+HamClock-Next ships with one built-in preset that you can apply immediately from the Presets modal:
+
+### Prop Firehose
+
+The **Prop Firehose** preset fills the screen with propagation and space weather tiles. It is useful when you want a dedicated monitoring view.
+
+What it loads:
+- **Pane 1**: Solar → Solar Storm → Solar Cycle → Ionosonde
+- **Pane 2**: Solar Impact Timeline → SFI 30-Day Trend → NOAA Space Wx → Tropo
+- **Pane 3**: Aurora → Aurora Graph → VOACAP DE-DX → DRAP
+- **Pane 4**: Solar (compact) → Band Conditions → NCDXF Beacons
+- **Pane 5**: DE Info
+- **Pane 6**: DX Info
+
+Apply it the same way as any other preset: click **★**, select **Prop Firehose**, then click **Apply**.
 
 ---
 
