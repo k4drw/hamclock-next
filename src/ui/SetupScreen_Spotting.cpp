@@ -114,9 +114,9 @@ void SetupScreen::renderTabDXCluster(SDL_Renderer *renderer, int cx, int pad,
   static constexpr int kAgeChoices[4] = {10, 20, 40, 60};
   int ageRadioX = fieldX + fontMgr_.getLogicalWidth("Max age:  ", cat->ptSize(FontStyle::SmallRegular));
   int ageR = 7;
-  int ageSpacing = fontMgr_.getLogicalWidth("  60m  ", cat->ptSize(FontStyle::SmallRegular));
+  int ageSpacing = fontMgr_.getLogicalWidth("  60min   ", cat->ptSize(FontStyle::SmallRegular));
   for (int i = 0; i < 4; i++) {
-    std::string lbl = std::to_string(kAgeChoices[i]) + "m";
+    std::string lbl = std::to_string(kAgeChoices[i]) + "min";
     int cx_r = ageRadioX + i * ageSpacing + ageR;
     int cy_r = y + ageR + 2;
     bool selected = (clusterMaxAgeMinutes_ == kAgeChoices[i]);
@@ -131,7 +131,7 @@ void SetupScreen::renderTabDXCluster(SDL_Renderer *renderer, int cx, int pad,
       SDL_RenderFillRect(renderer, &inner);
     }
     int lblW = fontMgr_.getLogicalWidth(lbl, cat->ptSize(FontStyle::SmallRegular));
-    cat->drawText(renderer, lbl, cx_r + ageR + 3, y + 4, rc, FontStyle::SmallRegular);
+    cat->drawText(renderer, lbl, cx_r + ageR + 3, y + 2, rc, FontStyle::SmallRegular);
     clusterAgeRects_[i] = {cx_r - ageR, cy_r - ageR, ageR * 2 + 3 + lblW, ageR * 2};
   }
   y += 26;
