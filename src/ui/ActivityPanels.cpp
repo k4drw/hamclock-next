@@ -41,10 +41,12 @@ void DXPedPanel::update() {
   auto data = store_->get();
   if (data.lastUpdated != lastUpdate_) {
     allRows_.clear();
+    allPeds_.clear();
     for (const auto &de : data.dxpeds) {
       std::stringstream ss;
       ss << de.call << '\t' << de.location;
       allRows_.push_back(ss.str());
+      allPeds_.push_back(de);
     }
     if (allRows_.empty() && data.valid) {
       allRows_.push_back("No upcoming expeditions");
@@ -55,6 +57,23 @@ void DXPedPanel::update() {
     int end = std::min(scrollOffset_ + MAX_VISIBLE_ROWS, (int)allRows_.size());
     setRows(std::vector<std::string>(allRows_.begin() + scrollOffset_,
                                      allRows_.begin() + end));
+    int pedEnd = std::min(scrollOffset_ + MAX_VISIBLE_ROWS, (int)allPeds_.size());
+    currentPeds_ =
+        (scrollOffset_ < (int)allPeds_.size())
+            ? std::vector<DXPedition>(allPeds_.begin() + scrollOffset_,
+                                      allPeds_.begin() + pedEnd)
+            : std::vector<DXPedition>{};
+    // Restore highlight after data refresh if the selected call is still visible.
+    int hi = -1;
+    if (!selectedCall_.empty()) {
+      for (size_t i = 0; i < currentPeds_.size(); ++i) {
+        if (currentPeds_[i].call == selectedCall_) {
+          hi = static_cast<int>(i);
+          break;
+        }
+      }
+    }
+    setHighlightedIndex(hi);
     lastUpdate_ = data.lastUpdated;
   }
 }
@@ -75,9 +94,70 @@ bool DXPedPanel::onMouseWheel(int scrollY) {
     int end = std::min(scrollOffset_ + MAX_VISIBLE_ROWS, (int)allRows_.size());
     setRows(std::vector<std::string>(allRows_.begin() + scrollOffset_,
                                      allRows_.begin() + end));
+    int pedEnd = std::min(scrollOffset_ + MAX_VISIBLE_ROWS, (int)allPeds_.size());
+    currentPeds_ =
+        (scrollOffset_ < (int)allPeds_.size())
+            ? std::vector<DXPedition>(allPeds_.begin() + scrollOffset_,
+                                      allPeds_.begin() + pedEnd)
+            : std::vector<DXPedition>{};
+    int hi = -1;
+    if (!selectedCall_.empty()) {
+      for (size_t i = 0; i < currentPeds_.size(); ++i) {
+        if (currentPeds_[i].call == selectedCall_) {
+          hi = static_cast<int>(i);
+          break;
+        }
+      }
+    }
+    setHighlightedIndex(hi);
     return true;
   }
   return false;
+}
+
+bool DXPedPanel::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
+  (void)mod;
+  (void)clicks;
+  if (mx < x_ || mx >= x_ + width_ || my < y_ || my >= y_ + height_)
+    return false;
+
+  int pad = std::max(2, static_cast<int>(width_ * 0.03f));
+  int titleAreaH = pad * 2;
+  if (titleTex_)
+    titleAreaH += titleH_;
+
+  if (my <= y_ + titleAreaH)
+    return false;
+
+  int rowY = my - (y_ + titleAreaH);
+  int remaining = (y_ + height_) - (y_ + titleAreaH);
+  int rowCount = static_cast<int>(currentPeds_.size());
+  if (rowCount <= 0)
+    return false;
+  int rowH = std::max(rowFontSize_ + 4, remaining / rowCount);
+  if (rowH <= 0)
+    return false;
+  size_t idx = rowY / rowH;
+  if (idx >= currentPeds_.size())
+    return false;
+
+  const auto &clicked = currentPeds_[idx];
+  // Unresolved rows: dimmed and inert.
+  if (clicked.lat == 0.0 && clicked.lon == 0.0)
+    return false;
+
+  if (selectedCall_ == clicked.call) {
+    selectedCall_.clear();
+    setHighlightedIndex(-1);
+    if (onPeditionDeactivated_)
+      onPeditionDeactivated_();
+  } else {
+    selectedCall_ = clicked.call;
+    setHighlightedIndex(static_cast<int>(idx));
+    if (onPeditionActivated_)
+      onPeditionActivated_(clicked);
+  }
+  return true;
 }
 
 void DXPedPanel::renderRowText(SDL_Renderer *renderer, int index, int rx, int ry,
@@ -91,12 +171,24 @@ void DXPedPanel::renderRowText(SDL_Renderer *renderer, int index, int rx, int ry
       (tab != std::string::npos) ? row.substr(0, tab) : row;
   const std::string loc =
       (tab != std::string::npos) ? row.substr(tab + 1) : "";
+
+  // Dim rows whose callsign could not be geolocated (lat/lon still at default 0).
+  SDL_Color rowColor = color;
+  if (index >= 0 && index < static_cast<int>(currentPeds_.size())) {
+    const auto &pe = currentPeds_[index];
+    if (pe.lat == 0.0 && pe.lon == 0.0) {
+      rowColor = {static_cast<Uint8>(color.r / 2),
+                  static_cast<Uint8>(color.g / 2),
+                  static_cast<Uint8>(color.b / 2), color.a};
+    }
+  }
+
   int pad = std::max(2, static_cast<int>(width_ * 0.03f));
   int midY = ry + rh / 2;
   int colX = rx + rw * 42 / 100;
-  cat->drawText(renderer, call, rx + pad, midY, color, FontStyle::Fast, false,
-                false, true);
-  cat->drawText(renderer, loc, colX, midY, color, FontStyle::Fast, false,
+  cat->drawText(renderer, call, rx + pad, midY, rowColor, FontStyle::Fast,
+                false, false, true);
+  cat->drawText(renderer, loc, colX, midY, rowColor, FontStyle::Fast, false,
                 false, true);
 }
 

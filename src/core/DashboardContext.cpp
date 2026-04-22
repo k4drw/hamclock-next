@@ -389,8 +389,8 @@ DashboardContext::DashboardContext(AppContext &ctx)
 #endif
   satMgr->setObserver(appCfg.lat, appCfg.lon);
 
-  activityProvider =
-      std::make_unique<ActivityProvider>(netManager, activityStore);
+  activityProvider = std::make_unique<ActivityProvider>(
+      netManager, activityStore, ctx.prefixMgr);
   activityProvider->fetch();
 
   // Re-fetch POTA spots once the parks CSV is parsed so spots get coordinates.
@@ -987,6 +987,28 @@ DashboardContext::DashboardContext(AppContext &ctx)
           }
           state->dxCallsign.clear();
           state->dxFreqKhz = 0.0;
+        });
+      }
+    } else if (type == "dx_peditions") {
+      auto *dxpPanel = dynamic_cast<DXPedPanel *>(widgetPool[type].get());
+      if (dxpPanel) {
+        dxpPanel->setOnPeditionActivated(
+            [state, dxcStore](const DXPedition &p) {
+              state->dxCallsign = p.call;
+              state->dxLocation = {p.lat, p.lon};
+              state->dxGrid = Astronomy::latLonToGrid(p.lat, p.lon);
+              state->dxActive = true;
+              dxcStore->clearSelection();
+            });
+        dxpPanel->setOnPeditionDeactivated([state]() {
+          if (state->mapDxActive) {
+            state->dxLocation = state->mapDxLocation;
+            state->dxGrid = state->mapDxGrid;
+            state->dxActive = true;
+          } else {
+            state->dxActive = false;
+          }
+          state->dxCallsign.clear();
         });
       }
     } else if (type == "live_spots") {

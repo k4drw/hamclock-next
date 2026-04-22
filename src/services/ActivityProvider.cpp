@@ -20,8 +20,9 @@
 using json = nlohmann::json;
 
 ActivityProvider::ActivityProvider(NetworkManager &net,
-                                   std::shared_ptr<ActivityDataStore> store)
-    : net_(net), store_(store) {}
+                                   std::shared_ptr<ActivityDataStore> store,
+                                   PrefixManager &prefixMgr)
+    : net_(net), store_(store), prefixMgr_(prefixMgr) {}
 
 void ActivityProvider::fetch() {
   lastFetchMs_ = SDL_GetTicks();
@@ -31,13 +32,13 @@ void ActivityProvider::fetch() {
 }
 
 void ActivityProvider::fetchDXPeds() {
-  net_.fetchAsync(DX_PEDS_URL, [](std::string data) {
+  net_.fetchAsync(DX_PEDS_URL, [pfx = &prefixMgr_](std::string data) {
     if (data.empty()) {
       LOG_E("ActivityProvider", "Failed to fetch DXPeditions from NG3K");
       return;
     }
 
-    WorkerService::getInstance().submitTask([data]() {
+    WorkerService::getInstance().submitTask([data, pfx]() {
       auto *update = new ActivityData();
       auto now = std::chrono::system_clock::now();
 
@@ -103,6 +104,12 @@ void ActivityProvider::fetchDXPeds() {
           DXPedition de;
           de.call = call.length() > 16 ? call.substr(0, 16) : call;
           de.location = loc.length() > 32 ? loc.substr(0, 32) : loc;
+
+          LatLong ll;
+          if (pfx && pfx->findLocation(de.call, ll)) {
+            de.lat = ll.lat;
+            de.lon = ll.lon;
+          }
 
           auto parseAdxoDate = [](const std::string &s, int &year, char *mon,
                                   int &day) -> bool {
