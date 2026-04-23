@@ -85,6 +85,8 @@ void populateWidgetDescriptions() {
     "Worked All States (WAS) tracking grid showing status (worked/confirmed) for all 50 US states.");
   r.setDescription("wac_radar",
     "Worked All Continents (WAC) award progress radar showing worked/confirmed status for all 6 continents.");
+  r.setDescription("zone_heatmap",
+    "Zone Heatmap — tracks Worked All Zones (WAZ) for CQ (1-40) and ITU (1-75) zones.");
 
   // ── Tracking ─────────────────────────────────────────────────────────────────
   r.setDescription("satellite",

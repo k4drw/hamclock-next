@@ -46,6 +46,12 @@ struct ADIFStats {
   // Continents (WAC) - NA, SA, EU, AF, AS, OC
   std::set<std::string> workedContinents;
   std::set<std::string> confirmedContinents;
+  
+  // Zones (WAZ/ITU) - Map of Zone # -> set of bands
+  std::map<int, std::set<std::string>> workedZonesCQ;
+  std::map<int, std::set<std::string>> confirmedZonesCQ;
+  std::map<int, std::set<std::string>> workedZonesITU;
+  std::map<int, std::set<std::string>> confirmedZonesITU;
 
   bool valid = false;
   std::string activeBandFilter;

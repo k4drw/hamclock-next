@@ -272,6 +272,28 @@ void ADIFProvider::processFile(const std::filesystem::path &path) {
           }
         }
 
+        // Track zones for WAZ/ITU
+        if (!useBand.empty()) {
+          if (!cqZone.empty()) {
+            int z = StringUtils::safe_stoi(cqZone);
+            if (z >= 1 && z <= 40) {
+              stats.workedZonesCQ[z].insert(useBand);
+              if (qslRcvd == "Y" || lotwRcvd == "Y" || eqslRcvd == "Y") {
+                stats.confirmedZonesCQ[z].insert(useBand);
+              }
+            }
+          }
+          if (!ituZone.empty()) {
+            int z = StringUtils::safe_stoi(ituZone);
+            if (z >= 1 && z <= 75) {
+              stats.workedZonesITU[z].insert(useBand);
+              if (qslRcvd == "Y" || lotwRcvd == "Y" || eqslRcvd == "Y") {
+                stats.confirmedZonesITU[z].insert(useBand);
+              }
+            }
+          }
+        }
+
         // Maintain latest calls list (most recent first)
         auto it =
             std::find(stats.latestCalls.begin(), stats.latestCalls.end(), call);
