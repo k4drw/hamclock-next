@@ -81,4 +81,18 @@ std::string trim(const std::string &s) {
   return s.substr(start, end - start + 1);
 }
 
+std::string unescapeHtml(const std::string &s) {
+  std::string res = s;
+  static const std::pair<std::string, std::string> entities[] = {
+      {"&amp;", "&"}, {"&lt;", "<"}, {"&gt;", ">"}, {"&quot;", "\""}, {"&apos;", "'"}};
+  for (const auto &p : entities) {
+    size_t pos = 0;
+    while ((pos = res.find(p.first, pos)) != std::string::npos) {
+      res.replace(pos, p.first.length(), p.second);
+      pos += p.second.length();
+    }
+  }
+  return res;
+}
+
 } // namespace StringUtils

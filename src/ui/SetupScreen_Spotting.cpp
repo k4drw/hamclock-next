@@ -155,5 +155,23 @@ void SetupScreen::renderTabDXCluster(SDL_Renderer *renderer, int cx, int pad,
   }
   cat->drawText(renderer, "Enable RBN (feeds DX Cluster panel)", fieldX + 30,
                 y + 10, themes.text, FontStyle::SmallRegular, false, false, true);
-  y += 24;
+  y += 32;
+
+  // --- DX ENHANCEMENTS SECTION ---
+  cat->drawText(renderer, "--- DX Enhancements ---", cx, y, themes.accent,
+                FontStyle::SmallBold, true);
+  y += cat->ptSize(FontStyle::SmallBold) + vSpace + 4;
+
+  cat->drawText(renderer, "K-Index Alert Threshold:", fieldX, y + 10,
+                themes.text, FontStyle::SmallRegular);
+  int kLabelW = fontMgr_.getLogicalWidth("K-Index Alert Threshold: ",
+                                         cat->ptSize(FontStyle::SmallRegular));
+  kIndexThresholdRect_ = {fieldX + kLabelW, y, 60, fieldH};
+  kIndexThresholdInput_.render(
+      renderer, fontMgr_, kIndexThresholdRect_.x, y, 60, fieldH,
+      FontStyle::SmallRegular, textPad,
+      activeTab_ == Tab::Spotting && activeField_ == 4, true, themes.accent,
+      themes.textDim, themes.text, themes.text, themes.textDim, "5.0",
+      &themes.rowStripe1);
+  y += fieldH + vSpace;
 }

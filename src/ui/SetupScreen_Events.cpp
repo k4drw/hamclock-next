@@ -178,6 +178,8 @@ bool SetupScreen::onMouseDown(int mx, int my, Uint16 mod, int clicks) {
       if (hitField(wsjtxPortRect_, 3, &wsjtxPortInput_))
         return true;
     }
+    if (hitField(kIndexThresholdRect_, 4, &kIndexThresholdInput_))
+      return true;
   } else if (activeTab_ == Tab::Rig) {
     if (hitField(rigHostRect_, 0, &rigHostInput_))
       return true;
@@ -636,8 +638,8 @@ void SetupScreen::onMouseMove(int mx, int /*my*/) {
       r = *rects[activeField_];
   } else if (activeTab_ == Tab::Spotting) {
     const SDL_Rect *rects[] = {&clusterHostRect_, &clusterPortRect_,
-                               &clusterLoginRect_, &wsjtxPortRect_};
-    if (activeField_ >= 0 && activeField_ < 4)
+                               &clusterLoginRect_, &wsjtxPortRect_, &kIndexThresholdRect_};
+    if (activeField_ >= 0 && activeField_ < 5)
       r = *rects[activeField_];
   } else if (activeTab_ == Tab::Rig) {
     const SDL_Rect *rects[] = {&rigHostRect_, &rigPortRect_, &rotatorHostRect_,

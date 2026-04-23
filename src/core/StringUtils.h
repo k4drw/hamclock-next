@@ -28,4 +28,7 @@ std::string toLower(const std::string &s);
 // Trim whitespace from both ends of a string.
 std::string trim(const std::string &s);
 
+// Unescape common HTML entities (&amp;, &lt;, etc.)
+std::string unescapeHtml(const std::string &s);
+
 } // namespace StringUtils

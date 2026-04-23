@@ -43,14 +43,17 @@ void DXPedPanel::update() {
   if (data.lastUpdated != lastUpdate_) {
     allRows_.clear();
     allPeds_.clear();
+    auto now = std::chrono::system_clock::now();
     for (const auto &de : data.dxpeds) {
-      std::stringstream ss;
-      ss << de.call << '\t' << de.location;
-      allRows_.push_back(ss.str());
-      allPeds_.push_back(de);
+      if (now >= de.startTime && now <= de.endTime) {
+        std::stringstream ss;
+        ss << de.call << '\t' << de.location;
+        allRows_.push_back(ss.str());
+        allPeds_.push_back(de);
+      }
     }
     if (allRows_.empty() && data.valid) {
-      allRows_.push_back("No upcoming expeditions");
+      allRows_.push_back("No active expeditions");
     }
     // Clamp scroll and rebuild visible slice
     int maxScroll = std::max(0, (int)allRows_.size() - MAX_VISIBLE_ROWS);
@@ -171,12 +174,15 @@ void DXPedPanel::renderRowText(SDL_Renderer *renderer, int index, int rx, int ry
   const std::string &call = pe.call;
   const std::string &loc = pe.location;
 
-  // Active status check
-  auto now = std::chrono::system_clock::now();
-  bool active = (now >= pe.startTime && now <= pe.endTime);
-
+  SDL_Color rowColor = color;
   ThemeColors themes = getThemeColors(theme_);
-  SDL_Color rowColor = active ? themes.accent : color;
+
+  // Last day highlight logic: use warning color if ending within 24 hours and not selected.
+  auto now = std::chrono::system_clock::now();
+  auto hoursLeft = std::chrono::duration_cast<std::chrono::hours>(pe.endTime - now).count();
+  if (hoursLeft < 24 && hoursLeft >= 0 && index != getHighlightedIndex()) {
+    rowColor = themes.warning;
+  }
 
   // Dim rows whose callsign could not be geolocated (lat/lon still at default 0).
   if (pe.lat == 0.0 && pe.lon == 0.0) {

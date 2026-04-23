@@ -23,6 +23,7 @@ void SetupScreen::setConfig(const AppConfig &cfg) {
   hubIpInput_.setMaxLength(40);
   hubPortInput_.setMaxLength(5);
   watchlistInputField_.setMaxLength(256);
+  kIndexThresholdInput_.setMaxLength(4);
 
   gpsEnabled_ = cfg.gpsEnabled;
   audioMuted_ = cfg.audioMuted;
@@ -135,6 +136,10 @@ void SetupScreen::setConfig(const AppConfig &cfg) {
   tzCustomOffsetInput_.setValue(std::to_string(defaultTzOffset_ == 999 ? 0 : defaultTzOffset_));
   tzCustomLabelInput_.setValue(defaultTzLabel_);
 
+  char kBuf[16];
+  std::snprintf(kBuf, sizeof(kBuf), "%.1f", (double)cfg.kIndexAlertThreshold);
+  kIndexThresholdInput_.setValue(kBuf);
+
   callsignInput_.setCursorToEnd();
 }
 
@@ -232,6 +237,10 @@ AppConfig SetupScreen::getConfig(const AppConfig& base) const {
   cfg.fontPath = fontPath_;
   cfg.defaultTzOffset = defaultTzOffset_;
   cfg.defaultTzLabel = defaultTzLabel_;
+
+  cfg.kIndexAlertThreshold =
+      StringUtils::safe_stof(kIndexThresholdInput_.getValue());
+  if (cfg.kIndexAlertThreshold < 0) cfg.kIndexAlertThreshold = 0;
 
   return cfg;
 }

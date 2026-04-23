@@ -140,6 +140,7 @@ private:
   std::string countdownTime_; // YYYY-MM-DD HH:MM
   TextInput dimTimeInput_;
   TextInput brightTimeInput_;
+  TextInput kIndexThresholdInput_;
 
   SDL_Rect qrzUsernameRect_ = {0, 0, 0, 0};
   SDL_Rect qrzPasswordRect_ = {0, 0, 0, 0};
@@ -218,6 +219,7 @@ private:
   SDL_Rect scheduleToggleRect_ = {0, 0, 0, 0};
   SDL_Rect dimTimeRect_ = {0, 0, 0, 0};
   SDL_Rect customizeBtnRect_ = {0, 0, 0, 0};
+  SDL_Rect kIndexThresholdRect_ = {0, 0, 0, 0};
 
   std::unique_ptr<HamClock::ThemeCustomizer> themeCustomizer_;
 

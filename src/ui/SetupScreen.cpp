@@ -94,6 +94,8 @@ TextInput *SetupScreen::getActiveInput() {
       return &clusterLoginInput_;
     case 3:
       return &wsjtxPortInput_;
+    case 4:
+      return &kIndexThresholdInput_;
     }
   } else if (activeTab_ == Tab::Appearance) {
     switch (activeField_) {
