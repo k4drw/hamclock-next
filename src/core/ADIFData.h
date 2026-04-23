@@ -43,6 +43,10 @@ struct ADIFStats {
   std::set<std::string> workedStates;
   std::set<std::string> confirmedStates;
 
+  // Continents (WAC) - NA, SA, EU, AF, AS, OC
+  std::set<std::string> workedContinents;
+  std::set<std::string> confirmedContinents;
+
   bool valid = false;
   std::string activeBandFilter;
   std::string activeModeFilter;

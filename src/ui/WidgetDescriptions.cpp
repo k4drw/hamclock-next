@@ -83,6 +83,8 @@ void populateWidgetDescriptions() {
     "DXCC award progress tracker — worked vs. confirmed entities by band/mode.");
   r.setDescription("was_progress",
     "Worked All States (WAS) tracking grid showing status (worked/confirmed) for all 50 US states.");
+  r.setDescription("wac_radar",
+    "Worked All Continents (WAC) award progress radar showing worked/confirmed status for all 6 continents.");
 
   // ── Tracking ─────────────────────────────────────────────────────────────────
   r.setDescription("satellite",

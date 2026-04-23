@@ -371,4 +371,78 @@ void drawGear(SDL_Renderer *renderer, float x, float y, float radius,
   drawCircle(renderer, x, y, r * 0.35f, centerColor);
 }
 
+void drawPie(SDL_Renderer *renderer, float x, float y, float radius,
+             float startAngle, float endAngle, SDL_Color color) {
+  if (radius <= 0)
+    return;
+
+#if SDL_VERSION_ATLEAST(2, 0, 18)
+  float startRad = startAngle * 3.14159265f / 180.0f;
+  float endRad = endAngle * 3.14159265f / 180.0f;
+  float diff = endRad - startRad;
+  while (diff < 0) diff += 2.0f * 3.14159265f;
+  
+  int segments = static_cast<int>(radius * diff * 0.5f);
+  if (segments < 8) segments = 8;
+  if (segments > 32) segments = 32;
+
+  std::vector<SDL_Vertex> verts;
+  verts.reserve(segments + 2);
+
+  SDL_Vertex center;
+  center.position = {x, y};
+  center.color = color;
+  center.tex_coord = {0, 0};
+  verts.push_back(center);
+
+  for (int i = 0; i <= segments; ++i) {
+    float theta = startRad + diff * static_cast<float>(i) / static_cast<float>(segments);
+    SDL_Vertex v;
+    v.position = {x + radius * std::cos(theta), y + radius * std::sin(theta)};
+    v.color = color;
+    v.tex_coord = {0, 0};
+    verts.push_back(v);
+  }
+
+  std::vector<int> indices;
+  indices.reserve(segments * 3);
+  for (int i = 1; i <= segments; ++i) {
+    indices.push_back(0);
+    indices.push_back(i);
+    indices.push_back(i + 1);
+  }
+
+  SDL_RenderGeometry(renderer, nullptr, verts.data(),
+                     static_cast<int>(verts.size()), indices.data(),
+                     static_cast<int>(indices.size()));
+#endif
+}
+
+void drawArcOutline(SDL_Renderer *renderer, float x, float y, float radius,
+                    float startAngle, float endAngle, float thickness, SDL_Color color) {
+  if (radius <= 0)
+    return;
+
+#if SDL_VERSION_ATLEAST(2, 0, 18)
+  float startRad = startAngle * 3.14159265f / 180.0f;
+  float endRad = endAngle * 3.14159265f / 180.0f;
+  float diff = endRad - startRad;
+  while (diff < 0) diff += 2.0f * 3.14159265f;
+
+  int segments = static_cast<int>(radius * diff * 0.5f);
+  if (segments < 8) segments = 8;
+  if (segments > 32) segments = 32;
+
+  std::vector<SDL_FPoint> points;
+  points.reserve(segments + 1);
+
+  for (int i = 0; i <= segments; ++i) {
+    float theta = startRad + diff * static_cast<float>(i) / static_cast<float>(segments);
+    points.push_back({x + radius * std::cos(theta), y + radius * std::sin(theta)});
+  }
+
+  drawPolyline(renderer, points.data(), static_cast<int>(points.size()), thickness, color, false);
+#endif
+}
+
 } // namespace RenderUtils

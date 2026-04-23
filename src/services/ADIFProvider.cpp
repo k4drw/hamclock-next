@@ -260,6 +260,18 @@ void ADIFProvider::processFile(const std::filesystem::path &path) {
           }
         }
 
+        // Track continents for WAC
+        int entityNum = prefixMgr_.findDXCC(call);
+        if (entityNum > 0) {
+          std::string cont = prefixMgr_.getContinent(entityNum);
+          if (!cont.empty()) {
+            stats.workedContinents.insert(cont);
+            if (qslRcvd == "Y" || lotwRcvd == "Y" || eqslRcvd == "Y") {
+              stats.confirmedContinents.insert(cont);
+            }
+          }
+        }
+
         // Maintain latest calls list (most recent first)
         auto it =
             std::find(stats.latestCalls.begin(), stats.latestCalls.end(), call);
