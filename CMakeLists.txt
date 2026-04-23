@@ -691,6 +691,7 @@ set(HAMCLOCK_SOURCES
     src/ui/WorldClockPanel.cpp
     src/ui/EMEToolPanel.cpp
     src/ui/SantaPanel.cpp
+    src/ui/WASPanel.cpp
 )
 
 if(EMSCRIPTEN)

@@ -152,6 +152,7 @@ void populateWidgetDescriptions();
 #include "ui/BigClockPanel.h"
 #include "ui/CallsignClock.h"
 #include "ui/VoacapDeDxPanel.h"
+#include "ui/WASPanel.h"
 #include <SDL.h>
 #include <SDL_image.h>
 #include <SDL_syswm.h>
@@ -768,6 +769,9 @@ DashboardContext::DashboardContext(AppContext &ctx)
     } else if (type == "adif") {
       widgetPool[type] =
           std::make_unique<ADIFPanel>(0, 0, 0, 0, fontMgr, adifStore);
+    } else if (type == "was_progress") {
+      widgetPool[type] =
+          std::make_unique<WASPanel>(0, 0, 0, 0, fontMgr, adifStore);
     } else if (type == "countdown") {
       widgetPool[type] = std::make_unique<CountdownPanel>(
           0, 0, 0, 0, fontMgr, ctx.appCfg,

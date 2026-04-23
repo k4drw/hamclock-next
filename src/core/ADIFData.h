@@ -16,6 +16,7 @@ struct QSORecord {
   std::string freq;
   std::string rstSent;
   std::string rstRcvd;
+  std::string state;
   std::string name;
   std::string qth;
   std::string gridsquare;
@@ -37,6 +38,10 @@ struct ADIFStats {
 
   // DXCC entity number → set of bands with at least one confirmed QSO.
   std::map<int, std::set<std::string>> confirmedEntitiesPerBand;
+
+  // US States (WAS)
+  std::set<std::string> workedStates;
+  std::set<std::string> confirmedStates;
 
   bool valid = false;
   std::string activeBandFilter;

@@ -81,6 +81,8 @@ void populateWidgetDescriptions() {
     "Daily greyline opening and closing times for configured DXCC entities.");
   r.setDescription("dxcc_progress",
     "DXCC award progress tracker — worked vs. confirmed entities by band/mode.");
+  r.setDescription("was_progress",
+    "Worked All States (WAS) tracking grid showing status (worked/confirmed) for all 50 US states.");
 
   // ── Tracking ─────────────────────────────────────────────────────────────────
   r.setDescription("satellite",

@@ -193,6 +193,7 @@ void ADIFProvider::processFile(const std::filesystem::path &path) {
       std::string qslRcvd = getTagContent(record, "QSL_RCVD");
       std::string lotwRcvd = getTagContent(record, "LOTW_QSL_RCVD");
       std::string eqslRcvd = getTagContent(record, "EQSL_QSL_RCVD");
+      std::string state = getTagContent(record, "STATE");
 
       if (!call.empty()) {
         stats.totalQSOs++;
@@ -248,6 +249,17 @@ void ADIFProvider::processFile(const std::filesystem::path &path) {
           }
         }
 
+        // Track states for WAS
+        if (!state.empty()) {
+          // Normalize to uppercase
+          std::string uState = state;
+          std::transform(uState.begin(), uState.end(), uState.begin(), ::toupper);
+          stats.workedStates.insert(uState);
+          if (qslRcvd == "Y" || lotwRcvd == "Y" || eqslRcvd == "Y") {
+            stats.confirmedStates.insert(uState);
+          }
+        }
+
         // Maintain latest calls list (most recent first)
         auto it =
             std::find(stats.latestCalls.begin(), stats.latestCalls.end(), call);
@@ -269,6 +281,7 @@ void ADIFProvider::processFile(const std::filesystem::path &path) {
         qso.freq = freq.length() > 16 ? freq.substr(0, 16) : freq;
         qso.rstSent = rstSent.length() > 8 ? rstSent.substr(0, 8) : rstSent;
         qso.rstRcvd = rstRcvd.length() > 8 ? rstRcvd.substr(0, 8) : rstRcvd;
+        qso.state = state.length() > 8 ? state.substr(0, 8) : state;
         qso.name = name.length() > 32 ? name.substr(0, 32) : name;
         qso.qth = qth.length() > 32 ? qth.substr(0, 32) : qth;
         qso.gridsquare = gridsquare.length() > 16 ? gridsquare.substr(0, 16) : gridsquare;
