@@ -354,6 +354,7 @@ bool ConfigManager::load(AppConfig &config) {
   // RSS
   if (json.contains("rss")) {
     config.rssEnabled = json["rss"].value("enabled", true);
+    config.rssUrl = json["rss"].value("url", "");
   }
 
   // Activity panels
@@ -881,6 +882,7 @@ bool ConfigManager::save(const AppConfig &config) {
   json["world_clocks"] = wcArr;
 
   json["rss"]["enabled"] = config.rssEnabled;
+  json["rss"]["url"] = config.rssUrl;
   json["activity"]["onta_filter"] = config.ontaFilter;
   json["activity"]["onta_max_dist_km"] = config.ontaMaxDistKm;
 

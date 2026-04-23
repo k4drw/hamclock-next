@@ -61,6 +61,7 @@ static SDL_Color hexToColor(const std::string &hex) {
 #ifdef ENABLE_DEBUG_API
 #include "../core/UIRegistry.h"
 #endif
+#include "../services/RSSProvider.h"
 #include <iomanip>
 #include <algorithm>
 #include <filesystem>
@@ -526,6 +527,7 @@ void WebServer::registerRoutes(httplib::Server &svr) {
     j["gpsEnabled"] = cfg_->gpsEnabled;
     j["centerMapOnDe"] = cfg_->centerMapOnDe;
     j["rssEnabled"] = cfg_->rssEnabled;
+    j["rssUrl"] = cfg_->rssUrl;
     j["brightness"] = cfg_->brightness;
     j["brightnessSchedule"] = cfg_->brightnessSchedule;
     j["dimHour"] = cfg_->dimHour;
@@ -663,6 +665,24 @@ void WebServer::registerRoutes(httplib::Server &svr) {
       res.set_content("missing params: lat,lon or grid", "text/plain");
     }
   });
+  
+  svr.Get("/set_rss", [this](const httplib::Request &req, httplib::Response &res) {
+    if (req.has_param("url")) {
+      std::string url = req.get_param_value("url");
+      cfg_->rssUrl = url;
+      if (cfgMgr_) cfgMgr_->save(*cfg_);
+      
+      std::lock_guard<std::mutex> lk(dataMutex_);
+      if (rssProvider_) {
+          rssProvider_->setCustomUrl(url);
+          rssProvider_->fetch(); // Trigger immediate fetch
+      }
+      res.set_content("ok", "text/plain");
+    } else {
+      res.status = 400;
+      res.set_content("missing url param", "text/plain");
+    }
+  });
 
   svr.Get("/set_config", [this](const httplib::Request &req,
                                 httplib::Response &res) {
@@ -757,6 +777,11 @@ void WebServer::registerRoutes(httplib::Server &svr) {
       cfg_->gpsEnabled = req.get_param_value("gps_enabled") == "1";
     if (req.has_param("rss_enabled"))
       cfg_->rssEnabled = req.get_param_value("rss_enabled") == "1";
+    if (req.has_param("rss_url")) {
+      cfg_->rssUrl = req.get_param_value("rss_url");
+      std::lock_guard<std::mutex> lk(dataMutex_);
+      if (rssProvider_) rssProvider_->setCustomUrl(cfg_->rssUrl);
+    }
     if (req.has_param("onta_filter"))
       cfg_->ontaFilter = req.get_param_value("onta_filter");
     if (req.has_param("spot_source")) {

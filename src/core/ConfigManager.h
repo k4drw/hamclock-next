@@ -208,6 +208,7 @@ struct AppConfig {
 
   // RSS
   bool rssEnabled = true; // Show RSS news banner
+  std::string rssUrl;     // Custom RSS feed URL
 
   // Activity panels
   std::string ontaFilter = "all"; // "all", "pota", or "sota"

@@ -257,7 +257,7 @@ struct DashboardContext {
       std::make_shared<std::atomic<bool>>(true);
 
   // State for background data aggregation
-  std::vector<std::string> rssHeadlines[3];
+  std::vector<std::string> rssHeadlines[4];
   bool rssDataDirty = false;
 
   DashboardContext(AppContext &ctx);

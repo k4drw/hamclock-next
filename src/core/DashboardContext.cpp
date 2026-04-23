@@ -367,6 +367,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
     noaaProvider->fetchAuroraMap();
 
   rssProvider = std::make_unique<RSSProvider>(netManager, rssStore);
+  rssProvider->setCustomUrl(appCfg.rssUrl);
   rssProvider->fetch();
 
   spotProvider = std::make_unique<LiveSpotProvider>(
@@ -463,8 +464,11 @@ DashboardContext::DashboardContext(AppContext &ctx)
   adifProvider = std::make_unique<ADIFProvider>(adifStore, ctx.prefixMgr);
   adifProvider->fetch(ctx.cfgMgr.configDir() / "logs.adif");
 #ifndef __EMSCRIPTEN__
-  if (ctx.webServer)
+  if (ctx.webServer) {
     ctx.webServer->setADIFProvider(adifProvider.get());
+    ctx.webServer->setRssProvider(rssProvider.get());
+    ctx.webServer->setRssBanner(rssBanner.get());
+  }
 #endif
 
   mufRtProvider = std::make_shared<MufRtProvider>(netManager);
@@ -2148,9 +2152,12 @@ void DashboardContext::update(AppContext &ctx) {
           int feed_idx = event.user.code;
           auto *headlines =
               static_cast<std::vector<std::string> *>(event.user.data1);
-          if (headlines && feed_idx >= 0 && feed_idx < 3) {
-            rssHeadlines[feed_idx] = std::move(*headlines);
-            rssDataDirty = true;
+          if (headlines && feed_idx >= 0) {
+            int target_idx = (feed_idx == 99) ? 3 : feed_idx;
+            if (target_idx < 4) {
+              rssHeadlines[target_idx] = std::move(*headlines);
+              rssDataDirty = true;
+            }
           }
           delete headlines;
           break;
@@ -2594,7 +2601,7 @@ void DashboardContext::update(AppContext &ctx) {
   // After event loop, process any aggregated data
   if (rssDataDirty) {
     RSSData data;
-    for (int i = 0; i < 3; ++i) {
+    for (int i = 0; i < 4; ++i) {
       data.headlines.insert(data.headlines.end(), rssHeadlines[i].begin(),
                             rssHeadlines[i].end());
     }

@@ -38,6 +38,7 @@ class StopwatchPanel;
 class CalendarStore;
 class TimePanel;
 class RSSBanner;
+class RSSProvider;
 class MarineStore;
 
 // Web interface for HamClock.
@@ -97,6 +98,7 @@ public:
   }
   void setTimePanel(TimePanel *tp) { std::lock_guard<std::mutex> lk(dataMutex_); timePanel_ = tp; }
   void setRssBanner(RSSBanner *rb) { std::lock_guard<std::mutex> lk(dataMutex_); rssBanner_ = rb; }
+  void setRssProvider(RSSProvider *p) { std::lock_guard<std::mutex> lk(dataMutex_); rssProvider_ = p; }
   void setPaneExpandControl(std::atomic<int> *cmd) { std::lock_guard<std::mutex> lk(dataMutex_); paneExpandCmd_ = cmd; }
 
   // Pane set commands (solo/add/remove/next) must be applied on the main/render
@@ -155,6 +157,7 @@ private:
   std::shared_ptr<CalendarStore> calendarStore_;
   TimePanel *timePanel_ = nullptr;
   RSSBanner *rssBanner_ = nullptr;
+  RSSProvider *rssProvider_ = nullptr;
   std::atomic<int> *paneExpandCmd_ = nullptr;
   std::vector<PendingPaneSet> pendingPaneSets_;  // guarded by dataMutex_
   std::shared_ptr<MarineStore> marineStore_;
