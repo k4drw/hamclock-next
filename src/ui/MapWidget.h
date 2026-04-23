@@ -129,6 +129,10 @@ public:
   void showCalendarAlert(const std::string &summary, const std::string &source,
                          time_t startTime, int dismissMinutes);
 
+  // Show a DX alert overlay (ATNO/Needed entity spotted).
+  void showDXAlert(const std::string &call, const std::string &entity,
+                   double freq, const std::string &mode);
+
   // Robinson boundary helper
   static float getRobinsonXCoeff(double lat);
 
@@ -344,6 +348,7 @@ private:
   void renderRssButton(SDL_Renderer *renderer);
   void renderAsteroidOverlay(SDL_Renderer *renderer);
   void renderCalendarAlert(SDL_Renderer *renderer);
+  void renderDXAlert(SDL_Renderer *renderer);
 
   struct CalendarAlertState {
     bool active = false;
@@ -353,6 +358,16 @@ private:
     uint32_t shownAtMs = 0;
     uint32_t durationMs = 30000;
   } calendarAlert_;
+
+  struct DXAlertState {
+    bool active = false;
+    std::string call;
+    std::string entity;
+    double freq = 0;
+    std::string mode;
+    uint32_t shownAtMs = 0;
+    uint32_t durationMs = 20000; // 20s for DX alerts
+  } dxAlert_;
 
   SDL_Rect rssRect_ = {};
 };

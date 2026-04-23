@@ -1133,6 +1133,7 @@ void MapWidget::render(SDL_Renderer *renderer) {
   renderCloudLegend(renderer);
 
   renderCalendarAlert(renderer);
+  renderDXAlert(renderer);
 
   // Note: MapViewMenu is rendered via renderModal() in the centralized modal
   // pass, not here. This prevents clipping to the map pane bounds.

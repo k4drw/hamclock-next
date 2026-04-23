@@ -90,6 +90,20 @@ bool MapWidget::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
     }
   }
 
+  // DX alert dismissal
+  if (dxAlert_.active) {
+    const int panW = (int)(mapRect_.w * 0.60);
+    const int panH = 80;
+    const int panX = mapRect_.x + (mapRect_.w - panW) / 2;
+    const int panY = mapRect_.y + (mapRect_.h - panH) / 2 + 100; // offset from calendar
+    SDL_Rect panRect = {panX, panY, panW, panH};
+    SDL_Point pt = {mx, my};
+    if (SDL_PointInRect(&pt, &panRect)) {
+      dxAlert_.active = false;
+      return true;
+    }
+  }
+
   if (deMenuVisible_) {
     SDL_Point pt = {mx, my};
     if (SDL_PointInRect(&pt, &deMenuRect_)) {

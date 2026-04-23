@@ -24,6 +24,7 @@
 #include "FontCatalog.h"
 #include "PaneContainer.h"
 #include "RenderUtils.h"
+#include "../core/SoundManager.h"
 #include <fmt/core.h>
 
 #include <algorithm>
@@ -2739,4 +2740,62 @@ void MapWidget::renderStarField(SDL_Renderer *renderer) {
 
   for (const BgStar &bg : s_bgStars)
     drawStar(bg.ra_deg, bg.dec_deg, bg.mag);
+}
+
+void MapWidget::showDXAlert(const std::string &call, const std::string &entity,
+                            double freq, const std::string &mode) {
+  dxAlert_.call = call;
+  dxAlert_.entity = entity;
+  dxAlert_.freq = freq;
+  dxAlert_.mode = mode;
+  dxAlert_.shownAtMs = SDL_GetTicks();
+  dxAlert_.active = true;
+  SoundManager::getInstance().speak("New one! " + call + " on " + mode);
+}
+
+void MapWidget::renderDXAlert(SDL_Renderer *renderer) {
+  if (!dxAlert_.active)
+    return;
+
+  uint32_t now = SDL_GetTicks();
+  if (now - dxAlert_.shownAtMs > dxAlert_.durationMs) {
+    dxAlert_.active = false;
+    return;
+  }
+
+  ThemeColors themes = getThemeColors(theme_);
+  auto *cat = fontMgr_.catalog();
+
+  // Banner geometry
+  const int panW = (int)(mapRect_.w * 0.60);
+  const int panH = 80;
+  const int panX = mapRect_.x + (mapRect_.w - panW) / 2;
+  const int panY = mapRect_.y + (mapRect_.h - panH) / 2 + 100; // Offset from calendar
+  SDL_Rect panRect = {panX, panY, panW, panH};
+
+  // Shadow/Glow
+  SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+  SDL_SetRenderDrawColor(renderer, 0, 0, 0, 180);
+  SDL_Rect shadow = {panX + 4, panY + 4, panW, panH};
+  SDL_RenderFillRect(renderer, &shadow);
+
+  // Background
+  SDL_SetRenderDrawColor(renderer, 20, 20, 20, 240);
+  SDL_RenderFillRect(renderer, &panRect);
+  SDL_SetRenderDrawColor(renderer, themes.accent.r, themes.accent.g, themes.accent.b, 255);
+  SDL_RenderDrawRect(renderer, &panRect);
+
+  // Content
+  int curY = panY + 12;
+  cat->drawText(renderer, "DX ALERT: NEW ONE!", panX + panW / 2, curY, themes.accent, FontStyle::MicroBold, true);
+  curY += 20;
+
+  char buf[128];
+  int bi = freqToBandIndex(dxAlert_.freq);
+  std::string bandStr = (bi >= 0) ? kBands[bi].name : "";
+  std::snprintf(buf, sizeof(buf), "%s on %.1f kHz %s (%s)", dxAlert_.call.c_str(), dxAlert_.freq, dxAlert_.mode.c_str(), bandStr.c_str());
+  cat->drawText(renderer, buf, panX + panW / 2, curY, themes.text, FontStyle::UI, true);
+  curY += 22;
+
+  cat->drawText(renderer, dxAlert_.entity, panX + panW / 2, curY, themes.info, FontStyle::Fast, true);
 }

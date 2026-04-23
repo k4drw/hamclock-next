@@ -409,7 +409,8 @@ DashboardContext::DashboardContext(AppContext &ctx)
       });
 
   dxcProvider = std::make_unique<DXClusterProvider>(
-      dxcStore, ctx.prefixMgr, watchlistStore, watchlistHitStore, state.get());
+      dxcStore, ctx.prefixMgr, watchlistStore, watchlistHitStore, state.get(),
+      ctx.adifStore);
 #ifndef __EMSCRIPTEN__
   if (isMasterMode || isWidgetConfigured("dx_cluster") || isWidgetConfigured("watchlist"))
     dxcProvider->start(appCfg);
@@ -2168,6 +2169,21 @@ void DashboardContext::update(AppContext &ctx) {
             }
           }
           delete headlines;
+          break;
+        }
+        case HamClock::AE_DX_ALERT: {
+          struct DXAlertData {
+            std::string call;
+            std::string entity;
+            double freq;
+            std::string mode;
+          };
+          auto *data = static_cast<DXAlertData *>(event.user.data1);
+          if (data && ctx.dashboard && ctx.dashboard->mapArea) {
+            ctx.dashboard->mapArea->showDXAlert(data->call, data->entity,
+                                               data->freq, data->mode);
+          }
+          delete data;
           break;
         }
         case AE_SOLAR_DATA_READY: {

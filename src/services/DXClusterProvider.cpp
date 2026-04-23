@@ -11,6 +11,9 @@
 #include "../core/SoundManager.h"
 #include <httplib.h>
 #include <nlohmann/json.hpp>
+#include "../core/Constants.h"
+#include "../core/LiveSpotData.h"
+#include "../core/ADIFData.h"
 #ifdef _WIN32
 #include <winsock2.h>
 #include <ws2tcpip.h>
@@ -67,9 +70,10 @@ DXClusterProvider::DXClusterProvider(std::shared_ptr<DXClusterDataStore> store,
                                      PrefixManager &pm,
                                      std::shared_ptr<WatchlistStore> watchlist,
                                      std::shared_ptr<WatchlistHitStore> hits,
-                                     HamClockState *state)
+                                     HamClockState *state,
+                                     std::shared_ptr<ADIFStore> adif)
     : store_(store), pm_(pm), watchlist_(watchlist), hits_(hits),
-      state_(state) {
+      state_(state), adif_(adif) {
   firstAttemptTime_ = std::chrono::system_clock::now();
 }
 
@@ -717,6 +721,40 @@ void DXClusterProvider::processLine(const std::string &line) {
           hit.time = spot.spottedAt;
           hits_->addHit(hit);
           SoundManager::getInstance().speak("Watchlist: " + hit.call);
+        }
+
+        // DX ADIF Alert Check (ATNO / Needed Entity)
+        if (adif_ && spot.txLat != 0.0) {
+          int dxcc = pm_.findDXCC(spot.txCall);
+          if (dxcc > 0) {
+            auto stats = adif_->get();
+            if (stats.valid) {
+              int bi = freqToBandIndex(spot.freqKhz);
+              std::string band = (bi >= 0) ? kBands[bi].name : "";
+              bool worked = false;
+              if (stats.workedEntitiesPerBand.count(dxcc)) {
+                if (band.empty() || stats.workedEntitiesPerBand[dxcc].count(band)) {
+                  worked = true;
+                }
+              }
+
+              if (!worked) {
+                // Trigger Alert
+                struct DXAlertData {
+                  std::string call;
+                  std::string entity;
+                  double freq;
+                  std::string mode;
+                };
+                auto *data = new DXAlertData{spot.txCall, pm_.getCountryName(dxcc), spot.freqKhz, spot.mode};
+                SDL_Event event;
+                std::memset(&event, 0, sizeof(event));
+                event.type = HamClock::AE_BASE_EVENT + HamClock::AE_DX_ALERT;
+                event.user.data1 = data;
+                SDL_PushEvent(&event);
+              }
+            }
+          }
         }
       }
     }

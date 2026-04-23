@@ -63,6 +63,7 @@ static constexpr uint32_t AE_SATELLITE_DATA_READY = 21;
 static constexpr uint32_t AE_UPDATE_DATA_READY = 22;
 static constexpr uint32_t AE_SPACEWX_ALERT_READY = 23;
 static constexpr uint32_t AE_MARINE_LOOKUP_READY = 24;
+static constexpr uint32_t AE_DX_ALERT = 25;
 
 
 } // namespace HamClock

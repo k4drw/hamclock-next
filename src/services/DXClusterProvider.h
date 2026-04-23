@@ -21,7 +21,8 @@ public:
       std::shared_ptr<DXClusterDataStore> store, PrefixManager &pm,
       std::shared_ptr<WatchlistStore> watchlist = nullptr,
       std::shared_ptr<WatchlistHitStore> hits = nullptr,
-      HamClockState *state = nullptr);
+      HamClockState *state = nullptr,
+      std::shared_ptr<class ADIFStore> adif = nullptr);
   ~DXClusterProvider();
 
   void start(const AppConfig &config);
@@ -51,6 +52,7 @@ private:
   std::shared_ptr<WatchlistHitStore> hits_;
   AppConfig config_;
   HamClockState *state_;
+  std::shared_ptr<class ADIFStore> adif_;
 
   std::thread thread_;
   std::atomic<bool> running_{false};
