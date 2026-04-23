@@ -997,6 +997,8 @@ DashboardContext::DashboardContext(AppContext &ctx)
               state->dxCallsign = p.call;
               state->dxLocation = {p.lat, p.lon};
               state->dxGrid = Astronomy::latLonToGrid(p.lat, p.lon);
+              state->dxStartTime = p.startTime;
+              state->dxEndTime = p.endTime;
               state->dxActive = true;
               dxcStore->clearSelection();
             });
@@ -1009,6 +1011,8 @@ DashboardContext::DashboardContext(AppContext &ctx)
             state->dxActive = false;
           }
           state->dxCallsign.clear();
+          state->dxStartTime = {};
+          state->dxEndTime = {};
         });
       }
     } else if (type == "live_spots") {

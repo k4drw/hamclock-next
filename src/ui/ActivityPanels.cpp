@@ -1,6 +1,7 @@
 #include "ActivityPanels.h"
 #include "WidgetRegistry.h"
 #include "../core/LiveSpotData.h" // For kBands and freqToBandIndex
+#include "../core/Astronomy.h"
 #include "../core/MemoryMonitor.h"
 #include "../core/StringUtils.h"
 #include "../core/Theme.h"
@@ -163,33 +164,62 @@ bool DXPedPanel::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
 void DXPedPanel::renderRowText(SDL_Renderer *renderer, int index, int rx, int ry,
                                int rw, int rh, SDL_Color color) {
   auto *cat = fontMgr_.catalog();
-  if (!cat)
+  if (!cat || index < 0 || index >= static_cast<int>(currentPeds_.size()))
     return;
-  const std::string &row = rows_[index];
-  auto tab = row.find('\t');
-  const std::string call =
-      (tab != std::string::npos) ? row.substr(0, tab) : row;
-  const std::string loc =
-      (tab != std::string::npos) ? row.substr(tab + 1) : "";
+
+  const auto &pe = currentPeds_[index];
+  const std::string &call = pe.call;
+  const std::string &loc = pe.location;
+
+  // Active status check
+  auto now = std::chrono::system_clock::now();
+  bool active = (now >= pe.startTime && now <= pe.endTime);
+
+  ThemeColors themes = getThemeColors(theme_);
+  SDL_Color rowColor = active ? themes.accent : color;
 
   // Dim rows whose callsign could not be geolocated (lat/lon still at default 0).
-  SDL_Color rowColor = color;
-  if (index >= 0 && index < static_cast<int>(currentPeds_.size())) {
-    const auto &pe = currentPeds_[index];
-    if (pe.lat == 0.0 && pe.lon == 0.0) {
-      rowColor = {static_cast<Uint8>(color.r / 2),
-                  static_cast<Uint8>(color.g / 2),
-                  static_cast<Uint8>(color.b / 2), color.a};
-    }
+  if (pe.lat == 0.0 && pe.lon == 0.0) {
+    rowColor = {static_cast<Uint8>(rowColor.r / 2),
+                static_cast<Uint8>(rowColor.g / 2),
+                static_cast<Uint8>(rowColor.b / 2), rowColor.a};
   }
 
   int pad = std::max(2, static_cast<int>(width_ * 0.03f));
   int midY = ry + rh / 2;
-  int colX = rx + rw * 42 / 100;
-  cat->drawText(renderer, call, rx + pad, midY, rowColor, FontStyle::Fast,
-                false, false, true);
-  cat->drawText(renderer, loc, colX, midY, rowColor, FontStyle::Fast, false,
-                false, true);
+
+  if (width_ > 300) {
+    // Maximized/Wide Layout: 3 Columns (Call, Loc, Dates)
+    int col1X = rx + pad;
+    int col2X = rx + rw * 25 / 100;
+    int col3X = rx + rw * 70 / 100;
+
+    cat->drawText(renderer, call, col1X, midY, rowColor, FontStyle::Fast, false,
+                  false, true);
+    cat->drawText(renderer, loc, col2X, midY, rowColor, FontStyle::Fast, false,
+                  false, true);
+
+    auto startT = std::chrono::system_clock::to_time_t(pe.startTime);
+    auto endT = std::chrono::system_clock::to_time_t(pe.endTime);
+    struct tm tmStart, tmEnd;
+    Astronomy::portable_gmtime(&startT, &tmStart);
+    Astronomy::portable_gmtime(&endT, &tmEnd);
+
+    char sBuf[16], eBuf[16], dateRange[64];
+    std::strftime(sBuf, sizeof(sBuf), "%b %d", &tmStart);
+    std::strftime(eBuf, sizeof(eBuf), "%b %d", &tmEnd);
+    std::snprintf(dateRange, sizeof(dateRange), "%s - %s", sBuf, eBuf);
+
+    cat->drawText(renderer, dateRange, col3X, midY, rowColor, FontStyle::Fast,
+                  false, false, true);
+  } else {
+    // Standard layout: 2 Columns
+    int colX = rx + rw * 42 / 100;
+    cat->drawText(renderer, call, rx + pad, midY, rowColor, FontStyle::Fast,
+                  false, false, true);
+    cat->drawText(renderer, loc, colX, midY, rowColor, FontStyle::Fast, false,
+                  false, true);
+  }
 }
 
 // --- ONTAPanel ---

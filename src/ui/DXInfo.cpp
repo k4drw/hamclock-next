@@ -62,7 +62,21 @@ void DXInfo::update() {
 
   if (!state_->dxCallsign.empty()) {
     lineText_[1] = state_->dxCallsign;
-    lineText_[6] = state_->dxGrid;
+    if (state_->dxStartTime != std::chrono::system_clock::time_point{}) {
+      auto startT = std::chrono::system_clock::to_time_t(state_->dxStartTime);
+      auto endT = std::chrono::system_clock::to_time_t(state_->dxEndTime);
+      struct tm tmStart, tmEnd;
+      Astronomy::portable_gmtime(&startT, &tmStart);
+      Astronomy::portable_gmtime(&endT, &tmEnd);
+      char sBuf[16], eBuf[16], dBuf[64];
+      std::strftime(sBuf, sizeof(sBuf), "%b %d", &tmStart);
+      std::strftime(eBuf, sizeof(eBuf), "%b %d", &tmEnd);
+      std::snprintf(dBuf, sizeof(dBuf), "%s: %s-%s", state_->dxGrid.c_str(),
+                    sBuf, eBuf);
+      lineText_[6] = dBuf;
+    } else {
+      lineText_[6] = state_->dxGrid;
+    }
   } else {
     lineText_[1] = state_->dxGrid;
     lineText_[6].clear();
