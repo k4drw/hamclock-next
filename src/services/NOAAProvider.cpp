@@ -15,6 +15,27 @@
 #include <sstream>
 #include <nlohmann/json.hpp>
 #include <unordered_map>
+#include <ctime>
+
+static std::chrono::system_clock::time_point parseISO8601(const std::string &s) {
+  std::tm tm = {};
+  int y, m, d, hh, mm, ss;
+  if (std::sscanf(s.c_str(), "%d-%d-%dT%d:%d:%d", &y, &m, &d, &hh, &mm, &ss) == 6) {
+    tm.tm_year = y - 1900;
+    tm.tm_mon = m - 1;
+    tm.tm_mday = d;
+    tm.tm_hour = hh;
+    tm.tm_min = mm;
+    tm.tm_sec = ss;
+    tm.tm_isdst = -1;
+#ifdef _WIN32
+    return std::chrono::system_clock::from_time_t(_mkgmtime(&tm));
+#else
+    return std::chrono::system_clock::from_time_t(timegm(&tm));
+#endif
+  }
+  return std::chrono::system_clock::now();
+}
 
 NOAAProvider::NOAAProvider(NetworkManager &net,
                            std::shared_ptr<SolarDataStore> store,
@@ -126,8 +147,17 @@ void NOAAProvider::fetchKIndex() {
       update->last_updated = std::chrono::system_clock::now();
       update->valid = true;
 
-      if (kIndexHistoryStore)
-        kIndexHistoryStore->push(update->k_index);
+      if (kIndexHistoryStore) {
+        for (const auto &item : j) {
+          if (item.is_object() && item.contains("Kp") &&
+              item["Kp"].is_number() && item.contains("time_tag") &&
+              item["time_tag"].is_string()) {
+            float k = item["Kp"].get<float>();
+            auto ts = parseISO8601(item["time_tag"].get<std::string>());
+            kIndexHistoryStore->push(k, ts);
+          }
+        }
+      }
 
       SDL_Event event;
       SDL_zero(event);

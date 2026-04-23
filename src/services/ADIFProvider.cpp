@@ -190,6 +190,9 @@ void ADIFProvider::processFile(const std::filesystem::path &path) {
       std::string notes = getTagContent(record, "NOTES");
       std::string latStr = getTagContent(record, "LAT");
       std::string lonStr = getTagContent(record, "LON");
+      std::string qslRcvd = getTagContent(record, "QSL_RCVD");
+      std::string lotwRcvd = getTagContent(record, "LOTW_QSL_RCVD");
+      std::string eqslRcvd = getTagContent(record, "EQSL_QSL_RCVD");
 
       if (!call.empty()) {
         stats.totalQSOs++;
@@ -237,8 +240,12 @@ void ADIFProvider::processFile(const std::filesystem::path &path) {
         // Track worked DXCC entities per band for cluster spot marking
         if (!useBand.empty()) {
           int entityNum = prefixMgr_.findDXCC(call);
-          if (entityNum > 0)
+          if (entityNum > 0) {
             stats.workedEntitiesPerBand[entityNum].insert(useBand);
+            if (qslRcvd == "Y" || lotwRcvd == "Y" || eqslRcvd == "Y") {
+              stats.confirmedEntitiesPerBand[entityNum].insert(useBand);
+            }
+          }
         }
 
         // Maintain latest calls list (most recent first)

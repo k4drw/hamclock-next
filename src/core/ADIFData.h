@@ -35,6 +35,9 @@ struct ADIFStats {
   // Used by DXClusterPanel to mark spots as New/New-Band/Worked.
   std::map<int, std::set<std::string>> workedEntitiesPerBand;
 
+  // DXCC entity number → set of bands with at least one confirmed QSO.
+  std::map<int, std::set<std::string>> confirmedEntitiesPerBand;
+
   bool valid = false;
   std::string activeBandFilter;
   std::string activeModeFilter;

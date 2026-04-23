@@ -1,6 +1,8 @@
 #pragma once
 
+#include "../core/ConfigManager.h"
 #include "../core/KIndexHistoryData.h"
+#include "../core/SolarData.h"
 #include "FontManager.h"
 #include "Widget.h"
 #include <memory>
@@ -11,7 +13,9 @@ struct SDL_Renderer;
 class KIndexAlertPanel : public Widget {
 public:
   KIndexAlertPanel(int x, int y, int w, int h, FontManager &fontMgr,
-                   std::shared_ptr<KIndexHistoryStore> store);
+                   std::shared_ptr<KIndexHistoryStore> store,
+                   std::shared_ptr<SolarDataStore> solarStore,
+                   const AppConfig *config);
 
   std::string getName() const override { return "KIndex Alert"; }
   const char *typeId() const override { return "kindex_trend"; }
@@ -26,4 +30,6 @@ private:
 
   FontManager &fontMgr_;
   std::shared_ptr<KIndexHistoryStore> store_;
+  std::shared_ptr<SolarDataStore> solarStore_;
+  const AppConfig *config_;
 };

@@ -905,7 +905,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
           0, 0, 0, 0, fontMgr, ctx.solarStore);
     } else if (type == "kindex_trend") {
       widgetPool[type] = std::make_unique<KIndexAlertPanel>(
-          0, 0, 0, 0, fontMgr, kIndexHistoryStore);
+          0, 0, 0, 0, fontMgr, kIndexHistoryStore, solarStore, &appCfg);
     } else if (type == "sfi_trend") {
       widgetPool[type] = std::make_unique<SFITrendPanel>(
           0, 0, 0, 0, fontMgr, sfiHistoryStore, solarStore);

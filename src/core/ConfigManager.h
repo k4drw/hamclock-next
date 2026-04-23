@@ -272,6 +272,9 @@ struct AppConfig {
 
   // Presets
   std::vector<ConfigPreset> presets;
+
+  // DX Enhancements
+  float kIndexAlertThreshold = 5.0f;
 };
 
 class ConfigManager {

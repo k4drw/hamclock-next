@@ -52,6 +52,7 @@ static const char *modeFromFreq(double khz) {
   if (khz >= 24915 && khz < 24990) return "SSB";
   if (khz >= 28000 && khz < 28070) return "CW";
   if (khz >= 28070 && khz < 28300) return "RTTY";
+  if (khz >= 29000 && khz < 29200) return "AM";
   if (khz >= 28300 && khz < 29700) return "SSB";
   if (khz >= 50000 && khz < 50100) return "CW";
   if (khz >= 50100 && khz < 50300) return "SSB";
@@ -61,12 +62,12 @@ static const char *modeFromFreq(double khz) {
 static SDL_Color modeColor(const char *mode) {
   if (!mode || mode[0] == '\0') return {120, 120, 120, 255};
   std::string m(mode);
-  if (m == "CW")   return {220, 200,  60, 255}; // yellow
-  if (m == "SSB")  return { 80, 160, 255, 255}; // blue
-  if (m == "FT8")  return { 60, 210,  80, 255}; // green
-  if (m == "FT4")  return {255, 140,  40, 255}; // orange
-  if (m == "RTTY") return {230,  90,  50, 255}; // red-orange
-  if (m == "WSPR") return {180,  80, 255, 255}; // purple
+  if (m == "CW")   return {0,   255, 255, 255}; // cyan
+  if (m == "SSB")  return {0,   255, 0,   255}; // green
+  if (m == "FT8" || m == "FT4") return {255, 0, 255, 255}; // magenta
+  if (m == "RTTY") return {255, 255, 0,   255}; // yellow
+  if (m == "WSPR") return {180, 80,  255, 255}; // purple
+  if (m == "AM")   return {160, 160, 160, 255}; // grey
   return {160, 160, 160, 255};
 }
 
@@ -300,20 +301,32 @@ void DXClusterPanel::render(SDL_Renderer *renderer) {
     // 3. DXCC needed badge (N=new entity, B=new band)
     if (showBadge && spot.txDxcc > 0) {
       ADIFStats adif = adifStore_->get();
-      auto it = adif.workedEntitiesPerBand.find(spot.txDxcc);
+      int entityNum = spot.txDxcc;
+      auto workedIt = adif.workedEntitiesPerBand.find(entityNum);
+      auto confIt = adif.confirmedEntitiesPerBand.find(entityNum);
+
+      int bandIdx = freqToBandIndex(spot.freq);
+      std::string band = (bandIdx >= 0) ? kBands[bandIdx].name : "";
+
       std::string badgeStr;
-      SDL_Color badgeCol = {120, 120, 120, 255};
-      if (it == adif.workedEntitiesPerBand.end()) {
+      SDL_Color badgeCol = {150, 150, 150, 255}; // default dim grey
+
+      if (workedIt == adif.workedEntitiesPerBand.end()) {
         badgeStr = "N"; // new entity — not in log at all
         badgeCol = {0, 240, 220, 255}; // cyan
       } else {
-        int bandIdx = freqToBandIndex(spot.freq);
-        if (bandIdx >= 0) {
-          std::string band(kBands[bandIdx].name);
-          if (it->second.find(band) == it->second.end()) {
-            badgeStr = "B"; // new band
-            badgeCol = {255, 220, 60, 255}; // yellow
-          }
+        bool workedThisBand = (!band.empty() && workedIt->second.count(band));
+        bool confirmedThisBand = (confIt != adif.confirmedEntitiesPerBand.end() && !band.empty() && confIt->second.count(band));
+        bool confirmedElsewhere = (confIt != adif.confirmedEntitiesPerBand.end() && !confIt->second.empty());
+
+        if (confirmedThisBand) {
+          badgeStr = ""; // already worked and confirmed
+        } else if (!workedThisBand && confirmedElsewhere) {
+          badgeStr = "B"; // new band (confirmed elsewhere)
+          badgeCol = {255, 220, 60, 255}; // yellow
+        } else {
+          badgeStr = "W"; // worked but not confirmed
+          badgeCol = {150, 150, 150, 255}; // dim grey
         }
       }
       if (!cache.badgeTex || cache.lastBadge != badgeStr) {

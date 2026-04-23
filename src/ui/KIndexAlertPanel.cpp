@@ -8,8 +8,11 @@
 
 KIndexAlertPanel::KIndexAlertPanel(int x, int y, int w, int h,
                                    FontManager &fontMgr,
-                                   std::shared_ptr<KIndexHistoryStore> store)
-    : Widget(x, y, w, h), fontMgr_(fontMgr), store_(std::move(store)) {}
+                                   std::shared_ptr<KIndexHistoryStore> store,
+                                   std::shared_ptr<SolarDataStore> solarStore,
+                                   const AppConfig *config)
+    : Widget(x, y, w, h), fontMgr_(fontMgr), store_(std::move(store)),
+      solarStore_(std::move(solarStore)), config_(config) {}
 
 void KIndexAlertPanel::update() {}
 
@@ -57,11 +60,31 @@ void KIndexAlertPanel::render(SDL_Renderer *renderer) {
   int gScale = kpToGScale(current);
   SDL_Color col = kpColor(current);
 
-  // Kp and G-scale on the same row, right-aligned before the maximize button
+  // Kp and G-scale
   char kpGStr[24];
   std::snprintf(kpGStr, sizeof(kpGStr), "%.1f G%d", (double)current, gScale);
   cat->drawText(renderer, kpGStr, x_ + width_ - rightMargin, y_ + 3,
                 col, FontStyle::SmallBold, false, true);
+
+  // A-index below the title if space allows
+  if (solarStore_) {
+    SolarData sd = solarStore_->get();
+    if (sd.valid) {
+      char aStr[16];
+      std::snprintf(aStr, sizeof(aStr), "A-idx %d", sd.a_index);
+      cat->drawText(renderer, aStr, x_ + 6, y_ + titleH, themes.textDim,
+                    FontStyle::Micro);
+    }
+  }
+
+  // Alert border if K >= threshold
+  if (config_ && current >= config_->kIndexAlertThreshold) {
+    SDL_SetRenderDrawColor(renderer, 220, 50, 50, 255); // red
+    SDL_Rect r = {x_, y_, width_, height_};
+    SDL_RenderDrawRect(renderer, &r);
+    r.x++; r.y++; r.w -= 2; r.h -= 2;
+    SDL_RenderDrawRect(renderer, &r);
+  }
 
   // --- 24-hour bar chart ---
   auto history = store_->getHistory();
@@ -148,5 +171,5 @@ void KIndexAlertPanel::render(SDL_Renderer *renderer) {
 
 REGISTER_WIDGET("kindex_trend", "K-Index Alert", false, false, {
   return std::make_unique<KIndexAlertPanel>(
-      0, 0, 0, 0, deps.fontMgr, deps.kIndexHistoryStore);
+      0, 0, 0, 0, deps.fontMgr, deps.kIndexHistoryStore, deps.solarStore, &deps.appCfg);
 })
