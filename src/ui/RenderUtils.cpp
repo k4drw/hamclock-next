@@ -415,6 +415,10 @@ void drawPie(SDL_Renderer *renderer, float x, float y, float radius,
   SDL_RenderGeometry(renderer, nullptr, verts.data(),
                      static_cast<int>(verts.size()), indices.data(),
                      static_cast<int>(indices.size()));
+#else
+  // Fallback for older SDL: Draw a simple circle outline
+  SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a);
+  drawCircleOutline(renderer, x, y, radius, color);
 #endif
 }
 
@@ -442,6 +446,10 @@ void drawArcOutline(SDL_Renderer *renderer, float x, float y, float radius,
   }
 
   drawPolyline(renderer, points.data(), static_cast<int>(points.size()), thickness, color, false);
+#else
+  // Fallback for older SDL: Draw a simple circle outline
+  SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a);
+  drawCircleOutline(renderer, x, y, radius, color);
 #endif
 }
 
