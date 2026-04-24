@@ -86,6 +86,14 @@ To add a widget to a pane, click the **top strip** of the pane to open the widge
 | **Alerts**          | Triggered alerts based on watchlist hits or band activity thresholds             | Internal                          |
 | **Greyline Win.**   | Daily greyline opening and closing times for configured DXCC entities            | Astronomical calculation          |
 | **DXCC Progress**   | DXCC award progress tracker — worked vs. confirmed entities by band and mode     | Local ADIF log                    |
+| **WAS Progress**    | Work All States award tracker — visual progress display of worked and confirmed US states | Local ADIF log                    |
+| **WAC Radar**       | Work All Continents award tracker — pie chart visualization showing progress toward WAC with 6 continents color-coded by status | Local ADIF log                    |
+| **Zone Heatmap**    | Work All Zones award tracker — clickable grid display of CQ (1–40) and ITU (1–75) zones; click title to toggle between zone types | Local ADIF log                    |
+| **LoTW Auto-Sync**  | LoTW (Logbook of The World) confirmation tracking — displays last sync time, synced QSO count, and connection status with automatic hourly refresh | ARRL LoTW service                 |
+
+### DX ATNO Alerts
+
+When the DX Cluster detects an "All-Time New One" (ATNO) — a DXCC entity you haven't worked before — a high-contrast alert banner flashes on the map with the callsign and band. Your speaker also plays a voice notification so you don't miss it. Dismiss the alert by clicking the banner. This feature runs automatically whenever the DX Cluster is active.
 
 ![DX Cluster widget](images/widgets/dx_cluster.png)
 
