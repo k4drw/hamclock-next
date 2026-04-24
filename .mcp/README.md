@@ -162,5 +162,5 @@ The memory diagnostic tools support the following Phase 37 optimizations:
 **Related documentation:**
 - `MEMORY_FIX_SUMMARY.md` - Detailed before/after analysis
 - `working_docs/PROJECT_STATUS.md` - Phase 37 summary
-- `.mcp/MCP_UPDATE_PLAN.md` - MCP enhancement plan
+- `MCP_GUIDE.md` - MCP tools and features guide
 

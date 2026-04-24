@@ -67,15 +67,6 @@ Add the server to your assistant's configuration (e.g., `claude_desktop_config.j
 
 Once active, the following tools become available to your AI assistant:
 
-### 📊 Parity & Progress
-- **`parity_summary`**: View the overall progress of the `next` codebase vs `original`.
-- **`parity_list`**: Search for features by status (`MISSING`, `PARTIAL`, `IMPLEMENTED`).
-- **`parity_feature`**: Get JSON metadata for a specific feature.
-- **`parity_verify_feature`**: Ping a running hamclock-next instance to see if a feature's API is live.
-- **`parity_sync`**: Update `parity_v2.json` from a Markdown report.
-- **`parity_create_ticket`**: Generates a detailed implementation plan for a single feature.
-- **`parity_create_batch_tickets`**: Generates task lists for multiple features.
-
 ### 🔍 Codebase Intelligence
 - **`project_context`**: Get project context and architectural knowledge (decisions, gotchas, api_examples, etc.).
 - **`repo_map <original|next>`**: Generates a high-level summary of the entire repository structure.

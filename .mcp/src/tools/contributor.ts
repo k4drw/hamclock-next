@@ -281,9 +281,8 @@ ${pc.philosophy}`);
         lines.push(`2. \`src/ui/${name}Panel.cpp\`     — widget render + update logic`);
         lines.push(`3. \`src/services/${name}Provider.h/.cpp\` — data fetch (if new data source needed)`, "");
         lines.push("## Files to Modify");
-        lines.push(`4. \`src/core/WidgetType.h\`         — add ${name.toUpperCase()} to enum`);
-        lines.push(`5. \`src/ui/WidgetSelector.cpp\`     — add entry to allTypes[] array`);
-        lines.push(`6. \`CMakeLists.txt\`                — add ${name}Panel.cpp to SOURCES`, "");
+        lines.push(`4. \`src/ui/${name}Panel.cpp\`       — add REGISTER_WIDGET("${name.toLowerCase()}", ${name}Panel) at file end`);
+        lines.push(`5. \`CMakeLists.txt\`                — add ${name}Panel.cpp to SOURCES`, "");
         lines.push("## Registration Pattern");
         const minimalExample = existsSync(resolve(NEXT_PATH, "src/ui/ENVPanel.cpp"))
           ? "`src/ui/ENVPanel.cpp`"
