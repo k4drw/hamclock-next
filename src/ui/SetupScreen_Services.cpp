@@ -1,5 +1,6 @@
 #include "SetupScreen.h"
 #include "../core/Theme.h"
+#include "../core/MemoryMonitor.h"
 #include <SDL.h>
 #include <string>
 
@@ -94,7 +95,8 @@ void SetupScreen::renderTabServices(SDL_Renderer *renderer, int cx, int pad,
                 FontStyle::SmallBold);
   int clublogFieldW = fieldW;
   yField = y + labelH;
-  fontMgr_.renderText(renderer, clublogApiKeyInput_.getValue(), {100, 100, 100, 255}, 11);
+  SDL_Texture *keyTex = fontMgr_.renderText(renderer, clublogApiKeyInput_.getValue(), {100, 100, 100, 255}, 11);
+  if (keyTex) MemoryMonitor::getInstance().destroyTexture(keyTex);
   // Render the input field for Clublog API Key
   clublogApiKeyInput_.render(renderer, fontMgr_, fieldX, yField, clublogFieldW, fieldH,
                              FontStyle::SmallRegular, textPad, activeField_ == 6,
