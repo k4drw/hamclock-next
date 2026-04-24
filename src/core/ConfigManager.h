@@ -163,6 +163,11 @@ struct AppConfig {
   std::string qrzUsername;
   std::string qrzPassword;
 
+  // LoTW Auto-Sync
+  std::string lotwCall;
+  std::string lotwPassword;
+  std::string lotwLastSync; // YYYY-MM-DD format
+
   // Additional Services
   std::string repeaterBookKey;
   std::string winlinkKey;
@@ -209,6 +214,9 @@ struct AppConfig {
   // RSS
   bool rssEnabled = true; // Show RSS news banner
   std::string rssUrl;     // Custom RSS feed URL
+
+  // Clublog API
+  std::string clublogApiKey; // API key for clublog.org most wanted list
 
   // Activity panels
   std::string ontaFilter = "all"; // "all", "pota", or "sota"

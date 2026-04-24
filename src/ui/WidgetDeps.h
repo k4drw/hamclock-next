@@ -50,6 +50,8 @@ class GreylineDXStore;
 class AuroraMapStore;
 class CalendarStore;
 class SpaceWeatherAlertStore;
+class LoTWActivityStore;
+class ClublogStore;
 
 // Providers / services (non-owning raw pointers)
 class LiveSpotProvider;
@@ -114,6 +116,8 @@ struct WidgetDeps {
   std::shared_ptr<AuroraMapStore>       auroraMapStore;
   std::shared_ptr<CalendarStore>        calendarStore;
   std::shared_ptr<SpaceWeatherAlertStore> spaceWxAlertStore;
+  std::shared_ptr<LoTWActivityStore>    lotwActivityStore;
+  std::shared_ptr<ClublogStore>         clublogStore;
 
   // Providers / services (non-owning; owned by DashboardContext)
   LiveSpotProvider  *spotProvider      = nullptr;

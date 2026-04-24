@@ -87,6 +87,12 @@ void populateWidgetDescriptions() {
     "Worked All Continents (WAC) award progress radar showing worked/confirmed status for all 6 continents.");
   r.setDescription("zone_heatmap",
     "Zone Heatmap — tracks Worked All Zones (WAZ) for CQ (1-40) and ITU (1-75) zones.");
+  r.setDescription("grid_progress",
+    "Grid Progress — tracks worked and confirmed Maidenhead grid squares (4-char like EN50) from ADIF log.");
+  r.setDescription("clublog_wanted",
+    "Most Wanted — ranked list of DXCC entities from Clublog.org API; red=needed, grey=worked/confirmed.");
+  r.setDescription("lotw_sync",
+    "LoTW Sync status panel: last sync time, QSOs synced count, connection status, and error messages.");
 
   // ── Tracking ─────────────────────────────────────────────────────────────────
   r.setDescription("satellite",

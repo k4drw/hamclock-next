@@ -43,6 +43,8 @@ class WeatherStore;
 class CallbookStore;
 class DstStore;
 class ADIFStore;
+class LoTWActivityStore;
+class ClublogStore;
 class SantaStore;
 class RotatorDataStore;
 class RigDataStore;
@@ -79,6 +81,9 @@ namespace HamClock { class GPSProvider; }
 class NOAAProvider;
 class RSSProvider;
 class LiveSpotProvider;
+class LoTWActivityProvider;
+class ClublogProvider;
+class LoTWProvider;
 class ActivityProvider;
 class DXClusterProvider;
 class RBNProvider;
@@ -169,6 +174,9 @@ struct DashboardContext {
   FccProvider fccProvider;
   std::shared_ptr<DstProvider> dstProvider;
   std::unique_ptr<ADIFProvider> adifProvider;
+  std::unique_ptr<LoTWActivityProvider> lotwActivityProvider;
+  std::unique_ptr<ClublogProvider> clublogProvider;
+  std::unique_ptr<LoTWProvider> lotwProvider;
   std::shared_ptr<MufRtProvider> mufRtProvider;
   std::shared_ptr<IonosondeProvider> ionosondeProvider;
   std::shared_ptr<HamClock::ReachProvider> reachProvider;
@@ -314,6 +322,8 @@ struct AppContext {
   std::shared_ptr<CallbookStore> callbookStore;
   std::shared_ptr<DstStore> dstStore;
   std::shared_ptr<ADIFStore> adifStore;
+  std::shared_ptr<LoTWActivityStore> lotwActivityStore;
+  std::shared_ptr<ClublogStore> clublogStore;
   std::shared_ptr<SantaStore> santaStore;
   std::shared_ptr<RotatorDataStore> rotatorStore;
   std::shared_ptr<RigDataStore> rigStore;

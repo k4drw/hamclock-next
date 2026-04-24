@@ -51,6 +51,9 @@ void populateWidgetDescriptions();
 #include "services/IonosondeProvider.h"
 #include "services/LightningProvider.h"
 #include "services/LiveSpotProvider.h"
+#include "services/LoTWActivityProvider.h"
+#include "services/ClublogProvider.h"
+#include "services/LoTWProvider.h"
 #include "services/MarineProvider.h"
 #include "services/MeteorProvider.h"
 #include "services/MoonProvider.h"
@@ -79,6 +82,7 @@ void populateWidgetDescriptions();
 #include "ui/BandConditionsPanel.h"
 #include "ui/BeaconPanel.h"
 #include "ui/CallbookPanel.h"
+#include "ui/ClublogWantedPanel.h"
 #include "ui/ClockAuxPanel.h"
 #include "ui/ContestPanel.h"
 #include "ui/CountdownPanel.h"
@@ -101,6 +105,7 @@ void populateWidgetDescriptions();
 #include "ui/LayoutManager.h"
 #include "ui/LightningPanel.h"
 #include "ui/LiveSpotPanel.h"
+#include "ui/LoTWSyncPanel.h"
 #include "ui/LocalPanel.h"
 #include "ui/MapWidget.h"
 #include "ui/MarinePanel.h"
@@ -475,6 +480,20 @@ DashboardContext::DashboardContext(AppContext &ctx)
   }
 #endif
 
+  lotwActivityProvider = std::make_unique<LoTWActivityProvider>(
+      netManager, ctx.lotwActivityStore);
+  lotwActivityProvider->fetch();
+
+  clublogProvider = std::make_unique<ClublogProvider>(
+      netManager, ctx.clublogStore, appCfg.clublogApiKey);
+  if (!appCfg.clublogApiKey.empty())
+    clublogProvider->fetch();
+
+  lotwProvider = std::make_unique<LoTWProvider>(
+      netManager, ctx.adifStore, appCfg.lotwCall, appCfg.lotwPassword);
+  if (!appCfg.lotwCall.empty() && !appCfg.lotwPassword.empty())
+    lotwProvider->fetch();
+
   mufRtProvider = std::make_shared<MufRtProvider>(netManager);
   mufRtProvider->update();
 
@@ -683,10 +702,10 @@ DashboardContext::DashboardContext(AppContext &ctx)
     } else if (type == "dx_cluster") {
 #ifndef __EMSCRIPTEN__
       widgetPool[type] = std::make_unique<DXClusterPanel>(
-          0, 0, 0, 0, fontMgr, dxcStore, rigService.get(), &appCfg, adifStore, watchlistStore);
+          0, 0, 0, 0, fontMgr, dxcStore, rigService.get(), &appCfg, adifStore, watchlistStore, ctx.lotwActivityStore);
 #else
       widgetPool[type] = std::make_unique<DXClusterPanel>(
-          0, 0, 0, 0, fontMgr, dxcStore, nullptr, &appCfg, adifStore, watchlistStore);
+          0, 0, 0, 0, fontMgr, dxcStore, nullptr, &appCfg, adifStore, watchlistStore, ctx.lotwActivityStore);
 #endif
     } else if (type == "live_spots") {
       widgetPool[type] = std::make_unique<LiveSpotPanel>(
@@ -781,6 +800,12 @@ DashboardContext::DashboardContext(AppContext &ctx)
     } else if (type == "zone_heatmap") {
       widgetPool[type] =
           std::make_unique<ZoneHeatmapPanel>(0, 0, 0, 0, fontMgr, adifStore);
+    } else if (type == "clublog_wanted") {
+      widgetPool[type] = std::make_unique<ClublogWantedPanel>(
+          0, 0, 0, 0, fontMgr, ctx.clublogStore, adifStore);
+    } else if (type == "lotw_sync") {
+      widgetPool[type] = std::make_unique<LoTWSyncPanel>(
+          0, 0, 0, 0, fontMgr);
     } else if (type == "countdown") {
       widgetPool[type] = std::make_unique<CountdownPanel>(
           0, 0, 0, 0, fontMgr, ctx.appCfg,

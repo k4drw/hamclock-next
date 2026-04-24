@@ -560,6 +560,9 @@ set(HAMCLOCK_SOURCES
     src/services/LTR329Provider.cpp
     src/services/ADIFProvider.cpp
     src/services/ActivityProvider.cpp
+    src/services/LoTWActivityProvider.cpp
+    src/services/ClublogProvider.cpp
+    src/services/LoTWProvider.cpp
     src/services/DRAPProvider.cpp
     src/services/LiveSpotProvider.cpp
     src/services/ReachProvider.cpp
@@ -605,6 +608,7 @@ set(HAMCLOCK_SOURCES
     src/ui/AlertsPanel.cpp
     src/ui/BigClockPanel.cpp
     src/ui/CallsignClock.cpp
+    src/ui/ClublogWantedPanel.cpp
     src/ui/SolarCyclePanel.cpp
     src/ui/GreylineWindowsPanel.cpp
     src/ui/DXCCProgressPanel.cpp
@@ -630,6 +634,7 @@ set(HAMCLOCK_SOURCES
     src/ui/SysInfoPanel.cpp
     src/ui/DRAPPanel.cpp
     src/ui/GimbalPanel.cpp
+    src/ui/GridProgressPanel.cpp
     src/ui/GreylineModal.cpp
     src/ui/PresetsModal.cpp
     src/ui/HistoryPanel.cpp
@@ -643,6 +648,7 @@ set(HAMCLOCK_SOURCES
     src/ui/SatWidget.cpp
     src/ui/ListPanel.cpp
     src/ui/LiveSpotPanel.cpp
+    src/ui/LoTWSyncPanel.cpp
     src/ui/LocalPanel.cpp
     src/ui/MapWidget.cpp
     src/ui/MapWidget_Input.cpp

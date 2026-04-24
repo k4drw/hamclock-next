@@ -134,6 +134,9 @@ private:
   // Services & Rig
   TextInput qrzUsernameInput_;
   TextInput qrzPasswordInput_;
+  TextInput lotwCallInput_;
+  TextInput lotwPasswordInput_;
+  TextInput clublogApiKeyInput_;
   TextInput repeaterBookInput_;
   TextInput winlinkInput_;
   std::string countdownLabel_;
@@ -144,6 +147,9 @@ private:
 
   SDL_Rect qrzUsernameRect_ = {0, 0, 0, 0};
   SDL_Rect qrzPasswordRect_ = {0, 0, 0, 0};
+  SDL_Rect lotwCallRect_ = {0, 0, 0, 0};
+  SDL_Rect lotwPasswordRect_ = {0, 0, 0, 0};
+  SDL_Rect clublogApiKeyRect_ = {0, 0, 0, 0};
   SDL_Rect repeaterBookRect_ = {0, 0, 0, 0};
   SDL_Rect winlinkRect_ = {0, 0, 0, 0};
   SDL_Rect brightTimeRect_ = {0, 0, 0, 0};

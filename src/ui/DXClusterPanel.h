@@ -2,6 +2,7 @@
 
 #include "../core/ADIFData.h"
 #include "../core/DXClusterData.h"
+#include "../core/LoTWActivityData.h"
 #include "ListPanel.h"
 #include <SDL.h>
 #include <chrono>
@@ -20,7 +21,8 @@ public:
                  RigService *rigService = nullptr,
                  const AppConfig *config = nullptr,
                  std::shared_ptr<ADIFStore> adifStore = nullptr,
-                 std::shared_ptr<WatchlistStore> watchlist = nullptr);
+                 std::shared_ptr<WatchlistStore> watchlist = nullptr,
+                 std::shared_ptr<LoTWActivityStore> lotwStore = nullptr);
   ~DXClusterPanel() override;
 
   void update() override;
@@ -63,6 +65,7 @@ private:
   std::shared_ptr<DXClusterDataStore> store_;
   std::shared_ptr<ADIFStore> adifStore_;
   std::shared_ptr<WatchlistStore> watchlist_;
+  std::shared_ptr<LoTWActivityStore> lotwStore_;
   RigService *rigService_;
   const AppConfig *config_;
   std::chrono::system_clock::time_point lastUpdate_{};
@@ -86,6 +89,8 @@ private:
     int modeW = 0, modeH = 0;
     SDL_Texture *badgeTex = nullptr;  // DXCC needed badge (N / B)
     int badgeW = 0, badgeH = 0;
+    SDL_Texture *lotwTex = nullptr;   // LoTW activity badge (L)
+    int lotwW = 0, lotwH = 0;
     SDL_Texture *callTex = nullptr;
     int callW = 0, callH = 0;
     SDL_Texture *ageTex = nullptr;
@@ -93,6 +98,7 @@ private:
     std::string lastAge;
     std::string lastMode;
     std::string lastBadge;
+    std::string lastLoTW;  // Track LoTW badge state for caching
     double lastFreq = -1.0;
     std::string lastCall;
   };

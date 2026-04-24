@@ -9,6 +9,8 @@
 #include "core/DisplayPower.h"
 #include "core/HamClockState.h"
 #include "core/LiveSpotData.h"
+#include "core/LoTWActivityData.h"
+#include "core/ClublogData.h"
 #include "core/PrefixManager.h"
 #include "core/RSSData.h"
 #include "core/RigData.h"
@@ -572,6 +574,8 @@ int main(int argc, char *argv[]) {
   ctx.callbookStore = std::make_shared<CallbookStore>();
   ctx.dstStore = std::make_shared<DstStore>();
   ctx.adifStore = std::make_shared<ADIFStore>();
+  ctx.lotwActivityStore = std::make_shared<LoTWActivityStore>();
+  ctx.clublogStore = std::make_shared<ClublogStore>();
   ctx.santaStore = std::make_shared<SantaStore>();
   ctx.rotatorStore = std::make_shared<RotatorDataStore>();
   ctx.rigStore = std::make_shared<RigDataStore>();

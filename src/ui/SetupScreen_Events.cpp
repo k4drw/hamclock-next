@@ -215,6 +215,12 @@ bool SetupScreen::onMouseDown(int mx, int my, Uint16 mod, int clicks) {
       return true;
     if (hitField(qrzPasswordRect_, 1, &qrzPasswordInput_))
       return true;
+    if (hitField(lotwCallRect_, 4, &lotwCallInput_))
+      return true;
+    if (hitField(lotwPasswordRect_, 5, &lotwPasswordInput_))
+      return true;
+    if (hitField(clublogApiKeyRect_, 6, &clublogApiKeyInput_))
+      return true;
     if (hitField(repeaterBookRect_, 2, &repeaterBookInput_))
       return true;
     if (hitField(winlinkRect_, 3, &winlinkInput_))

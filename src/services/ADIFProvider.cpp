@@ -294,6 +294,20 @@ void ADIFProvider::processFile(const std::filesystem::path &path) {
           }
         }
 
+        // Track Maidenhead grid squares (4-char like "EN50")
+        if (!gridsquare.empty()) {
+          std::string grid4 = gridsquare;
+          std::transform(grid4.begin(), grid4.end(), grid4.begin(), ::toupper);
+          if (grid4.length() >= 4) {
+            grid4 = grid4.substr(0, 4);
+            bool confirmed = (qslRcvd == "Y" || lotwRcvd == "Y" || eqslRcvd == "Y");
+            stats.workedGrids4[grid4] = stats.workedGrids4[grid4] || confirmed;
+            if (confirmed) {
+              stats.confirmedGrids4[grid4] = true;
+            }
+          }
+        }
+
         // Maintain latest calls list (most recent first)
         auto it =
             std::find(stats.latestCalls.begin(), stats.latestCalls.end(), call);

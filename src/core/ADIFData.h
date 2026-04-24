@@ -53,6 +53,10 @@ struct ADIFStats {
   std::map<int, std::set<std::string>> workedZonesITU;
   std::map<int, std::set<std::string>> confirmedZonesITU;
 
+  // Maidenhead Grid Squares (4-char like "EN50")
+  std::map<std::string, bool> workedGrids4;    // grid -> confirmed
+  std::map<std::string, bool> confirmedGrids4;
+
   bool valid = false;
   std::string activeBandFilter;
   std::string activeModeFilter;

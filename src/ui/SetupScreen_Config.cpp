@@ -72,6 +72,9 @@ void SetupScreen::setConfig(const AppConfig &cfg) {
 
   qrzUsernameInput_.setValue(cfg.qrzUsername);
   qrzPasswordInput_.setValue(cfg.qrzPassword);
+  lotwCallInput_.setValue(cfg.lotwCall);
+  lotwPasswordInput_.setValue(cfg.lotwPassword);
+  clublogApiKeyInput_.setValue(cfg.clublogApiKey);
   repeaterBookInput_.setValue(cfg.repeaterBookKey);
   winlinkInput_.setValue(cfg.winlinkKey);
   countdownLabel_ = cfg.countdownLabel;
@@ -188,6 +191,9 @@ AppConfig SetupScreen::getConfig(const AppConfig& base) const {
 
   cfg.qrzUsername = qrzUsernameInput_.getValue();
   cfg.qrzPassword = qrzPasswordInput_.getValue();
+  cfg.lotwCall = lotwCallInput_.getValue();
+  cfg.lotwPassword = lotwPasswordInput_.getValue();
+  cfg.clublogApiKey = clublogApiKeyInput_.getValue();
   cfg.repeaterBookKey = repeaterBookInput_.getValue();
   cfg.winlinkKey = winlinkInput_.getValue();
   cfg.countdownLabel = countdownLabel_;

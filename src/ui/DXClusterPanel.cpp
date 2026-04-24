@@ -75,10 +75,12 @@ DXClusterPanel::DXClusterPanel(int x, int y, int w, int h, FontManager &fontMgr,
                                std::shared_ptr<DXClusterDataStore> store,
                                RigService *rigService, const AppConfig *config,
                                std::shared_ptr<ADIFStore> adifStore,
-                               std::shared_ptr<WatchlistStore> watchlist)
+                               std::shared_ptr<WatchlistStore> watchlist,
+                               std::shared_ptr<LoTWActivityStore> lotwStore)
     : ListPanel(x, y, w, h, fontMgr, "DX Cluster", {}), store_(store),
       adifStore_(std::move(adifStore)), watchlist_(std::move(watchlist)),
-      rigService_(rigService), config_(config) {}
+      lotwStore_(std::move(lotwStore)), rigService_(rigService),
+      config_(config) {}
 
 DXClusterPanel::~DXClusterPanel() { clearSpotCache(); }
 
@@ -90,6 +92,8 @@ void DXClusterPanel::clearSpotCache() {
       MemoryMonitor::getInstance().destroyTexture(cs.modeTex);
     if (cs.badgeTex)
       MemoryMonitor::getInstance().destroyTexture(cs.badgeTex);
+    if (cs.lotwTex)
+      MemoryMonitor::getInstance().destroyTexture(cs.lotwTex);
     if (cs.callTex)
       MemoryMonitor::getInstance().destroyTexture(cs.callTex);
     if (cs.ageTex)
@@ -215,20 +219,25 @@ void DXClusterPanel::render(SDL_Renderer *renderer) {
 
   int pad = std::max(2, static_cast<int>(width_ * 0.03f));
 
-  // Column layout: Freq | [Mode] | [Badge] | Call | Age
+  // Column layout: Freq | [Mode] | [Badge] | [LoTW] | Call | Age
   // Mode badge (CW/FT8/SSB…) shown at ≥140px; DXCC badge (N/B) shown at ≥120px.
+  // LoTW badge (L) shown at ≥100px when LoTW data available.
   int freqColW = fontMgr_.getLogicalWidth("88888.8", rowFontSize_);
   int ageColW = fontMgr_.getLogicalWidth("999m", rowFontSize_);
   bool showMode = (width_ >= 140);
   bool showBadge = (width_ >= 120) && adifStore_ && adifStore_->get().valid;
+  bool showLoTW = (width_ >= 100) && lotwStore_;
   int modeColW =
       showMode ? (fontMgr_.getLogicalWidth("RTTY", rowFontSize_) + 2) : 0;
   int badgeColW =
       showBadge ? (fontMgr_.getLogicalWidth("B", rowFontSize_) + 2) : 0;
+  int lotwColW =
+      showLoTW ? (fontMgr_.getLogicalWidth("L", rowFontSize_) + 2) : 0;
   int freqXEnd = x_ + pad + freqColW;
   int modeX = freqXEnd + 4;
   int badgeX = modeX + modeColW + (showMode ? 4 : 0);
-  int callX = badgeX + badgeColW + (showBadge ? 3 : (showMode ? 0 : 2));
+  int lotwX = badgeX + badgeColW + (showBadge ? 3 : (showMode ? 0 : 2));
+  int callX = lotwX + lotwColW + (showLoTW ? 3 : 0);
   int ageX = x_ + width_ - pad - ageColW;
 
   int curY = contentY_;
@@ -347,7 +356,42 @@ void DXClusterPanel::render(SDL_Renderer *renderer) {
       }
     }
 
-    // 4. Call (left-aligned, clipped before age column)
+    // 4. LoTW activity badge (L with color based on recency)
+    if (showLoTW && lotwStore_) {
+      // Determine LoTW recency for the spotter (or spotted entity)
+      // We check the TX callsign primarily
+      int lotwRecency = 0;
+      std::string callToCheck = spot.call; // Spotter's call
+      if (!callToCheck.empty()) {
+        lotwRecency = lotwStore_->getRecencyCategory(callToCheck);
+      }
+
+      std::string lotwStr = (lotwRecency > 0) ? "L" : "";
+      SDL_Color lotwCol = {150, 150, 150, 255}; // default: unknown/inactive
+      if (lotwRecency == 1)
+        lotwCol = {0, 220, 60, 255}; // green: <30d
+      else if (lotwRecency == 2)
+        lotwCol = {255, 220, 60, 255}; // yellow: <1yr
+
+      if (!cache.lotwTex || cache.lastLoTW != lotwStr) {
+        if (cache.lotwTex)
+          MemoryMonitor::getInstance().destroyTexture(cache.lotwTex);
+        cache.lotwTex = nullptr;
+        cache.lotwW = cache.lotwH = 0;
+        if (!lotwStr.empty()) {
+          cache.lotwTex = fontMgr_.renderText(renderer, lotwStr, lotwCol,
+                                              rowFontSize_, &cache.lotwW, &cache.lotwH);
+        }
+        cache.lastLoTW = lotwStr;
+      }
+      if (cache.lotwTex) {
+        int ty = rowY + (rowH - cache.lotwH) / 2;
+        SDL_Rect dst = {lotwX, ty, cache.lotwW, cache.lotwH};
+        SDL_RenderCopy(renderer, cache.lotwTex, nullptr, &dst);
+      }
+    }
+
+    // 5. Call (left-aligned, clipped before age column)
     if (!cache.callTex || cache.lastCall != spot.call) {
       if (cache.callTex)
         MemoryMonitor::getInstance().destroyTexture(cache.callTex);
