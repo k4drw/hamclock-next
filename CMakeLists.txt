@@ -693,6 +693,7 @@ set(HAMCLOCK_SOURCES
     src/ui/SantaPanel.cpp
     src/ui/WASPanel.cpp
     src/ui/WACRadarPanel.cpp
+    src/ui/ZoneHeatmapPanel.cpp
 )
 
 if(EMSCRIPTEN)

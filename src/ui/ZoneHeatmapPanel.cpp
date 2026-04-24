@@ -22,7 +22,9 @@ void ZoneHeatmapPanel::onResize(int x, int y, int w, int h) {
     Widget::onResize(x, y, w, h);
 }
 
-bool ZoneHeatmapPanel::onMouseUp(int mx, int my, int button) {
+bool ZoneHeatmapPanel::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
+    (void)mod;
+    (void)clicks;
     if (mx > x_ && mx < x_ + width_ && my > y_ && my < y_ + 25) {
         modeITU_ = !modeITU_;
         return true;

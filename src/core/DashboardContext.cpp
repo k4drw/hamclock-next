@@ -154,6 +154,7 @@ void populateWidgetDescriptions();
 #include "ui/VoacapDeDxPanel.h"
 #include "ui/WASPanel.h"
 #include "ui/WACRadarPanel.h"
+#include "ui/ZoneHeatmapPanel.h"
 #include <SDL.h>
 #include <SDL_image.h>
 #include <SDL_syswm.h>
@@ -777,6 +778,9 @@ DashboardContext::DashboardContext(AppContext &ctx)
     } else if (type == "wac_radar") {
       widgetPool[type] =
           std::make_unique<WACRadarPanel>(0, 0, 0, 0, fontMgr, adifStore);
+    } else if (type == "zone_heatmap") {
+      widgetPool[type] =
+          std::make_unique<ZoneHeatmapPanel>(0, 0, 0, 0, fontMgr, adifStore);
     } else if (type == "countdown") {
       widgetPool[type] = std::make_unique<CountdownPanel>(
           0, 0, 0, 0, fontMgr, ctx.appCfg,
