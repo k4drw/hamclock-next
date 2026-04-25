@@ -35,6 +35,10 @@ struct DXClusterData {
 
   bool hasSelection = false;
   DXClusterSpot selectedSpot;
+
+  std::string watchedCall;
+  bool watchedSpotted = false;
+  std::chrono::steady_clock::time_point watchedSpottedAt;
 };
 
 class DXClusterDataStore {
@@ -52,6 +56,10 @@ public:
 
   void selectSpot(const DXClusterSpot &spot);
   void clearSelection();
+
+  void setWatchedCall(const std::string &call);
+  void setWatchedSpotted(std::chrono::steady_clock::time_point when);
+  void clearWatchedSpotted();
 
   // Prune in-memory spots older than maxAgeMinutes — call periodically even
   // when no new spots arrive (telnet dropped, rate-limited, etc.)

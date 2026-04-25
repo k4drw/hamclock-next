@@ -220,3 +220,26 @@ void DXClusterDataStore::clearSelection() {
   newData->hasSelection = false;
   data_ = newData;
 }
+
+void DXClusterDataStore::setWatchedCall(const std::string &call) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  auto newData = std::make_shared<DXClusterData>(*data_);
+  newData->watchedCall = call;
+  newData->watchedSpotted = false;
+  data_ = newData;
+}
+
+void DXClusterDataStore::setWatchedSpotted(std::chrono::steady_clock::time_point when) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  auto newData = std::make_shared<DXClusterData>(*data_);
+  newData->watchedSpotted = true;
+  newData->watchedSpottedAt = when;
+  data_ = newData;
+}
+
+void DXClusterDataStore::clearWatchedSpotted() {
+  std::lock_guard<std::mutex> lock(mutex_);
+  auto newData = std::make_shared<DXClusterData>(*data_);
+  newData->watchedSpotted = false;
+  data_ = newData;
+}

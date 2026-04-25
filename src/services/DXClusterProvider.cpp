@@ -635,6 +635,19 @@ void DXClusterProvider::processWSJTX(const uint8_t *packet, size_t len) {
 
     store_->addSpot(spot);
 
+    // Watched call check
+    {
+      auto data = store_->snapshot();
+      if (!data->watchedCall.empty() && spot.txCall == data->watchedCall) {
+        store_->setWatchedSpotted(std::chrono::steady_clock::now());
+        // Update DX location from spot
+        if (state_) {
+          state_->dxLocation = {spot.txLat, spot.txLon};
+          state_->dxGrid = spot.txGrid;
+        }
+      }
+    }
+
     // Watchlist check
     if (watchlist_ && hits_ && watchlist_->contains(spot.txCall)) {
       WatchlistHit hit;
@@ -709,6 +722,19 @@ void DXClusterProvider::processLine(const std::string &line) {
         }
 
         store_->addSpot(spot);
+
+        // Watched call check
+        {
+          auto data = store_->snapshot();
+          if (!data->watchedCall.empty() && spot.txCall == data->watchedCall) {
+            store_->setWatchedSpotted(std::chrono::steady_clock::now());
+            // Update DX location from spot
+            if (state_) {
+              state_->dxLocation = {spot.txLat, spot.txLon};
+              state_->dxGrid = spot.txGrid;
+            }
+          }
+        }
 
         // Watchlist Check
         if (watchlist_ && hits_ && watchlist_->contains(spot.txCall)) {

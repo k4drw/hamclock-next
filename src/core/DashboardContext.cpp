@@ -917,7 +917,8 @@ DashboardContext::DashboardContext(AppContext &ctx)
       widgetPool[type] = std::move(sw);
     } else if (type == "dx_info") {
       widgetPool[type] = std::make_unique<DXInfo>(0, 0, 0, 0, fontMgr, state,
-                                                  dxWeatherStore);
+                                                  dxWeatherStore, dxcStore,
+                                                  callbookProvider.get(), callbookStore);
     } else if (type == "env_temp") {
       widgetPool[type] = std::make_unique<ENVPanel>(
           0, 0, 0, 0, fontMgr, deWeatherStore, ENVPanel::ENVMode::Temp);

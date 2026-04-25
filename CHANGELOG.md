@@ -22,6 +22,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **VOACAP 6m Band Support** — propagation overlays for 50 MHz band
 - **Horizontal Current Band Cursor** — frequency indicator on frequency axis
 - **Live Spot Map Integration** — ON-THE-AIR spots overlay on map widget
+- **DX Info Manual Entry** — enter DX callsign directly via modal dialog; CallbookProvider lookup retrieves accurate grid/location from api.hamdb.org; widget border highlights amber when callsign appears in incoming spots (30s auto-fade)
 
 ### Changed
 - **Wiki Documentation** — 19 content gaps fixed across 15 pages (feature coverage, plain-English explanations)
