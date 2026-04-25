@@ -12,6 +12,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **LoTW Auto-Sync Widget** — automatic ADIF-to-LoTW upload integration with live activity tracking
 - **Zone Heatmap Widget** — visual DXCC zone contact distribution
 - **WAS Progress Widget** — US state contact tracker with map overlay
+- **WAC Radar Widget** — 6-segment pie chart visualization (NA, SA, EU, AF, AS, OC) for continent-level award tracking
 - **DX ATNO Alerts** — notify on rare DXCC entity spots matching ADIF needs
 - **Custom RSS Feed Support** — user-configurable content in News widget
 - **Enhanced Solar/Space Weather Widget** — 9 propagation overlays (MUF, reliability, TOA, DRAP, Aurora, etc.)
@@ -22,7 +23,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **VOACAP 6m Band Support** — propagation overlays for 50 MHz band
 - **Horizontal Current Band Cursor** — frequency indicator on frequency axis
 - **Live Spot Map Integration** — ON-THE-AIR spots overlay on map widget
-- **DX Info Manual Entry** — enter DX callsign directly via modal dialog; CallbookProvider lookup retrieves accurate grid/location from api.hamdb.org; widget border highlights amber when callsign appears in incoming spots (30s auto-fade)
+- **DX Info Manual Entry** — enter DX callsigns directly via a centered modal dialog (triggered by clicking the widget); features auto-uppercasing and `api.hamdb.org` (CallbookProvider) lookup for accurate location resolution for hams who have moved; widget border highlights amber when the callsign appears in live spots (30s auto-fade)
 - **Global Volume Control** — adjustable audio levels (0-100) for alarms and TTS; dedicated slider in Setup -> Identity tab
 
 ### Changed
@@ -31,6 +32,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **DXInfo Display** — DX local time via ZoneDetect library, bearing/distance tooltips
 - **Propagation Overlay Auto-Switch** — smart band selection on frequency tune
 - **LoTW & Clublog Panels** — theme color integration, text rendering cache for performance
+- **ADIF Award Tracking Engine** — extended `ADIFStats` and `ADIFProvider` to track worked/confirmed continents, CQ zones, and ITU zones (parses `CQZ` and `ITUZ` tags)
+- **Callbook Integration Service** — new `CallbookProvider` for asynchronous location resolution via external APIs
+- **Polar Rendering Primitives** — new `RenderUtils` methods for `drawPie` and `drawArcOutline` supporting advanced circular UI elements
 
 ### Fixed
 - **GPU Texture Leaks** — SetupScreen, tooltip rendering, MemoryMonitor VRAM accounting drift
