@@ -160,7 +160,7 @@ void SetupScreen::renderTabAppearance(SDL_Renderer *renderer, int cx, int pad,
     dimTimeRect_ = {dimX, y, halfFieldW, 24};
     dimTimeInput_.render(renderer, fontMgr_, dimX, y, halfFieldW, 24,
                          FontStyle::SmallRegular, textPad, activeField_ == 1,
-                         true, themes.accent, themes.textDim, themes.text, themes.text, themes.textDim, "HH:MM", &themes.rowStripe1);
+                         true, themes.accent, themes.border, themes.text, themes.text, themes.textDim, "HH:MM", &themes.rowStripe1);
 
     cat->drawText(renderer, "Bright:", fieldX + halfW, y + 12, themes.text,
                   FontStyle::SmallRegular, false, false, true);
@@ -168,7 +168,7 @@ void SetupScreen::renderTabAppearance(SDL_Renderer *renderer, int cx, int pad,
     brightTimeRect_ = {brightX, y, halfFieldW, 24};
     brightTimeInput_.render(renderer, fontMgr_, brightX, y, halfFieldW, 24,
                             FontStyle::SmallRegular, textPad, activeField_ == 2,
-                            true, themes.accent, themes.textDim, themes.text, themes.text, themes.textDim, "HH:MM", &themes.rowStripe1);
+                            true, themes.accent, themes.border, themes.text, themes.text, themes.textDim, "HH:MM", &themes.rowStripe1);
     y += 24 + vSpace;
   } else {
     dimTimeRect_ = {0, 0, 0, 0};

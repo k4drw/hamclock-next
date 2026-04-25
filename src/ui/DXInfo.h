@@ -77,7 +77,7 @@ private:
 
   // Manual DX entry modal
   bool manualDXModalActive_ = false;
-  std::string manualDXInput_;
+  TextInput manualDXInput_;
   bool watchedSpotActive_ = false;
 
   // Up to 10 lines: "DX:", grid, coords, bearing, distance, country, +2 weather, local time

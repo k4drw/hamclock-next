@@ -26,7 +26,9 @@ DXInfo::DXInfo(int x, int y, int w, int h, FontManager &fontMgr,
       state_(std::move(state)), weatherStore_(std::move(weatherStore)),
       dxcStore_(std::move(dxcStore)), callbookStore_(std::move(callbookStore)),
       greylineModal_(0, 0, HamClock::LOGICAL_WIDTH, HamClock::LOGICAL_HEIGHT,
-                     fontMgr), manualDXInput_("") {}
+                     fontMgr) {
+  manualDXInput_.setMaxLength(20);
+}
 
 void DXInfo::destroyCache() {
   for (int i = 0; i < kNumLines; ++i) {
@@ -282,6 +284,8 @@ bool DXInfo::onMouseUp(int mx, int my, Uint16 /*mod*/, int /*clicks*/) {
   if (manualDXModalActive_) {
     // Close modal on click
     manualDXModalActive_ = false;
+    manualDXInput_.setActive(false);
+    SDL_StopTextInput();
     return true;
   }
 
@@ -300,6 +304,8 @@ bool DXInfo::onMouseUp(int mx, int my, Uint16 /*mod*/, int /*clicks*/) {
   if (mx >= x_ && mx < x_ + width_ && my >= y_ && my < y_ + height_) {
     manualDXModalActive_ = true;
     manualDXInput_.clear();
+    manualDXInput_.setActive(true);
+    SDL_StartTextInput();
     return true;
   }
 
@@ -314,7 +320,7 @@ bool DXInfo::onKeyDown(SDL_Keycode key, Uint16 mod) {
   if (manualDXModalActive_) {
     if (key == SDLK_RETURN || key == SDLK_KP_ENTER) {
       // Submit callsign
-      std::string val = manualDXInput_;
+      std::string val = manualDXInput_.getValue();
       std::transform(val.begin(), val.end(), val.begin(), ::toupper);
       if (!val.empty()) {
         // Set as DX target
@@ -334,34 +340,26 @@ bool DXInfo::onKeyDown(SDL_Keycode key, Uint16 mod) {
         }
       }
       manualDXModalActive_ = false;
-      manualDXInput_.clear();
+      manualDXInput_.setActive(false);
+      SDL_StopTextInput();
       return true;
     }
     if (key == SDLK_ESCAPE) {
       manualDXModalActive_ = false;
-      manualDXInput_.clear();
+      manualDXInput_.setActive(false);
+      SDL_StopTextInput();
       return true;
     }
-    if (key == SDLK_BACKSPACE) {
-      if (!manualDXInput_.empty()) {
-        manualDXInput_.pop_back();
-      }
-      return true;
-    }
-    return true; // Consume all keys when modal active
+    return manualDXInput_.onKeyDown(key, mod);
   }
   return false;
 }
 
 bool DXInfo::onTextInput(const char *text) {
   if (manualDXModalActive_) {
-    // Add character to input (uppercase), limit to reasonable length
-    if (manualDXInput_.length() < 20) {
-      std::string upper(text);
-      std::transform(upper.begin(), upper.end(), upper.begin(), ::toupper);
-      manualDXInput_ += upper;
-    }
-    return true;
+    std::string upper(text);
+    std::transform(upper.begin(), upper.end(), upper.begin(), ::toupper);
+    return manualDXInput_.onTextInput(upper.c_str());
   }
   return false;
 }
@@ -397,18 +395,16 @@ void DXInfo::renderManualDXModal(SDL_Renderer *renderer) {
   fontMgr_.catalog()->drawText(renderer, "Enter DX Callsign:", modalX + 10,
                                modalY + 10, themes.text, FontStyle::Fast);
 
-  // Input field background
-  SDL_Rect inputField = {modalX + 10, modalY + 30, modalW - 20, 24};
-  SDL_SetRenderDrawColor(renderer, 64, 64, 64, 255);
-  SDL_RenderFillRect(renderer, &inputField);
-  SDL_SetRenderDrawColor(renderer, themes.accent.r, themes.accent.g,
-                         themes.accent.b, 255);
-  SDL_RenderDrawRect(renderer, &inputField);
-
-  // Input text + cursor
-  fontMgr_.catalog()->drawText(renderer, (manualDXInput_ + "_").c_str(),
-                               modalX + 15, modalY + 35, themes.accent,
-                               FontStyle::Fast);
+  // Input field using TextInput widget
+  int inputX = modalX + 10;
+  int inputY = modalY + 30;
+  int inputW = modalW - 20;
+  int inputH = 24;
+  manualDXInput_.render(renderer, fontMgr_, inputX, inputY, inputW, inputH,
+                        FontStyle::Fast, 6, manualDXInput_.isActive(), true,
+                        themes.accent, themes.border, themes.text,
+                        themes.text, themes.textDim, "Enter callsign...",
+                        &themes.rowStripe1);
 }
 
 nlohmann::json DXInfo::getDebugData() const {

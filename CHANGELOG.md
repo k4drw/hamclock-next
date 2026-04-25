@@ -39,6 +39,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Polar Rendering Primitives** — new `RenderUtils` methods for `drawPie` and `drawArcOutline` supporting advanced circular UI elements
 
 ### Fixed
+- **Theming and Text Input Standards** — audit of 91 theme-aware and 17 text-input panels found 5 non-compliant instances (SetupScreen_Appearance dimTimeInput/brightTimeInput using textDim instead of border; DXInfo manual entry using hard-coded color, string input instead of TextInput class). All fixes applied; standards enforced across all UI components.
 - **Presets Modal UX** — expanded visible rows from 5 to 8, added alphabetical sorting, fixed deletion tracking integration
 - **GPU Texture Leaks** — SetupScreen, tooltip rendering, MemoryMonitor VRAM accounting drift
 - **GPU Memory Stability** — FontManager LRU pruning on Raspberry Pi (low-memory mode)
