@@ -5,6 +5,7 @@
 #include <SDL.h>
 #include <nlohmann/json.hpp>
 
+#include <algorithm>
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
@@ -149,7 +150,18 @@ bool ConfigManager::init() {
   return true;
 }
 
-static void addFactoryPresets(AppConfig &config) {
+static void ensureFactoryPresets(AppConfig &config) {
+  auto presetExists = [&](const std::string &name) {
+    return std::any_of(config.presets.begin(), config.presets.end(),
+                       [&](const ConfigPreset &p) { return p.name == name; });
+  };
+
+  auto addIfMissing = [&](ConfigPreset p) {
+    if (!presetExists(p.name) && config.deletedFactoryPresets.find(p.name) == config.deletedFactoryPresets.end()) {
+      config.presets.push_back(std::move(p));
+    }
+  };
+
   // DX preset
   {
     ConfigPreset p;
@@ -160,7 +172,7 @@ static void addFactoryPresets(AppConfig &config) {
     p.pane4Rotation = {"band_conditions"};
     p.pane5Rotation = {"de_info"};
     p.pane6Rotation = {"dx_info"};
-    config.presets.push_back(std::move(p));
+    addIfMissing(std::move(p));
   }
   // Contest preset
   {
@@ -172,7 +184,7 @@ static void addFactoryPresets(AppConfig &config) {
     p.pane4Rotation = {"solar"};
     p.pane5Rotation = {"de_info"};
     p.pane6Rotation = {"dx_info"};
-    config.presets.push_back(std::move(p));
+    addIfMissing(std::move(p));
   }
   // Satellite preset
   {
@@ -184,9 +196,9 @@ static void addFactoryPresets(AppConfig &config) {
     p.pane4Rotation = {"solar"};
     p.pane5Rotation = {"satellite"};
     p.pane6Rotation = {"de_info"};
-    config.presets.push_back(std::move(p));
+    addIfMissing(std::move(p));
   }
-  // Environment/WX preset — uses unlocked panes 5-6 for ENV sensors
+  // Environment/WX preset
   {
     ConfigPreset p;
     p.name = "Environment/WX";
@@ -196,7 +208,7 @@ static void addFactoryPresets(AppConfig &config) {
     p.pane4Rotation = {"de_weather"};
     p.pane5Rotation = {"env_temp"};
     p.pane6Rotation = {"env_humidity"};
-    config.presets.push_back(std::move(p));
+    addIfMissing(std::move(p));
   }
   // Propagation Firehose preset
   {
@@ -213,7 +225,19 @@ static void addFactoryPresets(AppConfig &config) {
                       PropOverlayType::Aurora};
     p.propOverlay = PropOverlayType::Muf;
     p.rotationIntervalS = 30;
-    config.presets.push_back(std::move(p));
+    addIfMissing(std::move(p));
+  }
+  // DE Station Status preset
+  {
+    ConfigPreset p;
+    p.name = "DE Station Status";
+    p.pane1Rotation = {"dxcc_progress", "was_progress", "grid_progress"};
+    p.pane2Rotation = {"zone_heatmap", "clublog_wanted"};
+    p.pane3Rotation = {"wac_radar", "alerts"};
+    p.pane4Rotation = {"band_conditions"};
+    p.pane5Rotation = {"de_info"};
+    p.pane6Rotation = {"lotw_sync", "adif"};
+    addIfMissing(std::move(p));
   }
 }
 
@@ -641,6 +665,14 @@ bool ConfigManager::load(AppConfig &config) {
     }
   }
 
+  // Deleted factory presets
+  if (json.contains("deleted_factory_presets") && json["deleted_factory_presets"].is_array()) {
+    for (auto &item : json["deleted_factory_presets"]) {
+      if (item.is_string())
+        config.deletedFactoryPresets.insert(item.get<std::string>());
+    }
+  }
+
   // World Clock
   config.worldClocks.clear();
   if (json.contains("world_clocks") && json["world_clocks"].is_array()) {
@@ -666,9 +698,8 @@ if (!loadedJson) {
     config.worldClocks.push_back({"", 0, false});
   }
 
-  // Seed factory presets on first use
-  if (config.presets.empty())
-    addFactoryPresets(config);
+  // Ensure factory presets exist (skip deleted ones)
+  ensureFactoryPresets(config);
 
   // Sync internal state
   config_ = config;
@@ -944,6 +975,15 @@ bool ConfigManager::save(const AppConfig &config) {
     json["presets"] = presetsArr;
   }
 
+  // Deleted factory presets
+  {
+    auto deletedArr = nlohmann::json::array();
+    for (const auto &name : config.deletedFactoryPresets) {
+      deletedArr.push_back(name);
+    }
+    json["deleted_factory_presets"] = deletedArr;
+  }
+
   std::filesystem::path tmpPath = configPath_;
   tmpPath.replace_extension(".json.tmp");
 
@@ -1055,6 +1095,13 @@ void ConfigManager::savePreset(AppConfig &config, const std::string &name) {
 
 void ConfigManager::deletePreset(AppConfig &config, int index) {
   if (index >= 0 && index < (int)config.presets.size()) {
+    const auto &presetName = config.presets[index].name;
+    // Track deletion of factory presets so they don't reappear on update
+    static const std::set<std::string> factoryPresetNames = {
+        "DX", "Contest", "Satellite", "Environment/WX", "Prop Firehose", "DE Station Status"};
+    if (factoryPresetNames.find(presetName) != factoryPresetNames.end()) {
+      config.deletedFactoryPresets.insert(presetName);
+    }
     config.presets.erase(config.presets.begin() + index);
   }
 }

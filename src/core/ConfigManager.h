@@ -2,6 +2,7 @@
 
 #include <filesystem>
 #include <map>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -282,6 +283,7 @@ struct AppConfig {
 
   // Presets
   std::vector<ConfigPreset> presets;
+  std::set<std::string> deletedFactoryPresets;  // Factory preset names user has deleted
 
   // DX Enhancements
   float kIndexAlertThreshold = 5.0f;

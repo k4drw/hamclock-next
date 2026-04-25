@@ -25,6 +25,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Live Spot Map Integration** — ON-THE-AIR spots overlay on map widget
 - **DX Info Manual Entry** — enter DX callsigns directly via a centered modal dialog (triggered by clicking the widget); features auto-uppercasing and `api.hamdb.org` (CallbookProvider) lookup for accurate location resolution for hams who have moved; widget border highlights amber when the callsign appears in live spots (30s auto-fade)
 - **Global Volume Control** — adjustable audio levels (0-100) for alarms and TTS; dedicated slider in Setup -> Identity tab
+- **DE Station Status Preset** — new built-in preset highlighting award tracking (DXCC, WAS, Grid, WAC, Zone Heatmap) and QSO management (LoTW Sync, ADIF Tracking); factory preset deletion tracking ensures user-deleted presets don't reappear on app updates
 
 ### Changed
 - **Wiki Documentation** — 100% v1.6 feature documentation coverage; 26 content gaps fixed across 15 pages including new sections for LoTW Auto-Sync, Award Trackers, Direct DX Lookup, and Global Volume Control.
@@ -38,6 +39,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Polar Rendering Primitives** — new `RenderUtils` methods for `drawPie` and `drawArcOutline` supporting advanced circular UI elements
 
 ### Fixed
+- **Presets Modal UX** — expanded visible rows from 5 to 8, added alphabetical sorting, fixed deletion tracking integration
 - **GPU Texture Leaks** — SetupScreen, tooltip rendering, MemoryMonitor VRAM accounting drift
 - **GPU Memory Stability** — FontManager LRU pruning on Raspberry Pi (low-memory mode)
 - **MCP Diagnostic Tools** — fixed diagnose_memory endpoint polling, new_feature_checklist macro reference, removed 7 stale parity tools from docs

@@ -14,6 +14,9 @@ void PresetsModal::init(AppConfig *cfg, std::function<void()> onApply) {
 void PresetsModal::open() {
   if (!cfg_)
     return;
+  // Sort presets alphabetically by name
+  std::sort(cfg_->presets.begin(), cfg_->presets.end(),
+            [](const ConfigPreset &a, const ConfigPreset &b) { return a.name < b.name; });
   active_ = true;
   saving_ = false;
   scrollOffset_ = 0;
@@ -412,7 +415,7 @@ void PresetsModal::applyPreset(int index) {
 void PresetsModal::deletePreset(int index) {
   if (!cfg_ || index < 0 || index >= (int)cfg_->presets.size())
     return;
-  cfg_->presets.erase(cfg_->presets.begin() + index);
+  ConfigManager::instance().deletePreset(*cfg_, index);
   ConfigManager::instance().save(*cfg_);
   // Clamp scroll
   int total = (int)cfg_->presets.size();

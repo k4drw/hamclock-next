@@ -34,9 +34,9 @@ private:
   void applyPropFirehose();
 
   static constexpr int kModalW    = 420;
-  static constexpr int kModalH    = 360;  // +30 for Contest row, +30 for Firehose row
+  static constexpr int kModalH    = 430;  // Expanded for 8 visible rows
   static constexpr int kRowH      = 30;
-  static constexpr int kVisibleRows = 5;
+  static constexpr int kVisibleRows = 8;
   static constexpr int kLogicalW  = 800;
   static constexpr int kLogicalH  = 480;
 

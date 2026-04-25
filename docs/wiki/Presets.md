@@ -69,7 +69,7 @@ The preset is removed immediately. This action cannot be undone.
 
 ## Built-in Presets
 
-HamClock-Next ships with one built-in preset that you can apply immediately from the Presets modal:
+HamClock-Next ships with several built-in presets that you can apply immediately from the Presets modal:
 
 ### Prop Firehose
 
@@ -84,6 +84,22 @@ What it loads:
 - **Pane 6**: DX Info
 
 Apply it the same way as any other preset: click **★**, select **Prop Firehose**, then click **Apply**.
+
+---
+
+### DE Station Status
+
+The **DE Station Status** preset focuses on your own station achievements and QSO management. It displays award progress, geographic coverage, and QSO records in a rotating view.
+
+What it loads:
+- **Pane 1**: DXCC Progress → WAS Progress → Grid Progress
+- **Pane 2**: Zone Heatmap → ClubLog Most Wanted
+- **Pane 3**: WAC Radar → Alerts
+- **Pane 4**: Band Conditions
+- **Pane 5**: DE Info
+- **Pane 6**: LoTW Sync → ADIF Tracking
+
+Apply it the same way as any other preset: click **★**, select **DE Station Status**, then click **Apply**.
 
 ---
 
