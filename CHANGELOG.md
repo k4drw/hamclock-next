@@ -6,6 +6,41 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [v1.6.0] — 2026-04-24
+
+### Added
+- **LoTW Auto-Sync Widget** — automatic ADIF-to-LoTW upload integration with live activity tracking
+- **Zone Heatmap Widget** — visual DXCC zone contact distribution
+- **WAS Progress Widget** — US state contact tracker with map overlay
+- **DX ATNO Alerts** — notify on rare DXCC entity spots matching ADIF needs
+- **Custom RSS Feed Support** — user-configurable content in News widget
+- **Enhanced Solar/Space Weather Widget** — 9 propagation overlays (MUF, reliability, TOA, DRAP, Aurora, etc.)
+- **K-Index Alert Threshold** — configurable K-index trigger for notifications
+- **DX Cluster Band Legend Click-To-Filter** — click band color to filter spots
+- **DX Cluster Sub-Band Mode Badges** — visual CW/SSB/FT8/RTTY/WSPR indicators
+- **SFI 30-Day Trend Chart** — solar flux index historical graph
+- **VOACAP 6m Band Support** — propagation overlays for 50 MHz band
+- **Horizontal Current Band Cursor** — frequency indicator on frequency axis
+- **Live Spot Map Integration** — ON-THE-AIR spots overlay on map widget
+
+### Changed
+- **Wiki Documentation** — 19 content gaps fixed across 15 pages (feature coverage, plain-English explanations)
+- **DX Panel UI** — active status indicator, clickable expeditions, theme-aware colors
+- **DXInfo Display** — DX local time via ZoneDetect library, bearing/distance tooltips
+- **Propagation Overlay Auto-Switch** — smart band selection on frequency tune
+- **LoTW & Clublog Panels** — theme color integration, text rendering cache for performance
+
+### Fixed
+- **GPU Texture Leaks** — SetupScreen, tooltip rendering, MemoryMonitor VRAM accounting drift
+- **GPU Memory Stability** — FontManager LRU pruning on Raspberry Pi (low-memory mode)
+- **MCP Diagnostic Tools** — fixed diagnose_memory endpoint polling, new_feature_checklist macro reference, removed 7 stale parity tools from docs
+- **Propagation Overlay Sync** — band/overlay state consistency across panel updates
+- **DX Cluster Crash** — Windows telnet socket NULL handling, spot sort order, band filter interaction
+- **Marine Widget Update** — immediate WTTR.in data fetch on load (no startup delay)
+- **Network Timeout Stability** — 45s socket timeout for NASA/JPL/FCC/NOAA endpoints
+
+---
+
 ## [v1.5.0] — 2026-04-12
 
 ### Added
