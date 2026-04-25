@@ -856,6 +856,18 @@ REGISTER_WIDGET("dx_peditions", "DX Peditions", true, false, {
 })
 
 REGISTER_WIDGET("on_the_air", "On The Air", true, false, {
-  return std::make_unique<ONTAPanel>(
+  auto p = std::make_unique<ONTAPanel>(
       0, 0, 0, 0, deps.fontMgr, *deps.activityProvider, deps.activityStore);
+  p->setFilter(deps.appCfg.ontaFilter);
+  p->setDeLocation(deps.appCfg.lat, deps.appCfg.lon);
+  p->setMaxDistKm(deps.appCfg.ontaMaxDistKm);
+  p->setOnFilterChanged([&appCfg = deps.appCfg, &cfgMgr = deps.cfgMgr](const std::string &f) {
+    appCfg.ontaFilter = f;
+    cfgMgr.save(appCfg);
+  });
+  p->setOnMaxDistChanged([&appCfg = deps.appCfg, &cfgMgr = deps.cfgMgr](int km) {
+    appCfg.ontaMaxDistKm = km;
+    cfgMgr.save(appCfg);
+  });
+  return p;
 })

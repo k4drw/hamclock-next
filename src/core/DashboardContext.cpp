@@ -696,268 +696,65 @@ DashboardContext::DashboardContext(AppContext &ctx)
     if (widgetPool.count(type) && widgetPool[type])
       return widgetPool[type].get();
 
-    if (type == "solar") {
-      widgetPool[type] = std::make_unique<SpaceWeatherPanel>(
-          0, 0, 0, 0, fontMgr, texMgr, solarStore, ctx.xrayHistoryStore);
-    } else if (type == "dx_cluster") {
-#ifndef __EMSCRIPTEN__
-      widgetPool[type] = std::make_unique<DXClusterPanel>(
-          0, 0, 0, 0, fontMgr, dxcStore, rigService.get(), &appCfg, adifStore, watchlistStore, ctx.lotwActivityStore);
-#else
-      widgetPool[type] = std::make_unique<DXClusterPanel>(
-          0, 0, 0, 0, fontMgr, dxcStore, nullptr, &appCfg, adifStore, watchlistStore, ctx.lotwActivityStore);
-#endif
-    } else if (type == "live_spots") {
-      widgetPool[type] = std::make_unique<LiveSpotPanel>(
-          0, 0, 0, 0, fontMgr, *spotProvider, spotStore, appCfg, ctx.cfgMgr);
-    } else if (type == "band_conditions") {
-      widgetPool[type] =
-          std::make_unique<BandConditionsPanel>(0, 0, 0, 0, fontMgr, bandStore);
-    } else if (type == "contests") {
-      widgetPool[type] =
-          std::make_unique<ContestPanel>(0, 0, 0, 0, fontMgr, contestStore, appCfg);
-    } else if (type == "world_clock") {
-      widgetPool[type] = std::make_unique<WorldClockPanel>(
-          0, 0, 0, 0, ctx.cfgMgr, fontMgr);
-    } else if (type == "callsign_clock") {
-      widgetPool[type] =
-          std::make_unique<CallsignClock>(0, 0, 0, 0, fontMgr, appCfg.callsign, appCfg);
-    } else if (type == "callbook") {
-      widgetPool[type] =
-          std::make_unique<CallbookPanel>(0, 0, 0, 0, fontMgr, callbookStore);
-    } else if (type == "dst_index") {
-      widgetPool[type] =
-          std::make_unique<DstPanel>(0, 0, 0, 0, fontMgr, texMgr, dstStore);
-    } else
-    if (type == "watchlist") {
-      widgetPool[type] = std::make_unique<WatchlistPanel>(
-          0, 0, 0, 0, fontMgr, watchlistStore, watchlistHitStore);
-    } else if (type == "eme_tool") {
-      widgetPool[type] = std::make_unique<EMEToolPanel>(0, 0, 0, 0, fontMgr,
-                                                        texMgr, moonStore, appCfg);
-    } else if (type == "santa_tracker") {
-      widgetPool[type] =
-          std::make_unique<SantaPanel>(0, 0, 0, 0, fontMgr, santaStore);
-    } else if (type == "on_the_air") {
-      auto ontaPanel = std::make_unique<ONTAPanel>(
-          0, 0, 0, 0, fontMgr, *activityProvider, activityStore);
-      ontaPanel->setFilter(appCfg.ontaFilter);
-      ontaPanel->setDeLocation(appCfg.lat, appCfg.lon);
-      ontaPanel->setMaxDistKm(appCfg.ontaMaxDistKm);
-      ontaPanel->setOnFilterChanged([&ctx](const std::string &f) {
-        ctx.appCfg.ontaFilter = f;
-        ctx.cfgMgr.save(ctx.appCfg);
-      });
-      ontaPanel->setOnMaxDistChanged([&ctx](int km) {
-        ctx.appCfg.ontaMaxDistKm = km;
-        ctx.cfgMgr.save(ctx.appCfg);
-      });
-      widgetPool[type] = std::move(ontaPanel);
-    } else if (type == "dx_peditions") {
-      widgetPool[type] = std::make_unique<DXPedPanel>(
-          0, 0, 0, 0, fontMgr, *activityProvider, activityStore);
-    } else if (type == "gimbal") {
-      auto gp = std::make_unique<GimbalPanel>(0, 0, 0, 0, fontMgr, texMgr,
-                                              rotatorStore);
-      gp->setObserver(appCfg.lat, appCfg.lon);
-      widgetPool[type] = std::move(gp);
-    } else if (type == "moon") {
-      widgetPool[type] = std::make_unique<MoonPanel>(
-          0, 0, 0, 0, fontMgr, texMgr, netManager, moonStore);
-    } else if (type == "clock_aux") {
-      widgetPool[type] = std::make_unique<ClockAuxPanel>(0, 0, 0, 0, fontMgr,
-                                                         appCfg, ctx.cfgMgr);
-    } else if (type == "big_clock") {
-      widgetPool[type] = std::make_unique<BigClockPanel>(0, 0, 0, 0, fontMgr,
-                                                         appCfg, ctx.cfgMgr);
-    } else if (type == "history_flux") {
-      widgetPool[type] = std::make_unique<HistoryPanel>(
-          0, 0, 0, 0, fontMgr, texMgr, historyStore, "flux");
-    } else if (type == "history_ssn") {
-      widgetPool[type] = std::make_unique<HistoryPanel>(
-          0, 0, 0, 0, fontMgr, texMgr, historyStore, "ssn");
-    } else if (type == "history_kp") {
-      widgetPool[type] = std::make_unique<HistoryPanel>(
-          0, 0, 0, 0, fontMgr, texMgr, historyStore, "kp");
-    } else if (type == "drap") {
-      widgetPool[type] = std::make_unique<DRAPPanel>(0, 0, 0, 0, fontMgr,
-                                                     texMgr, *drapProvider);
-    } else if (type == "aurora") {
-      widgetPool[type] = std::make_unique<AuroraPanel>(0, 0, 0, 0, fontMgr,
-                                                       texMgr, *auroraProvider);
-    } else if (type == "aurora_graph") {
-      widgetPool[type] = std::make_unique<AuroraGraphPanel>(
-          0, 0, 0, 0, fontMgr, texMgr, auroraHistoryStore);
-    } else if (type == "adif") {
-      widgetPool[type] =
-          std::make_unique<ADIFPanel>(0, 0, 0, 0, fontMgr, adifStore);
-    } else if (type == "was_progress") {
-      widgetPool[type] =
-          std::make_unique<WASPanel>(0, 0, 0, 0, fontMgr, adifStore);
-    } else if (type == "wac_radar") {
-      widgetPool[type] =
-          std::make_unique<WACRadarPanel>(0, 0, 0, 0, fontMgr, adifStore);
-    } else if (type == "zone_heatmap") {
-      widgetPool[type] =
-          std::make_unique<ZoneHeatmapPanel>(0, 0, 0, 0, fontMgr, adifStore);
-    } else if (type == "clublog_wanted") {
-      widgetPool[type] = std::make_unique<ClublogWantedPanel>(
-          0, 0, 0, 0, fontMgr, ctx.clublogStore, adifStore);
-    } else if (type == "lotw_sync") {
-      widgetPool[type] = std::make_unique<LoTWSyncPanel>(
-          0, 0, 0, 0, fontMgr);
-    } else if (type == "countdown") {
-      widgetPool[type] = std::make_unique<CountdownPanel>(
-          0, 0, 0, 0, fontMgr, ctx.appCfg,
-          [&ctx]() { ctx.cfgMgr.save(ctx.appCfg); });
-    } else if (type == "de_weather") {
-      widgetPool[type] = std::make_unique<WeatherPanel>(
-          0, 0, 0, 0, fontMgr, deWeatherStore, "DE Weather");
-    } else if (type == "dx_weather") {
-      widgetPool[type] = std::make_unique<WeatherPanel>(
-          0, 0, 0, 0, fontMgr, dxWeatherStore, "DX Weather");
-    } else if (type == "ncdxf") {
-      widgetPool[type] =
-          std::make_unique<BeaconPanel>(0, 0, 0, 0, fontMgr, *beaconProvider);
-    } else if (type == "sdo") {
-      auto sdoP = std::make_unique<SDOPanel>(0, 0, 0, 0, fontMgr, texMgr, *sdoProvider);
-      sdoP->setObserver(appCfg.lat, appCfg.lon);
-      widgetPool[type] = std::move(sdoP);
-    } else if (type == "sys_info") {
-      widgetPool[type] = std::make_unique<SysInfoPanel>(
-          0, 0, 0, 0, fontMgr, ctx.cpuMonitor, ctx.state, appCfg.useMetric);
-    } else if (type == "asteroid") {
-      widgetPool[type] = std::make_unique<AsteroidPanel>(
-          0, 0, 0, 0, fontMgr, texMgr, *asteroidProvider, state, &appCfg,
-          [&ctx]() { ctx.cfgMgr.save(ctx.appCfg); });
-    } else if (type == "alerts") {
-      widgetPool[type] =
-          std::make_unique<AlertsPanel>(0, 0, 0, 0, fontMgr, ctx.alertsStore);
-    } else if (type == "forecast") {
-      widgetPool[type] = std::make_unique<ForecastPanel>(0, 0, 0, 0, fontMgr,
-                                                         ctx.forecastStore);
-    } else if (type == "repeater_dir") {
-      widgetPool[type] = std::make_unique<RepeaterPanel>(0, 0, 0, 0, fontMgr,
-                                                         ctx.repeaterStore);
-    } else if (type == "hurricane") {
-      widgetPool[type] = std::make_unique<HurricanePanel>(0, 0, 0, 0, fontMgr,
-                                                          ctx.hurricaneStore);
-    } else if (type == "marine") {
-      widgetPool[type] = std::make_unique<MarinePanel>(
-          0, 0, 0, 0, fontMgr, ctx.marineStore, marineProvider.get());
-
-    } else if (type == "winlink") {
-      widgetPool[type] =
-          std::make_unique<WinlinkPanel>(0, 0, 0, 0, fontMgr, ctx.winlinkStore);
-    } else if (type == "greyline_dx") {
-      widgetPool[type] = std::make_unique<GreylineDXPanel>(0, 0, 0, 0, fontMgr,
-                                                           ctx.greylineDXStore);
-    } else if (type == "stopwatch") {
-      widgetPool[type] = std::make_unique<StopwatchPanel>(0, 0, 0, 0, fontMgr);
-    } else if (type == "rig_control") {
-#ifndef __EMSCRIPTEN__
-      widgetPool[type] = std::make_unique<RigControlPanel>(
-          0, 0, 0, 0, fontMgr, rigService.get());
-#else
-      widgetPool[type] = std::make_unique<RigControlPanel>(
-          0, 0, 0, 0, fontMgr, nullptr);
-#endif
-    } else if (type == "voacap_dedx") {
-      widgetPool[type] = std::make_unique<VoacapDeDxPanel>(
-          0, 0, 0, 0, fontMgr, state, solarStore, ionosondeProvider, appCfg,
-          ctx.rigStore.get());
-    } else if (type == "solar_timeline") {
-      widgetPool[type] = std::make_unique<SolarTimelinePanel>(
-          0, 0, 0, 0, fontMgr, netManager);
-    } else if (type == "calendar") {
-      auto *calPanel = new CalendarPanel(0, 0, 0, 0, fontMgr, appCfg, ctx.calendarStore);
-      calPanel->setNotifyMinutes(appCfg.calendarNotifyMinutes);
-      calPanel->setAllDayNotifyHour(appCfg.calendarAllDayNotifyHour);
-      calPanel->setDismissMinutes(appCfg.calendarDismissMinutes);
-      calPanel->setOnConfigChanged([&ctx](int mins, int hour, int dismiss) {
-        ctx.appCfg.calendarNotifyMinutes = mins;
-        ctx.appCfg.calendarAllDayNotifyHour = hour;
-        ctx.appCfg.calendarDismissMinutes = dismiss;
-        ctx.cfgMgr.save(ctx.appCfg);
-      });
-      widgetPool[type] = std::unique_ptr<CalendarPanel>(calPanel);
-    } else if (type == "reminders") {
-      widgetPool[type] = std::make_unique<ReminderPanel>(
-          0, 0, 0, 0, fontMgr, ctx.appCfg, ctx.cfgMgr, *callbookProvider,
-          callbookStore, fccProvider);
-    } else if (type == "tropo") {
-      widgetPool[type] = std::make_unique<TropoPanel>(0, 0, 0, 0, fontMgr);
-    } else if (type == "lightning") {
-      widgetPool[type] = std::make_unique<LightningPanel>(0, 0, 0, 0, fontMgr);
-    } else if (type == "meteor") {
-      widgetPool[type] =
-          std::make_unique<MeteorPanel>(0, 0, 0, 0, fontMgr, texMgr);
-    } else if (type == "ionosonde") {
-      widgetPool[type] =
-          std::make_unique<IonosondePanel>(0, 0, 0, 0, fontMgr, texMgr);
-    } else if (type == "solar_storm") {
-      widgetPool[type] =
-          std::make_unique<SolarStormPanel>(0, 0, 0, 0, fontMgr, texMgr);
-    } else if (type == "de_info") {
-      widgetPool[type] = std::make_unique<LocalPanel>(0, 0, 0, 0, fontMgr,
-                                                      state, deWeatherStore);
-    } else if (type == "satellite") {
-      auto sw = std::make_unique<SatWidget>(0, 0, 0, 0, fontMgr, texMgr,
-                                            *satMgr, appCfg);
-      sw->setObserver(appCfg.lat, appCfg.lon);
-      sw->restoreState(appCfg.satWidgetSatellite);
-      sw->setMapTrackVisible(appCfg.showSatTrack);
-      sw->setOnSatChanged([&ctx](const std::string &satName) {
-        ctx.appCfg.satWidgetSatellite = satName;
-        ctx.cfgMgr.save(ctx.appCfg);
-      });
-      sw->setOnMapTrackToggle([&ctx](bool enabled) {
-        ctx.appCfg.showSatTrack = enabled;
-        ctx.cfgMgr.save(ctx.appCfg);
-      });
-      widgetPool[type] = std::move(sw);
-    } else if (type == "dx_info") {
-      widgetPool[type] = std::make_unique<DXInfo>(0, 0, 0, 0, fontMgr, state,
-                                                  dxWeatherStore, dxcStore,
-                                                  callbookProvider, callbookStore);
-    } else if (type == "env_temp") {
-      widgetPool[type] = std::make_unique<ENVPanel>(
-          0, 0, 0, 0, fontMgr, deWeatherStore, ENVPanel::ENVMode::Temp);
-    } else if (type == "env_pressure") {
-      widgetPool[type] = std::make_unique<ENVPanel>(
-          0, 0, 0, 0, fontMgr, deWeatherStore, ENVPanel::ENVMode::Pressure);
-    } else if (type == "env_humidity") {
-      widgetPool[type] = std::make_unique<ENVPanel>(
-          0, 0, 0, 0, fontMgr, deWeatherStore, ENVPanel::ENVMode::Humidity);
-    } else if (type == "env_dewpoint") {
-      widgetPool[type] = std::make_unique<ENVPanel>(
-          0, 0, 0, 0, fontMgr, deWeatherStore, ENVPanel::ENVMode::Dewpoint);
-    } else if (type == "solar_cycle") {
-      widgetPool[type] = std::make_unique<SolarCyclePanel>(
-          0, 0, 0, 0, fontMgr, texMgr, historyStore);
-    } else if (type == "greyline_windows") {
-      widgetPool[type] = std::make_unique<GreylineWindowsPanel>(
-          0, 0, 0, 0, fontMgr, state, appCfg);
-    } else if (type == "dxcc_progress") {
-      widgetPool[type] = std::make_unique<DXCCProgressPanel>(
-          0, 0, 0, 0, fontMgr, adifStore, ctx.prefixMgr);
-    } else if (type == "spacewx_alerts") {
-      widgetPool[type] = std::make_unique<SpaceWeatherAlertsPanel>(
-          0, 0, 0, 0, fontMgr, appCfg, spaceWxAlertStore);
-    } else if (type == "noaa_spacewx") {
-      widgetPool[type] = std::make_unique<NOAASpaceWxPanel>(
-          0, 0, 0, 0, fontMgr, ctx.solarStore);
-    } else if (type == "kindex_trend") {
-      widgetPool[type] = std::make_unique<KIndexAlertPanel>(
-          0, 0, 0, 0, fontMgr, kIndexHistoryStore, solarStore, &appCfg);
-    } else if (type == "sfi_trend") {
-      widgetPool[type] = std::make_unique<SFITrendPanel>(
-          0, 0, 0, 0, fontMgr, sfiHistoryStore, solarStore);
-    } else {
-      widgetPool[type] = std::make_unique<PlaceholderWidget>(
-          0, 0, 0, 0, fontMgr, type.c_str(),
-          SDL_Color{0, 200, 255, 255});
-    }
+    WidgetDeps deps{
+        fontMgr,
+        texMgr,
+        appCfg,
+        ctx.cfgMgr,
+        netManager,
+        ctx.prefixMgr,
+        state,
+        ctx.cpuMonitor,
+        solarStore,
+        auroraHistoryStore,
+        watchlistStore,
+        watchlistHitStore,
+        spotStore,
+        activityStore,
+        dxcStore,
+        bandStore,
+        contestStore,
+        moonStore,
+        historyStore,
+        deWeatherStore,
+        dxWeatherStore,
+        callbookStore,
+        dstStore,
+        adifStore,
+        santaStore,
+        rotatorStore,
+        ctx.rigStore,
+        ctx.alertsStore,
+        ctx.forecastStore,
+        ctx.repeaterStore,
+        ctx.hurricaneStore,
+        ctx.marineStore,
+        ctx.winlinkStore,
+        ctx.drapDataStore,
+        ctx.xrayHistoryStore,
+        kIndexHistoryStore,
+        sfiHistoryStore,
+        ctx.greylineDXStore,
+        ctx.auroraMapStore,
+        ctx.calendarStore,
+        spaceWxAlertStore,
+        ctx.lotwActivityStore,
+        ctx.clublogStore,
+        spotProvider.get(),
+        activityProvider.get(),
+        drapProvider.get(),
+        auroraProvider.get(),
+        sdoProvider.get(),
+        beaconProvider.get(),
+        satMgr.get(),
+        asteroidProvider.get(),
+        callbookProvider,
+        ionosondeProvider,
+        &fccProvider,
+        rigService.get(),
+        marineProvider.get(),
+    };
+    widgetPool[type] = WidgetRegistry::instance().create(type, deps);
 
     // Wire callbacks for newly created widgets
     if (type == "dx_cluster") {
