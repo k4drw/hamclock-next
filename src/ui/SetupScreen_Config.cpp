@@ -27,6 +27,7 @@ void SetupScreen::setConfig(const AppConfig &cfg) {
 
   gpsEnabled_ = cfg.gpsEnabled;
   audioMuted_ = cfg.audioMuted;
+  audioVolume_ = cfg.audioVolume;
   callsignInput_.setValue(cfg.callsign);
   gridInput_.setValue(cfg.grid);
   frnText_ = cfg.callsignFrn;
@@ -150,6 +151,7 @@ AppConfig SetupScreen::getConfig(const AppConfig& base) const {
   AppConfig cfg = base;
   cfg.gpsEnabled = gpsEnabled_;
   cfg.audioMuted = audioMuted_;
+  cfg.audioVolume = audioVolume_;
   cfg.callsign = callsignInput_.getValue();
   cfg.grid = gridInput_.getValue();
   cfg.callsignFrn = frnText_;

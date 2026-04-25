@@ -252,6 +252,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void hamclock_after_idbfs() {
                                  ctx.appCfg.hubPort);
     ctx.displayPower->setMethodByName(ctx.appCfg.displayPowerMethod);
     SoundManager::getInstance().setMuted(ctx.appCfg.audioMuted);
+    SoundManager::getInstance().setVolume(ctx.appCfg.audioVolume);
     ctx.activeSetup = AppContext::SetupMode::None;
   } else {
     LOG_I("Main", "No saved config found — showing setup screen");
@@ -367,6 +368,7 @@ int main(int argc, char *argv[]) {
     if (s_logLevel == "warn") applyLogLevel(ctx.appCfg.logLevel); // config overrides default only
     ctx.displayPower->setMethodByName(ctx.appCfg.displayPowerMethod);
     SoundManager::getInstance().setMuted(ctx.appCfg.audioMuted);
+    SoundManager::getInstance().setVolume(ctx.appCfg.audioVolume);
   }
 #endif
 
@@ -919,6 +921,7 @@ void main_tick() {
           // (asteroid prefs, live spots, alarms, etc.) survive untouched.
           ctx.appCfg = s->getConfig(ctx.appCfg);
           SoundManager::getInstance().setMuted(ctx.appCfg.audioMuted);
+          SoundManager::getInstance().setVolume(ctx.appCfg.audioVolume);
 
           // Sync watchlist store from updated config
           auto oldW = ctx.watchlistStore->getAll();

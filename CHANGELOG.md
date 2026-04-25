@@ -23,6 +23,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Horizontal Current Band Cursor** — frequency indicator on frequency axis
 - **Live Spot Map Integration** — ON-THE-AIR spots overlay on map widget
 - **DX Info Manual Entry** — enter DX callsign directly via modal dialog; CallbookProvider lookup retrieves accurate grid/location from api.hamdb.org; widget border highlights amber when callsign appears in incoming spots (30s auto-fade)
+- **Global Volume Control** — adjustable audio levels (0-100) for alarms and TTS; dedicated slider in Setup -> Identity tab
 
 ### Changed
 - **Wiki Documentation** — 19 content gaps fixed across 15 pages (feature coverage, plain-English explanations)
@@ -37,6 +38,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **MCP Diagnostic Tools** — fixed diagnose_memory endpoint polling, new_feature_checklist macro reference, removed 7 stale parity tools from docs
 - **Propagation Overlay Sync** — band/overlay state consistency across panel updates
 - **DX Cluster Crash** — Windows telnet socket NULL handling, spot sort order, band filter interaction
+- **Windows SAPI Volume Reset** — explicitly manages SAPI voice levels to prevent volume resetting to system defaults on startup or speech events
 - **Marine Widget Update** — immediate WTTR.in data fetch on load (no startup delay)
 - **Network Timeout Stability** — 45s socket timeout for NASA/JPL/FCC/NOAA endpoints
 

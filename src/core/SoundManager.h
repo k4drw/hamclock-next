@@ -37,6 +37,9 @@ public:
   void setMuted(bool m) { muted_.store(m, std::memory_order_relaxed); }
   bool isMuted() const { return muted_.load(std::memory_order_relaxed); }
 
+  void setVolume(int vol) { volume_.store(vol, std::memory_order_relaxed); }
+  int getVolume() const { return volume_.load(std::memory_order_relaxed); }
+
 private:
   SoundManager() = default;
   ~SoundManager();
@@ -45,6 +48,7 @@ private:
   bool disabled_ = false;
   std::atomic<bool> screenOn_{true};
   std::atomic<bool> muted_{false};
+  std::atomic<int> volume_{100};
   Mix_Chunk *alarmChunk_ = nullptr;
   std::mutex mutex_;
 

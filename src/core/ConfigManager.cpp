@@ -571,6 +571,7 @@ bool ConfigManager::load(AppConfig &config) {
     config.preventSleep = p.value("prevent_sleep", true);
     config.gpsEnabled = p.value("gps_enabled", false);
     config.audioMuted = p.value("audio_muted", false);
+    config.audioVolume = p.value("audio_volume", 100);
     config.skippedVersion = p.value("skipped_version", "");
   }
 
@@ -769,6 +770,7 @@ bool ConfigManager::save(const AppConfig &config) {
   json["power"]["prevent_sleep"] = config.preventSleep;
   json["power"]["gps_enabled"] = config.gpsEnabled;
   json["power"]["audio_muted"] = config.audioMuted;
+  json["power"]["audio_volume"] = config.audioVolume;
   json["power"]["skipped_version"] = config.skippedVersion;
 
   json["network"]["cors_proxy_url"] = config.corsProxyUrl;

@@ -93,6 +93,7 @@ private:
   Tab activeTab_ = Tab::Identity;
   bool gpsEnabled_ = false;
   bool audioMuted_ = false;
+  int audioVolume_ = 100;
   TextInput callsignInput_;
   TextInput gridInput_;
   TextInput latInput_;
@@ -208,6 +209,7 @@ private:
   SDL_Rect rbnToggleRect_ = {0, 0, 0, 0};
   SDL_Rect gpsToggleRect_ = {0, 0, 0, 0};
   SDL_Rect audioMuteToggleRect_ = {0, 0, 0, 0};
+  SDL_Rect audioVolumeSliderRect_ = {0, 0, 0, 0};
   SDL_Rect defaultTzRect_ = {0, 0, 0, 0};
   SDL_Rect themeRect_ = {0, 0, 0, 0};
   SDL_Rect nightLightsRect_ = {0, 0, 0, 0};

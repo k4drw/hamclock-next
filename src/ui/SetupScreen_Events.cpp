@@ -391,6 +391,11 @@ bool SetupScreen::onMouseDown(int mx, int my, Uint16 mod, int clicks) {
       audioMuted_ = !audioMuted_;
       return true;
     }
+    if (mx >= audioVolumeSliderRect_.x && mx < audioVolumeSliderRect_.x + audioVolumeSliderRect_.w &&
+        my >= audioVolumeSliderRect_.y && my < audioVolumeSliderRect_.y + audioVolumeSliderRect_.h) {
+      audioVolume_ = std::clamp((mx - audioVolumeSliderRect_.x) * 100 / audioVolumeSliderRect_.w, 0, 100);
+      return true;
+    }
     if (mx >= defaultTzRect_.x && mx < defaultTzRect_.x + defaultTzRect_.w &&
         my >= defaultTzRect_.y && my < defaultTzRect_.y + defaultTzRect_.h) {
       tzModalOpen_ = true;

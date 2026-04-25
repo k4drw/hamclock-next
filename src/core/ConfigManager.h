@@ -234,6 +234,7 @@ struct AppConfig {
 
   // Audio
   bool audioMuted = false;
+  int audioVolume = 100;
 
   // Aux Clock timezone
   int auxClockTzOffset = 0;            // Hours from UTC (-12 to +14)
