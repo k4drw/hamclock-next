@@ -20,7 +20,7 @@ DXInfo::DXInfo(int x, int y, int w, int h, FontManager &fontMgr,
                std::shared_ptr<HamClockState> state,
                std::shared_ptr<WeatherStore> weatherStore,
                std::shared_ptr<DXClusterDataStore> dxcStore,
-               CallbookProvider *callbookProvider,
+               std::shared_ptr<CallbookProvider> callbookProvider,
                std::shared_ptr<class CallbookStore> callbookStore)
     : Widget(x, y, w, h), fontMgr_(fontMgr), callbookProvider_(callbookProvider),
       state_(std::move(state)), weatherStore_(std::move(weatherStore)),

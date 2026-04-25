@@ -919,7 +919,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
     } else if (type == "dx_info") {
       widgetPool[type] = std::make_unique<DXInfo>(0, 0, 0, 0, fontMgr, state,
                                                   dxWeatherStore, dxcStore,
-                                                  callbookProvider.get(), callbookStore);
+                                                  callbookProvider, callbookStore);
     } else if (type == "env_temp") {
       widgetPool[type] = std::make_unique<ENVPanel>(
           0, 0, 0, 0, fontMgr, deWeatherStore, ENVPanel::ENVMode::Temp);

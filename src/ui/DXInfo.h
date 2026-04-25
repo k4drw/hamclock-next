@@ -29,7 +29,7 @@ public:
          std::shared_ptr<HamClockState> state,
          std::shared_ptr<WeatherStore> weatherStore,
          std::shared_ptr<DXClusterDataStore> dxcStore = nullptr,
-         CallbookProvider *callbookProvider = nullptr,
+         std::shared_ptr<CallbookProvider> callbookProvider = nullptr,
          std::shared_ptr<class CallbookStore> callbookStore = nullptr);
   ~DXInfo() override { destroyCache(); }
 
@@ -66,7 +66,7 @@ private:
   void destroyCache();
 
   FontManager &fontMgr_;
-  CallbookProvider *callbookProvider_;
+  std::shared_ptr<CallbookProvider> callbookProvider_;
   std::shared_ptr<HamClockState> state_;
   std::shared_ptr<WeatherStore> weatherStore_;
   std::shared_ptr<DXClusterDataStore> dxcStore_;

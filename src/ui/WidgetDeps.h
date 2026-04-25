@@ -128,7 +128,7 @@ struct WidgetDeps {
   BeaconProvider    *beaconProvider    = nullptr;
   SatelliteManager  *satMgr            = nullptr;
   AsteroidProvider  *asteroidProvider  = nullptr;
-  CallbookProvider  *callbookProvider  = nullptr;
+  std::shared_ptr<CallbookProvider> callbookProvider;
   std::shared_ptr<IonosondeProvider> ionosondeProvider;
   FccProvider       *fccProvider       = nullptr;
   RigService        *rigService        = nullptr;  // nullptr in WASM builds

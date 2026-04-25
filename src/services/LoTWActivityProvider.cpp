@@ -25,6 +25,7 @@ void LoTWActivityProvider::fetch() {
           activity;
       std::istringstream stream(data);
       std::string line;
+      int droppedLines = 0;
 
       // Skip header line if present
       bool isFirstLine = true;
@@ -45,8 +46,10 @@ void LoTWActivityProvider::fetch() {
         // Parse CSV: callsign,upload_date
         // Expected format: W5XYZ,2026-04-23
         size_t commaPos = line.find(',');
-        if (commaPos == std::string::npos)
+        if (commaPos == std::string::npos) {
+          ++droppedLines;
           continue;
+        }
 
         std::string call = line.substr(0, commaPos);
         std::string dateStr = line.substr(commaPos + 1);
@@ -77,7 +80,11 @@ void LoTWActivityProvider::fetch() {
                           [](unsigned char c) { return std::toupper(c); });
             activity[callUpper] =
                 std::chrono::system_clock::from_time_t(t);
+          } else {
+            ++droppedLines;
           }
+        } else {
+          ++droppedLines;
         }
       }
 
@@ -88,6 +95,10 @@ void LoTWActivityProvider::fetch() {
       } else {
         LOG_W("LoTWActivityProvider",
               "No LoTW activity records parsed from CSV");
+      }
+
+      if (droppedLines > 0) {
+        LOG_W("LoTWActivityProvider", "Dropped %d malformed lines", droppedLines);
       }
     });
   });
