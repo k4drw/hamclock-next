@@ -24,6 +24,7 @@ struct HamClockState {
   std::string dxGrid;
   bool dxActive = false;
   double dxFreqKhz = 0.0;
+  double rigFreqKhz = 0.0;    // live rig VFO frequency; 0 if rig not connected
   std::chrono::system_clock::time_point dxStartTime{};
   std::chrono::system_clock::time_point dxEndTime{};
 

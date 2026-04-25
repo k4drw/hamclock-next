@@ -6,6 +6,7 @@
 #include "../core/VoacapEngine.h"
 #include <cmath>
 #include <cstring>
+#include <set>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -21,13 +22,15 @@ VoacapDeDxPanel::VoacapDeDxPanel(
     std::shared_ptr<HamClockState> state,
     std::shared_ptr<SolarDataStore> solarStore,
     std::shared_ptr<IonosondeProvider> ionoProvider,
-    AppConfig &config)
+    AppConfig &config,
+    RigDataStore *rigStore)
     : Widget(x, y, w, h),
       fontMgr_(fontMgr),
       state_(std::move(state)),
       solarStore_(std::move(solarStore)),
       ionoProvider_(std::move(ionoProvider)),
-      config_(config) {
+      config_(config),
+      rigStore_(rigStore) {
   for (int i = 0; i < 24; ++i) {
     for (int j = 0; j < 9; ++j) {
       relMatrix_[i][j] = 0.0f;
@@ -122,6 +125,29 @@ void VoacapDeDxPanel::update() {
   if (targetChanged || metricChanged || propChanged) {
     recalculateMatrix();
   }
+
+#ifndef __EMSCRIPTEN__
+  // Poll rig frequency and auto-switch map overlay band when no spot is active
+  if (rigStore_) {
+    auto rig = rigStore_->get();
+    if (rig.connected && rig.freqHz > 0) {
+      state_->rigFreqKhz = rig.freqHz / 1000.0;
+      // Auto-switch map overlay band when no spot is active
+      if (!state_->dxActive) {
+        int bi = freqToBandIndex(state_->rigFreqKhz);
+        if (bi >= 0) {
+          static const std::set<std::string> kOverlayBands = {
+              "80m", "60m", "40m", "30m", "20m", "17m", "15m", "12m", "10m", "6m"};
+          const std::string band = kBands[bi].name;
+          if (kOverlayBands.count(band))
+            config_.propBand = band;
+        }
+      }
+    } else {
+      state_->rigFreqKhz = 0.0;
+    }
+  }
+#endif
 }
 
 static SDL_Color reliabilityColor(float rel) {
@@ -258,10 +284,12 @@ void VoacapDeDxPanel::render(SDL_Renderer *renderer) {
   }
 
   // Current-band cursor: white horizontal line at the VOACAP band matching
-  // the selected DX spot's frequency. dxFreqKhz is populated by DX Cluster,
-  // On The Air, and Live Spots panel selections; zero for map-click DX.
-  if (state_->dxFreqKhz > 0.0) {
-    int bi = freqToBandIndex(state_->dxFreqKhz);
+  // the selected DX spot's frequency, or the rig frequency when no spot is active.
+  // dxFreqKhz is populated by DX Cluster, On The Air, and Live Spots panel
+  // selections; zero for map-click DX. rigFreqKhz is the live rig VFO frequency.
+  double freqForLine = state_->dxFreqKhz > 0.0 ? state_->dxFreqKhz : state_->rigFreqKhz;
+  if (freqForLine > 0.0) {
+    int bi = freqToBandIndex(freqForLine);
     int voacapIdx = -1;
     if (bi >= 0) {
       for (int b = 0; b < 9; ++b) {

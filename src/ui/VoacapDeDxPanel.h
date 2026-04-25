@@ -2,6 +2,7 @@
 
 #include "../core/HamClockState.h"
 #include "../core/PropEngine.h"
+#include "../core/RigData.h"
 #include "../core/SolarData.h"
 #include "../services/IonosondeProvider.h"
 #include "FontManager.h"
@@ -16,7 +17,8 @@ public:
                   std::shared_ptr<HamClockState> state,
                   std::shared_ptr<SolarDataStore> solarStore,
                   std::shared_ptr<IonosondeProvider> ionoProvider,
-                  AppConfig &config);
+                  AppConfig &config,
+                  RigDataStore *rigStore = nullptr);
 
   void update() override;
   void render(SDL_Renderer *renderer) override;
@@ -37,6 +39,7 @@ private:
   std::shared_ptr<SolarDataStore> solarStore_;
   std::shared_ptr<IonosondeProvider> ionoProvider_;
   AppConfig &config_;
+  RigDataStore *rigStore_ = nullptr;
 
   // 24 UTC hours x 9 bands (80, 40, 30, 20, 17, 15, 12, 10, 6m)
   float relMatrix_[24][9];
