@@ -29,8 +29,10 @@ To access the Setup screen at any time, click the **gear icon (⚙)** in the Tim
 | `lon`            | number | `0.0`   | Your longitude in decimal degrees                |
 | `defaultTzOffset`| int    | `0`     | Default time zone offset in hours from UTC — sets local time for all clocks at once (see note below) |
 | `defaultTzLabel` | string | `"UTC"` | Display label for the default time zone (e.g., `"EST"`, `"CET"`)                                    |
+| `audioVolume`    | integer| `100`   | Global volume for audio alerts, chimes, and voice notifications (0–100)                             |
 
-**Setting your default time zone** changes local time across all tiles that display local time at once — the Aux Clock, Calendar, Big Clock (when not locked to UTC), and World Clock slots. Set it once in Setup → **Identity** instead of configuring each clock widget individually.
+**Setting your default time zone**
+ changes local time across all tiles that display local time at once — the Aux Clock, Calendar, Big Clock (when not locked to UTC), and World Clock slots. Set it once in Setup → **Identity** instead of configuring each clock widget individually.
 
 If `lat`/`lon` are omitted, they are derived from the center of your grid square.
 

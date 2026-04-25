@@ -27,8 +27,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Global Volume Control** — adjustable audio levels (0-100) for alarms and TTS; dedicated slider in Setup -> Identity tab
 
 ### Changed
-- **Wiki Documentation** — 19 content gaps fixed across 15 pages (feature coverage, plain-English explanations)
-- **DX Panel UI** — active status indicator, clickable expeditions, theme-aware colors
+- **Wiki Documentation** — 100% v1.6 feature documentation coverage; 26 content gaps fixed across 15 pages including new sections for LoTW Auto-Sync, Award Trackers, Direct DX Lookup, and Global Volume Control.
+- **DX Panel UI**
+ — active status indicator, clickable expeditions, theme-aware colors
 - **DXInfo Display** — DX local time via ZoneDetect library, bearing/distance tooltips
 - **Propagation Overlay Auto-Switch** — smart band selection on frequency tune
 - **LoTW & Clublog Panels** — theme color integration, text rendering cache for performance

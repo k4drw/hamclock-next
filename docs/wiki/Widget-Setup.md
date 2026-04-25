@@ -15,6 +15,7 @@ These widgets start working as soon as you add them to a pane. No extra setup is
 - Band Conditions, NCDXF Beacons
 - History Flux, History KP, History SSN
 - K-Index Trend, SFI 30-Day Trend, NOAA Severity Scales, Space Weather Alerts
+- **K-Index Alert Threshold**: In the K-Index Alert widget, you can set a "trigger level." HamClock will only notify you (and the widget will only glow) when solar activity goes above your chosen number.
 
 **Weather & Environment**
 - DE Weather, DX Weather, Forecast, Hurricane, Lightning, Tropo, Meteor
@@ -22,9 +23,16 @@ These widgets start working as soon as you add them to a pane. No extra setup is
 **Tracking** *(uses your home location)*
 - Moon, EME Tool, Greyline DX, Greyline Windows, Santa Tracker
 
+**Award Tracking** *(requires a loaded ADIF log)*
+- **WAS Progress**: Tracks your US State contacts and shows your progress on a map.
+- **WAC Radar**: A 6-segment pie chart that shows which continents you have worked and confirmed.
+- **Zone Heatmap**: A clickable grid that tracks your progress through CQ and ITU zones.
+- **LoTW Auto-Sync**: Automatically sends your contacts to the ARRL "Logbook of The World" and shows your live confirmation count.
+
 **Info & Utilities**
 - DE Info, DX Info, Stopwatch, Sys Info, ADIF Log, Contests, VOACAP DE-DX
 - Solar Cycle 25 Tracker, DXCC Progress
+- **Frequency Cursor**: On graphs like the VOACAP DE-DX matrix, a white horizontal line shows exactly where your radio is currently tuned.
 
 **Timers** *(configure once inside the widget)*
 - Countdown - click the gear icon in the panel to set a label and target time
@@ -116,6 +124,15 @@ Shows upcoming and currently active DX expeditions — special operations by sta
 **Automatic setup:** No configuration needed. Just add it to a pane.
 
 **Click to set DX location:** Click any row in the DX Peditions widget to instantly set that expedition's location as your DX target. The DX Info panel updates immediately, and propagation overlays (if active) recalculate for that path. This is faster than using the Setup screen for quick DX target switching.
+
+---
+
+## DX Info
+
+Shows details about the station you are currently watching or have selected on the map.
+
+**Direct Callsign Entry:**
+Click anywhere on the DX Info widget to open a typing box. You can enter any callsign, and HamClock will immediately look up that station's location, distance, and local time. This is the fastest way to check a path for a station you just heard on the air.
 
 ---
 
@@ -274,8 +291,12 @@ Spoken alerts fire for:
 1. Install `flite` on your system:
    - **Linux / Raspberry Pi**: `sudo apt install flite`
    - **macOS**: `brew install flite`
-   - **Windows**: voice alerts are not available on Windows at this time.
-2. Restart HamClock-Next. If `flite` is found, voice alerts are active automatically.
+   - **Windows**: voice alerts are handled natively by Windows.
+2. Restart HamClock-Next. If `flite` is found (on Linux/Mac), voice alerts are active automatically.
+
+**Volume Control:**
+You can adjust the loudness of all voice alerts and chimes using the **Volume** slider in Setup → **Identity** tab. 
+
 3. To silence all voice alerts temporarily, use the global **audio mute** setting (Setup → **Audio** tab or REST API `/set_config?audio_mute=1`).
 
 ---

@@ -66,6 +66,10 @@ To add a widget to a pane, click the **top strip** of the pane to open the widge
 | **NCDXF**           | NCDXF/IBP international beacon schedule and current beacon on air                           | NCDXF              |
 | **Voacap DE-DX**    | VOACAP short-path propagation prediction between DE and DX. Covers nine bands — 80m, 40m, 30m, 20m, 17m, 15m, 12m, 10m, and 6m — across all 24 UTC hours. A horizontal white line highlights the band that matches the DX spot you currently have selected, so you can see predicted conditions for that band at a glance. | VOACAP (local)     |
 
+### Frequency Cursor
+
+On widgets that show propagation charts (like the VOACAP DE-DX matrix), a white horizontal line acts as a **Frequency Cursor**. This line automatically moves to show you the band of the DX station you have selected, helping you visualize the path conditions for your exact operating frequency.
+
 ![Band Conditions widget](images/widgets/band_conditions.png)
 
 ![Live Spots widget](images/widgets/live_spots.png)
