@@ -29,8 +29,12 @@ private:
   void beginSave();
   void commitSave();
   void cancelSave();
+  void beginRename(int index);
+  void commitRename();
+  void cancelRename();
   void applyPreset(int index);
   void deletePreset(int index);
+  void overwritePreset(int index);
   void applyPropFirehose();
 
   static constexpr int kModalW    = 420;
@@ -46,7 +50,9 @@ private:
 
   bool active_       = false;
   bool saving_       = false;
+  bool renaming_     = false;
   int  scrollOffset_ = 0;
+  int  renameIndex_  = -1;
 
   TextInput nameInput_;
 
@@ -67,6 +73,6 @@ private:
   SDL_Rect propFirehoseApplyRect_ = {};
 
   // Populated each render call — bounding rects for each visible row's buttons
-  struct RowRects { SDL_Rect apply; SDL_Rect del; };
+  struct RowRects { SDL_Rect apply; SDL_Rect rename; SDL_Rect update; SDL_Rect del; };
   std::vector<RowRects> rowRects_;
 };

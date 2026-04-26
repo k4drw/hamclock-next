@@ -151,6 +151,20 @@ bool ConfigManager::init() {
 }
 
 static void ensureFactoryPresets(AppConfig &config) {
+  // Factory preset names (must match the names defined below)
+  static const std::set<std::string> factoryNames = {
+      "DX", "Contest", "Satellite", "Environment/WX", "Prop Firehose", "DE Station Status"};
+
+  // Remove any user presets that shadow factory presets (unless explicitly deleted)
+  auto it = config.presets.begin();
+  while (it != config.presets.end()) {
+    if (factoryNames.count(it->name) && config.deletedFactoryPresets.find(it->name) == config.deletedFactoryPresets.end()) {
+      it = config.presets.erase(it);
+    } else {
+      ++it;
+    }
+  }
+
   auto presetExists = [&](const std::string &name) {
     return std::any_of(config.presets.begin(), config.presets.end(),
                        [&](const ConfigPreset &p) { return p.name == name; });
@@ -172,6 +186,7 @@ static void ensureFactoryPresets(AppConfig &config) {
     p.pane4Rotation = {"band_conditions"};
     p.pane5Rotation = {"de_info"};
     p.pane6Rotation = {"dx_info"};
+    p.propOverlay = PropOverlayType::Reliability;
     addIfMissing(std::move(p));
   }
   // Contest preset
@@ -184,6 +199,7 @@ static void ensureFactoryPresets(AppConfig &config) {
     p.pane4Rotation = {"solar"};
     p.pane5Rotation = {"de_info"};
     p.pane6Rotation = {"dx_info"};
+    p.propOverlay = PropOverlayType::Heatmap;
     addIfMissing(std::move(p));
   }
   // Satellite preset
@@ -194,8 +210,8 @@ static void ensureFactoryPresets(AppConfig &config) {
     p.pane2Rotation = {"eme_tool"};
     p.pane3Rotation = {"gimbal"};
     p.pane4Rotation = {"solar"};
-    p.pane5Rotation = {"satellite"};
-    p.pane6Rotation = {"de_info"};
+    p.pane5Rotation = {"de_info"};
+    p.pane6Rotation = {"satellite"};
     addIfMissing(std::move(p));
   }
   // Environment/WX preset
@@ -205,9 +221,10 @@ static void ensureFactoryPresets(AppConfig &config) {
     p.pane1Rotation = {"de_weather"};
     p.pane2Rotation = {"dx_weather"};
     p.pane3Rotation = {"forecast"};
-    p.pane4Rotation = {"de_weather"};
-    p.pane5Rotation = {"env_temp"};
-    p.pane6Rotation = {"env_humidity"};
+    p.pane4Rotation = {"solar"};
+    p.pane5Rotation = {"de_info"};
+    p.pane6Rotation = {"dx_info"};
+    p.weatherOverlay = WeatherOverlayType::WxMb;
     addIfMissing(std::move(p));
   }
   // Propagation Firehose preset
@@ -217,7 +234,7 @@ static void ensureFactoryPresets(AppConfig &config) {
     p.pane1Rotation = {"solar", "solar_storm", "solar_cycle", "ionosonde"};
     p.pane2Rotation = {"solar_timeline", "sfi_trend", "noaa_spacewx", "tropo"};
     p.pane3Rotation = {"aurora", "aurora_graph", "voacap_dedx", "drap"};
-    p.pane4Rotation = {"solar", "band_conditions", "ncdxf"};
+    p.pane4Rotation = {"band_conditions", "ncdxf"};
     p.pane5Rotation = {"de_info"};
     p.pane6Rotation = {"dx_info"};
     p.propRotation = {PropOverlayType::Muf, PropOverlayType::Reliability,
@@ -237,6 +254,7 @@ static void ensureFactoryPresets(AppConfig &config) {
     p.pane4Rotation = {"band_conditions"};
     p.pane5Rotation = {"de_info"};
     p.pane6Rotation = {"lotw_sync", "adif"};
+    p.weatherOverlay = WeatherOverlayType::CloudsGrib;
     addIfMissing(std::move(p));
   }
 }
@@ -934,8 +952,11 @@ bool ConfigManager::save(const AppConfig &config) {
     }
   }
 
-  // Presets
+  // Presets (only save user-created presets, not factory presets)
   {
+    static const std::set<std::string> factoryNames = {
+        "DX", "Contest", "Satellite", "Environment/WX", "Prop Firehose", "DE Station Status"};
+
     auto savePresetRotation = [](const std::vector<std::string> &vec) {
       auto arr = nlohmann::json::array();
       for (const auto &t : vec) arr.push_back(t);
@@ -943,6 +964,10 @@ bool ConfigManager::save(const AppConfig &config) {
     };
     auto presetsArr = nlohmann::json::array();
     for (const auto &p : config.presets) {
+      // Skip factory presets; only save user-created ones
+      if (factoryNames.count(p.name) > 0)
+        continue;
+
       nlohmann::json jp;
       jp["name"]               = p.name;
       jp["pane1_rotation"]     = savePresetRotation(p.pane1Rotation);
