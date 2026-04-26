@@ -316,12 +316,16 @@ void NetworkManager::fetchAsync(const std::string &url,
         if (!body.empty()) {
           LOG_D("NetworkManager", "Hub client: Received {} bytes from Hub for {}", body.size(), url);
           {
-            std::lock_guard<std::mutex> lock(cacheMutex_);
             CacheEntry entry;
             entry.timestamp = std::time(nullptr);
             if (body.size() < 512 * 1024)
               entry.data = body;
-            cache_[url] = entry;
+
+            std::lock_guard<std::mutex> lock(cacheMutex_);
+            // Hub master mode: skip in-memory cache (20s client timeout, just proxying)
+            if (hubMode_ != HubMode::Master) {
+              cache_[url] = entry;
+            }
             if (!cacheDir_.empty())
               saveToDisk(url, entry, body);
           }
@@ -514,7 +518,10 @@ void NetworkManager::fetchDirect(const std::string &url,
             response.size() / 1024.0 / 1024.0);
     }
 
-    cache_[url] = entry;
+    // Hub master mode: skip in-memory cache (20s client timeout, just proxying)
+    if (hubMode_ != HubMode::Master) {
+      cache_[url] = entry;
+    }
     if (!cacheDir_.empty()) {
       saveToDisk(url, entry, response);
     }
@@ -669,6 +676,26 @@ void NetworkManager::waitForCacheLoad() {
 void NetworkManager::loadCache() {
   if (cacheDir_.empty())
     return;
+
+  // Prune cache files older than 1 day
+  {
+    auto now = std::time(nullptr);
+    auto cutoff = now - (24 * 3600); // 1 day ago
+    for (const auto &entry : std::filesystem::directory_iterator(cacheDir_)) {
+      if (entry.is_regular_file()) {
+        auto lastWrite = std::filesystem::last_write_time(entry.path());
+        auto sctp = std::chrono::time_point_cast<std::chrono::seconds>(lastWrite);
+        auto age = sctp.time_since_epoch().count();
+        if (age < cutoff) {
+          std::error_code ec;
+          std::filesystem::remove(entry.path(), ec);
+          if (!ec) {
+            LOG_D("NetworkManager", "Pruned old cache file: {}", entry.path().filename().string());
+          }
+        }
+      }
+    }
+  }
 
   for (const auto &entry : std::filesystem::directory_iterator(cacheDir_)) {
     if (entry.is_regular_file()) {
