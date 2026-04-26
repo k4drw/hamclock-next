@@ -318,7 +318,6 @@ void NetworkManager::fetchAsync(const std::string &url,
             if (body.size() < 512 * 1024)
               entry.data = body;
             cache_[url] = entry;
-            evictCacheIfNeeded();
             if (!cacheDir_.empty())
               saveToDisk(url, entry, body);
           }
@@ -512,7 +511,6 @@ void NetworkManager::fetchDirect(const std::string &url,
     }
 
     cache_[url] = entry;
-    evictCacheIfNeeded();
     if (!cacheDir_.empty()) {
       saveToDisk(url, entry, response);
     }
@@ -777,27 +775,4 @@ std::string NetworkManager::getLocalIP() {
   freeifaddrs(addrs);
   return result;
 #endif
-}
-
-void NetworkManager::evictCacheIfNeeded() {
-  // Recalculate total cache size
-  currentCacheBytes_ = 0;
-  for (const auto &entry : cache_) {
-    currentCacheBytes_ += entry.second.data.size();
-  }
-
-  // Evict oldest entries until under limit
-  while (currentCacheBytes_ > kMaxCacheBytes && !cache_.empty()) {
-    auto oldest = cache_.begin();
-    for (auto it = cache_.begin(); it != cache_.end(); ++it) {
-      if (it->second.timestamp < oldest->second.timestamp) {
-        oldest = it;
-      }
-    }
-    currentCacheBytes_ -= oldest->second.data.size();
-    LOG_I("NetworkManager", "Cache evicted entry, now using {:.1f} MB (max {:.0f} MB)",
-          currentCacheBytes_ / 1024.0 / 1024.0,
-          kMaxCacheBytes / 1024.0 / 1024.0);
-    cache_.erase(oldest);
-  }
 }

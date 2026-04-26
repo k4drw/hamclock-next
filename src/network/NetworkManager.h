@@ -64,8 +64,6 @@ private:
   };
   std::unordered_map<std::string, CacheEntry> cache_;
   std::mutex cacheMutex_;
-  static constexpr int64_t kMaxCacheBytes = 100 * 1024 * 1024; // 100 MB cap
-  int64_t currentCacheBytes_ = 0;
   std::filesystem::path cacheDir_;
   std::string corsProxyUrl_;
 
@@ -100,7 +98,6 @@ private:
   void saveToDisk(const std::string &url, const CacheEntry &entry,
                   const std::string &data = "");
   std::string fetchFromHubSync(const std::string &hubUrl);
-  void evictCacheIfNeeded();
   void fetchDirect(const std::string &url,
                    std::function<void(std::string)> callback,
                    bool hasCache, const CacheEntry &cached);
