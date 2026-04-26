@@ -206,6 +206,10 @@ void NetworkManager::fetchAsync(const std::string &url,
         }).detach();
         return;
       }
+    } else {
+      // Cache entry is stale — erase it so only active data stays in RAM
+      std::lock_guard<std::mutex> lock(cacheMutex_);
+      cache_.erase(url);
     }
   }
 
