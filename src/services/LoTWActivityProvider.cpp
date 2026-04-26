@@ -20,7 +20,8 @@ void LoTWActivityProvider::fetch() {
       return;
     }
 
-    WorkerService::getInstance().submitTask([this, data]() {
+    auto store = store_;
+    WorkerService::getInstance().submitTask([store, data]() {
       std::unordered_map<std::string, std::chrono::system_clock::time_point>
           activity;
       std::istringstream stream(data);
@@ -89,7 +90,7 @@ void LoTWActivityProvider::fetch() {
       }
 
       if (!activity.empty()) {
-        store_->update(activity);
+        store->update(activity);
         LOG_I("LoTWActivityProvider", "Loaded %zu LoTW user records",
               activity.size());
       } else {
