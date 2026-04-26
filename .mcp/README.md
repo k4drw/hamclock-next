@@ -2,6 +2,22 @@
 
 This document describes the tools provided by the HamClock-Next MCP server.
 
+## Newcomer Quick Start
+
+**First time adding a widget?** Use these tools in order:
+
+1. **`contributor_start`** — Orientation. Learn project origin, tech stack, build commands, PR workflow.
+2. **`project_context widget_scaffolding`** — C++ patterns. Async safety rules, theming enforcement, Widget vs ListPanel decision.
+3. **`new_feature_checklist YourName widget`** — Registration steps. Exact files to modify, REGISTER_WIDGET pattern, CMakeLists.txt syntax.
+4. **`get_scaffolding_template YourName`** — Boilerplate. Data struct, Provider, Panel templates with {Name} substituted.
+5. **`find_symbols` / `find_files`** — Live reference. Search codebase for existing examples (e.g., `find_symbols "REGISTER_WIDGET"`).
+
+Also check: `src/ui/WidgetDeps.h` (all 50+ dependency fields available in factory lambdas), `src/ui/Widget.h` (virtual methods to override).
+
+See **Memory Diagnostics** section below for Raspberry Pi debugging.
+
+---
+
 ## Overview
 
 The MCP server provides tools for contributors and AI agents working on `hamclock-next`. Feature parity with the original HamClock is 100% complete as of 2026-03-30, and the project is now in active feature development beyond the original.
