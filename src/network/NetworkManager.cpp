@@ -134,19 +134,6 @@ std::string NetworkManager::fetchFromHubSync(const std::string &hubUrl) {
 void NetworkManager::fetchAsync(const std::string &url,
                                 std::function<void(std::string)> callback,
                                 int cacheAgeSeconds, bool force) {
-  // Compute effective cache TTL based on hub mode
-  HubMode currentHubMode;
-  {
-    std::lock_guard<std::mutex> lk(hubMutex_);
-    currentHubMode = hubMode_;
-  }
-
-  int effectiveCacheAge = cacheAgeSeconds;
-  if (currentHubMode == HubMode::Master)
-    effectiveCacheAge = std::min(cacheAgeSeconds, kMasterCacheMaxAge);
-  else if (currentHubMode == HubMode::Client)
-    effectiveCacheAge = std::max(cacheAgeSeconds, kClientLocalCacheMin);
-
   // Check memory cache first
   CacheEntry cached;
   bool hasCache = false;
@@ -162,7 +149,7 @@ void NetworkManager::fetchAsync(const std::string &url,
 
   if (hasCache && !force) {
     std::time_t now = std::time(nullptr);
-    if (now - cached.timestamp < effectiveCacheAge) {
+    if (now - cached.timestamp < cacheAgeSeconds) {
       if (!cached.data.empty()) {
         LOG_T("NetworkManager", "Memory cache hit for {}", url);
         callback(cached.data);
@@ -335,7 +322,10 @@ void NetworkManager::fetchAsync(const std::string &url,
               entry.data = body;
 
             std::lock_guard<std::mutex> lock(cacheMutex_);
-            cache_[url] = entry;
+            // Hub master mode: skip in-memory cache (20s client timeout, just proxying)
+            if (hubMode_ != HubMode::Master) {
+              cache_[url] = entry;
+            }
             if (!cacheDir_.empty())
               saveToDisk(url, entry, body);
           }
@@ -528,8 +518,10 @@ void NetworkManager::fetchDirect(const std::string &url,
             response.size() / 1024.0 / 1024.0);
     }
 
-    // Write to in-memory cache; master TTL is capped to kMasterCacheMaxAge in fetchAsync
-    cache_[url] = entry;
+    // Hub master mode: skip in-memory cache (20s client timeout, just proxying)
+    if (hubMode_ != HubMode::Master) {
+      cache_[url] = entry;
+    }
     if (!cacheDir_.empty()) {
       saveToDisk(url, entry, response);
     }
