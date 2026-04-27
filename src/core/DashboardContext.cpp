@@ -453,11 +453,15 @@ DashboardContext::DashboardContext(AppContext &ctx)
 
   deWeatherProvider =
       std::make_unique<WeatherProvider>(netManager, deWeatherStore, 0);
-  deWeatherProvider->fetch(state->deLocation.lat, state->deLocation.lon);
+  if (state->deLocation.lat != 0.0 || state->deLocation.lon != 0.0) {
+    deWeatherProvider->fetch(state->deLocation.lat, state->deLocation.lon);
+  }
 
   dxWeatherProvider =
       std::make_unique<WeatherProvider>(netManager, dxWeatherStore, 1);
-  dxWeatherProvider->fetch(state->dxLocation.lat, state->dxLocation.lon);
+  if (state->dxLocation.lat != 0.0 || state->dxLocation.lon != 0.0) {
+    dxWeatherProvider->fetch(state->dxLocation.lat, state->dxLocation.lon);
+  }
 
   sdoProvider = std::make_shared<SDOProvider>(netManager);
   drapProvider = std::make_unique<DRAPProvider>(netManager, ctx.drapDataStore);
@@ -753,6 +757,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
         &fccProvider,
         rigService.get(),
         marineProvider.get(),
+        dxWeatherProvider.get(),
     };
     widgetPool[type] = WidgetRegistry::instance().create(type, deps);
 
@@ -1337,10 +1342,12 @@ void DashboardContext::update(AppContext &ctx) {
       satMgr->fetch();
 
     // --- Weather providers ---
-    if (isMaster || isWidgetActive("de_weather"))
+    if ((isMaster || isWidgetActive("de_weather")) &&
+        (ctx.state->deLocation.lat != 0.0 || ctx.state->deLocation.lon != 0.0))
       deWeatherProvider->fetch(ctx.state->deLocation.lat,
                                ctx.state->deLocation.lon);
-    if (isMaster || isWidgetActive("dx_weather"))
+    if ((isMaster || isWidgetActive("dx_weather")) &&
+        (ctx.state->dxLocation.lat != 0.0 || ctx.state->dxLocation.lon != 0.0))
       dxWeatherProvider->fetch(ctx.state->dxLocation.lat,
                                ctx.state->dxLocation.lon);
 
@@ -1441,11 +1448,13 @@ void DashboardContext::update(AppContext &ctx) {
 
     // Weather
     if ((isMaster || isWidgetActive("de_weather")) &&
+        (ctx.state->deLocation.lat != 0.0 || ctx.state->deLocation.lon != 0.0) &&
         (!ctx.deWeatherStore->get().valid || deWeatherProvider->isStale(now, 15 * 60 * 1000)) &&
         deWeatherProvider->isStale(now, kCooldown)) {
       deWeatherProvider->fetch(ctx.state->deLocation.lat, ctx.state->deLocation.lon);
     }
     if ((isMaster || isWidgetActive("dx_weather")) &&
+        (ctx.state->dxLocation.lat != 0.0 || ctx.state->dxLocation.lon != 0.0) &&
         (!ctx.dxWeatherStore->get().valid || dxWeatherProvider->isStale(now, 15 * 60 * 1000)) &&
         dxWeatherProvider->isStale(now, kCooldown)) {
       dxWeatherProvider->fetch(ctx.state->dxLocation.lat, ctx.state->dxLocation.lon);

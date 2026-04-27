@@ -16,6 +16,7 @@
 
 class PrefixManager;
 class CallbookProvider;
+class WeatherProvider;
 
 /**
  * DXInfo: Standard DX information widget.
@@ -28,6 +29,7 @@ public:
   DXInfo(int x, int y, int w, int h, FontManager &fontMgr,
          std::shared_ptr<HamClockState> state,
          std::shared_ptr<WeatherStore> weatherStore,
+         WeatherProvider *dxWeatherProvider = nullptr,
          std::shared_ptr<DXClusterDataStore> dxcStore = nullptr,
          std::shared_ptr<CallbookProvider> callbookProvider = nullptr,
          std::shared_ptr<class CallbookStore> callbookStore = nullptr);
@@ -69,8 +71,12 @@ private:
   std::shared_ptr<CallbookProvider> callbookProvider_;
   std::shared_ptr<HamClockState> state_;
   std::shared_ptr<WeatherStore> weatherStore_;
+  WeatherProvider *dxWeatherProvider_;
   std::shared_ptr<DXClusterDataStore> dxcStore_;
   std::shared_ptr<class CallbookStore> callbookStore_;
+
+  // Track location to detect changes and trigger weather fetch
+  struct LatLon lastDxLocation_ = {0.0, 0.0};
 
   HamClock::GreylineModal greylineModal_;
   SDL_Rect greylineBtnRect_ = {0, 0, 0, 0};

@@ -7,6 +7,7 @@
 #include "../core/MemoryMonitor.h"
 #include "../core/Theme.h"
 #include "../services/CallbookProvider.h"
+#include "../services/WeatherProvider.h"
 #include "FontCatalog.h"
 #include "WidgetRegistry.h"
 
@@ -19,11 +20,13 @@
 DXInfo::DXInfo(int x, int y, int w, int h, FontManager &fontMgr,
                std::shared_ptr<HamClockState> state,
                std::shared_ptr<WeatherStore> weatherStore,
+               WeatherProvider *dxWeatherProvider,
                std::shared_ptr<DXClusterDataStore> dxcStore,
                std::shared_ptr<CallbookProvider> callbookProvider,
                std::shared_ptr<class CallbookStore> callbookStore)
     : Widget(x, y, w, h), fontMgr_(fontMgr), callbookProvider_(callbookProvider),
       state_(std::move(state)), weatherStore_(std::move(weatherStore)),
+      dxWeatherProvider_(dxWeatherProvider),
       dxcStore_(std::move(dxcStore)), callbookStore_(std::move(callbookStore)),
       greylineModal_(0, 0, HamClock::LOGICAL_WIDTH, HamClock::LOGICAL_HEIGHT,
                      fontMgr) {
@@ -41,6 +44,20 @@ void DXInfo::destroyCache() {
 void DXInfo::update() {
   if (greylineModal_.isActive())
     return;
+
+  // Detect DX location changes and trigger weather fetch
+  if (state_ && (state_->dxLocation.lat != lastDxLocation_.lat ||
+                 state_->dxLocation.lon != lastDxLocation_.lon)) {
+    lastDxLocation_ = state_->dxLocation;
+    if (dxWeatherProvider_) {
+      dxWeatherProvider_->fetch(state_->dxLocation.lat, state_->dxLocation.lon);
+    }
+    if (weatherStore_) {
+      WeatherData wd;
+      wd.valid = false;
+      weatherStore_->update(wd);
+    }
+  }
 
   if (dxcStore_) {
     auto data = dxcStore_->snapshot();
@@ -427,7 +444,8 @@ nlohmann::json DXInfo::getDebugData() const {
 
 REGISTER_WIDGET("dx_info", "DX Info", false, false, {
   auto p = std::make_unique<DXInfo>(0, 0, 0, 0, deps.fontMgr, deps.state,
-                                    deps.dxWeatherStore, deps.dxcStore,
-                                    deps.callbookProvider, deps.callbookStore);
+                                    deps.dxWeatherStore, deps.dxWeatherProvider,
+                                    deps.dxcStore, deps.callbookProvider,
+                                    deps.callbookStore);
   return p;
 })
