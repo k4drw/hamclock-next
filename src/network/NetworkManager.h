@@ -15,6 +15,9 @@
 
 class NetworkManager {
 public:
+  static constexpr int kMasterCacheMaxAge = 1800;     // 30 min cap for master in-memory
+  static constexpr int kClientLocalCacheMin = 3600;   // client local disk valid >= 1h
+
   explicit NetworkManager(const std::filesystem::path &cacheDir = "");
   // Signal shutdown and block until every detached fetch thread that already
   // passed the alive_ check has finished touching our members.  This closes
