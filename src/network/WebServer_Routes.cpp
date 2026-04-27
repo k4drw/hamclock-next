@@ -1139,6 +1139,10 @@ void WebServer::registerRoutes(httplib::Server &svr) {
       res.status = 403;
       return;
     }
+    int maxAge = 3600;
+    if (req.has_param("max_age")) {
+      maxAge = StringUtils::safe_stoi(req.get_param_value("max_age"));
+    }
     auto prom = std::make_shared<std::promise<std::string>>();
     auto fut = prom->get_future();
     {
@@ -1146,7 +1150,7 @@ void WebServer::registerRoutes(httplib::Server &svr) {
       if (netMgr_) {
         netMgr_->fetchAsync(
             targetUrl, [prom](std::string b) { prom->set_value(std::move(b)); },
-            3600);
+            maxAge);
       } else {
         res.status = 503;
         return;

@@ -322,10 +322,7 @@ void NetworkManager::fetchAsync(const std::string &url,
               entry.data = body;
 
             std::lock_guard<std::mutex> lock(cacheMutex_);
-            // Hub master mode: skip in-memory cache (20s client timeout, just proxying)
-            if (hubMode_ != HubMode::Master) {
-              cache_[url] = entry;
-            }
+            cache_[url] = entry;
             if (!cacheDir_.empty())
               saveToDisk(url, entry, body);
           }
@@ -518,10 +515,7 @@ void NetworkManager::fetchDirect(const std::string &url,
             response.size() / 1024.0 / 1024.0);
     }
 
-    // Hub master mode: skip in-memory cache (20s client timeout, just proxying)
-    if (hubMode_ != HubMode::Master) {
-      cache_[url] = entry;
-    }
+    cache_[url] = entry;
     if (!cacheDir_.empty()) {
       saveToDisk(url, entry, response);
     }

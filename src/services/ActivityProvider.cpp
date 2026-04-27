@@ -176,7 +176,7 @@ void ActivityProvider::fetchDXPeds() {
       event.user.data1 = update;
       SDL_PushEvent(&event);
     });
-  });
+  }, 86400); // 24 hour cache
 }
 
 void ActivityProvider::fetchPOTA() {

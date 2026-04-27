@@ -276,6 +276,9 @@ struct DashboardContext {
   void restorePane(AppContext &ctx);
   void update(AppContext &ctx);
   void render(AppContext &ctx);
+
+private:
+  AppContext &appContext_;
 };
 
 // --------------------------------------------------------------------------

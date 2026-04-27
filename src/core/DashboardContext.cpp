@@ -281,7 +281,8 @@ void AppContext::updateLayoutMetrics() {
 
 DashboardContext::DashboardContext(AppContext &ctx)
     : fontMgr(), texMgr(), fontCatalog(fontMgr), debugOverlay(fontMgr),
-      satMgr(std::make_unique<SatelliteManager>(*ctx.netManager)) {
+      satMgr(std::make_unique<SatelliteManager>(*ctx.netManager)),
+      appContext_(ctx) {
   // Reset idle timer to now so the cursor-hide logic doesn't fire immediately
   lastMouseMotionMs = SDL_GetTicks();
   // Load font
@@ -1185,6 +1186,19 @@ DashboardContext::~DashboardContext() {
   parksReadyLive_->store(false, std::memory_order_release);
   dashboardLive_->store(false, std::memory_order_release);
 #ifndef __EMSCRIPTEN__
+  // Null out pointers in WebServer to prevent UAF from HTTP route handlers
+  if (appContext_.webServer) {
+    appContext_.webServer->setPanes(nullptr);
+    appContext_.webServer->setTimePanel(nullptr);
+    appContext_.webServer->setRssBanner(nullptr);
+    appContext_.webServer->setSatelliteManager(nullptr);
+    appContext_.webServer->setRotatorService(nullptr);
+    appContext_.webServer->setADIFProvider(nullptr);
+    appContext_.webServer->setRssProvider(nullptr);
+    appContext_.webServer->setBMEProvider(nullptr);
+    appContext_.webServer->setFrameCapture(nullptr);
+  }
+
   if (dxcProvider)
     dxcProvider->stop();
   if (rbnProvider)
@@ -2546,12 +2560,19 @@ void DashboardContext::update(AppContext &ctx) {
     mm.logStats("heartbeat");
     if (mm.isLowMemoryDevice()) {
       size_t rss = mm.getRSS();
-      const size_t kFlushThresholdBytes = 650ULL * 1024 * 1024;
+      const size_t kFlushThresholdBytes = 400ULL * 1024 * 1024;
       if (rss > kFlushThresholdBytes) {
-        LOG_W("Main", "RSS {:.1f} MB exceeds threshold on low-mem device — flushing caches",
+        // Tighten texture cache limit and prune oldest entries.
+        // This is safer than clearCache() which would nuke the map/night lights.
+        texMgr.setMaxCacheSize(30); 
+        
+        // FontCatalog holds the thousands of small 'volatile' text textures
+        // that actually consume the bulk of UI heap on RPi.
+        fontCatalog.clearCache();
+        fontMgr.clearCache();
+
+        LOG_W("Main", "RSS {:.1f} MB exceeds threshold — pruned textures and cleared font caches",
               rss / 1024.0 / 1024.0);
-        texMgr.clearCache();
-        texMgr.setMaxCacheSize(10);
       }
     }
     lastMemLogMs = now;

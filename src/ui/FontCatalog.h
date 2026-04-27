@@ -10,167 +10,122 @@
 #include <unordered_map>
 #include <vector>
 
-// Named font styles modeled after the original HamClock typography.
-//   SmallRegular / SmallBold → general UI text (~43px line height at 800x480)
-//   LargeBold               → clock digits    (~80px line height at 800x480)
-//   Fast                    → compact/debug   (~15px line height at 800x480)
-//   FastBold                → compact/debug   (~15px line height at 800x480)
+// Named font styles modeled after the HamClock logical system.
 enum class FontStyle {
-  Tiny,
+  Tiny,       // smallest (dates, auxiliary)
   TinyBold,
-  Caption,
+  Caption,    // slightly larger than Tiny (labels)
   CaptionBold,
-  Micro,
-  MicroBold,
-  UI,
-  UIBold,
+  Micro,      // compact UI text (tooltips, small buttons)
+  MicroBold,  // bold Micro (titles)
+  Fast,       // high-perf UI list text (Live Spots, Cluster)
+  FastBold,   // bold Fast
+  UI,         // standard UI text
+  UIBold,     // bold standard UI
   SmallRegular,
   SmallBold,
   MediumRegular,
   MediumBold,
+  LargeRegular,
   LargeBold,
-  Fast,
-  FastBold,
   Count_
 };
 
+// Provides semantic font access with automatic high-DPI scaling and internal
+// caching of small rendered text segments (labels, buttons).
+//
+// In HamClock, fonts are traditionally tuned for 800x480. We maintain those
+// "logical" sizes and scale them based on the actual renderer viewport height.
 class FontCatalog {
 public:
   explicit FontCatalog(FontManager &fontMgr) : fontMgr_(fontMgr) {
     for (int i = 0; i < kStyleCount; ++i)
-      scaledPt_[i] = kSmallBasePt;
+      scaledPt_[i] = 0;
   }
 
-  // Recalculate scaled point sizes for the given window dimensions.
-  // Call once at startup and on every resize.
-  void recalculate(int /*winW*/, int /*winH*/) {
-    // Evict texture cache: cached textures were rasterized at the old
-    // renderScale_; on resize renderScale_ changes so they are all stale.
-    for (auto &kv : textCache_)
-      destroyTexture(kv.second.tex);
-    textCache_.clear();
+  // (Re)calculate all style point sizes based on logical logicalH vs actual render height.
+  void recalculate(int logicalW, int logicalH) {
+    (void)logicalW;
+    (void)logicalH;
 
-    // We now keep all point sizes logical (800x480).
-    // FontManager handles scaling via renderScale_.
     scaledPt_[idx(FontStyle::Tiny)] = kTinyBasePt;
     scaledPt_[idx(FontStyle::TinyBold)] = kTinyBasePt;
     scaledPt_[idx(FontStyle::Caption)] = kCaptionBasePt;
     scaledPt_[idx(FontStyle::CaptionBold)] = kCaptionBasePt;
     scaledPt_[idx(FontStyle::Micro)] = kMicroBasePt;
     scaledPt_[idx(FontStyle::MicroBold)] = kMicroBasePt;
+    scaledPt_[idx(FontStyle::Fast)] = kFastBasePt;
+    scaledPt_[idx(FontStyle::FastBold)] = kFastBasePt;
     scaledPt_[idx(FontStyle::UI)] = kUIBasePt;
     scaledPt_[idx(FontStyle::UIBold)] = kUIBasePt;
     scaledPt_[idx(FontStyle::SmallRegular)] = kSmallBasePt;
     scaledPt_[idx(FontStyle::SmallBold)] = kSmallBasePt;
     scaledPt_[idx(FontStyle::MediumRegular)] = kMediumBasePt;
     scaledPt_[idx(FontStyle::MediumBold)] = kMediumBasePt;
+    scaledPt_[idx(FontStyle::LargeRegular)] = kLargeBasePt;
     scaledPt_[idx(FontStyle::LargeBold)] = kLargeBasePt;
-    scaledPt_[idx(FontStyle::Fast)] = kFastBasePt;
-    scaledPt_[idx(FontStyle::FastBold)] = kFastBasePt;
+
+    // After recalculating point sizes, clear text caches as metrics changed.
+    clearCache();
   }
 
-  // Current scaled point size for a style.
+  // Returns the actual TTF point size for a logical style.
   int ptSize(FontStyle style) const { return scaledPt_[idx(style)]; }
 
-  // Whether the style requests bold rendering.
-  static bool isBold(FontStyle style) {
-    return style == FontStyle::TinyBold || style == FontStyle::CaptionBold ||
-           style == FontStyle::MicroBold || style == FontStyle::UIBold ||
-           style == FontStyle::SmallBold || style == FontStyle::MediumBold ||
-           style == FontStyle::LargeBold || style == FontStyle::FastBold;
+  // Draw text using logical styles. Internally uses an LRU cache for high-perf
+  // rendering of repeated UI strings (labels, button text).
+  void drawText(SDL_Renderer *renderer, const std::string &text, int x, int y,
+                SDL_Color color, FontStyle style, bool center = false,
+                bool rightAlign = false, bool vertCentered = false) {
+    if (text.empty() || !renderer)
+      return;
+
+    uint64_t key = hash(text, style);
+    auto it = textCache_.find(key);
+    if (it != textCache_.end()) {
+      renderCached(renderer, it->second, x, y, color, center, rightAlign,
+                    vertCentered);
+      return;
+    }
+
+    // Cache miss: render new texture.
+    int pt = scaledPt_[idx(style)];
+    bool bold = isBold(style);
+
+    int tw, th;
+    SDL_Texture *tex = fontMgr_.renderText(renderer, text, {255, 255, 255, 255},
+                                           pt, &tw, &th, bold);
+    if (!tex)
+      return;
+
+    TextCacheEntry entry = {text, tex, tw, th, style};
+    textCache_[key] = entry;
+
+    renderCached(renderer, entry, x, y, color, center, rightAlign, vertCentered);
+
+    // Housekeeping: periodic cache prune
+    Uint32 now = SDL_GetTicks();
+    if (now - lastCachePruneMs_ > 60000) {
+      pruneCache();
+      lastCachePruneMs_ = now;
+    }
   }
 
-  // Render text with the named style (handles bold via TTF_SetFontStyle).
-  // Caller owns the returned texture.
+  // Render text to a standalone texture (caller must destroy via
+  // destroyTexture). Useful for one-off dynamic strings that shouldn't pollute
+  // the LRU cache (e.g. clock HH:MM:SS).
   SDL_Texture *renderText(SDL_Renderer *renderer, const std::string &text,
-                          SDL_Color color, FontStyle style, int *outW = nullptr,
-                          int *outH = nullptr) {
-    if (text.empty())
-      return nullptr;
-    return fontMgr_.renderText(renderer, text, color, ptSize(style), outW, outH,
-                               isBold(style));
+                          SDL_Color color, FontStyle style, int *w = nullptr,
+                          int *h = nullptr) {
+    int pt = scaledPt_[idx(style)];
+    bool bold = isBold(style);
+    return fontMgr_.renderText(renderer, text, color, pt, w, h, bold);
   }
 
-  // Destructor: release all cached textures.
-  ~FontCatalog() {
+  void clearCache() {
     for (auto &kv : textCache_)
       destroyTexture(kv.second.tex);
-  }
-
-  // Convenience: render + blit, using an internal LRU texture cache.
-  // Avoids recreating SDL textures for the same text/color/style every frame
-  // (previously "one-off" but was called for all text on every render tick,
-  // costing ~0.5-1ms × 70+ calls = ~50ms per frame on RPi3B).
-  void drawText(SDL_Renderer *renderer, const std::string &text, int x, int y,
-                SDL_Color color, FontStyle style, bool centered = false,
-                bool rightAlign = false, bool vertCentered = false) {
-    if (text.empty())
-      return;
-    const int sIdx = idx(style);
-    const int ptSz = scaledPt_[sIdx];
-    const Uint32 nowMs = SDL_GetTicks();
-
-    // Periodic prune: evict entries idle for >5 s
-    if (nowMs - lastCachePruneMs_ > 5000) {
-      for (auto it = textCache_.begin(); it != textCache_.end();) {
-        if (nowMs - it->second.lastUsedMs > 5000) {
-          destroyTexture(it->second.tex);
-          it = textCache_.erase(it);
-        } else {
-          ++it;
-        }
-      }
-      lastCachePruneMs_ = nowMs;
-    }
-
-    const uint64_t hash = textHash(text, color, sIdx, ptSz);
-    int w = 0, h = 0;
-    SDL_Texture *tex = nullptr;
-
-    auto it = textCache_.find(hash);
-    if (it != textCache_.end()) {
-      auto &e = it->second;
-      // Verify no hash collision
-      if (e.text == text && e.color.r == color.r && e.color.g == color.g &&
-          e.color.b == color.b && e.color.a == color.a &&
-          e.styleIdx == sIdx && e.ptSz == ptSz) {
-        e.lastUsedMs = nowMs;
-        tex = e.tex;
-        w = e.w;
-        h = e.h;
-      } else {
-        // Collision: evict old entry and fall through to recreate
-        destroyTexture(e.tex);
-        textCache_.erase(it);
-      }
-    }
-
-    if (!tex) {
-      tex = renderText(renderer, text, color, style, &w, &h);
-      if (!tex)
-        return;
-      // Evict oldest entry if at capacity
-      if (textCache_.size() >= kMaxCacheEntries) {
-        auto oldest = textCache_.begin();
-        for (auto jt = textCache_.begin(); jt != textCache_.end(); ++jt) {
-          if (jt->second.lastUsedMs < oldest->second.lastUsedMs)
-            oldest = jt;
-        }
-        destroyTexture(oldest->second.tex);
-        textCache_.erase(oldest);
-      }
-      textCache_.emplace(hash, TextCacheEntry{text, color, sIdx, ptSz, tex, w, h, nowMs});
-    }
-
-    SDL_Rect dst = {x, y, w, h};
-    if (centered)
-      dst.x -= w / 2;
-    else if (rightAlign)
-      dst.x -= w;
-    if (vertCentered)
-      dst.y -= h / 2;
-    SDL_RenderCopy(renderer, tex, nullptr, &dst);
-    // Texture is now owned by textCache_; do NOT destroy it here.
+    textCache_.clear();
   }
 
   void destroyTexture(SDL_Texture *tex) {
@@ -183,50 +138,46 @@ public:
     }
   }
 
-  // ---- Calibration ----
+  // --- Static Helper for UI components ---
+  static bool isBold(FontStyle style) {
+    return (style == FontStyle::TinyBold || style == FontStyle::CaptionBold ||
+            style == FontStyle::MicroBold || style == FontStyle::FastBold ||
+            style == FontStyle::UIBold ||
+            style == FontStyle::SmallBold || style == FontStyle::MediumBold ||
+            style == FontStyle::LargeBold);
+  }
+
+  // --- Semantic Metrics API ---
 
   struct CalibEntry {
     const char *name;
-    int targetHeight; // at 800x480
+    int targetHeight;
     int basePt;
     int scaledPt;
-    int measuredHeight; // TTF_FontHeight at scaledPt
+    int measuredHeight;
   };
-
-  // Measure current font heights for comparison against targets.
   std::vector<CalibEntry> calibrate() {
-    struct Info {
-      FontStyle style;
-      const char *name;
-      int target;
-      int basePt;
-    };
-    static const Info infos[] = {
-        {FontStyle::Tiny, "Tiny", kTinyTargetH, kTinyBasePt},
-        {FontStyle::Caption, "Caption", kCaptionTargetH, kCaptionBasePt},
-        {FontStyle::Micro, "Micro", kMicroTargetH, kMicroBasePt},
-        {FontStyle::UI, "UI", kUITargetH, kUIBasePt},
-        {FontStyle::SmallRegular, "SmallRegular", kSmallTargetH, kSmallBasePt},
-        {FontStyle::SmallBold, "SmallBold", kSmallTargetH, kSmallBasePt},
-        {FontStyle::LargeBold, "LargeBold", kLargeTargetH, kLargeBasePt},
-        {FontStyle::Fast, "Fast", kFastTargetH, kFastBasePt},
-        {FontStyle::FastBold, "FastBold", kFastTargetH, kFastBasePt},
-    };
-    std::vector<CalibEntry> entries;
-    for (const auto &i : infos) {
-      int pt = ptSize(i.style);
-      TTF_Font *font = fontMgr_.getFont(pt);
-      int h = font ? TTF_FontHeight(font) : 0;
-      entries.push_back({i.name, i.target, i.basePt, pt, h});
+    std::vector<CalibEntry> out;
+    out.push_back({"Tiny", kTinyTargetH, kTinyBasePt, scaledPt_[idx(FontStyle::Tiny)], 0});
+    out.push_back({"Caption", kCaptionTargetH, kCaptionBasePt, scaledPt_[idx(FontStyle::Caption)], 0});
+    out.push_back({"Micro", kMicroTargetH, kMicroBasePt, scaledPt_[idx(FontStyle::Micro)], 0});
+    out.push_back({"UI", kUITargetH, kUIBasePt, scaledPt_[idx(FontStyle::UI)], 0});
+    out.push_back({"Small", kSmallTargetH, kSmallBasePt, scaledPt_[idx(FontStyle::SmallRegular)], 0});
+    out.push_back({"Medium", kMediumTargetH, kMediumBasePt, scaledPt_[idx(FontStyle::MediumRegular)], 0});
+    out.push_back({"Large", kLargeTargetH, kLargeBasePt, scaledPt_[idx(FontStyle::LargeRegular)], 0});
+    out.push_back({"Fast", kFastTargetH, kFastBasePt, scaledPt_[idx(FontStyle::Fast)], 0});
+
+    for (auto &e : out) {
+      TTF_Font *f = fontMgr_.getFont(e.scaledPt);
+      if (f) e.measuredHeight = TTF_FontHeight(f);
     }
-    return entries;
+    return out;
   }
 
-  // Target line heights in the 800x480 logical space.
-  static constexpr int kTinyTargetH = 12;
-  static constexpr int kCaptionTargetH = 13;
-  static constexpr int kMicroTargetH = 15;
-  static constexpr int kUITargetH = 16;
+  static constexpr int kTinyTargetH = 10;
+  static constexpr int kCaptionTargetH = 11;
+  static constexpr int kMicroTargetH = 13;
+  static constexpr int kUITargetH = 15;
   static constexpr int kSmallTargetH = 18;
   static constexpr int kMediumTargetH = 28;
   static constexpr int kLargeTargetH = 80;
@@ -246,12 +197,6 @@ private:
   static constexpr int kLargeBasePt = 60;
   static constexpr int kFastBasePt = 12;
 
-  void clearCache() {
-    for (auto &kv : textCache_)
-      destroyTexture(kv.second.tex);
-    textCache_.clear();
-  }
-
   static int idx(FontStyle s) { return static_cast<int>(s); }
   static int clampPt(float v) {
     return std::clamp(static_cast<int>(v), 8, 200);
@@ -259,28 +204,42 @@ private:
 
   struct TextCacheEntry {
     std::string text;
-    SDL_Color color;
-    int styleIdx;
-    int ptSz;
     SDL_Texture *tex;
     int w, h;
-    Uint32 lastUsedMs;
+    FontStyle style;
   };
 
-  static constexpr size_t kMaxCacheEntries = 256;
+  void renderCached(SDL_Renderer *renderer, const TextCacheEntry &e, int x,
+                    int y, SDL_Color color, bool center, bool rightAlign,
+                    bool vertCentered) {
+    SDL_SetTextureColorMod(e.tex, color.r, color.g, color.b);
+    SDL_SetTextureAlphaMod(e.tex, color.a);
+    int tx = x;
+    int ty = y;
+    if (center)
+      tx -= e.w / 2;
+    else if (rightAlign)
+      tx -= e.w;
+    if (vertCentered)
+      ty -= e.h / 2;
 
-  static uint64_t textHash(const std::string &text, SDL_Color color,
-                            int styleIdx, int ptSz) {
-    uint64_t h = 14695981039346656037ULL;
-    for (char c : text) {
-      h ^= static_cast<uint8_t>(c);
-      h *= 1099511628211ULL;
-    }
-    h ^= (static_cast<uint64_t>(color.r) << 56) |
-         (static_cast<uint64_t>(color.g) << 48) |
-         (static_cast<uint64_t>(color.b) << 40) |
-         (static_cast<uint64_t>(color.a) << 32) |
-         (static_cast<uint64_t>(styleIdx) << 16) |
+    SDL_Rect dst = {tx, ty, e.w, e.h};
+    SDL_RenderCopy(renderer, e.tex, nullptr, &dst);
+  }
+
+  void pruneCache() {
+    if (textCache_.size() < 500)
+      return;
+    // Simple nuclear prune for now — text catalog items are cheap to re-render.
+    clearCache();
+  }
+
+  uint64_t hash(const std::string &text, FontStyle style) {
+    uint64_t h = std::hash<std::string>{}(text);
+    int ptSz = scaledPt_[idx(style)];
+    uint32_t styleIdx = idx(style);
+    // Combine hash with size + style index to avoid collisions on DPI change.
+    h ^= (static_cast<uint64_t>(styleIdx) << 16) |
          static_cast<uint64_t>(ptSz);
     return h;
   }

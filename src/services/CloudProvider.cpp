@@ -108,6 +108,7 @@ SDL_Texture *CloudProvider::getTexture(SDL_Renderer *renderer, int w, int h, SDL
     }
     texture_ = SDL_CreateTextureFromSurface(renderer, pendingSurface_);
     if (texture_) {
+      MemoryMonitor::getInstance().addVram((int64_t)pendingSurface_->w * pendingSurface_->h * 4);
       texW_ = pendingSurface_->w;
       texH_ = pendingSurface_->h;
       SDL_SetTextureBlendMode(texture_, SDL_BLENDMODE_BLEND);
