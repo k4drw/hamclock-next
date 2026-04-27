@@ -1355,13 +1355,13 @@ void MapWidget::onPropDataReady(PropOverlayType type,
   if (type == PropOverlayType::Reliability)
     maxVal = 100.0f;
   else if (type == PropOverlayType::Voacap)
-    maxVal = 35.0f;  // MUF(3000) in MHz, same scale as MUF-RT
+    maxVal = 54.0f;  // MUF(3000) in MHz — extend to 6m (54 MHz)
   else if (type == PropOverlayType::Toa)
     maxVal = 40.0f;
   else if (type == PropOverlayType::Heatmap)
     maxVal = 1.0f;  // ReachProvider normalizes grid to 0..1
   else
-    maxVal = 35.0f;  // MUF (matches original HamClock CM_MUF_V scale)
+    maxVal = 54.0f;  // MUF — extend to 6m (54 MHz)
 
   for (size_t i = 0; i < grid.size(); ++i) {
     float val = grid[i];

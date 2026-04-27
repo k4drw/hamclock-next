@@ -1661,11 +1661,11 @@ void MapWidget::renderLegend(SDL_Renderer *renderer) {
   if (type == PropOverlayType::Muf) {
     title = "MUF-RT (MHz)";
     labelMin = "0";
-    labelMax = "35";
+    labelMax = "54";
   } else if (type == PropOverlayType::Voacap) {
     title = "MUF-VCAP (MHz)";
     labelMin = "0";
-    labelMax = "35";
+    labelMax = "54";
   } else if (type == PropOverlayType::Reliability) {
     title = "Rel (%)";
     labelMin = "0";
@@ -1754,11 +1754,34 @@ void MapWidget::renderLegend(SDL_Renderer *renderer) {
     SDL_RenderFillRect(renderer, &seg);
   }
 
-  // Draw Min/Max Labels
-  cat->drawText(renderer, labelMin, lx, ly + legendH + 8, txtCol,
-                FontStyle::Micro, false, false, true);
-  cat->drawText(renderer, labelMax, lx + legendW, ly + legendH + 8, txtCol,
-                FontStyle::Micro, true, false, true);
+  // Draw Tick Marks and Labels
+  struct Tick { float frac; std::string label; };
+  std::vector<Tick> ticks;
+
+  if (type == PropOverlayType::Muf || type == PropOverlayType::Voacap) {
+    // 0..54 MHz — mark every 10 MHz
+    ticks = {{0.f, "0"}, {10.f/54.f, "10"}, {20.f/54.f, "20"},
+             {30.f/54.f, "30"}, {40.f/54.f, "40"}, {1.f, "54"}};
+  } else if (type == PropOverlayType::Reliability || type == PropOverlayType::Aurora) {
+    ticks = {{0.f, "0"}, {0.25f, "25"}, {0.5f, "50"}, {0.75f, "75"}, {1.f, "100"}};
+  } else if (type == PropOverlayType::Toa) {
+    ticks = {{0.f, "0"}, {0.25f, "10"}, {0.5f, "20"}, {0.75f, "30"}, {1.f, "40"}};
+  } else if (type == PropOverlayType::Drap) {
+    ticks = {{0.f, "0"}, {1.f/3.f, "10"}, {2.f/3.f, "20"}, {1.f, "30+"}};
+  } else {
+    // Heatmap: just endpoints
+    ticks = {{0.f, "Low"}, {1.f, "High"}};
+  }
+
+  SDL_SetRenderDrawColor(renderer, txtCol.r, txtCol.g, txtCol.b, 200);
+  for (auto &tk : ticks) {
+    int tx = lx + (int)(tk.frac * legendW);
+    // Tick line: 4px below bar
+    SDL_RenderDrawLine(renderer, tx, ly + legendH, tx, ly + legendH + 4);
+    // Label: centered on tick, 8px below bar
+    cat->drawText(renderer, tk.label, tx, ly + legendH + 8, txtCol,
+                  FontStyle::Micro, true, false, true);
+  }
 }
 
 void MapWidget::renderWxMbLegend(SDL_Renderer *renderer) {
