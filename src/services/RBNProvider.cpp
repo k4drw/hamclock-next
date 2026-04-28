@@ -21,9 +21,10 @@ RBNProvider::RBNProvider(std::shared_ptr<DXClusterDataStore> store,
                          PrefixManager &pm,
                          std::shared_ptr<WatchlistStore> watchlist,
                          std::shared_ptr<WatchlistHitStore> hits,
+                         std::shared_ptr<HeardMeStore> heardMe,
                          HamClockState *state)
     : store_(store), pm_(pm), watchlist_(watchlist), hits_(hits),
-      state_(state) {}
+      heardMe_(heardMe), state_(state) {}
 
 RBNProvider::~RBNProvider() { stop(); }
 
@@ -367,8 +368,17 @@ void RBNProvider::processLine(const std::string &line) {
     while (*p == ' ')
       p++;
     float snr = 0;
-    if (sscanf(p, "%f dB", &snr) == 1)
+    if (sscanf(p, "%f dB", &snr) == 1) {
       spot.snr = snr;
+      // Skip past SNR field to find WPM
+      const char *wpm_p = std::strstr(p, " dB");
+      if (wpm_p) {
+        wpm_p += 3;
+        int wpm = 0;
+        if (sscanf(wpm_p, "%d WPM", &wpm) == 1)
+          spot.wpm = wpm;
+      }
+    }
   }
 
   // Resolve coordinates from prefix database
@@ -384,10 +394,15 @@ void RBNProvider::processLine(const std::string &line) {
     spot.rxGrid = Astronomy::latLonToGrid(ll.lat, ll.lon);
   }
 
-  LOG_D("RBN", "Spot: {} on {:.1f} kHz {} {:.0f}dB", spot.txCall,
-        spot.freqKhz, spot.mode, spot.snr);
+  LOG_D("RBN", "Spot: {} on {:.1f} kHz {} {:.0f}dB {} WPM", spot.txCall,
+        spot.freqKhz, spot.mode, spot.snr, spot.wpm);
 
   store_->addSpot(spot);
+
+  // Heard Me check
+  if (heardMe_ && !config_.callsign.empty() && spot.txCall == config_.callsign) {
+    heardMe_->addSpot(spot);
+  }
 
   // Watchlist check
   if (watchlist_ && hits_ && watchlist_->contains(spot.txCall)) {

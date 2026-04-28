@@ -2,6 +2,7 @@
 
 #include "../core/ConfigManager.h"
 #include "../core/DXClusterData.h"
+#include "../core/HeardMeStore.h"
 #include "../core/PrefixManager.h"
 #include "../core/WatchlistHitStore.h"
 #include "../core/WatchlistStore.h"
@@ -24,6 +25,7 @@ public:
                        PrefixManager &pm,
                        std::shared_ptr<WatchlistStore> watchlist = nullptr,
                        std::shared_ptr<WatchlistHitStore> hits = nullptr,
+                       std::shared_ptr<HeardMeStore> heardMe = nullptr,
                        HamClockState *state = nullptr);
   ~RBNProvider();
 
@@ -41,6 +43,7 @@ private:
   PrefixManager &pm_;
   std::shared_ptr<WatchlistStore> watchlist_;
   std::shared_ptr<WatchlistHitStore> hits_;
+  std::shared_ptr<HeardMeStore> heardMe_;
   HamClockState *state_;
   AppConfig config_;
 

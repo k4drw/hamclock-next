@@ -46,6 +46,7 @@ class ADIFStore;
 class LoTWActivityStore;
 class ClublogStore;
 class FlareDataStore;
+class HeardMeStore;
 class SantaStore;
 class RotatorDataStore;
 class RigDataStore;
@@ -331,6 +332,7 @@ struct AppContext {
   std::shared_ptr<LoTWActivityStore> lotwActivityStore;
   std::shared_ptr<ClublogStore> clublogStore;
   std::shared_ptr<FlareDataStore> flareStore;
+  std::shared_ptr<HeardMeStore> heardMeStore;
   std::shared_ptr<SantaStore> santaStore;
   std::shared_ptr<RotatorDataStore> rotatorStore;
   std::shared_ptr<RigDataStore> rigStore;

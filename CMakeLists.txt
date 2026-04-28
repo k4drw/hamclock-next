@@ -535,6 +535,7 @@ set(HAMCLOCK_SOURCES
     src/core/DatabaseManager.cpp
     src/core/OrbitPredictor.cpp
     src/core/DXClusterData.cpp
+    src/core/HeardMeStore.cpp
     src/core/DisplayPower.cpp
     src/core/PaneRestrictions.cpp
     src/core/GreylineCalculator.cpp
@@ -630,6 +631,7 @@ set(HAMCLOCK_SOURCES
     src/ui/QSORatePanel.cpp
     src/ui/FlareLogPanel.cpp
     src/ui/GreylineDXFilterPanel.cpp
+    src/ui/HeardMePanel.cpp
     src/ui/DXClusterPanel.cpp
     src/ui/BandConditionsPanel.cpp
     src/ui/BeaconPanel.cpp

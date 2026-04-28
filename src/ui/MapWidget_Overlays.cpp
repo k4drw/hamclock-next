@@ -4,6 +4,7 @@
 #endif
 #endif
 #include "MapWidget.h"
+#include "../core/HeardMeStore.h"
 #include "../core/AsteroidPropagator.h"
 #include "../core/Astronomy.h"
 #include "../core/StarCatalog.h"
@@ -1063,6 +1064,49 @@ void MapWidget::renderDXClusterSpots(SDL_Renderer *renderer) {
                                  static_cast<int>(sp.y), color,
                                  FontStyle::Tiny);
   }
+  SDL_RenderSetClipRect(renderer, nullptr);
+}
+
+void MapWidget::renderHeardMeSpots(SDL_Renderer *renderer) {
+  if (!heardMeStore_)
+    return;
+  auto spots = heardMeStore_->getSpots();
+  if (spots.empty())
+    return;
+
+  SDL_RenderSetClipRect(renderer, &mapRect_);
+  SDL_Texture *lineTex = texMgr_.get(LINE_AA_KEY);
+  ThemeColors themes = getThemeColors(theme_);
+
+  double deLat = state_ ? state_->deLocation.lat : config_.lat;
+  double deLon = state_ ? state_->deLocation.lon : config_.lon;
+  SDL_FPoint deP = latLonToScreen(deLat, deLon);
+
+  for (const auto &spot : spots) {
+    if (spot.rxLat == 0.0 && spot.rxLon == 0.0)
+      continue;
+
+    SDL_FPoint rxP = latLonToScreen(spot.rxLat, spot.rxLon);
+
+    // Fade by age (20 min window)
+    auto now = std::chrono::system_clock::now();
+    float ageMin = (float)std::chrono::duration_cast<std::chrono::minutes>(now - spot.spottedAt).count();
+    float alpha = 1.0f - (ageMin / 20.0f);
+    alpha = std::max(0.1f, std::min(1.0f, alpha));
+
+    SDL_Color col = themes.accent;
+    col.a = (Uint8)(alpha * 200);
+
+    // Draw line
+    SDL_FPoint pts[2] = {deP, rxP};
+    RenderUtils::drawPolylineTextured(renderer, lineTex, pts, 2, 1.5f, col);
+
+    // Draw small dot at skimmer
+    SDL_Rect dot = {(int)rxP.x - 2, (int)rxP.y - 2, 4, 4};
+    SDL_SetRenderDrawColor(renderer, col.r, col.g, col.b, col.a);
+    SDL_RenderFillRect(renderer, &dot);
+  }
+
   SDL_RenderSetClipRect(renderer, nullptr);
 }
 

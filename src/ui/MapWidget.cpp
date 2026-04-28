@@ -1081,6 +1081,7 @@ void MapWidget::render(SDL_Renderer *renderer) {
   renderAsteroidOverlay(renderer);
   renderSpotOverlay(renderer);
   renderDXClusterSpots(renderer);
+  renderHeardMeSpots(renderer);
   renderADIFPins(renderer);
   renderONTASpots(renderer);
   renderBeacons(renderer);

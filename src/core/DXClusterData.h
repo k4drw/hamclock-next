@@ -18,6 +18,7 @@ struct DXClusterSpot {
   std::string mode;
   double freqKhz = 0.0;
   double snr = 0.0;
+  int wpm = 0;
 
   double txLat = 0.0;
   double txLon = 0.0;

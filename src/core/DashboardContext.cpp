@@ -357,6 +357,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
   ctx.sfiHistoryStore = std::make_shared<SFIHistoryStore>();
   ctx.drapDataStore = std::make_shared<DRAPDataStore>();
   ctx.flareStore = std::make_shared<FlareDataStore>();
+  ctx.heardMeStore = std::make_shared<HeardMeStore>();
   noaaProvider =
       std::make_unique<NOAAProvider>(netManager, solarStore, auroraHistoryStore,
                                      ctx.xrayHistoryStore, state.get());
@@ -428,7 +429,8 @@ DashboardContext::DashboardContext(AppContext &ctx)
 
   rbnProvider =
       std::make_unique<RBNProvider>(dxcStore, ctx.prefixMgr, watchlistStore,
-                                   watchlistHitStore, state.get());
+                                    watchlistHitStore, ctx.heardMeStore,
+                                    state.get());
 #ifndef __EMSCRIPTEN__
   if ((isMasterMode || isWidgetConfigured("dx_cluster") ||
        isWidgetConfigured("watchlist")) &&
@@ -753,6 +755,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
         ctx.lotwActivityStore,
         ctx.clublogStore,
         ctx.flareStore,
+        ctx.heardMeStore,
         spotProvider.get(),
         activityProvider.get(),
         drapProvider.get(),
@@ -1054,6 +1057,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
   mapArea->setOnConfigChanged([&ctx] { ctx.cfgMgr.save(ctx.appCfg); });
   mapArea->setSpotStore(spotStore);
   mapArea->setDXClusterStore(dxcStore);
+  mapArea->setHeardMeStore(ctx.heardMeStore);
   mapArea->setADIFStore(adifStore);
   mapArea->setMufRtProvider(mufRtProvider.get());
   mapArea->setBeaconProvider(beaconProvider.get());
