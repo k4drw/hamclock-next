@@ -20,7 +20,7 @@ void BandConditionsProvider::update() {
   BandConditionsData data;
   // Common bands for propagation display
   static const std::vector<std::string> bands = {"80m", "40m", "20m", "15m",
-                                                 "10m"};
+                                                 "10m", "6m"};
 
   // Store the solar data used for calculations
   data.sfi = solar.sfi;
@@ -116,6 +116,20 @@ BandCondition BandConditionsProvider::calculate(int sfi, int k,
     if (sfi > 180)
       return BandCondition::GOOD;
     if (sfi > 140)
+      return BandCondition::FAIR;
+    return BandCondition::POOR;
+  }
+
+  if (band == "6m") {
+    if (!day)
+      return BandCondition::POOR;
+    if (k >= 5)
+      return BandCondition::POOR;
+    if (sfi > 200)
+      return BandCondition::EXCELLENT;
+    if (sfi > 150)
+      return BandCondition::GOOD;
+    if (sfi > 100)
       return BandCondition::FAIR;
     return BandCondition::POOR;
   }

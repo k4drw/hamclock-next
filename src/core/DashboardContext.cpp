@@ -11,6 +11,7 @@
 #include "core/DXClusterData.h"
 #include "core/DatabaseManager.h"
 #include "core/DisplayPower.h"
+#include "core/FlareData.h"
 #include "core/HamClockState.h"
 #include "core/LiveSpotData.h"
 #include "core/PrefixManager.h"
@@ -43,6 +44,7 @@ void populateWidgetDescriptions();
 #include "services/DRAPProvider.h"
 #include "services/DXClusterProvider.h"
 #include "services/DstProvider.h"
+#include "services/FlareProvider.h"
 #include "services/FccProvider.h"
 #include "services/ForecastProvider.h"
 #include "services/GPSProvider.h"
@@ -354,6 +356,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
   ctx.kIndexHistoryStore = std::make_shared<KIndexHistoryStore>();
   ctx.sfiHistoryStore = std::make_shared<SFIHistoryStore>();
   ctx.drapDataStore = std::make_shared<DRAPDataStore>();
+  ctx.flareStore = std::make_shared<FlareDataStore>();
   noaaProvider =
       std::make_unique<NOAAProvider>(netManager, solarStore, auroraHistoryStore,
                                      ctx.xrayHistoryStore, state.get());
@@ -439,6 +442,10 @@ DashboardContext::DashboardContext(AppContext &ctx)
 
   contestProvider = std::make_unique<ContestProvider>(netManager, contestStore);
   contestProvider->fetch();
+
+  flareProvider = std::make_unique<FlareProvider>(netManager, ctx.flareStore);
+  if (isMasterMode || isWidgetConfigured("flare_log"))
+    flareProvider->fetch();
 
   moonProvider = std::make_unique<MoonProvider>(netManager, moonStore);
   moonProvider->update(appCfg.lat, appCfg.lon);
@@ -745,6 +752,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
         spaceWxAlertStore,
         ctx.lotwActivityStore,
         ctx.clublogStore,
+        ctx.flareStore,
         spotProvider.get(),
         activityProvider.get(),
         drapProvider.get(),
@@ -1500,6 +1508,11 @@ void DashboardContext::update(AppContext &ctx) {
         (!ctx.contestStore->get().valid || contestProvider->isStale(now, 12 * 60 * 60 * 1000)) &&
         contestProvider->isStale(now, kCooldown)) {
       contestProvider->fetch();
+    }
+
+    // Solar Flares
+    if ((isMaster || isWidgetActive("flare_log")) && flareProvider && flareProvider->isStale(now, 15 * 60 * 1000)) {
+      flareProvider->fetch();
     }
 
     // History

@@ -71,6 +71,12 @@ void populateWidgetDescriptions() {
     "Active POTA and SOTA activations worldwide with frequency and park/summit details.");
   r.setDescription("adif",
     "Displays recent QSOs from a local ADIF log file; auto-refreshes as log grows.");
+  r.setDescription("qso_rate",
+    "QSO rate tracker — sparkline chart of QSOs per hour for the past 12 hours with peak and total stats.");
+  r.setDescription("flare_log",
+    "Solar Flare Log — scrollable list of recent X-ray flares (class B–X) from NOAA with peak times and durations.");
+  r.setDescription("greyline_spots",
+    "Greyline Spots — shows only DX cluster spots where the spotter or DX station is near the sunrise/sunset terminator.");
   r.setDescription("callbook",
     "Callsign lookup showing name, QTH, grid square, and license class.");
   r.setDescription("watchlist",

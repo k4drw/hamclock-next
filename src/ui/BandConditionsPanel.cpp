@@ -66,156 +66,41 @@ void BandConditionsPanel::render(SDL_Renderer *renderer) {
   ThemeColors themes = getThemeColors(theme_);
 
   renderChrome(renderer);
-
-  int titleH = 20;
-  auto *cat = fontMgr_.catalog();
-  // Standard Title
-  cat->drawText(renderer, "Band Conditions", x_ + 10, y_ + 5, themes.accent,
-                FontStyle::MicroBold);
+  renderTitle(renderer, fontMgr_, "Band Conditions");
 
   if (!dataValid_) {
+    auto *cat = fontMgr_.catalog();
     cat->drawText(renderer, "No Data", x_ + width_ / 2,
-                  y_ + titleH + (height_ - titleH) / 2, themes.textDim,
+                  y_ + height_ / 2, themes.textDim,
                   FontStyle::Micro, true);
     return;
   }
 
-  int pad = 4;
-  int tableWidth = width_ - 2 * pad;
-  bool maximized = (width_ > 300);
-  if (maximized) {
-    tableWidth = width_ / 2 - 2 * pad;
-  }
-
-  int colWidth = tableWidth / 3;
-  int numRows =
-      static_cast<int>(currentData_.statuses.size()) + 1; // +1 for header
-  int availableH = height_ - titleH - 2 * pad;
-  int rowHeight = availableH / numRows;
-
-  // Use logical styles
-  FontStyle cellStyle = (rowHeight < 15) ? FontStyle::Tiny : FontStyle::Micro;
-  FontStyle headerStyle =
-      (rowHeight < 15) ? FontStyle::TinyBold : FontStyle::MicroBold;
-
-  SDL_Color headerColor = themes.accent;
-  SDL_Color labelColor = themes.text;
-
-  int curY = y_ + titleH + pad;
-
-  auto drawInCol = [&](const std::string &text, int colIdx, SDL_Color color,
-                       FontStyle style, int yOffset = 0) {
-    int tx = x_ + pad + colIdx * colWidth + colWidth / 2;
-    int ty = curY + rowHeight / 2 + yOffset;
-    cat->drawText(renderer, text, tx, ty, color, style, true);
-  };
+  auto *cat = fontMgr_.catalog();
+  const int row_h = 16;
+  const int col1_w = 30;
+  const int start_y = y_ + 20;
 
   // Header
-  bool useShort = (tableWidth < 100);
-  if (!useShort) {
-    drawInCol("Band", 0, headerColor, headerStyle, -2);
-    drawInCol("Day", 1, headerColor, headerStyle, -2);
-    drawInCol("Night", 2, headerColor, headerStyle, -2);
-  }
-
-  // Line under header (only if showing header)
-  if (!useShort) {
-    SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
-                           themes.border.b, themes.border.a);
-    SDL_RenderDrawLine(renderer, x_ + pad, curY + rowHeight - 2,
-                       x_ + tableWidth + pad, curY + rowHeight - 2);
-    curY += rowHeight;
-  }
+  cat->drawText(renderer, "Band", x_ + 6, start_y, themes.accent, FontStyle::Tiny);
+  cat->drawText(renderer, "Day", x_ + 6 + col1_w, start_y, themes.accent, FontStyle::Tiny);
+  cat->drawText(renderer, "Night", x_ + 6 + col1_w + 40, start_y, themes.accent, FontStyle::Tiny);
 
   // Rows
-  for (const auto &status : currentData_.statuses) {
-    drawInCol(status.band, 0, labelColor, cellStyle);
-    drawInCol(stringForCondition(status.day, useShort), 1,
-              colorForCondition(status.day, themes), cellStyle);
-    drawInCol(stringForCondition(status.night, useShort), 2,
-              colorForCondition(status.night, themes), cellStyle);
-    curY += rowHeight;
+  for (size_t i = 0; i < currentData_.statuses.size(); i++) {
+    int row_y = start_y + (i + 1) * row_h;
+    const auto &status = currentData_.statuses[i];
+
+    cat->drawText(renderer, status.band, x_ + 6, row_y, themes.text, FontStyle::Tiny);
+    cat->drawText(renderer, stringForCondition(status.day), x_ + 6 + col1_w, row_y,
+                  colorForCondition(status.day, themes), FontStyle::Tiny);
+    cat->drawText(renderer, stringForCondition(status.night), x_ + 6 + col1_w + 40, row_y,
+                  colorForCondition(status.night, themes), FontStyle::Tiny);
   }
-
-  if (maximized) {
-    renderPropagationLogic(renderer, themes);
-  }
-}
-
-void BandConditionsPanel::renderPropagationLogic(SDL_Renderer *renderer,
-                                                 const ThemeColors &themes) {
-  auto *cat = fontMgr_.catalog();
-  int pad = 10;
-  int startX = x_ + width_ / 2 + pad;
-  int startY = y_ + 28; // Below "Band Conditions" title
-  int lineH = 13;
-
-  cat->drawText(renderer, "How it works (N0NBH standards):", startX, startY,
-                themes.accent, FontStyle::MicroBold);
-  startY += lineH;
-  cat->drawText(renderer, "Simplified propagation model for HF.", startX,
-                startY, themes.textDim, FontStyle::Tiny);
-  startY += lineH + 5;
-
-  cat->drawText(renderer, "Current Activity Indices:", startX, startY,
-                themes.accent, FontStyle::MicroBold);
-  startY += lineH;
-  std::string sfiText = "SFI: " + std::to_string(currentData_.sfi) +
-                        " (Higher improves 15m/10m)";
-  cat->drawText(renderer, sfiText, startX, startY, themes.text, FontStyle::Tiny);
-  startY += lineH;
-
-  char kStr[64];
-  std::snprintf(kStr, sizeof(kStr), "K: %.1f (High K degrades prop.)",
-                currentData_.k_index);
-  cat->drawText(renderer, std::string(kStr), startX, startY, themes.text,
-                FontStyle::Tiny);
-
-  startY += lineH + 8;
-  cat->drawText(renderer, "Logic Thresholds:", startX, startY, themes.accent,
-                FontStyle::MicroBold);
-  startY += lineH;
-
-  struct LogicPoint {
-    std::string label;
-    std::string desc;
-    SDL_Color color;
-  };
-
-  std::vector<LogicPoint> points = {
-      {"Excellent", "SFI > 250 (10m) / >150 (20m) & K < 3", themes.info},
-      {"Good", "SFI > 180 (10m) / >100 (20m) & K < 3", themes.success},
-      {"Fair", "SFI > 140 (10m) / >70 (20m) & K < 5", themes.warning},
-      {"Poor", "High K-index (> 5) or Low SFI", themes.danger}};
-
-  for (const auto &p : points) {
-    cat->drawText(renderer, p.label + ":", startX, startY, p.color,
-                  FontStyle::MicroBold);
-    cat->drawText(renderer, p.desc, startX + 60, startY, themes.textDim,
-                  FontStyle::Tiny);
-    startY += lineH;
-  }
-
-  startY += 5;
-  cat->drawText(renderer, "Nuances:", startX, startY, themes.accent,
-                FontStyle::MicroBold);
-  startY += lineH;
-  cat->drawText(renderer, "* 80/40m: Better at Night (Low absorption)", startX,
-                startY, themes.textDim, FontStyle::Tiny);
-  startY += lineH;
-  cat->drawText(renderer, "* 15/10m: Daytime only (Requires ionization)",
-                startX, startY, themes.textDim, FontStyle::Tiny);
 }
 
 void BandConditionsPanel::onResize(int x, int y, int w, int h) {
   Widget::onResize(x, y, w, h);
-  auto *cat = fontMgr_.catalog();
-  // Use Micro style for very small cells, otherwise SmallRegular
-  if (h < 120 || w < 100) {
-    tableFontSize_ = cat->ptSize(FontStyle::Micro);
-  } else {
-    tableFontSize_ = cat->ptSize(FontStyle::SmallRegular);
-  }
 }
 
 SDL_Rect BandConditionsPanel::getActionRect(const std::string &action) const {

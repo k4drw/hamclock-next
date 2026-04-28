@@ -555,6 +555,7 @@ set(HAMCLOCK_SOURCES
     src/network/WebServer_Routes.cpp
     src/services/UpdateChecker.cpp
     src/services/NOAAProvider.cpp
+    src/services/FlareProvider.cpp
     src/services/RSSProvider.cpp
     src/services/BME280Provider.cpp
     src/services/LTR329Provider.cpp
@@ -626,6 +627,9 @@ set(HAMCLOCK_SOURCES
     src/ui/AuroraGraphPanel.cpp
     src/ui/KIndexAlertPanel.cpp
     src/ui/SFITrendPanel.cpp
+    src/ui/QSORatePanel.cpp
+    src/ui/FlareLogPanel.cpp
+    src/ui/GreylineDXFilterPanel.cpp
     src/ui/DXClusterPanel.cpp
     src/ui/BandConditionsPanel.cpp
     src/ui/BeaconPanel.cpp

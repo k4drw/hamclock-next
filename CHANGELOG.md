@@ -9,6 +9,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [v1.6.0] — 2026-04-24
 
 ### Added
+- **QSO Rate Tracker Widget** — sparkline chart of QSOs per hour for the past 12 hours with peak and total stats, sourced from local ADIF log.
+- **Solar Flare Event Log Widget** — scrollable list of recent X-ray flares (class B–X) from NOAA SWPC with peak times and durations; fetches from dedicated endpoint every 15 minutes.
+- **Greyline DX Spots Filter** — filters live DX cluster spots to show only those near the grey line (terminator window ±N degrees).
+- **Band Advisor Widget** — real-time propagation status table for HF bands (80m, 40m, 20m, 15m, 10m) based on K-index and SFI; later consolidated into Band Conditions widget.
+- **6m Band Support in Band Conditions** — extended Band Conditions widget to include 6m band with appropriate SFI/K-index thresholds.
 - **LoTW Auto-Sync Widget** — automatic ADIF-to-LoTW upload integration with live activity tracking
 - **Zone Heatmap Widget** — visual DXCC zone contact distribution
 - **WAS Progress Widget** — US state contact tracker with map overlay
@@ -40,6 +45,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Polar Rendering Primitives** — new `RenderUtils` methods for `drawPie` and `drawArcOutline` supporting advanced circular UI elements
 
 ### Fixed
+- **FlareProvider Wiring** — Fixed structural error in DashboardContext.cpp where FlareProvider was accessed via AppContext parameter instead of DashboardContext member; changed `ctx.flareProvider` to `flareProvider` at initialization and periodic-fetch sites. Flare widget now correctly initializes and fetches NOAA data.
+- **Widget Font Readiness** — Added `fontMgr_.ready()` checks to QSO Rate Tracker, Band Advisor, Solar Flare Log, and Greyline Spots widgets to prevent rendering with uninitialized fonts at startup.
+- **Band Conditions Widget Simplification** — Removed verbose "How it works" explanation panel from BandConditionsPanel; layout now shows compact band | day | night table. Deleted duplicate BandAdvisorPanel widget (functionality consolidated into Band Conditions).
 - **Theming and Text Input Standards** — audit of 91 theme-aware and 17 text-input panels found 5 non-compliant instances (SetupScreen_Appearance dimTimeInput/brightTimeInput using textDim instead of border; DXInfo manual entry using hard-coded color, string input instead of TextInput class). All fixes applied; standards enforced across all UI components.
 - **Presets Modal UX** — expanded visible rows from 5 to 8, added alphabetical sorting, fixed deletion tracking integration
 - **GPU Texture Leaks** — SetupScreen, tooltip rendering, MemoryMonitor VRAM accounting drift
