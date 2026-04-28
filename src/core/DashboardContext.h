@@ -178,9 +178,9 @@ struct DashboardContext {
   FccProvider fccProvider;
   std::shared_ptr<DstProvider> dstProvider;
   std::unique_ptr<ADIFProvider> adifProvider;
-  std::unique_ptr<LoTWActivityProvider> lotwActivityProvider;
-  std::unique_ptr<ClublogProvider> clublogProvider;
-  std::unique_ptr<LoTWProvider> lotwProvider;
+  std::shared_ptr<LoTWActivityProvider> lotwActivityProvider;
+  std::shared_ptr<ClublogProvider> clublogProvider;
+  std::shared_ptr<LoTWProvider> lotwProvider;
   std::shared_ptr<MufRtProvider> mufRtProvider;
   std::shared_ptr<IonosondeProvider> ionosondeProvider;
   std::shared_ptr<HamClock::ReachProvider> reachProvider;

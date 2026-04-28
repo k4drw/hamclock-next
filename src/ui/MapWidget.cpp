@@ -1132,6 +1132,8 @@ void MapWidget::render(SDL_Renderer *renderer) {
   renderLegend(renderer);
   renderWxMbLegend(renderer);
   renderCloudLegend(renderer);
+  if (config_.showLocalPropGauge)
+    renderLocalPropGauge(renderer);
 
   renderCalendarAlert(renderer);
   renderDXAlert(renderer);

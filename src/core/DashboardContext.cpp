@@ -494,16 +494,16 @@ DashboardContext::DashboardContext(AppContext &ctx)
   }
 #endif
 
-  lotwActivityProvider = std::make_unique<LoTWActivityProvider>(
+  lotwActivityProvider = std::make_shared<LoTWActivityProvider>(
       netManager, ctx.lotwActivityStore);
   lotwActivityProvider->fetch();
 
-  clublogProvider = std::make_unique<ClublogProvider>(
+  clublogProvider = std::make_shared<ClublogProvider>(
       netManager, ctx.clublogStore, appCfg.clublogApiKey);
   if (!appCfg.clublogApiKey.empty())
     clublogProvider->fetch();
 
-  lotwProvider = std::make_unique<LoTWProvider>(
+  lotwProvider = std::make_shared<LoTWProvider>(
       netManager, ctx.adifStore, appCfg.lotwCall, appCfg.lotwPassword);
   if (!appCfg.lotwCall.empty() && !appCfg.lotwPassword.empty())
     lotwProvider->fetch();

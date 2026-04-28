@@ -8,7 +8,8 @@
 // Fetches LoTW user activity data from public CSV and updates activity store.
 // Source: https://lotw.arrl.org/lotw-user-activity.csv (updated daily)
 // Interval: 24 hours (efficient reuse of once-daily CSV)
-class LoTWActivityProvider : public ProviderBase {
+class LoTWActivityProvider : public ProviderBase,
+                             public std::enable_shared_from_this<LoTWActivityProvider> {
 public:
   LoTWActivityProvider(NetworkManager &net,
                        std::shared_ptr<LoTWActivityStore> store);

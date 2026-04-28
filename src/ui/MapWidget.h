@@ -177,6 +177,7 @@ private:
   void renderPropagationOverlay(SDL_Renderer *renderer);
   void updatePropagationOverlay();
   void renderAzimuthalMask(SDL_Renderer *renderer);
+  void renderLocalPropGauge(SDL_Renderer *renderer);
   void renderCountryBorders(SDL_Renderer *renderer);
 
   TextureManager &texMgr_;

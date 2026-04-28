@@ -31,7 +31,11 @@ void LoTWProvider::fetch() {
                     "?login=" + call_ + "&password=" + password_ +
                     "&qso_query=1&qso_qslsince=" + lastSyncDate_;
 
-  net_.fetchAsync(url, [this](std::string data) {
+  std::weak_ptr<LoTWProvider> weakSelf = shared_from_this();
+  net_.fetchAsync(url, [weakSelf](std::string data) {
+    auto self = weakSelf.lock();
+    if (!self)
+      return;
     if (data.empty()) {
       LOG_E("LoTWProvider", "Failed to fetch LoTW confirmations");
       return;

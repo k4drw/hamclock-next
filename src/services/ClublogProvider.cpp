@@ -23,13 +23,17 @@ void ClublogProvider::fetch() {
   std::string url = std::string(CLUBLOG_API_BASE) + "?api=" + apiKey_ +
                     "&format=json&mode=dx";
 
-  net_.fetchAsync(url, [this](std::string data) {
+  std::weak_ptr<ClublogProvider> weakSelf = shared_from_this();
+  net_.fetchAsync(url, [weakSelf](std::string data) {
+    auto self = weakSelf.lock();
+    if (!self)
+      return;
     if (data.empty()) {
       LOG_E("ClublogProvider", "Failed to fetch Clublog most wanted");
       return;
     }
 
-    WorkerService::getInstance().submitTask([this, data]() {
+    WorkerService::getInstance().submitTask([self, data]() {
       try {
         auto j = json::parse(data);
         std::vector<MostWantedEntry> entries;
@@ -47,7 +51,7 @@ void ClublogProvider::fetch() {
         }
 
         if (!entries.empty()) {
-          store_->update(entries);
+          self->store_->update(entries);
           LOG_I("ClublogProvider", "Loaded %zu most wanted DXCC entities",
                 entries.size());
         } else {

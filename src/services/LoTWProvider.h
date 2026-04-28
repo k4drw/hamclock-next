@@ -6,7 +6,8 @@
 #include <memory>
 #include <string>
 
-class LoTWProvider : public ProviderBase {
+class LoTWProvider : public ProviderBase,
+                     public std::enable_shared_from_this<LoTWProvider> {
 public:
   LoTWProvider(NetworkManager &net, std::shared_ptr<ADIFStore> store,
                const std::string &call, const std::string &password);

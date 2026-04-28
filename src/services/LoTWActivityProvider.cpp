@@ -14,13 +14,20 @@ LoTWActivityProvider::LoTWActivityProvider(NetworkManager &net,
 
 void LoTWActivityProvider::fetch() {
   lastFetchMs_ = SDL_GetTicks();
-  net_.fetchAsync(LOTW_ACTIVITY_URL, [this](std::string data) {
+  std::weak_ptr<LoTWActivityProvider> weakSelf = shared_from_this();
+
+  net_.fetchAsync(LOTW_ACTIVITY_URL, [weakSelf](std::string data) {
+    auto self = weakSelf.lock();
+    if (!self) {
+      LOG_D("LoTWActivityProvider", "Callback fired after provider destruction, ignoring");
+      return;
+    }
     if (data.empty()) {
       LOG_E("LoTWActivityProvider", "Failed to fetch LoTW activity CSV");
       return;
     }
 
-    auto store = store_;
+    auto store = self->store_;
     WorkerService::getInstance().submitTask([store, data]() {
       std::unordered_map<std::string, std::chrono::system_clock::time_point>
           activity;

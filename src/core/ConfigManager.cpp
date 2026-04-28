@@ -335,6 +335,7 @@ bool ConfigManager::load(AppConfig &config) {
     config.showSatTrack = ap.value("show_sat_track", true);
     config.showBeacons = ap.value("show_beacons", true);
     config.showBorders = ap.value("show_borders", false);
+    config.showLocalPropGauge = ap.value("show_local_prop_gauge", false);
     config.displayPowerMethod = ap.value("display_power_method", "auto");
     config.logLevel = ap.value("log_level", "warn");
     config.qrzUsername = ap.value("qrz_username", "");
@@ -782,6 +783,7 @@ bool ConfigManager::save(const AppConfig &config) {
   json["appearance"]["show_sat_track"] = config.showSatTrack;
   json["appearance"]["show_beacons"] = config.showBeacons;
   json["appearance"]["show_borders"] = config.showBorders;
+  json["appearance"]["show_local_prop_gauge"] = config.showLocalPropGauge;
   json["appearance"]["display_power_method"] = config.displayPowerMethod;
   if (config.logLevel != "warn")
     json["appearance"]["log_level"] = config.logLevel;

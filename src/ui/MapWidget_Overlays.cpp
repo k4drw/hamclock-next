@@ -2866,3 +2866,87 @@ void MapWidget::renderDXAlert(SDL_Renderer *renderer) {
 
   cat->drawText(renderer, dxAlert_.entity, panX + panW / 2, curY, themes.info, FontStyle::Fast, true);
 }
+
+void MapWidget::renderLocalPropGauge(SDL_Renderer *renderer) {
+  if (!iono_ || !state_ || !solar_)
+    return;
+
+  // 1. Data Collection
+  double deLat = state_->deLocation.lat;
+  double deLon = state_->deLocation.lon;
+
+  InterpolatedIonosonde ionoLocal = iono_->interpolate(deLat, deLon);
+  SolarData sw = solar_->get();
+
+  // Current UTC hour
+  std::time_t t_now = std::time(nullptr);
+  std::tm *ptm = std::gmtime(&t_now);
+  double utcHour = ptm->tm_hour + ptm->tm_min / 60.0;
+  double localSolarHour = std::fmod(utcHour + deLon / 15.0 + 24.0, 24.0);
+
+  // Local MUF (RT)
+  double muf = 0;
+  if (ionoLocal.stationsUsed > 0 && ionoLocal.foF2 > 0) {
+    // Use foF2 * M(3000)F2 factor
+    muf = ionoLocal.foF2 * ionoLocal.md;
+  } else {
+    // Fallback to solar model
+    double hourFactor = 1.0 + 0.4 * std::cos((localSolarHour - 14.0) * M_PI / 12.0);
+    double latFactor = std::max(0.1, 1.0 - std::abs(deLat) / 150.0);
+    double ssn = (sw.sunspot_number > 0) ? (double)sw.sunspot_number : 50.0;
+    double foF2_est = 0.9 * std::sqrt(ssn + 15.0) * hourFactor * latFactor;
+    muf = foF2_est * 3.0;
+  }
+
+  // Local LUF
+  // Use a heuristic 500km distance for "local" skywave
+  double luf = PropEngine::calculateLUF(500.0, deLat, localSolarHour, (double)sw.sfi, (double)sw.k_index);
+
+  // 2. Determine Recommended Bands (limit to top 6)
+  std::string recBands;
+  int count = 0;
+  for (int i = 0; i < kNumBands; ++i) {
+    double freqMhz = kBands[i].minKhz / 1000.0;
+    if (freqMhz >= luf && freqMhz <= muf) {
+      if (!recBands.empty()) recBands += " ";
+      recBands += kBands[i].name;
+      count++;
+      if (count >= 6) break;
+    }
+  }
+  if (recBands.empty()) recBands = "None";
+
+  // 3. UI Layout (Compact Box at bottom center)
+  ThemeColors themes = getThemeColors(theme_);
+  auto *cat = fontMgr_.catalog();
+
+  char line1[64];
+  std::snprintf(line1, sizeof(line1), "MUF: %.1f  LUF: %.1f", muf, luf);
+  std::string line2 = "REC: " + recBands;
+
+  int ptSize = cat->ptSize(FontStyle::Micro);
+  int textW1 = fontMgr_.getLogicalWidth(line1, ptSize);
+  int textW2 = fontMgr_.getLogicalWidth(line2, ptSize);
+  int textW = std::max(textW1, textW2);
+
+  int padX = 10;
+  int boxW = textW + padX * 2;
+  int boxH = 36;
+  int bx = x_ + (width_ - boxW) / 2;
+  int by = mapRect_.y + mapRect_.h - boxH - 8;
+
+  SDL_Rect box = {bx, by, boxW, boxH};
+
+  // Background
+  SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, 160);
+  SDL_RenderFillRect(renderer, &box);
+
+  // Border
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 180);
+  SDL_RenderDrawRect(renderer, &box);
+
+  // Text
+  cat->drawText(renderer, line1, bx + boxW / 2, by + 11, themes.text, FontStyle::Micro, true);
+  cat->drawText(renderer, line2, bx + boxW / 2, by + 25, themes.success, FontStyle::Micro, true);
+}

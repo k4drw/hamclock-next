@@ -6,7 +6,8 @@
 #include <memory>
 #include <string>
 
-class ClublogProvider : public ProviderBase {
+class ClublogProvider : public ProviderBase,
+                         public std::enable_shared_from_this<ClublogProvider> {
 public:
   ClublogProvider(NetworkManager &net, std::shared_ptr<ClublogStore> store,
                   const std::string &apiKey);
