@@ -52,7 +52,7 @@ void SetupScreen::renderTabServices(SDL_Renderer *renderer, int cx, int pad,
   lotwCallRect_ = {col1X, y, colW, labelH + fieldH};
   yField = y + labelH;
   lotwCallInput_.render(renderer, fontMgr_, col1X, yField, colW, fieldH,
-                        FontStyle::SmallRegular, textPad, activeField_ == 4,
+                        FontStyle::SmallRegular, textPad, activeField_ == 2,
                         true, themes.accent, themes.textDim, themes.text, themes.text, themes.textDim,
                         "e.g. K4DRW");
 
@@ -68,7 +68,7 @@ void SetupScreen::renderTabServices(SDL_Renderer *renderer, int cx, int pad,
       tmpPwd.setSelectionAnchor(lotwPasswordInput_.getSelectionAnchor());
     }
     tmpPwd.render(renderer, fontMgr_, col2X, yField, colW, fieldH,
-                  FontStyle::SmallRegular, textPad, activeField_ == 5, true,
+                  FontStyle::SmallRegular, textPad, activeField_ == 3, true,
                   themes.accent, themes.textDim, themes.text, themes.text, themes.textDim, "********", &themes.rowStripe1);
   }
   y += labelH + fieldH + vSpace;
@@ -79,14 +79,14 @@ void SetupScreen::renderTabServices(SDL_Renderer *renderer, int cx, int pad,
   repeaterBookRect_ = {col1X, y, colW, labelH + fieldH};
   yField = y + labelH;
   repeaterBookInput_.render(renderer, fontMgr_, col1X, yField, colW, fieldH,
-                            FontStyle::SmallRegular, textPad, activeField_ == 2,
+                            FontStyle::SmallRegular, textPad, activeField_ == 4,
                             true, themes.accent, themes.textDim, themes.text, themes.text, themes.textDim, "Key", &themes.rowStripe1);
 
   cat->drawText(renderer, "Winlink Key:", col2X, y, themes.text,
                 FontStyle::SmallBold);
   winlinkRect_ = {col2X, y, colW, labelH + fieldH};
   winlinkInput_.render(renderer, fontMgr_, col2X, yField, colW, fieldH,
-                       FontStyle::SmallRegular, textPad, activeField_ == 3,
+                       FontStyle::SmallRegular, textPad, activeField_ == 5,
                        true, themes.accent, themes.textDim, themes.text, themes.text, themes.textDim, "Key", &themes.rowStripe1);
   y += labelH + fieldH + vSpace;
 
@@ -94,9 +94,8 @@ void SetupScreen::renderTabServices(SDL_Renderer *renderer, int cx, int pad,
   cat->drawText(renderer, "Clublog API Key:", fieldX, y, themes.text,
                 FontStyle::SmallBold);
   int clublogFieldW = fieldW;
+  clublogApiKeyRect_ = {fieldX, y, clublogFieldW, labelH + fieldH};
   yField = y + labelH;
-  SDL_Texture *keyTex = fontMgr_.renderText(renderer, clublogApiKeyInput_.getValue(), {100, 100, 100, 255}, 11);
-  if (keyTex) MemoryMonitor::getInstance().destroyTexture(keyTex);
   // Render the input field for Clublog API Key
   clublogApiKeyInput_.render(renderer, fontMgr_, fieldX, yField, clublogFieldW, fieldH,
                              FontStyle::SmallRegular, textPad, activeField_ == 6,

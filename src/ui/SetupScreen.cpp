@@ -111,9 +111,15 @@ TextInput *SetupScreen::getActiveInput() {
     case 1:
       return &qrzPasswordInput_;
     case 2:
-      return &repeaterBookInput_;
+      return &lotwCallInput_;
     case 3:
+      return &lotwPasswordInput_;
+    case 4:
+      return &repeaterBookInput_;
+    case 5:
       return &winlinkInput_;
+    case 6:
+      return &clublogApiKeyInput_;
     }
   } else if (activeTab_ == Tab::Rig) {
     switch (activeField_) {
