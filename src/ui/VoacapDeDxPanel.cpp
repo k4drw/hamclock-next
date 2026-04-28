@@ -154,7 +154,7 @@ static SDL_Color reliabilityColor(float rel) {
   // rel:    0     10         33         66          100
   // color: black   |   red    |  yellow  |   green
   if (rel < 10.0f) {
-    return {0, 0, 0, 255};
+    return {64, 64, 64, 255};
   } else if (rel < 33.0f) {
     return {255, 0, 0, 255};
   } else if (rel < 66.0f) {
@@ -208,7 +208,6 @@ void VoacapDeDxPanel::render(SDL_Renderer *renderer) {
   std::tm *ptm = std::gmtime(&t);
   int utcHour = ptm->tm_hour;
 
-  // The matrix rendering: column 0 = UTC 00:00, column 23 = UTC 23:00
   for (int hourOffset = 0; hourOffset < 24; ++hourOffset) {
     int px = x_ + pLeft + static_cast<int>(hourOffset * cellW);
     int nextPx = x_ + pLeft + static_cast<int>((hourOffset + 1) * cellW);
@@ -217,7 +216,7 @@ void VoacapDeDxPanel::render(SDL_Renderer *renderer) {
       int py = y_ + pTop + static_cast<int>((8 - b) * cellH);
       int nextPy = y_ + pTop + static_cast<int>((8 - b + 1) * cellH);
 
-      SDL_Color c = reliabilityColor(relMatrix_[hourOffset][b]);
+      SDL_Color c = reliabilityColor(relMatrix_[(utcHour + hourOffset) % 24][b]);
 
       SDL_Rect rect = {px, py, nextPx - px, nextPy - py};
       SDL_SetRenderDrawColor(renderer, c.r, c.g, c.b, c.a);
@@ -233,20 +232,21 @@ void VoacapDeDxPanel::render(SDL_Renderer *renderer) {
   }
 
   // X-axis labels (Timeline)
-  // Draw current UTC at offset 0
+  // Origin (0,0) is now
   int timelineY = y_ + pTop + pHeight + 8;
-  cat->drawText(renderer, "UTC", x_ + (pLeft / 2), timelineY,
-                themes.textDim, FontStyle::Tiny, false, true, true);
+  cat->drawText(renderer, "NOW", x_ + (pLeft / 2), timelineY,
+                themes.accent, FontStyle::Tiny, false, true, true);
 
   for (int hourOffset = 0; hourOffset < 24; hourOffset += 4) {
-    int px_center = x_ + pLeft + static_cast<int>((hourOffset + 0.5f) * cellW);
-    std::string hStr = std::to_string(hourOffset);
+    int px_center = x_ + 6 + pLeft + static_cast<int>((hourOffset + 0.5f) * cellW);
+    std::string hStr = std::to_string((utcHour + hourOffset) % 24);
     cat->drawText(renderer, hStr, px_center, timelineY,
                   themes.textDim, FontStyle::Tiny, false, true, true);
   }
 
-  // Legend
-  int legendY = y_ + pTop + pHeight + 23;
+  // Legend — centered under graph
+  int legendBoxY = y_ + pTop + pHeight + 15;
+  int legendTextY = legendBoxY + 16;
   float legendItemW = static_cast<float>(pWidth) / 4.0f;
   const float relVals[4] = {0.0f, 20.0f, 50.0f, 80.0f};
   const char *legendText[4] = {"<10", "10-33", "33-66", ">66"};
@@ -254,14 +254,14 @@ void VoacapDeDxPanel::render(SDL_Renderer *renderer) {
   for (int i = 0; i < 4; i++) {
     SDL_Color c = reliabilityColor(relVals[i]);
 
-    int lx = x_ + pLeft + static_cast<int>(i * legendItemW);
-    
-    SDL_Rect boxRect = {lx - 4, legendY - 8, 8, 8};
+    int lx = x_ + pLeft + static_cast<int>((i + 0.5f) * legendItemW);
+
+    SDL_Rect boxRect = {lx - 2, legendBoxY, 10, 10};
     SDL_SetRenderDrawColor(renderer, c.r, c.g, c.b, c.a);
     SDL_RenderFillRect(renderer, &boxRect);
 
-    cat->drawText(renderer, legendText[i], lx, legendY + 6, themes.textDim,
-                  FontStyle::Tiny, true, false, true); // centered under box
+    cat->drawText(renderer, legendText[i], lx, legendTextY, themes.textDim,
+                  FontStyle::Tiny, true, true, true);
   }
 
   // Grid lines mapping
@@ -276,9 +276,9 @@ void VoacapDeDxPanel::render(SDL_Renderer *renderer) {
     SDL_RenderDrawLine(renderer, x_ + pLeft, pyy, x_ + pLeft + pWidth, pyy);
   }
 
-  // "Now" cursor: white vertical line at the current UTC hour column
+  // "Now" cursor: white vertical line at the current UTC hour (left edge, column 0)
   {
-    int nowPx = x_ + pLeft + static_cast<int>(utcHour * cellW);
+    int nowPx = x_ + pLeft + 2;
     SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
     SDL_RenderDrawLine(renderer, nowPx, y_ + pTop, nowPx, y_ + pTop + pHeight);
   }
