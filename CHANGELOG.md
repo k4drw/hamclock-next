@@ -6,7 +6,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
-## [v1.6.0] — 2026-04-24
+## [v1.6.0] — TBD
 
 ### Added
 - **QSO Rate Tracker Widget** — sparkline chart of QSOs per hour for the past 12 hours with peak and total stats, sourced from local ADIF log.
@@ -31,6 +31,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **DX Info Manual Entry** — enter DX callsigns directly via a centered modal dialog (triggered by clicking the widget); features auto-uppercasing and `api.hamdb.org` (CallbookProvider) lookup for accurate location resolution for hams who have moved; widget border highlights amber when the callsign appears in live spots (30s auto-fade)
 - **Global Volume Control** — adjustable audio levels (0-100) for alarms and TTS; dedicated slider in Setup -> Identity tab
 - **DE Station Status Preset** — new built-in preset highlighting award tracking (DXCC, WAS, Grid, WAC, Zone Heatmap) and QSO management (LoTW Sync, ADIF Tracking); factory preset deletion tracking ensures user-deleted presets don't reappear on app updates
+- **Local Propagation Gauge** — compact map overlay at the map bottom showing real-time MUF, LUF, and recommended HF bands for the DE station; toggled via Map View menu; preference persisted as `showLocalPropGauge` in config.
 
 ### Changed
 - **MCP Server Documentation** — Enhanced onboarding context for new widget contributors: MCP JSON now documents 50+ WidgetDeps fields (stores, providers, core resources) with usage patterns; expanded gotchas section from 1 → 6 entries covering REGISTER_WIDGET two-step requirement, MemoryMonitor::destroyTexture pattern, StatusCache optimization, DashboardContext lifecycle; added base class selection guidance (Widget vs ListPanel) to widget_scaffolding. Project-local hc-new-widget skill now includes Base Class Selection section, Debugging Patterns (common failure modes), rate limiting/backoff patterns, and enhanced References. MCP README now includes 5-step Newcomer Quick Start path. AI agents and humans adding widgets can complete tasks without grepping the codebase.
@@ -43,6 +44,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **ADIF Award Tracking Engine** — extended `ADIFStats` and `ADIFProvider` to track worked/confirmed continents, CQ zones, and ITU zones (parses `CQZ` and `ITUZ` tags)
 - **Callbook Integration Service** — new `CallbookProvider` for asynchronous location resolution via external APIs
 - **Polar Rendering Primitives** — new `RenderUtils` methods for `drawPie` and `drawArcOutline` supporting advanced circular UI elements
+- **VOACAP DE-DX Timeline** — reoriented x-axis so the leftmost column is always the current UTC hour ("now at origin"); time flows right with 24-hour wrap-around; "now" cursor restored at left edge as a vertical white line for spot/band intersection visualization; legend items centered under graph columns; <10% reliability swatch changed from black to dark grey (64,64,64) for dark-theme contrast.
 
 ### Fixed
 - **FlareProvider Wiring** — Fixed structural error in DashboardContext.cpp where FlareProvider was accessed via AppContext parameter instead of DashboardContext member; changed `ctx.flareProvider` to `flareProvider` at initialization and periodic-fetch sites. Flare widget now correctly initializes and fetches NOAA data.
@@ -58,6 +60,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Windows SAPI Volume Reset** — explicitly manages SAPI voice levels to prevent volume resetting to system defaults on startup or speech events
 - **Marine Widget Update** — immediate WTTR.in data fetch on load (no startup delay)
 - **Network Timeout Stability** — 45s socket timeout for NASA/JPL/FCC/NOAA endpoints
+- **Provider Async Use-After-Free (SIGSEGV)** — LoTWActivityProvider, ClublogProvider, and LoTWProvider refactored to inherit `std::enable_shared_from_this`; async fetch callbacks now capture `std::weak_ptr` and verify object lifetime via `lock()` before execution; DashboardContext manages these providers via `std::shared_ptr`. Eliminates crash during dashboard destruction with in-flight network requests.
+- **Setup Services Tab** — fixed field focus order (QRZ → LoTW → Keys → Clublog), missing LoTW and Clublog bindings in `getActiveInput()`, `clublogApiKeyRect_` assignment gap, and mouse hit-testing across all 7 input fields; Tab key now cycles all fields in visual row order.
 
 ---
 
