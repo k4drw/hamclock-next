@@ -148,7 +148,7 @@ void HeardMePanel::clearCache() {
 std::string HeardMePanel::formatAge(const std::chrono::system_clock::time_point &spottedAt) const {
   auto now = std::chrono::system_clock::now();
   auto secs = std::chrono::duration_cast<std::chrono::seconds>(now - spottedAt).count();
-  if (secs < 60) return std::to_string(secs) + "s";
+  if (secs < 60) return std::to_string((secs / 10) * 10) + "s";
   return std::to_string(secs / 60) + "m";
 }
 

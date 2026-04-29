@@ -40,6 +40,7 @@ public:
 
   // Tune the persistent text cache limit at runtime (default: 300).
   // Call with a lower value (e.g. 100) on low-memory devices.
+  void setVolatileCacheLimit(size_t limit) { volatileCacheLimit_ = limit; }
   void setTextCacheLimit(size_t limit) { textCacheLimit_ = limit; }
 
   FontManager(const FontManager &) = delete;

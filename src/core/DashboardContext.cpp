@@ -1152,11 +1152,19 @@ DashboardContext::DashboardContext(AppContext &ctx)
           memMon.isLowMemoryDevice() ? "YES" : "NO");
     if (memMon.isLowMemoryDevice()) {
       texMgr.setMaxCacheSize(15);
-      LOG_I("Main", "Low-memory device: capping texture cache to 15");
+      fontMgr.setVolatileCacheLimit(100);
       fontMgr.setTextCacheLimit(100);
-      LOG_I("Main", "Low-memory device: capping font text cache to 100");
+      LOG_I("Main", "Low-memory device: capping texture cache to 15, font cache to 100");
     } else {
       texMgr.setMaxCacheSize(50);
+    }
+
+    if (isMasterMode && memMon.isLowMemoryDevice()) {
+      LOG_W("Hub", "Hub master on low-memory device ({:.0f} MB) — recommend 2+ GB",
+            memMon.getTotalRAM() / 1024.0 / 1024.0);
+      mapArea->setStartupBanner(
+          "WARNING: Hub master on low-memory device. Stability not guaranteed.",
+          30000);
     }
   }
 
@@ -2575,21 +2583,21 @@ void DashboardContext::update(AppContext &ctx) {
   if (now - lastMemLogMs > 60000) {
     auto &mm = MemoryMonitor::getInstance();
     mm.logStats("heartbeat");
-    if (mm.isLowMemoryDevice()) {
+    {
       size_t rss = mm.getRSS();
-      const size_t kFlushThresholdBytes = 400ULL * 1024 * 1024;
-      if (rss > kFlushThresholdBytes) {
-        // Tighten texture cache limit and prune oldest entries.
-        // This is safer than clearCache() which would nuke the map/night lights.
-        texMgr.setMaxCacheSize(30); 
-        
-        // FontCatalog holds the thousands of small 'volatile' text textures
-        // that actually consume the bulk of UI heap on RPi.
+      // Flush at 350 MB on low-memory devices (≤1.5 GB), 600 MB elsewhere.
+      // 60-second heartbeat window means threshold must be well below OOM kill.
+      size_t threshold = mm.isLowMemoryDevice()
+                             ? (350ULL * 1024 * 1024)
+                             : (600ULL * 1024 * 1024);
+      if (rss > threshold) {
+        LOG_W("Main", "RSS {:.1f} MB exceeds threshold — flushing caches",
+              rss / 1024.0 / 1024.0);
+        texMgr.setMaxCacheSize(mm.isLowMemoryDevice() ? 15 : 30);
+        fontMgr.setTextCacheLimit(100);
+        fontMgr.setVolatileCacheLimit(100);
         fontCatalog.clearCache();
         fontMgr.clearCache();
-
-        LOG_W("Main", "RSS {:.1f} MB exceeds threshold — pruned textures and cleared font caches",
-              rss / 1024.0 / 1024.0);
       }
     }
     lastMemLogMs = now;

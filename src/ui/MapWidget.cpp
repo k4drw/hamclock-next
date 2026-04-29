@@ -281,7 +281,7 @@ MapWidget::~MapWidget() {
   // Signal any in-flight WorkerService ground-track task to exit early rather
   // than dereference the now-dangling predictor_.
   trackAlive_->store(false, std::memory_order_release);
-  MemoryMonitor::getInstance().destroyTexture(nightOverlayTexture_);
+  MemoryMonitor::getInstance().destroyTexture(mufRtTexture_);
   MemoryMonitor::getInstance().destroyTexture(propTexture_);
   MemoryMonitor::getInstance().destroyTexture(auroraTexture_);
   MemoryMonitor::getInstance().destroyTexture(tooltip_.cachedTexture);
@@ -1137,6 +1137,7 @@ void MapWidget::render(SDL_Renderer *renderer) {
 
   renderCalendarAlert(renderer);
   renderDXAlert(renderer);
+  renderStartupBanner(renderer);
 
   // Note: MapViewMenu is rendered via renderModal() in the centralized modal
   // pass, not here. This prevents clipping to the map pane bounds.
@@ -1205,11 +1206,8 @@ void MapWidget::updatePropagationOverlay() {
         MemoryMonitor::getInstance().destroyTexture(propTexture_);
       if (auroraTexture_)
         MemoryMonitor::getInstance().destroyTexture(auroraTexture_);
-      if (nightOverlayTexture_)
-        MemoryMonitor::getInstance().destroyTexture(nightOverlayTexture_);
       propTexture_ = nullptr;
       auroraTexture_ = nullptr;
-      nightOverlayTexture_ = nullptr;
       return;
     }
 
@@ -1610,9 +1608,6 @@ SDL_Color MapWidget::getPropColor(PropOverlayType type, float t,
 void MapWidget::onResize(int x, int y, int w, int h) {
   Widget::onResize(x, y, w, h);
   recalcMapRect();
-  if (nightOverlayTexture_) {
-    MemoryMonitor::getInstance().destroyTexture(nightOverlayTexture_);
-  }
   // Invalidate all cached geometry that depends on screen coordinates
   gridDirty_ = true;
   borderDirty_ = true;

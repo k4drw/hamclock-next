@@ -2867,6 +2867,45 @@ void MapWidget::renderDXAlert(SDL_Renderer *renderer) {
   cat->drawText(renderer, dxAlert_.entity, panX + panW / 2, curY, themes.info, FontStyle::Fast, true);
 }
 
+void MapWidget::setStartupBanner(const std::string &text, uint32_t durationMs) {
+  startupBanner_.text = text;
+  startupBanner_.shownAtMs = SDL_GetTicks();
+  startupBanner_.durationMs = durationMs;
+  startupBanner_.active = true;
+}
+
+void MapWidget::renderStartupBanner(SDL_Renderer *renderer) {
+  if (!startupBanner_.active)
+    return;
+
+  if (SDL_GetTicks() - startupBanner_.shownAtMs > startupBanner_.durationMs) {
+    startupBanner_.active = false;
+    return;
+  }
+
+  ThemeColors themes = getThemeColors(theme_);
+  auto *cat = fontMgr_.catalog();
+
+  const int panW = (int)(mapRect_.w * 0.70);
+  const int panH = 44;
+  const int panX = mapRect_.x + (mapRect_.w - panW) / 2;
+  const int panY = mapRect_.y + 12;
+  SDL_Rect panRect = {panX, panY, panW, panH};
+
+  SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+  SDL_SetRenderDrawColor(renderer, 60, 40, 0, 220);
+  SDL_RenderFillRect(renderer, &panRect);
+  SDL_SetRenderDrawColor(renderer, themes.warning.r, themes.warning.g,
+                         themes.warning.b, 255);
+  SDL_RenderDrawRect(renderer, &panRect);
+
+  cat->drawText(renderer, startupBanner_.text.c_str(), panX + panW / 2,
+                panY + panH / 2, themes.warning, FontStyle::Micro, true, false,
+                true);
+
+  startupBannerRect_ = panRect;
+}
+
 void MapWidget::renderLocalPropGauge(SDL_Renderer *renderer) {
   if (!iono_ || !state_ || !solar_)
     return;
@@ -2947,6 +2986,6 @@ void MapWidget::renderLocalPropGauge(SDL_Renderer *renderer) {
   SDL_RenderDrawRect(renderer, &box);
 
   // Text
-  cat->drawText(renderer, line1, bx + boxW / 2, by + 11, themes.text, FontStyle::Micro, true);
-  cat->drawText(renderer, line2, bx + boxW / 2, by + 25, themes.success, FontStyle::Micro, true);
+  cat->drawText(renderer, line1, bx + boxW / 2, by + 6, themes.text, FontStyle::Micro, true);
+  cat->drawText(renderer, line2, bx + boxW / 2, by + 20, themes.success, FontStyle::Micro, true);
 }

@@ -138,6 +138,9 @@ public:
   void showDXAlert(const std::string &call, const std::string &entity,
                    double freq, const std::string &mode);
 
+  // Show a startup banner (e.g. for low-memory warnings).
+  void setStartupBanner(const std::string &text, uint32_t durationMs = 30000);
+
   // Robinson boundary helper
   static float getRobinsonXCoeff(double lat);
 
@@ -310,7 +313,6 @@ private:
   std::function<void()> onConfigChanged_;
   SDL_Rect projRect_ = {};
   bool useCompatibilityRenderPath_ = false;
-  SDL_Texture *nightOverlayTexture_ = nullptr;
   SDL_Texture *mufRtTexture_ = nullptr;
   SDL_Texture *propTexture_ = nullptr;
   SDL_Renderer *cachedRenderer_ = nullptr;
@@ -357,6 +359,7 @@ private:
   void renderAsteroidOverlay(SDL_Renderer *renderer);
   void renderCalendarAlert(SDL_Renderer *renderer);
   void renderDXAlert(SDL_Renderer *renderer);
+  void renderStartupBanner(SDL_Renderer *renderer);
 
   struct CalendarAlertState {
     bool active = false;
@@ -377,5 +380,13 @@ private:
     uint32_t durationMs = 20000; // 20s for DX alerts
   } dxAlert_;
 
+  struct StartupBannerState {
+    bool active = false;
+    std::string text;
+    uint32_t shownAtMs = 0;
+    uint32_t durationMs = 30000; // 30s for startup warnings
+  } startupBanner_;
+
+  SDL_Rect startupBannerRect_ = {};
   SDL_Rect rssRect_ = {};
 };

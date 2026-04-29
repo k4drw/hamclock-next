@@ -17,13 +17,6 @@
 const SetupScreen::TzPreset SetupScreen::kTzPresets[] = {
     {999, "Local"}, // system local time, DST-aware
     {0, "UTC"},
-    {-5, "EST"},
-    {-6, "CST"},
-    {-7, "MST"},
-    {-8, "PST"},
-    {1, "CET"},
-    {9, "JST"},
-    {10, "AEST"},
 };
 const int SetupScreen::kNumTzPresets = static_cast<int>(
     sizeof(SetupScreen::kTzPresets) / sizeof(SetupScreen::kTzPresets[0]));
@@ -428,7 +421,7 @@ void SetupScreen::renderTzModal(SDL_Renderer *renderer) {
 
   // Basic modal layout (hardcoded for simplicity)
   int mW = 280;
-  int mH = 380;
+  int mH = 200;
   int mx = (width_ - mW) / 2;
   int my = (height_ - mH) / 2;
   tzModalRect_ = {mx, my, mW, mH};
@@ -460,7 +453,7 @@ void SetupScreen::renderTzModal(SDL_Renderer *renderer) {
     if (i < kNumTzPresets) {
       char buf[64];
       if (kTzPresets[i].offset == 999)
-        std::strcpy(buf, "Local (System DST)");
+        std::strcpy(buf, "Local (System Time, DST aware)");
       else
         std::snprintf(buf, sizeof(buf), "%s (UTC%+d)", kTzPresets[i].label, kTzPresets[i].offset);
       cat->drawText(renderer, buf, r.x + 10, r.y + rowH / 2, selected ? themes.text : themes.textDim, FontStyle::UI, false, false, true);

@@ -90,6 +90,15 @@ bool MapWidget::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
     }
   }
 
+  // Startup banner dismissal
+  if (startupBanner_.active) {
+    SDL_Point pt = {mx, my};
+    if (SDL_PointInRect(&pt, &startupBannerRect_)) {
+      startupBanner_.active = false;
+      return true;
+    }
+  }
+
   // DX alert dismissal
   if (dxAlert_.active) {
     const int panW = (int)(mapRect_.w * 0.60);
