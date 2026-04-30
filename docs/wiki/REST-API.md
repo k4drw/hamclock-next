@@ -34,7 +34,7 @@ These endpoints handle reading and writing application settings.
 
 - `GET /api/config` : Returns core configuration data in JSON format.
 - `GET /get_config.json` : Redirects to `/api/config`.
-- `GET /set_config?...` : Updates configuration parameters. Key fields: `call`, `grid`, `theme`, `map_style`, `prop_overlay`, `wx_overlay`, `night_lights`, `use_metric`, `dx_enabled`, `rbn_enabled`, `aux_tz_offset`, `aux_tz_label`.
+- `GET /set_config?...` : Updates configuration parameters. Key fields: `call`, `grid`, `theme`, `map_style`, `prop_overlay`, `wx_overlay`, `night_lights`, `use_metric`, `dx_enabled`, `rbn_enabled`, `aux_tz_offset`, `aux_tz_label`, `lotw_call`, `lotw_password`, `clublog`, `show_local_prop_gauge`, `k_index_threshold`.
 - `GET /set_rss?enabled={0|1}` : Enables or disables the RSS news feed.
 - `GET /set_rss?url={RSS_URL}` : Configures a custom RSS feed URL. The feed appears in the scrolling text banner at the top of the screen alongside default news feeds. Provide the full RSS feed URL (e.g., `https://example.com/feed.xml`).
 - `GET /set_mapcolor?key={key}&color={#RRGGBB}` : Overrides a specific theme color (e.g., `map_bg`, `callsign_bg`).

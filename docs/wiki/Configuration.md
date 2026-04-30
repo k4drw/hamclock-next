@@ -58,6 +58,7 @@ If `lat`/`lon` are omitted, they are derived from the center of your grid square
 | `mapPanX`            | number | `0.0`               | Map horizontal pan offset                                   |
 | `mapPanY`            | number | `0.0`               | Map vertical pan offset                                     |
 | `displayPowerMethod` | string | `"auto"`            | Method to control display (`auto`, `vcgencmd`, `bl_power`)  |
+| `showLocalPropGauge` | bool   | `false`             | Show local propagation gauge map overlay                    |
 
 ---
 
@@ -116,6 +117,7 @@ If `lat`/`lon` are omitted, they are derived from the center of your grid square
 | `dxClusterHideDuplicates`  | bool    | `true`        | Hide redundant spots for same call/band                |
 | `dxClusterMaxAgeMinutes`   | integer | `20`          | Drop spots older than this (allowed: `10`, `20`, `40`, `60`) |
 | `wsjtxPort`                | integer | `2237`        | UDP port for WSJT-X feed                               |
+| `kIndexAlertThreshold`     | float   | `5.0`         | K-index threshold for alerts and notifications         |
 
 ---
 
@@ -297,3 +299,18 @@ If a Client cannot reach the Master, it falls back to fetching from the internet
 | `watchlist`      | array  | `[]`    | List of callsigns to monitor. In the setup screen, you can paste a list of callsigns separated by commas or spaces to add them all at once. |
 | `ontaFilter`     | string | `"all"` | Filter activations: `all`, `pota`, or `sota`                |
 | `corsProxyUrl`   | string | `"/proxy/"` | CORS proxy URL prefix for browser builds                |
+| `deletedFactoryPresets` | array | `[]` | Names of factory presets deleted by the user              |
+
+---
+
+## Service API Keys
+
+These keys enable advanced integrations with external services. Configure these in Setup → **Services** tab.
+
+| Field          | Type   | Default | Description                                   |
+| -------------- | ------ | ------- | --------------------------------------------- |
+| `repeaterbook` | string | `""`    | RepeaterBook API key                          |
+| `winlink`      | string | `""`    | Winlink API key / password                    |
+| `lotw_call`    | string | `""`    | ARRL Logbook of The World (LoTW) callsign     |
+| `lotw_password`| string | `""`    | LoTW password                                 |
+| `clublog`      | string | `""`    | Clublog API key                               |

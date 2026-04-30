@@ -92,7 +92,7 @@ The following widgets have no equivalent in the original HamClock:
 | **Meteor**        | Meteor scatter activity levels and upcoming shower calendar                                                                                                                                    |
 | **Solar Storm**   | Current NOAA geomagnetic storm watch / warning / alert status                                                                                                                                  |
 | **Tropo**         | Tropospheric ducting forecast index                                                                                                                                                            |
-| **Sys Info**      | System resource display: CPU, memory, network, uptime                                                                                                                                         |
+| **Sys Info**      | System resource display: CPU, memory, network, uptime, and GPU cache statistics (texture, vertex, and command buffer usage) for debugging.                                                                                                         |
 | **World Clock**   | Up to 4 configurable time zones with city labels and UTC offsets                                                                                                                               |
 | **Big Clock**     | High-visibility digital or analog clock with user-selectable color themes                                                                                                                     |
 | **Solar (Basic)** | A condensed version of the Solar widget for simpler space weather monitoring                                                                                                                   |
@@ -113,6 +113,7 @@ HamClock-Next adds several propagation overlays not present in the original:
 | **VOACAP Point**        | VOACAP prediction from DE to a specific DX target point                                                                         |
 | **VOACAP Reliability**  | Circuit reliability percentage map                                                                                              |
 | **VOACAP TOA**          | Take-Off Angle prediction using geometric F2-layer model (multi-hop capable)                                                    |
+| **VOACAP Timeline**     | Reoriented X-axis so the leftmost column is always the current UTC hour ("now at origin"), with a vertical white line cursor. |
 | **Propagation Heatmap** | Live [PSK Reporter / RBN / WSPR](Glossary.md#psk-reporter--rbn--wspr) spot density heat map — shows where your signal is actually being heard right now                             |
 | **DRAP**                | D-Region Absorption Prediction map (also available as a standalone widget)                                                      |
 
@@ -193,6 +194,7 @@ Presets make it simple to switch between operating contexts (contest, casual DX,
 - **JSON configuration file** — human-readable, portable, and version-controllable (replaces original binary/EEPROM format)
 - **Automatic migration** — the config loader auto-migrates legacy flat keys from earlier HamClock-Next versions
 - **Brightness schedule** — configure dim and bright times (hour:minute) for automatic display brightness control
+- **Service Credential Persistence** — sensitive credentials (LoTW, Clublog, etc.) are now persisted in `config.json` and manageable via the Web API.
 - **Color overrides** — per-element color customization via `colorOverrides` map
 - **RSS ticker** — optional scrolling RSS feed display
 - **CORS proxy** — configurable relay URL for browser builds; see [CORS proxy](Glossary.md#cors-proxy)

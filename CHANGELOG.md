@@ -32,6 +32,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Global Volume Control** — adjustable audio levels (0-100) for alarms and TTS; dedicated slider in Setup -> Identity tab
 - **DE Station Status Preset** — new built-in preset highlighting award tracking (DXCC, WAS, Grid, WAC, Zone Heatmap) and QSO management (LoTW Sync, ADIF Tracking); factory preset deletion tracking ensures user-deleted presets don't reappear on app updates
 - **Local Propagation Gauge** — compact map overlay at the map bottom showing real-time MUF, LUF, and recommended HF bands for the DE station; toggled via Map View menu; preference persisted as `showLocalPropGauge` in config.
+- **Cache Statistics in SysInfoPanel** — displays texture, vertex, and command buffer usage stats for debugging performance on "Master Hub" (centralized) deployments.
 
 ### Changed
 - **MCP Server Documentation** — Enhanced onboarding context for new widget contributors: MCP JSON now documents 50+ WidgetDeps fields (stores, providers, core resources) with usage patterns; expanded gotchas section from 1 → 6 entries covering REGISTER_WIDGET two-step requirement, MemoryMonitor::destroyTexture pattern, StatusCache optimization, DashboardContext lifecycle; added base class selection guidance (Widget vs ListPanel) to widget_scaffolding. Project-local hc-new-widget skill now includes Base Class Selection section, Debugging Patterns (common failure modes), rate limiting/backoff patterns, and enhanced References. MCP README now includes 5-step Newcomer Quick Start path. AI agents and humans adding widgets can complete tasks without grepping the codebase.
@@ -62,6 +63,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Network Timeout Stability** — 45s socket timeout for NASA/JPL/FCC/NOAA endpoints
 - **Provider Async Use-After-Free (SIGSEGV)** — LoTWActivityProvider, ClublogProvider, and LoTWProvider refactored to inherit `std::enable_shared_from_this`; async fetch callbacks now capture `std::weak_ptr` and verify object lifetime via `lock()` before execution; DashboardContext manages these providers via `std::shared_ptr`. Eliminates crash during dashboard destruction with in-flight network requests.
 - **Setup Services Tab** — fixed field focus order (QRZ → LoTW → Keys → Clublog), missing LoTW and Clublog bindings in `getActiveInput()`, `clublogApiKeyRect_` assignment gap, and mouse hit-testing across all 7 input fields; Tab key now cycles all fields in visual row order.
+- **Setup Screen Layout** — resolved layout instability and reformatting issues in the Setup screen.
+- **C++ Safety Audit** — resolved various C++ safety hazards (lifetime, threading, etc.) identified during a comprehensive audit.
+- **Memory Stability** — resolved DX Cluster heap churn and a memory leak in the weather overlay rendering path.
+- **Service Credential Persistence** — fixed issue where service credentials (LoTW, Clublog, etc.) were not persisted correctly; ensured Web API parity for remote configuration.
 
 ---
 

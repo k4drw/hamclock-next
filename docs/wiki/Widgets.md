@@ -64,7 +64,7 @@ To add a widget to a pane, click the **top strip** of the pane to open the widge
 | **Band Conditions** | Color-coded HF band condition summary (160m–10m) by path type                               | NOAA SWPC derived  |
 | **Live Spots**      | Real-time decoded signal spots from PSK Reporter or Reverse Beacon Network, plotted by band | PSK Reporter / RBN |
 | **NCDXF**           | NCDXF/IBP international beacon schedule and current beacon on air                           | NCDXF              |
-| **Voacap DE-DX**    | VOACAP short-path propagation prediction between DE and DX. Covers nine bands — 80m, 40m, 30m, 20m, 17m, 15m, 12m, 10m, and 6m — across all 24 UTC hours. A horizontal white line highlights the band that matches the DX spot you currently have selected, so you can see predicted conditions for that band at a glance. | VOACAP (local)     |
+| **Voacap DE-DX**    | VOACAP short-path propagation prediction between DE and DX. Covers nine bands — 80m, 40m, 30m, 20m, 17m, 15m, 12m, 10m, and 6m — across all 24 UTC hours. The X-axis is reoriented so the leftmost column always shows the current UTC hour ("now at origin"), with a vertical white line cursor for visualization. A horizontal white line highlights the band that matches the DX spot you currently have selected. | VOACAP (local)     |
 
 ### Frequency Cursor
 
@@ -158,7 +158,7 @@ When the DX Cluster detects an "All-Time New One" (ATNO) — a DXCC entity you h
 | **Rig Control**     | Displays frequency, mode, and S-meter from a connected transceiver *(requires Hamlib)*          | Hamlib rigctld           |
 | **Repeater Dir**    | Repeater directory lookup for your area *(requires API key)*                                    | RepeaterBook             |
 | **Winlink**         | Winlink gateway listing for your area *(requires Winlink account)*                              | Winlink API              |
-| **Sys Info**        | System information: CPU, memory, GPU VRAM, network stats, uptime                                | Local OS                 |
+| **Sys Info**        | System information: CPU, memory, GPU VRAM, network stats, uptime, and GPU cache statistics (texture, vertex, and command buffer usage) for performance debugging. | Local OS                 |
 
 ![DE Info widget](images/widgets/de_info.png)
 
