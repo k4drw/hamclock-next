@@ -536,6 +536,7 @@ void WebServer::registerRoutes(httplib::Server &svr) {
     j["dxClusterMaxAgeMinutes"] = cfg_->dxClusterMaxAgeMinutes;
     j["lotwCall"] = cfg_->lotwCall;
     j["lotwPassword"] = cfg_->lotwPassword;
+    j["lotwLastSync"] = cfg_->lotwLastSync;
     j["clublogApiKey"] = cfg_->clublogApiKey;
     j["kIndexAlertThreshold"] = cfg_->kIndexAlertThreshold;
     j["defaultTzOffset"] = cfg_->defaultTzOffset;
@@ -855,6 +856,8 @@ void WebServer::registerRoutes(httplib::Server &svr) {
       cfg_->lotwPassword = req.get_param_value("lotw_pass");
     if (req.has_param("clublog_api_key"))
       cfg_->clublogApiKey = req.get_param_value("clublog_api_key");
+    if (req.has_param("lotw_last_sync"))
+      cfg_->lotwLastSync = req.get_param_value("lotw_last_sync");
     if (req.has_param("k_index_threshold"))
       cfg_->kIndexAlertThreshold = (float)StringUtils::safe_stod(req.get_param_value("k_index_threshold"));
     if (req.has_param("default_tz_offset"))

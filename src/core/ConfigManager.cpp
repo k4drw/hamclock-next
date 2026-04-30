@@ -555,6 +555,7 @@ bool ConfigManager::load(AppConfig &config) {
     config.wsjtxPort = dxc.value("wsjtx_port", 2237);
     config.dxClusterHideDuplicates = dxc.value("hide_duplicates", true);
     config.dxClusterMaxAgeMinutes = dxc.value("max_age_minutes", 20);
+    config.kIndexAlertThreshold = dxc.value("k_index_threshold", 5.0f);
   }
 
   // Live Spots (Combined RBN, PSK Reporter, WSPR)
@@ -641,6 +642,10 @@ bool ConfigManager::load(AppConfig &config) {
     auto &k = json["api_keys"];
     config.repeaterBookKey = k.value("repeaterbook", "");
     config.winlinkKey = k.value("winlink", "");
+    config.lotwCall = k.value("lotw_call", "");
+    config.lotwPassword = k.value("lotw_password", "");
+    config.lotwLastSync = k.value("lotw_last_sync", "");
+    config.clublogApiKey = k.value("clublog", "");
   }
   // Presets
   if (json.contains("presets") && json["presets"].is_array()) {
@@ -851,6 +856,10 @@ bool ConfigManager::save(const AppConfig &config) {
 
   json["api_keys"]["repeaterbook"] = config.repeaterBookKey;
   json["api_keys"]["winlink"] = config.winlinkKey;
+  json["api_keys"]["lotw_call"] = config.lotwCall;
+  json["api_keys"]["lotw_password"] = config.lotwPassword;
+  json["api_keys"]["lotw_last_sync"] = config.lotwLastSync;
+  json["api_keys"]["clublog"] = config.clublogApiKey;
 
   auto saveRotation = [&](const std::string &key,
                           const std::vector<std::string> &vec) {
@@ -899,6 +908,7 @@ bool ConfigManager::save(const AppConfig &config) {
   json["dx_cluster"]["wsjtx_port"] = config.wsjtxPort;
   json["dx_cluster"]["hide_duplicates"] = config.dxClusterHideDuplicates;
   json["dx_cluster"]["max_age_minutes"] = config.dxClusterMaxAgeMinutes;
+  json["dx_cluster"]["k_index_threshold"] = config.kIndexAlertThreshold;
 
   json["live_spots"]["source"] =
       (config.liveSpotSource == LiveSpotSource::RBN)    ? "rbn"
