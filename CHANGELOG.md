@@ -64,7 +64,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Provider Async Use-After-Free (SIGSEGV)** — LoTWActivityProvider, ClublogProvider, and LoTWProvider refactored to inherit `std::enable_shared_from_this`; async fetch callbacks now capture `std::weak_ptr` and verify object lifetime via `lock()` before execution; DashboardContext manages these providers via `std::shared_ptr`. Eliminates crash during dashboard destruction with in-flight network requests.
 - **Setup Services Tab** — fixed field focus order (QRZ → LoTW → Keys → Clublog), missing LoTW and Clublog bindings in `getActiveInput()`, `clublogApiKeyRect_` assignment gap, and mouse hit-testing across all 7 input fields; Tab key now cycles all fields in visual row order.
 - **Setup Screen Layout** — resolved layout instability and reformatting issues in the Setup screen.
-- **C++ Safety Audit** — resolved various C++ safety hazards (lifetime, threading, etc.) identified during a comprehensive audit.
+- **C++ Safety Audit** — resolved multiple safety hazards (lifetime, threading, etc.) identified during a comprehensive audit:
+    - **Async Callback Safety** — `CallbookProvider` refactored to use robust pointer captures for nested asynchronous fetches.
+    - **Web Server Thread Safety** — audited `WebServer` route handlers to ensure consistent mutex locking during multi-threaded data access.
+    - **Network Thread Stability** — verified `NetworkManager` detached thread safety and `inflight_` counter logic to prevent use-after-free during shutdown.
 - **Memory Stability** — resolved DX Cluster heap churn and a memory leak in the weather overlay rendering path.
 - **Service Credential Persistence** — fixed issue where service credentials (LoTW, Clublog, etc.) were not persisted correctly; ensured Web API parity for remote configuration.
 
