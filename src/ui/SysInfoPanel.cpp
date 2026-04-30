@@ -21,11 +21,13 @@ std::string SysInfoPanel::getLocalIP() {
 // Constructor
 // ---------------------------------------------------------------------------
 SysInfoPanel::SysInfoPanel(int x, int y, int w, int h, FontManager &fontMgr,
+                           NetworkManager &netMgr,
                            std::shared_ptr<CPUMonitor> monitor,
                            std::shared_ptr<HamClockState> state,
-                           bool useMetric)
-    : Widget(x, y, w, h), fontMgr_(fontMgr), monitor_(std::move(monitor)),
-      state_(std::move(state)), useMetric_(useMetric) {}
+                           bool useMetric, bool showCacheStats)
+    : Widget(x, y, w, h), fontMgr_(fontMgr), netMgr_(netMgr),
+      monitor_(std::move(monitor)), state_(std::move(state)),
+      useMetric_(useMetric), showCacheStats_(showCacheStats) {}
 
 // ---------------------------------------------------------------------------
 // update()
@@ -55,6 +57,10 @@ void SysInfoPanel::update() {
     totalRam_ = mem.getTotalRAM();
     vramBytes_ = mem.getVramEstimated();
     diskPct_ = mem.getDiskUsagePct();
+
+    // Cache stats
+    cacheRamBytes_ = netMgr_.getCacheRamBytes();
+    cacheItemCount_ = netMgr_.getCacheItemCount();
 
     lastStatsUpdateMs_ = now;
   }
@@ -198,12 +204,23 @@ void SysInfoPanel::render(SDL_Renderer *renderer) {
     curY += cat->ptSize(FontStyle::Fast) + 4;
   }
 
-  // Row 5: IP
+  // Row 5: Cache stats (if enabled)
+  if (showCacheStats_) {
+    char cacheBuf[48];
+    float cacheM = static_cast<float>(cacheRamBytes_) / (1024.0f * 1024.0f);
+    std::snprintf(cacheBuf, sizeof(cacheBuf), "Cache %.1f MB (%zu items)",
+                  cacheM, cacheItemCount_);
+    cat->drawText(renderer, cacheBuf, cx, curY, themes.accent, FontStyle::Fast,
+                  true);
+    curY += cat->ptSize(FontStyle::Fast) + 4;
+  }
+
+  // Row 6: IP
   cat->drawText(renderer, cachedIP_.c_str(), cx, curY, themes.textDim,
                 FontStyle::Fast, true);
   curY += cat->ptSize(FontStyle::Fast) + 4;
 
-  // Row 6+: Provider errors (show up to 3 failing services)
+  // Row 7+: Provider errors (show up to 3 failing services)
   if (state_) {
     int shown = 0;
     std::lock_guard<std::mutex> lk(state_->servicesMutex);
@@ -243,5 +260,6 @@ SDL_Rect SysInfoPanel::getActionRect(const std::string &action) const {
 
 REGISTER_WIDGET("sys_info", "System Info", false, false, {
   return std::make_unique<SysInfoPanel>(
-      0, 0, 0, 0, deps.fontMgr, deps.cpuMonitor, deps.state, deps.appCfg.useMetric);
+      0, 0, 0, 0, deps.fontMgr, deps.netManager, deps.cpuMonitor, deps.state,
+      deps.appCfg.useMetric, deps.appCfg.showCacheStats);
 })

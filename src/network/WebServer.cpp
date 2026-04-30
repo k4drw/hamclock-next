@@ -207,14 +207,39 @@ void WebServer::run() {
     <div class="card">
       <label>Callsign</label>
       <input type="text" id="call" maxlength="12">
+      <label>FCC FRN</label>
+      <input type="text" id="call-frn" maxlength="10">
       <label>Grid Square</label>
       <input type="text" id="grid" maxlength="6">
       <label>Latitude</label>
       <input type="number" id="lat" step="0.0001" min="-90" max="90">
       <label>Longitude</label>
       <input type="number" id="lon" step="0.0001" min="-180" max="180">
-      <label style="margin-top:4px"><input type="checkbox" id="audio-muted"> Mute Audio / TTS</label>
-      <div class="grid-2">
+      <label style="margin-top:4px"><input type="checkbox" id="gps-enabled"> Synchronize with GPS (gpsd)</label>
+      <label><input type="checkbox" id="audio-muted"> Mute Audio / TTS</label>
+      <label>Volume: <span id="vol-pct">100</span>%</label>
+      <input type="range" id="audio-volume" min="0" max="100" value="100"
+             oninput="document.getElementById('vol-pct').textContent=this.value">
+      <label>Default Timezone</label>
+      <select id="default-tz-preset" onchange="toggleDefaultTzCustom()">
+        <option value="999|Local">Local (system time, DST-aware)</option>
+        <option value="0|UTC">UTC</option>
+        <option value="-5|EST">EST (UTC-5)</option>
+        <option value="-6|CST">CST (UTC-6)</option>
+        <option value="-7|MST">MST (UTC-7)</option>
+        <option value="-8|PST">PST (UTC-8)</option>
+        <option value="1|CET">CET (UTC+1)</option>
+        <option value="9|JST">JST (UTC+9)</option>
+        <option value="10|AEST">AEST (UTC+10)</option>
+        <option value="custom|custom">Custom...</option>
+      </select>
+      <div id="default-tz-custom-fields" style="display:none; margin-top:6px">
+        <label>UTC Offset (hours, -12 to +14)</label>
+        <input type="number" id="default-tz-offset" min="-12" max="14">
+        <label>Label (max 8 chars)</label>
+        <input type="text" id="default-tz-label" maxlength="8">
+      </div>
+      <div class="grid-2" style="margin-top:8px">
         <div>
           <label>Callsign Color</label>
           <input type="color" id="call-fg" style="height:38px">
@@ -392,6 +417,14 @@ void WebServer::run() {
       <div class="section-hdr">DX Cluster</div>
       <label><input type="checkbox" id="dx-enabled"> Enable DX Cluster</label>
       <label><input type="checkbox" id="rbn-enabled"> Enable RBN (Reverse Beacon Network)</label>
+      <label><input type="checkbox" id="dx-hide-dup"> Hide Duplicates</label>
+      <label>Max Age (minutes)</label>
+      <select id="dx-max-age">
+        <option value="10">10 mins</option>
+        <option value="20">20 mins</option>
+        <option value="40">40 mins</option>
+        <option value="60">60 mins</option>
+      </select>
       <label>Host</label>
       <input type="text" id="dx-host" placeholder="dxusa.net">
       <label>Port</label>
@@ -438,6 +471,18 @@ void WebServer::run() {
         <input type="password" id="qrz-pass" placeholder="(unchanged if blank)">
         <span class="pw-toggle" onclick="togglePW('qrz-pass')">👁</span>
       </div>
+      <label>LoTW Callsign</label>
+      <input type="text" id="lotw-call">
+      <label>LoTW Password</label>
+      <div class="pw-wrap" style="margin-bottom:10px">
+        <input type="password" id="lotw-pass" placeholder="(unchanged if blank)">
+        <span class="pw-toggle" onclick="togglePW('lotw-pass')">👁</span>
+      </div>
+      <label>Clublog API Key</label>
+      <div class="pw-wrap" style="margin-bottom:10px">
+        <input type="password" id="clublog-key">
+        <span class="pw-toggle" onclick="togglePW('clublog-key')">👁</span>
+      </div>
       <label>RepeaterBook Key</label>
       <div class="pw-wrap" style="margin-bottom:10px">
         <input type="password" id="rb-key">
@@ -466,7 +511,7 @@ void WebServer::run() {
     </div>
     <div class="card">
       <div class="section-hdr">Toggles</div>
-      <label><input type="checkbox" id="gps-enabled"> GPS Auto-Location</label>
+      <label><input type="checkbox" id="gps-enabled-serv"> GPS Auto-Location</label>
       <label><input type="checkbox" id="rss-enabled"> RSS News Banner</label>
       <label>POTA/SOTA Filter</label>
       <select id="onta-filter">
@@ -476,6 +521,8 @@ void WebServer::run() {
       </select>
       <label>Max Distance (km)</label>
       <input type="number" id="onta-max-dist" min="0" max="20000">
+      <label>K-Index Alert Threshold</label>
+      <input type="number" id="k-index-threshold" step="0.1" min="0" max="9">
       <button onclick="saveServices()">Save</button>
       <div id="services-msg"></div>
     </div>
@@ -674,6 +721,14 @@ void WebServer::run() {
     </div>
 
     <div class="card">
+      <div class="section-hdr">Countdown Timer</div>
+      <label>Event Label</label>
+      <input type="text" id="countdown-label" placeholder="e.g. Field Day">
+      <label>Target Date/Time (UTC)</label>
+      <input type="text" id="countdown-time" placeholder="YYYY-MM-DD HH:MM">
+    </div>
+
+    <div class="card">
       <button onclick="saveWidgetConfig()">Save Widget Config</button>
       <div id="wcfg-msg"></div>
     </div>
@@ -752,16 +807,40 @@ void WebServer::run() {
         const r = await fetch('/api/config');
         const c = await r.json();
         document.getElementById('call').value = c.callsign || '';
+        document.getElementById('call-frn').value = c.callsignFrn || '';
         document.getElementById('grid').value = c.grid || '';
         document.getElementById('lat').value = (c.lat !== undefined) ? c.lat : '';
         document.getElementById('lon').value = (c.lon !== undefined) ? c.lon : '';
+        document.getElementById('gps-enabled').checked = !!c.gpsEnabled;
         document.getElementById('audio-muted').checked = !!c.audioMuted;
+        const vol = c.audioVolume !== undefined ? c.audioVolume : 100;
+        document.getElementById('audio-volume').value = vol;
+        document.getElementById('vol-pct').textContent = vol;
+        
+        const tzOff = c.defaultTzOffset !== undefined ? c.defaultTzOffset : 0;
+        const tzLbl = c.defaultTzLabel || 'UTC';
+        const tzPresets = [{v:999,l:'Local'},{v:0,l:'UTC'},{v:-5,l:'EST'},
+                           {v:-6,l:'CST'},{v:-7,l:'MST'},{v:-8,l:'PST'},
+                           {v:1,l:'CET'},{v:9,l:'JST'},{v:10,l:'AEST'}];
+        const match = tzPresets.find(p => p.v === tzOff && p.l === tzLbl);
+        document.getElementById('default-tz-preset').value = match ? (tzOff+'|'+tzLbl) : 'custom|custom';
+        if (!match) {
+          document.getElementById('default-tz-offset').value = tzOff;
+          document.getElementById('default-tz-label').value  = tzLbl;
+        }
+        toggleDefaultTzCustom();
+
         document.getElementById('call-fg').value = c.callsignColor || '#ffffff';
         document.getElementById('call-bg').value = c.callsignBgColor || '#000000';
         if (c.installType !== 'WASM') {
           document.getElementById('cors-proxy-card').style.display = 'none';
         }
       } catch(e) { setMsg('Failed to load config: ' + e, true); }
+    }
+
+    function toggleDefaultTzCustom() {
+      const v = document.getElementById('default-tz-preset').value;
+      document.getElementById('default-tz-custom-fields').style.display = v.startsWith('custom') ? 'block' : 'none';
     }
 
     async function loadFonts(selectedPath) {
@@ -896,16 +975,32 @@ void WebServer::run() {
 
     async function saveConfig() {
       const call = document.getElementById('call').value.trim();
+      const callFrn = document.getElementById('call-frn').value.trim();
       const grid = document.getElementById('grid').value.trim();
       const lat  = document.getElementById('lat').value;
       const lon  = document.getElementById('lon').value;
+      const gpsEnabled = document.getElementById('gps-enabled').checked ? '1' : '0';
       const audioMuted = document.getElementById('audio-muted').checked ? '1' : '0';
+      const audioVolume = document.getElementById('audio-volume').value;
       const callFg = document.getElementById('call-fg').value;
       const callBg = document.getElementById('call-bg').value;
       const params = new URLSearchParams({
-        call, grid, lat, lon, audio_muted: audioMuted,
+        call, callsign_frn: callFrn, grid, lat, lon, 
+        gps_enabled: gpsEnabled, audio_muted: audioMuted,
+        audio_volume: audioVolume,
         callsign_color: callFg, callsign_bg_color: callBg
       });
+
+      const tzPreset = document.getElementById('default-tz-preset').value;
+      if (tzPreset.startsWith('custom')) {
+        params.set('default_tz_offset', document.getElementById('default-tz-offset').value);
+        params.set('default_tz_label', document.getElementById('default-tz-label').value || 'UTC');
+      } else {
+        const parts = tzPreset.split('|');
+        params.set('default_tz_offset', parts[0]);
+        params.set('default_tz_label', parts[1]);
+      }
+
       try {
         const r = await fetch('/set_config?' + params);
         const t = await r.text();
@@ -1033,6 +1128,8 @@ void WebServer::run() {
         const c = await r.json();
         document.getElementById('dx-enabled').checked = !!c.dxClusterEnabled;
         document.getElementById('rbn-enabled').checked = !!c.rbnEnabled;
+        document.getElementById('dx-hide-dup').checked = !!c.dxClusterHideDuplicates;
+        document.getElementById('dx-max-age').value = c.dxClusterMaxAgeMinutes || 20;
         document.getElementById('dx-host').value = c.dxClusterHost || '';
         document.getElementById('dx-port').value = c.dxClusterPort || 7300;
         document.getElementById('dx-login').value = c.dxClusterLogin || '';
@@ -1045,6 +1142,8 @@ void WebServer::run() {
       const params = new URLSearchParams({
         dx_enabled: document.getElementById('dx-enabled').checked ? '1' : '0',
         rbn_enabled: document.getElementById('rbn-enabled').checked ? '1' : '0',
+        dx_hide_duplicates: document.getElementById('dx-hide-dup').checked ? '1' : '0',
+        dx_max_age: document.getElementById('dx-max-age').value,
         dx_host: document.getElementById('dx-host').value.trim(),
         dx_port: document.getElementById('dx-port').value,
         dx_login: document.getElementById('dx-login').value.trim(),
@@ -1092,6 +1191,8 @@ void WebServer::run() {
         const r = await fetch('/api/config');
         const c = await r.json();
         document.getElementById('qrz-user').value = c.qrzUsername || '';
+        document.getElementById('lotw-call').value = c.lotwCall || '';
+        document.getElementById('clublog-key').value = c.clublogApiKey || '';
         document.getElementById('rb-key').value = c.repeaterBookKey || '';
         document.getElementById('wl-key').value = c.winlinkKey || '';
         document.getElementById('spot-source').value = c.liveSpotSource || 'PSK';
@@ -1100,10 +1201,11 @@ void WebServer::run() {
         document.querySelectorAll('#band-chips .chip').forEach((ch, i) => {
           ch.classList.toggle('active', !!(bitmask & (1 << i)));
         });
-        document.getElementById('gps-enabled').checked = !!c.gpsEnabled;
+        document.getElementById('gps-enabled-serv').checked = !!c.gpsEnabled;
         document.getElementById('rss-enabled').checked = !!c.rssEnabled;
         document.getElementById('onta-filter').value = c.ontaFilter || 'all';
         document.getElementById('onta-max-dist').value = c.ontaMaxDistKm || 0;
+        document.getElementById('k-index-threshold').value = c.kIndexAlertThreshold || 4.0;
         document.getElementById('spots-of-de').checked = !!c.liveSpotsOfDe;
         document.getElementById('spots-use-call').checked = !!c.liveSpotsUseCall;
       } catch(e) {}
@@ -1116,20 +1218,25 @@ void WebServer::run() {
       });
       const params = new URLSearchParams({
         qrz_user: document.getElementById('qrz-user').value.trim(),
+        lotw_call: document.getElementById('lotw-call').value.trim(),
+        clublog_api_key: document.getElementById('clublog-key').value.trim(),
         rb_key: document.getElementById('rb-key').value.trim(),
         wl_key: document.getElementById('wl-key').value.trim(),
         spot_source: document.getElementById('spot-source').value,
         spot_max_age: document.getElementById('spot-age').value,
         spot_bands: bitmask,
-        gps_enabled: document.getElementById('gps-enabled').checked ? '1' : '0',
+        gps_enabled: document.getElementById('gps-enabled-serv').checked ? '1' : '0',
         rss_enabled: document.getElementById('rss-enabled').checked ? '1' : '0',
         onta_filter: document.getElementById('onta-filter').value,
         onta_max_dist: document.getElementById('onta-max-dist').value,
+        k_index_threshold: document.getElementById('k-index-threshold').value,
         live_spots_of_de: document.getElementById('spots-of-de').checked ? '1' : '0',
         live_spots_use_call: document.getElementById('spots-use-call').checked ? '1' : '0'
       });
-      const pass = document.getElementById('qrz-pass').value;
-      if (pass) params.set('qrz_pass', pass);
+      const qrzPass = document.getElementById('qrz-pass').value;
+      if (qrzPass) params.set('qrz_pass', qrzPass);
+      const lotwPass = document.getElementById('lotw-pass').value;
+      if (lotwPass) params.set('lotw_pass', lotwPass);
       try {
         const r = await fetch('/set_config?' + params);
         showTabMsg('services-msg', await r.text() === 'ok');
@@ -1286,6 +1393,10 @@ void WebServer::run() {
         document.getElementById('ltr329-auto-dim').checked = !!c.ltr329AutoDim;
         document.getElementById('prevent-sleep').checked = !!c.preventSleep;
 
+        // Countdown
+        document.getElementById('countdown-label').value = c.countdownLabel || '';
+        document.getElementById('countdown-time').value = c.countdownTime || '';
+
       } catch(e) {}
     }
 
@@ -1363,7 +1474,9 @@ void WebServer::run() {
         idle_minutes: document.getElementById('idle-minutes').value,
         ltr329_auto_dim: document.getElementById('ltr329-auto-dim').checked ? '1' : '0',
         prevent_sleep: document.getElementById('prevent-sleep').checked ? '1' : '0',
-        aux_star_mode: document.getElementById('aux-star-mode').value
+        aux_star_mode: document.getElementById('aux-star-mode').value,
+        countdown_label: document.getElementById('countdown-label').value.trim(),
+        countdown_time: document.getElementById('countdown-time').value.trim()
       });
 
       const auxPreset = document.getElementById('aux-tz-preset').value;

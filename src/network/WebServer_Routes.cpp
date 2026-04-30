@@ -530,6 +530,18 @@ void WebServer::registerRoutes(httplib::Server &svr) {
     j["rssUrl"] = cfg_->rssUrl;
     j["brightness"] = cfg_->brightness;
     j["brightnessSchedule"] = cfg_->brightnessSchedule;
+    j["audioVolume"] = cfg_->audioVolume;
+    j["callsignFrn"] = cfg_->callsignFrn;
+    j["dxClusterHideDuplicates"] = cfg_->dxClusterHideDuplicates;
+    j["dxClusterMaxAgeMinutes"] = cfg_->dxClusterMaxAgeMinutes;
+    j["lotwCall"] = cfg_->lotwCall;
+    j["lotwPassword"] = cfg_->lotwPassword;
+    j["clublogApiKey"] = cfg_->clublogApiKey;
+    j["kIndexAlertThreshold"] = cfg_->kIndexAlertThreshold;
+    j["defaultTzOffset"] = cfg_->defaultTzOffset;
+    j["defaultTzLabel"] = cfg_->defaultTzLabel;
+    j["countdownLabel"] = cfg_->countdownLabel;
+    j["countdownTime"] = cfg_->countdownTime;
     j["dimHour"] = cfg_->dimHour;
     j["dimMinute"] = cfg_->dimMinute;
     j["brightHour"] = cfg_->brightHour;
@@ -829,6 +841,30 @@ void WebServer::registerRoutes(httplib::Server &svr) {
           StringUtils::safe_stoi(req.get_param_value("rotation_interval"));
     if (req.has_param("sync_rotation"))
       cfg_->syncRotation = req.get_param_value("sync_rotation") == "1";
+    if (req.has_param("audio_volume"))
+      cfg_->audioVolume = StringUtils::safe_stoi(req.get_param_value("audio_volume"));
+    if (req.has_param("callsign_frn"))
+      cfg_->callsignFrn = req.get_param_value("callsign_frn");
+    if (req.has_param("dx_hide_duplicates"))
+      cfg_->dxClusterHideDuplicates = req.get_param_value("dx_hide_duplicates") == "1";
+    if (req.has_param("dx_max_age"))
+      cfg_->dxClusterMaxAgeMinutes = StringUtils::safe_stoi(req.get_param_value("dx_max_age"));
+    if (req.has_param("lotw_call"))
+      cfg_->lotwCall = req.get_param_value("lotw_call");
+    if (req.has_param("lotw_pass"))
+      cfg_->lotwPassword = req.get_param_value("lotw_pass");
+    if (req.has_param("clublog_api_key"))
+      cfg_->clublogApiKey = req.get_param_value("clublog_api_key");
+    if (req.has_param("k_index_threshold"))
+      cfg_->kIndexAlertThreshold = (float)StringUtils::safe_stod(req.get_param_value("k_index_threshold"));
+    if (req.has_param("default_tz_offset"))
+      cfg_->defaultTzOffset = StringUtils::safe_stoi(req.get_param_value("default_tz_offset"));
+    if (req.has_param("default_tz_label"))
+      cfg_->defaultTzLabel = req.get_param_value("default_tz_label");
+    if (req.has_param("countdown_label"))
+      cfg_->countdownLabel = req.get_param_value("countdown_label");
+    if (req.has_param("countdown_time"))
+      cfg_->countdownTime = req.get_param_value("countdown_time");
 
     if (req.has_param("watchlist")) {
       std::string w = req.get_param_value("watchlist");

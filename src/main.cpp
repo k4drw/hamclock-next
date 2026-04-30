@@ -317,6 +317,8 @@ int main(int argc, char *argv[]) {
       forceSoftware = true;
     } else if (arg == "--live-web") {
       forceLiveWeb = true;
+    } else if (arg == "--show-cache-stats") {
+      ctx.appCfg.showCacheStats = true;
     } else if (arg == "--no-audio") {
       SoundManager::getInstance().disable();
     } else if (arg == "--log-level" && i + 1 < argc) {

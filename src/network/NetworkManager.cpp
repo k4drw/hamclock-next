@@ -152,6 +152,10 @@ void NetworkManager::fetchAsync(const std::string &url,
     if (now - cached.timestamp < cacheAgeSeconds) {
       if (!cached.data.empty()) {
         LOG_T("NetworkManager", "Memory cache hit for {}", url);
+        {
+          std::lock_guard<std::mutex> lock(cacheMutex_);
+          updateLruAndPrune(url, cached.data.size());
+        }
         callback(cached.data);
         return;
       } else {
@@ -209,6 +213,7 @@ void NetworkManager::fetchAsync(const std::string &url,
     } else {
       // Cache entry is stale — erase it so only active data stays in RAM
       std::lock_guard<std::mutex> lock(cacheMutex_);
+      removeFromLru(url);
       cache_.erase(url);
     }
   }
@@ -318,10 +323,20 @@ void NetworkManager::fetchAsync(const std::string &url,
           {
             CacheEntry entry;
             entry.timestamp = std::time(nullptr);
-            if (body.size() < 512 * 1024)
-              entry.data = body;
+            
+            bool isLarge = body.size() > 512 * 1024;
+            bool isImage = url.find(".jpg") != std::string::npos ||
+                           url.find(".png") != std::string::npos ||
+                           url.find("image") != std::string::npos;
 
             std::lock_guard<std::mutex> lock(cacheMutex_);
+            if (!isLarge && !isImage) {
+              entry.data = body;
+              updateLruAndPrune(url, body.size());
+            } else {
+              removeFromLru(url);
+            }
+
             cache_[url] = entry;
             if (!cacheDir_.empty())
               saveToDisk(url, entry, body);
@@ -507,12 +522,20 @@ void NetworkManager::fetchDirect(const std::string &url,
       entry.etag = headers.at("etag");
 
     bool isLarge = response.size() > 512 * 1024;
-    if (!isLarge) {
+    bool isImage = url.find(".jpg") != std::string::npos ||
+                   url.find(".png") != std::string::npos ||
+                   url.find("image") != std::string::npos ||
+                   (headers.count("content-type") &&
+                    headers.at("content-type").find("image/") != std::string::npos);
+
+    if (!isLarge && !isImage) {
       entry.data = response;
+      updateLruAndPrune(url, response.size());
     } else {
       LOG_D("NetworkManager",
-            "Data for {} is large ({:.1f} MB), skipping RAM cache", url,
-            response.size() / 1024.0 / 1024.0);
+            "Data for {} is {} ({:.1f} MB), skipping RAM cache", url,
+            isLarge ? "large" : "an image", response.size() / 1024.0 / 1024.0);
+      removeFromLru(url);
     }
 
     cache_[url] = entry;
@@ -801,3 +824,65 @@ std::string NetworkManager::getLocalIP() {
   return result;
 #endif
 }
+
+void NetworkManager::updateLruAndPrune(const std::string &url, size_t dataSize) {
+  // Caller must hold cacheMutex_
+  removeFromLru(url);
+
+  lru_.push_front(url);
+  totalRamBytes_ += dataSize;
+
+  while (totalRamBytes_ > MAX_RAM_BYTES && !lru_.empty()) {
+    std::string oldest = lru_.back();
+    auto it = cache_.find(oldest);
+    if (it != cache_.end()) {
+      if (!it->second.data.empty()) {
+        totalRamBytes_ -= it->second.data.size();
+        it->second.data.clear();
+        LOG_D("NetworkManager", "LRU: Evicted payload for {} to save RAM", oldest);
+      }
+    }
+    lru_.pop_back();
+  }
+}
+
+void NetworkManager::removeFromLru(const std::string &url) {
+  // Caller must hold cacheMutex_
+  auto it = std::find(lru_.begin(), lru_.end(), url);
+  if (it != lru_.end()) {
+    auto cit = cache_.find(url);
+    if (cit != cache_.end()) {
+      totalRamBytes_ -= cit->second.data.size();
+    }
+    lru_.erase(it);
+  }
+}
+
+void NetworkManager::pruneStaleCache(int maxAgeSeconds) {
+  std::lock_guard<std::mutex> lock(cacheMutex_);
+  std::time_t now = std::time(nullptr);
+  int count = 0;
+  for (auto it = cache_.begin(); it != cache_.end();) {
+    if (now - it->second.timestamp > maxAgeSeconds) {
+      if (!cacheDir_.empty()) {
+        std::error_code ec;
+        std::filesystem::remove(cacheDir_ / hashUrl(it->first), ec);
+      }
+      if (!it->second.data.empty()) {
+        totalRamBytes_ -= it->second.data.size();
+        auto lruIt = std::find(lru_.begin(), lru_.end(), it->first);
+        if (lruIt != lru_.end())
+          lru_.erase(lruIt);
+      }
+      it = cache_.erase(it);
+      count++;
+    } else {
+      ++it;
+    }
+  }
+  if (count > 0) {
+    LOG_I("NetworkManager", "Pruned {} stale cache entries from memory and disk",
+          count);
+  }
+}
+

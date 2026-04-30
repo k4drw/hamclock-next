@@ -262,6 +262,7 @@ struct AppConfig {
   HubMode hubMode = HubMode::Off;
   std::string hubIp = "";
   int hubPort = 8080;
+  bool showCacheStats = false; // Debugging: show NetworkManager stats in SysInfoPanel
 
   // Network (WASM)
   // CORS proxy prefix prepended to all external URLs in the WASM build.

@@ -7,6 +7,7 @@
 #include <ctime>
 #include <filesystem>
 #include <functional>
+#include <list>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -101,6 +102,14 @@ private:
   void fetchDirect(const std::string &url,
                    std::function<void(std::string)> callback,
                    bool hasCache, const CacheEntry &cached);
+
+  // LRU and RAM cache management
+  void updateLruAndPrune(const std::string &url, size_t dataSize);
+  void removeFromLru(const std::string &url);
+  std::list<std::string> lru_;
+  size_t totalRamBytes_ = 0;
+  const size_t MAX_RAM_BYTES = 5 * 1024 * 1024; // 5 MB RAM cap
+
 #ifdef __ANDROID__
   // Concatenates Android's per-file system CA store into a single PEM bundle
   // that mbedTLS can use via CURLOPT_CAINFO. Called once from the constructor.
@@ -111,6 +120,13 @@ private:
 public:
   // Get the server-reported last modified time for a cached URL
   std::time_t getCacheServerTime(const std::string &url);
+
+  // Periodic cleanup of entries older than maxAgeSeconds
+  void pruneStaleCache(int maxAgeSeconds = 86400);
+
+  // Cache stats for debugging
+  size_t getCacheRamBytes() const { return totalRamBytes_; }
+  size_t getCacheItemCount() const { return cache_.size(); }
 
   // Get the local IPv4 address (excluding loopback).
   static std::string getLocalIP();

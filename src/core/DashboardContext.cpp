@@ -2603,6 +2603,13 @@ void DashboardContext::update(AppContext &ctx) {
     lastMemLogMs = now;
   }
 
+  // 10-minute network cache prune — helps prevent disk and RAM bloat from time-stamped URLs (SDO/Moon)
+  if (now - lastPruneMs_ > 10 * 60 * 1000) {
+    if (ctx.netManager)
+      ctx.netManager->pruneStaleCache();
+    lastPruneMs_ = now;
+  }
+
   if (isPowerOn) {
     for (auto *w : widgets)
       w->update();
