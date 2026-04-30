@@ -63,7 +63,7 @@ void SetupScreen::renderTabServices(SDL_Renderer *renderer, int cx, int pad,
     std::string passMask(lotwPasswordInput_.getValue().length(), '*');
     TextInput tmpPwd;
     tmpPwd.setValue(passMask);
-    if (activeField_ == 5) {
+    if (activeField_ == 3) {
       tmpPwd.setCursorPos(lotwPasswordInput_.getCursorPos());
       tmpPwd.setSelectionAnchor(lotwPasswordInput_.getSelectionAnchor());
     }

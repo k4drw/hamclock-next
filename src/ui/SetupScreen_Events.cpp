@@ -782,7 +782,7 @@ bool SetupScreen::onKeyDown(SDL_Keycode key, Uint16 mod) {
   if (activeTab_ == Tab::Identity) {
     nFields = 4;
   } else if (activeTab_ == Tab::Spotting) {
-    nFields = clusterWSJTX_ ? 4 : 3;
+    nFields = 5;
   } else if (activeTab_ == Tab::Appearance) {
     nFields = 2; // 0=dimTime, 1=brightTime
   } else if (activeTab_ == Tab::Services) {

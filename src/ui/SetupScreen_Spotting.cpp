@@ -9,7 +9,7 @@ void SetupScreen::renderTabDXCluster(SDL_Renderer *renderer, int cx, int pad,
   auto *cat = fontMgr_.catalog();
   int y =
       (modalRect_.y + cat->ptSize(FontStyle::MediumBold) + 2 * pad + fieldH);
-  int vSpace = 5;
+  int vSpace = 2;
   ThemeColors themes = getThemeColors(theme_, colorOverrides_);
 
   // --- DX CLUSTER SECTION ---
@@ -63,7 +63,7 @@ void SetupScreen::renderTabDXCluster(SDL_Renderer *renderer, int cx, int pad,
   cat->drawText(renderer, "Enable DX Cluster", fieldX + 30, y + 10, themes.text,
                 FontStyle::SmallRegular, false, false, true);
 
-  y += 24;
+  y += 20;
 
   int wsjtxLabelW = fontMgr_.getLogicalWidth("Use WSJT-X (UDP)", cat->ptSize(FontStyle::SmallRegular));
   toggleRect_ = {fieldX, y, 30 + wsjtxLabelW, 20};
@@ -91,7 +91,7 @@ void SetupScreen::renderTabDXCluster(SDL_Renderer *renderer, int cx, int pad,
   } else {
     wsjtxPortRect_ = {0, 0, 0, 0};
   }
-  y += 24;
+  y += 20;
 
   int dupeLabelW = fontMgr_.getLogicalWidth("Hide duplicates (one per call/band)", cat->ptSize(FontStyle::SmallRegular));
   clusterHideDuplicatesRect_ = {fieldX, y, 30 + dupeLabelW, 20};
@@ -107,7 +107,7 @@ void SetupScreen::renderTabDXCluster(SDL_Renderer *renderer, int cx, int pad,
   }
   cat->drawText(renderer, "Hide duplicates (one per call/band)", fieldX + 30, y + 10, themes.text,
                 FontStyle::SmallRegular, false, false, true);
-  y += 28;
+  y += 22;
 
   // Age filter row
   cat->drawText(renderer, "Max age:", fieldX, y + 4, themes.text, FontStyle::SmallRegular);
@@ -134,7 +134,7 @@ void SetupScreen::renderTabDXCluster(SDL_Renderer *renderer, int cx, int pad,
     cat->drawText(renderer, lbl, cx_r + ageR + 3, y + 2, rc, FontStyle::SmallRegular);
     clusterAgeRects_[i] = {cx_r - ageR, cy_r - ageR, ageR * 2 + 3 + lblW, ageR * 2};
   }
-  y += 26;
+  y += 22;
 
   // --- RBN SECTION ---
   cat->drawText(renderer, "--- Reverse Beacon Network ---", cx, y, themes.accent,
@@ -155,12 +155,12 @@ void SetupScreen::renderTabDXCluster(SDL_Renderer *renderer, int cx, int pad,
   }
   cat->drawText(renderer, "Enable RBN (feeds DX Cluster panel)", fieldX + 30,
                 y + 10, themes.text, FontStyle::SmallRegular, false, false, true);
-  y += 32;
+  y += 24;
 
   // --- DX ENHANCEMENTS SECTION ---
   cat->drawText(renderer, "--- DX Enhancements ---", cx, y, themes.accent,
                 FontStyle::SmallBold, true);
-  y += cat->ptSize(FontStyle::SmallBold) + vSpace + 4;
+  y += cat->ptSize(FontStyle::SmallBold) + vSpace;
 
   cat->drawText(renderer, "K-Index Alert Threshold:", fieldX, y + 10,
                 themes.text, FontStyle::SmallRegular);

@@ -332,11 +332,6 @@ void SetupScreen::render(SDL_Renderer *renderer) {
                 themes.bg, FontStyle::SmallRegular, true, false, true);
   okBtnRect_ = okBtn;
 
-  if (!liveWebUrl_.empty()) {
-    int urlY = y - 24;
-    cat->drawText(renderer, liveWebUrl_.c_str(), cx, urlY, themes.accent,
-                  FontStyle::SmallBold, true, false, true);
-  }
 
 #ifndef __EMSCRIPTEN__
   renderFontModal(renderer);
