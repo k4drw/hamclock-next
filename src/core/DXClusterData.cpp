@@ -111,6 +111,7 @@ void DXClusterDataStore::addSpot(const DXClusterSpot &spot) {
 
     // 3. Atomically swap the main pointer
     data_ = newData;
+    version_++;
   }
 
   // Persist to DB (outside the lock)
@@ -151,6 +152,7 @@ void DXClusterDataStore::setConnected(bool connected,
   newData->statusMsg = status;
   newData->lastUpdate = std::chrono::system_clock::now();
   data_ = newData;
+  version_++;
 }
 
 void DXClusterDataStore::clear() {
@@ -159,6 +161,7 @@ void DXClusterDataStore::clear() {
   newData->spots.clear();
   newData->lastUpdate = std::chrono::system_clock::now();
   data_ = newData;
+  version_++;
   DatabaseManager::instance().exec("DELETE FROM dx_spots");
 }
 
@@ -179,8 +182,10 @@ void DXClusterDataStore::pruneInMemory() {
                        return (now - s.spottedAt) > maxAge;
                      }),
       newData->spots.end());
-  if (newData->spots.size() != before)
+  if (newData->spots.size() != before) {
     data_ = newData;
+    version_++;
+  }
 }
 
 void DXClusterDataStore::pruneOldSpots() {
@@ -204,6 +209,7 @@ void DXClusterDataStore::setSpots(const std::vector<DXClusterSpot> &spots) {
   newData->spots = spots;
   newData->lastUpdate = std::chrono::system_clock::now();
   data_ = newData;
+  version_++;
 }
 
 void DXClusterDataStore::selectSpot(const DXClusterSpot &spot) {
@@ -212,6 +218,7 @@ void DXClusterDataStore::selectSpot(const DXClusterSpot &spot) {
   newData->hasSelection = true;
   newData->selectedSpot = spot;
   data_ = newData;
+  version_++;
 }
 
 void DXClusterDataStore::clearSelection() {
@@ -219,6 +226,7 @@ void DXClusterDataStore::clearSelection() {
   auto newData = std::make_shared<DXClusterData>(*data_);
   newData->hasSelection = false;
   data_ = newData;
+  version_++;
 }
 
 void DXClusterDataStore::setWatchedCall(const std::string &call) {
@@ -227,6 +235,7 @@ void DXClusterDataStore::setWatchedCall(const std::string &call) {
   newData->watchedCall = call;
   newData->watchedSpotted = false;
   data_ = newData;
+  version_++;
 }
 
 void DXClusterDataStore::setWatchedSpotted(std::chrono::steady_clock::time_point when) {
@@ -235,6 +244,7 @@ void DXClusterDataStore::setWatchedSpotted(std::chrono::steady_clock::time_point
   newData->watchedSpotted = true;
   newData->watchedSpottedAt = when;
   data_ = newData;
+  version_++;
 }
 
 void DXClusterDataStore::clearWatchedSpotted() {
@@ -242,4 +252,5 @@ void DXClusterDataStore::clearWatchedSpotted() {
   auto newData = std::make_shared<DXClusterData>(*data_);
   newData->watchedSpotted = false;
   data_ = newData;
+  version_++;
 }

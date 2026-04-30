@@ -40,11 +40,11 @@ void DXPedPanel::update() {
   }
 
   auto data = store_->get();
-  if (data.lastUpdated != lastUpdate_) {
+  if (data->lastUpdated != lastUpdate_) {
     allRows_.clear();
     allPeds_.clear();
     auto now = std::chrono::system_clock::now();
-    for (const auto &de : data.dxpeds) {
+    for (const auto &de : data->dxpeds) {
       if (now >= de.startTime && now <= de.endTime) {
         std::stringstream ss;
         ss << de.call << '\t' << de.location;
@@ -52,7 +52,7 @@ void DXPedPanel::update() {
         allPeds_.push_back(de);
       }
     }
-    if (allRows_.empty() && data.valid) {
+    if (allRows_.empty() && data->valid) {
       allRows_.push_back("No active expeditions");
     }
     // Clamp scroll and rebuild visible slice
@@ -78,7 +78,7 @@ void DXPedPanel::update() {
       }
     }
     setHighlightedIndex(hi);
-    lastUpdate_ = data.lastUpdated;
+    lastUpdate_ = data->lastUpdated;
   }
 }
 
@@ -333,17 +333,17 @@ void ONTAPanel::update() {
   }
 
   auto data = store_->get();
-  if (data.lastUpdated != lastUpdate_) {
-    rebuildRows(data);
-    lastUpdate_ = data.lastUpdated;
+  if (data->lastUpdated != lastUpdate_) {
+    rebuildRows(*data);
+    lastUpdate_ = data->lastUpdated;
   }
 
   // Update highlight from selection
-  if (data.hasSelection) {
+  if (data->hasSelection) {
     int foundIdx = -1;
     for (size_t i = 0; i < currentSpots_.size(); ++i) {
-      if (currentSpots_[i].call == data.selectedSpot.call &&
-          currentSpots_[i].ref == data.selectedSpot.ref) {
+      if (currentSpots_[i].call == data->selectedSpot.call &&
+          currentSpots_[i].ref == data->selectedSpot.ref) {
         foundIdx = static_cast<int>(i);
         break;
       }
@@ -551,14 +551,15 @@ bool ONTAPanel::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
 
     // Clear selection if it no longer matches the new filter
     auto data = store_->get();
-    if (data.hasSelection) {
-      std::string lowerProg = StringUtils::toLower(data.selectedSpot.program);
+    if (data->hasSelection) {
+      std::string lowerProg = StringUtils::toLower(data->selectedSpot.program);
       bool match = (filter_ == Filter::ALL) ||
                    (filter_ == Filter::POTA && lowerProg == "pota") ||
                    (filter_ == Filter::SOTA && lowerProg == "sota");
       if (!match) {
-        data.hasSelection = false;
-        store_->set(data);
+        ActivityData newData = *data;
+        newData.hasSelection = false;
+        store_->set(newData);
       }
     }
 
@@ -606,19 +607,20 @@ bool ONTAPanel::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
       if (idx < currentSpots_.size()) {
         auto data = store_->get();
         const auto &clicked = currentSpots_[idx];
-        bool isSame = data.hasSelection &&
-                      data.selectedSpot.call == clicked.call &&
-                      data.selectedSpot.ref == clicked.ref;
+        ActivityData newData = *data;
+        bool isSame = data->hasSelection &&
+                      data->selectedSpot.call == clicked.call &&
+                      data->selectedSpot.ref == clicked.ref;
         if (isSame) {
-          data.hasSelection = false;
-          store_->set(data);
+          newData.hasSelection = false;
+          store_->set(newData);
           setHighlightedIndex(-1);
           if (onSpotDeactivated_)
             onSpotDeactivated_();
         } else {
-          data.hasSelection = true;
-          data.selectedSpot = clicked;
-          store_->set(data);
+          newData.hasSelection = true;
+          newData.selectedSpot = clicked;
+          store_->set(newData);
           setHighlightedIndex(static_cast<int>(idx));
           if (onSpotActivated_)
             onSpotActivated_(clicked);
@@ -778,9 +780,10 @@ bool ONTAPanel::handleSetupClick(int mx, int my) {
     }
     if (needRebuild) {
       auto data = store_->get();
-      data.hasSelection = false;
-      store_->set(data);
-      rebuildRows(data);
+      ActivityData newData = *data;
+      newData.hasSelection = false;
+      store_->set(newData);
+      rebuildRows(newData);
     }
     if (filterChanged && onFilterChanged_) {
       std::string fstr;

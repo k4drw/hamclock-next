@@ -2030,9 +2030,9 @@ void WebServer::registerRoutes(httplib::Server &svr) {
               res.status = 503;
               return;
             }
-            ActivityData ad = activityStore_->get();
+            auto ad = activityStore_->get();
             std::ostringstream oss;
-            for (const auto &s : ad.ontaSpots)
+            for (const auto &s : ad->ontaSpots)
               oss << std::left << std::setw(12) << s.call << std::setw(8)
                   << s.program << std::setw(10) << s.ref << s.freqKhz << "\n";
             res.set_content(oss.str(), "text/plain");
@@ -2045,9 +2045,9 @@ void WebServer::registerRoutes(httplib::Server &svr) {
               res.status = 503;
               return;
             }
-            ActivityData ad = activityStore_->get();
+            auto ad = activityStore_->get();
             std::ostringstream oss;
-            for (const auto &d : ad.dxpeds)
+            for (const auto &d : ad->dxpeds)
               oss << std::left << std::setw(12) << d.call << d.location << "\n";
             res.set_content(oss.str(), "text/plain");
           });

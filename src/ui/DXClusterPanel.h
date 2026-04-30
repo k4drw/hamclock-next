@@ -68,7 +68,9 @@ private:
   std::shared_ptr<LoTWActivityStore> lotwStore_;
   RigService *rigService_;
   const AppConfig *config_;
-  std::chrono::system_clock::time_point lastUpdate_{};
+  uint32_t lastVer_ = 0;
+  std::chrono::system_clock::time_point lastUpdate_;
+
   std::vector<std::string> allRows_;
   std::vector<double> allFreqs_;
   std::vector<double> visibleFreqs_;

@@ -103,6 +103,12 @@ void DXClusterPanel::clearSpotCache() {
 }
 
 void DXClusterPanel::update() {
+  uint32_t ver = store_->getVersion();
+  bool scrollChanged = (scrollOffset_ != lastScrollOffset_);
+  if (ver == lastVer_ && !scrollChanged)
+    return;
+  lastVer_ = ver;
+
   auto data = store_->snapshot();
   bool dataChanged = (data->lastUpdate != lastUpdate_);
 
@@ -112,7 +118,7 @@ void DXClusterPanel::update() {
   }
 
   // Sync scroll offset and visible rows
-  bool scrollChanged = (scrollOffset_ != lastScrollOffset_);
+  scrollChanged = (scrollOffset_ != lastScrollOffset_);
   std::string selectionKey;
   if (data->hasSelection)
     selectionKey = data->selectedSpot.txCall + ":" +

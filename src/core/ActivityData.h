@@ -1,6 +1,8 @@
 #pragma once
 
+#include <atomic>
 #include <chrono>
+#include <memory>
 #include <mutex>
 #include <string>
 #include <vector>
@@ -37,17 +39,23 @@ struct ActivityData {
 
 class ActivityDataStore {
 public:
-  ActivityData get() const {
+  ActivityDataStore() : data_(std::make_shared<ActivityData>()) {}
+
+  std::shared_ptr<const ActivityData> get() const {
     std::lock_guard<std::mutex> lock(mutex_);
     return data_;
   }
 
   void set(const ActivityData &data) {
     std::lock_guard<std::mutex> lock(mutex_);
-    data_ = data;
+    data_ = std::make_shared<ActivityData>(data);
+    version_++;
   }
+
+  uint32_t getVersion() const { return version_.load(std::memory_order_relaxed); }
 
 private:
   mutable std::mutex mutex_;
-  ActivityData data_;
+  std::shared_ptr<ActivityData> data_;
+  std::atomic<uint32_t> version_{0};
 };

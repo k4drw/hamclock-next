@@ -25,6 +25,11 @@ void LiveSpotPanel::update() {
     provider_.fetch();
   }
 
+  uint32_t ver = store_->getVersion();
+  if (ver == lastVer_)
+    return;
+  lastVer_ = ver;
+
   auto data = store_->snapshot();
 
   // Rebuild subtitle if grid changed or source changed

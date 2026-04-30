@@ -130,8 +130,8 @@ void MapWidget::renderGreatCircle(SDL_Renderer *renderer) {
   SDL_Color color = themes.accent;
 
   // Use band color if selected DX is a spot
-  if (state_->dxActive && dxcStore_) {
-    auto data = dxcStore_->snapshot();
+  if (state_->dxActive && currentDxcSnapshot_) {
+    auto data = currentDxcSnapshot_;
     if (data->hasSelection && data->selectedSpot.freqKhz > 0) {
       int bi = freqToBandIndex(data->selectedSpot.freqKhz);
       if (bi >= 0) {
@@ -858,8 +858,8 @@ void MapWidget::renderSpotOverlay(SDL_Renderer *renderer) {
   if (!widgetEnabled)
     return;
 
-  auto data = spotStore_->snapshot();
-  if (!data->valid || data->spots.empty())
+  auto data = currentSpotSnapshot_;
+  if (!data || !data->valid || data->spots.empty())
     return;
 
   bool anySelected = false;
@@ -969,10 +969,8 @@ void MapWidget::renderSpotOverlay(SDL_Renderer *renderer) {
 }
 
 void MapWidget::renderDXClusterSpots(SDL_Renderer *renderer) {
-  if (!dxcStore_)
-    return;
-  auto data = dxcStore_->snapshot();
-  if (data->spots.empty())
+  auto data = currentDxcSnapshot_;
+  if (!data || data->spots.empty())
     return;
 
   SDL_RenderSetClipRect(renderer, &mapRect_);
@@ -1153,11 +1151,11 @@ void MapWidget::renderONTASpots(SDL_Renderer *renderer) {
   if (!activityStore_)
     return;
 
-  ActivityData data = activityStore_->get();
-  if (!data.hasSelection)
+  auto data = activityStore_->get();
+  if (!data->hasSelection)
     return;
 
-  const auto &spot = data.selectedSpot;
+  const auto &spot = data->selectedSpot;
 
   // Sync with active filter
   if (config_.ontaFilter != "all") {
@@ -1170,7 +1168,7 @@ void MapWidget::renderONTASpots(SDL_Renderer *renderer) {
   // try to find updated coords in the live ontaSpots list.
   double spotLat = spot.lat, spotLon = spot.lon;
   if (spotLat == 0.0 && spotLon == 0.0) {
-    for (const auto &s : data.ontaSpots) {
+    for (const auto &s : data->ontaSpots) {
       if (s.call == spot.call && s.ref == spot.ref &&
           (s.lat != 0.0 || s.lon != 0.0)) {
         spotLat = s.lat;
@@ -1491,13 +1489,11 @@ void MapWidget::renderWxMbOverlay(SDL_Renderer *renderer) {
 
   // Poll for new GFS data — rebuild GPU buffers when segments arrive.
   {
-    std::vector<WxSegment> segs;
-    std::vector<WxQuiver> quivers;
     SDL_Surface *fillSurface = nullptr;
     bool zoomChanged = (config_.mapZoom != lastWxZoom_);
     bool panChanged = (config_.mapPanX != lastWxPanX_ || config_.mapPanY != lastWxPanY_);
 
-    if (wxmb_->getSegments(segs, quivers, fillSurface) || zoomChanged || panChanged || wxVerts_.empty()) {
+    if (wxmb_->getSegments(wxSegs_, wxQuivers_, fillSurface) || zoomChanged || panChanged || wxVerts_.empty()) {
       wxVerts_.clear();
       wxIndices_.clear();
       
@@ -1551,7 +1547,7 @@ void MapWidget::renderWxMbOverlay(SDL_Renderer *renderer) {
                                : (float)mapRect_.w * 0.5f;
 
         // --- Isobar contour segments -----------------------------------------
-        for (const auto &seg : segs) {
+        for (const auto &seg : wxSegs_) {
           SDL_FPoint p1 = wxProjectPt(seg.lat1, seg.lon1, pass);
           SDL_FPoint p2 = wxProjectPt(seg.lat2, seg.lon2, pass);
 
@@ -1597,7 +1593,7 @@ void MapWidget::renderWxMbOverlay(SDL_Renderer *renderer) {
         // --- Wind quiver arrows
         // -----------------------------------------------
         SDL_Color arrowColor = {180, 220, 255, 160};
-        for (const auto &q : quivers) {
+        for (const auto &q : wxQuivers_) {
           float speed = std::sqrt(q.u * q.u + q.v * q.v);
           if (speed < 0.5f)
             continue;

@@ -47,6 +47,7 @@ private:
   std::shared_ptr<LiveSpotDataStore> store_;
   AppConfig &config_;
   ConfigManager &cfgMgr_;
+  uint32_t lastVer_ = 0;
 
   // Snapshot of last-rendered data (to detect changes)
   int lastCounts_[kNumBands] = {};

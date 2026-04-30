@@ -1,6 +1,8 @@
 #pragma once
 
+#include <atomic>
 #include <chrono>
+#include <cstdint>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -48,6 +50,10 @@ public:
   ~DXClusterDataStore();
 
   std::shared_ptr<const DXClusterData> snapshot() const;
+
+  // Returns current data version. Incremented on every spot list change.
+  uint32_t getVersion() const { return version_.load(std::memory_order_relaxed); }
+
   void addSpot(const DXClusterSpot &spot);
   void setConnected(bool connected, const std::string &status = "");
   void setMaxAgeMinutes(int minutes);
@@ -75,5 +81,6 @@ private:
 
   mutable std::mutex mutex_;
   std::shared_ptr<DXClusterData> data_;
-  int maxAgeMinutes_ = 20;
+  std::atomic<int32_t> version_{0};
+  int maxAgeMinutes_ = 60;
 };

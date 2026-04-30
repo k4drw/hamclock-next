@@ -336,6 +336,11 @@ DashboardContext::DashboardContext(AppContext &ctx)
   auto &netManager = *ctx.netManager;
   auto &appCfg = ctx.appCfg;
 
+  currentDxcSnapshot_ = dxcStore->snapshot();
+  currentSpotSnapshot_ = spotStore->snapshot();
+  lastDxcVer_ = dxcStore->getVersion();
+  lastSpotVer_ = spotStore->getVersion();
+
   // Returns true if the widget appears in any pane rotation.
   // aurora_graph is always treated as configured: its history store
   // needs continuous sampling even when the pane is off-screen.
@@ -784,7 +789,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
               state->dxGrid = spot.txGrid;
               state->dxFreqKhz = spot.freqKhz;
               state->dxActive = (spot.txLat != 0.0 || spot.txLon != 0.0);
-              auto ad = activityStore->get();
+              ActivityData ad = *activityStore->get();
               ad.hasSelection = false;
               activityStore->set(ad);
               if (appCfg.propOverlay != PropOverlayType::None) {
@@ -1322,6 +1327,20 @@ void DashboardContext::update(AppContext &ctx) {
   // If display is off (software sleep), skip updates and logic
   bool isPowerOn = ctx.displayPower->getPower();
 
+  // 1. Throttle data store snapshots to avoid per-frame deep copies
+  if (isPowerOn) {
+    uint32_t dVer = ctx.dxcStore->getVersion();
+    if (dVer != lastDxcVer_ || !currentDxcSnapshot_) {
+      currentDxcSnapshot_ = ctx.dxcStore->snapshot();
+      lastDxcVer_ = dVer;
+    }
+    uint32_t sVer = ctx.spotStore->getVersion();
+    if (sVer != lastSpotVer_ || !currentSpotSnapshot_) {
+      currentSpotSnapshot_ = ctx.spotStore->snapshot();
+      lastSpotVer_ = sVer;
+    }
+  }
+
   // Background refresh every 15 minutes, but only if power is on
   auto isWidgetActive = [&](const std::string &typeId) {
     for (auto &p : panes) {
@@ -1496,14 +1515,15 @@ void DashboardContext::update(AppContext &ctx) {
 
     // Live Spots
     if ((isMaster || isWidgetActive("live_spots") || appCfg.propOverlay != PropOverlayType::None) &&
-        (!ctx.spotStore->snapshot()->valid || spotProvider->isStale(now, 5 * 60 * 1000)) &&
+        (!currentSpotSnapshot_->valid || spotProvider->isStale(now, 5 * 60 * 1000)) &&
         spotProvider->isStale(now, kCooldown)) {
+
       spotProvider->fetch();
     }
 
     // Activity (POTA/SOTA/DXPeds)
     if ((isMaster || isWidgetActive("on_the_air") || isWidgetActive("dx_peditions") || appCfg.ontaFilter != "Off") &&
-        (!ctx.activityStore->get().valid || activityProvider->isStale(now, 15 * 60 * 1000)) &&
+        (!ctx.activityStore->get()->valid || activityProvider->isStale(now, 15 * 60 * 1000)) &&
         activityProvider->isStale(now, kCooldown)) {
       activityProvider->fetch();
     }
@@ -2136,7 +2156,7 @@ void DashboardContext::update(AppContext &ctx) {
         case AE_ACTIVITY_DATA_READY: {
           auto *update = static_cast<ActivityData *>(event.user.data1);
           if (update && ctx.activityStore) {
-            auto data = ctx.activityStore->get();
+            ActivityData data = *ctx.activityStore->get();
             switch (
                 static_cast<ActivityProvider::UpdateType>(event.user.code)) {
             case ActivityProvider::UpdateType::DXPeds:

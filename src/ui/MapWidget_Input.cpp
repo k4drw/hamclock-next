@@ -179,7 +179,7 @@ bool MapWidget::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
     const SpotRecord *hitSpot = nullptr;
     double hitLat = 0.0, hitLon = 0.0;
     if (spotStore_) {
-      auto data = spotStore_->snapshot();
+      auto data = currentSpotSnapshot_;
       float bestDist = 10.0f;  // matches hover kHitRadius
       for (const auto &spot : data->spots) {
         double rLat, rLon;
@@ -233,8 +233,9 @@ bool MapWidget::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
       dxcStore_->clearSelection();
     if (activityStore_) {
       auto ad = activityStore_->get();
-      ad.hasSelection = false;
-      activityStore_->set(ad);
+      ActivityData newData = *ad;
+      newData.hasSelection = false;
+      activityStore_->set(newData);
     }
   }
 
@@ -463,14 +464,14 @@ void MapWidget::onMouseMove(int mx, int my) {
 
   // 5. Check ONTA selected spot only
   if (tip.empty() && activityStore_) {
-    ActivityData ads = activityStore_->get();
-    if (ads.hasSelection) {
-      const auto &sel = ads.selectedSpot;
+    auto ads = activityStore_->get();
+    if (ads->hasSelection) {
+      const auto &sel = ads->selectedSpot;
       // Resolve lat/lon: use selectedSpot coords, or fall back to ontaSpots
       // list
       double sLat = sel.lat, sLon = sel.lon;
       if (sLat == 0.0 && sLon == 0.0) {
-        for (const auto &s : ads.ontaSpots) {
+        for (const auto &s : ads->ontaSpots) {
           if (s.call == sel.call && s.ref == sel.ref &&
               (s.lat != 0.0 || s.lon != 0.0)) {
             sLat = s.lat;
@@ -585,7 +586,7 @@ void MapWidget::onMouseMove(int mx, int my) {
 
   // 8. Check DX Cluster selected spot only (mirrors renderDXClusterSpots logic)
   if (tip.empty() && dxcStore_) {
-    auto data = dxcStore_->snapshot();
+    auto data = currentDxcSnapshot_;
     if (data->hasSelection && data->selectedSpot.txLat != 0.0) {
       const auto &spot = data->selectedSpot;
       if (screenDist(spot.txLat, spot.txLon) < kHitRadius) {
@@ -603,8 +604,8 @@ void MapWidget::onMouseMove(int mx, int my) {
   }
 
   // 9. Check Live Spots (generic ones on map)
-  if (tip.empty() && spotStore_) {
-    auto data = spotStore_->snapshot();
+  if (tip.empty() && currentSpotSnapshot_) {
+    auto data = currentSpotSnapshot_;
     bool ofDe = config_.liveSpotsOfDe;
     bool useCall = config_.liveSpotsUseCall;
     std::string myLabel = useCall ? config_.callsign : config_.grid;

@@ -524,6 +524,22 @@ void MapWidget::update() {
     mapViewMenu_->update();
   }
 
+  // Throttle data store snapshots to avoid per-frame deep copies
+  if (dxcStore_) {
+    uint32_t ver = dxcStore_->getVersion();
+    if (ver != lastDxcVer_ || !currentDxcSnapshot_) {
+      currentDxcSnapshot_ = dxcStore_->snapshot();
+      lastDxcVer_ = ver;
+    }
+  }
+  if (spotStore_) {
+    uint32_t ver = spotStore_->getVersion();
+    if (ver != lastSpotVer_ || !currentSpotSnapshot_) {
+      currentSpotSnapshot_ = spotStore_->snapshot();
+      lastSpotVer_ = ver;
+    }
+  }
+
   uint32_t nowMs = SDL_GetTicks();
 
   // Handle deferred DE menu display for right-click timing
@@ -1696,14 +1712,12 @@ nlohmann::json MapWidget::getDebugData() const {
   }
 
   // Spot counts
-  if (spotStore_) {
-    auto sd = spotStore_->snapshot();
-    j["live_spot_count"] = static_cast<int>(sd->spots.size());
+  if (currentSpotSnapshot_) {
+    j["live_spot_count"] = static_cast<int>(currentSpotSnapshot_->spots.size());
   }
-  if (dxcStore_) {
-    auto dd = dxcStore_->snapshot();
-    j["dxc_spot_count"] = static_cast<int>(dd->spots.size());
-    j["dxc_connected"] = dd->connected;
+  if (currentDxcSnapshot_) {
+    j["dxc_spot_count"] = static_cast<int>(currentDxcSnapshot_->spots.size());
+    j["dxc_connected"] = currentDxcSnapshot_->connected;
   }
 
   // Tooltip

@@ -16,6 +16,7 @@
 #include "MapViewMenu.h"
 #include "TextureManager.h"
 #include "Widget.h"
+#include "../services/WxMbProvider.h"
 
 #include <SDL.h>
 
@@ -261,6 +262,8 @@ private:
   std::vector<SDL_Vertex> borderVerts_;
   std::vector<int> borderIndices_;
   // WX/Pressure overlay GPU geometry (rebuilt when new GFS data arrives)
+  std::vector<WxSegment> wxSegs_;
+  std::vector<WxQuiver> wxQuivers_;
   std::vector<SDL_Vertex> wxVerts_;
   std::vector<int> wxIndices_;
   SDL_Texture *wxFillTex_ = nullptr;       // pressure fill layer (blue-white-red)
@@ -277,6 +280,11 @@ private:
   LatLon lastDE_ = {0, 0};
   LatLon lastDX_ = {0, 0};
   double lastZoom_ = 1.0;
+
+  uint32_t lastDxcVer_ = 0;
+  uint32_t lastSpotVer_ = 0;
+  std::shared_ptr<const DXClusterData> currentDxcSnapshot_;
+  std::shared_ptr<const LiveSpotData> currentSpotSnapshot_;
 
   // Tooltip state
   struct Tooltip {

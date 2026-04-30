@@ -6,6 +6,8 @@
 #include "ConfigManager.h"       // AppConfig, ConfigManager
 #include "Constants.h"           // INITIAL_WIDTH, INITIAL_HEIGHT, etc.
 #include "PrefixManager.h"       // PrefixManager (AppContext value member)
+#include "DXClusterData.h"
+#include "LiveSpotData.h"
 #include "../ui/DebugOverlay.h"  // DebugOverlay (DashboardContext value member)
 #include "../ui/LayoutManager.h" // LayoutManager, Widget (transitively)
 #include "../ui/TextureManager.h"// TextureManager (DashboardContext value member)
@@ -259,6 +261,10 @@ struct DashboardContext {
   Uint32 lastSleepAssert = 0;
   Uint32 lastMemLogMs = 0;
   Uint32 lastPruneMs_ = 0;
+  uint32_t lastDxcVer_ = 0;
+  uint32_t lastSpotVer_ = 0;
+  std::shared_ptr<const DXClusterData> currentDxcSnapshot_;
+  std::shared_ptr<const LiveSpotData> currentSpotSnapshot_;
   float fingerScrollAccum_ = 0.0f;  // accumulated normalized finger-Y for swipe-to-scroll
   bool fingerWasScrolling_ = false;  // true if current touch gesture crossed scroll threshold
   // Guards provider callbacks captured by background threads.
