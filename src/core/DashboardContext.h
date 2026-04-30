@@ -357,6 +357,13 @@ struct AppContext {
   std::shared_ptr<AuroraMapStore> auroraMapStore;
   std::shared_ptr<CalendarStore> calendarStore;
 
+  #ifndef __EMSCRIPTEN__
+  std::unique_ptr<WebServer> webServer;
+  std::unique_ptr<FrameCapture> frameCapture;
+  std::unique_ptr<UpdateChecker> updateChecker;
+  std::unique_ptr<HamClock::GPSProvider> gpsProvider;
+  #endif
+
   // Managers & Services
   std::unique_ptr<NetworkManager> netManager;
   PrefixManager prefixMgr;
@@ -364,12 +371,6 @@ struct AppContext {
   std::shared_ptr<BrightnessManager> brightnessMgr;
   std::shared_ptr<CPUMonitor> cpuMonitor;
 
-#ifndef __EMSCRIPTEN__
-  std::unique_ptr<WebServer> webServer;
-  std::unique_ptr<FrameCapture> frameCapture;
-  std::unique_ptr<UpdateChecker> updateChecker;
-  std::unique_ptr<HamClock::GPSProvider> gpsProvider;
-#endif
   std::unique_ptr<BME280Provider> bmeProvider;
   std::unique_ptr<LTR329Provider> ltr329Provider;
 

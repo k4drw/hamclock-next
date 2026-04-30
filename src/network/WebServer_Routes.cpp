@@ -1683,7 +1683,12 @@ void WebServer::registerRoutes(httplib::Server &svr) {
 
   svr.Get("/stream.mjpeg", [this](const httplib::Request &req,
                                   httplib::Response &res) {
-    if (!frameCapture_ || !liveWebEnabled_) {
+    bool hasFC = false;
+    {
+      std::lock_guard<std::mutex> lk(dataMutex_);
+      hasFC = (frameCapture_ != nullptr);
+    }
+    if (!hasFC || !liveWebEnabled_) {
       res.status = 503;
       return;
     }
@@ -2192,8 +2197,11 @@ void WebServer::registerRoutes(httplib::Server &svr) {
                 SDL_PushEvent(&up);
               }
             }
-            if (frameCapture_)
-              frameCapture_->requestBaseCapture();
+            {
+              std::lock_guard<std::mutex> lk(dataMutex_);
+              if (frameCapture_)
+                frameCapture_->requestBaseCapture();
+            }
             res.set_content("ok", "text/plain");
           });
 

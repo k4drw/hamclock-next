@@ -1235,6 +1235,25 @@ DashboardContext::~DashboardContext() {
   if (rotatorService)
     rotatorService->stop();
 #endif
+
+  // Null out observer pointers in UI components to prevent dangling pointers
+  // if components are re-created or dashboard is partially torn down.
+  if (mapArea) {
+    mapArea->setPredictor(nullptr);
+    mapArea->setAsteroidProvider(nullptr);
+    mapArea->setMufRtProvider(nullptr);
+    mapArea->setBeaconProvider(nullptr);
+    mapArea->setSolarDataStore(nullptr);
+    mapArea->setPanes({});
+  }
+  if (timePanel) {
+    timePanel->setRigDataStore(nullptr);
+  }
+  for (auto &p : panes) {
+    if (p) {
+      p->setLineAATexture(nullptr);
+    }
+  }
 }
 
 void DashboardContext::applySidePanelMode(const std::string &chosen, AppContext &ctx) {
