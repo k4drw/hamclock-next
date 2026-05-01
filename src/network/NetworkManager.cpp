@@ -211,10 +211,14 @@ void NetworkManager::fetchAsync(const std::string &url,
         return;
       }
     } else {
-      // Cache entry is stale — erase it so only active data stays in RAM
+      // Cache entry is stale — clear payload but keep metadata for If-Modified-Since
       std::lock_guard<std::mutex> lock(cacheMutex_);
       removeFromLru(url);
-      cache_.erase(url);
+      auto it = cache_.find(url);
+      if (it != cache_.end() && !it->second.data.empty()) {
+        totalRamBytes_ -= it->second.data.size();
+        it->second.data.clear();
+      }
     }
   }
 
@@ -306,7 +310,7 @@ void NetworkManager::fetchAsync(const std::string &url,
       std::string encoded = base64Encode(url);
       std::string hubUrl = "http://" + hubIp_ + ":" + std::to_string(hubPort_) +
                            "/api/hub/fetch?url=" + encoded +
-                           "&max_age=" + std::to_string(cacheAgeSeconds);
+                           "&max_age=" + (force ? "0" : std::to_string(cacheAgeSeconds));
       
       LOG_D("NetworkManager", "Hub client: Proxying request for {} to Hub at {}", url, hubUrl);
 

@@ -1204,7 +1204,13 @@ void WebServer::registerRoutes(httplib::Server &svr) {
       res.status = 502;
       return;
     }
-    res.set_content(body, "application/octet-stream");
+    res.set_content_provider(
+        body.size(), "application/octet-stream",
+        [body = std::move(body)](size_t offset, size_t length,
+                                httplib::DataSink &sink) -> bool {
+          sink.write(body.data() + offset, length);
+          return true;
+        });
   });
 
   svr.Get("/api/hub/dxcluster", [this](const httplib::Request &,
