@@ -2046,36 +2046,35 @@ void DashboardContext::update(AppContext &ctx) {
       if (event.type >= AE_BASE_EVENT) {
         switch (event.type - AE_BASE_EVENT) {
         case AE_SATELLITE_TRACK_READY: {
-          auto *track =
-              static_cast<std::vector<GroundTrackPoint> *>(event.user.data1);
+          std::unique_ptr<std::vector<GroundTrackPoint>> track(
+              static_cast<std::vector<GroundTrackPoint> *>(event.user.data1));
           if (track && ctx.dashboard && ctx.dashboard->mapArea) {
             ctx.dashboard->mapArea->onSatTrackReady(*track);
           }
-          delete track; // Free the memory allocated by the worker thread
           break;
         }
         case AE_SATELLITE_DATA_READY: {
-          auto *raw = static_cast<std::string *>(event.user.data1);
+          std::unique_ptr<std::string> raw(
+              static_cast<std::string *>(event.user.data1));
           if (raw && ctx.dashboard && ctx.dashboard->satMgr) {
             ctx.dashboard->satMgr->onDataReady(*raw);
           }
-          delete raw;
           break;
         }
 #ifndef __EMSCRIPTEN__
         case AE_UPDATE_DATA_READY: {
-          auto *raw = static_cast<std::string *>(event.user.data1);
+          std::unique_ptr<std::string> raw(
+              static_cast<std::string *>(event.user.data1));
           if (raw && ctx.updateChecker) {
             ctx.updateChecker->onDataReady(*raw);
           }
-          delete raw;
           break;
         }
 #endif
         case AE_RSS_DATA_READY: {
           int feed_idx = event.user.code;
-          auto *headlines =
-              static_cast<std::vector<std::string> *>(event.user.data1);
+          std::unique_ptr<std::vector<std::string>> headlines(
+              static_cast<std::vector<std::string> *>(event.user.data1));
           if (headlines && feed_idx >= 0) {
             int target_idx = (feed_idx == 99) ? 3 : feed_idx;
             if (target_idx < 4) {
@@ -2083,7 +2082,6 @@ void DashboardContext::update(AppContext &ctx) {
               rssDataDirty = true;
             }
           }
-          delete headlines;
           break;
         }
         case HamClock::AE_DX_ALERT: {
@@ -2093,16 +2091,17 @@ void DashboardContext::update(AppContext &ctx) {
             double freq;
             std::string mode;
           };
-          auto *data = static_cast<DXAlertData *>(event.user.data1);
+          std::unique_ptr<DXAlertData> data(
+              static_cast<DXAlertData *>(event.user.data1));
           if (data && ctx.dashboard && ctx.dashboard->mapArea) {
             ctx.dashboard->mapArea->showDXAlert(data->call, data->entity,
                                                data->freq, data->mode);
           }
-          delete data;
           break;
         }
         case AE_SOLAR_DATA_READY: {
-          auto *update = static_cast<SolarData *>(event.user.data1);
+          std::unique_ptr<SolarData> update(
+              static_cast<SolarData *>(event.user.data1));
           if (update && ctx.solarStore) {
             auto data = ctx.solarStore->get();
             switch (static_cast<NOAAProvider::UpdateType>(event.user.code)) {
@@ -2161,19 +2160,19 @@ void DashboardContext::update(AppContext &ctx) {
               bandProvider->update();
             }
           }
-          delete update;
           break;
         }
         case AE_AURORA_DATA_READY: {
-          float percent = *(static_cast<float *>(event.user.data1));
+          std::unique_ptr<float> percentPtr(
+              static_cast<float *>(event.user.data1));
           if (ctx.auroraHistoryStore) {
-            ctx.auroraHistoryStore->addPoint(percent);
+            ctx.auroraHistoryStore->addPoint(*percentPtr);
           }
-          delete static_cast<float *>(event.user.data1);
           break;
         }
         case AE_ACTIVITY_DATA_READY: {
-          auto *update = static_cast<ActivityData *>(event.user.data1);
+          std::unique_ptr<ActivityData> update(
+              static_cast<ActivityData *>(event.user.data1));
           if (update && ctx.activityStore) {
             ActivityData data = *ctx.activityStore->get();
             switch (
@@ -2206,11 +2205,11 @@ void DashboardContext::update(AppContext &ctx) {
             data.valid = true;
             ctx.activityStore->set(data);
           }
-          delete update;
           break;
         }
         case AE_WEATHER_DATA_READY: {
-          auto *update = static_cast<WeatherData *>(event.user.data1);
+          std::unique_ptr<WeatherData> update(
+              static_cast<WeatherData *>(event.user.data1));
           int id = event.user.code;
           if (update) {
             if (id == 0 && ctx.deWeatherStore) {
@@ -2219,82 +2218,81 @@ void DashboardContext::update(AppContext &ctx) {
               ctx.dxWeatherStore->update(*update);
             }
           }
-          delete update;
           break;
         }
         case AE_CONTEST_DATA_READY: {
-          auto *update = static_cast<ContestData *>(event.user.data1);
+          std::unique_ptr<ContestData> update(
+              static_cast<ContestData *>(event.user.data1));
           if (update && ctx.contestStore) {
             ctx.contestStore->update(*update);
           }
-          delete update;
           break;
         }
         case AE_HISTORY_DATA_READY: {
-          auto *update = static_cast<HistorySeries *>(event.user.data1);
+          std::unique_ptr<HistorySeries> update(
+              static_cast<HistorySeries *>(event.user.data1));
           if (update && ctx.historyStore) {
             ctx.historyStore->update(update->name, *update);
           }
-          delete update;
           break;
         }
         case AE_PROP_DATA_READY: {
-          auto *grid = static_cast<std::vector<float> *>(event.user.data1);
+          std::unique_ptr<std::vector<float>> grid(
+              static_cast<std::vector<float> *>(event.user.data1));
           if (grid && ctx.dashboard && ctx.dashboard->mapArea) {
             ctx.dashboard->mapArea->onPropDataReady(
                 static_cast<PropOverlayType>(event.user.code), *grid);
           }
-          delete grid;
           break;
         }
         case AE_ASTEROID_ELEMENTS_READY: {
-          auto *payload =
+          std::unique_ptr<std::pair<std::string, OrbitalElements>> payload(
               static_cast<std::pair<std::string, OrbitalElements> *>(
-                  event.user.data1);
+                  event.user.data1));
           if (payload && ctx.dashboard && ctx.dashboard->mapArea) {
             ctx.dashboard->mapArea->onAsteroidElementsReady(payload->first,
                                                             payload->second);
           }
-          delete payload;
           break;
         }
         case AE_ALERTS_DATA_READY: {
-          auto *update = static_cast<AlertsData *>(event.user.data1);
+          std::unique_ptr<AlertsData> update(
+              static_cast<AlertsData *>(event.user.data1));
           if (update && ctx.alertsStore)
             ctx.alertsStore->update(*update);
-          delete update;
           break;
         }
         case AE_FORECAST_DATA_READY: {
-          auto *update = static_cast<ForecastData *>(event.user.data1);
+          std::unique_ptr<ForecastData> update(
+              static_cast<ForecastData *>(event.user.data1));
           if (update && ctx.forecastStore)
             ctx.forecastStore->update(*update);
-          delete update;
           break;
         }
         case AE_SPACEWX_ALERT_READY: {
-          auto *update = static_cast<SpaceWxAlertData *>(event.user.data1);
+          std::unique_ptr<SpaceWxAlertData> update(
+              static_cast<SpaceWxAlertData *>(event.user.data1));
           if (update && ctx.dashboard && ctx.dashboard->spaceWxAlertStore)
             ctx.dashboard->spaceWxAlertStore->update(*update);
-          delete update;
           break;
         }
         case AE_REPEATER_DATA_READY: {
-          auto *update = static_cast<RepeaterData *>(event.user.data1);
+          std::unique_ptr<RepeaterData> update(
+              static_cast<RepeaterData *>(event.user.data1));
           if (update && ctx.repeaterStore)
             ctx.repeaterStore->update(*update);
-          delete update;
           break;
         }
         case AE_HURRICANE_DATA_READY: {
-          auto *update = static_cast<HurricaneData *>(event.user.data1);
+          std::unique_ptr<HurricaneData> update(
+              static_cast<HurricaneData *>(event.user.data1));
           if (update && ctx.hurricaneStore)
             ctx.hurricaneStore->update(*update);
-          delete update;
           break;
         }
         case AE_MARINE_DATA_READY: {
-          auto *update = static_cast<MarineData *>(event.user.data1);
+          std::unique_ptr<MarineData> update(
+              static_cast<MarineData *>(event.user.data1));
           if (update && ctx.marineStore) {
             MarineData current = ctx.marineStore->get();
             if (event.user.code == 0) { // Tides
@@ -2311,35 +2309,34 @@ void DashboardContext::update(AppContext &ctx) {
             current.lastUpdate = update->lastUpdate;
             ctx.marineStore->update(current);
           }
-          delete update;
           break;
         }
         case AE_MARINE_LOOKUP_READY: {
-          auto *res = static_cast<MarineLookupResult *>(event.user.data1);
+          std::unique_ptr<MarineLookupResult> res(
+              static_cast<MarineLookupResult *>(event.user.data1));
           if (res && ctx.dashboard) {
             auto it = ctx.dashboard->widgetPool.find("marine");
             if (it != ctx.dashboard->widgetPool.end()) {
               static_cast<MarinePanel *>(it->second.get())->onLookupReady(*res);
             }
           }
-          delete res;
           break;
         }
 
         case AE_WINLINK_DATA_READY: {
-          auto *update = static_cast<WinlinkData *>(event.user.data1);
+          std::unique_ptr<WinlinkData> update(
+              static_cast<WinlinkData *>(event.user.data1));
           if (update && ctx.winlinkStore)
             ctx.winlinkStore->update(*update);
-          delete update;
           break;
         }
         case AE_MAP_IMAGE_READY: {
-          auto *data = static_cast<std::string *>(event.user.data1);
+          std::unique_ptr<std::string> data(
+              static_cast<std::string *>(event.user.data1));
           bool isNight = (event.user.code == 1);
           if (data && ctx.dashboard && ctx.dashboard->mapArea) {
             ctx.dashboard->mapArea->onMapImageReady(isNight, std::move(*data));
           }
-          delete data;
           break;
         }
         case AE_MOON_IMAGE_READY: {

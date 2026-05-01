@@ -1,4 +1,5 @@
 #include "SpaceWeatherPanel.h"
+#include "../core/Constants.h"
 #include "../core/Theme.h"
 #include "FontCatalog.h"
 #include "GraphHelper.h"
@@ -81,8 +82,14 @@ void SpaceWeatherPanel::destroyCache() {
 
 void SpaceWeatherPanel::update() {
   ThemeColors themes = getThemeColors(theme_);
+  
   if (xrayStore_)
     sparklineHistory_ = xrayStore_->getHistory();
+
+  if (!store_) {
+    dataValid_ = false;
+    return;
+  }
 
   SolarData data = store_->get();
   dataValid_ = data.valid;
@@ -211,17 +218,20 @@ void SpaceWeatherPanel::render(SDL_Renderer *renderer) {
                          themes.border.b, themes.border.a);
   SDL_RenderDrawRect(renderer, &rect);
 
-  int titleH = 20;
+  auto *cat = fontMgr_.catalog();
+  if (!cat) return;
+
   bool isSmall = (width_ < 150);
   const char *titleText = isSmall ? "Space WX" : "Space Weather";
   FontStyle titleStyle =
       isSmall ? FontStyle::CaptionBold : FontStyle::MicroBold;
-  fontMgr_.catalog()->drawText(renderer, titleText, x_ + 10, y_ + 5,
+  cat->drawText(renderer, titleText, x_ + HamClock::PANEL_TITLE_X_OFFSET, 
+                               y_ + HamClock::PANEL_TITLE_Y_OFFSET,
                                themes.accent, titleStyle);
 
   if (!dataValid_) {
-    fontMgr_.catalog()->drawText(renderer, "Awaiting data...", x_ + 10,
-                                 y_ + titleH + (height_ - titleH) / 2 - 8,
+    cat->drawText(renderer, "Awaiting data...", x_ + HamClock::PANEL_TITLE_X_OFFSET,
+                                 y_ + HamClock::PANEL_TITLE_HEIGHT + (height_ - HamClock::PANEL_TITLE_HEIGHT) / 2 - 8,
                                  themes.textDim, FontStyle::Micro);
     return;
   }
@@ -239,7 +249,7 @@ void SpaceWeatherPanel::render(SDL_Renderer *renderer) {
   int sparklineH = showSparkline ? 22 : 0;
 
   int cellW = width_ / numCols;
-  int cellH = (height_ - titleH - sparklineH - 10) /
+  int cellH = (height_ - HamClock::PANEL_TITLE_HEIGHT - sparklineH - 10) /
               numRows; // Leave space for title, sparkline, and pagination bar
   int pad = std::max(1, static_cast<int>(cellH * 0.05f));
 
@@ -256,7 +266,7 @@ void SpaceWeatherPanel::render(SDL_Renderer *renderer) {
     int col = i % numCols;
     int row = i / numCols;
     int cellX = x_ + col * cellW;
-    int cellY = y_ + titleH + row * cellH;
+    int cellY = y_ + HamClock::PANEL_TITLE_HEIGHT + row * cellH;
 
     // Label (cached until font size changes)
     if (labelFontChanged || !items_[itemIdx].labelTex) {
@@ -330,7 +340,7 @@ void SpaceWeatherPanel::render(SDL_Renderer *renderer) {
     const int pad = 4;
     const int slX = x_ + pad;
     const int slW = width_ - 2 * pad;
-    const int slY = y_ + titleH + numRows * cellH + 2;
+    const int slY = y_ + HamClock::PANEL_TITLE_HEIGHT + numRows * cellH + 2;
     const int slH = sparklineH - 4;
 
     // Log-scale Y mapping: 1e-8 (bottom) to 1e-3 (top)
@@ -431,12 +441,12 @@ void SpaceWeatherPanel::onMouseMove(int mx, int my) {
   bool isNarrow = (width_ < 110);
   int numCols = isNarrow ? 1 : 2;
   int numRows = isNarrow ? 4 : 2;
-  int titleH = 20;
+  // PANEL_TITLE_HEIGHT used from Constants.h
   bool showSparkline =
       (!isNarrow && xrayStore_ && !sparklineHistory_.empty() && height_ >= 80);
   int sparklineH = showSparkline ? 22 : 0;
   int cellW = width_ / numCols;
-  int cellH = (height_ - titleH - sparklineH - 10) / numRows;
+  int cellH = (height_ - HamClock::PANEL_TITLE_HEIGHT - sparklineH - 10) / numRows;
 
   // 1. Check label tooltips (SFI and K)
   int startIdx = currentPage_ * kItemsPerPage;
@@ -451,7 +461,7 @@ void SpaceWeatherPanel::onMouseMove(int mx, int my) {
     int col = i % numCols;
     int row = i / numCols;
     int cellX = x_ + col * cellW;
-    int cellY = y_ + titleH + row * cellH;
+    int cellY = y_ + HamClock::PANEL_TITLE_HEIGHT + row * cellH;
 
     int lx = cellX + (cellW - items_[itemIdx].labelW) / 2;
     int ly = cellY + pad;
@@ -480,7 +490,7 @@ void SpaceWeatherPanel::onMouseMove(int mx, int my) {
   const int slPad = 4;
   const int slX = x_ + slPad;
   const int slW = width_ - 2 * slPad;
-  const int slY = y_ + titleH + numRows * cellH + 2;
+  const int slY = y_ + HamClock::PANEL_TITLE_HEIGHT + numRows * cellH + 2;
   const int slH = sparklineH - 4;
 
   if (mx < slX || mx > slX + slW || my < slY || my > slY + slH) {
@@ -575,7 +585,7 @@ nlohmann::json SpaceWeatherPanel::getDebugData() const {
 
 void SpaceWeatherPanel::renderMaximized(SDL_Renderer *renderer,
                                          const ThemeColors &themes) {
-  int titleH = 30;
+  // PANEL_TITLE_HEIGHT used from Constants.h
   fontMgr_.catalog()->drawText(renderer, "HF Dashboard", x_ + 20, y_ + 10,
                                themes.accent, FontStyle::SmallBold);
 
@@ -584,7 +594,7 @@ void SpaceWeatherPanel::renderMaximized(SDL_Renderer *renderer,
     return;
 
   // --- 1. Top Section: NOAA Scales & Indices ---
-  int topY = y_ + titleH + 10;
+  int topY = y_ + HamClock::PANEL_TITLE_HEIGHT + 10;
   int topH = 60;
   int colW = width_ / 4;
 

@@ -1,5 +1,6 @@
 #include "ForecastProvider.h"
 #include "../core/Constants.h"
+#include "../core/Logger.h"
 #include "../core/WorkerService.h"
 #include <SDL.h>
 #include <chrono>
@@ -38,7 +39,8 @@ void ForecastProvider::fetch(double lat, double lon, bool force) {
                   j["properties"]["forecast"].get<std::string>();
               p2->fetchForecast(forecastUrl, false);
             }
-          } catch (...) {
+          } catch (const std::exception &e) {
+            LOG_E("ForecastProvider", "Parse points failed: %s", e.what());
           }
         });
       },
