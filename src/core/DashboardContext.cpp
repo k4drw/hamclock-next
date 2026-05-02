@@ -46,7 +46,7 @@ void populateWidgetDescriptions();
 #include "services/DstProvider.h"
 #include "services/FlareProvider.h"
 #include "services/FccProvider.h"
-#include "services/ForecastProvider.h"
+#include "services/OpenMeteoForecastProvider.h"
 #include "services/GPSProvider.h"
 #include "services/HistoryProvider.h"
 #include "services/HurricaneProvider.h"
@@ -529,7 +529,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
     alertsProvider->fetch(appCfg.lat, appCfg.lon);
 
   forecastProvider =
-      std::make_shared<ForecastProvider>(netManager, ctx.forecastStore);
+      std::make_shared<OpenMeteoForecastProvider>(netManager, ctx.forecastStore);
   if (isMasterMode || isWidgetConfigured("forecast"))
     forecastProvider->fetch(appCfg.lat, appCfg.lon);
 
@@ -1559,6 +1559,15 @@ void DashboardContext::update(AppContext &ctx) {
         (!ctx.contestStore->get().valid || contestProvider->isStale(now, 12 * 60 * 60 * 1000)) &&
         contestProvider->isStale(now, kCooldown)) {
       contestProvider->fetch();
+    }
+
+    // Forecast
+    if (forecastProvider &&
+        (isMaster || isWidgetActive("forecast")) &&
+        forecastProvider->isStale(now, 4 * 60 * 60 * 1000) &&
+        forecastProvider->isStale(now, kCooldown) &&
+        (appCfg.lat != 0.0 || appCfg.lon != 0.0)) {
+      forecastProvider->fetch(appCfg.lat, appCfg.lon);
     }
 
     // Solar Flares

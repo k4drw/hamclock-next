@@ -32,6 +32,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Global Volume Control** — adjustable audio levels (0-100) for alarms and TTS; dedicated slider in Setup -> Identity tab
 - **DE Station Status Preset** — new built-in preset highlighting award tracking (DXCC, WAS, Grid, WAC, Zone Heatmap) and QSO management (LoTW Sync, ADIF Tracking); factory preset deletion tracking ensures user-deleted presets don't reappear on app updates
 - **Local Propagation Gauge** — compact map overlay at the map bottom showing real-time MUF, LUF, and recommended HF bands for the DE station; toggled via Map View menu; preference persisted as `showLocalPropGauge` in config.
+- **Global Weather Forecast Widget** — worldwide 7-day weather forecasting via Open-Meteo API (replaces US-only NWS provider). Displays high/low temperatures, weather conditions (clear, rain, snow, storm), and precipitation probability; single HTTP GET every 4 hours; works for any lat/lon without authentication. Non-US users no longer see "Loading..." indefinitely.
 - **Cache Statistics in SysInfoPanel** — displays texture, vertex, and command buffer usage stats for debugging performance on "Master Hub" (centralized) deployments.
 
 ### Changed

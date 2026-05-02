@@ -39,7 +39,7 @@
 #include "services/DXClusterProvider.h"
 #include "services/DstProvider.h"
 #include "services/FccProvider.h"
-#include "services/ForecastProvider.h"
+#include "services/OpenMeteoForecastProvider.h"
 #include "services/GPSProvider.h"
 #include "services/HistoryProvider.h"
 #include "services/HurricaneProvider.h"

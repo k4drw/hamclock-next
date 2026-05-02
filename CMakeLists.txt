@@ -598,7 +598,7 @@ set(HAMCLOCK_SOURCES
     src/services/RBNProvider.cpp
     src/services/QRZProvider.cpp
     src/services/AlertsProvider.cpp
-    src/services/ForecastProvider.cpp
+    src/services/OpenMeteoForecastProvider.cpp
     src/services/RepeaterProvider.cpp
     src/services/HurricaneProvider.cpp
     src/services/MarineProvider.cpp

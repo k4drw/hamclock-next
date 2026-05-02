@@ -128,7 +128,7 @@ class DstProvider;
 class MufRtProvider;
 class IonosondeProvider;
 class AsteroidProvider;
-class ForecastProvider;
+class OpenMeteoForecastProvider;
 class WxMbProvider;
 class QRZProvider;
 
@@ -195,7 +195,7 @@ struct DashboardContext {
   std::shared_ptr<AsteroidProvider> asteroidProvider;
   std::unique_ptr<BeaconProvider> beaconProvider;
   std::unique_ptr<AlertsProvider> alertsProvider;
-  std::shared_ptr<ForecastProvider> forecastProvider;
+  std::shared_ptr<OpenMeteoForecastProvider> forecastProvider;
   std::unique_ptr<RepeaterProvider> repeaterProvider;
   std::unique_ptr<HurricaneProvider> hurricaneProvider;
   std::unique_ptr<MarineProvider> marineProvider;
