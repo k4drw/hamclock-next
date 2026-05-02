@@ -23,12 +23,15 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends \
             pandoc \
+            texlive \
             texlive-xetex \
-            texlive-fonts-recommended \
             texlive-latex-extra \
-            texlive-pictures \
+            texlive-fonts-recommended \
+            texlive-fonts-extra \
             fonts-dejavu \
-            fonts-freefont-ttf
+            fonts-freefont-ttf \
+            fonts-lmodern \
+            lmodern
 
       - name: Extract release notes for this version
         run: |

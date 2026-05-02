@@ -14,7 +14,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Greyline DX Spots Filter** — filters live DX cluster spots to show only those near the grey line (terminator window ±N degrees).
 - **Band Advisor Widget** — real-time propagation status table for HF bands (80m, 40m, 20m, 15m, 10m) based on K-index and SFI; later consolidated into Band Conditions widget.
 - **6m Band Support in Band Conditions** — extended Band Conditions widget to include 6m band with appropriate SFI/K-index thresholds.
-- **LoTW Auto-Sync Widget** — automatic ADIF-to-LoTW upload integration with live activity tracking
+- **LoTW Auto-Sync Widget** — automatic LoTW confirmation download with live tracking against local ADIF logs
 - **Zone Heatmap Widget** — visual DXCC zone contact distribution
 - **WAS Progress Widget** — US state contact tracker with map overlay
 - **WAC Radar Widget** — 6-segment pie chart visualization (NA, SA, EU, AF, AS, OC) for continent-level award tracking

@@ -27,7 +27,7 @@ These widgets start working as soon as you add them to a pane. No extra setup is
 - **WAS Progress**: Tracks your US State contacts and shows your progress on a map.
 - **WAC Radar**: A 6-segment pie chart that shows which continents you have worked and confirmed.
 - **Zone Heatmap**: A clickable grid that tracks your progress through CQ and ITU zones.
-- **LoTW Auto-Sync**: Automatically sends your contacts to the ARRL "Logbook of The World" and shows your live confirmation count.
+- **LoTW Auto-Sync**: Automatically connects to the ARRL "Logbook of The World" and downloads your live confirmation count. *(See [LoTW Auto-Sync](#lotw-auto-sync) below for setup instructions)*.
 
 **Info & Utilities**
 - DE Info, DX Info, Stopwatch, Sys Info, ADIF Log, Contests, VOACAP DE-DX
@@ -322,6 +322,21 @@ Copy your ADIF file to `~/.config/hamclock-next/log.adi` (Linux/Raspberry Pi) or
 Once a log is loaded, **DXCC award tracking** activates for the DX Cluster tile as well — spots for new entities or unconfirmed bands will show N/B/W badges automatically. See [DX Cluster](#dx-cluster) above.
 
 **Filtering inside the tile:** Click the band or mode label in the tile header to filter the log view to that band or mode. Click again to cycle through options.
+
+---
+
+## LoTW Auto-Sync
+
+The LoTW Auto-Sync tile automatically connects to ARRL's Logbook of The World and downloads your live confirmation count (QSLs received). (Note: HamClock does not upload logs to LoTW; it only syncs confirmations down to match against your local ADIF log).
+
+**Requirements:** You need an active ARRL LoTW account.
+
+**Setting it up:**
+1. Open Setup → **Services** tab.
+2. Enter your LoTW Callsign and LoTW Password in the fields provided.
+3. Save.
+
+The LoTW Auto-Sync tile will now automatically authenticate, sync, and display your confirmation tracking metrics.
 
 ---
 
