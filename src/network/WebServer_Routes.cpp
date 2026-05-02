@@ -1182,13 +1182,48 @@ void WebServer::registerRoutes(httplib::Server &svr) {
     if (req.has_param("max_age")) {
       maxAge = StringUtils::safe_stoi(req.get_param_value("max_age"));
     }
-    auto prom = std::make_shared<std::promise<std::string>>();
+
+    // Check if client provided IMS/INM headers for conditional GET
+    std::string clientIms = base64Decode(req.get_param_value("ims"));
+    std::string clientInm = base64Decode(req.get_param_value("inm"));
+
+    // --- Early Check: Can we return 304 without disk load or network fetch? ---
+    if (!clientIms.empty() || !clientInm.empty()) {
+      std::string masterLm, masterEtag;
+      std::time_t masterTs = 0;
+      {
+        std::lock_guard<std::mutex> lk(dataMutex_);
+        if (netMgr_) {
+          netMgr_->getCacheMetadata(targetUrl, masterLm, masterEtag, masterTs);
+        }
+      }
+
+      bool match = false;
+      if (!clientInm.empty() && clientInm == masterEtag)
+        match = true;
+      if (!clientIms.empty() && clientIms == masterLm)
+        match = true;
+
+      std::time_t now = std::time(nullptr);
+      if (match && (now - masterTs < maxAge)) {
+        LOG_D("WebServer",
+              "Hub Master: Early metadata match (304) for {}, skipping fetch",
+              targetUrl);
+        res.status = 304;
+        return;
+      }
+    }
+
+    auto prom = std::make_shared<std::promise<NetworkManager::SharedString>>();
     auto fut = prom->get_future();
     {
       std::lock_guard<std::mutex> lk(dataMutex_);
       if (netMgr_) {
-        netMgr_->fetchAsync(
-            targetUrl, [prom](std::string b) { prom->set_value(std::move(b)); },
+        netMgr_->fetchSharedAsync(
+            targetUrl,
+            [prom](NetworkManager::SharedString b) {
+              prom->set_value(std::move(b));
+            },
             maxAge);
       } else {
         res.status = 503;
@@ -1199,16 +1234,44 @@ void WebServer::registerRoutes(httplib::Server &svr) {
       res.status = 504;
       return;
     }
-    std::string body = fut.get();
-    if (body.empty()) {
+    NetworkManager::SharedString body = fut.get();
+
+    // --- Late Check: After potential network refresh, does client match now? ---
+    if (body && (!clientIms.empty() || !clientInm.empty())) {
+      std::string masterLm, masterEtag;
+      std::time_t masterTs = 0;
+      {
+        std::lock_guard<std::mutex> lk(dataMutex_);
+        if (netMgr_) {
+          netMgr_->getCacheMetadata(targetUrl, masterLm, masterEtag, masterTs);
+        }
+      }
+
+      bool match = false;
+      if (!clientInm.empty() && clientInm == masterEtag)
+        match = true;
+      if (!clientIms.empty() && clientIms == masterLm)
+        match = true;
+
+      if (match) {
+        LOG_D("WebServer",
+              "Hub Master: Post-fetch metadata match (304) for {}, skipping "
+              "stream",
+              targetUrl);
+        res.status = 304;
+        return;
+      }
+    }
+
+    if (!body || body->empty()) {
       res.status = 502;
       return;
     }
     res.set_content_provider(
-        body.size(), "application/octet-stream",
+        body->size(), "application/octet-stream",
         [body = std::move(body)](size_t offset, size_t length,
                                 httplib::DataSink &sink) -> bool {
-          sink.write(body.data() + offset, length);
+          sink.write(body->data() + offset, length);
           return true;
         });
   });

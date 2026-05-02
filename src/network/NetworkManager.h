@@ -55,9 +55,17 @@ public:
   // SDL init has consumed most of the time budget).
   void waitForCacheLoad();
 
+  // Shared string type to avoid large allocations when multiple clients request
+  // the same URL concurrently from a Hub Master.
+  using SharedString = std::shared_ptr<const std::string>;
+  using SharedCallback = std::function<void(SharedString)>;
+
+  void fetchSharedAsync(const std::string &url, SharedCallback callback,
+                        int cacheAgeSeconds = 3600, bool force = false);
+
 private:
   struct CacheEntry {
-    std::string data;
+    SharedString data;
     std::time_t timestamp;
     std::time_t serverTime = 0;
     std::string lastModified;
@@ -68,6 +76,7 @@ private:
   std::filesystem::path cacheDir_;
   std::string corsProxyUrl_;
 
+  HubMode     hubIpMode_  = HubMode::Off; // Keep for binary compatibility if needed
   HubMode     hubMode_  = HubMode::Off;
   std::string hubIp_;
   int         hubPort_  = 8080;
@@ -75,7 +84,7 @@ private:
 
   // Maps in-flight URL → list of callbacks waiting on the same fetch.
   // When a fetch completes, the primary callback plus all queued callbacks are called.
-  std::unordered_map<std::string, std::vector<std::function<void(std::string)>>> activeFetches_;
+  std::unordered_map<std::string, std::vector<SharedCallback>> activeFetches_;
   std::mutex fetchMutex_;
 
   // Shared with all detached fetch threads. alive_ is set to false and the
@@ -98,17 +107,17 @@ private:
   void loadCache();
   void saveToDisk(const std::string &url, const CacheEntry &entry,
                   const std::string &data = "");
-  std::string fetchFromHubSync(const std::string &hubUrl);
-  void fetchDirect(const std::string &url,
-                   std::function<void(std::string)> callback,
+  std::string fetchFromHubSync(const std::string &hubUrl, long &httpCode);
+  void fetchDirect(const std::string &url, SharedCallback callback,
                    bool hasCache, const CacheEntry &cached);
+  SharedString loadFromDiskCache(const std::string &url);
 
   // LRU and RAM cache management
   void updateLruAndPrune(const std::string &url, size_t dataSize);
   void removeFromLru(const std::string &url);
   std::list<std::string> lru_;
   size_t totalRamBytes_ = 0;
-  const size_t MAX_RAM_BYTES = 5 * 1024 * 1024; // 5 MB RAM cap
+  const size_t MAX_RAM_BYTES = 50 * 1024 * 1024; // 50 MB RAM cap
 
 #ifdef __ANDROID__
   // Concatenates Android's per-file system CA store into a single PEM bundle
@@ -120,6 +129,10 @@ private:
 public:
   // Get the server-reported last modified time for a cached URL
   std::time_t getCacheServerTime(const std::string &url);
+
+  // Get metadata for conditional GET
+  bool getCacheMetadata(const std::string &url, std::string &lastModified,
+                        std::string &etag, std::time_t &timestamp);
 
   // Periodic cleanup of entries older than maxAgeSeconds
   void pruneStaleCache(int maxAgeSeconds = 86400);
