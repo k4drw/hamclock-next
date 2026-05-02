@@ -70,6 +70,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
     - **Network Thread Stability** — verified `NetworkManager` detached thread safety and `inflight_` counter logic to prevent use-after-free during shutdown.
 - **Memory Stability** — resolved DX Cluster heap churn and a memory leak in the weather overlay rendering path.
 - **Service Credential Persistence** — fixed issue where service credentials (LoTW, Clublog, etc.) were not persisted correctly; ensured Web API parity for remote configuration.
+- **Core Stability Sweep** — comprehensive refactor of core application event handlers and service error handling:
+    - **RAII Migration**: Converted 20+ custom event handlers in `DashboardContext` from raw `delete` pointers to `std::unique_ptr`, eliminating potential memory leaks.
+    - **Provider Error Handling**: Established Network Callback Policy banning blanket `catch (...)` blocks. Refactored `NOAAProvider` and `ForecastProvider` to catch `std::exception`, log errors via `LOG_E`, and maintain valid UI state on failures.
+    - **UI Layout Constants**: Added global UI layout constants to `Constants.h` to eliminate magic numbers and improve maintainability.
+    - **Defensive Guards**: Hardened `SpaceWeatherPanel` with null-pointer guards for data stores and font catalogs.
+- **Hub Master Network Optimization** — resolved critical memory usage issues on Hub Masters handling concurrent client requests:
+    - **Streaming Responses**: Replaced `res.set_content` with `res.set_content_provider` in `/api/hub/fetch`, moving response body into lambda to stream directly to socket, eliminating 10MB+ string copies per request.
+    - **Cache Metadata Preservation**: Modified `NetworkManager::fetchAsync` to preserve cache metadata (etag/lastModified) when entries go stale, enabling correct Conditional GET (304 Not Modified) behavior and preventing unnecessary full re-downloads.
+    - **Proxy Force-Refresh**: Updated client proxy logic to pass `max_age=0` when `force=true`, ensuring fresh data fetches when requested.
+- **Hub Master RAM Optimization** — finalized memory stability for Hub Masters to eliminate RAM ballooning during multi-client restarts:
+    - **SharedString Buffers**: Replaced `std::string` with `SharedString` (`std::shared_ptr<const std::string>`) throughout NetworkManager stack, enabling multiple concurrent clients to stream from the exact same shared buffer (N*Size → 1*Size RAM usage).
+    - **Extended RAM Cache**: Increased `MAX_RAM_BYTES` to 50MB and enabled RAM-caching of large payloads (>512KB) for Hub Masters, serving sequential client requests from memory instead of forcing redundant disk I/O and allocations.
+    - **Zero-Allocation 304s**: Implemented early metadata validation in `/api/hub/fetch` to return 304 Not Modified without triggering disk reads if cache is fresh.
+    - **Verification**: Hub Master RAM stabilized at ~350-380MB regardless of client restart patterns or concurrent map requests.
 
 ---
 
