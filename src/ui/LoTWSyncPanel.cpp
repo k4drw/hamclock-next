@@ -2,6 +2,7 @@
 #include "WidgetRegistry.h"
 #include "../core/MemoryMonitor.h"
 #include "../core/Theme.h"
+#include "../services/LoTWProvider.h"
 #include <SDL.h>
 #include <sstream>
 
@@ -35,9 +36,14 @@ void LoTWSyncPanel::setSyncStatus(time_t lastSync, int qsoCount, const std::stri
     lastSyncTime_ = lastSync;
     qsosSynced_ = qsoCount;
     lastError_ = error;
-    // We don't clear the cache here because render() will check if the text changed.
-    // However, for simplicity, we could just clear it. Let's let render() handle it.
   }
+}
+
+void LoTWSyncPanel::setupProvider(LoTWProvider *provider) {
+  if (!provider) return;
+  provider->setStatusCallback([this](time_t lastSync, int count, const std::string &error) {
+    setSyncStatus(lastSync, count, error);
+  });
 }
 
 void LoTWSyncPanel::update() {

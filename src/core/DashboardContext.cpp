@@ -896,6 +896,11 @@ DashboardContext::DashboardContext(AppContext &ctx)
           }
         });
       }
+    } else if (type == "lotw_sync") {
+      auto *syncPanel = dynamic_cast<LoTWSyncPanel *>(widgetPool[type].get());
+      if (syncPanel && lotwProvider) {
+        syncPanel->setupProvider(lotwProvider.get());
+      }
     }
 
     if (widgetPool[type]) {

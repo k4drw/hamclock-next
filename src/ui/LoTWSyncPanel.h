@@ -23,6 +23,7 @@ public:
   bool requiresConfigKey() const override { return false; }
 
   void setSyncStatus(time_t lastSync, int qsoCount, const std::string &error);
+  void setupProvider(class LoTWProvider *provider);
 
 private:
   void clearCache();

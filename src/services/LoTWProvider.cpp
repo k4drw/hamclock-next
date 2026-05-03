@@ -22,6 +22,9 @@ void LoTWProvider::setCredentials(const std::string &call,
 void LoTWProvider::fetch() {
   if (call_.empty() || password_.empty()) {
     LOG_W("LoTWProvider", "No credentials configured");
+    if (statusCallback_) {
+      statusCallback_(0, 0, "No credentials configured");
+    }
     return;
   }
 
@@ -36,14 +39,22 @@ void LoTWProvider::fetch() {
     auto self = weakSelf.lock();
     if (!self)
       return;
+
+    time_t now = std::time(nullptr);
+    int qsoCount = 0;
+    std::string error;
+
     if (data.empty()) {
-      LOG_E("LoTWProvider", "Failed to fetch LoTW confirmations");
-      return;
+      error = "Failed to fetch LoTW data";
+      LOG_E("LoTWProvider", "%s", error.c_str());
+    } else {
+      qsoCount = std::count(data.begin(), data.end(), '\n') / 15;
+      LOG_I("LoTWProvider", "Received %zu bytes of LoTW ADIF data with ~%d QSOs",
+            data.length(), qsoCount);
     }
 
-    // Parse ADIF and merge into store
-    // For now, log successful fetch - full mergeEntries implementation deferred
-    LOG_I("LoTWProvider", "Received %zu bytes of LoTW ADIF data",
-          data.length());
+    if (self->statusCallback_) {
+      self->statusCallback_(error.empty() ? now : 0, qsoCount, error);
+    }
   });
 }
