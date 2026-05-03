@@ -50,6 +50,7 @@ To add a widget to a pane, click the **top strip** of the pane to open the widge
 | **Solar Impact**    | Timeline of recent solar events: flares, CMEs, and geomagnetic storm onsets                    | NOAA SWPC                |
 | **NOAA SpaceWx**    | NOAA Space Weather forecast text: geomagnetic, solar radiation, and radio blackout conditions   | NOAA SWPC                |
 | **SpaceWx Alerts**  | Active NOAA Space Weather watches, warnings, and alerts as a scrollable list                    | NOAA SWPC                |
+| **Flare Log**       | Scrollable list of recent X-ray solar flares (classes B–X) from NOAA with peak times and durations | NOAA SWPC                |
 
 ![Solar widget](images/widgets/solar.png)
 
@@ -65,6 +66,7 @@ To add a widget to a pane, click the **top strip** of the pane to open the widge
 | **Live Spots**      | Real-time decoded signal spots from PSK Reporter or Reverse Beacon Network, plotted by band | PSK Reporter / RBN |
 | **NCDXF**           | NCDXF/IBP international beacon schedule and current beacon on air                           | NCDXF              |
 | **Voacap DE-DX**    | VOACAP short-path propagation prediction between DE and DX. Covers nine bands — 80m, 40m, 30m, 20m, 17m, 15m, 12m, 10m, and 6m — across all 24 UTC hours. The X-axis is reoriented so the leftmost column always shows the current UTC hour ("now at origin"), with a vertical white line cursor for visualization. A horizontal white line highlights the band that matches the DX spot you currently have selected. | VOACAP (local)     |
+| **Local Prop Gauge** | Compact map overlay showing your home station's current Maximum Usable Frequency (MUF), Lowest Usable Frequency (LUF), and which HF bands are open right now | VOACAP (local)     |
 
 ### Frequency Cursor
 
@@ -94,6 +96,9 @@ On widgets that show propagation charts (like the VOACAP DE-DX matrix), a white 
 | **WAC Radar**       | Work All Continents award tracker — pie chart visualization showing progress toward WAC with 6 continents color-coded by status | Local ADIF log                    |
 | **Zone Heatmap**    | Work All Zones award tracker — clickable grid display of CQ (1–40) and ITU (1–75) zones; click title to toggle between zone types | Local ADIF log                    |
 | **LoTW Auto-Sync**  | LoTW (Logbook of The World) confirmation tracking — displays last sync time, synced QSO count, and connection status with automatic hourly refresh | ARRL LoTW service                 |
+| **QSO Rate**        | Sparkline chart of QSOs per hour over the past 12 hours with peak count and total; sourced from local ADIF log | Local ADIF log                    |
+| **Greyline Filter** | Filters live DX cluster spots to show only those near the grey line (terminator ±N degrees) | DX Cluster (filtered)             |
+| **Heard Me**        | Real-time stations that decoded your transmissions via Reverse Beacon Network                  | RBN (Reverse Beacon Network)      |
 
 ### DX ATNO Alerts
 
