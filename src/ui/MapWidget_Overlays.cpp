@@ -1117,9 +1117,20 @@ void MapWidget::renderADIFPins(SDL_Renderer *renderer) {
 
   SDL_RenderSetClipRect(renderer, &mapRect_);
 
+  std::time_t now = std::time(nullptr);
+  now -= 30 * 24 * 60 * 60;
+  std::tm *tm = std::gmtime(&now);
+  char limitBuf[16];
+  std::strftime(limitBuf, sizeof(limitBuf), "%Y%m%d", tm);
+  std::string limitDate = limitBuf;
+
   for (const auto &qso : stats.recentQSOs) {
     if (qso.lat == 0.0 && qso.lon == 0.0)
       continue;
+
+    if (qso.date < limitDate)
+      continue;
+
 
     // Check filter
     if (!stats.activeBandFilter.empty() && stats.activeBandFilter != "All") {

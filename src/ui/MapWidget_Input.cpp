@@ -462,6 +462,43 @@ void MapWidget::onMouseMove(int mx, int my) {
     }
   }
 
+  // 4b. Check ADIF Pins
+  if (tip.empty() && adifStore_) {
+    auto stats = adifStore_->get();
+    if (stats.valid && !stats.recentQSOs.empty()) {
+      std::time_t nowTime = std::time(nullptr);
+      nowTime -= 30 * 24 * 60 * 60;
+      std::tm *tm = std::gmtime(&nowTime);
+      char limitBuf[16];
+      std::strftime(limitBuf, sizeof(limitBuf), "%Y%m%d", tm);
+      std::string limitDate = limitBuf;
+
+      for (const auto &qso : stats.recentQSOs) {
+        if (qso.lat == 0.0 && qso.lon == 0.0)
+          continue;
+        if (qso.date < limitDate)
+          continue;
+
+        if (!stats.activeBandFilter.empty() && stats.activeBandFilter != "All" && qso.band != stats.activeBandFilter)
+          continue;
+        if (!stats.activeModeFilter.empty() && stats.activeModeFilter != "All" && qso.mode != stats.activeModeFilter)
+          continue;
+
+        if (screenDist(qso.lat, qso.lon) < kHitRadius) {
+          char buf[128];
+          std::string fmtDate = qso.date;
+          if (fmtDate.length() == 8) {
+            fmtDate = fmtDate.substr(0, 4) + "-" + fmtDate.substr(4, 2) + "-" + fmtDate.substr(6, 2);
+          }
+          std::snprintf(buf, sizeof(buf), "%s\n%s\n%s %s", qso.callsign.c_str(), fmtDate.c_str(), qso.band.c_str(), qso.mode.c_str());
+          tip = buf;
+          break;
+        }
+      }
+    }
+  }
+
+
   // 5. Check ONTA selected spot only
   if (tip.empty() && activityStore_) {
     auto ads = activityStore_->get();
