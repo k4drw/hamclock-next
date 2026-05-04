@@ -509,7 +509,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
     clublogProvider->fetch();
 
   lotwProvider = std::make_shared<LoTWProvider>(
-      netManager, ctx.adifStore, appCfg.lotwCall, appCfg.lotwPassword);
+      netManager, ctx.adifStore, ctx.prefixMgr, appCfg.lotwCall, appCfg.lotwPassword);
   if (!appCfg.lotwCall.empty() && !appCfg.lotwPassword.empty())
     lotwProvider->fetch();
 
