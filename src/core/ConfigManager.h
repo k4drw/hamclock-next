@@ -92,6 +92,7 @@ struct AppConfig {
   bool showBeacons = true;  // Show NCDXF beacons on world map
   bool showBorders = false; // Show Natural Earth country borders
   bool showLocalPropGauge = false; // Show MUF/LUF gauge at bottom of map
+  bool showLotwQsos = true;  // Show LOTW QSO pins on world map
   std::string displayPowerMethod =
       "auto"; // "auto", "vcgencmd", "bl_power", etc.
   std::string logLevel = "warn"; // "trace","debug","info","warn","error"

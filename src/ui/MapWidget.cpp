@@ -1098,7 +1098,8 @@ void MapWidget::render(SDL_Renderer *renderer) {
   renderSpotOverlay(renderer);
   renderDXClusterSpots(renderer);
   renderHeardMeSpots(renderer);
-  renderADIFPins(renderer);
+  if (config_.showLotwQsos)
+    renderADIFPins(renderer);
   renderONTASpots(renderer);
   renderBeacons(renderer);
 
