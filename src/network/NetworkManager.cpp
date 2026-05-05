@@ -831,12 +831,28 @@ void NetworkManager::loadCache() {
             ce.lastModified = lm;
             ce.etag = etag;
             cache_[url] = ce;
+            lru_.push_front(url);
             } catch (const std::exception &ex) {
             LOG_W("NetworkManager", "Cache parse error for {}: {}",
                   entry.path().string(), ex.what());
           }
         }
       }
+    }
+  }
+
+  // Enforce MAX_CACHE_ENTRIES limit on loaded metadata to prevent unbounded growth
+  {
+    std::lock_guard<std::mutex> lock(cacheMutex_);
+    while ((int)cache_.size() > (int)MAX_CACHE_ENTRIES && !lru_.empty()) {
+      std::string oldest = lru_.back();
+      auto it = cache_.find(oldest);
+      if (it != cache_.end()) {
+        cache_.erase(it);
+        LOG_D("NetworkManager", "loadCache: Evicted excess entry {} (cache now {} entries)",
+              oldest, cache_.size());
+      }
+      lru_.pop_back();
     }
   }
 }
