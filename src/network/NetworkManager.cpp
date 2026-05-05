@@ -754,7 +754,7 @@ void NetworkManager::saveToDisk(const std::string &url, const CacheEntry &entry,
     ofs << url << "\n";
     ofs << entry.lastModified << "\n";
     ofs << entry.etag << "\n";
-    ofs << *fullDataPtr;
+    ofs.write(fullDataPtr->data(), fullDataPtr->size());
   }
 }
 
