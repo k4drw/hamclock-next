@@ -227,7 +227,6 @@ void NetworkManager::fetchSharedAsync(const std::string &url,
       removeFromLru(url);
       auto it = cache_.find(url);
       if (it != cache_.end() && it->second.data) {
-        totalRamBytes_ -= it->second.data->size();
         it->second.data.reset();
       }
     }
