@@ -787,7 +787,6 @@ void NetworkManager::loadCache() {
     }
   }
 
-  auto now = std::time(nullptr);
   for (const auto &entry : std::filesystem::directory_iterator(cacheDir_)) {
     if (entry.is_regular_file()) {
       std::ifstream ifs(entry.path(), std::ios::binary);
@@ -822,14 +821,8 @@ void NetworkManager::loadCache() {
             if (!std::getline(ifs, etag))
               continue;
 
-            // Skip entries older than 7 days to prevent metadata bloat
-            if (now - ts > 7 * 24 * 3600) {
-              LOG_T("NetworkManager", "Skipping stale cache entry: {}", url);
-              continue;
-            }
-
-            // empty-data path in fetchAsync).  Only metadata is loaded here so
-            // loadCache() stays fast regardless of how many URLs are cached.
+            // Load entry metadata from disk. Cache validity is controlled by
+            // cacheAgeSeconds parameter in fetchAsync, not by disk file age.
             std::lock_guard<std::mutex> lock(cacheMutex_);
             CacheEntry ce;
             ce.data = nullptr;
