@@ -117,7 +117,8 @@ private:
   void removeFromLru(const std::string &url);
   std::list<std::string> lru_;
   size_t totalRamBytes_ = 0;
-  const size_t MAX_RAM_BYTES = 50 * 1024 * 1024; // 50 MB RAM cap
+  const size_t MAX_RAM_BYTES = 50 * 1024 * 1024;     // 50 MB RAM cap
+  const size_t MAX_CACHE_ENTRIES = 5000;             // Cap on metadata entries to prevent unbounded growth
 
 #ifdef __ANDROID__
   // Concatenates Android's per-file system CA store into a single PEM bundle

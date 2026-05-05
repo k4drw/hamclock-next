@@ -788,6 +788,7 @@ void NetworkManager::loadCache() {
     }
   }
 
+  auto now = std::time(nullptr);
   for (const auto &entry : std::filesystem::directory_iterator(cacheDir_)) {
     if (entry.is_regular_file()) {
       std::ifstream ifs(entry.path(), std::ios::binary);
@@ -821,6 +822,12 @@ void NetworkManager::loadCache() {
             std::string etag;
             if (!std::getline(ifs, etag))
               continue;
+
+            // Skip entries older than 7 days to prevent metadata bloat
+            if (now - ts > 7 * 24 * 3600) {
+              LOG_T("NetworkManager", "Skipping stale cache entry: {}", url);
+              continue;
+            }
 
             // empty-data path in fetchAsync).  Only metadata is loaded here so
             // loadCache() stays fast regardless of how many URLs are cached.
@@ -921,6 +928,21 @@ void NetworkManager::updateLruAndPrune(const std::string &url, size_t dataSize) 
         LOG_D("NetworkManager", "LRU: Evicted payload for {} to save RAM",
               oldest);
       }
+    }
+    lru_.pop_back();
+  }
+
+  // Evict oldest entries if cache has grown too large (metadata bloat from disk-loaded entries)
+  while ((int)cache_.size() > (int)MAX_CACHE_ENTRIES && !lru_.empty()) {
+    std::string oldest = lru_.back();
+    auto it = cache_.find(oldest);
+    if (it != cache_.end()) {
+      if (it->second.data) {
+        totalRamBytes_ -= it->second.data->size();
+      }
+      cache_.erase(it);
+      LOG_D("NetworkManager", "Entry limit: Evicted entire entry for {} (cache now {} entries)",
+            oldest, cache_.size());
     }
     lru_.pop_back();
   }
