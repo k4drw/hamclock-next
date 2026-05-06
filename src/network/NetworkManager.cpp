@@ -597,7 +597,7 @@ void NetworkManager::fetchDirect(const std::string &url, SharedCallback callback
         (headers.count("content-type") &&
          headers.at("content-type").find("image/") != std::string::npos);
 
-    if (hubMode_ == HubMode::Master || (!isLarge && !isImage)) {
+    if (!isLarge && !isImage) {
       entry.data = response;
       updateLruAndPrune(url, response->size());
     } else {
