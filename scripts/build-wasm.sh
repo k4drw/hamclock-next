@@ -13,9 +13,16 @@ source "$EMSDK_DIR/emsdk_env.sh"
 BUILD_DIR="build-wasm"
 mkdir -p "$BUILD_DIR"
 
+DEBUG_API_FLAG="-DENABLE_DEBUG_API=OFF"
+for arg in "$@"; do
+    if [ "$arg" == "--enable-debug-api" ]; then
+        DEBUG_API_FLAG="-DENABLE_DEBUG_API=ON"
+    fi
+done
+
 emcmake cmake -S . -B "$BUILD_DIR" \
     -DCMAKE_BUILD_TYPE=Release \
-    -DENABLE_DEBUG_API=OFF
+    ${DEBUG_API_FLAG}
 
 emmake make -C "$BUILD_DIR" hamclock-wasm -j"$(nproc)"
 

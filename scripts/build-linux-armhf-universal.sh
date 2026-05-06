@@ -10,6 +10,13 @@ cd "$REPO_ROOT" || exit 1
 IMAGE="debian:bullseye"
 BUILD_DIR="build-linux-armhf-universal"
 
+DEBUG_API_FLAG="-DENABLE_DEBUG_API=OFF"
+for arg in "$@"; do
+    if [ "$arg" == "--enable-debug-api" ]; then
+        DEBUG_API_FLAG="-DENABLE_DEBUG_API=ON"
+    fi
+done
+
 # Get version from centralized files
 V_NUM=$(cat VERSION | tr -d '[:space:]')
 V_SUF=$(cat VERSION_SUFFIX | tr -d '[:space:]')
@@ -23,7 +30,7 @@ mkdir -p "$BUILD_DIR"
 # Common cmake flags shared by both variants.
 # Must be a single line — expanded inside docker bash -c "...", newlines would
 # be treated as command separators, not line continuations.
-COMMON_FLAGS="-DCMAKE_SYSTEM_NAME=Linux -DCMAKE_SYSTEM_PROCESSOR=arm -DCMAKE_C_COMPILER=arm-linux-gnueabihf-gcc -DCMAKE_CXX_COMPILER=arm-linux-gnueabihf-g++ -DCMAKE_BUILD_TYPE=Release -DENABLE_DEBUG_API=OFF -DBUILD_SHARED_LIBS=OFF -DCURL_DISABLE_INSTALL=ON -DSDL_STATIC=ON -DSDL_SHARED=OFF -DSDL_X11=ON -DSDL_X11_DYNAMIC=libX11.so.6 -DSDL_WAYLAND=ON -DSDL_WAYLAND_DYNAMIC=libwayland-client.so.0 -DSDL_KMSDRM=ON -DSDL_OPENGL=OFF -DSDL_GLES=ON -DSDL2IMAGE_VENDORED=ON -DSDL2IMAGE_SAMPLES=OFF -DSDL2IMAGE_WEBP=OFF -DSDL2IMAGE_TIF=OFF -DSDL2IMAGE_JXL=OFF -DSDL2IMAGE_AVIF=OFF -DHAMCLOCK_INSTALL_TYPE=DEB"
+COMMON_FLAGS="-DCMAKE_SYSTEM_NAME=Linux -DCMAKE_SYSTEM_PROCESSOR=arm -DCMAKE_C_COMPILER=arm-linux-gnueabihf-gcc -DCMAKE_CXX_COMPILER=arm-linux-gnueabihf-g++ -DCMAKE_BUILD_TYPE=Release ${DEBUG_API_FLAG} -DBUILD_SHARED_LIBS=OFF -DCURL_DISABLE_INSTALL=ON -DSDL_STATIC=ON -DSDL_SHARED=OFF -DSDL_X11=ON -DSDL_X11_DYNAMIC=libX11.so.6 -DSDL_WAYLAND=ON -DSDL_WAYLAND_DYNAMIC=libwayland-client.so.0 -DSDL_KMSDRM=ON -DSDL_OPENGL=OFF -DSDL_GLES=ON -DSDL2IMAGE_VENDORED=ON -DSDL2IMAGE_SAMPLES=OFF -DSDL2IMAGE_WEBP=OFF -DSDL2IMAGE_TIF=OFF -DSDL2IMAGE_JXL=OFF -DSDL2IMAGE_AVIF=OFF -DHAMCLOCK_INSTALL_TYPE=DEB"
 
 echo "Starting ARMhf DEB Build — unified + fb0 variants..."
 
