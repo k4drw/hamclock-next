@@ -77,9 +77,9 @@ void LoTWActivityProvider::fetch() {
       }
 
       if (!activity.empty()) {
-        store->update(activity);
-        LOG_I("LoTWActivityProvider", "Loaded %d LoTW user records",
-              (int)activity.size());
+        size_t count = activity.size();
+        store->update(std::move(activity));
+        LOG_I("LoTWActivityProvider", "Loaded %d LoTW user records", (int)count);
       } else {
         LOG_W("LoTWActivityProvider",
               "No LoTW activity records parsed from CSV");

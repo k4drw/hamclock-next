@@ -1,6 +1,7 @@
 #include "StringUtils.h"
 #include <charconv>
 #include <cstdlib>
+#include <functional>
 #include <string_view>
 
 #include <algorithm>
@@ -29,6 +30,11 @@ std::string extractAttr(const std::string &tag, const char *attr) {
 
 std::vector<std::string_view> splitCSVLineSV(std::string_view line) {
   std::vector<std::string_view> fields;
+  splitCSVLineSV(line, [&](std::string_view f) { fields.push_back(f); });
+  return fields;
+}
+
+void splitCSVLineSV(std::string_view line, std::function<void(std::string_view)> callback) {
   size_t start = 0;
   bool inQuotes = false;
   for (size_t i = 0; i < line.length(); ++i) {
@@ -36,20 +42,21 @@ std::vector<std::string_view> splitCSVLineSV(std::string_view line) {
     if (c == '"') {
       inQuotes = !inQuotes;
     } else if (c == ',' && !inQuotes) {
-      fields.push_back(line.substr(start, i - start));
+      std::string_view f = line.substr(start, i - start);
+      if (f.size() >= 2 && f.front() == '"' && f.back() == '"') {
+        f.remove_prefix(1);
+        f.remove_suffix(1);
+      }
+      callback(f);
       start = i + 1;
     }
   }
-  fields.push_back(line.substr(start));
-  
-  // Clean up quotes from fields
-  for (auto &f : fields) {
-    if (f.size() >= 2 && f.front() == '"' && f.back() == '"') {
-      f.remove_prefix(1);
-      f.remove_suffix(1);
-    }
+  std::string_view f = line.substr(start);
+  if (f.size() >= 2 && f.front() == '"' && f.back() == '"') {
+    f.remove_prefix(1);
+    f.remove_suffix(1);
   }
-  return fields;
+  callback(f);
 }
 
 double safe_stod(const std::string &s) {

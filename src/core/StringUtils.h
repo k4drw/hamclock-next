@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -13,8 +14,11 @@ namespace StringUtils {
 std::string extractAttr(const std::string &tag, const char *attr);
 
 // Lightweight CSV helper: splits a line into fields, handling quotes.
-// Returns a vector of views into the original string to avoid allocations.
+// Returns a vector of views into the original string.
 std::vector<std::string_view> splitCSVLineSV(std::string_view line);
+
+// Version that takes a callback to avoid vector allocation entirely.
+void splitCSVLineSV(std::string_view line, std::function<void(std::string_view)> callback);
 
 // Safely convert a string to a double, returning 0.0 on failure.
 double safe_stod(const std::string &s);

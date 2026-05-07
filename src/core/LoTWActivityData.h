@@ -13,9 +13,9 @@ struct LoTWActivityRecord {
 // Thread-safe store for LoTW user activity data (from lotw.arrl.org/lotw-user-activity.csv)
 class LoTWActivityStore {
 public:
-  void update(const std::unordered_map<std::string, std::chrono::system_clock::time_point> &activity) {
+  void update(std::unordered_map<std::string, std::chrono::system_clock::time_point> activity) {
     std::lock_guard<std::mutex> lock(mutex_);
-    activity_ = activity;
+    activity_ = std::move(activity);
     lastRefresh_ = std::chrono::system_clock::now();
   }
 

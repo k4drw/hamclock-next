@@ -148,14 +148,21 @@ void ActivityLocationManager::parsePOTA(const std::string &data) {
     if (line.empty())
       continue;
     
-    auto fields = StringUtils::splitCSVLineSV(line);
-    if (fields.size() >= 7) {
-      POTAPark p;
-      std::string_view ref = fields[0];
-      std::strncpy(p.reference, ref.data(), std::min(ref.size(), sizeof(p.reference) - 1));
-      p.reference[std::min(ref.size(), sizeof(p.reference) - 1)] = '\0';
-      p.lat = StringUtils::safe_stof(fields[5]);
-      p.lon = StringUtils::safe_stof(fields[6]);
+    int colIdx = 0;
+    POTAPark p;
+    StringUtils::splitCSVLineSV(line, [&](std::string_view field) {
+      if (colIdx == 0) {
+        std::strncpy(p.reference, field.data(), std::min(field.size(), sizeof(p.reference) - 1));
+        p.reference[std::min(field.size(), sizeof(p.reference) - 1)] = '\0';
+      } else if (colIdx == 5) {
+        p.lat = StringUtils::safe_stof(field);
+      } else if (colIdx == 6) {
+        p.lon = StringUtils::safe_stof(field);
+      }
+      colIdx++;
+    });
+
+    if (colIdx >= 7) {
       parks.push_back(p);
     }
   }
@@ -196,14 +203,21 @@ void ActivityLocationManager::parseSOTA(const std::string &data) {
     if (line.empty())
       continue;
 
-    auto fields = StringUtils::splitCSVLineSV(line);
-    if (fields.size() >= 10) {
-      SOTASummit s;
-      std::string_view ref = fields[0];
-      std::strncpy(s.reference, ref.data(), std::min(ref.size(), sizeof(s.reference) - 1));
-      s.reference[std::min(ref.size(), sizeof(s.reference) - 1)] = '\0';
-      s.lat = StringUtils::safe_stof(fields[9]); // Latitude column
-      s.lon = StringUtils::safe_stof(fields[8]); // Longitude column
+    int colIdx = 0;
+    SOTASummit s;
+    StringUtils::splitCSVLineSV(line, [&](std::string_view field) {
+      if (colIdx == 0) {
+        std::strncpy(s.reference, field.data(), std::min(field.size(), sizeof(s.reference) - 1));
+        s.reference[std::min(field.size(), sizeof(s.reference) - 1)] = '\0';
+      } else if (colIdx == 8) {
+        s.lon = StringUtils::safe_stof(field);
+      } else if (colIdx == 9) {
+        s.lat = StringUtils::safe_stof(field);
+      }
+      colIdx++;
+    });
+
+    if (colIdx >= 10) {
       summits.push_back(s);
     }
   }

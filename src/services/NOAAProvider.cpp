@@ -630,54 +630,51 @@ void NOAAProvider::fetchAuroraHistory() {
 void NOAAProvider::fetchAuroraMap() {
   auto auroraMapStore = auroraMapStore_;
   net_.fetchAsync(AURORA_URL, [auroraMapStore](std::string body) {
-    if (body.empty())
+    if (body.empty() || !auroraMapStore)
       return;
 
-    WorkerService::getInstance().submitTask([body, auroraMapStore]() {
+    WorkerService::getInstance().submitTask([body = std::move(body), auroraMapStore]() {
       try {
-        if (!auroraMapStore)
-          return;
-
-        auto j = nlohmann::json::parse(body, nullptr, false);
-        if (j.is_discarded() || !j.contains("coordinates"))
-          return;
-
         AuroraMapData data;
-        const auto &coords = j["coordinates"];
-        if (!coords.is_array())
+        
+        // Manual parse of JSON grid coordinates to avoid nlohmann::json massive allocation.
+        // Format: "coordinates":[[lon,lat,val],[lon,lat,val],...]
+        size_t coords_pos = body.find("\"coordinates\"");
+        if (coords_pos == std::string::npos)
           return;
 
-        for (const auto &point : coords) {
-          if (point.is_array() && point.size() >= 3) {
-            // NOAA OVATION spec: [longitude, latitude, probability].
-            // Longitude: 0 to 360, Latitude: -90 to 90.
-            double d_lon = point[0].get<double>();
-            double d_lat = point[1].get<double>();
-            int val = point[2].get<int>();
-
+        const char* p = body.c_str() + coords_pos;
+        int count = 0;
+        while ((p = std::strchr(p, '[')) != nullptr) {
+          double d_lon, d_lat;
+          int val;
+          if (std::sscanf(p, "[%lf,%lf,%d]", &d_lon, &d_lat, &val) == 3 ||
+              std::sscanf(p, "[%lf, %lf, %d]", &d_lon, &d_lat, &val) == 3) {
+            
             int lon = static_cast<int>(std::round(d_lon));
             int lat = static_cast<int>(std::round(d_lat));
 
             // Normalize longitude to 0..359
-            while (lon < 0)
-              lon += 360;
-            while (lon >= 360)
-              lon -= 360;
+            while (lon < 0) lon += 360;
+            while (lon >= 360) lon -= 360;
 
             if (lat >= -90 && lat <= 90) {
               int row = lat + 90; // 0 to 180
               data.grid[row * 360 + lon] =
                   static_cast<uint8_t>(std::clamp(val, 0, 100));
             }
+            count++;
           }
+          p++;
         }
+
         data.valid = true;
         data.lastUpdate = std::chrono::system_clock::now();
         auroraMapStore->update(data);
-        LOG_I("NOAAProvider", "Aurora map grid updated ({} points).",
-              (int)coords.size());
+        LOG_I("NOAAProvider", "Aurora map grid updated ({} points parsed manually).",
+              count);
       } catch (const std::exception &e) {
-        LOG_E("NOAAProvider", "Aurora JSON error: {}", e.what());
+        LOG_E("NOAAProvider", "Aurora parse error: {}", e.what());
       }
     });
   });
