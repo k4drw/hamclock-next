@@ -327,11 +327,12 @@ void LiveSpotProvider::fetchWSPR() {
         data.windowMinutes = maxAge;
 
         if (body.empty()) {
-          LOG_W("LiveSpot", "Empty response from db1.wspr.live");
+          LOG_I("LiveSpot", "No spots found for query (0 bytes from db1.wspr.live)");
           if (state) {
             std::lock_guard<std::mutex> lk(state->servicesMutex);
-            state->services["LiveSpot"].ok = false;
-            state->services["LiveSpot"].lastError = "Empty response";
+            state->services["LiveSpot"].ok = true;
+            state->services["LiveSpot"].lastSuccess = std::chrono::system_clock::now();
+            state->services["LiveSpot"].lastError = "";
           }
           data.lastUpdated = std::chrono::system_clock::now();
           data.valid = true;

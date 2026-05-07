@@ -374,6 +374,15 @@ void NetworkManager::fetchSharedAsync(const std::string &url,
               updateLruAndPrune(url, sharedBody->size());
             } else {
               removeFromLru(url);
+              lru_.push_front(url);
+              while ((int)cache_.size() > (int)MAX_CACHE_ENTRIES && !lru_.empty()) {
+                std::string oldest = lru_.back();
+                auto it = cache_.find(oldest);
+                if (it != cache_.end()) {
+                  cache_.erase(it);
+                }
+                lru_.pop_back();
+              }
             }
 
             cache_[url] = entry;
@@ -605,6 +614,17 @@ void NetworkManager::fetchDirect(const std::string &url, SharedCallback callback
             url, isLarge ? "large" : "an image",
             response->size() / 1024.0 / 1024.0);
       removeFromLru(url);
+      // Metadata-only entries still need LRU tracking for eviction
+      lru_.push_front(url);
+      // Check entry-count limit even for metadata-only entries
+      while ((int)cache_.size() > (int)MAX_CACHE_ENTRIES && !lru_.empty()) {
+        std::string oldest = lru_.back();
+        auto it = cache_.find(oldest);
+        if (it != cache_.end()) {
+          cache_.erase(it);
+        }
+        lru_.pop_back();
+      }
     }
 
     cache_[url] = entry;
@@ -932,10 +952,10 @@ void NetworkManager::updateLruAndPrune(const std::string &url, size_t dataSize) 
     if (it != cache_.end()) {
       if (it->second.data) {
         totalRamBytes_ -= it->second.data->size();
-        it->second.data.reset();
-        LOG_D("NetworkManager", "LRU: Evicted payload for {} to save RAM",
-              oldest);
       }
+      cache_.erase(it);
+      LOG_D("NetworkManager", "LRU: Evicted entry {} to save RAM (disk cache preserves metadata)",
+            oldest);
     }
     lru_.pop_back();
   }
@@ -978,11 +998,11 @@ void NetworkManager::pruneStaleCache(int maxAgeSeconds) {
         std::error_code ec;
         std::filesystem::remove(cacheDir_ / hashUrl(it->first), ec);
       }
+      auto lruIt = std::find(lru_.begin(), lru_.end(), it->first);
+      if (lruIt != lru_.end())
+        lru_.erase(lruIt);
       if (it->second.data) {
         totalRamBytes_ -= it->second.data->size();
-        auto lruIt = std::find(lru_.begin(), lru_.end(), it->first);
-        if (lruIt != lru_.end())
-          lru_.erase(lruIt);
       }
       it = cache_.erase(it);
       count++;
@@ -994,5 +1014,22 @@ void NetworkManager::pruneStaleCache(int maxAgeSeconds) {
     LOG_I("NetworkManager", "Pruned {} stale cache entries from memory and disk",
           count);
   }
+}
+
+void NetworkManager::dumpCacheStats() const {
+  std::lock_guard<std::mutex> lock(cacheMutex_);
+  size_t withData = 0, metadataOnly = 0, totalMetadataBytes = 0;
+  for (const auto& [url, entry] : cache_) {
+    if (entry.data) {
+      withData++;
+    } else {
+      metadataOnly++;
+      totalMetadataBytes += url.size() + entry.lastModified.size() + entry.etag.size();
+    }
+  }
+  LOG_I("NetworkManager",
+    "Cache stats: %zu w/data, %zu metadata-only (~%zu KB), LRU: %zu, RAM: %zu MB, Entries: %zu/%zu",
+    withData, metadataOnly, totalMetadataBytes / 1024, lru_.size(),
+    totalRamBytes_ / 1024 / 1024, cache_.size(), MAX_CACHE_ENTRIES);
 }
 

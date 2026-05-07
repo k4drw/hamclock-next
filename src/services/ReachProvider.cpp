@@ -200,10 +200,11 @@ void ReachProvider::fetchWSPR(const std::string& band, const std::string& mode) 
     net_.fetchAsync(url, [self, band, mode](std::string body) {
         auto p = self.lock();
         if (!p) return;
-        if (!body.empty())
+        if (body.empty()) {
+            LOG_I("ReachProvider", "WSPR fetch returned 0 bytes (no spots)");
+        } else {
             p->processWSPR(body, band, mode);
-        else
-            LOG_E("ReachProvider", "WSPR fetch failed or empty");
+        }
         p->onSourceComplete(band, mode);
     }, 300);
 }

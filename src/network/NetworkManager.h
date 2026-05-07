@@ -72,7 +72,7 @@ private:
     std::string etag;
   };
   std::unordered_map<std::string, CacheEntry> cache_;
-  std::mutex cacheMutex_;
+  mutable std::mutex cacheMutex_;
   std::filesystem::path cacheDir_;
   std::string corsProxyUrl_;
 
@@ -141,6 +141,9 @@ public:
   // Cache stats for debugging
   size_t getCacheRamBytes() const { return totalRamBytes_; }
   size_t getCacheItemCount() const { return cache_.size(); }
+
+  // Dump detailed cache stats for memory profiling
+  void dumpCacheStats() const;
 
   // Get the local IPv4 address (excluding loopback).
   static std::string getLocalIP();

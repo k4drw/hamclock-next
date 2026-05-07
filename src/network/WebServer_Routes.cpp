@@ -2987,6 +2987,14 @@ void WebServer::registerRoutes(httplib::Server &svr) {
     res.set_content(j.dump(), "application/json");
   });
 
+  svr.Get("/debug/memory", [this](const httplib::Request &, httplib::Response &res) {
+    nlohmann::json j;
+    j["cache_ram_bytes"] = (long long)netMgr_->getCacheRamBytes();
+    j["cache_item_count"] = (long long)netMgr_->getCacheItemCount();
+    netMgr_->dumpCacheStats();
+    res.set_content(j.dump(2), "application/json");
+  });
+
   svr.Get("/get_build.txt",
           [](const httplib::Request &, httplib::Response &res) {
             SDL_version sdlLinked;

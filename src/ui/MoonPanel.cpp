@@ -24,6 +24,12 @@ MoonPanel::~MoonPanel() {
 }
 
 void MoonPanel::update() {
+  uint32_t now = SDL_GetTicks();
+  // Moon data changes slowly (15-30m). 60s update is extremely conservative.
+  if (now - lastUpdateMs_ < 60000 && dataValid_)
+    return;
+  lastUpdateMs_ = now;
+
   currentData_ = store_->get();
   dataValid_ = currentData_.valid;
 
