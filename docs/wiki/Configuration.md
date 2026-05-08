@@ -59,6 +59,7 @@ If `lat`/`lon` are omitted, they are derived from the center of your grid square
 | `mapPanY`            | number | `0.0`               | Map vertical pan offset                                     |
 | `displayPowerMethod` | string | `"auto"`            | Method to control display (`auto`, `vcgencmd`, `bl_power`)  |
 | `showLocalPropGauge` | bool   | `false`             | Show local propagation gauge map overlay                    |
+| `showLotwQsos`       | bool   | `true`              | Show/hide ADIF and Logbook of The World (LoTW) world map QSO pins |
 
 ---
 

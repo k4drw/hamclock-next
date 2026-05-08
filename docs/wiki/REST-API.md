@@ -127,6 +127,7 @@ Use these endpoints to determine exactly where elements are on the screen (usefu
 - `GET /get_dx.txt` : DX location and bearing/distance.
 - `GET /get_stopwatch.txt` : Current status of the stopwatch (running state and time).
 - `GET /debug/logs` : Returns the last 100 lines of application logs.
+- `GET /debug/memory` : Returns JSON with cache RAM usage (`cache_ram_bytes`) and item counts (`cache_item_count`).
 
 ---
 

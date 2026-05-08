@@ -34,6 +34,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Local Propagation Gauge** — compact map overlay at the map bottom showing real-time MUF, LUF, and recommended HF bands for the DE station; toggled via Map View menu; preference persisted as `showLocalPropGauge` in config.
 - **Global Weather Forecast Widget** — worldwide 7-day weather forecasting via Open-Meteo API (replaces US-only NWS provider). Displays high/low temperatures, weather conditions (clear, rain, snow, storm), and precipitation probability; single HTTP GET every 4 hours; works for any lat/lon without authentication. Non-US users no longer see "Loading..." indefinitely.
 - **Cache Statistics in SysInfoPanel** — displays texture, vertex, and command buffer usage stats for debugging performance on "Master Hub" (centralized) deployments.
+- **ADIF/LoTW Map Pin Hover Tooltips** — hovering over ADIF/LoTW world map pins displays a tooltip with callsign, date, band, and mode, validated against active band/mode filters.
+- **LoTW QSO Toggle** — added a "LOTW QSOs" checkbox in the Map View menu (persisted via `showLotwQsos` in configuration) to toggle display of LoTW QSO pins on the world map.
+- **Debug Memory Endpoint** — added `/debug/memory` REST endpoint returning cache RAM usage and item counts.
+- **Enable Debug API Flag** — added `--enable-debug-api` command line option to build scripts to support local testing with the Debug API enabled.
 
 ### Changed
 - **MCP Server Documentation** — Enhanced onboarding context for new widget contributors: MCP JSON now documents 50+ WidgetDeps fields (stores, providers, core resources) with usage patterns; expanded gotchas section from 1 → 6 entries covering REGISTER_WIDGET two-step requirement, MemoryMonitor::destroyTexture pattern, StatusCache optimization, DashboardContext lifecycle; added base class selection guidance (Widget vs ListPanel) to widget_scaffolding. Project-local hc-new-widget skill now includes Base Class Selection section, Debugging Patterns (common failure modes), rate limiting/backoff patterns, and enhanced References. MCP README now includes 5-step Newcomer Quick Start path. AI agents and humans adding widgets can complete tasks without grepping the codebase.
@@ -47,6 +51,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Callbook Integration Service** — new `CallbookProvider` for asynchronous location resolution via external APIs
 - **Polar Rendering Primitives** — new `RenderUtils` methods for `drawPie` and `drawArcOutline` supporting advanced circular UI elements
 - **VOACAP DE-DX Timeline** — reoriented x-axis so the leftmost column is always the current UTC hour ("now at origin"); time flows right with 24-hour wrap-around; "now" cursor restored at left edge as a vertical white line for spot/band intersection visualization; legend items centered under graph columns; <10% reliability swatch changed from black to dark grey (64,64,64) for dark-theme contrast.
+- **WSPR Empty Response Interpretation** — WSPR providers now correctly treat 0-byte ClickHouse HTTP responses as 0 active spots (a normal state for inactive locators) rather than flagging a network error.
+- **Network Caching & Reliability** — overhauled NetworkManager caching: capped cache to 5,000 entries (MAX_CACHE_ENTRIES) to prevent unbounded metadata bloat, introduced LRU tracking for metadata-only entries, skipped RAM-caching for large (>512KB) and image files, binary-safe writing for JPEG/PNG disk caching, and extended max cache age to 30 days to protect large SOTA/POTA cache persistence across restarts.
 
 ### Fixed
 - **FlareProvider Wiring** — Fixed structural error in DashboardContext.cpp where FlareProvider was accessed via AppContext parameter instead of DashboardContext member; changed `ctx.flareProvider` to `flareProvider` at initialization and periodic-fetch sites. Flare widget now correctly initializes and fetches NOAA data.
@@ -85,6 +91,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
     - **Extended RAM Cache**: Increased `MAX_RAM_BYTES` to 50MB and enabled RAM-caching of large payloads (>512KB) for Hub Masters, serving sequential client requests from memory instead of forcing redundant disk I/O and allocations.
     - **Zero-Allocation 304s**: Implemented early metadata validation in `/api/hub/fetch` to return 304 Not Modified without triggering disk reads if cache is fresh.
     - **Verification**: Hub Master RAM stabilized at ~350-380MB regardless of client restart patterns or concurrent map requests.
+- **LoTW Auto-Sync Callback Wiring** — wired the LoTWSyncPanel to the LoTWProvider callback to display real sync time, QSO count, and connection status in the widget.
+- **Network Cache Double-Deduction** — fixed a bug where stale entries double-deducted their size from total RAM cache, leading to unsigned wrap-around values (observed as 175 exabytes in cache stats).
+- **Local Cache Bypass on Restart** — replaced unreliable file write-time checks with internal epoch-independent timestamp parsing, preventing clients from bypassing valid local caches at startup.
+- **Memory Overhaul & Churn Reduction** — resolved core performance and memory issues with a comprehensive memory overhaul: zero-allocation CSV parsing (`splitCSVLineSV`), zero-heap SOTA/POTA processing in `ActivityLocationManager`, static thread-local buffers in `RenderUtils` for rendering polylines/circles separately, `std::move` optimization in `LoTWActivityStore`, manual parsing of NOAA Aurora grid (bypassing heavy JSON overhead), high-performance `isoToTimeT` instead of `mktime`/`tzset` in `LoTWActivityProvider`, and throttling `MoonPanel` updates to 60s.
 
 ---
 
