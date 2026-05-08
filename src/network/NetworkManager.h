@@ -136,7 +136,7 @@ public:
                         std::string &etag, std::time_t &timestamp);
 
   // Periodic cleanup of entries older than maxAgeSeconds
-  void pruneStaleCache(int maxAgeSeconds = 86400);
+  void pruneStaleCache(int maxAgeSeconds = 30 * 24 * 3600);
 
   // Cache stats for debugging
   size_t getCacheRamBytes() const { return totalRamBytes_; }

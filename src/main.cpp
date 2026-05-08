@@ -548,6 +548,7 @@ int main(int argc, char *argv[]) {
   ctx.netManager->setHubConfig(ctx.appCfg.hubMode, ctx.appCfg.hubIp,
                                ctx.appCfg.hubPort);
 #ifndef __EMSCRIPTEN__
+  ctx.netManager->waitForCacheLoad();
   logStartupPhase("network manager ready");
 #endif
 

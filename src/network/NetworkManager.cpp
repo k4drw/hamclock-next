@@ -787,26 +787,6 @@ void NetworkManager::loadCache() {
   if (cacheDir_.empty())
     return;
 
-  // Prune cache files older than 1 day
-  {
-    auto now = std::time(nullptr);
-    auto cutoff = now - (24 * 3600); // 1 day ago
-    for (const auto &entry : std::filesystem::directory_iterator(cacheDir_)) {
-      if (entry.is_regular_file()) {
-        auto lastWrite = std::filesystem::last_write_time(entry.path());
-        auto sctp = std::chrono::time_point_cast<std::chrono::seconds>(lastWrite);
-        auto age = sctp.time_since_epoch().count();
-        if (age < cutoff) {
-          std::error_code ec;
-          std::filesystem::remove(entry.path(), ec);
-          if (!ec) {
-            LOG_D("NetworkManager", "Pruned old cache file: {}", entry.path().filename().string());
-          }
-        }
-      }
-    }
-  }
-
   for (const auto &entry : std::filesystem::directory_iterator(cacheDir_)) {
     if (entry.is_regular_file()) {
       std::ifstream ifs(entry.path(), std::ios::binary);
@@ -821,6 +801,17 @@ void NetworkManager::loadCache() {
             if (!std::getline(ifs, line))
               continue;
             std::time_t ts = std::stoll(line);
+
+            // Prune cache files older than 30 days based on their internal timestamp
+            std::time_t now = std::time(nullptr);
+            if (now - ts > 30 * 24 * 3600) {
+              ifs.close();
+              std::error_code ec;
+              std::filesystem::remove(entry.path(), ec);
+              LOG_D("NetworkManager", "Pruned old cache file on startup: {}",
+                    entry.path().filename().string());
+              continue;
+            }
 
             std::time_t serverTs = 0;
             if (v11) {
