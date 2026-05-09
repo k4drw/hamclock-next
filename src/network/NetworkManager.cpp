@@ -1026,3 +1026,13 @@ void NetworkManager::dumpCacheStats() const {
     totalRamBytes_ / 1024 / 1024, cache_.size(), MAX_CACHE_ENTRIES);
 }
 
+void NetworkManager::clearRamCache() {
+  std::lock_guard<std::mutex> lock(cacheMutex_);
+  for (auto &pair : cache_) {
+    pair.second.data.reset();
+  }
+  lru_.clear();
+  totalRamBytes_ = 0;
+  LOG_I("NetworkManager", "Cleared all RAM cache payloads");
+}
+

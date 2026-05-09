@@ -2652,19 +2652,23 @@ void DashboardContext::update(AppContext &ctx) {
     mm.logStats("heartbeat");
     {
       size_t rss = mm.getRSS();
-      // Flush at 350 MB on low-memory devices (≤1.5 GB), 600 MB elsewhere.
+      // Hard limit at 400 MB.
       // 60-second heartbeat window means threshold must be well below OOM kill.
-      size_t threshold = mm.isLowMemoryDevice()
-                             ? (350ULL * 1024 * 1024)
-                             : (600ULL * 1024 * 1024);
+      size_t threshold = 400ULL * 1024 * 1024;
       if (rss > threshold) {
-        LOG_W("Main", "RSS {:.1f} MB exceeds threshold — flushing caches",
+        LOG_W("Main", "RSS {:.1f} MB exceeds 400MB limit — flushing caches",
               rss / 1024.0 / 1024.0);
-        texMgr.setMaxCacheSize(mm.isLowMemoryDevice() ? 15 : 30);
+        texMgr.setMaxCacheSize(15);
         fontMgr.setTextCacheLimit(100);
         fontMgr.setVolatileCacheLimit(100);
         fontCatalog.clearCache();
         fontMgr.clearCache();
+        if (ctx.netManager) {
+          ctx.netManager->clearRamCache();
+        }
+#if defined(__linux__) && !defined(__EMSCRIPTEN__)
+        malloc_trim(0);
+#endif
       }
     }
     lastMemLogMs = now;

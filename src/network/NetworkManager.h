@@ -145,6 +145,9 @@ public:
   // Dump detailed cache stats for memory profiling
   void dumpCacheStats() const;
 
+  // Purge all shared payload strings from memory, preserving metadata.
+  void clearRamCache();
+
   // Get the local IPv4 address (excluding loopback).
   static std::string getLocalIP();
 };
