@@ -261,6 +261,7 @@ struct DashboardContext {
   Uint32 lastSleepAssert = 0;
   Uint32 lastMemLogMs = 0;
   Uint32 lastPruneMs_ = 0;
+  Uint32 lastBlackFrameMs_ = 0;
   uint32_t lastDxcVer_ = 0;
   uint32_t lastSpotVer_ = 0;
   std::shared_ptr<const DXClusterData> currentDxcSnapshot_;

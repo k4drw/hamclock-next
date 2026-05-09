@@ -1245,6 +1245,8 @@ void MapWidget::updatePropagationOverlay() {
       propTexture_ =
           SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32,
                             SDL_TEXTUREACCESS_STATIC, grid.cols, grid.rows);
+      if (propTexture_)
+        MemoryMonitor::getInstance().addVram((int64_t)grid.cols * grid.rows * 4);
       SDL_SetTextureBlendMode(propTexture_, SDL_BLENDMODE_BLEND);
     }
     if (!propTexture_)
@@ -1365,6 +1367,7 @@ void MapWidget::onPropDataReady(PropOverlayType type,
                                      PropEngine::MAP_W, PropEngine::MAP_H);
     if (!propTexture_)
       return;
+    MemoryMonitor::getInstance().addVram((int64_t)PropEngine::MAP_W * PropEngine::MAP_H * 4);
     SDL_SetTextureBlendMode(propTexture_, SDL_BLENDMODE_BLEND);
   }
 

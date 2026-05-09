@@ -189,6 +189,7 @@ void populateWidgetDescriptions();
 #endif
 #include <memory>
 #ifdef __linux__
+#include <malloc.h>
 #include <unistd.h>
 #endif
 
@@ -303,6 +304,16 @@ DashboardContext::DashboardContext(AppContext &ctx)
   SDL_GetRendererOutputSize(ctx.renderer, &drawW, &drawH);
   float rs = static_cast<float>(drawH) / LOGICAL_HEIGHT;
   fontMgr.setRenderScale(rs);
+
+  // In software mode textures live in system RAM; shrink the cache to avoid
+  // accumulating 200MB of pixel buffers (default 50 × 4MB on ARM).
+  {
+    SDL_RendererInfo rinfo;
+    if (SDL_GetRendererInfo(ctx.renderer, &rinfo) == 0 &&
+        (rinfo.flags & SDL_RENDERER_SOFTWARE)) {
+      texMgr.setMaxCacheSize(20);
+    }
+  }
 
   // Generate procedural textures
   texMgr.generateLineTexture(ctx.renderer, "line_aa");
@@ -1489,6 +1500,12 @@ void DashboardContext::update(AppContext &ctx) {
       ctx.updateChecker->fetch();
 #endif
     lastFetchMs = now;
+#if defined(__linux__) && !defined(__EMSCRIPTEN__)
+    // Return heap pages freed during provider parse burst back to the OS.
+    // 20+ concurrent fetches leave glibc malloc arenas with freed-but-retained
+    // pages that inflate RSS by ~50MB per screen wake if not trimmed.
+    malloc_trim(0);
+#endif
   }
 
   // --- Immediate Fetches for Active Widgets (Data missing or stale) ---
@@ -2826,9 +2843,21 @@ void DashboardContext::render(AppContext &ctx) {
   }
 
   if (!ctx.displayPower->getPower()) {
-    if (ctx.displayPower->consumeBlackFrame())
-      SDL_RenderPresent(ctx.renderer); // one black frame to clear the display
-    return; // subsequent ticks: don't present — let KMSDRM pipeline go idle
+    uint32_t nowMs = SDL_GetTicks();
+    if (ctx.displayPower->consumeBlackFrame()) {
+      SDL_RenderPresent(ctx.renderer); // first black frame to clear display
+      lastBlackFrameMs_ = nowMs;
+    } else if (nowMs - lastBlackFrameMs_ > 2000) {
+      // Keep SDL's KMSDRM page-flip chain alive with a periodic black frame.
+      // Stopping SDL_RenderPresent entirely can cause the KMS framebuffer
+      // chain to fall into an inconsistent state, resulting in new GEM
+      // buffer allocations (~50MB) that are never freed on each screen wake.
+      SDL_SetRenderDrawColor(ctx.renderer, 0, 0, 0, 255);
+      SDL_RenderClear(ctx.renderer);
+      SDL_RenderPresent(ctx.renderer);
+      lastBlackFrameMs_ = nowMs;
+    }
+    return;
   }
 
   Widget *activeModal = nullptr;

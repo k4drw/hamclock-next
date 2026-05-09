@@ -2186,6 +2186,7 @@ void MapWidget::renderAuroraOverlay(SDL_Renderer *renderer) {
         SDL_RenderSetClipRect(renderer, nullptr);
         return;
       }
+      MemoryMonitor::getInstance().addVram(360 * 181 * 4);
       SDL_SetTextureBlendMode(auroraTexture_, SDL_BLENDMODE_BLEND);
     }
 

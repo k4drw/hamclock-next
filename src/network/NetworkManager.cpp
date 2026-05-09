@@ -379,6 +379,7 @@ void NetworkManager::fetchSharedAsync(const std::string &url,
                 std::string oldest = lru_.back();
                 auto it = cache_.find(oldest);
                 if (it != cache_.end()) {
+                  if (it->second.data) totalRamBytes_ -= it->second.data->size();
                   cache_.erase(it);
                 }
                 lru_.pop_back();
@@ -621,6 +622,7 @@ void NetworkManager::fetchDirect(const std::string &url, SharedCallback callback
         std::string oldest = lru_.back();
         auto it = cache_.find(oldest);
         if (it != cache_.end()) {
+          if (it->second.data) totalRamBytes_ -= it->second.data->size();
           cache_.erase(it);
         }
         lru_.pop_back();
