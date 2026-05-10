@@ -105,7 +105,8 @@ void DXClusterPanel::clearSpotCache() {
 void DXClusterPanel::update() {
   uint32_t ver = store_->getVersion();
   bool scrollChanged = (scrollOffset_ != lastScrollOffset_);
-  if (ver == lastVer_ && !scrollChanged)
+  bool forceUpdate = (lastUpdate_ == std::chrono::system_clock::time_point{});
+  if (ver == lastVer_ && !scrollChanged && !forceUpdate)
     return;
   lastVer_ = ver;
 
