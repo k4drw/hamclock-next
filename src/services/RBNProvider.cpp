@@ -88,6 +88,10 @@ void RBNProvider::runTelnet(const std::string &host, int port,
     return;
   }
 
+  int keepalive = 1;
+  setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, (const char *)&keepalive,
+             sizeof(keepalive));
+
   struct hostent *he = gethostbyname(host.c_str());
   if (!he) {
     LOG_E("RBN", "Could not resolve {}", host);
@@ -148,6 +152,8 @@ void RBNProvider::runTelnet(const std::string &host, int port,
   std::string buffer;
   bool loggedIn = login.empty();
   auto lastHeartbeat = std::chrono::system_clock::now();
+  auto lastPrune = std::chrono::system_clock::now();
+  auto lastDataReceived = std::chrono::system_clock::now();
 
   while (!stopRequested_) {
 #ifdef _WIN32
@@ -178,6 +184,7 @@ void RBNProvider::runTelnet(const std::string &host, int port,
       }
 
       tmp[n] = '\0';
+      lastDataReceived = std::chrono::system_clock::now();
       buffer.append(tmp, n);
 
       size_t pos;
@@ -247,8 +254,21 @@ void RBNProvider::runTelnet(const std::string &host, int port,
         buffer.clear();
     }
 
-    // Heartbeat every 60 seconds
+    // Heartbeat & Maintenance checks
     auto now = std::chrono::system_clock::now();
+
+    // Periodic in-memory Prune (clears UI if stream is silent)
+    if (now - lastPrune > std::chrono::seconds(60)) {
+      if (store_) store_->pruneInMemory();
+      lastPrune = now;
+    }
+
+    // Watchdog (detects dead stream/VPN stall)
+    if (now - lastDataReceived > std::chrono::minutes(10)) {
+      LOG_W("RBN", "No data received for 10 minutes. Forcing reconnect.");
+      break;
+    }
+
     if (now - lastHeartbeat > std::chrono::seconds(60)) {
       send(sock, "\r\n", 2, 0);
       lastHeartbeat = now;
@@ -322,9 +342,17 @@ void RBNProvider::processLine(const std::string &line) {
       tm->tm_min = mn;
       tm->tm_sec = 0;
       std::time_t spot_c = Astronomy::portable_timegm(tm);
-      if (spot_c > now_c)
+      
+      // Handle day wrap: sub 24h only if delta > 30 mins in the future.
+      if (spot_c > now_c + 1800)
         spot_c -= 86400;
-      spot.spottedAt = std::chrono::system_clock::from_time_t(spot_c);
+      
+      // HHMMZ has minute precision; force receipt time for current minute
+      // or tolerated future drift so they start aging immediately at 0s.
+      if (static_cast<long>(now_c - spot_c) < 60)
+        spot.spottedAt = now;
+      else
+        spot.spottedAt = std::chrono::system_clock::from_time_t(spot_c);
     }
   }
 

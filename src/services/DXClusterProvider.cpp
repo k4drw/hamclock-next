@@ -234,6 +234,10 @@ void DXClusterProvider::runTelnet(const std::string &host, int port,
     return;
   }
 
+  int keepalive = 1;
+  setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, (const char *)&keepalive,
+             sizeof(keepalive));
+
   // Resolve hostname
   struct addrinfo hints{};
   hints.ai_family = AF_INET;
@@ -337,6 +341,8 @@ void DXClusterProvider::runTelnet(const std::string &host, int port,
   bool loginSent = false;   // track whether callsign has been sent
   bool initialRequestSent = false;
   auto lastHeartbeat = std::chrono::system_clock::now();
+  auto lastPrune = std::chrono::system_clock::now();
+  auto lastDataReceived = std::chrono::system_clock::now();
 
   // Elwood's DXCMSG_DT: 500ms pause before first send to let server settle.
   {
@@ -374,9 +380,23 @@ void DXClusterProvider::runTelnet(const std::string &host, int port,
 #endif
       break;
     }
+
+    auto now = std::chrono::system_clock::now();
+
+    // Periodic In-Memory Pruning (clears UI if feed goes quiet)
+    if (now - lastPrune > std::chrono::seconds(60)) {
+      store_->pruneInMemory();
+      lastPrune = now;
+    }
+
+    // Idle Data Watchdog (detects VPN zombies / dead streams)
+    if (now - lastDataReceived > std::chrono::minutes(10)) {
+      LOG_W("DXCluster", "No data received for 10 minutes. Forcing reconnect.");
+      break;
+    }
+
     if (sel == 0) {
       // Timeout — no data yet. Send heartbeat if needed.
-      auto now = std::chrono::system_clock::now();
       if (now - lastHeartbeat > std::chrono::seconds(60)) {
         if (send(sock, "\r\n", 2, 0) < 0) {
           LOG_W("DXCluster", "Heartbeat failed, closing connection");
@@ -414,6 +434,8 @@ void DXClusterProvider::runTelnet(const std::string &host, int port,
       }
       break;
     }
+
+    lastDataReceived = std::chrono::system_clock::now();
 
     // Strip Telnet IAC sequences (0xFF + 1–2 bytes) — prevents them from
     // corrupting line parsing and avoids stalling servers that send option
@@ -695,15 +717,17 @@ void DXClusterProvider::processLine(const std::string &line) {
             tm->tm_hour = hr;
             tm->tm_min = mn;
             tm->tm_sec = 0;
-            // Handle day wrap if needed (if hr:mn is in the future compared to
-            // now, it's likely yesterday)
+            // Handle day wrap: subtract a day only if the spot time is
+            // significantly in the future (e.g., > 30 min). This avoids 
+            // incorrectly rollbacking due to minor local clock drifts.
             std::time_t spot_c = Astronomy::portable_timegm(tm);
-            if (spot_c > now_c)
+            if (spot_c > now_c + 1800)
               spot_c -= 86400;
-            // HHMMZ has only minute precision. If the spot is from the current
-            // minute, use the actual receipt time so fresh spots show distinct
-            // elapsed seconds rather than all collapsing to the same value.
-            if (now_c - spot_c < 60)
+
+            // HHMMZ has only minute precision. If the spot is from within
+            // the current minute or any upcoming minute tolerated by drift,
+            // use actual receipt time to preserve immediate display.
+            if (static_cast<long>(now_c - spot_c) < 60)
               spot.spottedAt = now;
             else
               spot.spottedAt = std::chrono::system_clock::from_time_t(spot_c);
