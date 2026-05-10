@@ -310,6 +310,7 @@ void UpdateChecker::startDownload() {
     }
 
     curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+    curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeData);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &outFile);
     curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION, progressCallback);

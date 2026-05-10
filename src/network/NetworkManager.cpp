@@ -120,6 +120,7 @@ std::string NetworkManager::fetchFromHubSync(const std::string &hubUrl,
     return "";
   }
   curl_easy_setopt(curl, CURLOPT_URL, hubUrl.c_str());
+  curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
   curl_easy_setopt(curl, CURLOPT_TIMEOUT, 20L);
   curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
   curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeCallback);
@@ -481,6 +482,7 @@ void NetworkManager::fetchDirect(const std::string &url, SharedCallback callback
 
   std::unordered_map<std::string, std::string> headers;
   curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+  curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
   curl_easy_setopt(curl, CURLOPT_TIMEOUT, 45L);
   curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
 
