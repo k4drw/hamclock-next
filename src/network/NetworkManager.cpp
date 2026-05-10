@@ -1,5 +1,6 @@
 #include "NetworkManager.h"
 #include "../core/Logger.h"
+#include "../core/WorkerService.h"
 
 #ifndef __EMSCRIPTEN__
 #include <curl/curl.h>
@@ -195,7 +196,7 @@ void NetworkManager::fetchSharedAsync(const std::string &url,
               "Memory record found but no data (too large), loading from disk "
               "for {}",
               url);
-        std::thread([this, url, callback = std::move(callback),
+        WorkerService::getInstance().submitTask([this, url, callback = std::move(callback),
                      alive = alive_]() {
           {
             std::lock_guard<std::mutex> lk(inflightMutex_);
@@ -218,7 +219,7 @@ void NetworkManager::fetchSharedAsync(const std::string &url,
             if (--inflight_ == 0)
               inflightCv_.notify_all();
           }
-        }).detach();
+        });
         return;
       }
     } else {
@@ -333,7 +334,7 @@ void NetworkManager::fetchSharedAsync(const std::string &url,
 
       LOG_D("NetworkManager", "Hub client: Proxying request for {} to Hub at {}", url, hubUrl);
 
-      std::thread([this, hubUrl, url, callback = std::move(safeCallback), hasCache,
+      WorkerService::getInstance().submitTask([this, hubUrl, url, callback = std::move(safeCallback), hasCache,
                    cached, alive = alive_]() mutable {
         {
           std::lock_guard<std::mutex> lk(inflightMutex_);
@@ -403,12 +404,12 @@ void NetworkManager::fetchSharedAsync(const std::string &url,
           if (--inflight_ == 0)
             inflightCv_.notify_all();
         }
-      }).detach();
+      });
       return;
     }
   }
   // --- Direct fetch ---
-  std::thread([this, url, callback = std::move(safeCallback), hasCache,
+  WorkerService::getInstance().submitTask([this, url, callback = std::move(safeCallback), hasCache,
                cached, alive = alive_]() mutable {
     {
       std::lock_guard<std::mutex> lk(inflightMutex_);
@@ -422,7 +423,7 @@ void NetworkManager::fetchSharedAsync(const std::string &url,
       if (--inflight_ == 0)
         inflightCv_.notify_all();
     }
-  }).detach();
+  });
 #endif
 }
 
@@ -624,7 +625,8 @@ void NetworkManager::fetchDirect(const std::string &url, SharedCallback callback
         std::string oldest = lru_.back();
         auto it = cache_.find(oldest);
         if (it != cache_.end()) {
-          if (it->second.data) totalRamBytes_ -= it->second.data->size();
+          if (it->second.data)
+            totalRamBytes_ -= it->second.data->size();
           cache_.erase(it);
         }
         lru_.pop_back();
@@ -1030,11 +1032,9 @@ void NetworkManager::dumpCacheStats() const {
 
 void NetworkManager::clearRamCache() {
   std::lock_guard<std::mutex> lock(cacheMutex_);
-  for (auto &pair : cache_) {
-    pair.second.data.reset();
-  }
+  cache_.clear();
   lru_.clear();
   totalRamBytes_ = 0;
-  LOG_I("NetworkManager", "Cleared all RAM cache payloads");
+  LOG_I("NetworkManager", "Cleared all cache entries and RAM payloads");
 }
 
