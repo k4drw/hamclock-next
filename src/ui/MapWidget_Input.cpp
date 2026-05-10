@@ -178,7 +178,7 @@ bool MapWidget::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
     // current-band line for that spot (matches the hover tooltip data).
     const SpotRecord *hitSpot = nullptr;
     double hitLat = 0.0, hitLon = 0.0;
-    if (spotStore_) {
+    if (spotStore_ && currentSpotSnapshot_) {
       auto data = currentSpotSnapshot_;
       float bestDist = 10.0f;  // matches hover kHitRadius
       for (const auto &spot : data->spots) {
@@ -622,7 +622,7 @@ void MapWidget::onMouseMove(int mx, int my) {
   }
 
   // 8. Check DX Cluster selected spot only (mirrors renderDXClusterSpots logic)
-  if (tip.empty() && dxcStore_) {
+  if (tip.empty() && dxcStore_ && currentDxcSnapshot_) {
     auto data = currentDxcSnapshot_;
     if (data->hasSelection && data->selectedSpot.txLat != 0.0) {
       const auto &spot = data->selectedSpot;

@@ -70,10 +70,14 @@ public:
   // Set the live spot data store for map spot overlays.
   void setSpotStore(std::shared_ptr<LiveSpotDataStore> store) {
     spotStore_ = std::move(store);
+    if (spotStore_)
+      currentSpotSnapshot_ = spotStore_->snapshot();
   }
 
   void setDXClusterStore(std::shared_ptr<DXClusterDataStore> store) {
     dxcStore_ = std::move(store);
+    if (dxcStore_)
+      currentDxcSnapshot_ = dxcStore_->snapshot();
   }
 
   void setHeardMeStore(std::shared_ptr<HeardMeStore> store) {
