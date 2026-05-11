@@ -173,7 +173,7 @@ If `lat`/`lon` are omitted, they are derived from the center of your grid square
 | `sdoWavelength` | string | `"0193"` | SDO wavelength (e.g., `211193171`, `HMIB`, `0131`, `0193`, `0211`, `0304`, `1600`, `1700`) |
 | `sdoRotating`   | bool   | `false`  | Automatically rotate through available wavelengths every 30 seconds                                 |
 | `sdoPfss`       | bool   | `false`  | Overlay solar magnetic field lines (PFSS) on supported wavelengths                                  |
-| `sdoShowMovie`  | bool   | `false`  | Show SDO image as a time-lapse movie loop                                                           |
+| `sdoShowMovie`  | bool   | `false`  | Reserved; movie mode not yet implemented                                                            |
 
 ---
 

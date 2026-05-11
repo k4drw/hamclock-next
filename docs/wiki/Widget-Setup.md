@@ -209,7 +209,6 @@ Click the **gear icon** in the SDO panel to:
 - Choose a **wavelength** (0193, 0171, 0304, 1600, 1700, HMIB, HMIIC).
 - Enable **Rotating Display** to cycle wavelengths automatically.
 - Enable **PFSS Overlay** for magnetic field lines.
-- Enable **Movie Mode** for a time-lapse loop.
 
 ---
 

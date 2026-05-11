@@ -77,7 +77,7 @@ Controls the assignment and visualization of widgets in panes.
 - `GET /get_pane.txt` : Plaintext status of assigned widgets for each pane.
 - `GET /get_active_pane.txt` : Returns the currently visible widget ID for each pane.
 - `GET /set_panzoom?pan_x={X}&pan_y={Y}&zoom={Z}` : Directly set map pan/zoom.
-- `GET /set_sdo_options?wave={X}&rot={0|1}&pfss={0|1}&movie={0|1}` : Configure Solar widget (SDO) options.
+- `GET /set_sdo_options?wave={X}&rot={0|1}&pfss={0|1}&movie={0|1}` : Configure Solar widget (SDO) options. (`movie` param accepted but not yet implemented)
 
 ---
 

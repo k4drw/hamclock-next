@@ -25,12 +25,16 @@ All network requests are made by the HamClock-Next process itself. In browser (W
 
 ---
 
-## Solar Imagery (NASA SDO)
+## Solar Imagery (LMSAL / NASA SDO)
 
-| Data | Endpoint | Interval | Used By |
-|------|----------|----------|---------|
-| SDO AIA Images | `https://sdo.gsfc.nasa.gov/assets/img/latest/latest_256_{wavelength}.jpg` | 15 min | SDO |
-| SDO AIA Movie | `https://sdo.gsfc.nasa.gov/assets/img/latest/` | On demand | SDO (movie mode) |
+Images are fetched from a three-tier fallback chain. LMSAL (Lockheed Martin Solar & Astrophysics Laboratory) is the primary host; NASA GSFC and sol24.net are automatic fallbacks if LMSAL is unreachable.
+
+| Priority | Source | Endpoint Pattern | Interval | Used By |
+|----------|--------|-----------------|----------|---------|
+| 1 (Primary) | LMSAL | `http://sdowww.lmsal.com/sdomedia/SunInTime/mostrecent/l{wavelength}.jpg` | ~15 min | SDO |
+| 1 (Primary, PFSS/HMI) | LMSAL | `https://suntoday.lmsal.com/sdomedia/SunInTime/{YYYY}/{MM}/{DD}/...` | ~15 min | SDO |
+| 2 (Backup) | NASA GSFC | `https://sdo.gsfc.nasa.gov/assets/img/latest/latest_512_{wavelength}.jpg` | ~15 min | SDO |
+| 3 (Tertiary) | sol24.net | `https://sol24.net/data/latest_4096_{wavelength}.jpg` | ~15 min | SDO |
 
 ---
 

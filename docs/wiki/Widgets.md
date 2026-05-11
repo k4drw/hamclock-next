@@ -34,7 +34,7 @@ To add a widget to a pane, click the **top strip** of the pane to open the widge
 | Widget           | Description                                                                                                   | Data Source              |
 | ---------------- | ------------------------------------------------------------------------------------------------------------- | ------------------------ |
 | **Solar**        | Solar flux index (SFI), sunspot number (SSN), X-ray flux, proton flux, solar wind speed and density, Kp index | NOAA SWPC                |
-| **SDO**          | Live solar imagery from the Solar Dynamics Observatory in selectable wavelengths; optional movie loop         | NASA SDO                 |
+| **SDO**          | Live solar imagery from the Solar Dynamics Observatory in selectable wavelengths                              | LMSAL / NASA SDO         |
 | **Aurora**       | Global aurora forecast map from the NOAA OVATION model                                                        | NOAA SWPC                |
 | **Aurora Graph** | Time-series graph of geomagnetic Kp index and aurora activity                                                 | NOAA SWPC                |
 | **DRAP**         | D-Region Absorption Prediction — HF absorption map showing where ionospheric absorption degrades propagation  | NOAA SWPC                |
