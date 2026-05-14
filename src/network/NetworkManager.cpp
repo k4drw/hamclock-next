@@ -277,7 +277,7 @@ void NetworkManager::fetchSharedAsync(const std::string &url,
   struct FetchCtx {
     NetworkManager *mgr;
     std::string url;
-    std::function<void(std::string)> cb;
+    SharedCallback cb;
   };
   auto ctx = std::make_unique<FetchCtx>(
       FetchCtx{this, url, std::move(safeCallback)});
@@ -295,14 +295,14 @@ void NetworkManager::fetchSharedAsync(const std::string &url,
         // We don't have header headers easily in simple fetch on WASM,
         // but we can at least cache the data for small responses.
         if (response.size() < 512 * 1024) {
-          entry.data = response;
+          entry.data = std::make_shared<const std::string>(response);
         }
         owned->mgr->cache_[owned->url] = entry;
       }
 
-      owned->cb(std::move(response));
+      owned->cb(std::make_shared<const std::string>(std::move(response)));
     } else {
-      owned->cb("");
+      owned->cb(nullptr);
     }
     emscripten_fetch_close(fetch);
   };
@@ -310,7 +310,7 @@ void NetworkManager::fetchSharedAsync(const std::string &url,
     std::unique_ptr<FetchCtx> owned(static_cast<FetchCtx *>(fetch->userData));
     LOG_E("NetworkManager", "WASM fetch failed for {} (status {})", owned->url,
           fetch->status);
-    owned->cb(""); // empty string = failure
+    owned->cb(nullptr); // null = failure
     emscripten_fetch_close(fetch);
   };
 

@@ -783,7 +783,11 @@ DashboardContext::DashboardContext(AppContext &ctx)
         callbookProvider,
         ionosondeProvider,
         &fccProvider,
+#ifndef __EMSCRIPTEN__
         rigService.get(),
+#else
+        nullptr,
+#endif
         marineProvider.get(),
         dxWeatherProvider.get(),
     };
