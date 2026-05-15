@@ -67,6 +67,7 @@ static std::string dateToWeekday(const std::string &dateStr, int dayIndex) {
   ss >> std::get_time(&tm_info, "%Y-%m-%d");
   if (ss.fail())
     return "Day" + std::to_string(dayIndex);
+  std::mktime(&tm_info);
   char buf[16];
   std::strftime(buf, sizeof(buf), "%A", &tm_info);
   return buf;
