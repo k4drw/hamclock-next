@@ -64,6 +64,30 @@ std::string wsjtx_utf8(const uint8_t **bpp, const uint8_t *end) {
   *bpp += len;
   return s;
 }
+
+// Strips ANSI escape sequences and non-printable characters from callsigns.
+std::string sanitizeCall(const std::string &raw) {
+  std::string clean;
+  bool inEscape = false;
+  for (size_t i = 0; i < raw.length(); ++i) {
+    char c = raw[i];
+    if (c == '\x1B') {
+      inEscape = true;
+      continue;
+    }
+    if (inEscape) {
+      if (std::isalpha(static_cast<unsigned char>(c)))
+        inEscape = false;
+      continue;
+    }
+    // Keep alphanumeric and common ham delimiters
+    if (std::isalnum(static_cast<unsigned char>(c)) || c == '/' || c == '-' ||
+        c == '@' || c == '#') {
+      clean += static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+    }
+  }
+  return clean;
+}
 } // namespace
 
 DXClusterProvider::DXClusterProvider(std::shared_ptr<DXClusterDataStore> store,
@@ -160,9 +184,9 @@ void DXClusterProvider::runHubClient() {
         std::vector<DXClusterSpot> spots;
         for (const auto &j : arr) {
           DXClusterSpot s;
-          s.txCall  = j.value("txCall", "");
+          s.txCall  = sanitizeCall(j.value("txCall", ""));
           s.txGrid  = j.value("txGrid", "");
-          s.rxCall  = j.value("rxCall", "");
+          s.rxCall  = sanitizeCall(j.value("rxCall", ""));
           s.rxGrid  = j.value("rxGrid", "");
           s.mode    = j.value("mode", "");
           s.freqKhz = j.value("freqKhz", 0.0);
@@ -176,6 +200,33 @@ void DXClusterProvider::runHubClient() {
           int64_t ts = j.value("spottedAt", (int64_t)0);
           s.spottedAt = std::chrono::system_clock::time_point(
                             std::chrono::seconds(ts));
+
+          // Local resolution fallback for empty fields from the hub
+          if (s.txGrid.empty()) {
+            if (s.txLat != 0.0 || s.txLon != 0.0) {
+              s.txGrid = Astronomy::latLonToGrid(s.txLat, s.txLon);
+            } else {
+              LatLong ll;
+              if (pm_.findLocation(s.txCall, ll)) {
+                s.txLat = ll.lat;
+                s.txLon = ll.lon;
+                s.txGrid = Astronomy::latLonToGrid(ll.lat, ll.lon);
+              }
+            }
+          }
+          if (s.rxGrid.empty()) {
+            if (s.rxLat != 0.0 || s.rxLon != 0.0) {
+              s.rxGrid = Astronomy::latLonToGrid(s.rxLat, s.rxLon);
+            } else {
+              LatLong ll;
+              if (pm_.findLocation(s.rxCall, ll)) {
+                s.rxLat = ll.lat;
+                s.rxLon = ll.lon;
+                s.rxGrid = Astronomy::latLonToGrid(ll.lat, ll.lon);
+              }
+            }
+          }
+
           spots.push_back(s);
         }
         if (store_) store_->setSpots(spots);
@@ -651,6 +702,7 @@ void DXClusterProvider::processWSJTX(const uint8_t *packet, size_t len) {
       pm_.findLocation(dx_call, ll);
       spot.txLat = ll.lat;
       spot.txLon = ll.lon;
+      spot.txGrid = Astronomy::latLonToGrid(ll.lat, ll.lon);
     }
 
     if (!de_grid.empty()) {
@@ -659,6 +711,7 @@ void DXClusterProvider::processWSJTX(const uint8_t *packet, size_t len) {
       pm_.findLocation(de_call, ll);
       spot.rxLat = ll.lat;
       spot.rxLon = ll.lon;
+      spot.rxGrid = Astronomy::latLonToGrid(ll.lat, ll.lon);
     }
 
     store_->addSpot(spot);
@@ -704,8 +757,8 @@ void DXClusterProvider::processLine(const std::string &line) {
     const char *dxde = std::strstr(start, "DX de ");
     if (dxde) {
       if (sscanf(dxde, "DX de %31[^ :]: %f %31s", rxCall, &freq, txCall) == 3) {
-        spot.rxCall = rxCall;
-        spot.txCall = txCall;
+        spot.rxCall = sanitizeCall(rxCall);
+        spot.txCall = sanitizeCall(txCall);
         spot.freqKhz = freq;
         spot.spottedAt = std::chrono::system_clock::now(); // Default to now if
                                                            // time parsing fails
@@ -745,10 +798,12 @@ void DXClusterProvider::processLine(const std::string &line) {
         if (pm_.findLocation(spot.txCall, ll)) {
           spot.txLat = ll.lat;
           spot.txLon = ll.lon;
+          spot.txGrid = Astronomy::latLonToGrid(ll.lat, ll.lon);
         }
         if (pm_.findLocation(spot.rxCall, ll)) {
           spot.rxLat = ll.lat;
           spot.rxLon = ll.lon;
+          spot.rxGrid = Astronomy::latLonToGrid(ll.lat, ll.lon);
         }
 
         store_->addSpot(spot);

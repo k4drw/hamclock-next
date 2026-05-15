@@ -11,12 +11,15 @@
 #include <spdlog/fmt/fmt.h>
 
 struct HamClockState;
+class PrefixManager;
 
 class LiveSpotProvider : public ProviderBase {
 public:
   LiveSpotProvider(NetworkManager &net,
                    std::shared_ptr<LiveSpotDataStore> store,
-                   const AppConfig &config, HamClockState *state = nullptr,
+                   const AppConfig &config,
+                   PrefixManager &pm,
+                   HamClockState *state = nullptr,
                    std::shared_ptr<DXClusterDataStore> dxStore = nullptr);
 
   void fetch();
@@ -29,6 +32,7 @@ private:
   void fetchRBN();
 
   NetworkManager &net_;
+  PrefixManager &pm_;
   std::shared_ptr<LiveSpotDataStore> store_;
   std::shared_ptr<DXClusterDataStore> dxStore_;
   AppConfig config_;

@@ -400,7 +400,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
   rssProvider->fetch();
 
   spotProvider = std::make_unique<LiveSpotProvider>(
-      netManager, spotStore, appCfg, state.get(), dxcStore);
+      netManager, spotStore, appCfg, ctx.prefixMgr, state.get(), dxcStore);
   if (isMasterMode || isWidgetConfigured("live_spots") ||
       appCfg.propOverlay != PropOverlayType::None)
     spotProvider->fetch();
