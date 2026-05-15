@@ -6,6 +6,7 @@
 #include <curl/curl.h>
 #endif
 
+#include <mutex>
 #include <thread>
 
 #include <filesystem>
@@ -36,6 +37,11 @@
 #include <ifaddrs.h>
 #include <netinet/in.h>
 #endif
+
+// Serializes curl_easy_perform across all threads. Static mbedTLS (without
+// MBEDTLS_THREADING_PTHREAD) has non-thread-safe shared entropy and SSL
+// session state; concurrent SSL handshakes corrupt it and cause SIGABRT.
+static std::mutex sCurlMutex;
 
 static size_t writeCallback(char *ptr, size_t size, size_t nmemb,
                             void *userdata) {
@@ -126,7 +132,11 @@ std::string NetworkManager::fetchFromHubSync(const std::string &hubUrl,
   curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
   curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeCallback);
   curl_easy_setopt(curl, CURLOPT_WRITEDATA, &result);
-  CURLcode rc = curl_easy_perform(curl);
+  CURLcode rc;
+  {
+    std::lock_guard<std::mutex> lock(sCurlMutex);
+    rc = curl_easy_perform(curl);
+  }
   httpCode = 0;
   curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &httpCode);
   curl_easy_cleanup(curl);
@@ -550,7 +560,11 @@ void NetworkManager::fetchDirect(const std::string &url, SharedCallback callback
   curl_easy_setopt(curl, CURLOPT_WRITEDATA, response.get());
 
   LOG_D("NetworkManager", "Fetching from network: {}", url);
-  CURLcode res = curl_easy_perform(curl);
+  CURLcode res;
+  {
+    std::lock_guard<std::mutex> lock(sCurlMutex);
+    res = curl_easy_perform(curl);
+  }
 
   if (chunk) {
     curl_slist_free_all(chunk);

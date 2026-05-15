@@ -50,20 +50,26 @@ void RBNProvider::stop() {
 }
 
 void RBNProvider::run() {
-  std::string host =
-      config_.rbnHost.empty() ? DEFAULT_HOST : config_.rbnHost;
-  std::string login = config_.callsign; // RBN login = operator callsign
+  try {
+    std::string host =
+        config_.rbnHost.empty() ? DEFAULT_HOST : config_.rbnHost;
+    std::string login = config_.callsign; // RBN login = operator callsign
 
-  while (!stopRequested_) {
-    runTelnet(host, DEFAULT_PORT, login);
+    while (!stopRequested_) {
+      runTelnet(host, DEFAULT_PORT, login);
 
-    if (stopRequested_)
-      break;
+      if (stopRequested_)
+        break;
 
-    LOG_W("RBN", "Disconnected, retrying in 30s...");
-    std::unique_lock<std::mutex> lk(stopMutex_);
-    stopCv_.wait_for(lk, std::chrono::seconds(30),
-                     [this] { return stopRequested_.load(); });
+      LOG_W("RBN", "Disconnected, retrying in 30s...");
+      std::unique_lock<std::mutex> lk(stopMutex_);
+      stopCv_.wait_for(lk, std::chrono::seconds(30),
+                       [this] { return stopRequested_.load(); });
+    }
+  } catch (const std::exception &e) {
+    LOG_E("RBN", "Fatal exception in run(): {}", e.what());
+  } catch (...) {
+    LOG_E("RBN", "Fatal unknown exception in run()");
   }
   running_ = false;
 }

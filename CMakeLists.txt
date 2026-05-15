@@ -210,7 +210,7 @@ if(NOT WIN32 AND NOT EMSCRIPTEN AND NOT IOS)
         GIT_SHALLOW    TRUE
     )
     FetchContent_MakeAvailable(mbedtls)
-    # Explicitly suppress warnings for mbedtls targets
+    # Suppress warnings from mbedTLS targets
     foreach(target mbedtls mbedx509 mbedcrypto)
         if(TARGET ${target})
             if(MSVC)

@@ -103,43 +103,49 @@ void DXClusterProvider::stop() {
 }
 
 void DXClusterProvider::run() {
-  if (config_.hubMode == HubMode::Client && !config_.hubIp.empty()) {
-    runHubClient();
-    return;
-  }
-  while (!stopClicked_) {
-    if (config_.dxClusterUseWSJTX) {
-      runUDP(config_.wsjtxPort);
-    } else {
-      // Check for excessive lost connection rate (10 per hour as per Elwood)
-      if (checkConnectionRate()) {
-        runTelnet(config_.dxClusterHost, config_.dxClusterPort,
-                  config_.dxClusterLogin);
+  try {
+    if (config_.hubMode == HubMode::Client && !config_.hubIp.empty()) {
+      runHubClient();
+      return;
+    }
+    while (!stopClicked_) {
+      if (config_.dxClusterUseWSJTX) {
+        runUDP(config_.wsjtxPort);
       } else {
-        LOG_W("DXCluster", "Connection rate limit reached (10/hr)");
-        if (state_) {
-          std::lock_guard<std::mutex> lk(state_->servicesMutex);
-          state_->services["DXCluster"].ok = false;
-          state_->services["DXCluster"].lastError = "Rate limit reached (10/hr)";
+        // Check for excessive lost connection rate (10 per hour as per Elwood)
+        if (checkConnectionRate()) {
+          runTelnet(config_.dxClusterHost, config_.dxClusterPort,
+                    config_.dxClusterLogin);
+        } else {
+          LOG_W("DXCluster", "Connection rate limit reached (10/hr)");
+          if (state_) {
+            std::lock_guard<std::mutex> lk(state_->servicesMutex);
+            state_->services["DXCluster"].ok = false;
+            state_->services["DXCluster"].lastError = "Rate limit reached (10/hr)";
+          }
+          store_->setConnected(false, "Rate limit reached (10/hr)");
         }
-        store_->setConnected(false, "Rate limit reached (10/hr)");
+      }
+
+      if (stopClicked_)
+        break;
+
+      // Prune stale in-memory spots even when no new spots arrive (connection
+      // dropped, rate-limited, etc.) so the display doesn't show ancient data.
+      store_->pruneInMemory();
+
+      // Retry delay (increased to 60s to avoid hammering and IP bans)
+      // Interruptible: stop() will wake this immediately via sleepCv_.notify_one()
+      {
+        std::unique_lock<std::mutex> lk(sleepMutex_);
+        sleepCv_.wait_for(lk, std::chrono::seconds(60),
+                          [this] { return stopClicked_.load(); });
       }
     }
-
-    if (stopClicked_)
-      break;
-
-    // Prune stale in-memory spots even when no new spots arrive (connection
-    // dropped, rate-limited, etc.) so the display doesn't show ancient data.
-    store_->pruneInMemory();
-
-    // Retry delay (increased to 60s to avoid hammering and IP bans)
-    // Interruptible: stop() will wake this immediately via sleepCv_.notify_one()
-    {
-      std::unique_lock<std::mutex> lk(sleepMutex_);
-      sleepCv_.wait_for(lk, std::chrono::seconds(60),
-                        [this] { return stopClicked_.load(); });
-    }
+  } catch (const std::exception &e) {
+    LOG_E("DXCluster", "Fatal exception in run(): {}", e.what());
+  } catch (...) {
+    LOG_E("DXCluster", "Fatal unknown exception in run()");
   }
 }
 
