@@ -105,6 +105,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **DXClusterPanel Filter Regression** — Fixed `update()` short-circuit that silently ignored band/mode filter clicks after the memory-optimization refactor. Explicit `forceUpdate` path (triggered by zeroing `lastUpdate_` in `onMouseUp()`) now bypasses version check and regenerates rows correctly.
 - **MapWidget Segfault on Early Interaction** — Added null-pointer guards in `MapWidget::onMouseMove` and `onMouseUp` before dereferencing `currentSpotSnapshot_` and `currentDxcSnapshot_`; snapshots now initialized immediately in `setSpotStore` / `setDXClusterStore`. Resolves crash when mouse interaction occurs before the first update tick.
 - **DX Cluster Zombie Feed & Stale Ages** — Added 60-second in-memory pruning inside active Telnet threads and a 10-minute idle watchdog that reconnects on dead streams. Clock-drift tolerance (30 min) prevents backdating of spots; receipt-time override forces immediate age start for future-timestamped spots.
+- **DX Cluster Grid & Parsing** — Added local Maidenhead grid resolution fallback in `DXClusterProvider` to handle empty grid fields from hub servers. Added ANSI escape sequence stripping to ensure robust prefix lookups when connecting to colorized DX cluster feeds.
+- **Weather Forecast Days on Windows** — Resolved a cross-platform mismatch in `std::get_time` on Windows (MSVC) that caused the forecast to display repeating "Sunday"s by using `std::mktime` to compute the correct weekday.
+- **UpdateChecker Thread Safety** — Fixed a Use-After-Free (UAF) crash by properly canceling and waiting for the detached download thread during `UpdateChecker` destruction.
+- **Concurrent HTTPS Crashes** — Serialized `curl_easy_perform` calls globally to prevent background threads from corrupting non-thread-safe static mbedTLS state, eliminating random `SIGABRT` crashes on ARM platforms.
+- **WASM Build** — Restored WebAssembly build compatibility.
 
 ---
 
