@@ -62,7 +62,8 @@ void HistoryProvider::fetchFlux() {
       event.type = HamClock::AE_BASE_EVENT + HamClock::AE_HISTORY_DATA_READY;
       event.user.code = static_cast<int>(SeriesType::Flux);
       event.user.data1 = update;
-      SDL_PushEvent(&event);
+      if (SDL_PushEvent(&event) < 0)
+        delete update;
     });
   });
 }
@@ -116,7 +117,8 @@ void HistoryProvider::fetchSSN() {
       event.type = HamClock::AE_BASE_EVENT + HamClock::AE_HISTORY_DATA_READY;
       event.user.code = static_cast<int>(SeriesType::SSN);
       event.user.data1 = update;
-      SDL_PushEvent(&event);
+      if (SDL_PushEvent(&event) < 0)
+        delete update;
     });
   });
 }
@@ -166,7 +168,8 @@ void HistoryProvider::fetchKp() {
       event.type = HamClock::AE_BASE_EVENT + HamClock::AE_HISTORY_DATA_READY;
       event.user.code = static_cast<int>(SeriesType::Kp);
       event.user.data1 = update;
-      SDL_PushEvent(&event);
+      if (SDL_PushEvent(&event) < 0)
+        delete update;
     });
   });
 }

@@ -470,7 +470,8 @@ void NOAAProvider::fetchAurora() {
               event1.type =
                   HamClock::AE_BASE_EVENT + HamClock::AE_AURORA_DATA_READY;
               event1.user.data1 = percent1;
-              SDL_PushEvent(&event1);
+              if (SDL_PushEvent(&event1) < 0)
+                delete percent1;
             }
 
             auto *percent2 = new float(max_percent);
@@ -479,7 +480,8 @@ void NOAAProvider::fetchAurora() {
             event2.type =
                 HamClock::AE_BASE_EVENT + HamClock::AE_AURORA_DATA_READY;
             event2.user.data1 = percent2;
-            SDL_PushEvent(&event2);
+            if (SDL_PushEvent(&event2) < 0)
+              delete percent2;
           }
         }
       } catch (const std::exception &e) {

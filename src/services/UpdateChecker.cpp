@@ -194,8 +194,10 @@ void UpdateChecker::fetch() {
         SDL_Event ev;
         SDL_zero(ev);
         ev.type = HamClock::AE_BASE_EVENT + HamClock::AE_UPDATE_DATA_READY;
-        ev.user.data1 = new std::string(std::move(data));
-        SDL_PushEvent(&ev);
+        auto *updateData = new std::string(std::move(data));
+        ev.user.data1 = updateData;
+        if (SDL_PushEvent(&ev) < 0)
+          delete updateData;
       },
       kCacheSeconds);
 }

@@ -599,7 +599,8 @@ void MapWidget::update() {
         event.type =
             HamClock::AE_BASE_EVENT + HamClock::AE_SATELLITE_TRACK_READY;
         event.user.data1 = track_ptr;
-        SDL_PushEvent(&event);
+        if (SDL_PushEvent(&event) < 0)
+          delete track_ptr;
       });
     }
   } else if (!cachedSatTrack_.empty()) {
@@ -1344,7 +1345,8 @@ void MapWidget::updatePropagationOverlay() {
         event.type = HamClock::AE_BASE_EVENT + HamClock::AE_PROP_DATA_READY;
         event.user.code = static_cast<int>(overlayType);
         event.user.data1 = result;
-        SDL_PushEvent(&event);
+        if (SDL_PushEvent(&event) < 0)
+          delete result;
       });
 }
 

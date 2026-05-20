@@ -643,7 +643,8 @@ DashboardContext::DashboardContext(AppContext &ctx)
       event.type = HamClock::AE_BASE_EVENT + HamClock::AE_PROP_DATA_READY;
       event.user.code = static_cast<int>(PropOverlayType::Heatmap);
       event.user.data1 = result;
-      SDL_PushEvent(&event);
+      if (SDL_PushEvent(&event) < 0)
+        delete result;
     }
   });
 

@@ -1,4 +1,4 @@
-# HamClock-Next (v1.6)
+# HamClock-Next (v1.7B01)
 
 > **HamClock-Next** is a modern, multi-platform rewrite of the original HamClock
 > by **Elwood Downey, WB0OEW** (SK 29 January 2026).

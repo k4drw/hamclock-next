@@ -278,7 +278,8 @@ void AsteroidProvider::processElementsResponse(const std::string &des,
   SDL_zero(ev);
   ev.type = HamClock::AE_BASE_EVENT + HamClock::AE_ASTEROID_ELEMENTS_READY;
   ev.user.data1 = payload;
-  SDL_PushEvent(&ev);
+  if (SDL_PushEvent(&ev) < 0)
+    delete payload;
 }
 
 OrbitalElements

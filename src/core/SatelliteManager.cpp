@@ -57,8 +57,10 @@ void SatelliteManager::fetch(bool force) {
         SDL_Event ev;
         SDL_zero(ev);
         ev.type = HamClock::AE_BASE_EVENT + HamClock::AE_SATELLITE_DATA_READY;
-        ev.user.data1 = new std::string(std::move(response));
-        SDL_PushEvent(&ev);
+        auto *satData = new std::string(std::move(response));
+        ev.user.data1 = satData;
+        if (SDL_PushEvent(&ev) < 0)
+          delete satData;
       },
       86400); // 24 hour cache age
 
@@ -316,8 +318,10 @@ void SatelliteManager::fetchSCC(int noradId) {
         SDL_Event ev;
         SDL_zero(ev);
         ev.type = HamClock::AE_BASE_EVENT + HamClock::AE_SATELLITE_DATA_READY;
-        ev.user.data1 = new std::string(std::move(response));
-        SDL_PushEvent(&ev);
+        auto *satData2 = new std::string(std::move(response));
+        ev.user.data1 = satData2;
+        if (SDL_PushEvent(&ev) < 0)
+          delete satData2;
       },
       86400);
 }
