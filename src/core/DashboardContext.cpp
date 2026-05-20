@@ -188,7 +188,7 @@ void populateWidgetDescriptions();
 #include <winsock2.h>
 #endif
 #include <memory>
-#ifdef __linux__
+#if defined(__linux__) && !defined(__ANDROID__)
 #include <malloc.h>
 #include <unistd.h>
 #endif
@@ -1505,7 +1505,7 @@ void DashboardContext::update(AppContext &ctx) {
       ctx.updateChecker->fetch();
 #endif
     lastFetchMs = now;
-#if defined(__linux__) && !defined(__EMSCRIPTEN__)
+#if defined(__linux__) && !defined(__EMSCRIPTEN__) && !defined(__ANDROID__)
     // Return heap pages freed during provider parse burst back to the OS.
     // 20+ concurrent fetches leave glibc malloc arenas with freed-but-retained
     // pages that inflate RSS by ~50MB per screen wake if not trimmed.
@@ -2671,7 +2671,7 @@ void DashboardContext::update(AppContext &ctx) {
         if (ctx.netManager) {
           ctx.netManager->clearRamCache();
         }
-#if defined(__linux__) && !defined(__EMSCRIPTEN__)
+#if defined(__linux__) && !defined(__EMSCRIPTEN__) && !defined(__ANDROID__)
         malloc_trim(0);
 #endif
       }

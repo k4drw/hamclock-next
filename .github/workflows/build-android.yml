@@ -54,7 +54,13 @@ jobs:
       - name: Rename APK
         run: |
           VERSION="v$(cat VERSION | tr -d '[:space:]')"
-          cp build-android/app/build/outputs/apk/release/app-release.apk "hamclock-next_${VERSION}.apk"
+          EXPECTED="build-android/app/build/outputs/apk/release/app-release.apk"
+          if [ ! -f "$EXPECTED" ]; then
+            echo "Expected APK not found. APK files in build-android:"
+            find build-android -name "*.apk" 2>/dev/null || echo "(none)"
+            exit 1
+          fi
+          cp "$EXPECTED" "hamclock-next_${VERSION}.apk"
           echo "APK_NAME=hamclock-next_${VERSION}.apk" >> $GITHUB_ENV
 
       - name: Upload APK Artifact

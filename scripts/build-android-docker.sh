@@ -212,6 +212,7 @@ docker run --rm \
     -e LOCAL_USER_ID="$(id -u)" \
     mingc/android-build-box:latest \
     bash -c "
+        set -euo pipefail
         chmod +x gradlew
         # Avoid local.properties errors in Docker
         echo 'sdk.dir=/opt/android-sdk' > local.properties
