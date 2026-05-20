@@ -136,6 +136,7 @@ static std::vector<FccLicense> fetchFrnSync(const std::string &frn) {
   curl_easy_setopt(curl, CURLOPT_WRITEDATA, &htmlBuffer);
   curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
   curl_easy_setopt(curl, CURLOPT_TIMEOUT, 45L);
+  curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
   // Accept-Encoding: br/gzip sent above — let libcurl decompress automatically
   curl_easy_setopt(curl, CURLOPT_ACCEPT_ENCODING, "");
   // In-memory cookie jar (empty string enables it without writing a file)
@@ -216,17 +217,21 @@ void FccProvider::lookupFrn(const std::string &frn, ResultCb onDone) {
   LOG_W("FccProvider", "FCC ULS lookup not supported on WASM");
   onDone({});
 #else
-  std::thread([this, frn, onDone = std::move(onDone), alive = alive_]() {
-    {
-      std::lock_guard<std::mutex> lk(inflightMutex_);
-      if (!alive->load(std::memory_order_relaxed)) return;
-      ++inflight_;
+  {
+    std::lock_guard<std::mutex> lk(inflightMutex_);
+    if (!alive_->load(std::memory_order_relaxed)) {
+      onDone({});
+      return;
     }
+    ++inflight_;
+  }
+  std::thread([this, frn, onDone = std::move(onDone), alive = alive_]() {
     auto result = fetchFrnSync(frn);
     onDone(std::move(result));
     {
       std::lock_guard<std::mutex> lk(inflightMutex_);
-      if (--inflight_ == 0) inflightCv_.notify_all();
+      if (--inflight_ == 0)
+        inflightCv_.notify_all();
     }
   }).detach();
 #endif

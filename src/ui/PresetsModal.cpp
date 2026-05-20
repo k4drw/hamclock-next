@@ -14,6 +14,9 @@ void PresetsModal::init(AppConfig *cfg, std::function<void()> onApply) {
 void PresetsModal::open() {
   if (!cfg_)
     return;
+  // Sort presets alphabetically by name
+  std::sort(cfg_->presets.begin(), cfg_->presets.end(),
+            [](const ConfigPreset &a, const ConfigPreset &b) { return a.name < b.name; });
   active_ = true;
   saving_ = false;
   scrollOffset_ = 0;
@@ -118,7 +121,7 @@ void PresetsModal::render(SDL_Renderer *renderer) {
                 true, false, true);
 
   // ── Save area ────────────────────────────────────────────────────────────
-  if (!saving_) {
+  if (!saving_ && !renaming_) {
     // "★ Save Current Configuration" button
     fillRect(renderer, saveBtnRect_, btnFill);
     drawRect(renderer, saveBtnRect_, btnBorder);
@@ -190,22 +193,36 @@ void PresetsModal::render(SDL_Renderer *renderer) {
     cat->drawText(renderer, p.name, listRect_.x + 8, rowY + 7, nameCol,
                   FontStyle::Fast);
 
-    // [Apply] button
-    SDL_Rect applyR = {listRect_.x + listRect_.w - 130, rowY + 3, 60, 24};
+    // [Apply] button (60px @ -148)
+    SDL_Rect applyR = {listRect_.x + listRect_.w - 148, rowY + 3, 60, 24};
     fillRect(renderer, applyR, themes.rowStripe1);
     drawRect(renderer, applyR, themes.border);
     cat->drawText(renderer, "Apply", applyR.x + applyR.w / 2,
                   applyR.y + applyR.h / 2, greenColor, FontStyle::Caption, true,
                   false, true);
 
-    // [✕] delete button
-    SDL_Rect delR = {listRect_.x + listRect_.w - 64, rowY + 3, 24, 24};
+    // [Rename] button
+    SDL_Rect renameR = {listRect_.x + listRect_.w - 84, rowY + 3, 24, 24};
+    fillRect(renderer, renameR, themes.rowStripe1);
+    drawRect(renderer, renameR, themes.border);
+    cat->drawText(renderer, "✏", renameR.x + renameR.w / 2, renameR.y + renameR.h / 2,
+                  accent, FontStyle::Caption, true, false, true);
+
+    // [Update] button
+    SDL_Rect updateR = {listRect_.x + listRect_.w - 56, rowY + 3, 24, 24};
+    fillRect(renderer, updateR, themes.rowStripe1);
+    drawRect(renderer, updateR, themes.border);
+    cat->drawText(renderer, "↻", updateR.x + updateR.w / 2, updateR.y + updateR.h / 2,
+                  accent, FontStyle::Caption, true, false, true);
+
+    // [X] delete button (24px @ -28)
+    SDL_Rect delR = {listRect_.x + listRect_.w - 28, rowY + 3, 24, 24};
     fillRect(renderer, delR, themes.danger);
     drawRect(renderer, delR, themes.border);
     cat->drawText(renderer, "X", delR.x + delR.w / 2, delR.y + delR.h / 2,
                   white, FontStyle::Caption, true, false, true);
 
-    rowRects_.push_back({applyR, delR});
+    rowRects_.push_back({applyR, renameR, updateR, delR});
   }
 
   // Empty state message
@@ -282,11 +299,19 @@ bool PresetsModal::onMouseUp(int mx, int my, Uint16 /*mod*/) {
     return true;
   }
 
-  // Row buttons (apply / delete)
+  // Row buttons (apply / rename / update / delete)
   for (int j = 0; j < (int)rowRects_.size(); ++j) {
     int idx = scrollOffset_ + j;
     if (ptInRect(mx, my, rowRects_[j].apply)) {
       applyPreset(idx);
+      return true;
+    }
+    if (ptInRect(mx, my, rowRects_[j].rename)) {
+      beginRename(idx);
+      return true;
+    }
+    if (ptInRect(mx, my, rowRects_[j].update)) {
+      overwritePreset(idx);
       return true;
     }
     if (ptInRect(mx, my, rowRects_[j].del)) {
@@ -317,6 +342,21 @@ bool PresetsModal::onKeyDown(SDL_Keycode key, Uint16 mod) {
     }
   }
 
+  if (renaming_) {
+    switch (key) {
+    case SDLK_RETURN:
+    case SDLK_KP_ENTER:
+      commitRename();
+      return true;
+    case SDLK_ESCAPE:
+      cancelRename();
+      return true;
+    default:
+      nameInput_.onKeyDown(key, mod);
+      return true;
+    }
+  }
+
   if (key == SDLK_ESCAPE) {
     active_ = false;
     return true;
@@ -325,7 +365,7 @@ bool PresetsModal::onKeyDown(SDL_Keycode key, Uint16 mod) {
 }
 
 bool PresetsModal::onTextInput(const char *text) {
-  if (!active_ || !saving_)
+  if (!active_ || (!saving_ && !renaming_))
     return false;
   nameInput_.onTextInput(text);
   return true;
@@ -372,6 +412,9 @@ void PresetsModal::commitSave() {
   p.propBand = cfg_->propBand;
   p.propMode = cfg_->propMode;
   p.propPower = cfg_->propPower;
+  p.propToa = cfg_->propToa;
+  p.propPath = cfg_->propPath;
+  p.propAntGain = cfg_->propAntGain;
 
   cfg_->presets.push_back(std::move(p));
   ConfigManager::instance().save(*cfg_);
@@ -402,6 +445,9 @@ void PresetsModal::applyPreset(int index) {
   cfg_->propBand = p.propBand;
   cfg_->propMode = p.propMode;
   cfg_->propPower = p.propPower;
+  cfg_->propToa = p.propToa;
+  cfg_->propPath = p.propPath;
+  cfg_->propAntGain = p.propAntGain;
 
   if (onApply_)
     onApply_();
@@ -412,12 +458,70 @@ void PresetsModal::applyPreset(int index) {
 void PresetsModal::deletePreset(int index) {
   if (!cfg_ || index < 0 || index >= (int)cfg_->presets.size())
     return;
-  cfg_->presets.erase(cfg_->presets.begin() + index);
+  ConfigManager::instance().deletePreset(*cfg_, index);
   ConfigManager::instance().save(*cfg_);
   // Clamp scroll
   int total = (int)cfg_->presets.size();
   if (scrollOffset_ > 0 && scrollOffset_ >= total - kVisibleRows + 1)
     scrollOffset_ = std::max(0, total - kVisibleRows);
+}
+
+void PresetsModal::beginRename(int index) {
+  renaming_ = true;
+  renameIndex_ = index;
+  nameInput_.setValue(cfg_->presets[index].name);
+  nameInput_.setMaxLength(40);
+  nameInput_.setCursorToEnd();
+  nameInput_.setActive(true);
+  SDL_StartTextInput();
+}
+
+void PresetsModal::commitRename() {
+  if (!cfg_ || renameIndex_ < 0 || renameIndex_ >= (int)cfg_->presets.size())
+    return;
+  std::string newName = nameInput_.getValue();
+  if (newName.empty()) {
+    cancelRename();
+    return;
+  }
+  cfg_->presets[renameIndex_].name = newName;
+  std::sort(cfg_->presets.begin(), cfg_->presets.end(),
+            [](const ConfigPreset &a, const ConfigPreset &b) { return a.name < b.name; });
+  ConfigManager::instance().save(*cfg_);
+  renaming_ = false;
+  SDL_StopTextInput();
+}
+
+void PresetsModal::cancelRename() {
+  renaming_ = false;
+  SDL_StopTextInput();
+}
+
+void PresetsModal::overwritePreset(int index) {
+  if (!cfg_ || index < 0 || index >= (int)cfg_->presets.size())
+    return;
+  ConfigPreset &p = cfg_->presets[index];
+  p.pane1Rotation = cfg_->pane1Rotation;
+  p.pane2Rotation = cfg_->pane2Rotation;
+  p.pane3Rotation = cfg_->pane3Rotation;
+  p.pane4Rotation = cfg_->pane4Rotation;
+  p.pane5Rotation = cfg_->pane5Rotation;
+  p.pane6Rotation = cfg_->pane6Rotation;
+  p.rotationIntervalS = cfg_->rotationIntervalS;
+  p.propOverlay = cfg_->propOverlay;
+  p.propRotation = cfg_->propRotation;
+  p.weatherOverlay = cfg_->weatherOverlay;
+  p.mapStyle = cfg_->mapStyle;
+  p.mapNightLights = cfg_->mapNightLights;
+  p.showGrid = cfg_->showGrid;
+  p.gridType = cfg_->gridType;
+  p.propBand = cfg_->propBand;
+  p.propMode = cfg_->propMode;
+  p.propPower = cfg_->propPower;
+  p.propToa = cfg_->propToa;
+  p.propPath = cfg_->propPath;
+  p.propAntGain = cfg_->propAntGain;
+  ConfigManager::instance().save(*cfg_);
 }
 
 void PresetsModal::applyPropFirehose() {
@@ -433,7 +537,7 @@ void PresetsModal::applyPropFirehose() {
 
   // Force map to full rotation of propagation overlays
   cfg_->propRotation = {
-      PropOverlayType::Muf,     PropOverlayType::Reliability, PropOverlayType::Heatmap, 
+      PropOverlayType::Muf,     PropOverlayType::Reliability, PropOverlayType::Heatmap,
       PropOverlayType::Drap,        PropOverlayType::Aurora};
   cfg_->propOverlay = PropOverlayType::Muf;
 

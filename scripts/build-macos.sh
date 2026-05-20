@@ -8,6 +8,13 @@ SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 REPO_ROOT=$(dirname "$SCRIPT_DIR")
 cd "$REPO_ROOT" || exit 1
 
+DEBUG_API_FLAG="-DENABLE_DEBUG_API=OFF"
+for arg in "$@"; do
+    if [ "$arg" == "--enable-debug-api" ]; then
+        DEBUG_API_FLAG="-DENABLE_DEBUG_API=ON"
+    fi
+done
+
 # Check if running on macOS
 if [[ "$(uname)" != "Darwin" ]]; then
     echo "ERROR: This script must be run on macOS."
@@ -106,7 +113,7 @@ echo "Configuring CMake..."
 # We use standard build, maybe bundle it later.
 cmake -B build-macos -S . \
     -DCMAKE_BUILD_TYPE=Release \
-    -DENABLE_DEBUG_API=OFF \
+    ${DEBUG_API_FLAG} \
     -DCMAKE_OSX_ARCHITECTURES="arm64"
 
 echo "Building..."

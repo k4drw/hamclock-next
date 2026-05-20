@@ -16,6 +16,7 @@ struct QSORecord {
   std::string freq;
   std::string rstSent;
   std::string rstRcvd;
+  std::string state;
   std::string name;
   std::string qth;
   std::string gridsquare;
@@ -34,6 +35,27 @@ struct ADIFStats {
   // DXCC entity number → set of bands with at least one QSO.
   // Used by DXClusterPanel to mark spots as New/New-Band/Worked.
   std::map<int, std::set<std::string>> workedEntitiesPerBand;
+
+  // DXCC entity number → set of bands with at least one confirmed QSO.
+  std::map<int, std::set<std::string>> confirmedEntitiesPerBand;
+
+  // US States (WAS)
+  std::set<std::string> workedStates;
+  std::set<std::string> confirmedStates;
+
+  // Continents (WAC) - NA, SA, EU, AF, AS, OC
+  std::set<std::string> workedContinents;
+  std::set<std::string> confirmedContinents;
+  
+  // Zones (WAZ/ITU) - Map of Zone # -> set of bands
+  std::map<int, std::set<std::string>> workedZonesCQ;
+  std::map<int, std::set<std::string>> confirmedZonesCQ;
+  std::map<int, std::set<std::string>> workedZonesITU;
+  std::map<int, std::set<std::string>> confirmedZonesITU;
+
+  // Maidenhead Grid Squares (4-char like "EN50")
+  std::map<std::string, bool> workedGrids4;    // grid -> confirmed
+  std::map<std::string, bool> confirmedGrids4;
 
   bool valid = false;
   std::string activeBandFilter;

@@ -107,12 +107,12 @@ void CallbookProvider::lookup(const std::string &callsign) {
   // and outlasts DashboardContext) and net_ as a raw pointer (NetworkManager is
   // also AppContext-lifetime). Do NOT capture `this`: CallbookProvider lives in
   // DashboardContext and may be destroyed before these callbacks fire.
-  auto store   = store_;
-  auto *netPtr = &net_;
+  auto store = store_;
+  auto *net  = &net_;
 
-  fetchCallookAsync(*netPtr, callsign, result,
-                    [netPtr, result, callsign, store]() {
-                      fetchHamDBAsync(*netPtr, callsign, result,
+  fetchCallookAsync(*net, callsign, result,
+                    [net, result, callsign, store]() {
+                      fetchHamDBAsync(*net, callsign, result,
                                       [store, result]() {
                                         result->valid = true;
                                         store->set(*result);

@@ -54,7 +54,7 @@ fi
 
 # ── PDF engine: prefer lualatex (modern/robust), xelatex (Unicode), pdflatex ───
 PDF_ENGINE=""
-for engine in lualatex xelatex pdflatex; do
+for engine in xelatex pdflatex lualatex; do
   if command -v "$engine" &>/dev/null; then
     PDF_ENGINE="$engine"
     break

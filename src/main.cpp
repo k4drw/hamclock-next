@@ -9,6 +9,8 @@
 #include "core/DisplayPower.h"
 #include "core/HamClockState.h"
 #include "core/LiveSpotData.h"
+#include "core/LoTWActivityData.h"
+#include "core/ClublogData.h"
 #include "core/PrefixManager.h"
 #include "core/RSSData.h"
 #include "core/RigData.h"
@@ -37,7 +39,7 @@
 #include "services/DXClusterProvider.h"
 #include "services/DstProvider.h"
 #include "services/FccProvider.h"
-#include "services/ForecastProvider.h"
+#include "services/OpenMeteoForecastProvider.h"
 #include "services/GPSProvider.h"
 #include "services/HistoryProvider.h"
 #include "services/HurricaneProvider.h"
@@ -250,6 +252,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void hamclock_after_idbfs() {
                                  ctx.appCfg.hubPort);
     ctx.displayPower->setMethodByName(ctx.appCfg.displayPowerMethod);
     SoundManager::getInstance().setMuted(ctx.appCfg.audioMuted);
+    SoundManager::getInstance().setVolume(ctx.appCfg.audioVolume);
     ctx.activeSetup = AppContext::SetupMode::None;
   } else {
     LOG_I("Main", "No saved config found — showing setup screen");
@@ -314,6 +317,8 @@ int main(int argc, char *argv[]) {
       forceSoftware = true;
     } else if (arg == "--live-web") {
       forceLiveWeb = true;
+    } else if (arg == "--show-cache-stats") {
+      ctx.appCfg.showCacheStats = true;
     } else if (arg == "--no-audio") {
       SoundManager::getInstance().disable();
     } else if (arg == "--log-level" && i + 1 < argc) {
@@ -365,6 +370,7 @@ int main(int argc, char *argv[]) {
     if (s_logLevel == "warn") applyLogLevel(ctx.appCfg.logLevel); // config overrides default only
     ctx.displayPower->setMethodByName(ctx.appCfg.displayPowerMethod);
     SoundManager::getInstance().setMuted(ctx.appCfg.audioMuted);
+    SoundManager::getInstance().setVolume(ctx.appCfg.audioVolume);
   }
 #endif
 
@@ -542,6 +548,7 @@ int main(int argc, char *argv[]) {
   ctx.netManager->setHubConfig(ctx.appCfg.hubMode, ctx.appCfg.hubIp,
                                ctx.appCfg.hubPort);
 #ifndef __EMSCRIPTEN__
+  ctx.netManager->waitForCacheLoad();
   logStartupPhase("network manager ready");
 #endif
 
@@ -572,6 +579,8 @@ int main(int argc, char *argv[]) {
   ctx.callbookStore = std::make_shared<CallbookStore>();
   ctx.dstStore = std::make_shared<DstStore>();
   ctx.adifStore = std::make_shared<ADIFStore>();
+  ctx.lotwActivityStore = std::make_shared<LoTWActivityStore>();
+  ctx.clublogStore = std::make_shared<ClublogStore>();
   ctx.santaStore = std::make_shared<SantaStore>();
   ctx.rotatorStore = std::make_shared<RotatorDataStore>();
   ctx.rigStore = std::make_shared<RigDataStore>();
@@ -915,6 +924,7 @@ void main_tick() {
           // (asteroid prefs, live spots, alarms, etc.) survive untouched.
           ctx.appCfg = s->getConfig(ctx.appCfg);
           SoundManager::getInstance().setMuted(ctx.appCfg.audioMuted);
+          SoundManager::getInstance().setVolume(ctx.appCfg.audioVolume);
 
           // Sync watchlist store from updated config
           auto oldW = ctx.watchlistStore->getAll();

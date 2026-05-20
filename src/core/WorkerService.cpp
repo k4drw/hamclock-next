@@ -8,7 +8,9 @@ WorkerService &WorkerService::getInstance() {
 }
 
 WorkerService::WorkerService() {
-  const size_t num_threads = 2; // A small pool for embedded devices
+  size_t num_threads = std::thread::hardware_concurrency();
+  if (num_threads < 2) num_threads = 2;
+  if (num_threads > 4) num_threads = 4; // Cap for memory/cpu safety on Pi
   workers_.reserve(num_threads);
   for (size_t i = 0; i < num_threads; ++i) {
     workers_.emplace_back([this] { this->workerLoop(); });

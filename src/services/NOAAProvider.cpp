@@ -15,6 +15,27 @@
 #include <sstream>
 #include <nlohmann/json.hpp>
 #include <unordered_map>
+#include <ctime>
+
+static std::chrono::system_clock::time_point parseISO8601(const std::string &s) {
+  std::tm tm = {};
+  int y, m, d, hh, mm, ss;
+  if (std::sscanf(s.c_str(), "%d-%d-%dT%d:%d:%d", &y, &m, &d, &hh, &mm, &ss) == 6) {
+    tm.tm_year = y - 1900;
+    tm.tm_mon = m - 1;
+    tm.tm_mday = d;
+    tm.tm_hour = hh;
+    tm.tm_min = mm;
+    tm.tm_sec = ss;
+    tm.tm_isdst = -1;
+#ifdef _WIN32
+    return std::chrono::system_clock::from_time_t(_mkgmtime(&tm));
+#else
+    return std::chrono::system_clock::from_time_t(timegm(&tm));
+#endif
+  }
+  return std::chrono::system_clock::now();
+}
 
 NOAAProvider::NOAAProvider(NetworkManager &net,
                            std::shared_ptr<SolarDataStore> store,
@@ -126,8 +147,17 @@ void NOAAProvider::fetchKIndex() {
       update->last_updated = std::chrono::system_clock::now();
       update->valid = true;
 
-      if (kIndexHistoryStore)
-        kIndexHistoryStore->push(update->k_index);
+      if (kIndexHistoryStore) {
+        for (const auto &item : j) {
+          if (item.is_object() && item.contains("Kp") &&
+              item["Kp"].is_number() && item.contains("time_tag") &&
+              item["time_tag"].is_string()) {
+            float k = item["Kp"].get<float>();
+            auto ts = parseISO8601(item["time_tag"].get<std::string>());
+            kIndexHistoryStore->push(k, ts);
+          }
+        }
+      }
 
       SDL_Event event;
       SDL_zero(event);
@@ -377,7 +407,8 @@ void NOAAProvider::fetchDST() {
         event.user.code = static_cast<int>(UpdateType::DST);
         event.user.data1 = update;
         SDL_PushEvent(&event);
-      } catch (...) {
+      } catch (const std::exception &e) {
+        LOG_E("NOAAProvider", "DST parse failed: %s", e.what());
       }
     });
   });
@@ -451,7 +482,8 @@ void NOAAProvider::fetchAurora() {
             SDL_PushEvent(&event2);
           }
         }
-      } catch (...) {
+      } catch (const std::exception &e) {
+        LOG_E("NOAAProvider", "Aurora parse failed: %s", e.what());
       }
     });
   });
@@ -553,7 +585,8 @@ void NOAAProvider::fetchAuroraHistory() {
               backfill->speed[t] = v;
           }
         }
-      } catch (...) {
+      } catch (const std::exception &e) {
+        LOG_E("NOAAProvider", "Backfill parse failed: %s", e.what());
       }
       std::lock_guard<std::mutex> lk(backfill->mu);
       if (--backfill->pending == 0)
@@ -584,7 +617,8 @@ void NOAAProvider::fetchAuroraHistory() {
             backfill->mag[t] = {bz, bt};
           }
         }
-      } catch (...) {
+      } catch (const std::exception &e) {
+        LOG_E("NOAAProvider", "Backfill parse failed: %s", e.what());
       }
       std::lock_guard<std::mutex> lk(backfill->mu);
       if (--backfill->pending == 0)
@@ -596,54 +630,51 @@ void NOAAProvider::fetchAuroraHistory() {
 void NOAAProvider::fetchAuroraMap() {
   auto auroraMapStore = auroraMapStore_;
   net_.fetchAsync(AURORA_URL, [auroraMapStore](std::string body) {
-    if (body.empty())
+    if (body.empty() || !auroraMapStore)
       return;
 
-    WorkerService::getInstance().submitTask([body, auroraMapStore]() {
+    WorkerService::getInstance().submitTask([body = std::move(body), auroraMapStore]() {
       try {
-        if (!auroraMapStore)
-          return;
-
-        auto j = nlohmann::json::parse(body, nullptr, false);
-        if (j.is_discarded() || !j.contains("coordinates"))
-          return;
-
         AuroraMapData data;
-        const auto &coords = j["coordinates"];
-        if (!coords.is_array())
+        
+        // Manual parse of JSON grid coordinates to avoid nlohmann::json massive allocation.
+        // Format: "coordinates":[[lon,lat,val],[lon,lat,val],...]
+        size_t coords_pos = body.find("\"coordinates\"");
+        if (coords_pos == std::string::npos)
           return;
 
-        for (const auto &point : coords) {
-          if (point.is_array() && point.size() >= 3) {
-            // NOAA OVATION spec: [longitude, latitude, probability].
-            // Longitude: 0 to 360, Latitude: -90 to 90.
-            double d_lon = point[0].get<double>();
-            double d_lat = point[1].get<double>();
-            int val = point[2].get<int>();
-
+        const char* p = body.c_str() + coords_pos;
+        int count = 0;
+        while ((p = std::strchr(p, '[')) != nullptr) {
+          double d_lon, d_lat;
+          int val;
+          if (std::sscanf(p, "[%lf,%lf,%d]", &d_lon, &d_lat, &val) == 3 ||
+              std::sscanf(p, "[%lf, %lf, %d]", &d_lon, &d_lat, &val) == 3) {
+            
             int lon = static_cast<int>(std::round(d_lon));
             int lat = static_cast<int>(std::round(d_lat));
 
             // Normalize longitude to 0..359
-            while (lon < 0)
-              lon += 360;
-            while (lon >= 360)
-              lon -= 360;
+            while (lon < 0) lon += 360;
+            while (lon >= 360) lon -= 360;
 
             if (lat >= -90 && lat <= 90) {
               int row = lat + 90; // 0 to 180
               data.grid[row * 360 + lon] =
                   static_cast<uint8_t>(std::clamp(val, 0, 100));
             }
+            count++;
           }
+          p++;
         }
+
         data.valid = true;
         data.lastUpdate = std::chrono::system_clock::now();
         auroraMapStore->update(data);
-        LOG_I("NOAAProvider", "Aurora map grid updated ({} points).",
-              (int)coords.size());
+        LOG_I("NOAAProvider", "Aurora map grid updated ({} points parsed manually).",
+              count);
       } catch (const std::exception &e) {
-        LOG_E("NOAAProvider", "Aurora JSON error: {}", e.what());
+        LOG_E("NOAAProvider", "Aurora parse error: {}", e.what());
       }
     });
   });
@@ -721,7 +752,8 @@ void NOAAProvider::fetchDRAP() {
           event.user.data1 = update;
           SDL_PushEvent(&event);
         }
-      } catch (...) {
+      } catch (const std::exception &e) {
+        LOG_E("NOAAProvider", "Backfill parse failed: %s", e.what());
       }
     });
   });

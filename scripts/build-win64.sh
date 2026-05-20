@@ -7,6 +7,13 @@ cd "$REPO_ROOT" || exit 1
 
 IMAGE="dockcross/windows-static-x64"
 
+DEBUG_API_FLAG="-DENABLE_DEBUG_API=OFF"
+for arg in "$@"; do
+    if [ "$arg" == "--enable-debug-api" ]; then
+        DEBUG_API_FLAG="-DENABLE_DEBUG_API=ON"
+    fi
+done
+
 # Clean build directory using the container to avoid permission issues
 # TIP: Comment out the 'rm -rf' line below to keep _deps for faster subsequent builds
 echo "Cleaning old build artifacts..."
@@ -20,7 +27,7 @@ docker run --rm -v "$(pwd)":/work -w /work $IMAGE bash -c "
     convert packaging/icon.png -define icon:auto-resize=256,128,64,48,32,16 packaging/windows/icon.ico && \
     cmake -Bbuild-win64 -H. \
         -DCMAKE_BUILD_TYPE=Release \
-        -DENABLE_DEBUG_API=OFF \
+        ${DEBUG_API_FLAG} \
         -DBUILD_SHARED_LIBS=OFF \
         -DSDL2IMAGE_WEBP=OFF \
         -DSDL2IMAGE_TIF=OFF \

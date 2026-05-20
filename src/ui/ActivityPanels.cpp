@@ -1,6 +1,7 @@
 #include "ActivityPanels.h"
 #include "WidgetRegistry.h"
 #include "../core/LiveSpotData.h" // For kBands and freqToBandIndex
+#include "../core/Astronomy.h"
 #include "../core/MemoryMonitor.h"
 #include "../core/StringUtils.h"
 #include "../core/Theme.h"
@@ -39,17 +40,20 @@ void DXPedPanel::update() {
   }
 
   auto data = store_->get();
-  if (data.lastUpdated != lastUpdate_) {
+  if (data->lastUpdated != lastUpdate_) {
     allRows_.clear();
     allPeds_.clear();
-    for (const auto &de : data.dxpeds) {
-      std::stringstream ss;
-      ss << de.call << '\t' << de.location;
-      allRows_.push_back(ss.str());
-      allPeds_.push_back(de);
+    auto now = std::chrono::system_clock::now();
+    for (const auto &de : data->dxpeds) {
+      if (now >= de.startTime && now <= de.endTime) {
+        std::stringstream ss;
+        ss << de.call << '\t' << de.location;
+        allRows_.push_back(ss.str());
+        allPeds_.push_back(de);
+      }
     }
-    if (allRows_.empty() && data.valid) {
-      allRows_.push_back("No upcoming expeditions");
+    if (allRows_.empty() && data->valid) {
+      allRows_.push_back("No active expeditions");
     }
     // Clamp scroll and rebuild visible slice
     int maxScroll = std::max(0, (int)allRows_.size() - MAX_VISIBLE_ROWS);
@@ -74,7 +78,7 @@ void DXPedPanel::update() {
       }
     }
     setHighlightedIndex(hi);
-    lastUpdate_ = data.lastUpdated;
+    lastUpdate_ = data->lastUpdated;
   }
 }
 
@@ -163,33 +167,65 @@ bool DXPedPanel::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
 void DXPedPanel::renderRowText(SDL_Renderer *renderer, int index, int rx, int ry,
                                int rw, int rh, SDL_Color color) {
   auto *cat = fontMgr_.catalog();
-  if (!cat)
+  if (!cat || index < 0 || index >= static_cast<int>(currentPeds_.size()))
     return;
-  const std::string &row = rows_[index];
-  auto tab = row.find('\t');
-  const std::string call =
-      (tab != std::string::npos) ? row.substr(0, tab) : row;
-  const std::string loc =
-      (tab != std::string::npos) ? row.substr(tab + 1) : "";
+
+  const auto &pe = currentPeds_[index];
+  const std::string &call = pe.call;
+  const std::string &loc = pe.location;
+
+  SDL_Color rowColor = color;
+  ThemeColors themes = getThemeColors(theme_);
+
+  // Last day highlight logic: use warning color if ending within 24 hours and not selected.
+  auto now = std::chrono::system_clock::now();
+  auto hoursLeft = std::chrono::duration_cast<std::chrono::hours>(pe.endTime - now).count();
+  if (hoursLeft < 24 && hoursLeft >= 0 && index != getHighlightedIndex()) {
+    rowColor = themes.warning;
+  }
 
   // Dim rows whose callsign could not be geolocated (lat/lon still at default 0).
-  SDL_Color rowColor = color;
-  if (index >= 0 && index < static_cast<int>(currentPeds_.size())) {
-    const auto &pe = currentPeds_[index];
-    if (pe.lat == 0.0 && pe.lon == 0.0) {
-      rowColor = {static_cast<Uint8>(color.r / 2),
-                  static_cast<Uint8>(color.g / 2),
-                  static_cast<Uint8>(color.b / 2), color.a};
-    }
+  if (pe.lat == 0.0 && pe.lon == 0.0) {
+    rowColor = {static_cast<Uint8>(rowColor.r / 2),
+                static_cast<Uint8>(rowColor.g / 2),
+                static_cast<Uint8>(rowColor.b / 2), rowColor.a};
   }
 
   int pad = std::max(2, static_cast<int>(width_ * 0.03f));
   int midY = ry + rh / 2;
-  int colX = rx + rw * 42 / 100;
-  cat->drawText(renderer, call, rx + pad, midY, rowColor, FontStyle::Fast,
-                false, false, true);
-  cat->drawText(renderer, loc, colX, midY, rowColor, FontStyle::Fast, false,
-                false, true);
+
+  if (width_ > 300) {
+    // Maximized/Wide Layout: 3 Columns (Call, Loc, Dates)
+    int col1X = rx + pad;
+    int col2X = rx + rw * 25 / 100;
+    int col3X = rx + rw * 70 / 100;
+
+    cat->drawText(renderer, call, col1X, midY, rowColor, FontStyle::Fast, false,
+                  false, true);
+    cat->drawText(renderer, loc, col2X, midY, rowColor, FontStyle::Fast, false,
+                  false, true);
+
+    auto startT = std::chrono::system_clock::to_time_t(pe.startTime);
+    auto endT = std::chrono::system_clock::to_time_t(pe.endTime);
+    struct tm tmStart, tmEnd;
+    Astronomy::portable_gmtime(&startT, &tmStart);
+    Astronomy::portable_gmtime(&endT, &tmEnd);
+
+    char sBuf[16], eBuf[16], dateRange[64];
+    std::strftime(sBuf, sizeof(sBuf), "%b %d", &tmStart);
+    std::strftime(eBuf, sizeof(eBuf), "%b %d", &tmEnd);
+    std::snprintf(dateRange, sizeof(dateRange), "%s - %s", sBuf, eBuf);
+
+    cat->drawText(renderer, dateRange, col3X, midY, rowColor, FontStyle::Fast,
+                  false, false, true);
+  } else {
+    // Standard layout: 2 Columns
+    int colX = rx + rw * 42 / 100;
+    cat->drawText(renderer, call, rx + pad, midY, rowColor, FontStyle::Fast,
+                  false, false, true);
+    cat->drawText(renderer, loc, colX, midY, rowColor, FontStyle::Fast, false,
+                  false, true);
+  }
 }
 
 // --- ONTAPanel ---
@@ -297,17 +333,17 @@ void ONTAPanel::update() {
   }
 
   auto data = store_->get();
-  if (data.lastUpdated != lastUpdate_) {
-    rebuildRows(data);
-    lastUpdate_ = data.lastUpdated;
+  if (data->lastUpdated != lastUpdate_) {
+    rebuildRows(*data);
+    lastUpdate_ = data->lastUpdated;
   }
 
   // Update highlight from selection
-  if (data.hasSelection) {
+  if (data->hasSelection) {
     int foundIdx = -1;
     for (size_t i = 0; i < currentSpots_.size(); ++i) {
-      if (currentSpots_[i].call == data.selectedSpot.call &&
-          currentSpots_[i].ref == data.selectedSpot.ref) {
+      if (currentSpots_[i].call == data->selectedSpot.call &&
+          currentSpots_[i].ref == data->selectedSpot.ref) {
         foundIdx = static_cast<int>(i);
         break;
       }
@@ -515,14 +551,15 @@ bool ONTAPanel::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
 
     // Clear selection if it no longer matches the new filter
     auto data = store_->get();
-    if (data.hasSelection) {
-      std::string lowerProg = StringUtils::toLower(data.selectedSpot.program);
+    if (data->hasSelection) {
+      std::string lowerProg = StringUtils::toLower(data->selectedSpot.program);
       bool match = (filter_ == Filter::ALL) ||
                    (filter_ == Filter::POTA && lowerProg == "pota") ||
                    (filter_ == Filter::SOTA && lowerProg == "sota");
       if (!match) {
-        data.hasSelection = false;
-        store_->set(data);
+        ActivityData newData = *data;
+        newData.hasSelection = false;
+        store_->set(newData);
       }
     }
 
@@ -570,19 +607,20 @@ bool ONTAPanel::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
       if (idx < currentSpots_.size()) {
         auto data = store_->get();
         const auto &clicked = currentSpots_[idx];
-        bool isSame = data.hasSelection &&
-                      data.selectedSpot.call == clicked.call &&
-                      data.selectedSpot.ref == clicked.ref;
+        ActivityData newData = *data;
+        bool isSame = data->hasSelection &&
+                      data->selectedSpot.call == clicked.call &&
+                      data->selectedSpot.ref == clicked.ref;
         if (isSame) {
-          data.hasSelection = false;
-          store_->set(data);
+          newData.hasSelection = false;
+          store_->set(newData);
           setHighlightedIndex(-1);
           if (onSpotDeactivated_)
             onSpotDeactivated_();
         } else {
-          data.hasSelection = true;
-          data.selectedSpot = clicked;
-          store_->set(data);
+          newData.hasSelection = true;
+          newData.selectedSpot = clicked;
+          store_->set(newData);
           setHighlightedIndex(static_cast<int>(idx));
           if (onSpotActivated_)
             onSpotActivated_(clicked);
@@ -742,9 +780,10 @@ bool ONTAPanel::handleSetupClick(int mx, int my) {
     }
     if (needRebuild) {
       auto data = store_->get();
-      data.hasSelection = false;
-      store_->set(data);
-      rebuildRows(data);
+      ActivityData newData = *data;
+      newData.hasSelection = false;
+      store_->set(newData);
+      rebuildRows(newData);
     }
     if (filterChanged && onFilterChanged_) {
       std::string fstr;
@@ -820,6 +859,18 @@ REGISTER_WIDGET("dx_peditions", "DX Peditions", true, false, {
 })
 
 REGISTER_WIDGET("on_the_air", "On The Air", true, false, {
-  return std::make_unique<ONTAPanel>(
+  auto p = std::make_unique<ONTAPanel>(
       0, 0, 0, 0, deps.fontMgr, *deps.activityProvider, deps.activityStore);
+  p->setFilter(deps.appCfg.ontaFilter);
+  p->setDeLocation(deps.appCfg.lat, deps.appCfg.lon);
+  p->setMaxDistKm(deps.appCfg.ontaMaxDistKm);
+  p->setOnFilterChanged([&appCfg = deps.appCfg, &cfgMgr = deps.cfgMgr](const std::string &f) {
+    appCfg.ontaFilter = f;
+    cfgMgr.save(appCfg);
+  });
+  p->setOnMaxDistChanged([&appCfg = deps.appCfg, &cfgMgr = deps.cfgMgr](int km) {
+    appCfg.ontaMaxDistKm = km;
+    cfgMgr.save(appCfg);
+  });
+  return p;
 })

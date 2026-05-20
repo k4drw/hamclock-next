@@ -194,7 +194,7 @@ void RSSProvider::fetch() {
   for (int i = 0; i < kNumFeeds; ++i) {
     const auto &feed = kFeeds[i];
     net_.fetchAsync(feed.url, [feed_index = i, feed_name = feed.name,
-                               parser = feed.parser](std::string body) {
+                                parser = feed.parser](std::string body) {
       if (body.empty()) {
         LOG_W("RSSProvider", "Fetch failed for {}", feed_name);
         return;
@@ -215,6 +215,33 @@ void RSSProvider::fetch() {
             event.user.data1 = headlines;
             SDL_PushEvent(&event);
           });
+    });
+  }
+
+  if (!customUrl_.empty()) {
+    net_.fetchAsync(customUrl_.c_str(), [url = customUrl_](std::string body) {
+      if (body.empty()) {
+        LOG_W("RSSProvider", "Fetch failed for custom RSS: {}", url);
+        return;
+      }
+
+      // Detect parser: search for <entry> (Atom) else use RSS
+      auto parser = (body.find("<entry>") != std::string::npos) ? parseAtom : parseRSS;
+      const char* feed_name = "Custom";
+
+      WorkerService::getInstance().submitTask([body, parser, feed_name]() {
+        LOG_D("RSSProvider", "Parsing {} on worker thread.", feed_name);
+        auto *headlines = new std::vector<std::string>(parser(body));
+        LOG_I("RSSProvider", "{} -> {} headlines", feed_name,
+              headlines->size());
+
+        SDL_Event event;
+        SDL_zero(event);
+        event.type = HamClock::AE_BASE_EVENT + HamClock::AE_RSS_DATA_READY;
+        event.user.code = 99; // Special code for custom
+        event.user.data1 = headlines;
+        SDL_PushEvent(&event);
+      });
     });
   }
 }

@@ -21,9 +21,10 @@ RBNProvider::RBNProvider(std::shared_ptr<DXClusterDataStore> store,
                          PrefixManager &pm,
                          std::shared_ptr<WatchlistStore> watchlist,
                          std::shared_ptr<WatchlistHitStore> hits,
+                         std::shared_ptr<HeardMeStore> heardMe,
                          HamClockState *state)
     : store_(store), pm_(pm), watchlist_(watchlist), hits_(hits),
-      state_(state) {}
+      heardMe_(heardMe), state_(state) {}
 
 RBNProvider::~RBNProvider() { stop(); }
 
@@ -49,20 +50,26 @@ void RBNProvider::stop() {
 }
 
 void RBNProvider::run() {
-  std::string host =
-      config_.rbnHost.empty() ? DEFAULT_HOST : config_.rbnHost;
-  std::string login = config_.callsign; // RBN login = operator callsign
+  try {
+    std::string host =
+        config_.rbnHost.empty() ? DEFAULT_HOST : config_.rbnHost;
+    std::string login = config_.callsign; // RBN login = operator callsign
 
-  while (!stopRequested_) {
-    runTelnet(host, DEFAULT_PORT, login);
+    while (!stopRequested_) {
+      runTelnet(host, DEFAULT_PORT, login);
 
-    if (stopRequested_)
-      break;
+      if (stopRequested_)
+        break;
 
-    LOG_W("RBN", "Disconnected, retrying in 30s...");
-    std::unique_lock<std::mutex> lk(stopMutex_);
-    stopCv_.wait_for(lk, std::chrono::seconds(30),
-                     [this] { return stopRequested_.load(); });
+      LOG_W("RBN", "Disconnected, retrying in 30s...");
+      std::unique_lock<std::mutex> lk(stopMutex_);
+      stopCv_.wait_for(lk, std::chrono::seconds(30),
+                       [this] { return stopRequested_.load(); });
+    }
+  } catch (const std::exception &e) {
+    LOG_E("RBN", "Fatal exception in run(): {}", e.what());
+  } catch (...) {
+    LOG_E("RBN", "Fatal unknown exception in run()");
   }
   running_ = false;
 }
@@ -86,6 +93,10 @@ void RBNProvider::runTelnet(const std::string &host, int port,
     }
     return;
   }
+
+  int keepalive = 1;
+  setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, (const char *)&keepalive,
+             sizeof(keepalive));
 
   struct hostent *he = gethostbyname(host.c_str());
   if (!he) {
@@ -147,6 +158,8 @@ void RBNProvider::runTelnet(const std::string &host, int port,
   std::string buffer;
   bool loggedIn = login.empty();
   auto lastHeartbeat = std::chrono::system_clock::now();
+  auto lastPrune = std::chrono::system_clock::now();
+  auto lastDataReceived = std::chrono::system_clock::now();
 
   while (!stopRequested_) {
 #ifdef _WIN32
@@ -177,6 +190,7 @@ void RBNProvider::runTelnet(const std::string &host, int port,
       }
 
       tmp[n] = '\0';
+      lastDataReceived = std::chrono::system_clock::now();
       buffer.append(tmp, n);
 
       size_t pos;
@@ -246,8 +260,21 @@ void RBNProvider::runTelnet(const std::string &host, int port,
         buffer.clear();
     }
 
-    // Heartbeat every 60 seconds
+    // Heartbeat & Maintenance checks
     auto now = std::chrono::system_clock::now();
+
+    // Periodic in-memory Prune (clears UI if stream is silent)
+    if (now - lastPrune > std::chrono::seconds(60)) {
+      if (store_) store_->pruneInMemory();
+      lastPrune = now;
+    }
+
+    // Watchdog (detects dead stream/VPN stall)
+    if (now - lastDataReceived > std::chrono::minutes(10)) {
+      LOG_W("RBN", "No data received for 10 minutes. Forcing reconnect.");
+      break;
+    }
+
     if (now - lastHeartbeat > std::chrono::seconds(60)) {
       send(sock, "\r\n", 2, 0);
       lastHeartbeat = now;
@@ -321,9 +348,17 @@ void RBNProvider::processLine(const std::string &line) {
       tm->tm_min = mn;
       tm->tm_sec = 0;
       std::time_t spot_c = Astronomy::portable_timegm(tm);
-      if (spot_c > now_c)
+      
+      // Handle day wrap: sub 24h only if delta > 30 mins in the future.
+      if (spot_c > now_c + 1800)
         spot_c -= 86400;
-      spot.spottedAt = std::chrono::system_clock::from_time_t(spot_c);
+      
+      // HHMMZ has minute precision; force receipt time for current minute
+      // or tolerated future drift so they start aging immediately at 0s.
+      if (static_cast<long>(now_c - spot_c) < 60)
+        spot.spottedAt = now;
+      else
+        spot.spottedAt = std::chrono::system_clock::from_time_t(spot_c);
     }
   }
 
@@ -367,8 +402,17 @@ void RBNProvider::processLine(const std::string &line) {
     while (*p == ' ')
       p++;
     float snr = 0;
-    if (sscanf(p, "%f dB", &snr) == 1)
+    if (sscanf(p, "%f dB", &snr) == 1) {
       spot.snr = snr;
+      // Skip past SNR field to find WPM
+      const char *wpm_p = std::strstr(p, " dB");
+      if (wpm_p) {
+        wpm_p += 3;
+        int wpm = 0;
+        if (sscanf(wpm_p, "%d WPM", &wpm) == 1)
+          spot.wpm = wpm;
+      }
+    }
   }
 
   // Resolve coordinates from prefix database
@@ -384,10 +428,15 @@ void RBNProvider::processLine(const std::string &line) {
     spot.rxGrid = Astronomy::latLonToGrid(ll.lat, ll.lon);
   }
 
-  LOG_D("RBN", "Spot: {} on {:.1f} kHz {} {:.0f}dB", spot.txCall,
-        spot.freqKhz, spot.mode, spot.snr);
+  LOG_D("RBN", "Spot: {} on {:.1f} kHz {} {:.0f}dB {} WPM", spot.txCall,
+        spot.freqKhz, spot.mode, spot.snr, spot.wpm);
 
   store_->addSpot(spot);
+
+  // Heard Me check
+  if (heardMe_ && !config_.callsign.empty() && spot.txCall == config_.callsign) {
+    heardMe_->addSpot(spot);
+  }
 
   // Watchlist check
   if (watchlist_ && hits_ && watchlist_->contains(spot.txCall)) {

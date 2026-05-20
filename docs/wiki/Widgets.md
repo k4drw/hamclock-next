@@ -34,7 +34,7 @@ To add a widget to a pane, click the **top strip** of the pane to open the widge
 | Widget           | Description                                                                                                   | Data Source              |
 | ---------------- | ------------------------------------------------------------------------------------------------------------- | ------------------------ |
 | **Solar**        | Solar flux index (SFI), sunspot number (SSN), X-ray flux, proton flux, solar wind speed and density, Kp index | NOAA SWPC                |
-| **SDO**          | Live solar imagery from the Solar Dynamics Observatory in selectable wavelengths; optional movie loop         | NASA SDO                 |
+| **SDO**          | Live solar imagery from the Solar Dynamics Observatory in selectable wavelengths                              | LMSAL / NASA SDO         |
 | **Aurora**       | Global aurora forecast map from the NOAA OVATION model                                                        | NOAA SWPC                |
 | **Aurora Graph** | Time-series graph of geomagnetic Kp index and aurora activity                                                 | NOAA SWPC                |
 | **DRAP**         | D-Region Absorption Prediction — HF absorption map showing where ionospheric absorption degrades propagation  | NOAA SWPC                |
@@ -50,6 +50,7 @@ To add a widget to a pane, click the **top strip** of the pane to open the widge
 | **Solar Impact**    | Timeline of recent solar events: flares, CMEs, and geomagnetic storm onsets                    | NOAA SWPC                |
 | **NOAA SpaceWx**    | NOAA Space Weather forecast text: geomagnetic, solar radiation, and radio blackout conditions   | NOAA SWPC                |
 | **SpaceWx Alerts**  | Active NOAA Space Weather watches, warnings, and alerts as a scrollable list                    | NOAA SWPC                |
+| **Flare Log**       | Scrollable list of recent X-ray solar flares (classes B–X) from NOAA with peak times and durations | NOAA SWPC                |
 
 ![Solar widget](images/widgets/solar.png)
 
@@ -64,7 +65,12 @@ To add a widget to a pane, click the **top strip** of the pane to open the widge
 | **Band Conditions** | Color-coded HF band condition summary (160m–10m) by path type                               | NOAA SWPC derived  |
 | **Live Spots**      | Real-time decoded signal spots from PSK Reporter or Reverse Beacon Network, plotted by band | PSK Reporter / RBN |
 | **NCDXF**           | NCDXF/IBP international beacon schedule and current beacon on air                           | NCDXF              |
-| **Voacap DE-DX**    | VOACAP short-path propagation prediction between DE and DX. Covers nine bands — 80m, 40m, 30m, 20m, 17m, 15m, 12m, 10m, and 6m — across all 24 UTC hours. A horizontal white line highlights the band that matches the DX spot you currently have selected, so you can see predicted conditions for that band at a glance. | VOACAP (local)     |
+| **Voacap DE-DX**    | VOACAP short-path propagation prediction between DE and DX. Covers nine bands — 80m, 40m, 30m, 20m, 17m, 15m, 12m, 10m, and 6m — across all 24 UTC hours. The X-axis is reoriented so the leftmost column always shows the current UTC hour ("now at origin"), with a vertical white line cursor for visualization. A horizontal white line highlights the band that matches the DX spot you currently have selected. | VOACAP (local)     |
+| **Local Prop Gauge** | Compact map overlay showing your home station's current Maximum Usable Frequency (MUF), Lowest Usable Frequency (LUF), and which HF bands are open right now | VOACAP (local)     |
+
+### Frequency Cursor
+
+On widgets that show propagation charts (like the VOACAP DE-DX matrix), a white horizontal line acts as a **Frequency Cursor**. This line automatically moves to show you the band of the DX station you have selected, helping you visualize the path conditions for your exact operating frequency.
 
 ![Band Conditions widget](images/widgets/band_conditions.png)
 
@@ -86,6 +92,17 @@ To add a widget to a pane, click the **top strip** of the pane to open the widge
 | **Alerts**          | Triggered alerts based on watchlist hits or band activity thresholds             | Internal                          |
 | **Greyline Win.**   | Daily greyline opening and closing times for configured DXCC entities            | Astronomical calculation          |
 | **DXCC Progress**   | DXCC award progress tracker — worked vs. confirmed entities by band and mode     | Local ADIF log                    |
+| **WAS Progress**    | Work All States award tracker — visual progress display of worked and confirmed US states | Local ADIF log                    |
+| **WAC Radar**       | Work All Continents award tracker — pie chart visualization showing progress toward WAC with 6 continents color-coded by status | Local ADIF log                    |
+| **Zone Heatmap**    | Work All Zones award tracker — clickable grid display of CQ (1–40) and ITU (1–75) zones; click title to toggle between zone types | Local ADIF log                    |
+| **LoTW Auto-Sync**  | LoTW (Logbook of The World) confirmation tracking — displays last sync time, synced QSO count, and connection status with automatic hourly refresh | ARRL LoTW service                 |
+| **QSO Rate**        | Sparkline chart of QSOs per hour over the past 12 hours with peak count and total; sourced from local ADIF log | Local ADIF log                    |
+| **Greyline Filter** | Filters live DX cluster spots to show only those near the grey line (terminator ±N degrees) | DX Cluster (filtered)             |
+| **Heard Me**        | Real-time stations that decoded your transmissions via Reverse Beacon Network                  | RBN (Reverse Beacon Network)      |
+
+### DX ATNO Alerts
+
+When the DX Cluster detects an "All-Time New One" (ATNO) — a DXCC entity you haven't worked before — a high-contrast alert banner flashes on the map with the callsign and band. Your speaker also plays a voice notification so you don't miss it. Dismiss the alert by clicking the banner. This feature runs automatically whenever the DX Cluster is active.
 
 ![DX Cluster widget](images/widgets/dx_cluster.png)
 
@@ -146,7 +163,7 @@ To add a widget to a pane, click the **top strip** of the pane to open the widge
 | **Rig Control**     | Displays frequency, mode, and S-meter from a connected transceiver *(requires Hamlib)*          | Hamlib rigctld           |
 | **Repeater Dir**    | Repeater directory lookup for your area *(requires API key)*                                    | RepeaterBook             |
 | **Winlink**         | Winlink gateway listing for your area *(requires Winlink account)*                              | Winlink API              |
-| **Sys Info**        | System information: CPU, memory, GPU VRAM, network stats, uptime                                | Local OS                 |
+| **Sys Info**        | System information: CPU, memory, GPU VRAM, network stats, uptime, and GPU cache statistics (texture, vertex, and command buffer usage) for performance debugging. | Local OS                 |
 
 ![DE Info widget](images/widgets/de_info.png)
 

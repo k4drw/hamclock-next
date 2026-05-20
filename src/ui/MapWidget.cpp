@@ -281,7 +281,7 @@ MapWidget::~MapWidget() {
   // Signal any in-flight WorkerService ground-track task to exit early rather
   // than dereference the now-dangling predictor_.
   trackAlive_->store(false, std::memory_order_release);
-  MemoryMonitor::getInstance().destroyTexture(nightOverlayTexture_);
+  MemoryMonitor::getInstance().destroyTexture(mufRtTexture_);
   MemoryMonitor::getInstance().destroyTexture(propTexture_);
   MemoryMonitor::getInstance().destroyTexture(auroraTexture_);
   MemoryMonitor::getInstance().destroyTexture(tooltip_.cachedTexture);
@@ -522,6 +522,22 @@ void MapWidget::update() {
   // Always update menu if visible
   if (mapViewMenu_->isVisible()) {
     mapViewMenu_->update();
+  }
+
+  // Throttle data store snapshots to avoid per-frame deep copies
+  if (dxcStore_) {
+    uint32_t ver = dxcStore_->getVersion();
+    if (ver != lastDxcVer_ || !currentDxcSnapshot_) {
+      currentDxcSnapshot_ = dxcStore_->snapshot();
+      lastDxcVer_ = ver;
+    }
+  }
+  if (spotStore_) {
+    uint32_t ver = spotStore_->getVersion();
+    if (ver != lastSpotVer_ || !currentSpotSnapshot_) {
+      currentSpotSnapshot_ = spotStore_->snapshot();
+      lastSpotVer_ = ver;
+    }
   }
 
   uint32_t nowMs = SDL_GetTicks();
@@ -1081,7 +1097,9 @@ void MapWidget::render(SDL_Renderer *renderer) {
   renderAsteroidOverlay(renderer);
   renderSpotOverlay(renderer);
   renderDXClusterSpots(renderer);
-  renderADIFPins(renderer);
+  renderHeardMeSpots(renderer);
+  if (config_.showLotwQsos)
+    renderADIFPins(renderer);
   renderONTASpots(renderer);
   renderBeacons(renderer);
 
@@ -1131,8 +1149,12 @@ void MapWidget::render(SDL_Renderer *renderer) {
   renderLegend(renderer);
   renderWxMbLegend(renderer);
   renderCloudLegend(renderer);
+  if (config_.showLocalPropGauge)
+    renderLocalPropGauge(renderer);
 
   renderCalendarAlert(renderer);
+  renderDXAlert(renderer);
+  renderStartupBanner(renderer);
 
   // Note: MapViewMenu is rendered via renderModal() in the centralized modal
   // pass, not here. This prevents clipping to the map pane bounds.
@@ -1201,11 +1223,8 @@ void MapWidget::updatePropagationOverlay() {
         MemoryMonitor::getInstance().destroyTexture(propTexture_);
       if (auroraTexture_)
         MemoryMonitor::getInstance().destroyTexture(auroraTexture_);
-      if (nightOverlayTexture_)
-        MemoryMonitor::getInstance().destroyTexture(nightOverlayTexture_);
       propTexture_ = nullptr;
       auroraTexture_ = nullptr;
-      nightOverlayTexture_ = nullptr;
       return;
     }
 
@@ -1226,6 +1245,8 @@ void MapWidget::updatePropagationOverlay() {
       propTexture_ =
           SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32,
                             SDL_TEXTUREACCESS_STATIC, grid.cols, grid.rows);
+      if (propTexture_)
+        MemoryMonitor::getInstance().addVram((int64_t)grid.cols * grid.rows * 4);
       SDL_SetTextureBlendMode(propTexture_, SDL_BLENDMODE_BLEND);
     }
     if (!propTexture_)
@@ -1346,6 +1367,7 @@ void MapWidget::onPropDataReady(PropOverlayType type,
                                      PropEngine::MAP_W, PropEngine::MAP_H);
     if (!propTexture_)
       return;
+    MemoryMonitor::getInstance().addVram((int64_t)PropEngine::MAP_W * PropEngine::MAP_H * 4);
     SDL_SetTextureBlendMode(propTexture_, SDL_BLENDMODE_BLEND);
   }
 
@@ -1354,13 +1376,13 @@ void MapWidget::onPropDataReady(PropOverlayType type,
   if (type == PropOverlayType::Reliability)
     maxVal = 100.0f;
   else if (type == PropOverlayType::Voacap)
-    maxVal = 35.0f;  // MUF(3000) in MHz, same scale as MUF-RT
+    maxVal = 54.0f;  // MUF(3000) in MHz — extend to 6m (54 MHz)
   else if (type == PropOverlayType::Toa)
     maxVal = 40.0f;
   else if (type == PropOverlayType::Heatmap)
     maxVal = 1.0f;  // ReachProvider normalizes grid to 0..1
   else
-    maxVal = 35.0f;  // MUF (matches original HamClock CM_MUF_V scale)
+    maxVal = 54.0f;  // MUF — extend to 6m (54 MHz)
 
   for (size_t i = 0; i < grid.size(); ++i) {
     float val = grid[i];
@@ -1606,9 +1628,6 @@ SDL_Color MapWidget::getPropColor(PropOverlayType type, float t,
 void MapWidget::onResize(int x, int y, int w, int h) {
   Widget::onResize(x, y, w, h);
   recalcMapRect();
-  if (nightOverlayTexture_) {
-    MemoryMonitor::getInstance().destroyTexture(nightOverlayTexture_);
-  }
   // Invalidate all cached geometry that depends on screen coordinates
   gridDirty_ = true;
   borderDirty_ = true;
@@ -1697,14 +1716,12 @@ nlohmann::json MapWidget::getDebugData() const {
   }
 
   // Spot counts
-  if (spotStore_) {
-    auto sd = spotStore_->snapshot();
-    j["live_spot_count"] = static_cast<int>(sd->spots.size());
+  if (currentSpotSnapshot_) {
+    j["live_spot_count"] = static_cast<int>(currentSpotSnapshot_->spots.size());
   }
-  if (dxcStore_) {
-    auto dd = dxcStore_->snapshot();
-    j["dxc_spot_count"] = static_cast<int>(dd->spots.size());
-    j["dxc_connected"] = dd->connected;
+  if (currentDxcSnapshot_) {
+    j["dxc_spot_count"] = static_cast<int>(currentDxcSnapshot_->spots.size());
+    j["dxc_connected"] = currentDxcSnapshot_->connected;
   }
 
   // Tooltip

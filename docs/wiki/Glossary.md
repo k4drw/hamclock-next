@@ -182,7 +182,7 @@ A standard format for publishing regularly updated content — such as news head
 
 ## SDO (Solar Dynamics Observatory)
 
-A NASA solar observatory that provides the live solar images shown in the SDO widget.
+A NASA solar observatory. Live solar images are served by LMSAL (Lockheed Martin Solar & Astrophysics Laboratory) as the primary source, with NASA GSFC and sol24.net as automatic fallbacks.
 
 ---
 

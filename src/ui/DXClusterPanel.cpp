@@ -52,6 +52,7 @@ static const char *modeFromFreq(double khz) {
   if (khz >= 24915 && khz < 24990) return "SSB";
   if (khz >= 28000 && khz < 28070) return "CW";
   if (khz >= 28070 && khz < 28300) return "RTTY";
+  if (khz >= 29000 && khz < 29200) return "AM";
   if (khz >= 28300 && khz < 29700) return "SSB";
   if (khz >= 50000 && khz < 50100) return "CW";
   if (khz >= 50100 && khz < 50300) return "SSB";
@@ -61,12 +62,12 @@ static const char *modeFromFreq(double khz) {
 static SDL_Color modeColor(const char *mode) {
   if (!mode || mode[0] == '\0') return {120, 120, 120, 255};
   std::string m(mode);
-  if (m == "CW")   return {220, 200,  60, 255}; // yellow
-  if (m == "SSB")  return { 80, 160, 255, 255}; // blue
-  if (m == "FT8")  return { 60, 210,  80, 255}; // green
-  if (m == "FT4")  return {255, 140,  40, 255}; // orange
-  if (m == "RTTY") return {230,  90,  50, 255}; // red-orange
-  if (m == "WSPR") return {180,  80, 255, 255}; // purple
+  if (m == "CW")   return {0,   255, 255, 255}; // cyan
+  if (m == "SSB")  return {0,   255, 0,   255}; // green
+  if (m == "FT8" || m == "FT4") return {255, 0, 255, 255}; // magenta
+  if (m == "RTTY") return {255, 255, 0,   255}; // yellow
+  if (m == "WSPR") return {180, 80,  255, 255}; // purple
+  if (m == "AM")   return {160, 160, 160, 255}; // grey
   return {160, 160, 160, 255};
 }
 
@@ -74,10 +75,12 @@ DXClusterPanel::DXClusterPanel(int x, int y, int w, int h, FontManager &fontMgr,
                                std::shared_ptr<DXClusterDataStore> store,
                                RigService *rigService, const AppConfig *config,
                                std::shared_ptr<ADIFStore> adifStore,
-                               std::shared_ptr<WatchlistStore> watchlist)
+                               std::shared_ptr<WatchlistStore> watchlist,
+                               std::shared_ptr<LoTWActivityStore> lotwStore)
     : ListPanel(x, y, w, h, fontMgr, "DX Cluster", {}), store_(store),
       adifStore_(std::move(adifStore)), watchlist_(std::move(watchlist)),
-      rigService_(rigService), config_(config) {}
+      lotwStore_(std::move(lotwStore)), rigService_(rigService),
+      config_(config) {}
 
 DXClusterPanel::~DXClusterPanel() { clearSpotCache(); }
 
@@ -89,6 +92,8 @@ void DXClusterPanel::clearSpotCache() {
       MemoryMonitor::getInstance().destroyTexture(cs.modeTex);
     if (cs.badgeTex)
       MemoryMonitor::getInstance().destroyTexture(cs.badgeTex);
+    if (cs.lotwTex)
+      MemoryMonitor::getInstance().destroyTexture(cs.lotwTex);
     if (cs.callTex)
       MemoryMonitor::getInstance().destroyTexture(cs.callTex);
     if (cs.ageTex)
@@ -98,6 +103,13 @@ void DXClusterPanel::clearSpotCache() {
 }
 
 void DXClusterPanel::update() {
+  uint32_t ver = store_->getVersion();
+  bool scrollChanged = (scrollOffset_ != lastScrollOffset_);
+  bool forceUpdate = (lastUpdate_ == std::chrono::system_clock::time_point{});
+  if (ver == lastVer_ && !scrollChanged && !forceUpdate)
+    return;
+  lastVer_ = ver;
+
   auto data = store_->snapshot();
   bool dataChanged = (data->lastUpdate != lastUpdate_);
 
@@ -107,7 +119,7 @@ void DXClusterPanel::update() {
   }
 
   // Sync scroll offset and visible rows
-  bool scrollChanged = (scrollOffset_ != lastScrollOffset_);
+  scrollChanged = (scrollOffset_ != lastScrollOffset_);
   std::string selectionKey;
   if (data->hasSelection)
     selectionKey = data->selectedSpot.txCall + ":" +
@@ -214,20 +226,25 @@ void DXClusterPanel::render(SDL_Renderer *renderer) {
 
   int pad = std::max(2, static_cast<int>(width_ * 0.03f));
 
-  // Column layout: Freq | [Mode] | [Badge] | Call | Age
+  // Column layout: Freq | [Mode] | [Badge] | [LoTW] | Call | Age
   // Mode badge (CW/FT8/SSB…) shown at ≥140px; DXCC badge (N/B) shown at ≥120px.
+  // LoTW badge (L) shown at ≥100px when LoTW data available.
   int freqColW = fontMgr_.getLogicalWidth("88888.8", rowFontSize_);
   int ageColW = fontMgr_.getLogicalWidth("999m", rowFontSize_);
   bool showMode = (width_ >= 140);
   bool showBadge = (width_ >= 120) && adifStore_ && adifStore_->get().valid;
+  bool showLoTW = (width_ >= 100) && lotwStore_;
   int modeColW =
       showMode ? (fontMgr_.getLogicalWidth("RTTY", rowFontSize_) + 2) : 0;
   int badgeColW =
       showBadge ? (fontMgr_.getLogicalWidth("B", rowFontSize_) + 2) : 0;
+  int lotwColW =
+      showLoTW ? (fontMgr_.getLogicalWidth("L", rowFontSize_) + 2) : 0;
   int freqXEnd = x_ + pad + freqColW;
   int modeX = freqXEnd + 4;
   int badgeX = modeX + modeColW + (showMode ? 4 : 0);
-  int callX = badgeX + badgeColW + (showBadge ? 3 : (showMode ? 0 : 2));
+  int lotwX = badgeX + badgeColW + (showBadge ? 3 : (showMode ? 0 : 2));
+  int callX = lotwX + lotwColW + (showLoTW ? 3 : 0);
   int ageX = x_ + width_ - pad - ageColW;
 
   int curY = contentY_;
@@ -300,20 +317,32 @@ void DXClusterPanel::render(SDL_Renderer *renderer) {
     // 3. DXCC needed badge (N=new entity, B=new band)
     if (showBadge && spot.txDxcc > 0) {
       ADIFStats adif = adifStore_->get();
-      auto it = adif.workedEntitiesPerBand.find(spot.txDxcc);
+      int entityNum = spot.txDxcc;
+      auto workedIt = adif.workedEntitiesPerBand.find(entityNum);
+      auto confIt = adif.confirmedEntitiesPerBand.find(entityNum);
+
+      int bandIdx = freqToBandIndex(spot.freq);
+      std::string band = (bandIdx >= 0) ? kBands[bandIdx].name : "";
+
       std::string badgeStr;
-      SDL_Color badgeCol = {120, 120, 120, 255};
-      if (it == adif.workedEntitiesPerBand.end()) {
+      SDL_Color badgeCol = {150, 150, 150, 255}; // default dim grey
+
+      if (workedIt == adif.workedEntitiesPerBand.end()) {
         badgeStr = "N"; // new entity — not in log at all
         badgeCol = {0, 240, 220, 255}; // cyan
       } else {
-        int bandIdx = freqToBandIndex(spot.freq);
-        if (bandIdx >= 0) {
-          std::string band(kBands[bandIdx].name);
-          if (it->second.find(band) == it->second.end()) {
-            badgeStr = "B"; // new band
-            badgeCol = {255, 220, 60, 255}; // yellow
-          }
+        bool workedThisBand = (!band.empty() && workedIt->second.count(band));
+        bool confirmedThisBand = (confIt != adif.confirmedEntitiesPerBand.end() && !band.empty() && confIt->second.count(band));
+        bool confirmedElsewhere = (confIt != adif.confirmedEntitiesPerBand.end() && !confIt->second.empty());
+
+        if (confirmedThisBand) {
+          badgeStr = ""; // already worked and confirmed
+        } else if (!workedThisBand && confirmedElsewhere) {
+          badgeStr = "B"; // new band (confirmed elsewhere)
+          badgeCol = {255, 220, 60, 255}; // yellow
+        } else {
+          badgeStr = "W"; // worked but not confirmed
+          badgeCol = {150, 150, 150, 255}; // dim grey
         }
       }
       if (!cache.badgeTex || cache.lastBadge != badgeStr) {
@@ -334,7 +363,42 @@ void DXClusterPanel::render(SDL_Renderer *renderer) {
       }
     }
 
-    // 4. Call (left-aligned, clipped before age column)
+    // 4. LoTW activity badge (L with color based on recency)
+    if (showLoTW && lotwStore_) {
+      // Determine LoTW recency for the spotter (or spotted entity)
+      // We check the TX callsign primarily
+      int lotwRecency = 0;
+      std::string callToCheck = spot.call; // Spotter's call
+      if (!callToCheck.empty()) {
+        lotwRecency = lotwStore_->getRecencyCategory(callToCheck);
+      }
+
+      std::string lotwStr = (lotwRecency > 0) ? "L" : "";
+      SDL_Color lotwCol = {150, 150, 150, 255}; // default: unknown/inactive
+      if (lotwRecency == 1)
+        lotwCol = {0, 220, 60, 255}; // green: <30d
+      else if (lotwRecency == 2)
+        lotwCol = {255, 220, 60, 255}; // yellow: <1yr
+
+      if (!cache.lotwTex || cache.lastLoTW != lotwStr) {
+        if (cache.lotwTex)
+          MemoryMonitor::getInstance().destroyTexture(cache.lotwTex);
+        cache.lotwTex = nullptr;
+        cache.lotwW = cache.lotwH = 0;
+        if (!lotwStr.empty()) {
+          cache.lotwTex = fontMgr_.renderText(renderer, lotwStr, lotwCol,
+                                              rowFontSize_, &cache.lotwW, &cache.lotwH);
+        }
+        cache.lastLoTW = lotwStr;
+      }
+      if (cache.lotwTex) {
+        int ty = rowY + (rowH - cache.lotwH) / 2;
+        SDL_Rect dst = {lotwX, ty, cache.lotwW, cache.lotwH};
+        SDL_RenderCopy(renderer, cache.lotwTex, nullptr, &dst);
+      }
+    }
+
+    // 5. Call (left-aligned, clipped before age column)
     if (!cache.callTex || cache.lastCall != spot.call) {
       if (cache.callTex)
         MemoryMonitor::getInstance().destroyTexture(cache.callTex);

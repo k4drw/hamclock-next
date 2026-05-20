@@ -6,6 +6,8 @@
 #include "ConfigManager.h"       // AppConfig, ConfigManager
 #include "Constants.h"           // INITIAL_WIDTH, INITIAL_HEIGHT, etc.
 #include "PrefixManager.h"       // PrefixManager (AppContext value member)
+#include "DXClusterData.h"
+#include "LiveSpotData.h"
 #include "../ui/DebugOverlay.h"  // DebugOverlay (DashboardContext value member)
 #include "../ui/LayoutManager.h" // LayoutManager, Widget (transitively)
 #include "../ui/TextureManager.h"// TextureManager (DashboardContext value member)
@@ -43,6 +45,10 @@ class WeatherStore;
 class CallbookStore;
 class DstStore;
 class ADIFStore;
+class LoTWActivityStore;
+class ClublogStore;
+class FlareDataStore;
+class HeardMeStore;
 class SantaStore;
 class RotatorDataStore;
 class RigDataStore;
@@ -79,11 +85,15 @@ namespace HamClock { class GPSProvider; }
 class NOAAProvider;
 class RSSProvider;
 class LiveSpotProvider;
+class LoTWActivityProvider;
+class ClublogProvider;
+class LoTWProvider;
 class ActivityProvider;
 class DXClusterProvider;
 class RBNProvider;
 class BandConditionsProvider;
 class ContestProvider;
+class FlareProvider;
 class MoonProvider;
 class HistoryProvider;
 class WeatherProvider;
@@ -118,7 +128,7 @@ class DstProvider;
 class MufRtProvider;
 class IonosondeProvider;
 class AsteroidProvider;
-class ForecastProvider;
+class OpenMeteoForecastProvider;
 class WxMbProvider;
 class QRZProvider;
 
@@ -158,6 +168,7 @@ struct DashboardContext {
   std::unique_ptr<RBNProvider> rbnProvider;
   std::unique_ptr<BandConditionsProvider> bandProvider;
   std::unique_ptr<ContestProvider> contestProvider;
+  std::unique_ptr<FlareProvider> flareProvider;
   std::unique_ptr<MoonProvider> moonProvider;
   std::unique_ptr<HistoryProvider> historyProvider;
   std::unique_ptr<WeatherProvider> deWeatherProvider;
@@ -169,6 +180,9 @@ struct DashboardContext {
   FccProvider fccProvider;
   std::shared_ptr<DstProvider> dstProvider;
   std::unique_ptr<ADIFProvider> adifProvider;
+  std::shared_ptr<LoTWActivityProvider> lotwActivityProvider;
+  std::shared_ptr<ClublogProvider> clublogProvider;
+  std::shared_ptr<LoTWProvider> lotwProvider;
   std::shared_ptr<MufRtProvider> mufRtProvider;
   std::shared_ptr<IonosondeProvider> ionosondeProvider;
   std::shared_ptr<HamClock::ReachProvider> reachProvider;
@@ -181,7 +195,7 @@ struct DashboardContext {
   std::shared_ptr<AsteroidProvider> asteroidProvider;
   std::unique_ptr<BeaconProvider> beaconProvider;
   std::unique_ptr<AlertsProvider> alertsProvider;
-  std::shared_ptr<ForecastProvider> forecastProvider;
+  std::shared_ptr<OpenMeteoForecastProvider> forecastProvider;
   std::unique_ptr<RepeaterProvider> repeaterProvider;
   std::unique_ptr<HurricaneProvider> hurricaneProvider;
   std::unique_ptr<MarineProvider> marineProvider;
@@ -246,6 +260,12 @@ struct DashboardContext {
   bool cursorVisible = true;
   Uint32 lastSleepAssert = 0;
   Uint32 lastMemLogMs = 0;
+  Uint32 lastPruneMs_ = 0;
+  Uint32 lastBlackFrameMs_ = 0;
+  uint32_t lastDxcVer_ = 0;
+  uint32_t lastSpotVer_ = 0;
+  std::shared_ptr<const DXClusterData> currentDxcSnapshot_;
+  std::shared_ptr<const LiveSpotData> currentSpotSnapshot_;
   float fingerScrollAccum_ = 0.0f;  // accumulated normalized finger-Y for swipe-to-scroll
   bool fingerWasScrolling_ = false;  // true if current touch gesture crossed scroll threshold
   // Guards provider callbacks captured by background threads.
@@ -257,7 +277,7 @@ struct DashboardContext {
       std::make_shared<std::atomic<bool>>(true);
 
   // State for background data aggregation
-  std::vector<std::string> rssHeadlines[3];
+  std::vector<std::string> rssHeadlines[4];
   bool rssDataDirty = false;
 
   DashboardContext(AppContext &ctx);
@@ -268,6 +288,9 @@ struct DashboardContext {
   void restorePane(AppContext &ctx);
   void update(AppContext &ctx);
   void render(AppContext &ctx);
+
+private:
+  AppContext &appContext_;
 };
 
 // --------------------------------------------------------------------------
@@ -314,6 +337,10 @@ struct AppContext {
   std::shared_ptr<CallbookStore> callbookStore;
   std::shared_ptr<DstStore> dstStore;
   std::shared_ptr<ADIFStore> adifStore;
+  std::shared_ptr<LoTWActivityStore> lotwActivityStore;
+  std::shared_ptr<ClublogStore> clublogStore;
+  std::shared_ptr<FlareDataStore> flareStore;
+  std::shared_ptr<HeardMeStore> heardMeStore;
   std::shared_ptr<SantaStore> santaStore;
   std::shared_ptr<RotatorDataStore> rotatorStore;
   std::shared_ptr<RigDataStore> rigStore;
@@ -331,6 +358,13 @@ struct AppContext {
   std::shared_ptr<AuroraMapStore> auroraMapStore;
   std::shared_ptr<CalendarStore> calendarStore;
 
+  #ifndef __EMSCRIPTEN__
+  std::unique_ptr<WebServer> webServer;
+  std::unique_ptr<FrameCapture> frameCapture;
+  std::unique_ptr<UpdateChecker> updateChecker;
+  std::unique_ptr<HamClock::GPSProvider> gpsProvider;
+  #endif
+
   // Managers & Services
   std::unique_ptr<NetworkManager> netManager;
   PrefixManager prefixMgr;
@@ -338,12 +372,6 @@ struct AppContext {
   std::shared_ptr<BrightnessManager> brightnessMgr;
   std::shared_ptr<CPUMonitor> cpuMonitor;
 
-#ifndef __EMSCRIPTEN__
-  std::unique_ptr<WebServer> webServer;
-  std::unique_ptr<FrameCapture> frameCapture;
-  std::unique_ptr<UpdateChecker> updateChecker;
-  std::unique_ptr<HamClock::GPSProvider> gpsProvider;
-#endif
   std::unique_ptr<BME280Provider> bmeProvider;
   std::unique_ptr<LTR329Provider> ltr329Provider;
 

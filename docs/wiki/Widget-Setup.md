@@ -15,6 +15,7 @@ These widgets start working as soon as you add them to a pane. No extra setup is
 - Band Conditions, NCDXF Beacons
 - History Flux, History KP, History SSN
 - K-Index Trend, SFI 30-Day Trend, NOAA Severity Scales, Space Weather Alerts
+- **K-Index Alert Threshold**: In the K-Index Alert widget, you can set a "trigger level." HamClock will only notify you (and the widget will only glow) when solar activity goes above your chosen number.
 
 **Weather & Environment**
 - DE Weather, DX Weather, Forecast, Hurricane, Lightning, Tropo, Meteor
@@ -22,9 +23,16 @@ These widgets start working as soon as you add them to a pane. No extra setup is
 **Tracking** *(uses your home location)*
 - Moon, EME Tool, Greyline DX, Greyline Windows, Santa Tracker
 
+**Award Tracking** *(requires a loaded ADIF log)*
+- **WAS Progress**: Tracks your US State contacts and shows your progress on a map.
+- **WAC Radar**: A 6-segment pie chart that shows which continents you have worked and confirmed.
+- **Zone Heatmap**: A clickable grid that tracks your progress through CQ and ITU zones.
+- **LoTW Auto-Sync**: Automatically connects to the ARRL "Logbook of The World" and downloads your live confirmation count. *(See [LoTW Auto-Sync](#lotw-auto-sync) below for setup instructions)*.
+
 **Info & Utilities**
 - DE Info, DX Info, Stopwatch, Sys Info, ADIF Log, Contests, VOACAP DE-DX
 - Solar Cycle 25 Tracker, DXCC Progress
+- **Frequency Cursor**: On graphs like the VOACAP DE-DX matrix, a white horizontal line shows exactly where your radio is currently tuned.
 
 **Timers** *(configure once inside the widget)*
 - Countdown - click the gear icon in the panel to set a label and target time
@@ -119,6 +127,15 @@ Shows upcoming and currently active DX expeditions — special operations by sta
 
 ---
 
+## DX Info
+
+Shows details about the station you are currently watching or have selected on the map.
+
+**Direct Callsign Entry:**
+Click anywhere on the DX Info widget to open a typing box. You can enter any callsign, and HamClock will immediately look up that station's location, distance, and local time. This is the fastest way to check a path for a station you just heard on the air.
+
+---
+
 ## Watchlist & Alerts
 
 The Watchlist lets you monitor specific callsigns in the [DX cluster](Glossary.md#dx--dx-cluster--spot) stream and get notified when they appear.
@@ -192,7 +209,6 @@ Click the **gear icon** in the SDO panel to:
 - Choose a **wavelength** (0193, 0171, 0304, 1600, 1700, HMIB, HMIIC).
 - Enable **Rotating Display** to cycle wavelengths automatically.
 - Enable **PFSS Overlay** for magnetic field lines.
-- Enable **Movie Mode** for a time-lapse loop.
 
 ---
 
@@ -274,8 +290,12 @@ Spoken alerts fire for:
 1. Install `flite` on your system:
    - **Linux / Raspberry Pi**: `sudo apt install flite`
    - **macOS**: `brew install flite`
-   - **Windows**: voice alerts are not available on Windows at this time.
-2. Restart HamClock-Next. If `flite` is found, voice alerts are active automatically.
+   - **Windows**: voice alerts are handled natively by Windows.
+2. Restart HamClock-Next. If `flite` is found (on Linux/Mac), voice alerts are active automatically.
+
+**Volume Control:**
+You can adjust the loudness of all voice alerts and chimes using the **Volume** slider in Setup → **Identity** tab. 
+
 3. To silence all voice alerts temporarily, use the global **audio mute** setting (Setup → **Audio** tab or REST API `/set_config?audio_mute=1`).
 
 ---
@@ -301,6 +321,21 @@ Copy your ADIF file to `~/.config/hamclock-next/log.adi` (Linux/Raspberry Pi) or
 Once a log is loaded, **DXCC award tracking** activates for the DX Cluster tile as well — spots for new entities or unconfirmed bands will show N/B/W badges automatically. See [DX Cluster](#dx-cluster) above.
 
 **Filtering inside the tile:** Click the band or mode label in the tile header to filter the log view to that band or mode. Click again to cycle through options.
+
+---
+
+## LoTW Auto-Sync
+
+The LoTW Auto-Sync tile automatically connects to ARRL's Logbook of The World and downloads your live confirmation count (QSLs received). (Note: HamClock does not upload logs to LoTW; it only syncs confirmations down to match against your local ADIF log).
+
+**Requirements:** You need an active ARRL LoTW account.
+
+**Setting it up:**
+1. Open Setup → **Services** tab.
+2. Enter your LoTW Callsign and LoTW Password in the fields provided.
+3. Save.
+
+The LoTW Auto-Sync tile will now automatically authenticate, sync, and display your confirmation tracking metrics.
 
 ---
 

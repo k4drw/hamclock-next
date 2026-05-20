@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../core/LiveSpotData.h"
 #include "../core/SolarData.h"
 #include "../core/Theme.h"
 #include "../core/XRayData.h"
@@ -17,7 +18,8 @@ public:
   SpaceWeatherPanel(int x, int y, int w, int h, FontManager &fontMgr,
                     TextureManager &texMgr,
                     std::shared_ptr<SolarDataStore> store,
-                    std::shared_ptr<XRayHistoryStore> xrayStore = nullptr);
+                    std::shared_ptr<XRayHistoryStore> xrayStore = nullptr,
+                    std::shared_ptr<LiveSpotDataStore> spotStore = nullptr);
   ~SpaceWeatherPanel() override { destroyCache(); }
 
   void update() override;
@@ -36,6 +38,12 @@ public:
 
 private:
   void destroyCache();
+  void renderMaximized(SDL_Renderer *renderer, const ThemeColors &themes);
+  void drawGauge(SDL_Renderer *renderer, int cx, int cy, int radius, float value,
+                 float minVal, float maxVal, const char *label,
+                 const char *unit, SDL_Color color, const ThemeColors &themes);
+  void drawBandMatrix(SDL_Renderer *renderer, int bx, int by, int bw, int bh,
+                      const ThemeColors &themes);
   static SDL_Color colorForK(float k, const ThemeColors &themes);
   static SDL_Color colorForSFI(int sfi, const ThemeColors &themes);
   static SDL_Color colorForNOAAScale(int scale, const ThemeColors &themes);
@@ -44,6 +52,7 @@ private:
   TextureManager &texMgr_;
   std::shared_ptr<SolarDataStore> store_;
   std::shared_ptr<XRayHistoryStore> xrayStore_;
+  std::shared_ptr<LiveSpotDataStore> spotStore_;
   std::vector<XRayDataPoint> sparklineHistory_;
 
   static constexpr int kNumItems = 15;

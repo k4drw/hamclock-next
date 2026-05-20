@@ -1,5 +1,6 @@
 #include "LiveSpotProvider.h"
 #include "../core/HamClockState.h"
+#include "../core/PrefixManager.h"
 #include "../core/Logger.h"
 #include "../core/StringUtils.h"
 #include <SDL.h>
@@ -80,9 +81,10 @@ void parsePSKReporter(const std::string &body, LiveSpotData &data,
 LiveSpotProvider::LiveSpotProvider(NetworkManager &net,
                                    std::shared_ptr<LiveSpotDataStore> store,
                                    const AppConfig &config,
+                                   PrefixManager &pm,
                                    HamClockState *state,
                                    std::shared_ptr<DXClusterDataStore> dxStore)
-    : net_(net), store_(std::move(store)), dxStore_(std::move(dxStore)),
+    : net_(net), pm_(pm), store_(std::move(store)), dxStore_(std::move(dxStore)),
       config_(config), state_(state) {}
 
 void LiveSpotProvider::fetch() {
@@ -327,11 +329,12 @@ void LiveSpotProvider::fetchWSPR() {
         data.windowMinutes = maxAge;
 
         if (body.empty()) {
-          LOG_W("LiveSpot", "Empty response from db1.wspr.live");
+          LOG_I("LiveSpot", "No spots found for query (0 bytes from db1.wspr.live)");
           if (state) {
             std::lock_guard<std::mutex> lk(state->servicesMutex);
-            state->services["LiveSpot"].ok = false;
-            state->services["LiveSpot"].lastError = "Empty response";
+            state->services["LiveSpot"].ok = true;
+            state->services["LiveSpot"].lastSuccess = std::chrono::system_clock::now();
+            state->services["LiveSpot"].lastError = "";
           }
           data.lastUpdated = std::chrono::system_clock::now();
           data.valid = true;
@@ -445,6 +448,16 @@ void LiveSpotProvider::fetchRBN() {
       else
         match = (!myGrid4.empty() && spot.rxGrid.size() >= 4 &&
                  spot.rxGrid.substr(0, 4) == myGrid4);
+    }
+
+    if (!match && !useCall) {
+      // RBN Grid Fallback: If precise grid match fails, check if the station and the
+      // user are in the same country (DXCC), given that RBN relies on prefix-level grids.
+      int myDxcc = pm_.findDXCC(myCall);
+      int spotDxcc = pm_.findDXCC(ofDe ? spot.txCall : spot.rxCall);
+      if (myDxcc > 0 && spotDxcc > 0 && myDxcc == spotDxcc) {
+        match = true;
+      }
     }
 
     if (!match) {

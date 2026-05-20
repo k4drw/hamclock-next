@@ -35,6 +35,7 @@ private:
   std::shared_ptr<MoonStore> store_;
   MoonData currentData_;
   bool dataValid_ = false;
+  uint32_t lastUpdateMs_ = 0;
 
   std::string lastImageUrl_;
   bool imageLoading_ = false;

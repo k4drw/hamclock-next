@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <chrono>
 #include <cstring>
 #include <memory>
@@ -71,30 +72,39 @@ public:
     return data_;
   }
 
+  uint32_t getVersion() const { return version_.load(std::memory_order_relaxed); }
+
   // Set provider data, preserving UI-driven selectedBands state.
   void set(const LiveSpotData &data) {
     std::lock_guard<std::mutex> lock(mutex_);
     
-    // Perform an in-place update to avoid deep copy churn
-    std::memcpy(data_->bandCounts, data.bandCounts, sizeof(data.bandCounts));
-    data_->spots = data.spots;
+    // Create a new copy to modify (Copy-on-Write)
+    auto newData = std::make_shared<LiveSpotData>(*data_);
+    
+    std::memcpy(newData->bandCounts, data.bandCounts, sizeof(newData->bandCounts));
+    newData->spots = data.spots;
     static constexpr size_t kMaxSpots = 500;
-    if (data_->spots.size() > kMaxSpots)
-      data_->spots.erase(data_->spots.begin(),
-                         data_->spots.begin() +
-                             (data_->spots.size() - kMaxSpots));
-    data_->grid = data.grid;
-    data_->windowMinutes = data.windowMinutes;
-    data_->lastUpdated = data.lastUpdated;
-    data_->valid = data.valid;
-    // Note: selectedBands is intentionally not overwritten to preserve UI state.
+    if (newData->spots.size() > kMaxSpots)
+      newData->spots.erase(newData->spots.begin(),
+                           newData->spots.begin() +
+                               (newData->spots.size() - kMaxSpots));
+    newData->grid = data.grid;
+    newData->windowMinutes = data.windowMinutes;
+    newData->lastUpdated = data.lastUpdated;
+    newData->valid = data.valid;
+    
+    data_ = newData;
+    version_++;
   }
 
   void setSelectedBandsMask(uint32_t mask) {
     std::lock_guard<std::mutex> lock(mutex_);
+    auto newData = std::make_shared<LiveSpotData>(*data_);
     for (int i = 0; i < kNumBands; ++i) {
-      data_->selectedBands[i] = (mask & (1 << i)) != 0;
+      newData->selectedBands[i] = (mask & (1 << i)) != 0;
     }
+    data_ = newData;
+    version_++;
   }
 
   uint32_t getSelectedBandsMask() const {
@@ -110,11 +120,15 @@ public:
   void toggleBand(int idx) {
     std::lock_guard<std::mutex> lock(mutex_);
     if (idx >= 0 && idx < kNumBands) {
-      data_->selectedBands[idx] = !data_->selectedBands[idx];
+      auto newData = std::make_shared<LiveSpotData>(*data_);
+      newData->selectedBands[idx] = !newData->selectedBands[idx];
+      data_ = newData;
+      version_++;
     }
   }
 
 private:
   mutable std::mutex mutex_;
   std::shared_ptr<LiveSpotData> data_;
+  std::atomic<uint32_t> version_{0};
 };

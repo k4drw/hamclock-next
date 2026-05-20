@@ -32,8 +32,4 @@ private:
 
   SDL_Color colorForCondition(BandCondition cond, const ThemeColors &themes);
   const char *stringForCondition(BandCondition cond, bool shortForm = false) const;
-  void renderPropagationLogic(SDL_Renderer *renderer, const ThemeColors &themes);
-
-  int labelFontSize_ = 12;
-  int tableFontSize_ = 10;
 };

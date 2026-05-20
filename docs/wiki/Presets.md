@@ -69,7 +69,7 @@ The preset is removed immediately. This action cannot be undone.
 
 ## Built-in Presets
 
-HamClock-Next ships with one built-in preset that you can apply immediately from the Presets modal:
+HamClock-Next ships with several built-in presets that you can apply immediately from the Presets modal:
 
 ### Prop Firehose
 
@@ -84,6 +84,78 @@ What it loads:
 - **Pane 6**: DX Info
 
 Apply it the same way as any other preset: click **★**, select **Prop Firehose**, then click **Apply**.
+
+---
+
+### DE Station Status
+
+The **DE Station Status** preset focuses on your own station achievements and QSO management. It displays award progress, geographic coverage, and QSO records in a rotating view.
+
+What it loads:
+- **Pane 1**: DXCC Progress → WAS Progress → Grid Progress
+- **Pane 2**: Zone Heatmap → ClubLog Most Wanted
+- **Pane 3**: WAC Radar → Alerts
+- **Pane 4**: Band Conditions
+- **Pane 5**: DE Info
+- **Pane 6**: LoTW Sync → ADIF Tracking
+
+Apply it the same way as any other preset: click **★**, select **DE Station Status**, then click **Apply**.
+
+---
+
+### DX
+
+The **DX** preset optimizes the display for DX hunting and chasing. It combines DX Cluster integration, live spotting networks, and band conditions for real-time propagation awareness.
+
+What it loads:
+- **Pane 1**: DX Cluster
+- **Pane 2**: DX Peditions
+- **Pane 3**: Live Spots
+- **Pane 4**: Band Conditions
+- **Pane 5**: DE Info
+- **Pane 6**: DX Info
+
+---
+
+### Contest
+
+The **Contest** preset provides essential tools for contesting: live spot tracking, band conditions, and quick propagation monitoring.
+
+What it loads:
+- **Pane 1**: DX Cluster
+- **Pane 2**: Live Spots
+- **Pane 3**: Band Conditions
+- **Pane 4**: Solar (compact)
+- **Pane 5**: DE Info
+- **Pane 6**: DX Info
+
+---
+
+### Satellite
+
+The **Satellite** preset focuses on satellite operating and EME (Earth-Moon-Earth) communications. It includes lunar phase, tracking tools, and rotator control.
+
+What it loads:
+- **Pane 1**: Moon
+- **Pane 2**: EME Tool
+- **Pane 3**: Gimbal (Rotator Control)
+- **Pane 4**: Solar (compact)
+- **Pane 5**: Satellite (with polar plot and pass arcs)
+- **Pane 6**: DE Info
+
+---
+
+### Environment/WX
+
+The **Environment/WX** preset displays weather and environmental data for both your station and the DX location. Useful for monitoring tropospheric propagation and local conditions.
+
+What it loads:
+- **Pane 1**: DE Weather
+- **Pane 2**: DX Weather
+- **Pane 3**: Forecast
+- **Pane 4**: DE Weather (alternate view)
+- **Pane 5**: Environmental Temp
+- **Pane 6**: Environmental Humidity
 
 ---
 

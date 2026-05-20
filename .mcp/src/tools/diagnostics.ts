@@ -8,14 +8,14 @@ import { NEXT_PATH } from "../state.js";
 export function registerDiagnosticTools(server: McpServer) {
   server.tool(
     "diagnose_memory",
-    "Query memory diagnostics from a running hamclock-next instance. Checks FPS, texture allocation health, and memory-related errors.",
+    "Query widget and render diagnostics from a running hamclock-next instance via /debug/widgets.",
     {
       base_url: z.string().default("http://localhost:8080").describe("Base URL of running hamclock-next instance"),
     },
     { readOnlyHint: true, openWorldHint: true },
     async ({ base_url }) => {
       try {
-        const resp = await fetch(`${base_url}/get_memory.txt`);
+        const resp = await fetch(`${base_url}/debug/widgets`);
         if (!resp.ok) {
           return { isError: true, content: [{ type: "text", text: `Failed to fetch memory stats: ${resp.statusText}` }] };
         }

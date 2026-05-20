@@ -23,9 +23,11 @@ void SetupScreen::setConfig(const AppConfig &cfg) {
   hubIpInput_.setMaxLength(40);
   hubPortInput_.setMaxLength(5);
   watchlistInputField_.setMaxLength(256);
+  kIndexThresholdInput_.setMaxLength(4);
 
   gpsEnabled_ = cfg.gpsEnabled;
   audioMuted_ = cfg.audioMuted;
+  audioVolume_ = cfg.audioVolume;
   callsignInput_.setValue(cfg.callsign);
   gridInput_.setValue(cfg.grid);
   frnText_ = cfg.callsignFrn;
@@ -71,6 +73,9 @@ void SetupScreen::setConfig(const AppConfig &cfg) {
 
   qrzUsernameInput_.setValue(cfg.qrzUsername);
   qrzPasswordInput_.setValue(cfg.qrzPassword);
+  lotwCallInput_.setValue(cfg.lotwCall);
+  lotwPasswordInput_.setValue(cfg.lotwPassword);
+  clublogApiKeyInput_.setValue(cfg.clublogApiKey);
   repeaterBookInput_.setValue(cfg.repeaterBookKey);
   winlinkInput_.setValue(cfg.winlinkKey);
   countdownLabel_ = cfg.countdownLabel;
@@ -135,6 +140,10 @@ void SetupScreen::setConfig(const AppConfig &cfg) {
   tzCustomOffsetInput_.setValue(std::to_string(defaultTzOffset_ == 999 ? 0 : defaultTzOffset_));
   tzCustomLabelInput_.setValue(defaultTzLabel_);
 
+  char kBuf[16];
+  std::snprintf(kBuf, sizeof(kBuf), "%.1f", (double)cfg.kIndexAlertThreshold);
+  kIndexThresholdInput_.setValue(kBuf);
+
   callsignInput_.setCursorToEnd();
 }
 
@@ -142,6 +151,7 @@ AppConfig SetupScreen::getConfig(const AppConfig& base) const {
   AppConfig cfg = base;
   cfg.gpsEnabled = gpsEnabled_;
   cfg.audioMuted = audioMuted_;
+  cfg.audioVolume = audioVolume_;
   cfg.callsign = callsignInput_.getValue();
   cfg.grid = gridInput_.getValue();
   cfg.callsignFrn = frnText_;
@@ -183,6 +193,9 @@ AppConfig SetupScreen::getConfig(const AppConfig& base) const {
 
   cfg.qrzUsername = qrzUsernameInput_.getValue();
   cfg.qrzPassword = qrzPasswordInput_.getValue();
+  cfg.lotwCall = lotwCallInput_.getValue();
+  cfg.lotwPassword = lotwPasswordInput_.getValue();
+  cfg.clublogApiKey = clublogApiKeyInput_.getValue();
   cfg.repeaterBookKey = repeaterBookInput_.getValue();
   cfg.winlinkKey = winlinkInput_.getValue();
   cfg.countdownLabel = countdownLabel_;
@@ -232,6 +245,10 @@ AppConfig SetupScreen::getConfig(const AppConfig& base) const {
   cfg.fontPath = fontPath_;
   cfg.defaultTzOffset = defaultTzOffset_;
   cfg.defaultTzLabel = defaultTzLabel_;
+
+  cfg.kIndexAlertThreshold =
+      StringUtils::safe_stof(kIndexThresholdInput_.getValue());
+  if (cfg.kIndexAlertThreshold < 0) cfg.kIndexAlertThreshold = 0;
 
   return cfg;
 }

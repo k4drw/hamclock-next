@@ -21,6 +21,8 @@ void MapViewMenu::show(AppConfig &config, std::function<void()> onApply) {
   showGrid_ = config.showGrid;
   showBeacons_ = config.showBeacons;
   showBorders_ = config.showBorders;
+  showLocalPropGauge_ = config.showLocalPropGauge;
+  showLotwQsos_ = config.showLotwQsos;
   centerMapOnDe_ = config.centerMapOnDe;
   gridType_ = config.gridType;
   propOverlay_ = config.propOverlay;
@@ -69,28 +71,28 @@ void MapViewMenu::recalcLayout() {
   int y = menuRect_.y + 45; // Start below title
 
   // Row 1
-  projRec_ = {col1X, y + 25, colW, 30};
-  styleRec_ = {col2X, y + 25, colW, 30};
+  projRec_ = {col1X, y + 20, colW, 30};
+  styleRec_ = {col2X, y + 20, colW, 30};
   projHeaderY_ = y; // Label Y
   styleHeaderY_ = y;
 
   // Row 2
   y += 60;
-  gridRec_ = {col1X, y + 25, colW, 30};
-  overlayRec_ = {col2X, y + 25, colW, 30};
+  gridRec_ = {col1X, y + 20, colW, 30};
+  overlayRec_ = {col2X, y + 20, colW, 30};
   gridHeaderY_ = y;
   mufRtHeaderY_ = y;
 
   // Row 3
   y += 60;
-  weatherRec_ = {col1X, y + 25, colW, 30};
+  weatherRec_ = {col1X, y + 20, colW, 30};
   weatherHeaderY_ = y;
-  propColormapRec_ = {col2X, y + 25, colW - 50, 30};
-  editPropColorsRec_ = {col2X + colW - 45, y + 25, 45, 30};
+  propColormapRec_ = {col2X, y + 20, colW - 50, 30};
+  editPropColorsRec_ = {col2X + colW - 45, y + 20, 45, 30};
   propColorHeaderY_ = y;
 
   // Row 4 (Toggles)
-  y += 70;
+  y += 55;
   auto *cat = fontMgr_.catalog();
   int beaconsLabelW =
       fontMgr_.getLogicalWidth("Beacons", cat->ptSize(FontStyle::UI));
@@ -98,21 +100,30 @@ void MapViewMenu::recalcLayout() {
   int bordersLabelW =
       fontMgr_.getLogicalWidth("Borders", cat->ptSize(FontStyle::UI));
   bordersRec_ = {col1X + 110, y, 20 + 10 + bordersLabelW, 20};
+  int propGaugeLabelW =
+      fontMgr_.getLogicalWidth("Prop Gauge", cat->ptSize(FontStyle::UI));
+  localPropGaugeRec_ = {col2X + 10, y, 20 + 10 + propGaugeLabelW, 20};
   int centerDeLabelW =
       fontMgr_.getLogicalWidth("Center on DE", cat->ptSize(FontStyle::UI));
-  centerDeCheckRect_ = {col2X + 10, y, 20 + 10 + centerDeLabelW, 20};
+  centerDeCheckRect_ = {col2X + 130, y, 20 + 10 + centerDeLabelW, 20};
+
+  // Row 4b (Additional toggles)
+  y += 25;
+  int lotwLabelW =
+      fontMgr_.getLogicalWidth("LOTW QSOs", cat->ptSize(FontStyle::UI));
+  lotwQsosRec_ = {col1X + 10, y, 20 + 10 + lotwLabelW, 20};
 
   // Row 5 (VOACAP) - 3 columns
-  y += 35;
+  y += 25;
   voacapHeaderY_ = y;
   int col3W = (menuW - 40) / 3;
   int c1 = menuRect_.x + 20;
   int c2 = c1 + col3W + 10;
   int c3 = c2 + col3W + 10;
 
-  bandRec_ = {c1, y + 35, col3W, 30};
-  modeRec_ = {c2, y + 35, col3W, 30};
-  powerRec_ = {c3, y + 35, col3W, 30};
+  bandRec_ = {c1, y + 45, col3W, 30};
+  modeRec_ = {c2, y + 45, col3W, 30};
+  powerRec_ = {c3, y + 45, col3W, 30};
 
   // Row 5b (TOA, Path stacked, Ant Gain)
   y += 90;
@@ -307,8 +318,12 @@ void MapViewMenu::render(SDL_Renderer *renderer) {
                     themes.text);
   renderRadioButton(renderer, bordersRec_, showBorders_, "Borders",
                     themes.text);
+  renderRadioButton(renderer, lotwQsosRec_, showLotwQsos_, "LOTW QSOs",
+                    themes.text);
   renderRadioButton(renderer, centerDeCheckRect_, centerMapOnDe_,
                     "Center on DE", themes.text);
+  renderRadioButton(renderer, localPropGaugeRec_, showLocalPropGauge_,
+                    "Prop Gauge", themes.text);
 
   // VOACAP Extras (Used for VOACAP and Reliability)
   if (propOverlay_ == PropOverlayType::Voacap ||
@@ -785,8 +800,16 @@ bool MapViewMenu::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
     showBorders_ = !showBorders_;
     return true;
   }
+  if (SDL_PointInRect(&pt, &lotwQsosRec_)) {
+    showLotwQsos_ = !showLotwQsos_;
+    return true;
+  }
   if (SDL_PointInRect(&pt, &centerDeCheckRect_)) {
     centerMapOnDe_ = !centerMapOnDe_;
+    return true;
+  }
+  if (SDL_PointInRect(&pt, &localPropGaugeRec_)) {
+    showLocalPropGauge_ = !showLocalPropGauge_;
     return true;
   }
 
@@ -848,6 +871,9 @@ bool MapViewMenu::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
     config_->showGrid = showGrid_;
     config_->showBeacons = showBeacons_;
     config_->showBorders = showBorders_;
+    config_->showLotwQsos = showLotwQsos_;
+    config_->showLocalPropGauge = showLocalPropGauge_;
+    config_->centerMapOnDe = centerMapOnDe_;
     config_->gridType = gridType_;
     config_->propOverlay = propOverlay_;
     config_->weatherOverlay = weatherOverlay_;

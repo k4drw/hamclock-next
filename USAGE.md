@@ -78,6 +78,7 @@ Reduces external API rate-limit consumption when multiple HamClock-Next instance
 | `-s`, `--software`    | Force software rendering (no OpenGL/MSAA)                             |
 | `--live-web`          | Enable interactive web control interface                              |
 | `--no-audio`          | Permanently disable all audio output                                  |
+| `--show-cache-stats`  | Display real-time NetworkManager cache metrics in SysInfoPanel        |
 | `--log-level <level>` | Set log verbosity: `debug`, `info`, `warn`, `error` (default: `warn`) |
 | `-h`, `--help`        | Show help message                                                     |
 

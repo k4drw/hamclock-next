@@ -93,6 +93,15 @@ public:
   int windowWidth() const { return winW_; }
   int windowHeight() const { return winH_; }
 
+  Widget *findWidgetByTypeId(const char *typeId) const {
+    for (const auto &e : entries_) {
+      if (e.widget && e.widget->typeId() == typeId) {
+        return e.widget;
+      }
+    }
+    return nullptr;
+  }
+
 private:
   // Canonical rects from hamclock_layout.md (800x480 logical coords).
   // Assigns exact pixel positions to each widget by registration order within

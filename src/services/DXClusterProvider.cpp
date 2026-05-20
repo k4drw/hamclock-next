@@ -11,6 +11,9 @@
 #include "../core/SoundManager.h"
 #include <httplib.h>
 #include <nlohmann/json.hpp>
+#include "../core/Constants.h"
+#include "../core/LiveSpotData.h"
+#include "../core/ADIFData.h"
 #ifdef _WIN32
 #include <winsock2.h>
 #include <ws2tcpip.h>
@@ -61,15 +64,40 @@ std::string wsjtx_utf8(const uint8_t **bpp, const uint8_t *end) {
   *bpp += len;
   return s;
 }
+
+// Strips ANSI escape sequences and non-printable characters from callsigns.
+std::string sanitizeCall(const std::string &raw) {
+  std::string clean;
+  bool inEscape = false;
+  for (size_t i = 0; i < raw.length(); ++i) {
+    char c = raw[i];
+    if (c == '\x1B') {
+      inEscape = true;
+      continue;
+    }
+    if (inEscape) {
+      if (std::isalpha(static_cast<unsigned char>(c)))
+        inEscape = false;
+      continue;
+    }
+    // Keep alphanumeric and common ham delimiters
+    if (std::isalnum(static_cast<unsigned char>(c)) || c == '/' || c == '-' ||
+        c == '@' || c == '#') {
+      clean += static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+    }
+  }
+  return clean;
+}
 } // namespace
 
 DXClusterProvider::DXClusterProvider(std::shared_ptr<DXClusterDataStore> store,
                                      PrefixManager &pm,
                                      std::shared_ptr<WatchlistStore> watchlist,
                                      std::shared_ptr<WatchlistHitStore> hits,
-                                     HamClockState *state)
+                                     HamClockState *state,
+                                     std::shared_ptr<ADIFStore> adif)
     : store_(store), pm_(pm), watchlist_(watchlist), hits_(hits),
-      state_(state) {
+      state_(state), adif_(adif) {
   firstAttemptTime_ = std::chrono::system_clock::now();
 }
 
@@ -99,43 +127,49 @@ void DXClusterProvider::stop() {
 }
 
 void DXClusterProvider::run() {
-  if (config_.hubMode == HubMode::Client && !config_.hubIp.empty()) {
-    runHubClient();
-    return;
-  }
-  while (!stopClicked_) {
-    if (config_.dxClusterUseWSJTX) {
-      runUDP(config_.wsjtxPort);
-    } else {
-      // Check for excessive lost connection rate (10 per hour as per Elwood)
-      if (checkConnectionRate()) {
-        runTelnet(config_.dxClusterHost, config_.dxClusterPort,
-                  config_.dxClusterLogin);
+  try {
+    if (config_.hubMode == HubMode::Client && !config_.hubIp.empty()) {
+      runHubClient();
+      return;
+    }
+    while (!stopClicked_) {
+      if (config_.dxClusterUseWSJTX) {
+        runUDP(config_.wsjtxPort);
       } else {
-        LOG_W("DXCluster", "Connection rate limit reached (10/hr)");
-        if (state_) {
-          std::lock_guard<std::mutex> lk(state_->servicesMutex);
-          state_->services["DXCluster"].ok = false;
-          state_->services["DXCluster"].lastError = "Rate limit reached (10/hr)";
+        // Check for excessive lost connection rate (10 per hour as per Elwood)
+        if (checkConnectionRate()) {
+          runTelnet(config_.dxClusterHost, config_.dxClusterPort,
+                    config_.dxClusterLogin);
+        } else {
+          LOG_W("DXCluster", "Connection rate limit reached (10/hr)");
+          if (state_) {
+            std::lock_guard<std::mutex> lk(state_->servicesMutex);
+            state_->services["DXCluster"].ok = false;
+            state_->services["DXCluster"].lastError = "Rate limit reached (10/hr)";
+          }
+          store_->setConnected(false, "Rate limit reached (10/hr)");
         }
-        store_->setConnected(false, "Rate limit reached (10/hr)");
+      }
+
+      if (stopClicked_)
+        break;
+
+      // Prune stale in-memory spots even when no new spots arrive (connection
+      // dropped, rate-limited, etc.) so the display doesn't show ancient data.
+      store_->pruneInMemory();
+
+      // Retry delay (increased to 60s to avoid hammering and IP bans)
+      // Interruptible: stop() will wake this immediately via sleepCv_.notify_one()
+      {
+        std::unique_lock<std::mutex> lk(sleepMutex_);
+        sleepCv_.wait_for(lk, std::chrono::seconds(60),
+                          [this] { return stopClicked_.load(); });
       }
     }
-
-    if (stopClicked_)
-      break;
-
-    // Prune stale in-memory spots even when no new spots arrive (connection
-    // dropped, rate-limited, etc.) so the display doesn't show ancient data.
-    store_->pruneInMemory();
-
-    // Retry delay (increased to 60s to avoid hammering and IP bans)
-    // Interruptible: stop() will wake this immediately via sleepCv_.notify_one()
-    {
-      std::unique_lock<std::mutex> lk(sleepMutex_);
-      sleepCv_.wait_for(lk, std::chrono::seconds(60),
-                        [this] { return stopClicked_.load(); });
-    }
+  } catch (const std::exception &e) {
+    LOG_E("DXCluster", "Fatal exception in run(): {}", e.what());
+  } catch (...) {
+    LOG_E("DXCluster", "Fatal unknown exception in run()");
   }
 }
 
@@ -150,9 +184,9 @@ void DXClusterProvider::runHubClient() {
         std::vector<DXClusterSpot> spots;
         for (const auto &j : arr) {
           DXClusterSpot s;
-          s.txCall  = j.value("txCall", "");
+          s.txCall  = sanitizeCall(j.value("txCall", ""));
           s.txGrid  = j.value("txGrid", "");
-          s.rxCall  = j.value("rxCall", "");
+          s.rxCall  = sanitizeCall(j.value("rxCall", ""));
           s.rxGrid  = j.value("rxGrid", "");
           s.mode    = j.value("mode", "");
           s.freqKhz = j.value("freqKhz", 0.0);
@@ -166,6 +200,33 @@ void DXClusterProvider::runHubClient() {
           int64_t ts = j.value("spottedAt", (int64_t)0);
           s.spottedAt = std::chrono::system_clock::time_point(
                             std::chrono::seconds(ts));
+
+          // Local resolution fallback for empty fields from the hub
+          if (s.txGrid.empty()) {
+            if (s.txLat != 0.0 || s.txLon != 0.0) {
+              s.txGrid = Astronomy::latLonToGrid(s.txLat, s.txLon);
+            } else {
+              LatLong ll;
+              if (pm_.findLocation(s.txCall, ll)) {
+                s.txLat = ll.lat;
+                s.txLon = ll.lon;
+                s.txGrid = Astronomy::latLonToGrid(ll.lat, ll.lon);
+              }
+            }
+          }
+          if (s.rxGrid.empty()) {
+            if (s.rxLat != 0.0 || s.rxLon != 0.0) {
+              s.rxGrid = Astronomy::latLonToGrid(s.rxLat, s.rxLon);
+            } else {
+              LatLong ll;
+              if (pm_.findLocation(s.rxCall, ll)) {
+                s.rxLat = ll.lat;
+                s.rxLon = ll.lon;
+                s.rxGrid = Astronomy::latLonToGrid(ll.lat, ll.lon);
+              }
+            }
+          }
+
           spots.push_back(s);
         }
         if (store_) store_->setSpots(spots);
@@ -229,6 +290,10 @@ void DXClusterProvider::runTelnet(const std::string &host, int port,
     }
     return;
   }
+
+  int keepalive = 1;
+  setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, (const char *)&keepalive,
+             sizeof(keepalive));
 
   // Resolve hostname
   struct addrinfo hints{};
@@ -333,6 +398,8 @@ void DXClusterProvider::runTelnet(const std::string &host, int port,
   bool loginSent = false;   // track whether callsign has been sent
   bool initialRequestSent = false;
   auto lastHeartbeat = std::chrono::system_clock::now();
+  auto lastPrune = std::chrono::system_clock::now();
+  auto lastDataReceived = std::chrono::system_clock::now();
 
   // Elwood's DXCMSG_DT: 500ms pause before first send to let server settle.
   {
@@ -370,9 +437,23 @@ void DXClusterProvider::runTelnet(const std::string &host, int port,
 #endif
       break;
     }
+
+    auto now = std::chrono::system_clock::now();
+
+    // Periodic In-Memory Pruning (clears UI if feed goes quiet)
+    if (now - lastPrune > std::chrono::seconds(60)) {
+      store_->pruneInMemory();
+      lastPrune = now;
+    }
+
+    // Idle Data Watchdog (detects VPN zombies / dead streams)
+    if (now - lastDataReceived > std::chrono::minutes(10)) {
+      LOG_W("DXCluster", "No data received for 10 minutes. Forcing reconnect.");
+      break;
+    }
+
     if (sel == 0) {
       // Timeout — no data yet. Send heartbeat if needed.
-      auto now = std::chrono::system_clock::now();
       if (now - lastHeartbeat > std::chrono::seconds(60)) {
         if (send(sock, "\r\n", 2, 0) < 0) {
           LOG_W("DXCluster", "Heartbeat failed, closing connection");
@@ -410,6 +491,8 @@ void DXClusterProvider::runTelnet(const std::string &host, int port,
       }
       break;
     }
+
+    lastDataReceived = std::chrono::system_clock::now();
 
     // Strip Telnet IAC sequences (0xFF + 1–2 bytes) — prevents them from
     // corrupting line parsing and avoids stalling servers that send option
@@ -619,6 +702,7 @@ void DXClusterProvider::processWSJTX(const uint8_t *packet, size_t len) {
       pm_.findLocation(dx_call, ll);
       spot.txLat = ll.lat;
       spot.txLon = ll.lon;
+      spot.txGrid = Astronomy::latLonToGrid(ll.lat, ll.lon);
     }
 
     if (!de_grid.empty()) {
@@ -627,9 +711,23 @@ void DXClusterProvider::processWSJTX(const uint8_t *packet, size_t len) {
       pm_.findLocation(de_call, ll);
       spot.rxLat = ll.lat;
       spot.rxLon = ll.lon;
+      spot.rxGrid = Astronomy::latLonToGrid(ll.lat, ll.lon);
     }
 
     store_->addSpot(spot);
+
+    // Watched call check
+    {
+      auto data = store_->snapshot();
+      if (!data->watchedCall.empty() && spot.txCall == data->watchedCall) {
+        store_->setWatchedSpotted(std::chrono::steady_clock::now());
+        // Update DX location from spot
+        if (state_) {
+          state_->dxLocation = {spot.txLat, spot.txLon};
+          state_->dxGrid = spot.txGrid;
+        }
+      }
+    }
 
     // Watchlist check
     if (watchlist_ && hits_ && watchlist_->contains(spot.txCall)) {
@@ -659,8 +757,8 @@ void DXClusterProvider::processLine(const std::string &line) {
     const char *dxde = std::strstr(start, "DX de ");
     if (dxde) {
       if (sscanf(dxde, "DX de %31[^ :]: %f %31s", rxCall, &freq, txCall) == 3) {
-        spot.rxCall = rxCall;
-        spot.txCall = txCall;
+        spot.rxCall = sanitizeCall(rxCall);
+        spot.txCall = sanitizeCall(txCall);
         spot.freqKhz = freq;
         spot.spottedAt = std::chrono::system_clock::now(); // Default to now if
                                                            // time parsing fails
@@ -678,15 +776,17 @@ void DXClusterProvider::processLine(const std::string &line) {
             tm->tm_hour = hr;
             tm->tm_min = mn;
             tm->tm_sec = 0;
-            // Handle day wrap if needed (if hr:mn is in the future compared to
-            // now, it's likely yesterday)
+            // Handle day wrap: subtract a day only if the spot time is
+            // significantly in the future (e.g., > 30 min). This avoids 
+            // incorrectly rollbacking due to minor local clock drifts.
             std::time_t spot_c = Astronomy::portable_timegm(tm);
-            if (spot_c > now_c)
+            if (spot_c > now_c + 1800)
               spot_c -= 86400;
-            // HHMMZ has only minute precision. If the spot is from the current
-            // minute, use the actual receipt time so fresh spots show distinct
-            // elapsed seconds rather than all collapsing to the same value.
-            if (now_c - spot_c < 60)
+
+            // HHMMZ has only minute precision. If the spot is from within
+            // the current minute or any upcoming minute tolerated by drift,
+            // use actual receipt time to preserve immediate display.
+            if (static_cast<long>(now_c - spot_c) < 60)
               spot.spottedAt = now;
             else
               spot.spottedAt = std::chrono::system_clock::from_time_t(spot_c);
@@ -698,13 +798,28 @@ void DXClusterProvider::processLine(const std::string &line) {
         if (pm_.findLocation(spot.txCall, ll)) {
           spot.txLat = ll.lat;
           spot.txLon = ll.lon;
+          spot.txGrid = Astronomy::latLonToGrid(ll.lat, ll.lon);
         }
         if (pm_.findLocation(spot.rxCall, ll)) {
           spot.rxLat = ll.lat;
           spot.rxLon = ll.lon;
+          spot.rxGrid = Astronomy::latLonToGrid(ll.lat, ll.lon);
         }
 
         store_->addSpot(spot);
+
+        // Watched call check
+        {
+          auto data = store_->snapshot();
+          if (!data->watchedCall.empty() && spot.txCall == data->watchedCall) {
+            store_->setWatchedSpotted(std::chrono::steady_clock::now());
+            // Update DX location from spot
+            if (state_) {
+              state_->dxLocation = {spot.txLat, spot.txLon};
+              state_->dxGrid = spot.txGrid;
+            }
+          }
+        }
 
         // Watchlist Check
         if (watchlist_ && hits_ && watchlist_->contains(spot.txCall)) {
@@ -717,6 +832,40 @@ void DXClusterProvider::processLine(const std::string &line) {
           hit.time = spot.spottedAt;
           hits_->addHit(hit);
           SoundManager::getInstance().speak("Watchlist: " + hit.call);
+        }
+
+        // DX ADIF Alert Check (ATNO / Needed Entity)
+        if (adif_ && spot.txLat != 0.0) {
+          int dxcc = pm_.findDXCC(spot.txCall);
+          if (dxcc > 0) {
+            auto stats = adif_->get();
+            if (stats.valid) {
+              int bi = freqToBandIndex(spot.freqKhz);
+              std::string band = (bi >= 0) ? kBands[bi].name : "";
+              bool worked = false;
+              if (stats.workedEntitiesPerBand.count(dxcc)) {
+                if (band.empty() || stats.workedEntitiesPerBand[dxcc].count(band)) {
+                  worked = true;
+                }
+              }
+
+              if (!worked) {
+                // Trigger Alert
+                struct DXAlertData {
+                  std::string call;
+                  std::string entity;
+                  double freq;
+                  std::string mode;
+                };
+                auto *data = new DXAlertData{spot.txCall, pm_.getCountryName(dxcc), spot.freqKhz, spot.mode};
+                SDL_Event event;
+                std::memset(&event, 0, sizeof(event));
+                event.type = HamClock::AE_BASE_EVENT + HamClock::AE_DX_ALERT;
+                event.user.data1 = data;
+                SDL_PushEvent(&event);
+              }
+            }
+          }
         }
       }
     }

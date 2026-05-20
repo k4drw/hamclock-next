@@ -54,7 +54,7 @@ static ChartGeom chartGeom(int wx, int wy, int ww, int wh) {
   g.w    = ww - labelW - 4;
   g.h    = wh - titleH - bottomH - 4;
   g.yMin = 60;
-  g.yMax = 220;
+  g.yMax = 230;
   return g;
 }
 
@@ -103,9 +103,10 @@ void SFITrendPanel::render(SDL_Renderer *renderer) {
   // Band-viability reference lines
   struct RefLine { int sfi; const char *label; SDL_Color col; };
   static const RefLine refs[] = {
-    {80,  "80",  {220, 60,  60,  100}},
-    {120, "120", {240, 220, 30,  100}},
-    {160, "160", {0,   200, 180, 100}},
+    {70,  "70",  {220, 60,  60,  100}},
+    {100, "100", {240, 220, 30,  100}},
+    {150, "150", {60,  200, 60,  100}},
+    {200, "200", {0,   230, 220, 100}},
   };
   for (const auto &r : refs) {
     if (r.sfi < g.yMin || r.sfi > g.yMax) continue;
@@ -139,6 +140,32 @@ void SFITrendPanel::render(SDL_Renderer *renderer) {
     int axisY = y_ + height_ - 11;
     cat->drawText(renderer, frontDate.c_str(), g.x,       axisY, themes.textDim, FontStyle::Tiny);
     cat->drawText(renderer, backDate.c_str(),  g.x + g.w, axisY, themes.textDim, FontStyle::Tiny, false, true);
+  }
+
+  // Band viability table (top right)
+  if (width_ > 140 && currentSFI > 0) {
+    int tableX = x_ + width_ - 50;
+    int tableY = y_ + 22;
+    cat->drawText(renderer, "Viability", tableX, tableY - 10, themes.textDim, FontStyle::Micro);
+    
+    auto drawRow = [&](const char *band, const char *status, SDL_Color col) {
+        cat->drawText(renderer, band, tableX, tableY, themes.text, FontStyle::Micro);
+        cat->drawText(renderer, status, tableX + 25, tableY, col, FontStyle::Micro);
+        tableY += 10;
+    };
+
+    const char *s10 = "Poor";
+    SDL_Color c10 = {220, 60, 60, 255};
+    if (currentSFI >= 160) { s10 = "Exc"; c10 = {0, 230, 220, 255}; }
+    else if (currentSFI >= 120) { s10 = "Good"; c10 = {60, 200, 60, 255}; }
+    else if (currentSFI >= 80)  { s10 = "Fair"; c10 = {240, 220, 30, 255}; }
+
+    const char *s20 = (currentSFI >= 80) ? "Exc" : "Good";
+    SDL_Color c20 = (currentSFI >= 80) ? SDL_Color{0, 230, 220, 255} : SDL_Color{60, 200, 60, 255};
+
+    drawRow("10m", s10, c10);
+    drawRow("20m", s20, c20);
+    drawRow("40m", "Exc", {0, 230, 220, 255});
   }
 
   if (tooltip_.visible)

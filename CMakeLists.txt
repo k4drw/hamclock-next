@@ -210,7 +210,7 @@ if(NOT WIN32 AND NOT EMSCRIPTEN AND NOT IOS)
         GIT_SHALLOW    TRUE
     )
     FetchContent_MakeAvailable(mbedtls)
-    # Explicitly suppress warnings for mbedtls targets
+    # Suppress warnings from mbedTLS targets
     foreach(target mbedtls mbedx509 mbedcrypto)
         if(TARGET ${target})
             if(MSVC)
@@ -535,6 +535,7 @@ set(HAMCLOCK_SOURCES
     src/core/DatabaseManager.cpp
     src/core/OrbitPredictor.cpp
     src/core/DXClusterData.cpp
+    src/core/HeardMeStore.cpp
     src/core/DisplayPower.cpp
     src/core/PaneRestrictions.cpp
     src/core/GreylineCalculator.cpp
@@ -555,11 +556,15 @@ set(HAMCLOCK_SOURCES
     src/network/WebServer_Routes.cpp
     src/services/UpdateChecker.cpp
     src/services/NOAAProvider.cpp
+    src/services/FlareProvider.cpp
     src/services/RSSProvider.cpp
     src/services/BME280Provider.cpp
     src/services/LTR329Provider.cpp
     src/services/ADIFProvider.cpp
     src/services/ActivityProvider.cpp
+    src/services/LoTWActivityProvider.cpp
+    src/services/ClublogProvider.cpp
+    src/services/LoTWProvider.cpp
     src/services/DRAPProvider.cpp
     src/services/LiveSpotProvider.cpp
     src/services/ReachProvider.cpp
@@ -593,7 +598,7 @@ set(HAMCLOCK_SOURCES
     src/services/RBNProvider.cpp
     src/services/QRZProvider.cpp
     src/services/AlertsProvider.cpp
-    src/services/ForecastProvider.cpp
+    src/services/OpenMeteoForecastProvider.cpp
     src/services/RepeaterProvider.cpp
     src/services/HurricaneProvider.cpp
     src/services/MarineProvider.cpp
@@ -605,6 +610,7 @@ set(HAMCLOCK_SOURCES
     src/ui/AlertsPanel.cpp
     src/ui/BigClockPanel.cpp
     src/ui/CallsignClock.cpp
+    src/ui/ClublogWantedPanel.cpp
     src/ui/SolarCyclePanel.cpp
     src/ui/GreylineWindowsPanel.cpp
     src/ui/DXCCProgressPanel.cpp
@@ -622,6 +628,10 @@ set(HAMCLOCK_SOURCES
     src/ui/AuroraGraphPanel.cpp
     src/ui/KIndexAlertPanel.cpp
     src/ui/SFITrendPanel.cpp
+    src/ui/QSORatePanel.cpp
+    src/ui/FlareLogPanel.cpp
+    src/ui/GreylineDXFilterPanel.cpp
+    src/ui/HeardMePanel.cpp
     src/ui/DXClusterPanel.cpp
     src/ui/BandConditionsPanel.cpp
     src/ui/BeaconPanel.cpp
@@ -630,6 +640,7 @@ set(HAMCLOCK_SOURCES
     src/ui/SysInfoPanel.cpp
     src/ui/DRAPPanel.cpp
     src/ui/GimbalPanel.cpp
+    src/ui/GridProgressPanel.cpp
     src/ui/GreylineModal.cpp
     src/ui/PresetsModal.cpp
     src/ui/HistoryPanel.cpp
@@ -643,6 +654,7 @@ set(HAMCLOCK_SOURCES
     src/ui/SatWidget.cpp
     src/ui/ListPanel.cpp
     src/ui/LiveSpotPanel.cpp
+    src/ui/LoTWSyncPanel.cpp
     src/ui/LocalPanel.cpp
     src/ui/MapWidget.cpp
     src/ui/MapWidget_Input.cpp
@@ -691,6 +703,9 @@ set(HAMCLOCK_SOURCES
     src/ui/WorldClockPanel.cpp
     src/ui/EMEToolPanel.cpp
     src/ui/SantaPanel.cpp
+    src/ui/WASPanel.cpp
+    src/ui/WACRadarPanel.cpp
+    src/ui/ZoneHeatmapPanel.cpp
 )
 
 if(EMSCRIPTEN)

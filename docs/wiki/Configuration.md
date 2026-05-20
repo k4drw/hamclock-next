@@ -29,8 +29,10 @@ To access the Setup screen at any time, click the **gear icon (⚙)** in the Tim
 | `lon`            | number | `0.0`   | Your longitude in decimal degrees                |
 | `defaultTzOffset`| int    | `0`     | Default time zone offset in hours from UTC — sets local time for all clocks at once (see note below) |
 | `defaultTzLabel` | string | `"UTC"` | Display label for the default time zone (e.g., `"EST"`, `"CET"`)                                    |
+| `audioVolume`    | integer| `100`   | Global volume for audio alerts, chimes, and voice notifications (0–100)                             |
 
-**Setting your default time zone** changes local time across all tiles that display local time at once — the Aux Clock, Calendar, Big Clock (when not locked to UTC), and World Clock slots. Set it once in Setup → **Identity** instead of configuring each clock widget individually.
+**Setting your default time zone**
+ changes local time across all tiles that display local time at once — the Aux Clock, Calendar, Big Clock (when not locked to UTC), and World Clock slots. Set it once in Setup → **Identity** instead of configuring each clock widget individually.
 
 If `lat`/`lon` are omitted, they are derived from the center of your grid square.
 
@@ -56,6 +58,8 @@ If `lat`/`lon` are omitted, they are derived from the center of your grid square
 | `mapPanX`            | number | `0.0`               | Map horizontal pan offset                                   |
 | `mapPanY`            | number | `0.0`               | Map vertical pan offset                                     |
 | `displayPowerMethod` | string | `"auto"`            | Method to control display (`auto`, `vcgencmd`, `bl_power`)  |
+| `showLocalPropGauge` | bool   | `false`             | Show local propagation gauge map overlay                    |
+| `showLotwQsos`       | bool   | `true`              | Show/hide ADIF and Logbook of The World (LoTW) world map QSO pins |
 
 ---
 
@@ -114,6 +118,7 @@ If `lat`/`lon` are omitted, they are derived from the center of your grid square
 | `dxClusterHideDuplicates`  | bool    | `true`        | Hide redundant spots for same call/band                |
 | `dxClusterMaxAgeMinutes`   | integer | `20`          | Drop spots older than this (allowed: `10`, `20`, `40`, `60`) |
 | `wsjtxPort`                | integer | `2237`        | UDP port for WSJT-X feed                               |
+| `kIndexAlertThreshold`     | float   | `5.0`         | K-index threshold for alerts and notifications         |
 
 ---
 
@@ -168,7 +173,7 @@ If `lat`/`lon` are omitted, they are derived from the center of your grid square
 | `sdoWavelength` | string | `"0193"` | SDO wavelength (e.g., `211193171`, `HMIB`, `0131`, `0193`, `0211`, `0304`, `1600`, `1700`) |
 | `sdoRotating`   | bool   | `false`  | Automatically rotate through available wavelengths every 30 seconds                                 |
 | `sdoPfss`       | bool   | `false`  | Overlay solar magnetic field lines (PFSS) on supported wavelengths                                  |
-| `sdoShowMovie`  | bool   | `false`  | Show SDO image as a time-lapse movie loop                                                           |
+| `sdoShowMovie`  | bool   | `false`  | Reserved; movie mode not yet implemented                                                            |
 
 ---
 
@@ -295,3 +300,18 @@ If a Client cannot reach the Master, it falls back to fetching from the internet
 | `watchlist`      | array  | `[]`    | List of callsigns to monitor. In the setup screen, you can paste a list of callsigns separated by commas or spaces to add them all at once. |
 | `ontaFilter`     | string | `"all"` | Filter activations: `all`, `pota`, or `sota`                |
 | `corsProxyUrl`   | string | `"/proxy/"` | CORS proxy URL prefix for browser builds                |
+| `deletedFactoryPresets` | array | `[]` | Names of factory presets deleted by the user              |
+
+---
+
+## Service API Keys
+
+These keys enable advanced integrations with external services. Configure these in Setup → **Services** tab.
+
+| Field          | Type   | Default | Description                                   |
+| -------------- | ------ | ------- | --------------------------------------------- |
+| `repeaterbook` | string | `""`    | RepeaterBook API key                          |
+| `winlink`      | string | `""`    | Winlink API key / password                    |
+| `lotw_call`    | string | `""`    | ARRL Logbook of The World (LoTW) callsign     |
+| `lotw_password`| string | `""`    | LoTW password                                 |
+| `clublog`      | string | `""`    | Clublog API key                               |

@@ -178,6 +178,8 @@ bool SetupScreen::onMouseDown(int mx, int my, Uint16 mod, int clicks) {
       if (hitField(wsjtxPortRect_, 3, &wsjtxPortInput_))
         return true;
     }
+    if (hitField(kIndexThresholdRect_, 4, &kIndexThresholdInput_))
+      return true;
   } else if (activeTab_ == Tab::Rig) {
     if (hitField(rigHostRect_, 0, &rigHostInput_))
       return true;
@@ -213,9 +215,15 @@ bool SetupScreen::onMouseDown(int mx, int my, Uint16 mod, int clicks) {
       return true;
     if (hitField(qrzPasswordRect_, 1, &qrzPasswordInput_))
       return true;
-    if (hitField(repeaterBookRect_, 2, &repeaterBookInput_))
+    if (hitField(lotwCallRect_, 2, &lotwCallInput_))
       return true;
-    if (hitField(winlinkRect_, 3, &winlinkInput_))
+    if (hitField(lotwPasswordRect_, 3, &lotwPasswordInput_))
+      return true;
+    if (hitField(repeaterBookRect_, 4, &repeaterBookInput_))
+      return true;
+    if (hitField(winlinkRect_, 5, &winlinkInput_))
+      return true;
+    if (hitField(clublogApiKeyRect_, 6, &clublogApiKeyInput_))
       return true;
   } else if (activeTab_ == Tab::Network && hubMode_ == HubMode::Client) {
     if (hitField(hubIpRect_, 0, &hubIpInput_))
@@ -381,6 +389,11 @@ bool SetupScreen::onMouseDown(int mx, int my, Uint16 mod, int clicks) {
     if (mx >= audioMuteToggleRect_.x && mx <= audioMuteToggleRect_.x + audioMuteToggleRect_.w &&
         my >= audioMuteToggleRect_.y && my <= audioMuteToggleRect_.y + audioMuteToggleRect_.h) {
       audioMuted_ = !audioMuted_;
+      return true;
+    }
+    if (mx >= audioVolumeSliderRect_.x && mx < audioVolumeSliderRect_.x + audioVolumeSliderRect_.w &&
+        my >= audioVolumeSliderRect_.y && my < audioVolumeSliderRect_.y + audioVolumeSliderRect_.h) {
+      audioVolume_ = std::clamp((mx - audioVolumeSliderRect_.x) * 100 / audioVolumeSliderRect_.w, 0, 100);
       return true;
     }
     if (mx >= defaultTzRect_.x && mx < defaultTzRect_.x + defaultTzRect_.w &&
@@ -636,8 +649,8 @@ void SetupScreen::onMouseMove(int mx, int /*my*/) {
       r = *rects[activeField_];
   } else if (activeTab_ == Tab::Spotting) {
     const SDL_Rect *rects[] = {&clusterHostRect_, &clusterPortRect_,
-                               &clusterLoginRect_, &wsjtxPortRect_};
-    if (activeField_ >= 0 && activeField_ < 4)
+                               &clusterLoginRect_, &wsjtxPortRect_, &kIndexThresholdRect_};
+    if (activeField_ >= 0 && activeField_ < 5)
       r = *rects[activeField_];
   } else if (activeTab_ == Tab::Rig) {
     const SDL_Rect *rects[] = {&rigHostRect_, &rigPortRect_, &rotatorHostRect_,
@@ -645,11 +658,12 @@ void SetupScreen::onMouseMove(int mx, int /*my*/) {
     if (activeField_ >= 0 && activeField_ < 4)
       r = *rects[activeField_];
   } else if (activeTab_ == Tab::Services) {
-    // Both Username and Password use full fieldW in render pass
-    int pad = 20;
-    int fieldW = modalRect_.w - 2 * pad;
-    int fieldX = modalRect_.x + pad;
-    r = {fieldX, 0, fieldW, 0}; // Y and H not strictly needed for onMouseMove
+    const SDL_Rect *rects[] = {&qrzUsernameRect_, &qrzPasswordRect_,
+                               &lotwCallRect_,     &lotwPasswordRect_,
+                               &repeaterBookRect_, &winlinkRect_,
+                               &clublogApiKeyRect_};
+    if (activeField_ >= 0 && activeField_ < 7)
+      r = *rects[activeField_];
   } else if (activeTab_ == Tab::Network) {
     const SDL_Rect *rects[] = {&hubIpRect_, &hubPortRect_};
     if (activeField_ >= 0 && activeField_ < 2)
@@ -768,11 +782,11 @@ bool SetupScreen::onKeyDown(SDL_Keycode key, Uint16 mod) {
   if (activeTab_ == Tab::Identity) {
     nFields = 4;
   } else if (activeTab_ == Tab::Spotting) {
-    nFields = clusterWSJTX_ ? 4 : 3;
+    nFields = 5;
   } else if (activeTab_ == Tab::Appearance) {
     nFields = 2; // 0=dimTime, 1=brightTime
   } else if (activeTab_ == Tab::Services) {
-    nFields = 4;
+    nFields = 7;
   } else if (activeTab_ == Tab::Rig) {
     nFields = 4;
   } else if (activeTab_ == Tab::Widgets) {

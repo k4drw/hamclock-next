@@ -2,6 +2,7 @@
 
 #include <filesystem>
 #include <map>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -90,6 +91,8 @@ struct AppConfig {
   bool showSatTrack = true; // Show satellite ground track line on world map
   bool showBeacons = true;  // Show NCDXF beacons on world map
   bool showBorders = false; // Show Natural Earth country borders
+  bool showLocalPropGauge = false; // Show MUF/LUF gauge at bottom of map
+  bool showLotwQsos = true;  // Show LOTW QSO pins on world map
   std::string displayPowerMethod =
       "auto"; // "auto", "vcgencmd", "bl_power", etc.
   std::string logLevel = "warn"; // "trace","debug","info","warn","error"
@@ -163,6 +166,11 @@ struct AppConfig {
   std::string qrzUsername;
   std::string qrzPassword;
 
+  // LoTW Auto-Sync
+  std::string lotwCall;
+  std::string lotwPassword;
+  std::string lotwLastSync; // YYYY-MM-DD format
+
   // Additional Services
   std::string repeaterBookKey;
   std::string winlinkKey;
@@ -208,6 +216,10 @@ struct AppConfig {
 
   // RSS
   bool rssEnabled = true; // Show RSS news banner
+  std::string rssUrl;     // Custom RSS feed URL
+
+  // Clublog API
+  std::string clublogApiKey; // API key for clublog.org most wanted list
 
   // Activity panels
   std::string ontaFilter = "all"; // "all", "pota", or "sota"
@@ -225,6 +237,7 @@ struct AppConfig {
 
   // Audio
   bool audioMuted = false;
+  int audioVolume = 100;
 
   // Aux Clock timezone
   int auxClockTzOffset = 0;            // Hours from UTC (-12 to +14)
@@ -250,6 +263,7 @@ struct AppConfig {
   HubMode hubMode = HubMode::Off;
   std::string hubIp = "";
   int hubPort = 8080;
+  bool showCacheStats = false; // Debugging: show NetworkManager stats in SysInfoPanel
 
   // Network (WASM)
   // CORS proxy prefix prepended to all external URLs in the WASM build.
@@ -272,6 +286,10 @@ struct AppConfig {
 
   // Presets
   std::vector<ConfigPreset> presets;
+  std::set<std::string> deletedFactoryPresets;  // Factory preset names user has deleted
+
+  // DX Enhancements
+  float kIndexAlertThreshold = 5.0f;
 };
 
 class ConfigManager {

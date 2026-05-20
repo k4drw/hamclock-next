@@ -90,6 +90,29 @@ bool MapWidget::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
     }
   }
 
+  // Startup banner dismissal
+  if (startupBanner_.active) {
+    SDL_Point pt = {mx, my};
+    if (SDL_PointInRect(&pt, &startupBannerRect_)) {
+      startupBanner_.active = false;
+      return true;
+    }
+  }
+
+  // DX alert dismissal
+  if (dxAlert_.active) {
+    const int panW = (int)(mapRect_.w * 0.60);
+    const int panH = 80;
+    const int panX = mapRect_.x + (mapRect_.w - panW) / 2;
+    const int panY = mapRect_.y + (mapRect_.h - panH) / 2 + 100; // offset from calendar
+    SDL_Rect panRect = {panX, panY, panW, panH};
+    SDL_Point pt = {mx, my};
+    if (SDL_PointInRect(&pt, &panRect)) {
+      dxAlert_.active = false;
+      return true;
+    }
+  }
+
   if (deMenuVisible_) {
     SDL_Point pt = {mx, my};
     if (SDL_PointInRect(&pt, &deMenuRect_)) {
@@ -155,8 +178,8 @@ bool MapWidget::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
     // current-band line for that spot (matches the hover tooltip data).
     const SpotRecord *hitSpot = nullptr;
     double hitLat = 0.0, hitLon = 0.0;
-    if (spotStore_) {
-      auto data = spotStore_->snapshot();
+    if (spotStore_ && currentSpotSnapshot_) {
+      auto data = currentSpotSnapshot_;
       float bestDist = 10.0f;  // matches hover kHitRadius
       for (const auto &spot : data->spots) {
         double rLat, rLon;
@@ -210,8 +233,9 @@ bool MapWidget::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
       dxcStore_->clearSelection();
     if (activityStore_) {
       auto ad = activityStore_->get();
-      ad.hasSelection = false;
-      activityStore_->set(ad);
+      ActivityData newData = *ad;
+      newData.hasSelection = false;
+      activityStore_->set(newData);
     }
   }
 
@@ -438,16 +462,53 @@ void MapWidget::onMouseMove(int mx, int my) {
     }
   }
 
+  // 4b. Check ADIF Pins
+  if (tip.empty() && adifStore_) {
+    auto stats = adifStore_->get();
+    if (stats.valid && !stats.recentQSOs.empty()) {
+      std::time_t nowTime = std::time(nullptr);
+      nowTime -= 30 * 24 * 60 * 60;
+      std::tm *tm = std::gmtime(&nowTime);
+      char limitBuf[16];
+      std::strftime(limitBuf, sizeof(limitBuf), "%Y%m%d", tm);
+      std::string limitDate = limitBuf;
+
+      for (const auto &qso : stats.recentQSOs) {
+        if (qso.lat == 0.0 && qso.lon == 0.0)
+          continue;
+        if (qso.date < limitDate)
+          continue;
+
+        if (!stats.activeBandFilter.empty() && stats.activeBandFilter != "All" && qso.band != stats.activeBandFilter)
+          continue;
+        if (!stats.activeModeFilter.empty() && stats.activeModeFilter != "All" && qso.mode != stats.activeModeFilter)
+          continue;
+
+        if (screenDist(qso.lat, qso.lon) < kHitRadius) {
+          char buf[128];
+          std::string fmtDate = qso.date;
+          if (fmtDate.length() == 8) {
+            fmtDate = fmtDate.substr(0, 4) + "-" + fmtDate.substr(4, 2) + "-" + fmtDate.substr(6, 2);
+          }
+          std::snprintf(buf, sizeof(buf), "%s\n%s\n%s %s", qso.callsign.c_str(), fmtDate.c_str(), qso.band.c_str(), qso.mode.c_str());
+          tip = buf;
+          break;
+        }
+      }
+    }
+  }
+
+
   // 5. Check ONTA selected spot only
   if (tip.empty() && activityStore_) {
-    ActivityData ads = activityStore_->get();
-    if (ads.hasSelection) {
-      const auto &sel = ads.selectedSpot;
+    auto ads = activityStore_->get();
+    if (ads->hasSelection) {
+      const auto &sel = ads->selectedSpot;
       // Resolve lat/lon: use selectedSpot coords, or fall back to ontaSpots
       // list
       double sLat = sel.lat, sLon = sel.lon;
       if (sLat == 0.0 && sLon == 0.0) {
-        for (const auto &s : ads.ontaSpots) {
+        for (const auto &s : ads->ontaSpots) {
           if (s.call == sel.call && s.ref == sel.ref &&
               (s.lat != 0.0 || s.lon != 0.0)) {
             sLat = s.lat;
@@ -561,8 +622,8 @@ void MapWidget::onMouseMove(int mx, int my) {
   }
 
   // 8. Check DX Cluster selected spot only (mirrors renderDXClusterSpots logic)
-  if (tip.empty() && dxcStore_) {
-    auto data = dxcStore_->snapshot();
+  if (tip.empty() && dxcStore_ && currentDxcSnapshot_) {
+    auto data = currentDxcSnapshot_;
     if (data->hasSelection && data->selectedSpot.txLat != 0.0) {
       const auto &spot = data->selectedSpot;
       if (screenDist(spot.txLat, spot.txLon) < kHitRadius) {
@@ -580,8 +641,8 @@ void MapWidget::onMouseMove(int mx, int my) {
   }
 
   // 9. Check Live Spots (generic ones on map)
-  if (tip.empty() && spotStore_) {
-    auto data = spotStore_->snapshot();
+  if (tip.empty() && currentSpotSnapshot_) {
+    auto data = currentSpotSnapshot_;
     bool ofDe = config_.liveSpotsOfDe;
     bool useCall = config_.liveSpotsUseCall;
     std::string myLabel = useCall ? config_.callsign : config_.grid;

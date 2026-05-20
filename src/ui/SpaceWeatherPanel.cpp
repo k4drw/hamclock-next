@@ -1,4 +1,5 @@
 #include "SpaceWeatherPanel.h"
+#include "../core/Constants.h"
 #include "../core/Theme.h"
 #include "FontCatalog.h"
 #include "GraphHelper.h"
@@ -13,9 +14,11 @@
 SpaceWeatherPanel::SpaceWeatherPanel(
     int x, int y, int w, int h, FontManager &fontMgr, TextureManager &texMgr,
     std::shared_ptr<SolarDataStore> store,
-    std::shared_ptr<XRayHistoryStore> xrayStore)
+    std::shared_ptr<XRayHistoryStore> xrayStore,
+    std::shared_ptr<LiveSpotDataStore> spotStore)
     : Widget(x, y, w, h), fontMgr_(fontMgr), texMgr_(texMgr),
-      store_(std::move(store)), xrayStore_(std::move(xrayStore)) {
+      store_(std::move(store)), xrayStore_(std::move(xrayStore)),
+      spotStore_(std::move(spotStore)) {
   items_[0].label = "SFI";
   items_[1].label = "SN";
   items_[2].label = "A";
@@ -79,8 +82,14 @@ void SpaceWeatherPanel::destroyCache() {
 
 void SpaceWeatherPanel::update() {
   ThemeColors themes = getThemeColors(theme_);
+  
   if (xrayStore_)
     sparklineHistory_ = xrayStore_->getHistory();
+
+  if (!store_) {
+    dataValid_ = false;
+    return;
+  }
 
   SolarData data = store_->get();
   dataValid_ = data.valid;
@@ -182,6 +191,12 @@ void SpaceWeatherPanel::render(SDL_Renderer *renderer) {
 
   ThemeColors themes = getThemeColors(theme_);
 
+  // Maximized view (Width > 300) shows all data on one screen
+  if (width_ > 300) {
+    renderMaximized(renderer, themes);
+    return;
+  }
+
   // Cycle pages every 7 seconds
   uint32_t now = SDL_GetTicks();
   if (now - lastPageUpdate_ > 7000) {
@@ -203,17 +218,20 @@ void SpaceWeatherPanel::render(SDL_Renderer *renderer) {
                          themes.border.b, themes.border.a);
   SDL_RenderDrawRect(renderer, &rect);
 
-  int titleH = 20;
+  auto *cat = fontMgr_.catalog();
+  if (!cat) return;
+
   bool isSmall = (width_ < 150);
   const char *titleText = isSmall ? "Space WX" : "Space Weather";
   FontStyle titleStyle =
       isSmall ? FontStyle::CaptionBold : FontStyle::MicroBold;
-  fontMgr_.catalog()->drawText(renderer, titleText, x_ + 10, y_ + 5,
+  cat->drawText(renderer, titleText, x_ + HamClock::PANEL_TITLE_X_OFFSET, 
+                               y_ + HamClock::PANEL_TITLE_Y_OFFSET,
                                themes.accent, titleStyle);
 
   if (!dataValid_) {
-    fontMgr_.catalog()->drawText(renderer, "Awaiting data...", x_ + 10,
-                                 y_ + titleH + (height_ - titleH) / 2 - 8,
+    cat->drawText(renderer, "Awaiting data...", x_ + HamClock::PANEL_TITLE_X_OFFSET,
+                                 y_ + HamClock::PANEL_TITLE_HEIGHT + (height_ - HamClock::PANEL_TITLE_HEIGHT) / 2 - 8,
                                  themes.textDim, FontStyle::Micro);
     return;
   }
@@ -231,7 +249,7 @@ void SpaceWeatherPanel::render(SDL_Renderer *renderer) {
   int sparklineH = showSparkline ? 22 : 0;
 
   int cellW = width_ / numCols;
-  int cellH = (height_ - titleH - sparklineH - 10) /
+  int cellH = (height_ - HamClock::PANEL_TITLE_HEIGHT - sparklineH - 10) /
               numRows; // Leave space for title, sparkline, and pagination bar
   int pad = std::max(1, static_cast<int>(cellH * 0.05f));
 
@@ -248,7 +266,7 @@ void SpaceWeatherPanel::render(SDL_Renderer *renderer) {
     int col = i % numCols;
     int row = i / numCols;
     int cellX = x_ + col * cellW;
-    int cellY = y_ + titleH + row * cellH;
+    int cellY = y_ + HamClock::PANEL_TITLE_HEIGHT + row * cellH;
 
     // Label (cached until font size changes)
     if (labelFontChanged || !items_[itemIdx].labelTex) {
@@ -322,7 +340,7 @@ void SpaceWeatherPanel::render(SDL_Renderer *renderer) {
     const int pad = 4;
     const int slX = x_ + pad;
     const int slW = width_ - 2 * pad;
-    const int slY = y_ + titleH + numRows * cellH + 2;
+    const int slY = y_ + HamClock::PANEL_TITLE_HEIGHT + numRows * cellH + 2;
     const int slH = sparklineH - 4;
 
     // Log-scale Y mapping: 1e-8 (bottom) to 1e-3 (top)
@@ -423,12 +441,12 @@ void SpaceWeatherPanel::onMouseMove(int mx, int my) {
   bool isNarrow = (width_ < 110);
   int numCols = isNarrow ? 1 : 2;
   int numRows = isNarrow ? 4 : 2;
-  int titleH = 20;
+  // PANEL_TITLE_HEIGHT used from Constants.h
   bool showSparkline =
       (!isNarrow && xrayStore_ && !sparklineHistory_.empty() && height_ >= 80);
   int sparklineH = showSparkline ? 22 : 0;
   int cellW = width_ / numCols;
-  int cellH = (height_ - titleH - sparklineH - 10) / numRows;
+  int cellH = (height_ - HamClock::PANEL_TITLE_HEIGHT - sparklineH - 10) / numRows;
 
   // 1. Check label tooltips (SFI and K)
   int startIdx = currentPage_ * kItemsPerPage;
@@ -443,7 +461,7 @@ void SpaceWeatherPanel::onMouseMove(int mx, int my) {
     int col = i % numCols;
     int row = i / numCols;
     int cellX = x_ + col * cellW;
-    int cellY = y_ + titleH + row * cellH;
+    int cellY = y_ + HamClock::PANEL_TITLE_HEIGHT + row * cellH;
 
     int lx = cellX + (cellW - items_[itemIdx].labelW) / 2;
     int ly = cellY + pad;
@@ -472,7 +490,7 @@ void SpaceWeatherPanel::onMouseMove(int mx, int my) {
   const int slPad = 4;
   const int slX = x_ + slPad;
   const int slW = width_ - 2 * slPad;
-  const int slY = y_ + titleH + numRows * cellH + 2;
+  const int slY = y_ + HamClock::PANEL_TITLE_HEIGHT + numRows * cellH + 2;
   const int slH = sparklineH - 4;
 
   if (mx < slX || mx > slX + slW || my < slY || my > slY + slH) {
@@ -565,8 +583,212 @@ nlohmann::json SpaceWeatherPanel::getDebugData() const {
   return j;
 }
 
+void SpaceWeatherPanel::renderMaximized(SDL_Renderer *renderer,
+                                         const ThemeColors &themes) {
+  // PANEL_TITLE_HEIGHT used from Constants.h
+  fontMgr_.catalog()->drawText(renderer, "HF Dashboard", x_ + 20, y_ + 10,
+                               themes.accent, FontStyle::SmallBold);
+
+  SolarData data = store_->get();
+  if (!data.valid)
+    return;
+
+  // --- 1. Top Section: NOAA Scales & Indices ---
+  int topY = y_ + HamClock::PANEL_TITLE_HEIGHT + 10;
+  int topH = 60;
+  int colW = width_ / 4;
+
+  auto drawBadge = [&](const char *lbl, int scale, int bx, int by) {
+    SDL_Color c = colorForNOAAScale(scale, themes);
+    char buf[16];
+    std::snprintf(buf, sizeof(buf), "%s%d", lbl, scale);
+    fontMgr_.catalog()->drawText(renderer, buf, bx + colW / 2, by + 15, c,
+                                 FontStyle::MediumBold, true);
+    fontMgr_.catalog()->drawText(renderer, "NOAA Scale", bx + colW / 2, by + 40,
+                                 themes.textDim, FontStyle::Micro, true);
+  };
+
+  drawBadge("R", data.noaa_r_scale, x_, topY);
+  drawBadge("S", data.noaa_s_scale, x_ + colW, topY);
+  drawBadge("G", data.noaa_g_scale, x_ + 2 * colW, topY);
+
+  // Big K-Index
+  fontMgr_.catalog()->drawText(renderer, "K-Index", x_ + 3 * colW + colW / 2,
+                               topY + 40, themes.textDim, FontStyle::Micro,
+                               true);
+  char kBuf[16];
+  std::snprintf(kBuf, sizeof(kBuf), "%.1f", data.k_index);
+  fontMgr_.catalog()->drawText(renderer, kBuf, x_ + 3 * colW + colW / 2,
+                               topY + 15, colorForK(data.k_index, themes),
+                               FontStyle::MediumBold, true);
+
+  // --- 2. Middle Section: Solar Wind Gauges ---
+  int midY = topY + topH + 20;
+  int gaugeR = std::min(45, (width_ / 4 - 20) / 2);
+  int gaugeSpacing = width_ / 4;
+
+  drawGauge(renderer, x_ + gaugeSpacing * 0 + gaugeSpacing / 2, midY + gaugeR,
+            gaugeR, static_cast<float>(data.solar_wind_speed), 300, 1000, "Wind",
+            "km/s", themes.warning, themes);
+  drawGauge(renderer, x_ + gaugeSpacing * 1 + gaugeSpacing / 2, midY + gaugeR,
+            gaugeR, static_cast<float>(data.solar_wind_density), 0, 50, "Dens",
+            "p/cm3", themes.info, themes);
+  drawGauge(renderer, x_ + gaugeSpacing * 2 + gaugeSpacing / 2, midY + gaugeR,
+            gaugeR, static_cast<float>(data.bz), -10, 10, "Bz", "nT",
+            (data.bz < 0) ? themes.danger : themes.success, themes);
+  drawGauge(renderer, x_ + gaugeSpacing * 3 + gaugeSpacing / 2, midY + gaugeR,
+            gaugeR, static_cast<float>(data.bt), 0, 30, "Bt", "nT", themes.text,
+            themes);
+
+  // --- 3. Bottom Section: Band Matrix & Sparkline ---
+  int botY = midY + gaugeR * 2 + 40;
+  int matrixW = std::min(width_ - 40, 400);
+  int matrixX = x_ + (width_ - matrixW) / 2;
+  drawBandMatrix(renderer, matrixX, botY, matrixW, 40, themes);
+
+  if (xrayStore_) {
+    int slY = botY + 60;
+    int slH = height_ - (slY - y_) - 20;
+    if (slH > 30) {
+      // Draw sparkline with axis labels
+      fontMgr_.catalog()->drawText(renderer, "6hr X-Ray Flux", x_ + 20, slY - 10,
+                                   themes.textDim, FontStyle::Micro);
+
+      const int slX = x_ + 40;
+      const int slW = width_ - 80;
+      const double logMin = -8.0;
+      const double logMax = -3.0;
+      auto fluxToY = [&](double flux) -> int {
+        double logVal = std::log10(std::max(flux, 1e-9));
+        double t = (logVal - logMin) / (logMax - logMin);
+        t = std::max(0.0, std::min(1.0, t));
+        return slY + slH - static_cast<int>(t * slH);
+      };
+
+      // Threshold lines with labels
+      static const struct {
+        double val;
+        const char *lbl;
+      } kThr[] = {{1e-8, "A"}, {1e-7, "B"}, {1e-6, "C"}, {1e-5, "M"}, {1e-4, "X"}};
+      for (const auto &t : kThr) {
+        int ty = fluxToY(t.val);
+        SDL_SetRenderDrawColor(renderer, 60, 60, 60, 100);
+        SDL_RenderDrawLine(renderer, slX, ty, slX + slW, ty);
+        fontMgr_.catalog()->drawText(renderer, t.lbl, slX - 15, ty - 5,
+                                     themes.textDim, FontStyle::Micro);
+      }
+
+      auto now = std::chrono::system_clock::now();
+      auto tMin = now - std::chrono::hours(6);
+      double tSpan = std::chrono::duration<double>(now - tMin).count();
+      std::vector<SDL_FPoint> slPts;
+      for (const auto &pt : sparklineHistory_) {
+        if (pt.timestamp < tMin)
+          continue;
+        double age = std::chrono::duration<double>(pt.timestamp - tMin).count();
+        slPts.push_back({static_cast<float>(slX + age / tSpan * slW),
+                         static_cast<float>(fluxToY(pt.flux))});
+      }
+      if (!slPts.empty()) {
+        GraphHelper::drawPolyline(renderer, texMgr_.get("line_aa"), slPts.data(),
+                                  static_cast<int>(slPts.size()), themes.info,
+                                  2.0f);
+      }
+    }
+  }
+}
+
+void SpaceWeatherPanel::drawGauge(SDL_Renderer *renderer, int cx, int cy,
+                                  int radius, float value, float minVal,
+                                  float maxVal, const char *label,
+                                  const char *unit, SDL_Color color,
+                                  const ThemeColors &themes) {
+  // Arc from 225 deg to -45 deg (270 degree span)
+  const float startAngle = 135.0f * (M_PI / 180.0f);
+  const float spanAngle = 270.0f * (M_PI / 180.0f);
+
+  // Background arc
+  std::vector<SDL_FPoint> bgPts;
+  for (int i = 0; i <= 30; ++i) {
+    float a = startAngle + (i / 30.0f) * spanAngle;
+    bgPts.push_back({cx + std::cos(a) * radius, cy + std::sin(a) * radius});
+  }
+  GraphHelper::drawPolyline(renderer, texMgr_.get("line_aa"), bgPts.data(),
+                            static_cast<int>(bgPts.size()), themes.rowStripe2,
+                            3.0f);
+
+  // Value arc
+  float t = (value - minVal) / (maxVal - minVal);
+  t = std::max(0.0f, std::min(1.0f, t));
+  if (t > 0.05f) {
+    std::vector<SDL_FPoint> valPts;
+    int segments = static_cast<int>(t * 30);
+    for (int i = 0; i <= segments; ++i) {
+      float a = startAngle + (i / 30.0f) * spanAngle;
+      valPts.push_back({cx + std::cos(a) * radius, cy + std::sin(a) * radius});
+    }
+    GraphHelper::drawPolyline(renderer, texMgr_.get("line_aa"), valPts.data(),
+                              static_cast<int>(valPts.size()), color, 4.0f);
+  }
+
+  // Label & Value
+  fontMgr_.catalog()->drawText(renderer, label, cx, cy - 5, themes.textDim,
+                               FontStyle::Micro, true);
+  char vBuf[32];
+  if (std::abs(value) < 10)
+    std::snprintf(vBuf, sizeof(vBuf), "%.1f", value);
+  else
+    std::snprintf(vBuf, sizeof(vBuf), "%.0f", value);
+  fontMgr_.catalog()->drawText(renderer, vBuf, cx, cy + 12, themes.text,
+                               FontStyle::TinyBold, true);
+  fontMgr_.catalog()->drawText(renderer, unit, cx, cy + radius + 10,
+                               themes.textDim, FontStyle::Micro, true);
+}
+
+void SpaceWeatherPanel::drawBandMatrix(SDL_Renderer *renderer, int bx, int by,
+                                       int bw, int bh,
+                                       const ThemeColors &themes) {
+  if (!spotStore_)
+    return;
+  auto data = spotStore_->snapshot();
+  if (!data->valid)
+    return;
+
+  int cellW = bw / 10;
+  int gap = 2;
+
+  // Find max count for intensity scaling
+  int maxC = 1;
+  for (int i = 0; i < kNumBands; ++i)
+    maxC = std::max(maxC, data->bandCounts[i]);
+
+  for (int i = 0; i < 10; ++i) {
+    int cx = bx + i * cellW;
+    int count = data->bandCounts[i];
+    float intensity = static_cast<float>(count) / maxC;
+
+    // Background: Band color with alpha/brightness based on intensity
+    SDL_Color bc = kBands[i].color;
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+    SDL_SetRenderDrawColor(renderer, bc.r, bc.g, bc.b,
+                           static_cast<Uint8>(50 + 205 * intensity));
+    SDL_Rect r = {cx + gap, by, cellW - 2 * gap, bh};
+    SDL_RenderFillRect(renderer, &r);
+
+    // Band Name
+    fontMgr_.catalog()->drawText(renderer, kBands[i].name, cx + cellW / 2,
+                                 by + bh / 2 - 6, themes.text, FontStyle::Fast,
+                                 true);
+    // Count
+    fontMgr_.catalog()->drawText(renderer, std::to_string(count), cx + cellW / 2,
+                                 by + bh / 2 + 8, themes.text, FontStyle::Micro,
+                                 true);
+  }
+}
+
 #include "WidgetRegistry.h"
 REGISTER_WIDGET("solar", "Solar", false, false, {
   return std::make_unique<SpaceWeatherPanel>(
-      0, 0, 0, 0, deps.fontMgr, deps.texMgr, deps.solarStore, deps.xrayHistoryStore);
+      0, 0, 0, 0, deps.fontMgr, deps.texMgr, deps.solarStore,
+      deps.xrayHistoryStore, deps.spotStore);
 })

@@ -61,6 +61,7 @@ static SDL_Color hexToColor(const std::string &hex) {
 #ifdef ENABLE_DEBUG_API
 #include "../core/UIRegistry.h"
 #endif
+#include "../services/RSSProvider.h"
 #include <iomanip>
 #include <algorithm>
 #include <filesystem>
@@ -526,8 +527,22 @@ void WebServer::registerRoutes(httplib::Server &svr) {
     j["gpsEnabled"] = cfg_->gpsEnabled;
     j["centerMapOnDe"] = cfg_->centerMapOnDe;
     j["rssEnabled"] = cfg_->rssEnabled;
+    j["rssUrl"] = cfg_->rssUrl;
     j["brightness"] = cfg_->brightness;
     j["brightnessSchedule"] = cfg_->brightnessSchedule;
+    j["audioVolume"] = cfg_->audioVolume;
+    j["callsignFrn"] = cfg_->callsignFrn;
+    j["dxClusterHideDuplicates"] = cfg_->dxClusterHideDuplicates;
+    j["dxClusterMaxAgeMinutes"] = cfg_->dxClusterMaxAgeMinutes;
+    j["lotwCall"] = cfg_->lotwCall;
+    j["lotwPassword"] = cfg_->lotwPassword;
+    j["lotwLastSync"] = cfg_->lotwLastSync;
+    j["clublogApiKey"] = cfg_->clublogApiKey;
+    j["kIndexAlertThreshold"] = cfg_->kIndexAlertThreshold;
+    j["defaultTzOffset"] = cfg_->defaultTzOffset;
+    j["defaultTzLabel"] = cfg_->defaultTzLabel;
+    j["countdownLabel"] = cfg_->countdownLabel;
+    j["countdownTime"] = cfg_->countdownTime;
     j["dimHour"] = cfg_->dimHour;
     j["dimMinute"] = cfg_->dimMinute;
     j["brightHour"] = cfg_->brightHour;
@@ -663,6 +678,24 @@ void WebServer::registerRoutes(httplib::Server &svr) {
       res.set_content("missing params: lat,lon or grid", "text/plain");
     }
   });
+  
+  svr.Get("/set_rss", [this](const httplib::Request &req, httplib::Response &res) {
+    if (req.has_param("url")) {
+      std::string url = req.get_param_value("url");
+      cfg_->rssUrl = url;
+      if (cfgMgr_) cfgMgr_->save(*cfg_);
+      
+      std::lock_guard<std::mutex> lk(dataMutex_);
+      if (rssProvider_) {
+          rssProvider_->setCustomUrl(url);
+          rssProvider_->fetch(); // Trigger immediate fetch
+      }
+      res.set_content("ok", "text/plain");
+    } else {
+      res.status = 400;
+      res.set_content("missing url param", "text/plain");
+    }
+  });
 
   svr.Get("/set_config", [this](const httplib::Request &req,
                                 httplib::Response &res) {
@@ -757,6 +790,11 @@ void WebServer::registerRoutes(httplib::Server &svr) {
       cfg_->gpsEnabled = req.get_param_value("gps_enabled") == "1";
     if (req.has_param("rss_enabled"))
       cfg_->rssEnabled = req.get_param_value("rss_enabled") == "1";
+    if (req.has_param("rss_url")) {
+      cfg_->rssUrl = req.get_param_value("rss_url");
+      std::lock_guard<std::mutex> lk(dataMutex_);
+      if (rssProvider_) rssProvider_->setCustomUrl(cfg_->rssUrl);
+    }
     if (req.has_param("onta_filter"))
       cfg_->ontaFilter = req.get_param_value("onta_filter");
     if (req.has_param("spot_source")) {
@@ -804,6 +842,32 @@ void WebServer::registerRoutes(httplib::Server &svr) {
           StringUtils::safe_stoi(req.get_param_value("rotation_interval"));
     if (req.has_param("sync_rotation"))
       cfg_->syncRotation = req.get_param_value("sync_rotation") == "1";
+    if (req.has_param("audio_volume"))
+      cfg_->audioVolume = StringUtils::safe_stoi(req.get_param_value("audio_volume"));
+    if (req.has_param("callsign_frn"))
+      cfg_->callsignFrn = req.get_param_value("callsign_frn");
+    if (req.has_param("dx_hide_duplicates"))
+      cfg_->dxClusterHideDuplicates = req.get_param_value("dx_hide_duplicates") == "1";
+    if (req.has_param("dx_max_age"))
+      cfg_->dxClusterMaxAgeMinutes = StringUtils::safe_stoi(req.get_param_value("dx_max_age"));
+    if (req.has_param("lotw_call"))
+      cfg_->lotwCall = req.get_param_value("lotw_call");
+    if (req.has_param("lotw_pass"))
+      cfg_->lotwPassword = req.get_param_value("lotw_pass");
+    if (req.has_param("clublog_api_key"))
+      cfg_->clublogApiKey = req.get_param_value("clublog_api_key");
+    if (req.has_param("lotw_last_sync"))
+      cfg_->lotwLastSync = req.get_param_value("lotw_last_sync");
+    if (req.has_param("k_index_threshold"))
+      cfg_->kIndexAlertThreshold = (float)StringUtils::safe_stod(req.get_param_value("k_index_threshold"));
+    if (req.has_param("default_tz_offset"))
+      cfg_->defaultTzOffset = StringUtils::safe_stoi(req.get_param_value("default_tz_offset"));
+    if (req.has_param("default_tz_label"))
+      cfg_->defaultTzLabel = req.get_param_value("default_tz_label");
+    if (req.has_param("countdown_label"))
+      cfg_->countdownLabel = req.get_param_value("countdown_label");
+    if (req.has_param("countdown_time"))
+      cfg_->countdownTime = req.get_param_value("countdown_time");
 
     if (req.has_param("watchlist")) {
       std::string w = req.get_param_value("watchlist");
@@ -1114,14 +1178,53 @@ void WebServer::registerRoutes(httplib::Server &svr) {
       res.status = 403;
       return;
     }
-    auto prom = std::make_shared<std::promise<std::string>>();
+    int maxAge = 3600;
+    if (req.has_param("max_age")) {
+      maxAge = StringUtils::safe_stoi(req.get_param_value("max_age"));
+    }
+
+    // Check if client provided IMS/INM headers for conditional GET
+    std::string clientIms = base64Decode(req.get_param_value("ims"));
+    std::string clientInm = base64Decode(req.get_param_value("inm"));
+
+    // --- Early Check: Can we return 304 without disk load or network fetch? ---
+    if (!clientIms.empty() || !clientInm.empty()) {
+      std::string masterLm, masterEtag;
+      std::time_t masterTs = 0;
+      {
+        std::lock_guard<std::mutex> lk(dataMutex_);
+        if (netMgr_) {
+          netMgr_->getCacheMetadata(targetUrl, masterLm, masterEtag, masterTs);
+        }
+      }
+
+      bool match = false;
+      if (!clientInm.empty() && clientInm == masterEtag)
+        match = true;
+      if (!clientIms.empty() && clientIms == masterLm)
+        match = true;
+
+      std::time_t now = std::time(nullptr);
+      if (match && (now - masterTs < maxAge)) {
+        LOG_D("WebServer",
+              "Hub Master: Early metadata match (304) for {}, skipping fetch",
+              targetUrl);
+        res.status = 304;
+        return;
+      }
+    }
+
+    auto prom = std::make_shared<std::promise<NetworkManager::SharedString>>();
     auto fut = prom->get_future();
     {
       std::lock_guard<std::mutex> lk(dataMutex_);
       if (netMgr_) {
-        netMgr_->fetchAsync(
-            targetUrl, [prom](std::string b) { prom->set_value(std::move(b)); },
-            3600);
+        netMgr_->fetchSharedAsync(
+            targetUrl,
+            [prom](NetworkManager::SharedString b) {
+              prom->set_value(std::move(b));
+            },
+            maxAge);
       } else {
         res.status = 503;
         return;
@@ -1131,12 +1234,46 @@ void WebServer::registerRoutes(httplib::Server &svr) {
       res.status = 504;
       return;
     }
-    std::string body = fut.get();
-    if (body.empty()) {
+    NetworkManager::SharedString body = fut.get();
+
+    // --- Late Check: After potential network refresh, does client match now? ---
+    if (body && (!clientIms.empty() || !clientInm.empty())) {
+      std::string masterLm, masterEtag;
+      std::time_t masterTs = 0;
+      {
+        std::lock_guard<std::mutex> lk(dataMutex_);
+        if (netMgr_) {
+          netMgr_->getCacheMetadata(targetUrl, masterLm, masterEtag, masterTs);
+        }
+      }
+
+      bool match = false;
+      if (!clientInm.empty() && clientInm == masterEtag)
+        match = true;
+      if (!clientIms.empty() && clientIms == masterLm)
+        match = true;
+
+      if (match) {
+        LOG_D("WebServer",
+              "Hub Master: Post-fetch metadata match (304) for {}, skipping "
+              "stream",
+              targetUrl);
+        res.status = 304;
+        return;
+      }
+    }
+
+    if (!body || body->empty()) {
       res.status = 502;
       return;
     }
-    res.set_content(body, "application/octet-stream");
+    res.set_content_provider(
+        body->size(), "application/octet-stream",
+        [body = std::move(body)](size_t offset, size_t length,
+                                httplib::DataSink &sink) -> bool {
+          sink.write(body->data() + offset, length);
+          return true;
+        });
   });
 
   svr.Get("/api/hub/dxcluster", [this](const httplib::Request &,
@@ -1615,7 +1752,12 @@ void WebServer::registerRoutes(httplib::Server &svr) {
 
   svr.Get("/stream.mjpeg", [this](const httplib::Request &req,
                                   httplib::Response &res) {
-    if (!frameCapture_ || !liveWebEnabled_) {
+    bool hasFC = false;
+    {
+      std::lock_guard<std::mutex> lk(dataMutex_);
+      hasFC = (frameCapture_ != nullptr);
+    }
+    if (!hasFC || !liveWebEnabled_) {
       res.status = 503;
       return;
     }
@@ -1962,9 +2104,9 @@ void WebServer::registerRoutes(httplib::Server &svr) {
               res.status = 503;
               return;
             }
-            ActivityData ad = activityStore_->get();
+            auto ad = activityStore_->get();
             std::ostringstream oss;
-            for (const auto &s : ad.ontaSpots)
+            for (const auto &s : ad->ontaSpots)
               oss << std::left << std::setw(12) << s.call << std::setw(8)
                   << s.program << std::setw(10) << s.ref << s.freqKhz << "\n";
             res.set_content(oss.str(), "text/plain");
@@ -1977,9 +2119,9 @@ void WebServer::registerRoutes(httplib::Server &svr) {
               res.status = 503;
               return;
             }
-            ActivityData ad = activityStore_->get();
+            auto ad = activityStore_->get();
             std::ostringstream oss;
-            for (const auto &d : ad.dxpeds)
+            for (const auto &d : ad->dxpeds)
               oss << std::left << std::setw(12) << d.call << d.location << "\n";
             res.set_content(oss.str(), "text/plain");
           });
@@ -2124,8 +2266,11 @@ void WebServer::registerRoutes(httplib::Server &svr) {
                 SDL_PushEvent(&up);
               }
             }
-            if (frameCapture_)
-              frameCapture_->requestBaseCapture();
+            {
+              std::lock_guard<std::mutex> lk(dataMutex_);
+              if (frameCapture_)
+                frameCapture_->requestBaseCapture();
+            }
             res.set_content("ok", "text/plain");
           });
 
@@ -2840,6 +2985,14 @@ void WebServer::registerRoutes(httplib::Server &svr) {
     nlohmann::json j = nlohmann::json::array();
     for (const auto &line : lines) j.push_back(line);
     res.set_content(j.dump(), "application/json");
+  });
+
+  svr.Get("/debug/memory", [this](const httplib::Request &, httplib::Response &res) {
+    nlohmann::json j;
+    j["cache_ram_bytes"] = (long long)netMgr_->getCacheRamBytes();
+    j["cache_item_count"] = (long long)netMgr_->getCacheItemCount();
+    netMgr_->dumpCacheStats();
+    res.set_content(j.dump(2), "application/json");
   });
 
   svr.Get("/get_build.txt",

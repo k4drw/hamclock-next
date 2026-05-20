@@ -127,47 +127,42 @@ void ActivityLocationManager::fetchAndLoad(NetworkManager &net) {
       86400 * 7);
 }
 
-// Lightweight CSV helper: splits a line into fields, handling quotes
-static std::vector<std::string> splitCSVLine(const std::string &line) {
-  std::vector<std::string> fields;
-  std::string field;
-  bool inQuotes = false;
-  for (size_t i = 0; i < line.length(); ++i) {
-    char c = line[i];
-    if (c == '"') {
-      inQuotes = !inQuotes;
-    } else if (c == ',' && !inQuotes) {
-      fields.push_back(field);
-      field.clear();
-    } else {
-      field += c;
-    }
-  }
-  fields.push_back(field);
-  return fields;
-}
-
 void ActivityLocationManager::parsePOTA(const std::string &data) {
   LOG_I("ActivityLoc", "Parsing POTA data...");
   std::vector<POTAPark> parks;
-  std::stringstream ss(data);
-  std::string line;
-
+  std::string_view sv(data);
+  
   // Header:
   // "reference","name","active","entityId","locationDesc","latitude","longitude","grid"
-  if (!std::getline(ss, line))
+  size_t pos = sv.find('\n');
+  if (pos == std::string_view::npos)
     return;
+  sv.remove_prefix(pos + 1);
 
-  while (std::getline(ss, line)) {
+  while (!sv.empty()) {
+    pos = sv.find('\n');
+    std::string_view line = (pos == std::string_view::npos) ? sv : sv.substr(0, pos);
+    if (pos == std::string_view::npos) sv = {};
+    else sv.remove_prefix(pos + 1);
+
     if (line.empty())
       continue;
-    auto fields = splitCSVLine(line);
-    if (fields.size() >= 7) {
-      POTAPark p;
-      std::strncpy(p.reference, fields[0].c_str(), sizeof(p.reference) - 1);
-      p.reference[sizeof(p.reference) - 1] = '\0';
-      p.lat = StringUtils::safe_stof(fields[5]);
-      p.lon = StringUtils::safe_stof(fields[6]);
+    
+    int colIdx = 0;
+    POTAPark p;
+    StringUtils::splitCSVLineSV(line, [&](std::string_view field) {
+      if (colIdx == 0) {
+        std::strncpy(p.reference, field.data(), std::min(field.size(), sizeof(p.reference) - 1));
+        p.reference[std::min(field.size(), sizeof(p.reference) - 1)] = '\0';
+      } else if (colIdx == 5) {
+        p.lat = StringUtils::safe_stof(field);
+      } else if (colIdx == 6) {
+        p.lon = StringUtils::safe_stof(field);
+      }
+      colIdx++;
+    });
+
+    if (colIdx >= 7) {
       parks.push_back(p);
     }
   }
@@ -187,30 +182,42 @@ void ActivityLocationManager::parsePOTA(const std::string &data) {
 void ActivityLocationManager::parseSOTA(const std::string &data) {
   LOG_I("ActivityLoc", "Parsing SOTA data...");
   std::vector<SOTASummit> summits;
-  std::stringstream ss(data);
-  std::string line;
+  std::string_view sv(data);
 
   // summitslist.csv has TWO header lines:
   //   Line 1: "SOTA Summits List (Date=...)"
   //   Line 2:
   //   SummitCode,AssociationName,RegionName,SummitName,AltM,AltFt,GridRef1,GridRef2,Longitude,Latitude,...
-  // Columns: [0]=SummitCode [6]=GridRef1 [7]=GridRef2 [8]=Longitude
-  // [9]=Latitude
-  if (!std::getline(ss, line))
-    return; // title line
-  if (!std::getline(ss, line))
-    return; // column header line
+  for (int i = 0; i < 2; ++i) {
+    size_t pos = sv.find('\n');
+    if (pos == std::string_view::npos) return;
+    sv.remove_prefix(pos + 1);
+  }
 
-  while (std::getline(ss, line)) {
+  while (!sv.empty()) {
+    size_t pos = sv.find('\n');
+    std::string_view line = (pos == std::string_view::npos) ? sv : sv.substr(0, pos);
+    if (pos == std::string_view::npos) sv = {};
+    else sv.remove_prefix(pos + 1);
+
     if (line.empty())
       continue;
-    auto fields = splitCSVLine(line);
-    if (fields.size() >= 10) {
-      SOTASummit s;
-      std::strncpy(s.reference, fields[0].c_str(), sizeof(s.reference) - 1);
-      s.reference[sizeof(s.reference) - 1] = '\0';
-      s.lat = StringUtils::safe_stof(fields[9]); // Latitude column
-      s.lon = StringUtils::safe_stof(fields[8]); // Longitude column
+
+    int colIdx = 0;
+    SOTASummit s;
+    StringUtils::splitCSVLineSV(line, [&](std::string_view field) {
+      if (colIdx == 0) {
+        std::strncpy(s.reference, field.data(), std::min(field.size(), sizeof(s.reference) - 1));
+        s.reference[std::min(field.size(), sizeof(s.reference) - 1)] = '\0';
+      } else if (colIdx == 8) {
+        s.lon = StringUtils::safe_stof(field);
+      } else if (colIdx == 9) {
+        s.lat = StringUtils::safe_stof(field);
+      }
+      colIdx++;
+    });
+
+    if (colIdx >= 10) {
       summits.push_back(s);
     }
   }

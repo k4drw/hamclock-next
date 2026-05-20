@@ -1,6 +1,8 @@
 #pragma once
 
+#include <atomic>
 #include <chrono>
+#include <cstdint>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -18,6 +20,7 @@ struct DXClusterSpot {
   std::string mode;
   double freqKhz = 0.0;
   double snr = 0.0;
+  int wpm = 0;
 
   double txLat = 0.0;
   double txLon = 0.0;
@@ -35,6 +38,10 @@ struct DXClusterData {
 
   bool hasSelection = false;
   DXClusterSpot selectedSpot;
+
+  std::string watchedCall;
+  bool watchedSpotted = false;
+  std::chrono::steady_clock::time_point watchedSpottedAt;
 };
 
 class DXClusterDataStore {
@@ -43,6 +50,10 @@ public:
   ~DXClusterDataStore();
 
   std::shared_ptr<const DXClusterData> snapshot() const;
+
+  // Returns current data version. Incremented on every spot list change.
+  uint32_t getVersion() const { return version_.load(std::memory_order_relaxed); }
+
   void addSpot(const DXClusterSpot &spot);
   void setConnected(bool connected, const std::string &status = "");
   void setMaxAgeMinutes(int minutes);
@@ -52,6 +63,10 @@ public:
 
   void selectSpot(const DXClusterSpot &spot);
   void clearSelection();
+
+  void setWatchedCall(const std::string &call);
+  void setWatchedSpotted(std::chrono::steady_clock::time_point when);
+  void clearWatchedSpotted();
 
   // Prune in-memory spots older than maxAgeMinutes — call periodically even
   // when no new spots arrive (telnet dropped, rate-limited, etc.)
@@ -66,5 +81,6 @@ private:
 
   mutable std::mutex mutex_;
   std::shared_ptr<DXClusterData> data_;
-  int maxAgeMinutes_ = 20;
+  std::atomic<int32_t> version_{0};
+  int maxAgeMinutes_ = 60;
 };

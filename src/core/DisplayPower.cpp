@@ -6,6 +6,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <thread>
 #ifdef __linux__
 #include <fcntl.h>
 #include <linux/fb.h>
@@ -286,7 +287,9 @@ bool DisplayPower::runVcgencmd(bool on) {
 #if defined(__linux__) && !defined(__EMSCRIPTEN__)
   std::string cmd =
       on ? "vcgencmd display_power 1" : "vcgencmd display_power 0";
-  return std::system((cmd + " > /dev/null 2>&1").c_str()) == 0;
+  std::thread([cmd]() { (void)std::system((cmd + " > /dev/null 2>&1").c_str()); })
+      .detach();
+  return true;
 #else
   (void)on;
   return false;
@@ -336,7 +339,8 @@ bool DisplayPower::runXsetDpms(bool on) {
     cmd = "DISPLAY=" + xDisplayEnv_ + " ";
   cmd += on ? "xset dpms force on > /dev/null 2>&1"
             : "xset dpms force off > /dev/null 2>&1";
-  return std::system(cmd.c_str()) == 0;
+  std::thread([cmd]() { (void)std::system(cmd.c_str()); }).detach();
+  return true;
 #else
   (void)on;
   return false;
@@ -347,7 +351,8 @@ bool DisplayPower::runTvservice(bool on) {
 #if !defined(__EMSCRIPTEN__) && !defined(_WIN32) && !TARGET_OS_IPHONE
   std::string cmd =
       on ? "tvservice -p > /dev/null 2>&1" : "tvservice -o > /dev/null 2>&1";
-  return std::system(cmd.c_str()) == 0;
+  std::thread([cmd]() { (void)std::system(cmd.c_str()); }).detach();
+  return true;
 #else
   (void)on;
   return false;
@@ -363,7 +368,8 @@ bool DisplayPower::runWlrRandr(bool on) {
     cmd = "WAYLAND_DISPLAY=" + wlDisplayEnv_ + " ";
   cmd += "wlr-randr --output " + wlrRandrOutput_ + (on ? " --on" : " --off") +
          " > /dev/null 2>&1";
-  return std::system(cmd.c_str()) == 0;
+  std::thread([cmd]() { (void)std::system(cmd.c_str()); }).detach();
+  return true;
 #else
   (void)on;
   return false;

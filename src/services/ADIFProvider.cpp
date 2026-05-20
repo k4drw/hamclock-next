@@ -190,6 +190,10 @@ void ADIFProvider::processFile(const std::filesystem::path &path) {
       std::string notes = getTagContent(record, "NOTES");
       std::string latStr = getTagContent(record, "LAT");
       std::string lonStr = getTagContent(record, "LON");
+      std::string qslRcvd = getTagContent(record, "QSL_RCVD");
+      std::string lotwRcvd = getTagContent(record, "LOTW_QSL_RCVD");
+      std::string eqslRcvd = getTagContent(record, "EQSL_QSL_RCVD");
+      std::string state = getTagContent(record, "STATE");
 
       if (!call.empty()) {
         stats.totalQSOs++;
@@ -237,8 +241,71 @@ void ADIFProvider::processFile(const std::filesystem::path &path) {
         // Track worked DXCC entities per band for cluster spot marking
         if (!useBand.empty()) {
           int entityNum = prefixMgr_.findDXCC(call);
-          if (entityNum > 0)
+          if (entityNum > 0) {
             stats.workedEntitiesPerBand[entityNum].insert(useBand);
+            if (qslRcvd == "Y" || lotwRcvd == "Y" || eqslRcvd == "Y") {
+              stats.confirmedEntitiesPerBand[entityNum].insert(useBand);
+            }
+          }
+        }
+
+        // Track states for WAS
+        if (!state.empty()) {
+          // Normalize to uppercase
+          std::string uState = state;
+          std::transform(uState.begin(), uState.end(), uState.begin(), ::toupper);
+          stats.workedStates.insert(uState);
+          if (qslRcvd == "Y" || lotwRcvd == "Y" || eqslRcvd == "Y") {
+            stats.confirmedStates.insert(uState);
+          }
+        }
+
+        // Track continents for WAC
+        int entityNum = prefixMgr_.findDXCC(call);
+        if (entityNum > 0) {
+          std::string cont = prefixMgr_.getContinent(entityNum);
+          if (!cont.empty()) {
+            stats.workedContinents.insert(cont);
+            if (qslRcvd == "Y" || lotwRcvd == "Y" || eqslRcvd == "Y") {
+              stats.confirmedContinents.insert(cont);
+            }
+          }
+        }
+
+        // Track zones for WAZ/ITU
+        if (!useBand.empty()) {
+          if (!cqZone.empty()) {
+            int z = StringUtils::safe_stoi(cqZone);
+            if (z >= 1 && z <= 40) {
+              stats.workedZonesCQ[z].insert(useBand);
+              if (qslRcvd == "Y" || lotwRcvd == "Y" || eqslRcvd == "Y") {
+                stats.confirmedZonesCQ[z].insert(useBand);
+              }
+            }
+          }
+          if (!ituZone.empty()) {
+            int z = StringUtils::safe_stoi(ituZone);
+            if (z >= 1 && z <= 75) {
+              stats.workedZonesITU[z].insert(useBand);
+              if (qslRcvd == "Y" || lotwRcvd == "Y" || eqslRcvd == "Y") {
+                stats.confirmedZonesITU[z].insert(useBand);
+              }
+            }
+          }
+        }
+
+        // Track Maidenhead grid squares (4-char like "EN50")
+        if (!gridsquare.empty()) {
+          std::string grid4 = gridsquare;
+          std::transform(grid4.begin(), grid4.end(), grid4.begin(), ::toupper);
+          if (grid4.length() >= 4) {
+            grid4 = grid4.substr(0, 4);
+            bool confirmed = (qslRcvd == "Y" || lotwRcvd == "Y" || eqslRcvd == "Y");
+            stats.workedGrids4[grid4] = stats.workedGrids4[grid4] || confirmed;
+            if (confirmed) {
+              stats.confirmedGrids4[grid4] = true;
+            }
+          }
         }
 
         // Maintain latest calls list (most recent first)
@@ -262,6 +329,7 @@ void ADIFProvider::processFile(const std::filesystem::path &path) {
         qso.freq = freq.length() > 16 ? freq.substr(0, 16) : freq;
         qso.rstSent = rstSent.length() > 8 ? rstSent.substr(0, 8) : rstSent;
         qso.rstRcvd = rstRcvd.length() > 8 ? rstRcvd.substr(0, 8) : rstRcvd;
+        qso.state = state.length() > 8 ? state.substr(0, 8) : state;
         qso.name = name.length() > 32 ? name.substr(0, 32) : name;
         qso.qth = qth.length() > 32 ? qth.substr(0, 32) : qth;
         qso.gridsquare = gridsquare.length() > 16 ? gridsquare.substr(0, 16) : gridsquare;

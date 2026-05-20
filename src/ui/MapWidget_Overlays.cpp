@@ -4,6 +4,7 @@
 #endif
 #endif
 #include "MapWidget.h"
+#include "../core/HeardMeStore.h"
 #include "../core/AsteroidPropagator.h"
 #include "../core/Astronomy.h"
 #include "../core/StarCatalog.h"
@@ -24,6 +25,7 @@
 #include "FontCatalog.h"
 #include "PaneContainer.h"
 #include "RenderUtils.h"
+#include "../core/SoundManager.h"
 #include <fmt/core.h>
 
 #include <algorithm>
@@ -128,8 +130,8 @@ void MapWidget::renderGreatCircle(SDL_Renderer *renderer) {
   SDL_Color color = themes.accent;
 
   // Use band color if selected DX is a spot
-  if (state_->dxActive && dxcStore_) {
-    auto data = dxcStore_->snapshot();
+  if (state_->dxActive && currentDxcSnapshot_) {
+    auto data = currentDxcSnapshot_;
     if (data->hasSelection && data->selectedSpot.freqKhz > 0) {
       int bi = freqToBandIndex(data->selectedSpot.freqKhz);
       if (bi >= 0) {
@@ -856,8 +858,8 @@ void MapWidget::renderSpotOverlay(SDL_Renderer *renderer) {
   if (!widgetEnabled)
     return;
 
-  auto data = spotStore_->snapshot();
-  if (!data->valid || data->spots.empty())
+  auto data = currentSpotSnapshot_;
+  if (!data || !data->valid || data->spots.empty())
     return;
 
   bool anySelected = false;
@@ -967,10 +969,8 @@ void MapWidget::renderSpotOverlay(SDL_Renderer *renderer) {
 }
 
 void MapWidget::renderDXClusterSpots(SDL_Renderer *renderer) {
-  if (!dxcStore_)
-    return;
-  auto data = dxcStore_->snapshot();
-  if (data->spots.empty())
+  auto data = currentDxcSnapshot_;
+  if (!data || data->spots.empty())
     return;
 
   SDL_RenderSetClipRect(renderer, &mapRect_);
@@ -1065,6 +1065,49 @@ void MapWidget::renderDXClusterSpots(SDL_Renderer *renderer) {
   SDL_RenderSetClipRect(renderer, nullptr);
 }
 
+void MapWidget::renderHeardMeSpots(SDL_Renderer *renderer) {
+  if (!heardMeStore_)
+    return;
+  auto spots = heardMeStore_->getSpots();
+  if (spots.empty())
+    return;
+
+  SDL_RenderSetClipRect(renderer, &mapRect_);
+  SDL_Texture *lineTex = texMgr_.get(LINE_AA_KEY);
+  ThemeColors themes = getThemeColors(theme_);
+
+  double deLat = state_ ? state_->deLocation.lat : config_.lat;
+  double deLon = state_ ? state_->deLocation.lon : config_.lon;
+  SDL_FPoint deP = latLonToScreen(deLat, deLon);
+
+  for (const auto &spot : spots) {
+    if (spot.rxLat == 0.0 && spot.rxLon == 0.0)
+      continue;
+
+    SDL_FPoint rxP = latLonToScreen(spot.rxLat, spot.rxLon);
+
+    // Fade by age (20 min window)
+    auto now = std::chrono::system_clock::now();
+    float ageMin = (float)std::chrono::duration_cast<std::chrono::minutes>(now - spot.spottedAt).count();
+    float alpha = 1.0f - (ageMin / 20.0f);
+    alpha = std::max(0.1f, std::min(1.0f, alpha));
+
+    SDL_Color col = themes.accent;
+    col.a = (Uint8)(alpha * 200);
+
+    // Draw line
+    SDL_FPoint pts[2] = {deP, rxP};
+    RenderUtils::drawPolylineTextured(renderer, lineTex, pts, 2, 1.5f, col);
+
+    // Draw small dot at skimmer
+    SDL_Rect dot = {(int)rxP.x - 2, (int)rxP.y - 2, 4, 4};
+    SDL_SetRenderDrawColor(renderer, col.r, col.g, col.b, col.a);
+    SDL_RenderFillRect(renderer, &dot);
+  }
+
+  SDL_RenderSetClipRect(renderer, nullptr);
+}
+
 void MapWidget::renderADIFPins(SDL_Renderer *renderer) {
   if (!adifStore_)
     return;
@@ -1074,9 +1117,20 @@ void MapWidget::renderADIFPins(SDL_Renderer *renderer) {
 
   SDL_RenderSetClipRect(renderer, &mapRect_);
 
+  std::time_t now = std::time(nullptr);
+  now -= 30 * 24 * 60 * 60;
+  std::tm *tm = std::gmtime(&now);
+  char limitBuf[16];
+  std::strftime(limitBuf, sizeof(limitBuf), "%Y%m%d", tm);
+  std::string limitDate = limitBuf;
+
   for (const auto &qso : stats.recentQSOs) {
     if (qso.lat == 0.0 && qso.lon == 0.0)
       continue;
+
+    if (qso.date < limitDate)
+      continue;
+
 
     // Check filter
     if (!stats.activeBandFilter.empty() && stats.activeBandFilter != "All") {
@@ -1108,11 +1162,11 @@ void MapWidget::renderONTASpots(SDL_Renderer *renderer) {
   if (!activityStore_)
     return;
 
-  ActivityData data = activityStore_->get();
-  if (!data.hasSelection)
+  auto data = activityStore_->get();
+  if (!data->hasSelection)
     return;
 
-  const auto &spot = data.selectedSpot;
+  const auto &spot = data->selectedSpot;
 
   // Sync with active filter
   if (config_.ontaFilter != "all") {
@@ -1125,7 +1179,7 @@ void MapWidget::renderONTASpots(SDL_Renderer *renderer) {
   // try to find updated coords in the live ontaSpots list.
   double spotLat = spot.lat, spotLon = spot.lon;
   if (spotLat == 0.0 && spotLon == 0.0) {
-    for (const auto &s : data.ontaSpots) {
+    for (const auto &s : data->ontaSpots) {
       if (s.call == spot.call && s.ref == spot.ref &&
           (s.lat != 0.0 || s.lon != 0.0)) {
         spotLat = s.lat;
@@ -1446,13 +1500,11 @@ void MapWidget::renderWxMbOverlay(SDL_Renderer *renderer) {
 
   // Poll for new GFS data — rebuild GPU buffers when segments arrive.
   {
-    std::vector<WxSegment> segs;
-    std::vector<WxQuiver> quivers;
     SDL_Surface *fillSurface = nullptr;
     bool zoomChanged = (config_.mapZoom != lastWxZoom_);
     bool panChanged = (config_.mapPanX != lastWxPanX_ || config_.mapPanY != lastWxPanY_);
 
-    if (wxmb_->getSegments(segs, quivers, fillSurface) || zoomChanged || panChanged || wxVerts_.empty()) {
+    if (wxmb_->getSegments(wxSegs_, wxQuivers_, fillSurface) || zoomChanged || panChanged || wxVerts_.empty()) {
       wxVerts_.clear();
       wxIndices_.clear();
       
@@ -1506,7 +1558,7 @@ void MapWidget::renderWxMbOverlay(SDL_Renderer *renderer) {
                                : (float)mapRect_.w * 0.5f;
 
         // --- Isobar contour segments -----------------------------------------
-        for (const auto &seg : segs) {
+        for (const auto &seg : wxSegs_) {
           SDL_FPoint p1 = wxProjectPt(seg.lat1, seg.lon1, pass);
           SDL_FPoint p2 = wxProjectPt(seg.lat2, seg.lon2, pass);
 
@@ -1552,7 +1604,7 @@ void MapWidget::renderWxMbOverlay(SDL_Renderer *renderer) {
         // --- Wind quiver arrows
         // -----------------------------------------------
         SDL_Color arrowColor = {180, 220, 255, 160};
-        for (const auto &q : quivers) {
+        for (const auto &q : wxQuivers_) {
           float speed = std::sqrt(q.u * q.u + q.v * q.v);
           if (speed < 0.5f)
             continue;
@@ -1660,11 +1712,11 @@ void MapWidget::renderLegend(SDL_Renderer *renderer) {
   if (type == PropOverlayType::Muf) {
     title = "MUF-RT (MHz)";
     labelMin = "0";
-    labelMax = "35";
+    labelMax = "54";
   } else if (type == PropOverlayType::Voacap) {
     title = "MUF-VCAP (MHz)";
     labelMin = "0";
-    labelMax = "35";
+    labelMax = "54";
   } else if (type == PropOverlayType::Reliability) {
     title = "Rel (%)";
     labelMin = "0";
@@ -1753,11 +1805,34 @@ void MapWidget::renderLegend(SDL_Renderer *renderer) {
     SDL_RenderFillRect(renderer, &seg);
   }
 
-  // Draw Min/Max Labels
-  cat->drawText(renderer, labelMin, lx, ly + legendH + 8, txtCol,
-                FontStyle::Micro, false, false, true);
-  cat->drawText(renderer, labelMax, lx + legendW, ly + legendH + 8, txtCol,
-                FontStyle::Micro, true, false, true);
+  // Draw Tick Marks and Labels
+  struct Tick { float frac; std::string label; };
+  std::vector<Tick> ticks;
+
+  if (type == PropOverlayType::Muf || type == PropOverlayType::Voacap) {
+    // 0..54 MHz — mark every 10 MHz
+    ticks = {{0.f, "0"}, {10.f/54.f, "10"}, {20.f/54.f, "20"},
+             {30.f/54.f, "30"}, {40.f/54.f, "40"}, {1.f, "54"}};
+  } else if (type == PropOverlayType::Reliability || type == PropOverlayType::Aurora) {
+    ticks = {{0.f, "0"}, {0.25f, "25"}, {0.5f, "50"}, {0.75f, "75"}, {1.f, "100"}};
+  } else if (type == PropOverlayType::Toa) {
+    ticks = {{0.f, "0"}, {0.25f, "10"}, {0.5f, "20"}, {0.75f, "30"}, {1.f, "40"}};
+  } else if (type == PropOverlayType::Drap) {
+    ticks = {{0.f, "0"}, {1.f/3.f, "10"}, {2.f/3.f, "20"}, {1.f, "30+"}};
+  } else {
+    // Heatmap: just endpoints
+    ticks = {{0.f, "Low"}, {1.f, "High"}};
+  }
+
+  SDL_SetRenderDrawColor(renderer, txtCol.r, txtCol.g, txtCol.b, 200);
+  for (auto &tk : ticks) {
+    int tx = lx + (int)(tk.frac * legendW);
+    // Tick line: 4px below bar
+    SDL_RenderDrawLine(renderer, tx, ly + legendH, tx, ly + legendH + 4);
+    // Label: centered on tick, 8px below bar
+    cat->drawText(renderer, tk.label, tx, ly + legendH + 8, txtCol,
+                  FontStyle::Micro, true, false, true);
+  }
 }
 
 void MapWidget::renderWxMbLegend(SDL_Renderer *renderer) {
@@ -2111,6 +2186,7 @@ void MapWidget::renderAuroraOverlay(SDL_Renderer *renderer) {
         SDL_RenderSetClipRect(renderer, nullptr);
         return;
       }
+      MemoryMonitor::getInstance().addVram(360 * 181 * 4);
       SDL_SetTextureBlendMode(auroraTexture_, SDL_BLENDMODE_BLEND);
     }
 
@@ -2739,4 +2815,185 @@ void MapWidget::renderStarField(SDL_Renderer *renderer) {
 
   for (const BgStar &bg : s_bgStars)
     drawStar(bg.ra_deg, bg.dec_deg, bg.mag);
+}
+
+void MapWidget::showDXAlert(const std::string &call, const std::string &entity,
+                            double freq, const std::string &mode) {
+  dxAlert_.call = call;
+  dxAlert_.entity = entity;
+  dxAlert_.freq = freq;
+  dxAlert_.mode = mode;
+  dxAlert_.shownAtMs = SDL_GetTicks();
+  dxAlert_.active = true;
+  SoundManager::getInstance().speak("New one! " + call + " on " + mode);
+}
+
+void MapWidget::renderDXAlert(SDL_Renderer *renderer) {
+  if (!dxAlert_.active)
+    return;
+
+  uint32_t now = SDL_GetTicks();
+  if (now - dxAlert_.shownAtMs > dxAlert_.durationMs) {
+    dxAlert_.active = false;
+    return;
+  }
+
+  ThemeColors themes = getThemeColors(theme_);
+  auto *cat = fontMgr_.catalog();
+
+  // Banner geometry
+  const int panW = (int)(mapRect_.w * 0.60);
+  const int panH = 80;
+  const int panX = mapRect_.x + (mapRect_.w - panW) / 2;
+  const int panY = mapRect_.y + (mapRect_.h - panH) / 2 + 100; // Offset from calendar
+  SDL_Rect panRect = {panX, panY, panW, panH};
+
+  // Shadow/Glow
+  SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+  SDL_SetRenderDrawColor(renderer, 0, 0, 0, 180);
+  SDL_Rect shadow = {panX + 4, panY + 4, panW, panH};
+  SDL_RenderFillRect(renderer, &shadow);
+
+  // Background
+  SDL_SetRenderDrawColor(renderer, 20, 20, 20, 240);
+  SDL_RenderFillRect(renderer, &panRect);
+  SDL_SetRenderDrawColor(renderer, themes.accent.r, themes.accent.g, themes.accent.b, 255);
+  SDL_RenderDrawRect(renderer, &panRect);
+
+  // Content
+  int curY = panY + 12;
+  cat->drawText(renderer, "DX ALERT: NEW ONE!", panX + panW / 2, curY, themes.accent, FontStyle::MicroBold, true);
+  curY += 20;
+
+  char buf[128];
+  int bi = freqToBandIndex(dxAlert_.freq);
+  std::string bandStr = (bi >= 0) ? kBands[bi].name : "";
+  std::snprintf(buf, sizeof(buf), "%s on %.1f kHz %s (%s)", dxAlert_.call.c_str(), dxAlert_.freq, dxAlert_.mode.c_str(), bandStr.c_str());
+  cat->drawText(renderer, buf, panX + panW / 2, curY, themes.text, FontStyle::UI, true);
+  curY += 22;
+
+  cat->drawText(renderer, dxAlert_.entity, panX + panW / 2, curY, themes.info, FontStyle::Fast, true);
+}
+
+void MapWidget::setStartupBanner(const std::string &text, uint32_t durationMs) {
+  startupBanner_.text = text;
+  startupBanner_.shownAtMs = SDL_GetTicks();
+  startupBanner_.durationMs = durationMs;
+  startupBanner_.active = true;
+}
+
+void MapWidget::renderStartupBanner(SDL_Renderer *renderer) {
+  if (!startupBanner_.active)
+    return;
+
+  if (SDL_GetTicks() - startupBanner_.shownAtMs > startupBanner_.durationMs) {
+    startupBanner_.active = false;
+    return;
+  }
+
+  ThemeColors themes = getThemeColors(theme_);
+  auto *cat = fontMgr_.catalog();
+
+  const int panW = (int)(mapRect_.w * 0.70);
+  const int panH = 44;
+  const int panX = mapRect_.x + (mapRect_.w - panW) / 2;
+  const int panY = mapRect_.y + 12;
+  SDL_Rect panRect = {panX, panY, panW, panH};
+
+  SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+  SDL_SetRenderDrawColor(renderer, 60, 40, 0, 220);
+  SDL_RenderFillRect(renderer, &panRect);
+  SDL_SetRenderDrawColor(renderer, themes.warning.r, themes.warning.g,
+                         themes.warning.b, 255);
+  SDL_RenderDrawRect(renderer, &panRect);
+
+  cat->drawText(renderer, startupBanner_.text.c_str(), panX + panW / 2,
+                panY + panH / 2, themes.warning, FontStyle::Micro, true, false,
+                true);
+
+  startupBannerRect_ = panRect;
+}
+
+void MapWidget::renderLocalPropGauge(SDL_Renderer *renderer) {
+  if (!iono_ || !state_ || !solar_)
+    return;
+
+  // 1. Data Collection
+  double deLat = state_->deLocation.lat;
+  double deLon = state_->deLocation.lon;
+
+  InterpolatedIonosonde ionoLocal = iono_->interpolate(deLat, deLon);
+  SolarData sw = solar_->get();
+
+  // Current UTC hour
+  std::time_t t_now = std::time(nullptr);
+  std::tm *ptm = std::gmtime(&t_now);
+  double utcHour = ptm->tm_hour + ptm->tm_min / 60.0;
+  double localSolarHour = std::fmod(utcHour + deLon / 15.0 + 24.0, 24.0);
+
+  // Local MUF (RT)
+  double muf = 0;
+  if (ionoLocal.stationsUsed > 0 && ionoLocal.foF2 > 0) {
+    // Use foF2 * M(3000)F2 factor
+    muf = ionoLocal.foF2 * ionoLocal.md;
+  } else {
+    // Fallback to solar model
+    double hourFactor = 1.0 + 0.4 * std::cos((localSolarHour - 14.0) * M_PI / 12.0);
+    double latFactor = std::max(0.1, 1.0 - std::abs(deLat) / 150.0);
+    double ssn = (sw.sunspot_number > 0) ? (double)sw.sunspot_number : 50.0;
+    double foF2_est = 0.9 * std::sqrt(ssn + 15.0) * hourFactor * latFactor;
+    muf = foF2_est * 3.0;
+  }
+
+  // Local LUF
+  // Use a heuristic 500km distance for "local" skywave
+  double luf = PropEngine::calculateLUF(500.0, deLat, localSolarHour, (double)sw.sfi, (double)sw.k_index);
+
+  // 2. Determine Recommended Bands (limit to top 6)
+  std::string recBands;
+  int count = 0;
+  for (int i = 0; i < kNumBands; ++i) {
+    double freqMhz = kBands[i].minKhz / 1000.0;
+    if (freqMhz >= luf && freqMhz <= muf) {
+      if (!recBands.empty()) recBands += " ";
+      recBands += kBands[i].name;
+      count++;
+      if (count >= 6) break;
+    }
+  }
+  if (recBands.empty()) recBands = "None";
+
+  // 3. UI Layout (Compact Box at bottom center)
+  ThemeColors themes = getThemeColors(theme_);
+  auto *cat = fontMgr_.catalog();
+
+  char line1[64];
+  std::snprintf(line1, sizeof(line1), "MUF: %.1f  LUF: %.1f", muf, luf);
+  std::string line2 = "REC: " + recBands;
+
+  int ptSize = cat->ptSize(FontStyle::Micro);
+  int textW1 = fontMgr_.getLogicalWidth(line1, ptSize);
+  int textW2 = fontMgr_.getLogicalWidth(line2, ptSize);
+  int textW = std::max(textW1, textW2);
+
+  int padX = 10;
+  int boxW = textW + padX * 2;
+  int boxH = 36;
+  int bx = x_ + (width_ - boxW) / 2;
+  int by = mapRect_.y + mapRect_.h - boxH - 8;
+
+  SDL_Rect box = {bx, by, boxW, boxH};
+
+  // Background
+  SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, 160);
+  SDL_RenderFillRect(renderer, &box);
+
+  // Border
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 180);
+  SDL_RenderDrawRect(renderer, &box);
+
+  // Text
+  cat->drawText(renderer, line1, bx + boxW / 2, by + 6, themes.text, FontStyle::Micro, true);
+  cat->drawText(renderer, line2, bx + boxW / 2, by + 20, themes.success, FontStyle::Micro, true);
 }

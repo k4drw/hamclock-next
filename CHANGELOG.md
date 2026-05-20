@@ -6,6 +6,113 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [v1.6.0] — TBD
+
+### Added
+- **QSO Rate Tracker Widget** — sparkline chart of QSOs per hour for the past 12 hours with peak and total stats, sourced from local ADIF log.
+- **Solar Flare Event Log Widget** — scrollable list of recent X-ray flares (class B–X) from NOAA SWPC with peak times and durations; fetches from dedicated endpoint every 15 minutes.
+- **Greyline DX Spots Filter** — filters live DX cluster spots to show only those near the grey line (terminator window ±N degrees).
+- **Band Advisor Widget** — real-time propagation status table for HF bands (80m, 40m, 20m, 15m, 10m) based on K-index and SFI; later consolidated into Band Conditions widget.
+- **6m Band Support in Band Conditions** — extended Band Conditions widget to include 6m band with appropriate SFI/K-index thresholds.
+- **LoTW Auto-Sync Widget** — automatic LoTW confirmation download with live tracking against local ADIF logs
+- **Zone Heatmap Widget** — visual DXCC zone contact distribution
+- **WAS Progress Widget** — US state contact tracker with map overlay
+- **WAC Radar Widget** — 6-segment pie chart visualization (NA, SA, EU, AF, AS, OC) for continent-level award tracking
+- **DX ATNO Alerts** — notify on rare DXCC entity spots matching ADIF needs
+- **Custom RSS Feed Support** — user-configurable content in News widget
+- **Enhanced Solar/Space Weather Widget** — 9 propagation overlays (MUF, reliability, TOA, DRAP, Aurora, etc.)
+- **K-Index Alert Threshold** — configurable K-index trigger for notifications
+- **DX Cluster Band Legend Click-To-Filter** — click band color to filter spots
+- **DX Cluster Sub-Band Mode Badges** — visual CW/SSB/FT8/RTTY/WSPR indicators
+- **SFI 30-Day Trend Chart** — solar flux index historical graph
+- **VOACAP 6m Band Support** — propagation overlays for 50 MHz band
+- **Horizontal Current Band Cursor** — frequency indicator on frequency axis
+- **Live Spot Map Integration** — ON-THE-AIR spots overlay on map widget
+- **DX Info Manual Entry** — enter DX callsigns directly via a centered modal dialog (triggered by clicking the widget); features auto-uppercasing and `api.hamdb.org` (CallbookProvider) lookup for accurate location resolution for hams who have moved; widget border highlights amber when the callsign appears in live spots (30s auto-fade)
+- **Global Volume Control** — adjustable audio levels (0-100) for alarms and TTS; dedicated slider in Setup -> Identity tab
+- **DE Station Status Preset** — new built-in preset highlighting award tracking (DXCC, WAS, Grid, WAC, Zone Heatmap) and QSO management (LoTW Sync, ADIF Tracking); factory preset deletion tracking ensures user-deleted presets don't reappear on app updates
+- **Local Propagation Gauge** — compact map overlay at the map bottom showing real-time MUF, LUF, and recommended HF bands for the DE station; toggled via Map View menu; preference persisted as `showLocalPropGauge` in config.
+- **Global Weather Forecast Widget** — worldwide 7-day weather forecasting via Open-Meteo API (replaces US-only NWS provider). Displays high/low temperatures, weather conditions (clear, rain, snow, storm), and precipitation probability; single HTTP GET every 4 hours; works for any lat/lon without authentication. Non-US users no longer see "Loading..." indefinitely.
+- **Cache Statistics in SysInfoPanel** — displays texture, vertex, and command buffer usage stats for debugging performance on "Master Hub" (centralized) deployments.
+- **ADIF/LoTW Map Pin Hover Tooltips** — hovering over ADIF/LoTW world map pins displays a tooltip with callsign, date, band, and mode, validated against active band/mode filters.
+- **LoTW QSO Toggle** — added a "LOTW QSOs" checkbox in the Map View menu (persisted via `showLotwQsos` in configuration) to toggle display of LoTW QSO pins on the world map.
+- **Debug Memory Endpoint** — added `/debug/memory` REST endpoint returning cache RAM usage and item counts.
+- **Enable Debug API Flag** — added `--enable-debug-api` command line option to build scripts to support local testing with the Debug API enabled.
+
+### Changed
+- **MCP Server Documentation** — Enhanced onboarding context for new widget contributors: MCP JSON now documents 50+ WidgetDeps fields (stores, providers, core resources) with usage patterns; expanded gotchas section from 1 → 6 entries covering REGISTER_WIDGET two-step requirement, MemoryMonitor::destroyTexture pattern, StatusCache optimization, DashboardContext lifecycle; added base class selection guidance (Widget vs ListPanel) to widget_scaffolding. Project-local hc-new-widget skill now includes Base Class Selection section, Debugging Patterns (common failure modes), rate limiting/backoff patterns, and enhanced References. MCP README now includes 5-step Newcomer Quick Start path. AI agents and humans adding widgets can complete tasks without grepping the codebase.
+- **Wiki Documentation** — 100% v1.6 feature documentation coverage; 26 content gaps fixed across 15 pages including new sections for LoTW Auto-Sync, Award Trackers, Direct DX Lookup, and Global Volume Control.
+- **DX Panel UI**
+ — active status indicator, clickable expeditions, theme-aware colors
+- **DXInfo Display** — DX local time via ZoneDetect library, bearing/distance tooltips
+- **Propagation Overlay Auto-Switch** — smart band selection on frequency tune
+- **LoTW & Clublog Panels** — theme color integration, text rendering cache for performance
+- **ADIF Award Tracking Engine** — extended `ADIFStats` and `ADIFProvider` to track worked/confirmed continents, CQ zones, and ITU zones (parses `CQZ` and `ITUZ` tags)
+- **Callbook Integration Service** — new `CallbookProvider` for asynchronous location resolution via external APIs
+- **Polar Rendering Primitives** — new `RenderUtils` methods for `drawPie` and `drawArcOutline` supporting advanced circular UI elements
+- **VOACAP DE-DX Timeline** — reoriented x-axis so the leftmost column is always the current UTC hour ("now at origin"); time flows right with 24-hour wrap-around; "now" cursor restored at left edge as a vertical white line for spot/band intersection visualization; legend items centered under graph columns; <10% reliability swatch changed from black to dark grey (64,64,64) for dark-theme contrast.
+- **WSPR Empty Response Interpretation** — WSPR providers now correctly treat 0-byte ClickHouse HTTP responses as 0 active spots (a normal state for inactive locators) rather than flagging a network error.
+- **Network Caching & Reliability** — overhauled NetworkManager caching: capped cache to 5,000 entries (MAX_CACHE_ENTRIES) to prevent unbounded metadata bloat, introduced LRU tracking for metadata-only entries, skipped RAM-caching for large (>512KB) and image files, binary-safe writing for JPEG/PNG disk caching, and extended max cache age to 30 days to protect large SOTA/POTA cache persistence across restarts.
+
+### Fixed
+- **Screen Wake Memory Growth** — Each screen off→on cycle was growing RSS by ~50MB permanently. Two causes addressed: (1) stopping `SDL_RenderPresent` entirely during screen-off left SDL's KMSDRM page-flip chain in an inconsistent state, causing GEM framebuffer reallocation on each wake; fixed by presenting a periodic black frame every 2s during screen-off to keep the pipeline healthy. (2) Screen wake triggers 20+ concurrent provider fetches (LoTW 8MB, SOTA 6MB, POTA 3MB simultaneously); added `malloc_trim(0)` after the 15-min cascade to return glibc heap pages to the OS after the burst.
+- **Software Renderer RAM Reduction** — In `--software` mode SDL textures live in system RAM instead of VRAM; the default 50-texture LRU cache could consume up to 200MB on ARM. Now auto-detects software renderer at startup via `SDL_GetRendererInfo` and reduces TextureManager cache to 20 textures (~80MB max).
+- **NetworkManager RAM Accounting Drift** — `totalRamBytes_` was not decremented when the entry-count eviction path fired during large/image fetches (`fetchDirect` and hub-client proxy). Counter inflated over time, triggering premature RAM-based cache evictions. Fixed in both eviction loops.
+- **VRAM Tracking Gaps** — Three raw `SDL_CreateTexture` calls in `MapWidget.cpp` (`propTexture_` at grid dimensions and at `PropEngine::MAP_W×MAP_H`) and `MapWidget_Overlays.cpp` (`auroraTexture_` at 360×181) lacked `MemoryMonitor::addVram()`, causing VRAM stats to be understated. Added tracking after each successful creation.
+- **FlareProvider Wiring** — Fixed structural error in DashboardContext.cpp where FlareProvider was accessed via AppContext parameter instead of DashboardContext member; changed `ctx.flareProvider` to `flareProvider` at initialization and periodic-fetch sites. Flare widget now correctly initializes and fetches NOAA data.
+- **Widget Font Readiness** — Added `fontMgr_.ready()` checks to QSO Rate Tracker, Band Advisor, Solar Flare Log, and Greyline Spots widgets to prevent rendering with uninitialized fonts at startup.
+- **Band Conditions Widget Simplification** — Removed verbose "How it works" explanation panel from BandConditionsPanel; layout now shows compact band | day | night table. Deleted duplicate BandAdvisorPanel widget (functionality consolidated into Band Conditions).
+- **Theming and Text Input Standards** — audit of 91 theme-aware and 17 text-input panels found 5 non-compliant instances (SetupScreen_Appearance dimTimeInput/brightTimeInput using textDim instead of border; DXInfo manual entry using hard-coded color, string input instead of TextInput class). All fixes applied; standards enforced across all UI components.
+- **Presets Modal UX** — expanded visible rows from 5 to 8, added alphabetical sorting, fixed deletion tracking integration
+- **GPU Texture Leaks** — SetupScreen, tooltip rendering, MemoryMonitor VRAM accounting drift
+- **GPU Memory Stability** — FontManager LRU pruning on Raspberry Pi (low-memory mode)
+- **MCP Diagnostic Tools** — fixed diagnose_memory endpoint polling, new_feature_checklist macro reference, removed 7 stale parity tools from docs
+- **Propagation Overlay Sync** — band/overlay state consistency across panel updates
+- **DX Cluster Crash** — Windows telnet socket NULL handling, spot sort order, band filter interaction
+- **Windows SAPI Volume Reset** — explicitly manages SAPI voice levels to prevent volume resetting to system defaults on startup or speech events
+- **Marine Widget Update** — immediate WTTR.in data fetch on load (no startup delay)
+- **Network Timeout Stability** — 45s socket timeout for NASA/JPL/FCC/NOAA endpoints
+- **Provider Async Use-After-Free (SIGSEGV)** — LoTWActivityProvider, ClublogProvider, and LoTWProvider refactored to inherit `std::enable_shared_from_this`; async fetch callbacks now capture `std::weak_ptr` and verify object lifetime via `lock()` before execution; DashboardContext manages these providers via `std::shared_ptr`. Eliminates crash during dashboard destruction with in-flight network requests.
+- **Setup Services Tab** — fixed field focus order (QRZ → LoTW → Keys → Clublog), missing LoTW and Clublog bindings in `getActiveInput()`, `clublogApiKeyRect_` assignment gap, and mouse hit-testing across all 7 input fields; Tab key now cycles all fields in visual row order.
+- **Setup Screen Layout** — resolved layout instability and reformatting issues in the Setup screen.
+- **C++ Safety Audit** — resolved multiple safety hazards (lifetime, threading, etc.) identified during a comprehensive audit:
+    - **Async Callback Safety** — `CallbookProvider` refactored to use robust pointer captures for nested asynchronous fetches.
+    - **Web Server Thread Safety** — audited `WebServer` route handlers to ensure consistent mutex locking during multi-threaded data access.
+    - **Network Thread Stability** — verified `NetworkManager` detached thread safety and `inflight_` counter logic to prevent use-after-free during shutdown.
+- **Memory Stability** — resolved DX Cluster heap churn and a memory leak in the weather overlay rendering path.
+- **Service Credential Persistence** — fixed issue where service credentials (LoTW, Clublog, etc.) were not persisted correctly; ensured Web API parity for remote configuration.
+- **Core Stability Sweep** — comprehensive refactor of core application event handlers and service error handling:
+    - **RAII Migration**: Converted 20+ custom event handlers in `DashboardContext` from raw `delete` pointers to `std::unique_ptr`, eliminating potential memory leaks.
+    - **Provider Error Handling**: Established Network Callback Policy banning blanket `catch (...)` blocks. Refactored `NOAAProvider` and `ForecastProvider` to catch `std::exception`, log errors via `LOG_E`, and maintain valid UI state on failures.
+    - **UI Layout Constants**: Added global UI layout constants to `Constants.h` to eliminate magic numbers and improve maintainability.
+    - **Defensive Guards**: Hardened `SpaceWeatherPanel` with null-pointer guards for data stores and font catalogs.
+- **Hub Master Network Optimization** — resolved critical memory usage issues on Hub Masters handling concurrent client requests:
+    - **Streaming Responses**: Replaced `res.set_content` with `res.set_content_provider` in `/api/hub/fetch`, moving response body into lambda to stream directly to socket, eliminating 10MB+ string copies per request.
+    - **Cache Metadata Preservation**: Modified `NetworkManager::fetchAsync` to preserve cache metadata (etag/lastModified) when entries go stale, enabling correct Conditional GET (304 Not Modified) behavior and preventing unnecessary full re-downloads.
+    - **Proxy Force-Refresh**: Updated client proxy logic to pass `max_age=0` when `force=true`, ensuring fresh data fetches when requested.
+- **Hub Master RAM Optimization** — finalized memory stability for Hub Masters to eliminate RAM ballooning during multi-client restarts:
+    - **SharedString Buffers**: Replaced `std::string` with `SharedString` (`std::shared_ptr<const std::string>`) throughout NetworkManager stack, enabling multiple concurrent clients to stream from the exact same shared buffer (N*Size → 1*Size RAM usage).
+    - **Extended RAM Cache**: Increased `MAX_RAM_BYTES` to 50MB and enabled RAM-caching of large payloads (>512KB) for Hub Masters, serving sequential client requests from memory instead of forcing redundant disk I/O and allocations.
+    - **Zero-Allocation 304s**: Implemented early metadata validation in `/api/hub/fetch` to return 304 Not Modified without triggering disk reads if cache is fresh.
+    - **Verification**: Hub Master RAM stabilized at ~350-380MB regardless of client restart patterns or concurrent map requests.
+- **LoTW Auto-Sync Callback Wiring** — wired the LoTWSyncPanel to the LoTWProvider callback to display real sync time, QSO count, and connection status in the widget.
+- **Network Cache Double-Deduction** — fixed a bug where stale entries double-deducted their size from total RAM cache, leading to unsigned wrap-around values (observed as 175 exabytes in cache stats).
+- **Local Cache Bypass on Restart** — replaced unreliable file write-time checks with internal epoch-independent timestamp parsing, preventing clients from bypassing valid local caches at startup.
+- **Memory Overhaul & Churn Reduction** — resolved core performance and memory issues with a comprehensive memory overhaul: zero-allocation CSV parsing (`splitCSVLineSV`), zero-heap SOTA/POTA processing in `ActivityLocationManager`, static thread-local buffers in `RenderUtils` for rendering polylines/circles separately, `std::move` optimization in `LoTWActivityStore`, manual parsing of NOAA Aurora grid (bypassing heavy JSON overhead), high-performance `isoToTimeT` instead of `mktime`/`tzset` in `LoTWActivityProvider`, and throttling `MoonPanel` updates to 60s.
+- **400 MB Memory Pressure Flush** — Unified `DashboardContext` memory heartbeat to a single 400 MB RSS threshold. Added `NetworkManager::clearRamCache()` to purge heavy string buffers without losing cache indexes; added `malloc_trim(0)` to return freed glibc heap pages to the kernel immediately on threshold breach.
+- **libcurl Signal Crash** — Set `CURLOPT_NOSIGNAL=1` across all four libcurl instantiation sites (`NetworkManager`, `FccProvider`, `UpdateChecker`). Resolves "Unexpected error 9 on netlink descriptor 21" crash caused by signal interruptions during high-concurrency DNS lookups triggered by memory cache purges.
+- **Network Thread Explosion & LRU Desync** — Migrated all `NetworkManager` detached threads to `WorkerService` thread pool (size = `hardware_concurrency`, capped 2–4) to prevent thread explosion under load. Fixed `clearRamCache()` to purge both the metadata map and LRU list, eliminating zombie metadata that silently disabled the RAM cache. Fixed duplicate LRU insertions in `fetchDirect` and hub-client paths. Resolves 433 MB RSS "not dropping" on long-running Master Hub nodes.
+- **DXClusterPanel Filter Regression** — Fixed `update()` short-circuit that silently ignored band/mode filter clicks after the memory-optimization refactor. Explicit `forceUpdate` path (triggered by zeroing `lastUpdate_` in `onMouseUp()`) now bypasses version check and regenerates rows correctly.
+- **MapWidget Segfault on Early Interaction** — Added null-pointer guards in `MapWidget::onMouseMove` and `onMouseUp` before dereferencing `currentSpotSnapshot_` and `currentDxcSnapshot_`; snapshots now initialized immediately in `setSpotStore` / `setDXClusterStore`. Resolves crash when mouse interaction occurs before the first update tick.
+- **DX Cluster Zombie Feed & Stale Ages** — Added 60-second in-memory pruning inside active Telnet threads and a 10-minute idle watchdog that reconnects on dead streams. Clock-drift tolerance (30 min) prevents backdating of spots; receipt-time override forces immediate age start for future-timestamped spots.
+- **DX Cluster Grid & Parsing** — Added local Maidenhead grid resolution fallback in `DXClusterProvider` to handle empty grid fields from hub servers. Added ANSI escape sequence stripping to ensure robust prefix lookups when connecting to colorized DX cluster feeds.
+- **Weather Forecast Days on Windows** — Resolved a cross-platform mismatch in `std::get_time` on Windows (MSVC) that caused the forecast to display repeating "Sunday"s by using `std::mktime` to compute the correct weekday.
+- **UpdateChecker Thread Safety** — Fixed a Use-After-Free (UAF) crash by properly canceling and waiting for the detached download thread during `UpdateChecker` destruction.
+- **Concurrent HTTPS Crashes** — Serialized `curl_easy_perform` calls globally to prevent background threads from corrupting non-thread-safe static mbedTLS state, eliminating random `SIGABRT` crashes on ARM platforms.
+- **WASM Build** — Restored WebAssembly build compatibility.
+
+---
+
 ## [v1.5.0] — 2026-04-12
 
 ### Added

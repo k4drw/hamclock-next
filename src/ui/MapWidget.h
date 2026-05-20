@@ -16,6 +16,7 @@
 #include "MapViewMenu.h"
 #include "TextureManager.h"
 #include "Widget.h"
+#include "../services/WxMbProvider.h"
 
 #include <SDL.h>
 
@@ -32,6 +33,7 @@ class WxMbProvider;
 class BeaconProvider;
 class IonosondeProvider;
 class SolarDataStore;
+class HeardMeStore;
 class PaneContainer;
 
 class MapWidget : public Widget {
@@ -68,10 +70,18 @@ public:
   // Set the live spot data store for map spot overlays.
   void setSpotStore(std::shared_ptr<LiveSpotDataStore> store) {
     spotStore_ = std::move(store);
+    if (spotStore_)
+      currentSpotSnapshot_ = spotStore_->snapshot();
   }
 
   void setDXClusterStore(std::shared_ptr<DXClusterDataStore> store) {
     dxcStore_ = std::move(store);
+    if (dxcStore_)
+      currentDxcSnapshot_ = dxcStore_->snapshot();
+  }
+
+  void setHeardMeStore(std::shared_ptr<HeardMeStore> store) {
+    heardMeStore_ = std::move(store);
   }
 
   void setAuroraStore(std::shared_ptr<AuroraHistoryStore> store) {
@@ -129,6 +139,13 @@ public:
   void showCalendarAlert(const std::string &summary, const std::string &source,
                          time_t startTime, int dismissMinutes);
 
+  // Show a DX alert overlay (ATNO/Needed entity spotted).
+  void showDXAlert(const std::string &call, const std::string &entity,
+                   double freq, const std::string &mode);
+
+  // Show a startup banner (e.g. for low-memory warnings).
+  void setStartupBanner(const std::string &text, uint32_t durationMs = 30000);
+
   // Robinson boundary helper
   static float getRobinsonXCoeff(double lat);
 
@@ -157,6 +174,7 @@ private:
   void renderSatGroundTrack(SDL_Renderer *renderer);
   void renderSpotOverlay(SDL_Renderer *renderer);
   void renderDXClusterSpots(SDL_Renderer *renderer);
+  void renderHeardMeSpots(SDL_Renderer *renderer);
   void renderAuroraOverlay(SDL_Renderer *renderer);
   void renderADIFPins(SDL_Renderer *renderer);
   void renderONTASpots(SDL_Renderer *renderer);
@@ -167,6 +185,7 @@ private:
   void renderPropagationOverlay(SDL_Renderer *renderer);
   void updatePropagationOverlay();
   void renderAzimuthalMask(SDL_Renderer *renderer);
+  void renderLocalPropGauge(SDL_Renderer *renderer);
   void renderCountryBorders(SDL_Renderer *renderer);
 
   TextureManager &texMgr_;
@@ -175,6 +194,7 @@ private:
   std::shared_ptr<HamClockState> state_;
   std::shared_ptr<LiveSpotDataStore> spotStore_;
   std::shared_ptr<DXClusterDataStore> dxcStore_;
+  std::shared_ptr<HeardMeStore> heardMeStore_;
   std::shared_ptr<AuroraHistoryStore> auroraStore_;
   std::shared_ptr<AuroraMapStore> auroraMapStore_;
   std::shared_ptr<DRAPDataStore> drapStore_;
@@ -246,6 +266,8 @@ private:
   std::vector<SDL_Vertex> borderVerts_;
   std::vector<int> borderIndices_;
   // WX/Pressure overlay GPU geometry (rebuilt when new GFS data arrives)
+  std::vector<WxSegment> wxSegs_;
+  std::vector<WxQuiver> wxQuivers_;
   std::vector<SDL_Vertex> wxVerts_;
   std::vector<int> wxIndices_;
   SDL_Texture *wxFillTex_ = nullptr;       // pressure fill layer (blue-white-red)
@@ -262,6 +284,11 @@ private:
   LatLon lastDE_ = {0, 0};
   LatLon lastDX_ = {0, 0};
   double lastZoom_ = 1.0;
+
+  uint32_t lastDxcVer_ = 0;
+  uint32_t lastSpotVer_ = 0;
+  std::shared_ptr<const DXClusterData> currentDxcSnapshot_;
+  std::shared_ptr<const LiveSpotData> currentSpotSnapshot_;
 
   // Tooltip state
   struct Tooltip {
@@ -298,7 +325,6 @@ private:
   std::function<void()> onConfigChanged_;
   SDL_Rect projRect_ = {};
   bool useCompatibilityRenderPath_ = false;
-  SDL_Texture *nightOverlayTexture_ = nullptr;
   SDL_Texture *mufRtTexture_ = nullptr;
   SDL_Texture *propTexture_ = nullptr;
   SDL_Renderer *cachedRenderer_ = nullptr;
@@ -344,6 +370,8 @@ private:
   void renderRssButton(SDL_Renderer *renderer);
   void renderAsteroidOverlay(SDL_Renderer *renderer);
   void renderCalendarAlert(SDL_Renderer *renderer);
+  void renderDXAlert(SDL_Renderer *renderer);
+  void renderStartupBanner(SDL_Renderer *renderer);
 
   struct CalendarAlertState {
     bool active = false;
@@ -354,5 +382,23 @@ private:
     uint32_t durationMs = 30000;
   } calendarAlert_;
 
+  struct DXAlertState {
+    bool active = false;
+    std::string call;
+    std::string entity;
+    double freq = 0;
+    std::string mode;
+    uint32_t shownAtMs = 0;
+    uint32_t durationMs = 20000; // 20s for DX alerts
+  } dxAlert_;
+
+  struct StartupBannerState {
+    bool active = false;
+    std::string text;
+    uint32_t shownAtMs = 0;
+    uint32_t durationMs = 30000; // 30s for startup warnings
+  } startupBanner_;
+
+  SDL_Rect startupBannerRect_ = {};
   SDL_Rect rssRect_ = {};
 };

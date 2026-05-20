@@ -14,6 +14,13 @@ BUILD_DIR="build-rpm-suse"
 # Get version from centralized file
 VERSION=$(cat VERSION | tr -d '[:space:]')
 
+DEBUG_API_SED=""
+for arg in "$@"; do
+    if [ "$arg" == "--enable-debug-api" ]; then
+        DEBUG_API_SED="sed -i 's/-DENABLE_DEBUG_API=OFF/-DENABLE_DEBUG_API=ON/g' /root/rpmbuild/SPECS/hamclock.spec \\&\\& "
+    fi
+done
+
 # Clean previous build artifacts
 echo "Cleaning old build artifacts..."
 rm -rf "$BUILD_DIR"
@@ -55,7 +62,7 @@ docker run --rm \
         echo '%_topdir /root/rpmbuild' > /root/.rpmmacros && \
         
         # Build RPM
-        rpmbuild -ba /root/rpmbuild/SPECS/hamclock.spec && \
+        ${DEBUG_API_SED}rpmbuild -ba /root/rpmbuild/SPECS/hamclock.spec && \
         
         # Copy artifacts back
         cp -rv /root/rpmbuild/RPMS /src/$BUILD_DIR/ && \

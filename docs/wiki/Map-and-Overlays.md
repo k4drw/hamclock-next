@@ -21,6 +21,12 @@ When you click the map close to a Live Spot pin or a DX Cluster marker, HamClock
 
 If you click on open water or empty land far from any pin, the click is treated as a plain location pick, as before.
 
+### ADIF/LoTW Map Pins and Hover Tooltips
+
+When `showLotwQsos` is enabled in configuration, logged contacts from LoTW or ADIF are plotted as pins on the world map.
+- **Hover Tooltips**: Hovering the cursor over any ADIF or LoTW map pin displays a small tooltip showing the callsign, date, band, and mode of that specific contact, dynamically filtered against active band/mode settings.
+- **Toggling Pins**: You can toggle the display of these pins on or off by clicking the **LOTW QSOs** checkbox in the Map View menu (right-click the map to open).
+
 ---
 
 ### Center the Map on Your Home Location

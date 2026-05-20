@@ -102,8 +102,10 @@ void ActivityProvider::fetchDXPeds() {
 
         if (!call.empty() && !d1.empty()) {
           DXPedition de;
-          de.call = call.length() > 16 ? call.substr(0, 16) : call;
-          de.location = loc.length() > 32 ? loc.substr(0, 32) : loc;
+          de.call = StringUtils::unescapeHtml(call);
+          if (de.call.length() > 16) de.call.resize(16);
+          de.location = StringUtils::unescapeHtml(loc);
+          if (de.location.length() > 32) de.location.resize(32);
 
           LatLong ll;
           if (pfx && pfx->findLocation(de.call, ll)) {
@@ -174,7 +176,7 @@ void ActivityProvider::fetchDXPeds() {
       event.user.data1 = update;
       SDL_PushEvent(&event);
     });
-  });
+  }, 86400); // 24 hour cache
 }
 
 void ActivityProvider::fetchPOTA() {

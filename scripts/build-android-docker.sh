@@ -8,6 +8,13 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BUILD_DIR="$REPO_ROOT/build-android"
 
+DEBUG_API_BOOL="OFF"
+for arg in "$@"; do
+    if [ "$arg" == "--enable-debug-api" ]; then
+        DEBUG_API_BOOL="ON"
+    fi
+done
+
 echo "=================================================="
 echo "    HamClock-Next Android APK Build Script       "
 echo "=================================================="
@@ -167,6 +174,8 @@ add_subdirectory(../../../ hamclock-next)
 # add_executable implicitly acts as a shared library under the NDK wrapper wrapper.
 set_target_properties(hamclock-next PROPERTIES OUTPUT_NAME "main")
 EOF
+
+sed -i "s/set(ENABLE_DEBUG_API OFF/set(ENABLE_DEBUG_API ${DEBUG_API_BOOL}/g" app/jni/CMakeLists.txt
 
 KEYSTORE_PATH="$REPO_ROOT/packaging/android-release.keystore"
 KEYSTORE_ALIAS="hamclock-next"

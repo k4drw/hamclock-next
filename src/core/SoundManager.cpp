@@ -153,6 +153,7 @@ void SoundManager::ttsWorkerFunc() {
 
 #if defined(_WIN32)
     std::wstring wtext(text.begin(), text.end());
+    voice->SetVolume(volume_.load(std::memory_order_relaxed));
     voice->Speak(wtext.c_str(), SPF_DEFAULT, nullptr);
 #elif defined(__APPLE__)
     extern char **environ;
@@ -189,6 +190,8 @@ void SoundManager::playAlarm() {
   std::lock_guard<std::mutex> lock(mutex_);
   if (!alarmChunk_)
     return;
+  int vol = volume_.load(std::memory_order_relaxed);
+  Mix_Volume(-1, (vol * MIX_MAX_VOLUME) / 100);
   Mix_PlayChannel(-1, alarmChunk_, 0);
 }
 

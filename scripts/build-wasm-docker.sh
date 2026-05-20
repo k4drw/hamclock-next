@@ -13,6 +13,13 @@ echo "Building HamClock-Next WASM using Docker (emscripten/emsdk:latest)..."
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BUILD_DIR="build-wasm"
 
+DEBUG_API_FLAG="-DENABLE_DEBUG_API=OFF"
+for arg in "$@"; do
+    if [ "$arg" == "--enable-debug-api" ]; then
+        DEBUG_API_FLAG="-DENABLE_DEBUG_API=ON"
+    fi
+done
+
 # Clean previous build to avoid CMake cache conflicts
 rm -rf "$REPO_ROOT/$BUILD_DIR"
 mkdir -p "$REPO_ROOT/$BUILD_DIR"
@@ -26,7 +33,7 @@ docker run --rm \
     /bin/bash -c "
         emcmake cmake -S . -B $BUILD_DIR \
             -DCMAKE_BUILD_TYPE=Release \
-            -DENABLE_DEBUG_API=OFF && \
+            ${DEBUG_API_FLAG} && \
         emmake make -C $BUILD_DIR hamclock-wasm -j$(nproc)
     "
 

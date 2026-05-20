@@ -33,6 +33,7 @@ working_docs/
 hamclock-original
 open-hamclock-backend
 .claude
+.agent
 AI_RULES.md
 CLAUDE.md
 GEMINI.md

@@ -26,6 +26,13 @@ static constexpr bool FIDELITY_MODE = true;
 // Default font size
 static constexpr int DEFAULT_FONT_SIZE = 24;
 
+// UI Layout Constants
+static constexpr int PANEL_TITLE_HEIGHT = 20;
+static constexpr int PANEL_PADDING = 4;
+static constexpr int PANEL_BORDER_WIDTH = 1;
+static constexpr int PANEL_TITLE_X_OFFSET = 10;
+static constexpr int PANEL_TITLE_Y_OFFSET = 5;
+
 // Custom SDL user event for blocking sleep
 static constexpr uint32_t SDL_USER_EVENT_BLOCK_SLEEP = 0x8001;
 // NTP sync request
@@ -63,6 +70,7 @@ static constexpr uint32_t AE_SATELLITE_DATA_READY = 21;
 static constexpr uint32_t AE_UPDATE_DATA_READY = 22;
 static constexpr uint32_t AE_SPACEWX_ALERT_READY = 23;
 static constexpr uint32_t AE_MARINE_LOOKUP_READY = 24;
+static constexpr uint32_t AE_DX_ALERT = 25;
 
 
 } // namespace HamClock

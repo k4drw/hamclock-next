@@ -93,6 +93,7 @@ private:
   Tab activeTab_ = Tab::Identity;
   bool gpsEnabled_ = false;
   bool audioMuted_ = false;
+  int audioVolume_ = 100;
   TextInput callsignInput_;
   TextInput gridInput_;
   TextInput latInput_;
@@ -134,15 +135,22 @@ private:
   // Services & Rig
   TextInput qrzUsernameInput_;
   TextInput qrzPasswordInput_;
+  TextInput lotwCallInput_;
+  TextInput lotwPasswordInput_;
+  TextInput clublogApiKeyInput_;
   TextInput repeaterBookInput_;
   TextInput winlinkInput_;
   std::string countdownLabel_;
   std::string countdownTime_; // YYYY-MM-DD HH:MM
   TextInput dimTimeInput_;
   TextInput brightTimeInput_;
+  TextInput kIndexThresholdInput_;
 
   SDL_Rect qrzUsernameRect_ = {0, 0, 0, 0};
   SDL_Rect qrzPasswordRect_ = {0, 0, 0, 0};
+  SDL_Rect lotwCallRect_ = {0, 0, 0, 0};
+  SDL_Rect lotwPasswordRect_ = {0, 0, 0, 0};
+  SDL_Rect clublogApiKeyRect_ = {0, 0, 0, 0};
   SDL_Rect repeaterBookRect_ = {0, 0, 0, 0};
   SDL_Rect winlinkRect_ = {0, 0, 0, 0};
   SDL_Rect brightTimeRect_ = {0, 0, 0, 0};
@@ -201,6 +209,7 @@ private:
   SDL_Rect rbnToggleRect_ = {0, 0, 0, 0};
   SDL_Rect gpsToggleRect_ = {0, 0, 0, 0};
   SDL_Rect audioMuteToggleRect_ = {0, 0, 0, 0};
+  SDL_Rect audioVolumeSliderRect_ = {0, 0, 0, 0};
   SDL_Rect defaultTzRect_ = {0, 0, 0, 0};
   SDL_Rect themeRect_ = {0, 0, 0, 0};
   SDL_Rect nightLightsRect_ = {0, 0, 0, 0};
@@ -218,6 +227,7 @@ private:
   SDL_Rect scheduleToggleRect_ = {0, 0, 0, 0};
   SDL_Rect dimTimeRect_ = {0, 0, 0, 0};
   SDL_Rect customizeBtnRect_ = {0, 0, 0, 0};
+  SDL_Rect kIndexThresholdRect_ = {0, 0, 0, 0};
 
   std::unique_ptr<HamClock::ThemeCustomizer> themeCustomizer_;
 

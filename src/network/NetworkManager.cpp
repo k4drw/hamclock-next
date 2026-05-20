@@ -1,10 +1,12 @@
 #include "NetworkManager.h"
 #include "../core/Logger.h"
+#include "../core/WorkerService.h"
 
 #ifndef __EMSCRIPTEN__
 #include <curl/curl.h>
 #endif
 
+#include <mutex>
 #include <thread>
 
 #include <filesystem>
@@ -35,6 +37,11 @@
 #include <ifaddrs.h>
 #include <netinet/in.h>
 #endif
+
+// Serializes curl_easy_perform across all threads. Static mbedTLS (without
+// MBEDTLS_THREADING_PTHREAD) has non-thread-safe shared entropy and SSL
+// session state; concurrent SSL handshakes corrupt it and cause SIGABRT.
+static std::mutex sCurlMutex;
 
 static size_t writeCallback(char *ptr, size_t size, size_t nmemb,
                             void *userdata) {
@@ -107,24 +114,33 @@ void NetworkManager::setHubConfig(HubMode mode, const std::string &ip,
   hubPort_ = port;
 }
 
-std::string NetworkManager::fetchFromHubSync(const std::string &hubUrl) {
+std::string NetworkManager::fetchFromHubSync(const std::string &hubUrl,
+                                            long &httpCode) {
 #ifdef __EMSCRIPTEN__
+  httpCode = 0;
   return "";
 #else
   std::string result;
   CURL *curl = curl_easy_init();
-  if (!curl)
+  if (!curl) {
+    httpCode = 0;
     return "";
+  }
   curl_easy_setopt(curl, CURLOPT_URL, hubUrl.c_str());
+  curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
   curl_easy_setopt(curl, CURLOPT_TIMEOUT, 20L);
   curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
   curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeCallback);
   curl_easy_setopt(curl, CURLOPT_WRITEDATA, &result);
-  CURLcode rc = curl_easy_perform(curl);
-  long httpCode = 0;
+  CURLcode rc;
+  {
+    std::lock_guard<std::mutex> lock(sCurlMutex);
+    rc = curl_easy_perform(curl);
+  }
+  httpCode = 0;
   curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &httpCode);
   curl_easy_cleanup(curl);
-  if (rc != CURLE_OK || httpCode != 200)
+  if (rc != CURLE_OK)
     return "";
   return result;
 #endif
@@ -134,6 +150,20 @@ std::string NetworkManager::fetchFromHubSync(const std::string &hubUrl) {
 void NetworkManager::fetchAsync(const std::string &url,
                                 std::function<void(std::string)> callback,
                                 int cacheAgeSeconds, bool force) {
+  fetchSharedAsync(
+      url,
+      [callback](SharedString data) {
+        if (data)
+          callback(*data);
+        else
+          callback("");
+      },
+      cacheAgeSeconds, force);
+}
+
+void NetworkManager::fetchSharedAsync(const std::string &url,
+                                      SharedCallback callback,
+                                      int cacheAgeSeconds, bool force) {
   // Check memory cache first
   CacheEntry cached;
   bool hasCache = false;
@@ -150,8 +180,12 @@ void NetworkManager::fetchAsync(const std::string &url,
   if (hasCache && !force) {
     std::time_t now = std::time(nullptr);
     if (now - cached.timestamp < cacheAgeSeconds) {
-      if (!cached.data.empty()) {
+      if (cached.data && !cached.data->empty()) {
         LOG_T("NetworkManager", "Memory cache hit for {}", url);
+        {
+          std::lock_guard<std::mutex> lock(cacheMutex_);
+          updateLruAndPrune(url, cached.data->size());
+        }
         callback(cached.data);
         return;
       } else {
@@ -159,7 +193,9 @@ void NetworkManager::fetchAsync(const std::string &url,
         {
           std::lock_guard<std::mutex> lock(fetchMutex_);
           if (activeFetches_.count(url)) {
-            LOG_T("NetworkManager", "Disk load already in progress for {}, queuing callback", url);
+            LOG_T("NetworkManager",
+                  "Disk load already in progress for {}, queuing callback",
+                  url);
             activeFetches_[url].push_back(std::move(callback));
             return;
           }
@@ -170,41 +206,40 @@ void NetworkManager::fetchAsync(const std::string &url,
               "Memory record found but no data (too large), loading from disk "
               "for {}",
               url);
-        std::thread([this, url, callback = std::move(callback),
+        WorkerService::getInstance().submitTask([this, url, callback = std::move(callback),
                      alive = alive_]() {
           {
             std::lock_guard<std::mutex> lk(inflightMutex_);
-            if (!alive->load(std::memory_order_relaxed)) return;
+            if (!alive->load(std::memory_order_relaxed))
+              return;
             ++inflight_;
           }
-          std::filesystem::path p = cacheDir_ / hashUrl(url);
-          std::ifstream ifs(p, std::ios::binary);
-          std::string data;
-          if (ifs) {
-            std::string line;
-            if (std::getline(ifs, line)) {
-              bool v11 = (line == "HamClockCache/1.1");
-              int skip = v11 ? 5 : 4;
-              for (int i = 0; i < skip; ++i)
-                std::getline(ifs, line);
-              data.assign((std::istreambuf_iterator<char>(ifs)),
-                          (std::istreambuf_iterator<char>()));
-            }
-          }
-          std::vector<std::function<void(std::string)>> pending;
+          SharedString data = loadFromDiskCache(url);
+          std::vector<SharedCallback> pending;
           {
             std::lock_guard<std::mutex> lock(fetchMutex_);
             pending = std::move(activeFetches_[url]);
             activeFetches_.erase(url);
           }
           callback(data);
-          for (auto &cb : pending) cb(data);
+          for (auto &cb : pending)
+            cb(data);
           {
             std::lock_guard<std::mutex> lk(inflightMutex_);
-            if (--inflight_ == 0) inflightCv_.notify_all();
+            if (--inflight_ == 0)
+              inflightCv_.notify_all();
           }
-        }).detach();
+        });
         return;
+      }
+    } else {
+      // Cache entry is stale — clear payload but keep metadata for
+      // If-Modified-Since
+      std::lock_guard<std::mutex> lock(cacheMutex_);
+      removeFromLru(url);
+      auto it = cache_.find(url);
+      if (it != cache_.end() && it->second.data) {
+        it->second.data.reset();
       }
     }
   }
@@ -213,22 +248,24 @@ void NetworkManager::fetchAsync(const std::string &url,
   {
     std::lock_guard<std::mutex> lock(fetchMutex_);
     if (activeFetches_.count(url)) {
-      LOG_T("NetworkManager", "Network fetch already in progress for {}, queuing callback", url);
+      LOG_T("NetworkManager",
+            "Network fetch already in progress for {}, queuing callback", url);
       activeFetches_[url].push_back(std::move(callback));
       return;
     }
     activeFetches_[url] = {};
   }
 
-  auto safeCallback = [this, url, callback = std::move(callback)](std::string data) {
-    std::vector<std::function<void(std::string)>> pending;
+  auto safeCallback = [this, url, callback = std::move(callback)](SharedString data) {
+    std::vector<SharedCallback> pending;
     {
       std::lock_guard<std::mutex> lock(fetchMutex_);
       pending = std::move(activeFetches_[url]);
       activeFetches_.erase(url);
     }
     callback(data);
-    for (auto &cb : pending) cb(data);
+    for (auto &cb : pending)
+      cb(data);
   };
 
 #ifdef __EMSCRIPTEN__
@@ -250,7 +287,7 @@ void NetworkManager::fetchAsync(const std::string &url,
   struct FetchCtx {
     NetworkManager *mgr;
     std::string url;
-    std::function<void(std::string)> cb;
+    SharedCallback cb;
   };
   auto ctx = std::make_unique<FetchCtx>(
       FetchCtx{this, url, std::move(safeCallback)});
@@ -268,14 +305,14 @@ void NetworkManager::fetchAsync(const std::string &url,
         // We don't have header headers easily in simple fetch on WASM,
         // but we can at least cache the data for small responses.
         if (response.size() < 512 * 1024) {
-          entry.data = response;
+          entry.data = std::make_shared<const std::string>(response);
         }
         owned->mgr->cache_[owned->url] = entry;
       }
 
-      owned->cb(std::move(response));
+      owned->cb(std::make_shared<const std::string>(std::move(response)));
     } else {
-      owned->cb("");
+      owned->cb(nullptr);
     }
     emscripten_fetch_close(fetch);
   };
@@ -283,7 +320,7 @@ void NetworkManager::fetchAsync(const std::string &url,
     std::unique_ptr<FetchCtx> owned(static_cast<FetchCtx *>(fetch->userData));
     LOG_E("NetworkManager", "WASM fetch failed for {} (status {})", owned->url,
           fetch->status);
-    owned->cb(""); // empty string = failure
+    owned->cb(nullptr); // null = failure
     emscripten_fetch_close(fetch);
   };
 
@@ -297,57 +334,106 @@ void NetworkManager::fetchAsync(const std::string &url,
       std::string encoded = base64Encode(url);
       std::string hubUrl = "http://" + hubIp_ + ":" + std::to_string(hubPort_) +
                            "/api/hub/fetch?url=" + encoded +
-                           "&max_age=" + std::to_string(cacheAgeSeconds);
-      
+                           "&max_age=" + (force ? "0" : std::to_string(cacheAgeSeconds));
+      if (hasCache) {
+        if (!cached.lastModified.empty())
+          hubUrl += "&ims=" + base64Encode(cached.lastModified);
+        if (!cached.etag.empty())
+          hubUrl += "&inm=" + base64Encode(cached.etag);
+      }
+
       LOG_D("NetworkManager", "Hub client: Proxying request for {} to Hub at {}", url, hubUrl);
 
-      std::thread([this, hubUrl, url, callback = std::move(safeCallback), hasCache,
+      WorkerService::getInstance().submitTask([this, hubUrl, url, callback = std::move(safeCallback), hasCache,
                    cached, alive = alive_]() mutable {
         {
           std::lock_guard<std::mutex> lk(inflightMutex_);
-          if (!alive->load(std::memory_order_relaxed)) return;
+          if (!alive->load(std::memory_order_relaxed))
+            return;
           ++inflight_;
         }
-        std::string body = fetchFromHubSync(hubUrl);
-        if (!body.empty()) {
-          LOG_D("NetworkManager", "Hub client: Received {} bytes from Hub for {}", body.size(), url);
+        long httpCode = 0;
+        std::string body = fetchFromHubSync(hubUrl, httpCode);
+        if (httpCode == 304) {
+          LOG_D("NetworkManager", "Hub client: 304 Not Modified from Hub for {}",
+                url);
+          SharedString retData = cached.data;
+          if (!retData) {
+            retData = loadFromDiskCache(url);
+          }
           {
             std::lock_guard<std::mutex> lock(cacheMutex_);
+            cache_[url].timestamp = std::time(nullptr);
+          }
+          callback(std::move(retData));
+        } else if (!body.empty()) {
+          LOG_D("NetworkManager",
+                "Hub client: Received {} bytes from Hub for {}", body.size(),
+                url);
+          auto sharedBody = std::make_shared<const std::string>(std::move(body));
+          {
             CacheEntry entry;
             entry.timestamp = std::time(nullptr);
-            if (body.size() < 512 * 1024)
-              entry.data = body;
+
+            bool isLarge = sharedBody->size() > 512 * 1024;
+            bool isImage = url.find(".jpg") != std::string::npos ||
+                           url.find(".png") != std::string::npos ||
+                           url.find("image") != std::string::npos;
+
+            std::lock_guard<std::mutex> lock(cacheMutex_);
+            if (hubMode_ == HubMode::Master || (!isLarge && !isImage)) {
+              entry.data = sharedBody;
+              updateLruAndPrune(url, sharedBody->size());
+            } else {
+              removeFromLru(url);
+              lru_.push_front(url);
+              while ((int)cache_.size() > (int)MAX_CACHE_ENTRIES && !lru_.empty()) {
+                std::string oldest = lru_.back();
+                auto it = cache_.find(oldest);
+                if (it != cache_.end()) {
+                  if (it->second.data) totalRamBytes_ -= it->second.data->size();
+                  cache_.erase(it);
+                }
+                lru_.pop_back();
+              }
+            }
+
             cache_[url] = entry;
             if (!cacheDir_.empty())
-              saveToDisk(url, entry, body);
+              saveToDisk(url, entry, *sharedBody);
           }
-          callback(std::move(body));
+          callback(std::move(sharedBody));
         } else {
-          LOG_D("NetworkManager", "Hub client: Hub miss or error for {}, falling back to direct", url);
+          LOG_D("NetworkManager",
+                "Hub client: Hub miss or error for {}, falling back to direct",
+                url);
           fetchDirect(url, std::move(callback), hasCache, cached);
         }
         {
           std::lock_guard<std::mutex> lk(inflightMutex_);
-          if (--inflight_ == 0) inflightCv_.notify_all();
+          if (--inflight_ == 0)
+            inflightCv_.notify_all();
         }
-      }).detach();
+      });
       return;
     }
   }
   // --- Direct fetch ---
-  std::thread([this, url, callback = std::move(safeCallback), hasCache,
+  WorkerService::getInstance().submitTask([this, url, callback = std::move(safeCallback), hasCache,
                cached, alive = alive_]() mutable {
     {
       std::lock_guard<std::mutex> lk(inflightMutex_);
-      if (!alive->load(std::memory_order_relaxed)) return;
+      if (!alive->load(std::memory_order_relaxed))
+        return;
       ++inflight_;
     }
     fetchDirect(url, std::move(callback), hasCache, cached);
     {
       std::lock_guard<std::mutex> lk(inflightMutex_);
-      if (--inflight_ == 0) inflightCv_.notify_all();
+      if (--inflight_ == 0)
+        inflightCv_.notify_all();
     }
-  }).detach();
+  });
 #endif
 }
 
@@ -360,25 +446,61 @@ std::time_t NetworkManager::getCacheServerTime(const std::string &url) {
   return 0;
 }
 
+NetworkManager::SharedString NetworkManager::loadFromDiskCache(const std::string &url) {
+  if (cacheDir_.empty())
+    return nullptr;
+  std::filesystem::path p = cacheDir_ / hashUrl(url);
+  std::ifstream ifs(p, std::ios::binary);
+  if (ifs) {
+    std::string line;
+    if (std::getline(ifs, line)) {
+      bool v11 = (line == "HamClockCache/1.1");
+      int skip = v11 ? 5 : 4;
+      for (int i = 0; i < skip; ++i)
+        std::getline(ifs, line);
+      return std::make_shared<const std::string>(
+          std::istreambuf_iterator<char>(ifs),
+          std::istreambuf_iterator<char>());
+    }
+  }
+  return nullptr;
+}
+
+bool NetworkManager::getCacheMetadata(const std::string &url,
+                                      std::string &lastModified,
+                                      std::string &etag,
+                                      std::time_t &timestamp) {
+  std::lock_guard<std::mutex> lock(cacheMutex_);
+  auto it = cache_.find(url);
+  if (it != cache_.end()) {
+    lastModified = it->second.lastModified;
+    etag = it->second.etag;
+    timestamp = it->second.timestamp;
+    return true;
+  }
+  return false;
+}
+
 #ifndef __EMSCRIPTEN__
-void NetworkManager::fetchDirect(const std::string &url,
-                                 std::function<void(std::string)> callback,
+void NetworkManager::fetchDirect(const std::string &url, SharedCallback callback,
                                  bool hasCache, const CacheEntry &cached) {
   CURL *curl = curl_easy_init();
   if (!curl) {
     LOG_E("NetworkManager", "curl_easy_init failed");
-    callback("");
+    callback(nullptr);
     return;
   }
 
   std::unordered_map<std::string, std::string> headers;
   curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+  curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
   curl_easy_setopt(curl, CURLOPT_TIMEOUT, 45L);
   curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
-  
+
   if (url.find("pskreporter.info") != std::string::npos) {
     curl_easy_setopt(curl, CURLOPT_USERAGENT, "HamClock/1.0");
-    curl_easy_setopt(curl, CURLOPT_REFERER, "https://pskreporter.info/pskmap.html");
+    curl_easy_setopt(curl,
+                     CURLOPT_REFERER, "https://pskreporter.info/pskmap.html");
   } else {
     curl_easy_setopt(curl, CURLOPT_USERAGENT, "HamClock-Next/1.0");
   }
@@ -400,7 +522,8 @@ void NetworkManager::fetchDirect(const std::string &url,
 // Note: Android defines __linux__ but has no CA bundle at standard paths.
 // Static mbedTLS cannot use Android's per-file /system/etc/security/cacerts/
 // store, so we disable peer verification there. All fetched data is public
-// (NOAA, ham radio databases); no sensitive credentials traverse these connections.
+// (NOAA, ham radio databases); no sensitive credentials traverse these
+// connections.
 #if defined(__ANDROID__)
   // Use the PEM bundle built from Android's system CA store at startup.
   if (!androidCaBundlePath_.empty())
@@ -417,7 +540,7 @@ void NetworkManager::fetchDirect(const std::string &url,
 #endif
 
   // Use Conditional GET (If-Modified-Since / If-None-Match) to save bandwidth
-  struct curl_slist *chunk = NULL;
+  struct curl_slist *chunk = nullptr;
   if (hasCache) {
     if (!cached.etag.empty()) {
       std::string h = "If-None-Match: " + cached.etag;
@@ -432,12 +555,16 @@ void NetworkManager::fetchDirect(const std::string &url,
     }
   }
 
-  std::string response;
+  auto response = std::make_shared<std::string>();
   curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeCallback);
-  curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
+  curl_easy_setopt(curl, CURLOPT_WRITEDATA, response.get());
 
   LOG_D("NetworkManager", "Fetching from network: {}", url);
-  CURLcode res = curl_easy_perform(curl);
+  CURLcode res;
+  {
+    std::lock_guard<std::mutex> lock(sCurlMutex);
+    res = curl_easy_perform(curl);
+  }
 
   if (chunk) {
     curl_slist_free_all(chunk);
@@ -452,28 +579,16 @@ void NetworkManager::fetchDirect(const std::string &url,
   if (res != CURLE_OK) {
     LOG_E("NetworkManager", "Fetch failed for {}: {}", url,
           curl_easy_strerror(res));
-    callback("");
+    callback(nullptr);
     return;
   }
 
   // Handle 304 Not Modified
   if (responseCode == 304) {
     LOG_D("NetworkManager", "304 Not Modified for {}", url);
-    std::string retData = cached.data;
-    if (retData.empty()) {
-      std::filesystem::path p = cacheDir_ / hashUrl(url);
-      std::ifstream ifs(p, std::ios::binary);
-      if (ifs) {
-        std::string line;
-        if (std::getline(ifs, line)) {
-          bool v11 = (line == "HamClockCache/1.1");
-          int skip = v11 ? 5 : 4;
-          for (int i = 0; i < skip; ++i)
-            std::getline(ifs, line);
-          retData.assign((std::istreambuf_iterator<char>(ifs)),
-                         (std::istreambuf_iterator<char>()));
-        }
-      }
+    SharedString retData = cached.data;
+    if (!retData) {
+      retData = loadFromDiskCache(url);
     }
     {
       std::lock_guard<std::mutex> lock(cacheMutex_);
@@ -485,7 +600,7 @@ void NetworkManager::fetchDirect(const std::string &url,
 
   if (responseCode != 200) {
     LOG_E("NetworkManager", "HTTP error {} for {}", responseCode, url);
-    callback("");
+    callback(nullptr);
     return;
   }
 
@@ -501,18 +616,40 @@ void NetworkManager::fetchDirect(const std::string &url,
     if (headers.count("etag"))
       entry.etag = headers.at("etag");
 
-    bool isLarge = response.size() > 512 * 1024;
-    if (!isLarge) {
+    bool isLarge = response->size() > 512 * 1024;
+    bool isImage =
+        url.find(".jpg") != std::string::npos ||
+        url.find(".png") != std::string::npos ||
+        url.find("image") != std::string::npos ||
+        (headers.count("content-type") &&
+         headers.at("content-type").find("image/") != std::string::npos);
+
+    if (!isLarge && !isImage) {
       entry.data = response;
+      updateLruAndPrune(url, response->size());
     } else {
-      LOG_D("NetworkManager",
-            "Data for {} is large ({:.1f} MB), skipping RAM cache", url,
-            response.size() / 1024.0 / 1024.0);
+      LOG_D("NetworkManager", "Data for {} is {} ({:.1f} MB), skipping RAM cache",
+            url, isLarge ? "large" : "an image",
+            response->size() / 1024.0 / 1024.0);
+      removeFromLru(url);
+      // Metadata-only entries still need LRU tracking for eviction
+      lru_.push_front(url);
+      // Check entry-count limit even for metadata-only entries
+      while ((int)cache_.size() > (int)MAX_CACHE_ENTRIES && !lru_.empty()) {
+        std::string oldest = lru_.back();
+        auto it = cache_.find(oldest);
+        if (it != cache_.end()) {
+          if (it->second.data)
+            totalRamBytes_ -= it->second.data->size();
+          cache_.erase(it);
+        }
+        lru_.pop_back();
+      }
     }
 
     cache_[url] = entry;
     if (!cacheDir_.empty()) {
-      saveToDisk(url, entry, response);
+      saveToDisk(url, entry, *response);
     }
   }
 
@@ -638,9 +775,13 @@ void NetworkManager::saveToDisk(const std::string &url, const CacheEntry &entry,
   if (cacheDir_.empty())
     return;
 
-  const std::string &fullData = data.empty() ? entry.data : data;
-  if (fullData.empty())
-    return;
+  const std::string *fullDataPtr = &data;
+  if (data.empty()) {
+    if (entry.data)
+      fullDataPtr = entry.data.get();
+    else
+      return;
+  }
 
   std::string filename = hashUrl(url);
   std::filesystem::path p = cacheDir_ / filename;
@@ -653,7 +794,7 @@ void NetworkManager::saveToDisk(const std::string &url, const CacheEntry &entry,
     ofs << url << "\n";
     ofs << entry.lastModified << "\n";
     ofs << entry.etag << "\n";
-    ofs << fullData;
+    ofs.write(fullDataPtr->data(), fullDataPtr->size());
   }
 }
 
@@ -681,6 +822,17 @@ void NetworkManager::loadCache() {
               continue;
             std::time_t ts = std::stoll(line);
 
+            // Prune cache files older than 30 days based on their internal timestamp
+            std::time_t now = std::time(nullptr);
+            if (now - ts > 30 * 24 * 3600) {
+              ifs.close();
+              std::error_code ec;
+              std::filesystem::remove(entry.path(), ec);
+              LOG_D("NetworkManager", "Pruned old cache file on startup: {}",
+                    entry.path().filename().string());
+              continue;
+            }
+
             std::time_t serverTs = 0;
             if (v11) {
               if (!std::getline(ifs, line))
@@ -700,17 +852,38 @@ void NetworkManager::loadCache() {
             if (!std::getline(ifs, etag))
               continue;
 
-            // Body is loaded lazily from disk on first access (see the
-            // empty-data path in fetchAsync).  Only metadata is loaded here so
-            // loadCache() stays fast regardless of how many URLs are cached.
+            // Load entry metadata from disk. Cache validity is controlled by
+            // cacheAgeSeconds parameter in fetchAsync, not by disk file age.
             std::lock_guard<std::mutex> lock(cacheMutex_);
-            cache_[url] = {"", ts, serverTs, lm, etag};
-          } catch (const std::exception &ex) {
+            CacheEntry ce;
+            ce.data = nullptr;
+            ce.timestamp = ts;
+            ce.serverTime = serverTs;
+            ce.lastModified = lm;
+            ce.etag = etag;
+            cache_[url] = ce;
+            lru_.push_front(url);
+            } catch (const std::exception &ex) {
             LOG_W("NetworkManager", "Cache parse error for {}: {}",
                   entry.path().string(), ex.what());
           }
         }
       }
+    }
+  }
+
+  // Enforce MAX_CACHE_ENTRIES limit on loaded metadata to prevent unbounded growth
+  {
+    std::lock_guard<std::mutex> lock(cacheMutex_);
+    while ((int)cache_.size() > (int)MAX_CACHE_ENTRIES && !lru_.empty()) {
+      std::string oldest = lru_.back();
+      auto it = cache_.find(oldest);
+      if (it != cache_.end()) {
+        cache_.erase(it);
+        LOG_D("NetworkManager", "loadCache: Evicted excess entry {} (cache now {} entries)",
+              oldest, cache_.size());
+      }
+      lru_.pop_back();
     }
   }
 }
@@ -776,3 +949,106 @@ std::string NetworkManager::getLocalIP() {
   return result;
 #endif
 }
+
+void NetworkManager::updateLruAndPrune(const std::string &url, size_t dataSize) {
+  // Caller must hold cacheMutex_
+  removeFromLru(url);
+
+  lru_.push_front(url);
+  totalRamBytes_ += dataSize;
+
+  while (totalRamBytes_ > MAX_RAM_BYTES && !lru_.empty()) {
+    std::string oldest = lru_.back();
+    auto it = cache_.find(oldest);
+    if (it != cache_.end()) {
+      if (it->second.data) {
+        totalRamBytes_ -= it->second.data->size();
+      }
+      cache_.erase(it);
+      LOG_D("NetworkManager", "LRU: Evicted entry {} to save RAM (disk cache preserves metadata)",
+            oldest);
+    }
+    lru_.pop_back();
+  }
+
+  // Evict oldest entries if cache has grown too large (metadata bloat from disk-loaded entries)
+  while ((int)cache_.size() > (int)MAX_CACHE_ENTRIES && !lru_.empty()) {
+    std::string oldest = lru_.back();
+    auto it = cache_.find(oldest);
+    if (it != cache_.end()) {
+      if (it->second.data) {
+        totalRamBytes_ -= it->second.data->size();
+      }
+      cache_.erase(it);
+      LOG_D("NetworkManager", "Entry limit: Evicted entire entry for {} (cache now {} entries)",
+            oldest, cache_.size());
+    }
+    lru_.pop_back();
+  }
+}
+
+void NetworkManager::removeFromLru(const std::string &url) {
+  // Caller must hold cacheMutex_
+  auto it = std::find(lru_.begin(), lru_.end(), url);
+  if (it != lru_.end()) {
+    auto cit = cache_.find(url);
+    if (cit != cache_.end() && cit->second.data) {
+      totalRamBytes_ -= cit->second.data->size();
+    }
+    lru_.erase(it);
+  }
+}
+
+void NetworkManager::pruneStaleCache(int maxAgeSeconds) {
+  std::lock_guard<std::mutex> lock(cacheMutex_);
+  std::time_t now = std::time(nullptr);
+  int count = 0;
+  for (auto it = cache_.begin(); it != cache_.end();) {
+    if (now - it->second.timestamp > maxAgeSeconds) {
+      if (!cacheDir_.empty()) {
+        std::error_code ec;
+        std::filesystem::remove(cacheDir_ / hashUrl(it->first), ec);
+      }
+      auto lruIt = std::find(lru_.begin(), lru_.end(), it->first);
+      if (lruIt != lru_.end())
+        lru_.erase(lruIt);
+      if (it->second.data) {
+        totalRamBytes_ -= it->second.data->size();
+      }
+      it = cache_.erase(it);
+      count++;
+    } else {
+      ++it;
+    }
+  }
+  if (count > 0) {
+    LOG_I("NetworkManager", "Pruned {} stale cache entries from memory and disk",
+          count);
+  }
+}
+
+void NetworkManager::dumpCacheStats() const {
+  std::lock_guard<std::mutex> lock(cacheMutex_);
+  size_t withData = 0, metadataOnly = 0, totalMetadataBytes = 0;
+  for (const auto& [url, entry] : cache_) {
+    if (entry.data) {
+      withData++;
+    } else {
+      metadataOnly++;
+      totalMetadataBytes += url.size() + entry.lastModified.size() + entry.etag.size();
+    }
+  }
+  LOG_I("NetworkManager",
+    "Cache stats: %zu w/data, %zu metadata-only (~%zu KB), LRU: %zu, RAM: %zu MB, Entries: %zu/%zu",
+    withData, metadataOnly, totalMetadataBytes / 1024, lru_.size(),
+    totalRamBytes_ / 1024 / 1024, cache_.size(), MAX_CACHE_ENTRIES);
+}
+
+void NetworkManager::clearRamCache() {
+  std::lock_guard<std::mutex> lock(cacheMutex_);
+  cache_.clear();
+  lru_.clear();
+  totalRamBytes_ = 0;
+  LOG_I("NetworkManager", "Cleared all cache entries and RAM payloads");
+}
+

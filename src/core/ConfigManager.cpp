@@ -5,6 +5,7 @@
 #include <SDL.h>
 #include <nlohmann/json.hpp>
 
+#include <algorithm>
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
@@ -149,7 +150,32 @@ bool ConfigManager::init() {
   return true;
 }
 
-static void addFactoryPresets(AppConfig &config) {
+static void ensureFactoryPresets(AppConfig &config) {
+  // Factory preset names (must match the names defined below)
+  static const std::set<std::string> factoryNames = {
+      "DX", "Contest", "Satellite", "Environment/WX", "Prop Firehose", "DE Station Status"};
+
+  // Remove any user presets that shadow factory presets (unless explicitly deleted)
+  auto it = config.presets.begin();
+  while (it != config.presets.end()) {
+    if (factoryNames.count(it->name) && config.deletedFactoryPresets.find(it->name) == config.deletedFactoryPresets.end()) {
+      it = config.presets.erase(it);
+    } else {
+      ++it;
+    }
+  }
+
+  auto presetExists = [&](const std::string &name) {
+    return std::any_of(config.presets.begin(), config.presets.end(),
+                       [&](const ConfigPreset &p) { return p.name == name; });
+  };
+
+  auto addIfMissing = [&](ConfigPreset p) {
+    if (!presetExists(p.name) && config.deletedFactoryPresets.find(p.name) == config.deletedFactoryPresets.end()) {
+      config.presets.push_back(std::move(p));
+    }
+  };
+
   // DX preset
   {
     ConfigPreset p;
@@ -160,7 +186,8 @@ static void addFactoryPresets(AppConfig &config) {
     p.pane4Rotation = {"band_conditions"};
     p.pane5Rotation = {"de_info"};
     p.pane6Rotation = {"dx_info"};
-    config.presets.push_back(std::move(p));
+    p.propOverlay = PropOverlayType::Reliability;
+    addIfMissing(std::move(p));
   }
   // Contest preset
   {
@@ -172,7 +199,8 @@ static void addFactoryPresets(AppConfig &config) {
     p.pane4Rotation = {"solar"};
     p.pane5Rotation = {"de_info"};
     p.pane6Rotation = {"dx_info"};
-    config.presets.push_back(std::move(p));
+    p.propOverlay = PropOverlayType::Heatmap;
+    addIfMissing(std::move(p));
   }
   // Satellite preset
   {
@@ -182,21 +210,22 @@ static void addFactoryPresets(AppConfig &config) {
     p.pane2Rotation = {"eme_tool"};
     p.pane3Rotation = {"gimbal"};
     p.pane4Rotation = {"solar"};
-    p.pane5Rotation = {"satellite"};
-    p.pane6Rotation = {"de_info"};
-    config.presets.push_back(std::move(p));
+    p.pane5Rotation = {"de_info"};
+    p.pane6Rotation = {"satellite"};
+    addIfMissing(std::move(p));
   }
-  // Environment/WX preset — uses unlocked panes 5-6 for ENV sensors
+  // Environment/WX preset
   {
     ConfigPreset p;
     p.name = "Environment/WX";
     p.pane1Rotation = {"de_weather"};
     p.pane2Rotation = {"dx_weather"};
     p.pane3Rotation = {"forecast"};
-    p.pane4Rotation = {"de_weather"};
-    p.pane5Rotation = {"env_temp"};
-    p.pane6Rotation = {"env_humidity"};
-    config.presets.push_back(std::move(p));
+    p.pane4Rotation = {"solar"};
+    p.pane5Rotation = {"de_info"};
+    p.pane6Rotation = {"dx_info"};
+    p.weatherOverlay = WeatherOverlayType::WxMb;
+    addIfMissing(std::move(p));
   }
   // Propagation Firehose preset
   {
@@ -205,7 +234,7 @@ static void addFactoryPresets(AppConfig &config) {
     p.pane1Rotation = {"solar", "solar_storm", "solar_cycle", "ionosonde"};
     p.pane2Rotation = {"solar_timeline", "sfi_trend", "noaa_spacewx", "tropo"};
     p.pane3Rotation = {"aurora", "aurora_graph", "voacap_dedx", "drap"};
-    p.pane4Rotation = {"solar", "band_conditions", "ncdxf"};
+    p.pane4Rotation = {"band_conditions", "ncdxf"};
     p.pane5Rotation = {"de_info"};
     p.pane6Rotation = {"dx_info"};
     p.propRotation = {PropOverlayType::Muf, PropOverlayType::Reliability,
@@ -213,7 +242,20 @@ static void addFactoryPresets(AppConfig &config) {
                       PropOverlayType::Aurora};
     p.propOverlay = PropOverlayType::Muf;
     p.rotationIntervalS = 30;
-    config.presets.push_back(std::move(p));
+    addIfMissing(std::move(p));
+  }
+  // DE Station Status preset
+  {
+    ConfigPreset p;
+    p.name = "DE Station Status";
+    p.pane1Rotation = {"dxcc_progress", "was_progress", "grid_progress"};
+    p.pane2Rotation = {"zone_heatmap", "clublog_wanted"};
+    p.pane3Rotation = {"wac_radar", "alerts"};
+    p.pane4Rotation = {"band_conditions"};
+    p.pane5Rotation = {"de_info"};
+    p.pane6Rotation = {"lotw_sync", "adif"};
+    p.weatherOverlay = WeatherOverlayType::CloudsGrib;
+    addIfMissing(std::move(p));
   }
 }
 
@@ -293,6 +335,7 @@ bool ConfigManager::load(AppConfig &config) {
     config.showSatTrack = ap.value("show_sat_track", true);
     config.showBeacons = ap.value("show_beacons", true);
     config.showBorders = ap.value("show_borders", false);
+    config.showLocalPropGauge = ap.value("show_local_prop_gauge", false);
     config.displayPowerMethod = ap.value("display_power_method", "auto");
     config.logLevel = ap.value("log_level", "warn");
     config.qrzUsername = ap.value("qrz_username", "");
@@ -354,6 +397,7 @@ bool ConfigManager::load(AppConfig &config) {
   // RSS
   if (json.contains("rss")) {
     config.rssEnabled = json["rss"].value("enabled", true);
+    config.rssUrl = json["rss"].value("url", "");
   }
 
   // Activity panels
@@ -511,6 +555,7 @@ bool ConfigManager::load(AppConfig &config) {
     config.wsjtxPort = dxc.value("wsjtx_port", 2237);
     config.dxClusterHideDuplicates = dxc.value("hide_duplicates", true);
     config.dxClusterMaxAgeMinutes = dxc.value("max_age_minutes", 20);
+    config.kIndexAlertThreshold = dxc.value("k_index_threshold", 5.0f);
   }
 
   // Live Spots (Combined RBN, PSK Reporter, WSPR)
@@ -570,6 +615,7 @@ bool ConfigManager::load(AppConfig &config) {
     config.preventSleep = p.value("prevent_sleep", true);
     config.gpsEnabled = p.value("gps_enabled", false);
     config.audioMuted = p.value("audio_muted", false);
+    config.audioVolume = p.value("audio_volume", 100);
     config.skippedVersion = p.value("skipped_version", "");
   }
 
@@ -596,6 +642,10 @@ bool ConfigManager::load(AppConfig &config) {
     auto &k = json["api_keys"];
     config.repeaterBookKey = k.value("repeaterbook", "");
     config.winlinkKey = k.value("winlink", "");
+    config.lotwCall = k.value("lotw_call", "");
+    config.lotwPassword = k.value("lotw_password", "");
+    config.lotwLastSync = k.value("lotw_last_sync", "");
+    config.clublogApiKey = k.value("clublog", "");
   }
   // Presets
   if (json.contains("presets") && json["presets"].is_array()) {
@@ -639,6 +689,14 @@ bool ConfigManager::load(AppConfig &config) {
     }
   }
 
+  // Deleted factory presets
+  if (json.contains("deleted_factory_presets") && json["deleted_factory_presets"].is_array()) {
+    for (auto &item : json["deleted_factory_presets"]) {
+      if (item.is_string())
+        config.deletedFactoryPresets.insert(item.get<std::string>());
+    }
+  }
+
   // World Clock
   config.worldClocks.clear();
   if (json.contains("world_clocks") && json["world_clocks"].is_array()) {
@@ -664,9 +722,8 @@ if (!loadedJson) {
     config.worldClocks.push_back({"", 0, false});
   }
 
-  // Seed factory presets on first use
-  if (config.presets.empty())
-    addFactoryPresets(config);
+  // Ensure factory presets exist (skip deleted ones)
+  ensureFactoryPresets(config);
 
   // Sync internal state
   config_ = config;
@@ -731,6 +788,7 @@ bool ConfigManager::save(const AppConfig &config) {
   json["appearance"]["show_sat_track"] = config.showSatTrack;
   json["appearance"]["show_beacons"] = config.showBeacons;
   json["appearance"]["show_borders"] = config.showBorders;
+  json["appearance"]["show_local_prop_gauge"] = config.showLocalPropGauge;
   json["appearance"]["display_power_method"] = config.displayPowerMethod;
   if (config.logLevel != "warn")
     json["appearance"]["log_level"] = config.logLevel;
@@ -768,6 +826,7 @@ bool ConfigManager::save(const AppConfig &config) {
   json["power"]["prevent_sleep"] = config.preventSleep;
   json["power"]["gps_enabled"] = config.gpsEnabled;
   json["power"]["audio_muted"] = config.audioMuted;
+  json["power"]["audio_volume"] = config.audioVolume;
   json["power"]["skipped_version"] = config.skippedVersion;
 
   json["network"]["cors_proxy_url"] = config.corsProxyUrl;
@@ -797,6 +856,10 @@ bool ConfigManager::save(const AppConfig &config) {
 
   json["api_keys"]["repeaterbook"] = config.repeaterBookKey;
   json["api_keys"]["winlink"] = config.winlinkKey;
+  json["api_keys"]["lotw_call"] = config.lotwCall;
+  json["api_keys"]["lotw_password"] = config.lotwPassword;
+  json["api_keys"]["lotw_last_sync"] = config.lotwLastSync;
+  json["api_keys"]["clublog"] = config.clublogApiKey;
 
   auto saveRotation = [&](const std::string &key,
                           const std::vector<std::string> &vec) {
@@ -845,6 +908,7 @@ bool ConfigManager::save(const AppConfig &config) {
   json["dx_cluster"]["wsjtx_port"] = config.wsjtxPort;
   json["dx_cluster"]["hide_duplicates"] = config.dxClusterHideDuplicates;
   json["dx_cluster"]["max_age_minutes"] = config.dxClusterMaxAgeMinutes;
+  json["dx_cluster"]["k_index_threshold"] = config.kIndexAlertThreshold;
 
   json["live_spots"]["source"] =
       (config.liveSpotSource == LiveSpotSource::RBN)    ? "rbn"
@@ -881,6 +945,7 @@ bool ConfigManager::save(const AppConfig &config) {
   json["world_clocks"] = wcArr;
 
   json["rss"]["enabled"] = config.rssEnabled;
+  json["rss"]["url"] = config.rssUrl;
   json["activity"]["onta_filter"] = config.ontaFilter;
   json["activity"]["onta_max_dist_km"] = config.ontaMaxDistKm;
 
@@ -899,8 +964,11 @@ bool ConfigManager::save(const AppConfig &config) {
     }
   }
 
-  // Presets
+  // Presets (only save user-created presets, not factory presets)
   {
+    static const std::set<std::string> factoryNames = {
+        "DX", "Contest", "Satellite", "Environment/WX", "Prop Firehose", "DE Station Status"};
+
     auto savePresetRotation = [](const std::vector<std::string> &vec) {
       auto arr = nlohmann::json::array();
       for (const auto &t : vec) arr.push_back(t);
@@ -908,6 +976,10 @@ bool ConfigManager::save(const AppConfig &config) {
     };
     auto presetsArr = nlohmann::json::array();
     for (const auto &p : config.presets) {
+      // Skip factory presets; only save user-created ones
+      if (factoryNames.count(p.name) > 0)
+        continue;
+
       nlohmann::json jp;
       jp["name"]               = p.name;
       jp["pane1_rotation"]     = savePresetRotation(p.pane1Rotation);
@@ -938,6 +1010,15 @@ bool ConfigManager::save(const AppConfig &config) {
       presetsArr.push_back(jp);
     }
     json["presets"] = presetsArr;
+  }
+
+  // Deleted factory presets
+  {
+    auto deletedArr = nlohmann::json::array();
+    for (const auto &name : config.deletedFactoryPresets) {
+      deletedArr.push_back(name);
+    }
+    json["deleted_factory_presets"] = deletedArr;
   }
 
   std::filesystem::path tmpPath = configPath_;
@@ -1051,6 +1132,13 @@ void ConfigManager::savePreset(AppConfig &config, const std::string &name) {
 
 void ConfigManager::deletePreset(AppConfig &config, int index) {
   if (index >= 0 && index < (int)config.presets.size()) {
+    const auto &presetName = config.presets[index].name;
+    // Track deletion of factory presets so they don't reappear on update
+    static const std::set<std::string> factoryPresetNames = {
+        "DX", "Contest", "Satellite", "Environment/WX", "Prop Firehose", "DE Station Status"};
+    if (factoryPresetNames.find(presetName) != factoryPresetNames.end()) {
+      config.deletedFactoryPresets.insert(presetName);
+    }
     config.presets.erase(config.presets.begin() + index);
   }
 }

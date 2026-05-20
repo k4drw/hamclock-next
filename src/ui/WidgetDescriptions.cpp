@@ -71,6 +71,12 @@ void populateWidgetDescriptions() {
     "Active POTA and SOTA activations worldwide with frequency and park/summit details.");
   r.setDescription("adif",
     "Displays recent QSOs from a local ADIF log file; auto-refreshes as log grows.");
+  r.setDescription("qso_rate",
+    "QSO rate tracker — sparkline chart of QSOs per hour for the past 12 hours with peak and total stats.");
+  r.setDescription("flare_log",
+    "Solar Flare Log — scrollable list of recent X-ray flares (class B–X) from NOAA with peak times and durations.");
+  r.setDescription("greyline_spots",
+    "Greyline Spots — shows only DX cluster spots where the spotter or DX station is near the sunrise/sunset terminator.");
   r.setDescription("callbook",
     "Callsign lookup showing name, QTH, grid square, and license class.");
   r.setDescription("watchlist",
@@ -81,6 +87,18 @@ void populateWidgetDescriptions() {
     "Daily greyline opening and closing times for configured DXCC entities.");
   r.setDescription("dxcc_progress",
     "DXCC award progress tracker — worked vs. confirmed entities by band/mode.");
+  r.setDescription("was_progress",
+    "Worked All States (WAS) tracking grid showing status (worked/confirmed) for all 50 US states.");
+  r.setDescription("wac_radar",
+    "Worked All Continents (WAC) award progress radar showing worked/confirmed status for all 6 continents.");
+  r.setDescription("zone_heatmap",
+    "Zone Heatmap — tracks Worked All Zones (WAZ) for CQ (1-40) and ITU (1-75) zones.");
+  r.setDescription("grid_progress",
+    "Grid Progress — tracks worked and confirmed Maidenhead grid squares (4-char like EN50) from ADIF log.");
+  r.setDescription("clublog_wanted",
+    "Most Wanted — ranked list of DXCC entities from Clublog.org API; red=needed, grey=worked/confirmed.");
+  r.setDescription("lotw_sync",
+    "LoTW Sync status panel: last sync time, QSOs synced count, connection status, and error messages.");
 
   // ── Tracking ─────────────────────────────────────────────────────────────────
   r.setDescription("satellite",

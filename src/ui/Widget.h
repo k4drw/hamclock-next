@@ -110,12 +110,10 @@ public:
     s_pendingTooltip_.active = false;
     auto *cat = s_pendingTooltip_.cat;
 
-    int tw1, th1, tw2 = 0, th2 = 0;
-    cat->renderText(renderer, s_pendingTooltip_.text, s_pendingTooltip_.textColor,
-                    FontStyle::Micro, &tw1, &th1);
-    if (!s_pendingTooltip_.text2.empty())
-      cat->renderText(renderer, s_pendingTooltip_.text2,
-                      s_pendingTooltip_.textDimColor, FontStyle::Micro, &tw2, &th2);
+    int tw1 = s_pendingTooltip_.tw1;
+    int th1 = s_pendingTooltip_.th1;
+    int tw2 = s_pendingTooltip_.tw2;
+    int th2 = s_pendingTooltip_.th2;
 
     int padX = 8;
     int padY = 4;
@@ -200,6 +198,7 @@ protected:
     SDL_Color bgColor;
     SDL_Color borderColor;
     FontCatalog *cat;
+    int tw1, th1, tw2, th2;
   };
   static inline PendingTooltip s_pendingTooltip_{};
 
@@ -247,6 +246,15 @@ protected:
       return;
     }
     ThemeColors themes = getThemeColors(theme_);
+    int tw1 = 0, th1 = 0, tw2 = 0, th2 = 0;
+    int ptSize = fontMgr.catalog()->ptSize(FontStyle::Micro);
+    tw1 = fontMgr.getLogicalWidth(tooltip_.text, ptSize);
+    th1 = fontMgr.getLogicalHeight(tooltip_.text, ptSize);
+    if (!tooltip_.text2.empty()) {
+      tw2 = fontMgr.getLogicalWidth(tooltip_.text2, ptSize);
+      th2 = fontMgr.getLogicalHeight(tooltip_.text2, ptSize);
+    }
+
     s_pendingTooltip_ = {true,
                          tooltip_.text,
                          tooltip_.text2,
@@ -256,7 +264,8 @@ protected:
                          themes.textDim,
                          themes.bg,
                          themes.border,
-                         fontMgr.catalog()};
+                         fontMgr.catalog(),
+                         tw1, th1, tw2, th2};
   }
 
 };

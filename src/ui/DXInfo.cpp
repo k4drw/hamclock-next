@@ -6,6 +6,8 @@
 #include "../core/GreylineCalculator.h"
 #include "../core/MemoryMonitor.h"
 #include "../core/Theme.h"
+#include "../services/CallbookProvider.h"
+#include "../services/WeatherProvider.h"
 #include "FontCatalog.h"
 #include "WidgetRegistry.h"
 
@@ -17,11 +19,19 @@
 
 DXInfo::DXInfo(int x, int y, int w, int h, FontManager &fontMgr,
                std::shared_ptr<HamClockState> state,
-               std::shared_ptr<WeatherStore> weatherStore)
-    : Widget(x, y, w, h), fontMgr_(fontMgr), state_(std::move(state)),
-      weatherStore_(std::move(weatherStore)),
+               std::shared_ptr<WeatherStore> weatherStore,
+               WeatherProvider *dxWeatherProvider,
+               std::shared_ptr<DXClusterDataStore> dxcStore,
+               std::shared_ptr<CallbookProvider> callbookProvider,
+               std::shared_ptr<class CallbookStore> callbookStore)
+    : Widget(x, y, w, h), fontMgr_(fontMgr), callbookProvider_(callbookProvider),
+      state_(std::move(state)), weatherStore_(std::move(weatherStore)),
+      dxWeatherProvider_(dxWeatherProvider),
+      dxcStore_(std::move(dxcStore)), callbookStore_(std::move(callbookStore)),
       greylineModal_(0, 0, HamClock::LOGICAL_WIDTH, HamClock::LOGICAL_HEIGHT,
-                     fontMgr) {}
+                     fontMgr) {
+  manualDXInput_.setMaxLength(20);
+}
 
 void DXInfo::destroyCache() {
   for (int i = 0; i < kNumLines; ++i) {
@@ -34,6 +44,40 @@ void DXInfo::destroyCache() {
 void DXInfo::update() {
   if (greylineModal_.isActive())
     return;
+
+  // Detect DX location changes and trigger weather fetch
+  if (state_ && (state_->dxLocation.lat != lastDxLocation_.lat ||
+                 state_->dxLocation.lon != lastDxLocation_.lon)) {
+    lastDxLocation_ = state_->dxLocation;
+    if (dxWeatherProvider_) {
+      dxWeatherProvider_->fetch(state_->dxLocation.lat, state_->dxLocation.lon);
+    }
+    if (weatherStore_) {
+      WeatherData wd;
+      wd.valid = false;
+      weatherStore_->update(wd);
+    }
+  }
+
+  if (dxcStore_) {
+    auto data = dxcStore_->snapshot();
+    if (data->watchedSpotted) {
+      auto elapsed = std::chrono::steady_clock::now() - data->watchedSpottedAt;
+      watchedSpotActive_ = (elapsed < std::chrono::seconds(30));
+    } else {
+      watchedSpotActive_ = false;
+    }
+  }
+
+  // Check for callbook data (from manual DX entry lookup)
+  if (!state_->dxCallsign.empty() && callbookStore_ && state_->dxLocation.lat == 0.0) {
+    auto cbData = callbookStore_->get();
+    if (cbData.valid && cbData.callsign == state_->dxCallsign &&
+        (cbData.lat != 0.0 || cbData.lon != 0.0)) {
+      state_->dxLocation = {cbData.lat, cbData.lon};
+      state_->dxGrid = cbData.grid;
+    }
+  }
 
   lineText_[0] = "DX:";
 
@@ -62,7 +106,21 @@ void DXInfo::update() {
 
   if (!state_->dxCallsign.empty()) {
     lineText_[1] = state_->dxCallsign;
-    lineText_[6] = state_->dxGrid;
+    if (state_->dxStartTime != std::chrono::system_clock::time_point{}) {
+      auto startT = std::chrono::system_clock::to_time_t(state_->dxStartTime);
+      auto endT = std::chrono::system_clock::to_time_t(state_->dxEndTime);
+      struct tm tmStart, tmEnd;
+      Astronomy::portable_gmtime(&startT, &tmStart);
+      Astronomy::portable_gmtime(&endT, &tmEnd);
+      char sBuf[16], eBuf[16], dBuf[64];
+      std::strftime(sBuf, sizeof(sBuf), "%b %d", &tmStart);
+      std::strftime(eBuf, sizeof(eBuf), "%b %d", &tmEnd);
+      std::snprintf(dBuf, sizeof(dBuf), "%s: %s-%s", state_->dxGrid.c_str(),
+                    sBuf, eBuf);
+      lineText_[6] = dBuf;
+    } else {
+      lineText_[6] = state_->dxGrid;
+    }
   } else {
     lineText_[1] = state_->dxGrid;
     lineText_[6].clear();
@@ -161,9 +219,9 @@ void DXInfo::render(SDL_Renderer *renderer) {
                                FontStyle::MicroBold);
 
   // Greyline Sync Button
+  int btnW = 35;
+  int btnH = 16;
   if (state_->dxActive) {
-    int btnW = 35;
-    int btnH = 16;
     greylineBtnRect_ = {x_ + width_ - btnW - 5, y_ + 4, btnW, btnH};
     SDL_SetRenderDrawColor(renderer, themes.rowStripe1.r, themes.rowStripe1.g,
                            themes.rowStripe1.b, 255);
@@ -178,6 +236,7 @@ void DXInfo::render(SDL_Renderer *renderer) {
   } else {
     greylineBtnRect_ = {0, 0, 0, 0};
   }
+
 
   int curY = y_ + 20 + pad / 2;
   for (int i = 0; i < kNumLines; ++i) {
@@ -204,6 +263,23 @@ void DXInfo::render(SDL_Renderer *renderer) {
       curY += lineH_[i] + pad / 3;
     }
   }
+
+  // Hint text when modal not active
+  if (!manualDXModalActive_) {
+    fontMgr_.catalog()->drawText(renderer, "(Click to enter DX manually)",
+                                 x_ + pad, y_ + height_ - 30, themes.textDim,
+                                 FontStyle::Micro);
+  }
+
+  // Highlight border if watched spot is active
+  if (watchedSpotActive_) {
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+    SDL_SetRenderDrawColor(renderer, themes.warning.r, themes.warning.g,
+                           themes.warning.b, 255);
+    SDL_Rect rect = {x_, y_, width_, height_};
+    SDL_RenderDrawRect(renderer, &rect);
+    SDL_RenderDrawRect(renderer, &rect); // Double-wide border
+  }
 }
 
 void DXInfo::onResize(int x, int y, int w, int h) {
@@ -222,6 +298,14 @@ bool DXInfo::onMouseUp(int mx, int my, Uint16 /*mod*/, int /*clicks*/) {
     return true;
   }
 
+  if (manualDXModalActive_) {
+    // Close modal on click
+    manualDXModalActive_ = false;
+    manualDXInput_.setActive(false);
+    SDL_StopTextInput();
+    return true;
+  }
+
   // Handle Greyline button click
   if (greylineBtnRect_.w > 0 && mx >= greylineBtnRect_.x &&
       mx < greylineBtnRect_.x + greylineBtnRect_.w && my >= greylineBtnRect_.y &&
@@ -232,6 +316,16 @@ bool DXInfo::onMouseUp(int mx, int my, Uint16 /*mod*/, int /*clicks*/) {
     greylineModal_.setWindow(window, state_->dxCallsign);
     return true;
   }
+
+  // Click on widget to open manual entry modal
+  if (mx >= x_ && mx < x_ + width_ && my >= y_ && my < y_ + height_) {
+    manualDXModalActive_ = true;
+    manualDXInput_.clear();
+    manualDXInput_.setActive(true);
+    SDL_StartTextInput();
+    return true;
+  }
+
   return false;
 }
 
@@ -239,7 +333,95 @@ bool DXInfo::onKeyDown(SDL_Keycode key, Uint16 mod) {
   if (greylineModal_.isActive()) {
     return greylineModal_.onKeyDown(key, mod);
   }
+
+  if (manualDXModalActive_) {
+    if (key == SDLK_RETURN || key == SDLK_KP_ENTER) {
+      // Submit callsign
+      std::string val = manualDXInput_.getValue();
+      std::transform(val.begin(), val.end(), val.begin(), ::toupper);
+      if (!val.empty()) {
+        // Set as DX target
+        state_->dxCallsign = val;
+        state_->dxActive = true;
+        state_->dxLocation = {0.0, 0.0};
+        state_->dxGrid = "";
+
+        // Trigger callbook lookup for accurate grid
+        if (callbookProvider_) {
+          callbookProvider_->lookup(val);
+        }
+
+        // Track for spot matching - will update location when spot arrives
+        if (dxcStore_) {
+          dxcStore_->setWatchedCall(val);
+        }
+      }
+      manualDXModalActive_ = false;
+      manualDXInput_.setActive(false);
+      SDL_StopTextInput();
+      return true;
+    }
+    if (key == SDLK_ESCAPE) {
+      manualDXModalActive_ = false;
+      manualDXInput_.setActive(false);
+      SDL_StopTextInput();
+      return true;
+    }
+    return manualDXInput_.onKeyDown(key, mod);
+  }
   return false;
+}
+
+bool DXInfo::onTextInput(const char *text) {
+  if (manualDXModalActive_) {
+    std::string upper(text);
+    std::transform(upper.begin(), upper.end(), upper.begin(), ::toupper);
+    return manualDXInput_.onTextInput(upper.c_str());
+  }
+  return false;
+}
+
+void DXInfo::renderModal(SDL_Renderer *renderer) {
+  if (greylineModal_.isActive()) {
+    greylineModal_.render(renderer);
+  }
+  renderManualDXModal(renderer);
+}
+
+void DXInfo::renderManualDXModal(SDL_Renderer *renderer) {
+  if (!manualDXModalActive_) return;
+
+  ThemeColors themes = getThemeColors(theme_);
+  int modalW = 300;
+  int modalH = 100;
+  int modalX = (HamClock::LOGICAL_WIDTH - modalW) / 2;
+  int modalY = (HamClock::LOGICAL_HEIGHT - modalH) / 2;
+
+  // Modal background
+  SDL_SetRenderDrawColor(renderer, themes.rowStripe1.r, themes.rowStripe1.g,
+                         themes.rowStripe1.b, 255);
+  SDL_Rect modalBg = {modalX, modalY, modalW, modalH};
+  SDL_RenderFillRect(renderer, &modalBg);
+
+  // Modal border
+  SDL_SetRenderDrawColor(renderer, themes.accent.r, themes.accent.g,
+                         themes.accent.b, 255);
+  SDL_RenderDrawRect(renderer, &modalBg);
+
+  // Label
+  fontMgr_.catalog()->drawText(renderer, "Enter DX Callsign:", modalX + 10,
+                               modalY + 10, themes.text, FontStyle::Fast);
+
+  // Input field using TextInput widget
+  int inputX = modalX + 10;
+  int inputY = modalY + 30;
+  int inputW = modalW - 20;
+  int inputH = 24;
+  manualDXInput_.render(renderer, fontMgr_, inputX, inputY, inputW, inputH,
+                        FontStyle::Fast, 6, manualDXInput_.isActive(), true,
+                        themes.accent, themes.border, themes.text,
+                        themes.text, themes.textDim, "Enter callsign...",
+                        &themes.rowStripe1);
 }
 
 nlohmann::json DXInfo::getDebugData() const {
@@ -262,6 +444,8 @@ nlohmann::json DXInfo::getDebugData() const {
 
 REGISTER_WIDGET("dx_info", "DX Info", false, false, {
   auto p = std::make_unique<DXInfo>(0, 0, 0, 0, deps.fontMgr, deps.state,
-                                    deps.dxWeatherStore);
+                                    deps.dxWeatherStore, deps.dxWeatherProvider,
+                                    deps.dxcStore, deps.callbookProvider,
+                                    deps.callbookStore);
   return p;
 })

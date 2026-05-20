@@ -99,6 +99,34 @@ void SetupScreen::renderTabIdentity(SDL_Renderer *renderer, int cx, int pad,
   }
   cat->drawText(renderer, "Mute all audio (TTS + alarm)", fieldX + 30, y + 10,
                 themes.text, FontStyle::SmallRegular, false, false, true);
+  y += 28;
+
+  cat->drawText(renderer, "Volume:", fieldX, y + 10, themes.text, FontStyle::SmallRegular, false, false, true);
+  int volLabelW = fontMgr_.getLogicalWidth("Volume:", cat->ptSize(FontStyle::SmallRegular));
+  int sliderX = fieldX + volLabelW + 10;
+  int sliderW = fieldW - (volLabelW + 10) - 50;
+  audioVolumeSliderRect_ = {sliderX, y, sliderW, 20};
+  
+  // Slider track
+  SDL_Rect track = {sliderX, y + 8, sliderW, 4};
+  SDL_SetRenderDrawColor(renderer, themes.rowStripe1.r, themes.rowStripe1.g, themes.rowStripe1.b, 255);
+  SDL_RenderFillRect(renderer, &track);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
+  SDL_RenderDrawRect(renderer, &track);
+  
+  // Slider thumb
+  int thumbX = sliderX + (audioVolume_ * sliderW / 100);
+  SDL_Rect thumb = {thumbX - 5, y, 10, 20};
+  SDL_SetRenderDrawColor(renderer, themes.accent.r, themes.accent.g, themes.accent.b, 255);
+  SDL_RenderFillRect(renderer, &thumb);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
+  SDL_RenderDrawRect(renderer, &thumb);
+  
+  // Percentage text
+  char volBuf[8];
+  std::snprintf(volBuf, sizeof(volBuf), "%d%%", audioVolume_);
+  cat->drawText(renderer, volBuf, sliderX + sliderW + 10, y + 10, themes.text, FontStyle::SmallRegular, false, false, true);
+
   y += 28 + vSpace;
 
   cat->drawText(renderer, "Default Timezone:", fieldX, y, themes.text, FontStyle::SmallBold);

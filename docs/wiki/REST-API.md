@@ -34,8 +34,9 @@ These endpoints handle reading and writing application settings.
 
 - `GET /api/config` : Returns core configuration data in JSON format.
 - `GET /get_config.json` : Redirects to `/api/config`.
-- `GET /set_config?...` : Updates configuration parameters. Key fields: `call`, `grid`, `theme`, `map_style`, `prop_overlay`, `wx_overlay`, `night_lights`, `use_metric`, `dx_enabled`, `rbn_enabled`, `aux_tz_offset`, `aux_tz_label`.
+- `GET /set_config?...` : Updates configuration parameters. Key fields: `call`, `grid`, `theme`, `map_style`, `prop_overlay`, `wx_overlay`, `night_lights`, `use_metric`, `dx_enabled`, `rbn_enabled`, `aux_tz_offset`, `aux_tz_label`, `lotw_call`, `lotw_password`, `clublog`, `show_local_prop_gauge`, `k_index_threshold`.
 - `GET /set_rss?enabled={0|1}` : Enables or disables the RSS news feed.
+- `GET /set_rss?url={RSS_URL}` : Configures a custom RSS feed URL. The feed appears in the scrolling text banner at the top of the screen alongside default news feeds. Provide the full RSS feed URL (e.g., `https://example.com/feed.xml`).
 - `GET /set_mapcolor?key={key}&color={#RRGGBB}` : Overrides a specific theme color (e.g., `map_bg`, `callsign_bg`).
 - `GET /set_dx?lat={lat}&lon={lon}&call={call}&grid={grid}` : Updates target DX location info.
 - `GET /api/hub/fetch?url={B64_URL}&max_age={SEC}` : Proxies a fetch through the Master's cache (Master mode only).
@@ -76,7 +77,7 @@ Controls the assignment and visualization of widgets in panes.
 - `GET /get_pane.txt` : Plaintext status of assigned widgets for each pane.
 - `GET /get_active_pane.txt` : Returns the currently visible widget ID for each pane.
 - `GET /set_panzoom?pan_x={X}&pan_y={Y}&zoom={Z}` : Directly set map pan/zoom.
-- `GET /set_sdo_options?wave={X}&rot={0|1}&pfss={0|1}&movie={0|1}` : Configure Solar widget (SDO) options.
+- `GET /set_sdo_options?wave={X}&rot={0|1}&pfss={0|1}&movie={0|1}` : Configure Solar widget (SDO) options. (`movie` param accepted but not yet implemented)
 
 ---
 
@@ -126,6 +127,7 @@ Use these endpoints to determine exactly where elements are on the screen (usefu
 - `GET /get_dx.txt` : DX location and bearing/distance.
 - `GET /get_stopwatch.txt` : Current status of the stopwatch (running state and time).
 - `GET /debug/logs` : Returns the last 100 lines of application logs.
+- `GET /debug/memory` : Returns JSON with cache RAM usage (`cache_ram_bytes`) and item counts (`cache_item_count`).
 
 ---
 

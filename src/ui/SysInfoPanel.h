@@ -10,6 +10,8 @@
 
 struct SDL_Renderer;
 
+class NetworkManager;
+
 // Displays CPU temperature, CPU%, RAM usage, and local IP address.
 // Layout adapts to available height:
 //   Tall (≥120px):   temp+CPU%, RAM used/total, est. VRAM, IP
@@ -18,9 +20,11 @@ struct SDL_Renderer;
 class SysInfoPanel : public Widget {
 public:
   SysInfoPanel(int x, int y, int w, int h, FontManager &fontMgr,
+               NetworkManager &netMgr,
                std::shared_ptr<CPUMonitor> monitor,
                std::shared_ptr<HamClockState> state,
-               bool useMetric = true);
+               bool useMetric = true,
+               bool showCacheStats = false);
 
   void update() override;
   void render(SDL_Renderer *renderer) override;
@@ -36,9 +40,11 @@ public:
 
 private:
   FontManager &fontMgr_;
+  NetworkManager &netMgr_;
   std::shared_ptr<CPUMonitor> monitor_;
   std::shared_ptr<HamClockState> state_;
   bool useMetric_;
+  bool showCacheStats_;
 
   // Temperature
   float currentTemp_ = 0.0f;
@@ -51,6 +57,10 @@ private:
   size_t totalRam_ = 0;
   int64_t vramBytes_ = 0;
   int diskPct_ = -1;
+
+  // Cache stats
+  size_t cacheRamBytes_ = 0;
+  size_t cacheItemCount_ = 0;
 
   // Throttling for stats (CPU, RAM, Temp)
   uint32_t lastStatsUpdateMs_ = 0;

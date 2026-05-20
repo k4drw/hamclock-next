@@ -157,20 +157,32 @@ static size_t writeData(void *ptr, size_t size, size_t nmemb, void *userdata) {
   return size * nmemb;
 }
 
-// userdata is a pointer to the atomic<float> progress member so the static
-// callback can update it without needing access to UpdateChecker internals.
+// userdata points to a DownloadContext; returning non-zero aborts the transfer.
 static int progressCallback(void *userdata, curl_off_t dlTotal,
                              curl_off_t dlNow, curl_off_t, curl_off_t) {
-  if (dlTotal > 0) {
-    auto *progress = static_cast<std::atomic<float> *>(userdata);
-    progress->store(static_cast<float>(dlNow) / static_cast<float>(dlTotal));
-  }
-  return 0;  // returning non-zero would abort the transfer
+  auto *ctx = static_cast<UpdateChecker::DownloadContext *>(userdata);
+  if (ctx->cancel.load(std::memory_order_acquire))
+    return 1;  // abort — destructor has signalled cancellation
+  if (dlTotal > 0)
+    ctx->progress.store(static_cast<float>(dlNow) / static_cast<float>(dlTotal));
+  return 0;
 }
 
 // ---------------------------------------------------------------------------
 
 UpdateChecker::UpdateChecker(NetworkManager &net) : net_(net) {}
+
+UpdateChecker::~UpdateChecker() {
+  // Signal any in-progress download to abort via the curl progress callback,
+  // then wait for the thread to decrement inflight_ and exit cleanly.
+  {
+    std::lock_guard<std::mutex> lk(inflightMutex_);
+    if (dlCtx_)
+      dlCtx_->cancel.store(true, std::memory_order_release);
+  }
+  std::unique_lock<std::mutex> lk(inflightMutex_);
+  inflightCv_.wait(lk, [this] { return inflight_ == 0; });
+}
 
 void UpdateChecker::fetch() {
   net_.fetchAsync(
@@ -256,7 +268,12 @@ UpdateChecker::DownloadState UpdateChecker::downloadState() const {
 }
 
 float UpdateChecker::downloadProgress() const {
-  return downloadProgress_.load();
+  std::shared_ptr<DownloadContext> ctx;
+  {
+    std::lock_guard<std::mutex> lk(inflightMutex_);
+    ctx = dlCtx_;
+  }
+  return ctx ? ctx->progress.load() : 0.0f;
 }
 
 std::string UpdateChecker::downloadedPath() const {
@@ -285,7 +302,15 @@ void UpdateChecker::startDownload() {
     return;
   }
 
-  downloadProgress_.store(0.0f);
+  // Create a fresh shared context; the thread holds a copy so progress and
+  // cancel remain valid even if the destructor races with thread startup.
+  std::shared_ptr<DownloadContext> ctx;
+  {
+    std::lock_guard<std::mutex> lk(inflightMutex_);
+    dlCtx_ = std::make_shared<DownloadContext>();
+    ctx = dlCtx_;
+    ++inflight_;
+  }
 
   // Determine temp file extension from URL
   auto ext = std::filesystem::path(url).extension().string();
@@ -293,12 +318,14 @@ void UpdateChecker::startDownload() {
   auto tmpPath = std::filesystem::temp_directory_path() /
                  ("hamclock-next-update" + ext);
 
-  std::thread([this, url, tmpPath]() {
+  std::thread([this, url, tmpPath, ctx]() {
     std::ofstream outFile(tmpPath, std::ios::binary | std::ios::trunc);
     if (!outFile) {
       LOG_W("UpdateChecker", "Cannot open temp file for download: {}",
             tmpPath.string());
       downloadState_.store(DownloadState::Failed);
+      std::lock_guard<std::mutex> lk(inflightMutex_);
+      if (--inflight_ == 0) inflightCv_.notify_all();
       return;
     }
 
@@ -306,14 +333,17 @@ void UpdateChecker::startDownload() {
     if (!curl) {
       LOG_W("UpdateChecker", "curl_easy_init failed");
       downloadState_.store(DownloadState::Failed);
+      std::lock_guard<std::mutex> lk(inflightMutex_);
+      if (--inflight_ == 0) inflightCv_.notify_all();
       return;
     }
 
     curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+    curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeData);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &outFile);
     curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION, progressCallback);
-    curl_easy_setopt(curl, CURLOPT_XFERINFODATA, &downloadProgress_);
+    curl_easy_setopt(curl, CURLOPT_XFERINFODATA, ctx.get());
     curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L);
     curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
     curl_easy_setopt(curl, CURLOPT_TIMEOUT, 300L);  // 5-minute cap
@@ -333,6 +363,11 @@ void UpdateChecker::startDownload() {
       LOG_W("UpdateChecker", "Download failed: {}", curl_easy_strerror(res));
       std::filesystem::remove(tmpPath);
       downloadState_.store(DownloadState::Failed);
+    }
+
+    {
+      std::lock_guard<std::mutex> lk(inflightMutex_);
+      if (--inflight_ == 0) inflightCv_.notify_all();
     }
   }).detach();
 }

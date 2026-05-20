@@ -1,5 +1,6 @@
 #include "CloudProvider.h"
 #include "../core/Logger.h"
+#include "../core/MemoryMonitor.h"
 #include "../core/WorkerService.h"
 #include "../ui/TextureManager.h"
 #include <SDL_image.h>
@@ -12,8 +13,7 @@ CloudProvider::CloudProvider(NetworkManager &netMgr) : netMgr_(netMgr) {}
 
 CloudProvider::~CloudProvider() {
   if (texture_) {
-    SDL_DestroyTexture(texture_);
-    texture_ = nullptr;
+    MemoryMonitor::getInstance().destroyTexture(texture_);
   }
   if (pendingSurface_) {
     SDL_FreeSurface(pendingSurface_);
@@ -104,10 +104,11 @@ SDL_Texture *CloudProvider::getTexture(SDL_Renderer *renderer, int w, int h, SDL
   // Check for new surface from background thread
   if (pendingSurface_) {
     if (texture_) {
-      SDL_DestroyTexture(texture_);
+      MemoryMonitor::getInstance().destroyTexture(texture_);
     }
     texture_ = SDL_CreateTextureFromSurface(renderer, pendingSurface_);
     if (texture_) {
+      MemoryMonitor::getInstance().addVram((int64_t)pendingSurface_->w * pendingSurface_->h * 4);
       texW_ = pendingSurface_->w;
       texH_ = pendingSurface_->h;
       SDL_SetTextureBlendMode(texture_, SDL_BLENDMODE_BLEND);
@@ -130,8 +131,7 @@ SDL_Texture *CloudProvider::getTexture(SDL_Renderer *renderer, int w, int h, SDL
 void CloudProvider::invalidateTexture() {
   std::lock_guard<std::mutex> lock(mutex_);
   if (texture_) {
-    SDL_DestroyTexture(texture_);
-    texture_ = nullptr;
+    MemoryMonitor::getInstance().destroyTexture(texture_);
   }
   if (pendingSurface_) {
     SDL_FreeSurface(pendingSurface_);

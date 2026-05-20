@@ -35,6 +35,10 @@ Pre-built packages are available for: **64-bit PC** (Linux and Windows), **Raspb
 
 Memory use has been substantially reduced for low-resource devices like the Raspberry Pi 3B. HamClock-Next now runs reliably on boards that previously ran out of memory and crashed.
 
+### Debug API Build Flag
+
+Use the `--enable-debug-api` flag with build scripts (e.g., `./scripts/build.sh`) to easily enable local testing of the REST Debug API.
+
 ---
 
 ## Stability & Network Improvements
@@ -46,6 +50,14 @@ Remote control commands sent via the [REST API](REST-API.md) are now synchronize
 ### Network Data Sharing (LAN Hub)
 
 If you run multiple HamClock-Next instances on the same local network, one can act as the **Master** and share its downloaded data with the others. This reduces internet traffic and prevents all instances from hammering the same data sources simultaneously. Client instances fall back to fetching directly if the Master is unavailable.
+
+### Memory Churn & High-Throughput Overhaul
+
+High-throughput background services (such as SOTA/POTA parsing, NOAA Aurora grid analysis, and LoTW Activity Store queries) have been completely overhauled to use zero-allocation `std::string_view` split algorithms, static thread-local rendering buffers, and moved data structures to eliminate frame-to-frame heap churn and reduce parsing latency by over 50%.
+
+### Robust Local Caching
+
+The caching system has been enhanced with a strict 5,000 metadata entry limit, LRU eviction for metadata-only entries, binary-safe cache writes, RAM caching bypass for large files (>512KB) to prevent Master Hub bloat, and epoch-independent timestamp checking to prevent unnecessary local cache bypass on application restart.
 
 ---
 
@@ -92,7 +104,7 @@ The following widgets have no equivalent in the original HamClock:
 | **Meteor**        | Meteor scatter activity levels and upcoming shower calendar                                                                                                                                    |
 | **Solar Storm**   | Current NOAA geomagnetic storm watch / warning / alert status                                                                                                                                  |
 | **Tropo**         | Tropospheric ducting forecast index                                                                                                                                                            |
-| **Sys Info**      | System resource display: CPU, memory, network, uptime                                                                                                                                         |
+| **Sys Info**      | System resource display: CPU, memory, network, uptime, and GPU cache statistics (texture, vertex, and command buffer usage) for debugging.                                                                                                         |
 | **World Clock**   | Up to 4 configurable time zones with city labels and UTC offsets                                                                                                                               |
 | **Big Clock**     | High-visibility digital or analog clock with user-selectable color themes                                                                                                                     |
 | **Solar (Basic)** | A condensed version of the Solar widget for simpler space weather monitoring                                                                                                                   |
@@ -113,6 +125,7 @@ HamClock-Next adds several propagation overlays not present in the original:
 | **VOACAP Point**        | VOACAP prediction from DE to a specific DX target point                                                                         |
 | **VOACAP Reliability**  | Circuit reliability percentage map                                                                                              |
 | **VOACAP TOA**          | Take-Off Angle prediction using geometric F2-layer model (multi-hop capable)                                                    |
+| **VOACAP Timeline**     | Reoriented X-axis so the leftmost column is always the current UTC hour ("now at origin"), with a vertical white line cursor. |
 | **Propagation Heatmap** | Live [PSK Reporter / RBN / WSPR](Glossary.md#psk-reporter--rbn--wspr) spot density heat map — shows where your signal is actually being heard right now                             |
 | **DRAP**                | D-Region Absorption Prediction map (also available as a standalone widget)                                                      |
 
@@ -140,6 +153,8 @@ User-defined colormaps let you tune map rendering for MUF, Reliability, and TOA 
 - **Interactive Zoom & Pan** — use the mouse wheel to zoom and drag to pan the map
 - **POTA activator map pins** — lime-green pins for active [POTA](Glossary.md#pota--sota) activations
 - **ADIF QSO map pins** — plots your logged QSOs from an ADIF file on the map
+- **ADIF/LoTW Map Pin Hover Tooltips** — hovering over ADIF/LoTW map pins displays a dynamic tooltip showing callsign, date, band, and mode, filtered by active settings
+- **LOTW QSO Map Toggle** — toggle the display of LoTW/ADIF QSO pins on/off via the "LOTW QSOs" checkbox in the Map View options menu
 - **Satellite ground track** — the selected satellite's orbital path is drawn as an arc on the map
 - **Beacon/widget-aware plotting** — beacon markers and Live Spots pins are only drawn when the related widget is active
 
@@ -193,6 +208,7 @@ Presets make it simple to switch between operating contexts (contest, casual DX,
 - **JSON configuration file** — human-readable, portable, and version-controllable (replaces original binary/EEPROM format)
 - **Automatic migration** — the config loader auto-migrates legacy flat keys from earlier HamClock-Next versions
 - **Brightness schedule** — configure dim and bright times (hour:minute) for automatic display brightness control
+- **Service Credential Persistence** — sensitive credentials (LoTW, Clublog, etc.) are now persisted in `config.json` and manageable via the Web API.
 - **Color overrides** — per-element color customization via `colorOverrides` map
 - **RSS ticker** — optional scrolling RSS feed display
 - **CORS proxy** — configurable relay URL for browser builds; see [CORS proxy](Glossary.md#cors-proxy)

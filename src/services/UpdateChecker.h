@@ -1,6 +1,8 @@
 #pragma once
 
 #include <atomic>
+#include <condition_variable>
+#include <memory>
 #include <mutex>
 #include <string>
 
@@ -13,6 +15,13 @@ class NetworkManager;
 class UpdateChecker {
 public:
   explicit UpdateChecker(NetworkManager &net);
+
+  // Destructor signals any in-progress download to abort and waits for the
+  // thread to exit so no members are accessed after destruction.
+  ~UpdateChecker();
+
+  UpdateChecker(const UpdateChecker &) = delete;
+  UpdateChecker &operator=(const UpdateChecker &) = delete;
 
   // Kick off (or refresh) the GitHub release check.
   // Results are cached for 6 hours by NetworkManager.
@@ -44,6 +53,14 @@ public:
 
   enum class DownloadState { Idle, InProgress, Complete, Failed };
 
+  // Shared between UpdateChecker and the download thread. Heap-allocated and
+  // ref-counted so the thread can safely read/write it after UpdateChecker is
+  // destroyed (destructor sets cancel and waits, so this is belt-and-suspenders).
+  struct DownloadContext {
+    std::atomic<float> progress{0.0f};
+    std::atomic<bool>  cancel{false};
+  };
+
   // Kick off a background download of the matched release asset.
   // Safe to call from the UI thread; no-op if already in progress.
   void startDownload();
@@ -61,6 +78,11 @@ private:
   std::string downloadUrl_;
 
   std::atomic<DownloadState> downloadState_{DownloadState::Idle};
-  std::atomic<float> downloadProgress_{0.0f};
   std::string downloadedPath_;  // guarded by mutex_
+
+  // Download thread lifetime tracking — mirrors FccProvider pattern.
+  std::shared_ptr<DownloadContext> dlCtx_;
+  mutable std::mutex inflightMutex_;
+  std::condition_variable inflightCv_;
+  int inflight_{0};
 };

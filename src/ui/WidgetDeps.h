@@ -50,6 +50,10 @@ class GreylineDXStore;
 class AuroraMapStore;
 class CalendarStore;
 class SpaceWeatherAlertStore;
+class LoTWActivityStore;
+class ClublogStore;
+class FlareDataStore;
+class HeardMeStore;
 
 // Providers / services (non-owning raw pointers)
 class LiveSpotProvider;
@@ -65,6 +69,7 @@ class IonosondeProvider;
 class RigService;
 class FccProvider;
 class MarineProvider;
+class WeatherProvider;
 
 // ---------------------------------------------------------------------------
 
@@ -114,6 +119,10 @@ struct WidgetDeps {
   std::shared_ptr<AuroraMapStore>       auroraMapStore;
   std::shared_ptr<CalendarStore>        calendarStore;
   std::shared_ptr<SpaceWeatherAlertStore> spaceWxAlertStore;
+  std::shared_ptr<LoTWActivityStore>    lotwActivityStore;
+  std::shared_ptr<ClublogStore>         clublogStore;
+  std::shared_ptr<FlareDataStore>       flareStore;
+  std::shared_ptr<HeardMeStore>         heardMeStore;
 
   // Providers / services (non-owning; owned by DashboardContext)
   LiveSpotProvider  *spotProvider      = nullptr;
@@ -124,10 +133,11 @@ struct WidgetDeps {
   BeaconProvider    *beaconProvider    = nullptr;
   SatelliteManager  *satMgr            = nullptr;
   AsteroidProvider  *asteroidProvider  = nullptr;
-  CallbookProvider  *callbookProvider  = nullptr;
+  std::shared_ptr<CallbookProvider> callbookProvider;
   std::shared_ptr<IonosondeProvider> ionosondeProvider;
   FccProvider       *fccProvider       = nullptr;
   RigService        *rigService        = nullptr;  // nullptr in WASM builds
   MarineProvider    *marineProvider    = nullptr;
+  WeatherProvider   *dxWeatherProvider = nullptr;
 };
 

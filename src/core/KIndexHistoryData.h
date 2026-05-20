@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <chrono>
 #include <mutex>
 #include <vector>
@@ -15,15 +16,31 @@ class KIndexHistoryStore {
 public:
   static constexpr int MAX_POINTS = 200;
 
-  void push(float kp) {
+  void push(float kp, std::chrono::system_clock::time_point ts =
+                          std::chrono::system_clock::now()) {
     std::lock_guard<std::mutex> lk(mutex_);
+
+    // Check if we already have this exact timestamp (avoid duplicates during
+    // backfill)
+    for (const auto &p : history_) {
+      if (p.timestamp == ts)
+        return;
+    }
+
     KIndexPoint p;
     p.kp = kp;
-    p.timestamp = std::chrono::system_clock::now();
+    p.timestamp = ts;
     history_.push_back(p);
 
+    // Keep sorted by timestamp
+    std::sort(history_.begin(), history_.end(),
+              [](const KIndexPoint &a, const KIndexPoint &b) {
+                return a.timestamp < b.timestamp;
+              });
+
     // Prune points older than 48 hours
-    auto cutoff = std::chrono::system_clock::now() - std::chrono::hours(48);
+    auto now = std::chrono::system_clock::now();
+    auto cutoff = now - std::chrono::hours(48);
     while (!history_.empty() && history_.front().timestamp < cutoff)
       history_.erase(history_.begin());
 

@@ -9,6 +9,13 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BUILD_DIR="$REPO_ROOT/build-ios"
 
+DEBUG_API_FLAG="-DENABLE_DEBUG_API=OFF"
+for arg in "$@"; do
+    if [ "$arg" == "--enable-debug-api" ]; then
+        DEBUG_API_FLAG="-DENABLE_DEBUG_API=ON"
+    fi
+done
+
 if [[ "$(uname)" != "Darwin" ]]; then
     echo "Error: iOS builds require macOS + Xcode. Linux is not supported."
     exit 1
@@ -36,6 +43,7 @@ cmake -B "$BUILD_DIR" \
     -DBUILD_TESTING=OFF \
     -DENABLE_TESTING=OFF \
     -DBUILD_CURL_EXE=OFF \
+    ${DEBUG_API_FLAG} \
     "$REPO_ROOT"
 
 # Discover the generated Xcode project name
