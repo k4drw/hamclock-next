@@ -297,6 +297,7 @@ bool ConfigManager::load(AppConfig &config) {
     config.propColormap = ap.value("prop_colormap", "muted");
     config.mapNightLights = ap.value("map_night_lights", true);
     config.useMetric = ap.value("use_metric", true);
+    config.scaleToFullScreen = ap.value("scale_to_full_screen", false);
     config.projection = ap.value("projection", "equirectangular");
     config.mapStyle = ap.value("map_style", "nasa");
     if (config.mapStyle.empty()) config.mapStyle = "nasa";
@@ -763,6 +764,7 @@ bool ConfigManager::save(const AppConfig &config) {
   json["appearance"]["prop_colormap"] = config.propColormap;
   json["appearance"]["map_night_lights"] = config.mapNightLights;
   json["appearance"]["use_metric"] = config.useMetric;
+  json["appearance"]["scale_to_full_screen"] = config.scaleToFullScreen;
   json["appearance"]["projection"] = config.projection;
   json["appearance"]["map_style"] = config.mapStyle;
   json["appearance"]["grid_type"] = config.gridType;

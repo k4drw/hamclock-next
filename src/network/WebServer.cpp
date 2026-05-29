@@ -342,6 +342,7 @@ void WebServer::run() {
       </select>
       <label style="margin-top:10px"><input type="checkbox" id="night-lights"> Show Night Lights</label>
       <label><input type="checkbox" id="use-metric"> Use Metric Units</label>
+      <label><input type="checkbox" id="scale-full-screen"> Scale to Full Screen</label>
       <label>MUF Real-time Opacity</label>
       <input type="range" id="muf-opacity" min="0" max="1" step="0.1" value="0.5">
       <div class="section-hdr" style="margin-top:16px">Font</div>
@@ -891,6 +892,7 @@ void WebServer::run() {
         document.getElementById('weather-overlay').value = c.weatherOverlay || 'none';
         document.getElementById('night-lights').checked = !!c.mapNightLights;
         document.getElementById('use-metric').checked = !!c.useMetric;
+        document.getElementById('scale-full-screen').checked = !!c.scaleToFullScreen;
         document.getElementById('muf-opacity').value = c.mufRtOpacity !== undefined ? c.mufRtOpacity : 0.5;
         await loadFonts(c.fontPath || '');
 
@@ -942,6 +944,7 @@ void WebServer::run() {
         show_beacons: showBeacons, show_sattrack: showSatTrack, show_grid: showGrid, grid_type: gridType,
         center_map_on_de: centerMapOnDe,
         prop_overlay: propOverlay, wx_overlay: wxOverlay, night_lights: nl, use_metric: mu,
+        scale_full_screen: document.getElementById('scale-full-screen').checked ? '1' : '0',
         display_power_method: dpm, font_path: fontPath,
         prop_band: document.getElementById('prop-band').value,
         prop_mode: document.getElementById('prop-mode').value,

@@ -74,6 +74,7 @@ struct AppConfig {
   std::string propColormap = "vibrant";       // "vibrant" (Original) or "muted" (Next)
   bool mapNightLights = true;
   bool useMetric = true;
+  bool scaleToFullScreen = false;
   std::string projection = "equirectangular"; // or "robinson"
   std::string mapStyle = "nasa";              // "nasa", "topo", "topo_bathy"
   bool showGrid = false;

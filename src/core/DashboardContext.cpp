@@ -256,27 +256,37 @@ void AppContext::updateLayoutMetrics() {
   if (FIDELITY_MODE) {
     float sw = static_cast<float>(globalDrawW) / LOGICAL_WIDTH;
     float sh = static_cast<float>(globalDrawH) / LOGICAL_HEIGHT;
-    layScale = std::min(sw, sh);
-    int logicalW = static_cast<int>(globalDrawW / layScale);
-    int logicalH = static_cast<int>(globalDrawH / layScale);
-    int xSpace = logicalW - LOGICAL_WIDTH;
-    int ySpace = logicalH - LOGICAL_HEIGHT;
-
-    switch (alignMode) {
-    case AlignMode::Center:
-      layLogicalOffX = xSpace / 2;
-      layLogicalOffY = ySpace / 2;
-      break;
-    case AlignMode::Left:
+    if (appCfg.scaleToFullScreen) {
+      layScaleX = sw;
+      layScaleY = sh;
       layLogicalOffX = 0;
       layLogicalOffY = 0;
-      break;
-    case AlignMode::Right:
-      layLogicalOffX = xSpace;
-      layLogicalOffY = ySpace / 2;
+    } else {
+      float layScale = std::min(sw, sh);
+      layScaleX = layScale;
+      layScaleY = layScale;
+      int logicalW = static_cast<int>(globalDrawW / layScale);
+      int logicalH = static_cast<int>(globalDrawH / layScale);
+      int xSpace = logicalW - LOGICAL_WIDTH;
+      int ySpace = logicalH - LOGICAL_HEIGHT;
+
+      switch (alignMode) {
+      case AlignMode::Center:
+        layLogicalOffX = xSpace / 2;
+        layLogicalOffY = ySpace / 2;
+        break;
+      case AlignMode::Left:
+        layLogicalOffX = 0;
+        layLogicalOffY = 0;
+        break;
+      case AlignMode::Right:
+        layLogicalOffX = xSpace;
+        layLogicalOffY = ySpace / 2;
+      }
     }
   } else {
-    layScale = 1.0f;
+    layScaleX = 1.0f;
+    layScaleY = 1.0f;
     layLogicalOffX = 0;
     layLogicalOffY = 0;
   }
@@ -1902,6 +1912,15 @@ void DashboardContext::update(AppContext &ctx) {
         } else if (event.key.keysym.sym == SDLK_o && ctx.dashboard) {
           ctx.dashboard->debugOverlay.toggle();
           consumed = true;
+        } else if (event.key.keysym.sym == SDLK_l) {
+          ctx.appCfg.scaleToFullScreen = !ctx.appCfg.scaleToFullScreen;
+          ctx.cfgMgr.save(ctx.appCfg);
+          SDL_Event ev{};
+          ev.type = SDL_WINDOWEVENT;
+          ev.window.event = SDL_WINDOWEVENT_SIZE_CHANGED;
+          SDL_GetWindowSize(ctx.window, &ev.window.data1, &ev.window.data2);
+          SDL_PushEvent(&ev);
+          consumed = true;
         } else if (event.key.keysym.sym == SDLK_F11) {
 
           Uint32 flags = SDL_GetWindowFlags(ctx.window);
@@ -1962,8 +1981,8 @@ void DashboardContext::update(AppContext &ctx) {
       if (FIDELITY_MODE) {
         float pixX = fmx * static_cast<float>(ctx.globalDrawW) / ctx.globalWinW;
         float pixY = fmy * static_cast<float>(ctx.globalDrawH) / ctx.globalWinH;
-        fmx = static_cast<int>(pixX / ctx.layScale);
-        fmy = static_cast<int>(pixY / ctx.layScale);
+        fmx = static_cast<int>(pixX / ctx.layScaleX);
+        fmy = static_cast<int>(pixY / ctx.layScaleY);
       }
       auto dispatchScroll = [&](int dy) {
         if (updateOverlay) {
@@ -2001,8 +2020,8 @@ void DashboardContext::update(AppContext &ctx) {
                      ctx.globalWinW;
         float pixY = event.button.y * static_cast<float>(ctx.globalDrawH) /
                      ctx.globalWinH;
-        smx = static_cast<int>(pixX / ctx.layScale);
-        smy = static_cast<int>(pixY / ctx.layScale);
+        smx = static_cast<int>(pixX / ctx.layScaleX);
+        smy = static_cast<int>(pixY / ctx.layScaleY);
       }
       if (focusedWidget)
         focusedWidget->onMouseDown(smx, smy, SDL_GetModState(),
@@ -2055,8 +2074,8 @@ void DashboardContext::update(AppContext &ctx) {
                        ctx.globalWinW;
           float pixY = event.button.y * static_cast<float>(ctx.globalDrawH) /
                        ctx.globalWinH;
-          smx = static_cast<int>(pixX / ctx.layScale);
-          smy = static_cast<int>(pixY / ctx.layScale);
+          smx = static_cast<int>(pixX / ctx.layScaleX);
+          smy = static_cast<int>(pixY / ctx.layScaleY);
         }
         if (updateOverlay->onMouseUp(smx, smy, SDL_GetModState(),
                                      event.button.clicks)) {
@@ -2449,8 +2468,8 @@ void DashboardContext::update(AppContext &ctx) {
                        ctx.globalWinW;
           float pixY = event.motion.y * static_cast<float>(ctx.globalDrawH) /
                        ctx.globalWinH;
-          mx = static_cast<int>(pixX / ctx.layScale);
-          my = static_cast<int>(pixY / ctx.layScale);
+          mx = static_cast<int>(pixX / ctx.layScaleX);
+          my = static_cast<int>(pixY / ctx.layScaleY);
         }
         if (focusedWidget)
           focusedWidget->onMouseMove(mx, my);
@@ -2482,8 +2501,8 @@ void DashboardContext::update(AppContext &ctx) {
                          ctx.globalWinW;
             float pixY = event.button.y * static_cast<float>(ctx.globalDrawH) /
                          ctx.globalWinH;
-            mx = static_cast<int>(pixX / ctx.layScale);
-            my = static_cast<int>(pixY / ctx.layScale);
+            mx = static_cast<int>(pixX / ctx.layScaleX);
+            my = static_cast<int>(pixY / ctx.layScaleY);
           }
           
           if (left) {
@@ -2547,8 +2566,8 @@ void DashboardContext::update(AppContext &ctx) {
                          ctx.globalWinW;
             float pixY = my * static_cast<float>(ctx.globalDrawH) /
                          ctx.globalWinH;
-            mx = static_cast<int>(pixX / ctx.layScale);
-            my = static_cast<int>(pixY / ctx.layScale);
+            mx = static_cast<int>(pixX / ctx.layScaleX);
+            my = static_cast<int>(pixY / ctx.layScaleY);
           }
           bool isFS = (expandedPaneIdx_ >= 0 && panes[expandedPaneIdx_]->getActiveType() == "big_clock");
           for (auto *w : eventWidgets) {
@@ -2622,10 +2641,12 @@ void DashboardContext::update(AppContext &ctx) {
     int dw, dh;
     SDL_GetRendererOutputSize(ctx.renderer, &dw, &dh);
     float ns = static_cast<float>(dh) / LOGICAL_HEIGHT;
-    if (ns > 0.5f && std::fabs(ns - fontMgr.renderScale()) > 0.01f) {
-      fontMgr.setRenderScale(ns);
-      fontMgr.clearCache();
-      fontCatalog.recalculate(LOGICAL_WIDTH, LOGICAL_HEIGHT);
+    if (ns > 0.5f) {
+      if (std::fabs(ns - fontMgr.renderScale()) > 0.01f) {
+        fontMgr.setRenderScale(ns);
+        fontMgr.clearCache();
+        fontCatalog.recalculate(LOGICAL_WIDTH, LOGICAL_HEIGHT);
+      }
       layout.recalculate(LOGICAL_WIDTH, LOGICAL_HEIGHT, ctx.layLogicalOffX,
                          ctx.layLogicalOffY);
       rssBanner->onResize(139 + ctx.layLogicalOffX, 412 + ctx.layLogicalOffY,
@@ -2848,7 +2869,7 @@ void DashboardContext::render(AppContext &ctx) {
 
   if (FIDELITY_MODE) {
     SDL_RenderSetViewport(ctx.renderer, nullptr);
-    SDL_RenderSetScale(ctx.renderer, ctx.layScale, ctx.layScale);
+    SDL_RenderSetScale(ctx.renderer, ctx.layScaleX, ctx.layScaleY);
   }
 
   if (!ctx.displayPower->getPower()) {
@@ -2916,7 +2937,7 @@ void DashboardContext::render(AppContext &ctx) {
     SDL_RenderFillRect(ctx.renderer, &full);
 
     if (FIDELITY_MODE)
-      SDL_RenderSetScale(ctx.renderer, ctx.layScale, ctx.layScale);
+      SDL_RenderSetScale(ctx.renderer, ctx.layScaleX, ctx.layScaleY);
 
     activeModal->renderModal(ctx.renderer);
   }
@@ -2931,8 +2952,8 @@ void DashboardContext::render(AppContext &ctx) {
     if (FIDELITY_MODE) {
       float pixX = mx * static_cast<float>(ctx.globalDrawW) / ctx.globalWinW;
       float pixY = my * static_cast<float>(ctx.globalDrawH) / ctx.globalWinH;
-      mx = static_cast<int>(pixX / ctx.layScale);
-      my = static_cast<int>(pixY / ctx.layScale);
+      mx = static_cast<int>(pixX / ctx.layScaleX);
+      my = static_cast<int>(pixY / ctx.layScaleY);
     }
 
     SDL_SetRenderDrawBlendMode(ctx.renderer, SDL_BLENDMODE_BLEND);

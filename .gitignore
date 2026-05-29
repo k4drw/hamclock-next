@@ -37,6 +37,9 @@ open-hamclock-backend
 AI_RULES.md
 CLAUDE.md
 GEMINI.md
+.antigravitycli/
+agy.yaml
+
 
 # Docker
 docker-build/

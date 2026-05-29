@@ -731,7 +731,7 @@ void main_tick() {
       }
 #endif
       if (FIDELITY_MODE)
-        setupFontMgr->setRenderScale(ctx.layScale);
+        setupFontMgr->setRenderScale(ctx.layScaleY);
 
       ctx.setupCatalog = std::make_unique<FontCatalog>(*setupFontMgr);
       setupFontMgr->setCatalog(ctx.setupCatalog.get());
@@ -803,8 +803,8 @@ void main_tick() {
                            ctx.globalWinW;
               float pixY = event.button.y * static_cast<float>(ctx.globalDrawH) /
                            ctx.globalWinH;
-              smx = static_cast<int>(pixX / ctx.layScale);
-              smy = static_cast<int>(pixY / ctx.layScale);
+              smx = static_cast<int>(pixX / ctx.layScaleX);
+              smy = static_cast<int>(pixY / ctx.layScaleY);
             }
             ctx.setupWidget->onMouseDown(smx, smy, SDL_GetModState(),
                                          event.button.clicks);
@@ -817,8 +817,8 @@ void main_tick() {
                            ctx.globalWinW;
               float pixY = event.button.y * static_cast<float>(ctx.globalDrawH) /
                            ctx.globalWinH;
-              smx = static_cast<int>(pixX / ctx.layScale);
-              smy = static_cast<int>(pixY / ctx.layScale);
+              smx = static_cast<int>(pixX / ctx.layScaleX);
+              smy = static_cast<int>(pixY / ctx.layScaleY);
             }
             ctx.setupWidget->onMouseUp(smx, smy, SDL_GetModState(),
                                        event.button.clicks);
@@ -830,8 +830,8 @@ void main_tick() {
                          ctx.globalWinW;
             float pixY = event.motion.y * static_cast<float>(ctx.globalDrawH) /
                          ctx.globalWinH;
-            smx = static_cast<int>(pixX / ctx.layScale);
-            smy = static_cast<int>(pixY / ctx.layScale);
+            smx = static_cast<int>(pixX / ctx.layScaleX);
+            smy = static_cast<int>(pixY / ctx.layScaleY);
           }
           ctx.setupWidget->onMouseMove(smx, smy);
         } else if (event.type == SDL_MOUSEWHEEL) {
@@ -861,7 +861,7 @@ void main_tick() {
                    event.window.event == SDL_WINDOWEVENT_SIZE_CHANGED) {
           ctx.updateLayoutMetrics();
           if (ctx.setupFontMgr) {
-            ctx.setupFontMgr->setRenderScale(ctx.layScale);
+            ctx.setupFontMgr->setRenderScale(ctx.layScaleY);
             ctx.setupFontMgr->clearCache();
           }
           if (ctx.setupCatalog) {
@@ -895,7 +895,7 @@ void main_tick() {
     SDL_RenderClear(ctx.renderer);
     if (FIDELITY_MODE) {
       SDL_RenderSetViewport(ctx.renderer, nullptr);
-      SDL_RenderSetScale(ctx.renderer, ctx.layScale, ctx.layScale);
+      SDL_RenderSetScale(ctx.renderer, ctx.layScaleX, ctx.layScaleY);
     }
     ctx.setupWidget->render(ctx.renderer);
 #ifndef __EMSCRIPTEN__
@@ -963,6 +963,9 @@ void main_tick() {
                                                 DEFAULT_FONT_SIZE);
         }
         ctx.dashboard->fontCatalog.recalculate(LOGICAL_WIDTH, LOGICAL_HEIGHT);
+        ctx.updateLayoutMetrics();
+        ctx.dashboard->layout.recalculate(LOGICAL_WIDTH, LOGICAL_HEIGHT,
+                                          ctx.layLogicalOffX, ctx.layLogicalOffY);
 
         // Propagate theme, metric, and font changes to all dashboard widgets
         for (auto *w : ctx.dashboard->widgets) {

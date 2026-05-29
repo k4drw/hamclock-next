@@ -313,7 +313,8 @@ struct AppContext {
   int globalDrawH = HamClock::INITIAL_HEIGHT;
 
   // Layout Metrics
-  float layScale = 1.0f;
+  float layScaleX = 1.0f;
+  float layScaleY = 1.0f;
   int layLogicalOffX = 0;
   int layLogicalOffY = 0;
   enum class AlignMode { Center, Left, Right };

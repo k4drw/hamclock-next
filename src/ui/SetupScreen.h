@@ -127,6 +127,7 @@ private:
   std::string mapStyle_ = "nasa";
   std::string projection_ = "equirectangular";
   bool useMetric_ = true;
+  bool scaleToFullScreen_ = false;
   bool rssEnabled_ = true;
   bool showBorders_ = false;
   std::string displayPowerMethod_ = "auto";
@@ -213,6 +214,7 @@ private:
   SDL_Rect defaultTzRect_ = {0, 0, 0, 0};
   SDL_Rect themeRect_ = {0, 0, 0, 0};
   SDL_Rect nightLightsRect_ = {0, 0, 0, 0};
+  SDL_Rect scaleToFullScreenRect_ = {0, 0, 0, 0};
   SDL_Rect metricToggleRect_ = {0, 0, 0, 0};
   SDL_Rect rssToggleRect_ = {0, 0, 0, 0};
   SDL_Rect bordersToggleRect_ = {0, 0, 0, 0};

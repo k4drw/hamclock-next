@@ -64,6 +64,7 @@ void SetupScreen::setConfig(const AppConfig &cfg) {
   displayPowerMethod_ = cfg.displayPowerMethod;
   mapNightLights_ = cfg.mapNightLights;
   useMetric_ = cfg.useMetric;
+  scaleToFullScreen_ = cfg.scaleToFullScreen;
   callsignColor_ = cfg.callsignColor;
   panelMode_ = cfg.panelMode;
   selectedSatellite_ = cfg.selectedSatellite;
@@ -184,6 +185,7 @@ AppConfig SetupScreen::getConfig(const AppConfig& base) const {
   cfg.displayPowerMethod = displayPowerMethod_;
   cfg.mapNightLights = mapNightLights_;
   cfg.useMetric = useMetric_;
+  cfg.scaleToFullScreen = scaleToFullScreen_;
   cfg.rssEnabled = rssEnabled_;
   cfg.showBorders = showBorders_;
   cfg.weatherOverlay = weatherOverlay_;

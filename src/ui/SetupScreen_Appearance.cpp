@@ -114,14 +114,18 @@ void SetupScreen::renderTabAppearance(SDL_Renderer *renderer, int cx, int pad,
                                           cat->ptSize(FontStyle::SmallRegular));
   int wMU = 25 + fontMgr_.getLogicalWidth("Metric Units",
                                           cat->ptSize(FontStyle::SmallRegular));
-  int toggleGap = 30;
-  int wRow2 = wNL + toggleGap + wMU;
+  int wFS = 25 + fontMgr_.getLogicalWidth("Scale to Full Screen",
+                                          cat->ptSize(FontStyle::SmallRegular));
+  int toggleGap = 20;
+  int wRow2 = wNL + toggleGap + wMU + toggleGap + wFS;
   int xRow2 = cx - wRow2 / 2;
 
   nightLightsRect_ = {xRow2, y, wNL, 20};
   drawToggle(nightLightsRect_, mapNightLights_, "Night Lights");
   metricToggleRect_ = {xRow2 + wNL + toggleGap, y, wMU, 20};
   drawToggle(metricToggleRect_, useMetric_, "Metric Units");
+  scaleToFullScreenRect_ = {metricToggleRect_.x + wMU + toggleGap, y, wFS, 20};
+  drawToggle(scaleToFullScreenRect_, scaleToFullScreen_, "Scale to Full Screen");
   y += 20 + vSpace;
 
   // --- Brightness section ---

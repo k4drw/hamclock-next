@@ -488,6 +488,7 @@ void WebServer::registerRoutes(httplib::Server &svr) {
     j["showSatTrack"] = cfg_->showSatTrack;
     j["mapNightLights"] = cfg_->mapNightLights;
     j["useMetric"] = cfg_->useMetric;
+    j["scaleToFullScreen"] = cfg_->scaleToFullScreen;
     j["propOverlay"] = propOverlayToString(cfg_->propOverlay);
     j["weatherOverlay"] = wxOverlayToString(cfg_->weatherOverlay);
     j["hubMode"] = (cfg_->hubMode == HubMode::Master)
@@ -726,6 +727,8 @@ void WebServer::registerRoutes(httplib::Server &svr) {
       cfg_->centerMapOnDe = req.get_param_value("center_map_on_de") == "1";
     if (req.has_param("use_metric"))
       cfg_->useMetric = req.get_param_value("use_metric") == "1";
+    if (req.has_param("scale_full_screen"))
+      cfg_->scaleToFullScreen = req.get_param_value("scale_full_screen") == "1";
     if (req.has_param("grid_type"))
       cfg_->gridType = req.get_param_value("grid_type");
     if (req.has_param("prop_overlay"))
@@ -1335,10 +1338,17 @@ void WebServer::registerRoutes(httplib::Server &svr) {
     int outW = LOGICAL_WIDTH, outH = LOGICAL_HEIGHT;
     if (renderer_)
       SDL_GetRendererOutputSize(renderer_, &outW, &outH);
-    float layScale = std::min(static_cast<float>(outW) / LOGICAL_WIDTH,
-                              static_cast<float>(outH) / LOGICAL_HEIGHT);
-    int lx = (layScale > 0.0f) ? static_cast<int>(x / layScale) : x;
-    int ly = (layScale > 0.0f) ? static_cast<int>(y / layScale) : y;
+    float scaleX = static_cast<float>(outW) / LOGICAL_WIDTH;
+    float scaleY = static_cast<float>(outH) / LOGICAL_HEIGHT;
+    float layScaleX = scaleX;
+    float layScaleY = scaleY;
+    if (!cfgMgr_->getConfig().scaleToFullScreen) {
+      float layScale = std::min(scaleX, scaleY);
+      layScaleX = layScale;
+      layScaleY = layScale;
+    }
+    int lx = (layScaleX > 0.0f) ? static_cast<int>(x / layScaleX) : x;
+    int ly = (layScaleY > 0.0f) ? static_cast<int>(y / layScaleY) : y;
     SDL_Event e{};
     e.type = AE_BASE_EVENT + AE_TOUCH;
     e.user.data1 = reinterpret_cast<void *>(static_cast<intptr_t>(lx));
@@ -2211,10 +2221,17 @@ void WebServer::registerRoutes(httplib::Server &svr) {
     int outW = LOGICAL_WIDTH, outH = LOGICAL_HEIGHT;
     if (renderer_)
       SDL_GetRendererOutputSize(renderer_, &outW, &outH);
-    float layScale = std::min(static_cast<float>(outW) / LOGICAL_WIDTH,
-                              static_cast<float>(outH) / LOGICAL_HEIGHT);
-    int lx = (layScale > 0.0f) ? static_cast<int>(x / layScale) : x;
-    int ly = (layScale > 0.0f) ? static_cast<int>(y / layScale) : y;
+    float scaleX = static_cast<float>(outW) / LOGICAL_WIDTH;
+    float scaleY = static_cast<float>(outH) / LOGICAL_HEIGHT;
+    float layScaleX = scaleX;
+    float layScaleY = scaleY;
+    if (!cfgMgr_->getConfig().scaleToFullScreen) {
+      float layScale = std::min(scaleX, scaleY);
+      layScaleX = layScale;
+      layScaleY = layScale;
+    }
+    int lx = (layScaleX > 0.0f) ? static_cast<int>(x / layScaleX) : x;
+    int ly = (layScaleY > 0.0f) ? static_cast<int>(y / layScaleY) : y;
     SDL_Event e{};
     e.type = AE_BASE_EVENT + AE_TOUCH;
     e.user.data1 = reinterpret_cast<void *>(static_cast<intptr_t>(lx));

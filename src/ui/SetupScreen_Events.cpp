@@ -498,6 +498,13 @@ bool SetupScreen::onMouseDown(int mx, int my, Uint16 mod, int clicks) {
       useMetric_ = !useMetric_;
       return true;
     }
+    if (mx >= scaleToFullScreenRect_.x &&
+        mx < scaleToFullScreenRect_.x + scaleToFullScreenRect_.w &&
+        my >= scaleToFullScreenRect_.y &&
+        my < scaleToFullScreenRect_.y + scaleToFullScreenRect_.h) {
+      scaleToFullScreen_ = !scaleToFullScreen_;
+      return true;
+    }
     if (mx >= brightnessSliderRect_.x &&
         mx < brightnessSliderRect_.x + brightnessSliderRect_.w &&
         my >= brightnessSliderRect_.y &&
