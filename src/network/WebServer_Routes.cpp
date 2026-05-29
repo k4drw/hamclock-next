@@ -485,6 +485,7 @@ void WebServer::registerRoutes(httplib::Server &svr) {
     j["gridType"] = cfg_->gridType;
     j["showBorders"] = cfg_->showBorders;
     j["showBeacons"] = cfg_->showBeacons;
+    j["showOntaSpots"] = cfg_->showOntaSpots;
     j["showSatTrack"] = cfg_->showSatTrack;
     j["mapNightLights"] = cfg_->mapNightLights;
     j["useMetric"] = cfg_->useMetric;
@@ -719,6 +720,8 @@ void WebServer::registerRoutes(httplib::Server &svr) {
       cfg_->showBorders = req.get_param_value("show_borders") == "1";
     if (req.has_param("show_beacons"))
       cfg_->showBeacons = req.get_param_value("show_beacons") == "1";
+    if (req.has_param("show_onta_spots"))
+      cfg_->showOntaSpots = req.get_param_value("show_onta_spots") == "1";
     if (req.has_param("show_sattrack"))
       cfg_->showSatTrack = req.get_param_value("show_sattrack") == "1";
     if (req.has_param("night_lights"))

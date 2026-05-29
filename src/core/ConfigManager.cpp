@@ -335,6 +335,7 @@ bool ConfigManager::load(AppConfig &config) {
     config.mufRtOpacity = ap.value("muf_rt_opacity", 40);
     config.showSatTrack = ap.value("show_sat_track", true);
     config.showBeacons = ap.value("show_beacons", true);
+    config.showOntaSpots = ap.value("show_onta_spots", false);
     config.showBorders = ap.value("show_borders", false);
     config.showLocalPropGauge = ap.value("show_local_prop_gauge", false);
     config.displayPowerMethod = ap.value("display_power_method", "auto");
@@ -789,6 +790,7 @@ bool ConfigManager::save(const AppConfig &config) {
   json["appearance"]["muf_rt_opacity"] = config.mufRtOpacity;
   json["appearance"]["show_sat_track"] = config.showSatTrack;
   json["appearance"]["show_beacons"] = config.showBeacons;
+  json["appearance"]["show_onta_spots"] = config.showOntaSpots;
   json["appearance"]["show_borders"] = config.showBorders;
   json["appearance"]["show_local_prop_gauge"] = config.showLocalPropGauge;
   json["appearance"]["display_power_method"] = config.displayPowerMethod;

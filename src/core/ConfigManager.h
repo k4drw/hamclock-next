@@ -91,6 +91,7 @@ struct AppConfig {
   int mufRtOpacity = 40;    // percentage
   bool showSatTrack = true; // Show satellite ground track line on world map
   bool showBeacons = true;  // Show NCDXF beacons on world map
+  bool showOntaSpots = false; // Show POTA/SOTA spots on map
   bool showBorders = false; // Show Natural Earth country borders
   bool showLocalPropGauge = false; // Show MUF/LUF gauge at bottom of map
   bool showLotwQsos = true;  // Show LOTW QSO pins on world map

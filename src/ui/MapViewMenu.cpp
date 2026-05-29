@@ -20,6 +20,7 @@ void MapViewMenu::show(AppConfig &config, std::function<void()> onApply) {
   mapStyle_ = config.mapStyle;
   showGrid_ = config.showGrid;
   showBeacons_ = config.showBeacons;
+  showOntaSpots_ = config.showOntaSpots;
   showBorders_ = config.showBorders;
   showLocalPropGauge_ = config.showLocalPropGauge;
   showLotwQsos_ = config.showLotwQsos;
@@ -112,6 +113,9 @@ void MapViewMenu::recalcLayout() {
   int lotwLabelW =
       fontMgr_.getLogicalWidth("LOTW QSOs", cat->ptSize(FontStyle::UI));
   lotwQsosRec_ = {col1X + 10, y, 20 + 10 + lotwLabelW, 20};
+  int ontaLabelW =
+      fontMgr_.getLogicalWidth("POTA/SOTA", cat->ptSize(FontStyle::UI));
+  ontaSpotsRec_ = {col1X + 110, y, 20 + 10 + ontaLabelW, 20};
 
   // Row 5 (VOACAP) - 3 columns
   y += 25;
@@ -319,6 +323,8 @@ void MapViewMenu::render(SDL_Renderer *renderer) {
   renderRadioButton(renderer, bordersRec_, showBorders_, "Borders",
                     themes.text);
   renderRadioButton(renderer, lotwQsosRec_, showLotwQsos_, "LOTW QSOs",
+                    themes.text);
+  renderRadioButton(renderer, ontaSpotsRec_, showOntaSpots_, "POTA/SOTA",
                     themes.text);
   renderRadioButton(renderer, centerDeCheckRect_, centerMapOnDe_,
                     "Center on DE", themes.text);
@@ -796,6 +802,10 @@ bool MapViewMenu::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
     showBeacons_ = !showBeacons_;
     return true;
   }
+  if (SDL_PointInRect(&pt, &ontaSpotsRec_)) {
+    showOntaSpots_ = !showOntaSpots_;
+    return true;
+  }
   if (SDL_PointInRect(&pt, &bordersRec_)) {
     showBorders_ = !showBorders_;
     return true;
@@ -870,6 +880,7 @@ bool MapViewMenu::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
     config_->mapStyle = mapStyle_;
     config_->showGrid = showGrid_;
     config_->showBeacons = showBeacons_;
+    config_->showOntaSpots = showOntaSpots_;
     config_->showBorders = showBorders_;
     config_->showLotwQsos = showLotwQsos_;
     config_->showLocalPropGauge = showLocalPropGauge_;

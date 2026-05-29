@@ -35,6 +35,9 @@ struct ActivityData {
 
   bool hasSelection = false;
   ONTASpot selectedSpot;
+  
+  int activeBandFilter = -1;
+  std::string activeModeFilter = "";
 };
 
 class ActivityDataStore {

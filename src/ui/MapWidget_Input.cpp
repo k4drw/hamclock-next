@@ -499,38 +499,45 @@ void MapWidget::onMouseMove(int mx, int my) {
   }
 
 
-  // 5. Check ONTA selected spot only
+  // 5. Check ONTA spots
   if (tip.empty() && activityStore_) {
     auto ads = activityStore_->get();
-    if (ads->hasSelection) {
-      const auto &sel = ads->selectedSpot;
-      // Resolve lat/lon: use selectedSpot coords, or fall back to ontaSpots
-      // list
-      double sLat = sel.lat, sLon = sel.lon;
-      if (sLat == 0.0 && sLon == 0.0) {
-        for (const auto &s : ads->ontaSpots) {
-          if (s.call == sel.call && s.ref == sel.ref &&
-              (s.lat != 0.0 || s.lon != 0.0)) {
-            sLat = s.lat;
-            sLon = s.lon;
-            break;
-          }
+    if (ads->valid) {
+      for (const auto &s : ads->ontaSpots) {
+        if (s.lat == 0.0 && s.lon == 0.0)
+          continue;
+        
+        bool isSelected = (ads->hasSelection && s.call == ads->selectedSpot.call && s.ref == ads->selectedSpot.ref);
+        
+        // Only consider if the marker is actually visible (showOntaSpots is true, or it's the selected spot)
+        if (!config_.showOntaSpots && !isSelected)
+          continue;
+          
+        if (config_.showOntaSpots && config_.ontaFilter != "all" && StringUtils::toLower(s.program) != config_.ontaFilter)
+          continue;
+
+        if (ads->activeBandFilter != -1 && freqToBandIndex(s.freqKhz) != ads->activeBandFilter)
+          continue;
+        if (!ads->activeModeFilter.empty() && s.mode != ads->activeModeFilter)
+          continue;
+
+        if (screenDist(s.lat, s.lon) < kHitRadius) {
+          tip = s.call;
+          char buf[128];
+          int bi = freqToBandIndex(s.freqKhz);
+          std::snprintf(buf, sizeof(buf), " %.1f kHz", s.freqKhz);
+          tip += buf;
+          if (bi >= 0)
+            tip += std::string(" (") + kBands[bi].name + ")";
+          if (!s.mode.empty())
+            tip += " " + s.mode;
+          tip += "\n" + s.program + ": " + s.ref;
+          break; // Stop at first hit
         }
-      }
-      if (sLat != 0.0 && screenDist(sLat, sLon) < kHitRadius) {
-        tip = sel.call;
-        char buf[128];
-        int bi = freqToBandIndex(sel.freqKhz);
-        std::snprintf(buf, sizeof(buf), " %.1f kHz", sel.freqKhz);
-        tip += buf;
-        if (bi >= 0)
-          tip += std::string(" (") + kBands[bi].name + ")";
-        if (!sel.mode.empty())
-          tip += " " + sel.mode;
-        tip += "\n" + sel.program + ": " + sel.ref;
       }
     }
   }
+
 
   // 6. Check asteroid
   if (tip.empty() && asteroidProvider_ &&

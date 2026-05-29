@@ -164,7 +164,11 @@ private:
   std::vector<CachedOntaSpot> spotCache_;
   void clearSpotCache();
   void renderBandLegend(SDL_Renderer *renderer, int maxY);
+  void renderModeFilter(SDL_Renderer *renderer, int maxY);
 
   int legendH_ = 0;
+  int modeFilterH_ = 0;
+  int activeBandFilter_ = -1;
+  std::string activeModeFilter_ = "";
   static constexpr int MAX_VISIBLE_ROWS = 12; // Adjusted for ONTA panel
 };

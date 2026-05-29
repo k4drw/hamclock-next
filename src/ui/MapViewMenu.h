@@ -38,6 +38,7 @@ private:
   std::string mapStyle_;
   bool showGrid_;
   bool showBeacons_;
+  bool showOntaSpots_;
   bool showBorders_;
   bool showLocalPropGauge_;
   bool showLotwQsos_;
@@ -81,7 +82,7 @@ private:
   SDL_Rect projRec_, styleRec_;
   SDL_Rect gridRec_, overlayRec_, weatherRec_;
   SDL_Rect propColormapRec_;
-  SDL_Rect beaconsRec_, bordersRec_, centerDeCheckRect_, localPropGaugeRec_, lotwQsosRec_;
+  SDL_Rect beaconsRec_, bordersRec_, centerDeCheckRect_, localPropGaugeRec_, lotwQsosRec_, ontaSpotsRec_;
   SDL_Rect bandRec_, modeRec_, powerRec_; // VOACAP row
   SDL_Rect toaRec_, toaUpRec_, toaDnRec_;             // TOA spinner
   SDL_Rect antGainRec_, antGainUpRec_, antGainDnRec_; // Ant Gain spinner

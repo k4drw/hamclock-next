@@ -279,6 +279,7 @@ void WebServer::run() {
       <div style="display:flex; gap:12px; margin-bottom:10px; flex-wrap:wrap">
         <label><input type="checkbox" id="show-borders"> Borders</label>
         <label><input type="checkbox" id="show-beacons"> Beacons</label>
+        <label><input type="checkbox" id="show-onta-spots"> POTA/SOTA</label>
         <label><input type="checkbox" id="show-sattrack"> Sat Track</label>
         <label><input type="checkbox" id="center-map-on-de"> Center on DE</label>
       </div>
@@ -870,6 +871,7 @@ void WebServer::run() {
         document.getElementById('projection').value = c.projection || 'equirectangular';
         document.getElementById('show-borders').checked = !!c.showBorders;
         document.getElementById('show-beacons').checked = !!c.showBeacons;
+        document.getElementById('show-onta-spots').checked = !!c.showOntaSpots;
         document.getElementById('show-sattrack').checked = !!c.showSatTrack;
         document.getElementById('center-map-on-de').checked = !!c.centerMapOnDe;
         
@@ -926,6 +928,7 @@ void WebServer::run() {
       const projection = document.getElementById('projection').value;
       const showBorders = document.getElementById('show-borders').checked ? '1' : '0';
       const showBeacons = document.getElementById('show-beacons').checked ? '1' : '0';
+      const showOntaSpots = document.getElementById('show-onta-spots').checked ? '1' : '0';
       const showSatTrack = document.getElementById('show-sattrack').checked ? '1' : '0';
       const centerMapOnDe = document.getElementById('center-map-on-de').checked ? '1' : '0';
       const gridMode = document.getElementById('grid-mode').value;
@@ -941,7 +944,7 @@ void WebServer::run() {
       const fontPath = document.getElementById('font-path').value.trim();
       const params = new URLSearchParams({
         theme, map_style: mapStyle, projection, show_borders: showBorders,
-        show_beacons: showBeacons, show_sattrack: showSatTrack, show_grid: showGrid, grid_type: gridType,
+        show_beacons: showBeacons, show_sattrack: showSatTrack, show_onta_spots: showOntaSpots, show_grid: showGrid, grid_type: gridType,
         center_map_on_de: centerMapOnDe,
         prop_overlay: propOverlay, wx_overlay: wxOverlay, night_lights: nl, use_metric: mu,
         scale_full_screen: document.getElementById('scale-full-screen').checked ? '1' : '0',

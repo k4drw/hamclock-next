@@ -306,6 +306,14 @@ void ONTAPanel::rebuildRows(const ActivityData &data) {
       if (dist > maxDistKm_)
         continue;
     }
+    if (activeBandFilter_ != -1) {
+      if (freqToBandIndex(os.freqKhz) != activeBandFilter_)
+        continue;
+    }
+    if (!activeModeFilter_.empty()) {
+      if (os.mode != activeModeFilter_)
+        continue;
+    }
     allSpots_.push_back(os);
   }
 
@@ -379,6 +387,7 @@ SDL_Color ONTAPanel::getRowColor(int index,
 void ONTAPanel::render(SDL_Renderer *renderer) {
   // Detect double height (SidePanel full height is ~332)
   legendH_ = (height_ > 300) ? 28 : 0;
+  modeFilterH_ = (height_ > 300) ? 14 : 0;
 
   // Let ListPanel draw background, border, title, and rows (empty strings)
   ListPanel::render(renderer);
@@ -422,18 +431,21 @@ void ONTAPanel::render(SDL_Renderer *renderer) {
   // Generous hit box spans full title height
   chipRect_ = {btnRect.x, y_, btnRect.w, titleAreaH};
 
-  // Render Band Legend at bottom if double-height
+  // Render Band Legend and Mode Filter at bottom if double-height
   if (legendH_ > 0) {
     renderBandLegend(renderer, y_ + height_ - 2);
+  }
+  if (modeFilterH_ > 0) {
+    renderModeFilter(renderer, y_ + height_ - 2 - legendH_);
   }
 
   if (currentSpots_.empty()) {
     return;
   }
 
-  // Calculate row height, accounting for legend if present
+  // Calculate row height, accounting for legend and mode filter if present
   int curY = y_ + titleAreaH;
-  int remaining = (y_ + height_ - legendH_) - curY;
+  int remaining = (y_ + height_ - legendH_ - modeFilterH_) - curY;
   int rowCount = static_cast<int>(currentSpots_.size());
   int rowH = std::max(rowFontSize_ + 4, remaining / rowCount);
 
@@ -593,12 +605,64 @@ bool ONTAPanel::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
   if (titleTex_)
     titleAreaH += titleH_;
 
+  // Mode filter row (above band legend)
+  if (modeFilterH_ > 0) {
+    int modeY = y_ + height_ - 2 - legendH_ - modeFilterH_;
+    if (my >= modeY && my < modeY + modeFilterH_) {
+      static const char *kModes[] = {"CW", "SSB", "FT8", "FT4", "RTTY", "WSPR"};
+      int cols = 6;
+      int cellW = (width_ - 4) / cols;
+      int col = (mx - (x_ + 4)) / cellW;
+      if (col >= 0 && col < cols) {
+        const char *clicked = kModes[col];
+        activeModeFilter_ = (activeModeFilter_ == clicked) ? "" : clicked;
+        
+        auto data = store_->get();
+        ActivityData newData = *data;
+        newData.activeModeFilter = activeModeFilter_;
+        store_->set(newData);
+        
+        lastUpdate_ = std::chrono::system_clock::time_point{}; // force update
+        update();
+        return true;
+      }
+    }
+  }
+
+  // Check band legend clicks
+  if (my >= y_ + height_ - legendH_ && legendH_ > 0) {
+    int cellH = 14;
+    int cols = 6;
+    int cellW = (width_ - 4) / cols;
+    int legY = y_ + height_ - legendH_;
+    int row = (my - legY) / cellH;
+    int col = (mx - (x_ + 4)) / cellW;
+    if (row >= 0 && row < 2 && col >= 0 && col < cols) {
+      int bandIdx = row * cols + col;
+      if (bandIdx >= 0 && bandIdx < kNumBands) {
+        if (activeBandFilter_ == bandIdx)
+          activeBandFilter_ = -1;
+        else
+          activeBandFilter_ = bandIdx;
+          
+        auto data = store_->get();
+        ActivityData newData = *data;
+        newData.activeBandFilter = activeBandFilter_;
+        store_->set(newData);
+          
+        lastUpdate_ = std::chrono::system_clock::time_point{}; // force update
+        update();
+        return true;
+      }
+    }
+  }
+
   // Title area clicks (outside the chip) are intentionally not consumed here
   // so they bubble up to PaneContainer for widget selection menu.
 
   if (my > y_ + titleAreaH) {
     int rowY = my - (y_ + titleAreaH);
-    int remaining = (y_ + height_) - (y_ + titleAreaH);
+    int remaining = (y_ + height_ - legendH_ - modeFilterH_) - (y_ + titleAreaH);
     int rowCount = static_cast<int>(currentSpots_.size());
     int rowH = (rowCount > 0) ? std::max(rowFontSize_ + 4, remaining / rowCount)
                               : rowFontSize_ + 4;
@@ -826,32 +890,86 @@ void ONTAPanel::renderBandLegend(SDL_Renderer *renderer, int maxY) {
   int cols = 6;
   int cellW = (width_ - 4) / cols;
   int boxSize = 7;
-
   for (int i = 0; i < kNumBands; ++i) {
     int row = i / cols;
     int col = i % cols;
     int lx = x_ + 4 + col * cellW;
     int midY = legendY + row * cellH + cellH / 2;
 
+    bool isSelected = (activeBandFilter_ == i);
+    bool isDimmed = (activeBandFilter_ != -1 && !isSelected);
+    Uint8 alpha = isDimmed ? 100 : 255;
+
     // Colored square, vertically centered in the row
     SDL_Rect box = {lx + 1, midY - boxSize / 2, boxSize, boxSize};
     SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
     SDL_SetRenderDrawColor(renderer, kBands[i].color.r, kBands[i].color.g,
-                           kBands[i].color.b, 255);
+                           kBands[i].color.b, alpha);
     SDL_RenderFillRect(renderer, &box);
+
+    if (isSelected) {
+      SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+      SDL_Rect border = {box.x - 1, box.y - 1, box.w + 2, box.h + 2};
+      SDL_RenderDrawRect(renderer, &border);
+    }
     SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
 
-    // Label right of box, vertically centered on the same midline (strip
-    // trailing 'm')
+    // Label right of box, vertically centered on the same midline
     std::string label(kBands[i].name);
     if (!label.empty() && label.back() == 'm')
       label.pop_back();
+    SDL_Color tc = themes.text;
+    tc.a = alpha;
     fontMgr_.catalog()->drawText(
-        renderer, label, lx + boxSize + 1, midY, themes.text, FontStyle::Tiny,
-        /*centered=*/false, /*rightAlign=*/false, /*vertCentered=*/true);
+        renderer, label, lx + boxSize + 1, midY, tc, FontStyle::Tiny,
+        false, false, true);
   }
 }
 
+void ONTAPanel::renderModeFilter(SDL_Renderer *renderer, int maxY) {
+  int cellH = 14;
+  int rowY = maxY - cellH;
+  ThemeColors themes = getThemeColors(theme_);
+
+  // Background + separator
+  SDL_Rect bg = {x_ + 1, rowY, width_ - 2, cellH};
+  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, 255);
+  SDL_RenderFillRect(renderer, &bg);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 200);
+  SDL_RenderDrawLine(renderer, x_ + 1, rowY, x_ + width_ - 1, rowY);
+
+  static const char *kModes[] = {"CW", "SSB", "FT8", "FT4", "RTTY", "WSPR"};
+  int cols = 6;
+  int cellW = (width_ - 4) / cols;
+  int boxSz = 7;
+  int midY = rowY + cellH / 2;
+
+  for (int i = 0; i < 6; ++i) {
+    const char *mode = kModes[i];
+    bool isSelected = (activeModeFilter_ == mode);
+    bool isDimmed = (!activeModeFilter_.empty() && !isSelected);
+    Uint8 alpha = isDimmed ? 100 : 255;
+
+    int lx = x_ + 4 + i * cellW;
+    // Just a generic color since there is no modeColor() available here
+    SDL_Color mc = {150, 150, 150, 255}; 
+
+    SDL_Rect box = {lx + 1, midY - boxSz / 2, boxSz, boxSz};
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+    SDL_SetRenderDrawColor(renderer, mc.r, mc.g, mc.b, alpha);
+    SDL_RenderFillRect(renderer, &box);
+    if (isSelected) {
+      SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+      SDL_Rect border = {box.x - 1, box.y - 1, box.w + 2, box.h + 2};
+      SDL_RenderDrawRect(renderer, &border);
+    }
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+
+    SDL_Color tc = {mc.r, mc.g, mc.b, alpha};
+    fontMgr_.catalog()->drawText(renderer, mode, lx + boxSz + 1, midY, tc,
+                                 FontStyle::Tiny, false, false, true);
+  }
+}
 
 REGISTER_WIDGET("dx_peditions", "DX Peditions", true, false, {
   return std::make_unique<DXPedPanel>(

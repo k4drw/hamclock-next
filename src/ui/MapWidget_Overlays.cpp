@@ -1163,82 +1163,86 @@ void MapWidget::renderONTASpots(SDL_Renderer *renderer) {
     return;
 
   auto data = activityStore_->get();
-  if (!data->hasSelection)
-    return;
-
-  const auto &spot = data->selectedSpot;
-
-  // Sync with active filter
-  if (config_.ontaFilter != "all") {
-    if (StringUtils::toLower(spot.program) != config_.ontaFilter) {
-      return;
-    }
-  }
-
-  // Use coords from selectedSpot; if 0,0 (e.g. POTA parks CSV not yet loaded),
-  // try to find updated coords in the live ontaSpots list.
-  double spotLat = spot.lat, spotLon = spot.lon;
-  if (spotLat == 0.0 && spotLon == 0.0) {
-    for (const auto &s : data->ontaSpots) {
-      if (s.call == spot.call && s.ref == spot.ref &&
-          (s.lat != 0.0 || s.lon != 0.0)) {
-        spotLat = s.lat;
-        spotLon = s.lon;
-        break;
-      }
-    }
-  }
-  if (spotLat == 0.0 && spotLon == 0.0)
-    return;
+  ThemeColors themes = getThemeColors(theme_);
 
   SDL_RenderSetClipRect(renderer, &mapRect_);
-  SDL_Texture *lineTex = texMgr_.get(LINE_AA_KEY);
 
-  // Case-insensitive program check for color
-  std::string lowerProg = StringUtils::toLower(spot.program);
-  ThemeColors themes =
-      getThemeColors(theme_);  // Added to access the current theme
-  SDL_Color color = (lowerProg == "pota") ? themes.success : themes.info;
+  // 1. Draw all markers if enabled
+  if (config_.showOntaSpots) {
+    for (const auto &s : data->ontaSpots) {
+      if (s.lat == 0.0 && s.lon == 0.0)
+        continue;
+      if (config_.ontaFilter != "all" && StringUtils::toLower(s.program) != config_.ontaFilter)
+        continue;
+      if (data->activeBandFilter != -1 && freqToBandIndex(s.freqKhz) != data->activeBandFilter)
+        continue;
+      if (!data->activeModeFilter.empty() && s.mode != data->activeModeFilter)
+        continue;
 
-  LatLon de = state_->deLocation;
-  int baseSegments = 250;
-  int segments = static_cast<int>(baseSegments * (1.0 + 0.8 * (config_.mapZoom - 1.0)));
-  auto path = Astronomy::calculateGreatCirclePath(de, {spotLat, spotLon}, segments);
+      SDL_Color color = (StringUtils::toLower(s.program) == "pota") ? themes.success : themes.info;
+      renderMarker(renderer, s.lat, s.lon, color.r, color.g, color.b, MarkerShape::Circle, true);
+    }
+  }
 
-  std::vector<SDL_FPoint> segment;
-  SDL_Color lineColor = {color.r, color.g, color.b, 100};
+  // 2. Draw great circle path for selected spot
+  if (data->hasSelection) {
+    const auto &spot = data->selectedSpot;
+    if (config_.ontaFilter == "all" || StringUtils::toLower(spot.program) == config_.ontaFilter) {
+      double spotLat = spot.lat, spotLon = spot.lon;
+      if (spotLat == 0.0 && spotLon == 0.0) {
+        for (const auto &s : data->ontaSpots) {
+          if (s.call == spot.call && s.ref == spot.ref &&
+              (s.lat != 0.0 || s.lon != 0.0)) {
+            spotLat = s.lat;
+            spotLon = s.lon;
+            break;
+          }
+        }
+      }
+      if (spotLat != 0.0 || spotLon != 0.0) {
+        SDL_Texture *lineTex = texMgr_.get(LINE_AA_KEY);
+        std::string lowerProg = StringUtils::toLower(spot.program);
+        SDL_Color color = (lowerProg == "pota") ? themes.success : themes.info;
+        LatLon de = state_->deLocation;
+        int baseSegments = 250;
+        int segments = static_cast<int>(baseSegments * (1.0 + 0.8 * (config_.mapZoom - 1.0)));
+        auto path = Astronomy::calculateGreatCirclePath(de, {spotLat, spotLon}, segments);
 
-  for (size_t i = 0; i < path.size(); ++i) {
-    if (i > 0) {
-      double lon0 = path[i - 1].lon;
-      double lon1 = path[i].lon;
-      if (std::fabs(lon0 - lon1) > 180.0) {
-        double lon1_adj = (lon1 < 0) ? lon1 + 360.0 : lon1 - 360.0;
-        double borderLon = (lon1 < 0) ? 180.0 : -180.0;
-        double dLon = lon1_adj - lon0;
-        double f = (std::fabs(dLon) > 1e-6) ? (borderLon - lon0) / dLon : 0.5;
-        double borderLat =
-            path[i - 1].lat + f * (path[i].lat - path[i - 1].lat);
+        std::vector<SDL_FPoint> segment;
+        SDL_Color lineColor = {color.r, color.g, color.b, 100};
 
-        segment.push_back(latLonToScreen(borderLat, borderLon));
+        for (size_t i = 0; i < path.size(); ++i) {
+          if (i > 0) {
+            double lon0 = path[i - 1].lon;
+            double lon1 = path[i].lon;
+            if (std::fabs(lon0 - lon1) > 180.0) {
+              double lon1_adj = (lon1 < 0) ? lon1 + 360.0 : lon1 - 360.0;
+              double borderLon = (lon1 < 0) ? 180.0 : -180.0;
+              double dLon = lon1_adj - lon0;
+              double f = (std::fabs(dLon) > 1e-6) ? (borderLon - lon0) / dLon : 0.5;
+              double borderLat =
+                  path[i - 1].lat + f * (path[i].lat - path[i - 1].lat);
+
+              segment.push_back(latLonToScreen(borderLat, borderLon));
+              if (segment.size() >= 2) {
+                RenderUtils::drawPolylineTextured(renderer, lineTex, segment.data(),
+                                                  static_cast<int>(segment.size()),
+                                                  1.2f, lineColor);
+              }
+              segment.clear();
+              segment.push_back(latLonToScreen(borderLat, -borderLon));
+            }
+          }
+          segment.push_back(latLonToScreen(path[i].lat, path[i].lon));
+        }
         if (segment.size() >= 2) {
           RenderUtils::drawPolylineTextured(renderer, lineTex, segment.data(),
-                                            static_cast<int>(segment.size()),
-                                            1.2f, lineColor);
+                                            static_cast<int>(segment.size()), 1.2f,
+                                            lineColor);
         }
-        segment.clear();
-        segment.push_back(latLonToScreen(borderLat, -borderLon));
       }
     }
-    segment.push_back(latLonToScreen(path[i].lat, path[i].lon));
   }
-  if (segment.size() >= 2) {
-    RenderUtils::drawPolylineTextured(renderer, lineTex, segment.data(),
-                                      static_cast<int>(segment.size()), 1.2f,
-                                      lineColor);
-  }
-
-  // Marker is now handled by the main render() loop using state_->dxLocation.
 
   SDL_RenderSetClipRect(renderer, nullptr);
 }
