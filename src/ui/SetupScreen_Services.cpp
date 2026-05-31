@@ -100,4 +100,6 @@ void SetupScreen::renderTabServices(SDL_Renderer *renderer, int cx, int pad,
   clublogApiKeyInput_.render(renderer, fontMgr_, fieldX, yField, clublogFieldW, fieldH,
                              FontStyle::SmallRegular, textPad, activeField_ == 6,
                              true, themes.accent, themes.textDim, themes.text, themes.text, themes.textDim, "Key");
+  y += labelH + fieldH + vSpace;
+
 }

@@ -292,6 +292,13 @@ struct AppConfig {
 
   // DX Enhancements
   float kIndexAlertThreshold = 5.0f;
+  
+  // MQTT Configuration
+  bool mqttEnabled = false;
+  std::string mqttBrokerUri = "ws://homeassistant.local:1884";
+  std::string mqttUsername = "";
+  std::string mqttPassword = "";
+  std::string mqttBaseTopic = "hamclock";
 };
 
 class ConfigManager {

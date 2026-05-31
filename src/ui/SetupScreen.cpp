@@ -131,6 +131,14 @@ TextInput *SetupScreen::getActiveInput() {
       return &hubIpInput_;
     case 1:
       return &hubPortInput_;
+    case 2:
+      return &mqttBrokerInput_;
+    case 3:
+      return &mqttTopicInput_;
+    case 4:
+      return &mqttUsernameInput_;
+    case 5:
+      return &mqttPasswordInput_;
     }
   } else if (activeTab_ == Tab::Widgets) {
     // Rotation interval field is actually numeric-only handled in onTextInput

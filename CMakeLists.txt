@@ -332,6 +332,13 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(spdlog)
 
+FetchContent_Declare(
+    mqttc
+    GIT_REPOSITORY https://github.com/LiamBindle/MQTT-C.git
+    GIT_TAG        v1.1.6
+)
+FetchContent_MakeAvailable(mqttc)
+
 
 # --- Make Available (Order carefully) ---
 # 1. Base dependencies
@@ -550,6 +557,8 @@ set(HAMCLOCK_SOURCES
     src/core/PropEngine.cpp
     src/core/VoacapEngine.cpp
     src/core/ActivityLocationManager.cpp
+    src/core/WebSocketTransport.cpp
+    src/services/MQTTService.cpp
     src/network/FrameCapture.cpp
     src/network/NetworkManager.cpp
     src/network/WebServer.cpp
@@ -757,6 +766,7 @@ if(EMSCRIPTEN)
         httplib::httplib
         fmt::fmt
         spdlog::spdlog
+        mqttc
     )
 
 else()
@@ -794,6 +804,7 @@ else()
         Threads::Threads
         httplib::httplib
         spdlog::spdlog
+        mqttc
         ${LIBDRM_LIBRARIES}
     )
 

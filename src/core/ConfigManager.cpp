@@ -560,6 +560,15 @@ bool ConfigManager::load(AppConfig &config) {
     config.kIndexAlertThreshold = dxc.value("k_index_threshold", 5.0f);
   }
 
+  if (json.contains("mqtt")) {
+    auto mq = json["mqtt"];
+    config.mqttEnabled = mq.value("enabled", false);
+    config.mqttBrokerUri = mq.value("broker_uri", "ws://homeassistant.local:1884");
+    config.mqttUsername = mq.value("username", "");
+    config.mqttPassword = mq.value("password", "");
+    config.mqttBaseTopic = mq.value("base_topic", "hamclock");
+  }
+
   // Live Spots (Combined RBN, PSK Reporter, WSPR)
   if (json.contains("live_spots")) {
     auto &ls = json["live_spots"];
@@ -913,6 +922,12 @@ bool ConfigManager::save(const AppConfig &config) {
   json["dx_cluster"]["hide_duplicates"] = config.dxClusterHideDuplicates;
   json["dx_cluster"]["max_age_minutes"] = config.dxClusterMaxAgeMinutes;
   json["dx_cluster"]["k_index_threshold"] = config.kIndexAlertThreshold;
+
+  json["mqtt"]["enabled"] = config.mqttEnabled;
+  json["mqtt"]["broker_uri"] = config.mqttBrokerUri;
+  json["mqtt"]["username"] = config.mqttUsername;
+  json["mqtt"]["password"] = config.mqttPassword;
+  json["mqtt"]["base_topic"] = config.mqttBaseTopic;
 
   json["live_spots"]["source"] =
       (config.liveSpotSource == LiveSpotSource::RBN)    ? "rbn"

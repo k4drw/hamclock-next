@@ -497,6 +497,21 @@ void WebServer::run() {
       </div>
     </div>
     <div class="card">
+      <div class="section-hdr">MQTT Settings</div>
+      <label style="margin-top:4px"><input type="checkbox" id="mqtt-enabled"> Enable MQTT</label>
+      <label>Broker URI (ws://...)</label>
+      <input type="text" id="mqtt-broker">
+      <label>Username (optional)</label>
+      <input type="text" id="mqtt-user">
+      <label>Password (optional)</label>
+      <div class="pw-wrap" style="margin-bottom:10px">
+        <input type="password" id="mqtt-pass" placeholder="(unchanged if blank)">
+        <span class="pw-toggle" onclick="togglePW('mqtt-pass')">👁</span>
+      </div>
+      <label>Base Topic</label>
+      <input type="text" id="mqtt-topic" value="hamclock">
+    </div>
+    <div class="card">
       <div class="section-hdr">Live Spots</div>
       <label>Source</label>
       <select id="spot-source">
@@ -1201,6 +1216,12 @@ void WebServer::run() {
         document.getElementById('clublog-key').value = c.clublogApiKey || '';
         document.getElementById('rb-key').value = c.repeaterBookKey || '';
         document.getElementById('wl-key').value = c.winlinkKey || '';
+        
+        document.getElementById('mqtt-enabled').checked = !!c.mqttEnabled;
+        document.getElementById('mqtt-broker').value = c.mqttBrokerUri || '';
+        document.getElementById('mqtt-user').value = c.mqttUsername || '';
+        document.getElementById('mqtt-topic').value = c.mqttBaseTopic || '';
+        
         document.getElementById('spot-source').value = c.liveSpotSource || 'PSK';
         document.getElementById('spot-age').value = c.liveSpotsMaxAge || 30;
         const bitmask = (c.liveSpotsBands !== undefined) ? c.liveSpotsBands : 0xFFF;
@@ -1237,8 +1258,14 @@ void WebServer::run() {
         onta_max_dist: document.getElementById('onta-max-dist').value,
         k_index_threshold: document.getElementById('k-index-threshold').value,
         live_spots_of_de: document.getElementById('spots-of-de').checked ? '1' : '0',
-        live_spots_use_call: document.getElementById('spots-use-call').checked ? '1' : '0'
+        live_spots_use_call: document.getElementById('spots-use-call').checked ? '1' : '0',
+        mqtt_enabled: document.getElementById('mqtt-enabled').checked ? '1' : '0',
+        mqtt_broker_uri: document.getElementById('mqtt-broker').value.trim(),
+        mqtt_username: document.getElementById('mqtt-user').value.trim(),
+        mqtt_base_topic: document.getElementById('mqtt-topic').value.trim()
       });
+      const mqttPass = document.getElementById('mqtt-pass').value;
+      if (mqttPass) params.set('mqtt_password', mqttPass);
       const qrzPass = document.getElementById('qrz-pass').value;
       if (qrzPass) params.set('qrz_pass', qrzPass);
       const lotwPass = document.getElementById('lotw-pass').value;

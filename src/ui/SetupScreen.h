@@ -141,6 +141,12 @@ private:
   TextInput clublogApiKeyInput_;
   TextInput repeaterBookInput_;
   TextInput winlinkInput_;
+  
+  bool mqttEnabled_ = false;
+  TextInput mqttBrokerInput_;
+  TextInput mqttUsernameInput_;
+  TextInput mqttPasswordInput_;
+  TextInput mqttTopicInput_;
   std::string countdownLabel_;
   std::string countdownTime_; // YYYY-MM-DD HH:MM
   TextInput dimTimeInput_;
@@ -154,6 +160,11 @@ private:
   SDL_Rect clublogApiKeyRect_ = {0, 0, 0, 0};
   SDL_Rect repeaterBookRect_ = {0, 0, 0, 0};
   SDL_Rect winlinkRect_ = {0, 0, 0, 0};
+  SDL_Rect mqttEnabledRect_ = {0, 0, 0, 0};
+  SDL_Rect mqttBrokerRect_ = {0, 0, 0, 0};
+  SDL_Rect mqttUsernameRect_ = {0, 0, 0, 0};
+  SDL_Rect mqttPasswordRect_ = {0, 0, 0, 0};
+  SDL_Rect mqttTopicRect_ = {0, 0, 0, 0};
   SDL_Rect brightTimeRect_ = {0, 0, 0, 0};
   SDL_Rect modalRect_ = {0, 0, 0, 0};
 

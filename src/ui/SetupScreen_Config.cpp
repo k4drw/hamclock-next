@@ -79,6 +79,12 @@ void SetupScreen::setConfig(const AppConfig &cfg) {
   clublogApiKeyInput_.setValue(cfg.clublogApiKey);
   repeaterBookInput_.setValue(cfg.repeaterBookKey);
   winlinkInput_.setValue(cfg.winlinkKey);
+  
+  mqttEnabled_ = cfg.mqttEnabled;
+  mqttBrokerInput_.setValue(cfg.mqttBrokerUri);
+  mqttUsernameInput_.setValue(cfg.mqttUsername);
+  mqttPasswordInput_.setValue(cfg.mqttPassword);
+  mqttTopicInput_.setValue(cfg.mqttBaseTopic);
   countdownLabel_ = cfg.countdownLabel;
   countdownTime_ = cfg.countdownTime;
   brightnessMgr_.setBrightness(cfg.brightness);
@@ -200,6 +206,11 @@ AppConfig SetupScreen::getConfig(const AppConfig& base) const {
   cfg.clublogApiKey = clublogApiKeyInput_.getValue();
   cfg.repeaterBookKey = repeaterBookInput_.getValue();
   cfg.winlinkKey = winlinkInput_.getValue();
+  cfg.mqttEnabled = mqttEnabled_;
+  cfg.mqttBrokerUri = mqttBrokerInput_.getValue();
+  cfg.mqttUsername = mqttUsernameInput_.getValue();
+  cfg.mqttPassword = mqttPasswordInput_.getValue();
+  cfg.mqttBaseTopic = mqttTopicInput_.getValue();
   cfg.countdownLabel = countdownLabel_;
   cfg.countdownTime = countdownTime_;
   cfg.brightness = brightnessMgr_.getBrightness();

@@ -503,6 +503,11 @@ void WebServer::registerRoutes(httplib::Server &svr) {
     j["dxClusterLogin"] = cfg_->dxClusterLogin;
     j["dxClusterUseWSJTX"] = cfg_->dxClusterUseWSJTX;
     j["wsjtxPort"] = cfg_->wsjtxPort;
+    j["mqttEnabled"] = cfg_->mqttEnabled;
+    j["mqttBrokerUri"] = cfg_->mqttBrokerUri;
+    j["mqttUsername"] = cfg_->mqttUsername;
+    j["mqttPassword"] = cfg_->mqttPassword;
+    j["mqttBaseTopic"] = cfg_->mqttBaseTopic;
     j["rbnEnabled"] = cfg_->rbnEnabled;
     j["rigHost"] = cfg_->rigHost;
     j["rigPort"] = cfg_->rigPort;
@@ -769,6 +774,18 @@ void WebServer::registerRoutes(httplib::Server &svr) {
     if (req.has_param("wsjtx_port"))
       cfg_->wsjtxPort =
           StringUtils::safe_stoi(req.get_param_value("wsjtx_port"));
+
+    if (req.has_param("mqtt_enabled"))
+      cfg_->mqttEnabled = req.get_param_value("mqtt_enabled") == "1";
+    if (req.has_param("mqtt_broker_uri"))
+      cfg_->mqttBrokerUri = req.get_param_value("mqtt_broker_uri");
+    if (req.has_param("mqtt_username"))
+      cfg_->mqttUsername = req.get_param_value("mqtt_username");
+    if (req.has_param("mqtt_password"))
+      cfg_->mqttPassword = req.get_param_value("mqtt_password");
+    if (req.has_param("mqtt_base_topic"))
+      cfg_->mqttBaseTopic = req.get_param_value("mqtt_base_topic");
+
     if (req.has_param("rig_host"))
       cfg_->rigHost = req.get_param_value("rig_host");
     if (req.has_param("rig_port"))

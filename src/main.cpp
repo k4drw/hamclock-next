@@ -48,6 +48,7 @@
 #include "services/LiveSpotProvider.h"
 #include "services/MarineProvider.h"
 #include "services/MeteorProvider.h"
+#include "services/MQTTService.h"
 #include "services/MoonProvider.h"
 #include "services/MufRtProvider.h"
 #include "services/NOAAProvider.h"
@@ -557,6 +558,7 @@ int main(int argc, char *argv[]) {
 
   ctx.prefixMgr.init();
   CitiesManager::getInstance().init();
+  MQTTService::getInstance().start();
 
   ctx.solarStore = std::make_shared<SolarDataStore>();
   ctx.auroraHistoryStore = std::make_shared<AuroraHistoryStore>();
@@ -674,6 +676,7 @@ int main(int argc, char *argv[]) {
 
   // Cleanup
   WorkerService::getInstance().stop();
+  MQTTService::getInstance().stop();
   SoundManager::getInstance().cleanup();
   SDL_DestroyRenderer(ctx.renderer);
   SDL_DestroyWindow(ctx.window);

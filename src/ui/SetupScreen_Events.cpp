@@ -225,11 +225,25 @@ bool SetupScreen::onMouseDown(int mx, int my, Uint16 mod, int clicks) {
       return true;
     if (hitField(clublogApiKeyRect_, 6, &clublogApiKeyInput_))
       return true;
-  } else if (activeTab_ == Tab::Network && hubMode_ == HubMode::Client) {
-    if (hitField(hubIpRect_, 0, &hubIpInput_))
-      return true;
-    if (hitField(hubPortRect_, 1, &hubPortInput_))
-      return true;
+
+  } else if (activeTab_ == Tab::Network) {
+    if (hubMode_ == HubMode::Client) {
+      if (hitField(hubIpRect_, 0, &hubIpInput_))
+        return true;
+      if (hitField(hubPortRect_, 1, &hubPortInput_))
+        return true;
+    }
+
+    if (mqttEnabled_) {
+      if (hitField(mqttBrokerRect_, 2, &mqttBrokerInput_))
+        return true;
+      if (hitField(mqttTopicRect_, 3, &mqttTopicInput_))
+        return true;
+      if (hitField(mqttUsernameRect_, 4, &mqttUsernameInput_))
+        return true;
+      if (hitField(mqttPasswordRect_, 5, &mqttPasswordInput_))
+        return true;
+    }
   } else if (activeTab_ == Tab::Appearance) {
     if (hitField(dimTimeRect_, 0, &dimTimeInput_))
       return true;
@@ -464,6 +478,12 @@ bool SetupScreen::onMouseDown(int mx, int my, Uint16 mod, int clicks) {
       activeField_ = 0;
       return true;
     }
+    
+    if (mx >= mqttEnabledRect_.x && mx <= mqttEnabledRect_.x + mqttEnabledRect_.w &&
+        my >= mqttEnabledRect_.y - 10 && my <= mqttEnabledRect_.y + mqttEnabledRect_.h + 10) {
+      mqttEnabled_ = !mqttEnabled_;
+      return true;
+    }
   } else if (activeTab_ == Tab::Appearance) {
     if (mx >= themeRect_.x && mx < themeRect_.x + themeRect_.w &&
         my >= themeRect_.y && my < themeRect_.y + themeRect_.h) {
@@ -668,12 +688,16 @@ void SetupScreen::onMouseMove(int mx, int /*my*/) {
     const SDL_Rect *rects[] = {&qrzUsernameRect_, &qrzPasswordRect_,
                                &lotwCallRect_,     &lotwPasswordRect_,
                                &repeaterBookRect_, &winlinkRect_,
-                               &clublogApiKeyRect_};
-    if (activeField_ >= 0 && activeField_ < 7)
+                               &clublogApiKeyRect_, &mqttBrokerRect_,
+                               &mqttTopicRect_, &mqttUsernameRect_,
+                               &mqttPasswordRect_};
+    if (activeField_ >= 0 && activeField_ < 11)
       r = *rects[activeField_];
   } else if (activeTab_ == Tab::Network) {
-    const SDL_Rect *rects[] = {&hubIpRect_, &hubPortRect_};
-    if (activeField_ >= 0 && activeField_ < 2)
+    const SDL_Rect *rects[] = {&hubIpRect_, &hubPortRect_,
+                               &mqttBrokerRect_, &mqttTopicRect_,
+                               &mqttUsernameRect_, &mqttPasswordRect_};
+    if (activeField_ >= 0 && activeField_ < 6)
       r = *rects[activeField_];
   } else if (activeTab_ == Tab::Appearance) {
     const SDL_Rect *rects[] = {&dimTimeRect_, &brightTimeRect_};

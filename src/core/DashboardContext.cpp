@@ -75,6 +75,8 @@ void populateWidgetDescriptions();
 #include "services/UpdateChecker.h"
 #include "services/WeatherProvider.h"
 #include "services/WinlinkProvider.h"
+#include "services/MQTTService.h"
+#include "ui/ColorPicker.h"
 #include "ui/ADIFPanel.h"
 #include "ui/ActivityPanels.h"
 #include "ui/AlertsPanel.h"
@@ -1368,6 +1370,9 @@ static int tzIdToOffset(const std::string &tzId, double fallbackLon) {
 }
 
 void DashboardContext::update(AppContext &ctx) {
+  // Publish MQTT state
+  MQTTService::getInstance().publishState(ctx);
+
   auto &appCfg = ctx.appCfg;
 
   ctx.updateLayoutMetrics();
