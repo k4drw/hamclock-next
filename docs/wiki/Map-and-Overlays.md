@@ -21,6 +21,8 @@ When you click the map close to a Live Spot pin or a DX Cluster marker, HamClock
 
 If you click on open water or empty land far from any pin, the click is treated as a plain location pick, as before.
 
+### POTA/SOTA Spot Highlights
+If a Live Spot on the map matches an active POTA (Parks on the Air) or SOTA (Summits on the Air) activation, the spot pin will be rendered with a distinct **white border** (halo) to help it stand out from standard DX spots.
 ### ADIF/LoTW Map Pins and Hover Tooltips
 
 When `showLotwQsos` is enabled in configuration, logged contacts from LoTW or ADIF are plotted as pins on the world map.

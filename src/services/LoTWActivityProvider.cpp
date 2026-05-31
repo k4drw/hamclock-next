@@ -79,14 +79,13 @@ void LoTWActivityProvider::fetch() {
       if (!activity.empty()) {
         size_t count = activity.size();
         store->update(std::move(activity));
-        LOG_I("LoTWActivityProvider", "Loaded %d LoTW user records", (int)count);
+        LOG_I("LoTWActivityProvider", "Loaded {} LoTW user records", (int)count);
       } else {
-        LOG_W("LoTWActivityProvider",
-              "No LoTW activity records parsed from CSV");
+        LOG_W("LoTWActivityProvider", "No LoTW activity records parsed from CSV");
       }
 
       if (droppedLines > 0) {
-        LOG_W("LoTWActivityProvider", "Dropped %d malformed lines", droppedLines);
+        LOG_W("LoTWActivityProvider", "Dropped {} malformed lines", droppedLines);
       }
     });
   });

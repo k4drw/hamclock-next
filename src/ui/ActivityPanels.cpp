@@ -388,6 +388,7 @@ void ONTAPanel::render(SDL_Renderer *renderer) {
   // Detect double height (SidePanel full height is ~332)
   legendH_ = (height_ > 300) ? 28 : 0;
   modeFilterH_ = (height_ > 300) ? 14 : 0;
+  distFilterH_ = (height_ > 300) ? 16 : 0;
 
   // Let ListPanel draw background, border, title, and rows (empty strings)
   ListPanel::render(renderer);
@@ -414,8 +415,7 @@ void ONTAPanel::render(SDL_Renderer *renderer) {
   SDL_Rect btnRect = {chipX - 5, btnY, cw + 10, btnH};
   SDL_Color chipColor = (filter_ != Filter::ALL) ? themes.accent : themes.info;
 
-  // Render concept: Semi-transparent black background + border matching text
-  // color
+  // Render concept: Semi-transparent black background + border matching text color
   SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
   SDL_Color btnBg = themes.rowStripe1;
   SDL_SetRenderDrawColor(renderer, btnBg.r, btnBg.g, btnBg.b, 160);
@@ -437,6 +437,9 @@ void ONTAPanel::render(SDL_Renderer *renderer) {
   }
   if (modeFilterH_ > 0) {
     renderModeFilter(renderer, y_ + height_ - 2 - legendH_);
+  }
+  if (distFilterH_ > 0) {
+    renderDistFilter(renderer, y_ + height_ - 2 - legendH_ - modeFilterH_);
   }
 
   if (currentSpots_.empty()) {
@@ -547,10 +550,6 @@ void ONTAPanel::render(SDL_Renderer *renderer) {
 bool ONTAPanel::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
   (void)mod;
 
-  if (showSetup_) {
-    return handleSetupClick(mx, my);
-  }
-
   // 1. Check chip hit FIRST (it might be right at the top edge)
   if (chipRect_.w > 0 && mx >= chipRect_.x && mx < chipRect_.x + chipRect_.w &&
       my >= chipRect_.y && my < chipRect_.y + chipRect_.h) {
@@ -629,6 +628,27 @@ bool ONTAPanel::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
     }
   }
 
+  // Dist filter row (above mode filter)
+  if (distFilterH_ > 0) {
+    int distY = y_ + height_ - 2 - legendH_ - modeFilterH_ - distFilterH_;
+    if (my >= distY && my < distY + distFilterH_) {
+      if (distDecBtn_.w > 0 && mx >= distDecBtn_.x && mx < distDecBtn_.x + distDecBtn_.w) {
+        maxDistKm_ = std::max(0, maxDistKm_ - 100);
+        if (onMaxDistChanged_) onMaxDistChanged_(maxDistKm_);
+        lastUpdate_ = std::chrono::system_clock::time_point{};
+        update();
+        return true;
+      }
+      if (distIncBtn_.w > 0 && mx >= distIncBtn_.x && mx < distIncBtn_.x + distIncBtn_.w) {
+        maxDistKm_ = std::min(20000, maxDistKm_ + 100);
+        if (onMaxDistChanged_) onMaxDistChanged_(maxDistKm_);
+        lastUpdate_ = std::chrono::system_clock::time_point{};
+        update();
+        return true;
+      }
+    }
+  }
+
   // Check band legend clicks
   if (my >= y_ + height_ - legendH_ && legendH_ > 0) {
     int cellH = 14;
@@ -662,7 +682,7 @@ bool ONTAPanel::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
 
   if (my > y_ + titleAreaH) {
     int rowY = my - (y_ + titleAreaH);
-    int remaining = (y_ + height_ - legendH_ - modeFilterH_) - (y_ + titleAreaH);
+    int remaining = (y_ + height_ - legendH_ - modeFilterH_ - distFilterH_) - (y_ + titleAreaH);
     int rowCount = static_cast<int>(currentSpots_.size());
     int rowH = (rowCount > 0) ? std::max(rowFontSize_ + 4, remaining / rowCount)
                               : rowFontSize_ + 4;
@@ -697,178 +717,9 @@ bool ONTAPanel::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
   return false;
 }
 
-bool ONTAPanel::isModalActive() const { return showSetup_; }
+bool ONTAPanel::isModalActive() const { return false; }
 
-void ONTAPanel::renderModal(SDL_Renderer *renderer) { renderSetup(renderer); }
-
-void ONTAPanel::renderSetup(SDL_Renderer *renderer) {
-  ThemeColors themes = getThemeColors(theme_);
-  auto *cat = fontMgr_.catalog();
-  // Background
-  SDL_Rect bg = {x_, y_, width_, height_};
-  RenderUtils::drawRect(renderer, (float)bg.x, (float)bg.y, (float)bg.w,
-                        (float)bg.h, themes.bg);
-  RenderUtils::drawRectOutline(renderer, (float)bg.x, (float)bg.y, (float)bg.w,
-                               (float)bg.h, themes.border);
-
-  SDL_Color cyan = themes.accent;
-  SDL_Color white = themes.text;
-
-  int y = y_ + 10;
-  int cx = x_ + width_ / 2;
-
-  // Title
-  cat->drawText(renderer, "--- ONTA Filter ---", cx, y, cyan,
-                FontStyle::MicroBold, true);
-  y += 22;
-  int lx = x_ + 10;
-  int btnW = width_ - 20;
-  int btnH = std::min(22, (height_ - 60) / 4);
-
-  auto renderButton = [&](const char *label, Filter f, SDL_Rect &rect) {
-    bool selected = (pendingFilter_ == f);
-    rect = {lx, y, btnW, btnH};
-    RenderUtils::drawRect(renderer, (float)rect.x, (float)rect.y, (float)rect.w,
-                          (float)rect.h,
-                          selected ? themes.accent : themes.rowStripe1);
-    RenderUtils::drawRectOutline(renderer, (float)rect.x, (float)rect.y,
-                                 (float)rect.w, (float)rect.h, themes.border);
-
-    cat->drawText(renderer, label, rect.x + rect.w / 2, y + btnH / 2,
-                  selected ? themes.bg : white, FontStyle::Fast, true, false,
-                  true);
-    y += btnH + 2;
-  };
-
-  renderButton("All Spots", Filter::ALL, allBtnRect_);
-  renderButton("POTA Spots Only", Filter::POTA, potaBtnRect_);
-  renderButton("SOTA Spots Only", Filter::SOTA, sotaBtnRect_);
-
-  // Distance filter row
-  y += 4;
-  int arrowW = btnH;
-  int valW = btnW - arrowW * 2 - 4;
-  distDecBtn_ = {lx, y, arrowW, btnH};
-  SDL_Rect valRect = {lx + arrowW + 2, y, valW, btnH};
-  distIncBtn_ = {lx + arrowW + 2 + valW + 2, y, arrowW, btnH};
-
-  RenderUtils::drawRect(renderer, (float)distDecBtn_.x, (float)distDecBtn_.y,
-                        (float)distDecBtn_.w, (float)distDecBtn_.h,
-                        themes.rowStripe2);
-  RenderUtils::drawRectOutline(renderer, (float)distDecBtn_.x,
-                               (float)distDecBtn_.y, (float)distDecBtn_.w,
-                               (float)distDecBtn_.h, themes.border);
-  cat->drawText(renderer, "-", distDecBtn_.x + distDecBtn_.w / 2,
-                y + btnH / 2, white, FontStyle::Fast, true, false, true);
-
-  RenderUtils::drawRect(renderer, (float)valRect.x, (float)valRect.y,
-                        (float)valRect.w, (float)valRect.h,
-                        themes.rowStripe1);
-  RenderUtils::drawRectOutline(renderer, (float)valRect.x, (float)valRect.y,
-                               (float)valRect.w, (float)valRect.h,
-                               themes.border);
-  char distBuf[24];
-  if (pendingMaxDistKm_ == 0)
-    std::snprintf(distBuf, sizeof(distBuf), "No limit");
-  else
-    std::snprintf(distBuf, sizeof(distBuf), "%d km", pendingMaxDistKm_);
-  cat->drawText(renderer, distBuf, valRect.x + valRect.w / 2,
-                y + btnH / 2, themes.accent, FontStyle::Fast, true, false,
-                true);
-
-  RenderUtils::drawRect(renderer, (float)distIncBtn_.x, (float)distIncBtn_.y,
-                        (float)distIncBtn_.w, (float)distIncBtn_.h,
-                        themes.rowStripe2);
-  RenderUtils::drawRectOutline(renderer, (float)distIncBtn_.x,
-                               (float)distIncBtn_.y, (float)distIncBtn_.w,
-                               (float)distIncBtn_.h, themes.border);
-  cat->drawText(renderer, "+", distIncBtn_.x + distIncBtn_.w / 2,
-                y + btnH / 2, white, FontStyle::Fast, true, false, true);
-  y += btnH + 2;
-
-  // Done Button
-  int doneW = 80, doneH = 28;
-  doneBtnRect_ = {cx - doneW / 2, y_ + height_ - doneH - 6, doneW, doneH};
-  RenderUtils::drawRect(renderer, (float)doneBtnRect_.x, (float)doneBtnRect_.y,
-                        (float)doneBtnRect_.w, (float)doneBtnRect_.h,
-                        themes.success);
-  RenderUtils::drawRectOutline(renderer, (float)doneBtnRect_.x,
-                               (float)doneBtnRect_.y, (float)doneBtnRect_.w,
-                               (float)doneBtnRect_.h, themes.border);
-  cat->drawText(renderer, "Done", cx, doneBtnRect_.y + doneH / 2, themes.bg,
-                FontStyle::Fast, true, false, true);
-}
-
-bool ONTAPanel::handleSetupClick(int mx, int my) {
-  if (mx >= allBtnRect_.x && mx < allBtnRect_.x + allBtnRect_.w &&
-      my >= allBtnRect_.y && my < allBtnRect_.y + allBtnRect_.h) {
-    pendingFilter_ = Filter::ALL;
-    return true;
-  }
-  if (mx >= potaBtnRect_.x && mx < potaBtnRect_.x + potaBtnRect_.w &&
-      my >= potaBtnRect_.y && my < potaBtnRect_.y + potaBtnRect_.h) {
-    pendingFilter_ = Filter::POTA;
-    return true;
-  }
-  if (mx >= sotaBtnRect_.x && mx < sotaBtnRect_.x + sotaBtnRect_.w &&
-      my >= sotaBtnRect_.y && my < sotaBtnRect_.y + sotaBtnRect_.h) {
-    pendingFilter_ = Filter::SOTA;
-    return true;
-  }
-  if (distDecBtn_.w > 0 &&
-      mx >= distDecBtn_.x && mx < distDecBtn_.x + distDecBtn_.w &&
-      my >= distDecBtn_.y && my < distDecBtn_.y + distDecBtn_.h) {
-    pendingMaxDistKm_ = std::max(0, pendingMaxDistKm_ - 100);
-    return true;
-  }
-  if (distIncBtn_.w > 0 &&
-      mx >= distIncBtn_.x && mx < distIncBtn_.x + distIncBtn_.w &&
-      my >= distIncBtn_.y && my < distIncBtn_.y + distIncBtn_.h) {
-    pendingMaxDistKm_ = std::min(5000, pendingMaxDistKm_ + 100);
-    return true;
-  }
-
-  if (mx >= doneBtnRect_.x && mx < doneBtnRect_.x + doneBtnRect_.w &&
-      my >= doneBtnRect_.y && my < doneBtnRect_.y + doneBtnRect_.h) {
-    bool needRebuild = false;
-    if (maxDistKm_ != pendingMaxDistKm_) {
-      maxDistKm_ = pendingMaxDistKm_;
-      needRebuild = true;
-      if (onMaxDistChanged_)
-        onMaxDistChanged_(maxDistKm_);
-    }
-    bool filterChanged = (filter_ != pendingFilter_);
-    if (filterChanged) {
-      filter_ = pendingFilter_;
-      needRebuild = true;
-    }
-    if (needRebuild) {
-      auto data = store_->get();
-      ActivityData newData = *data;
-      newData.hasSelection = false;
-      store_->set(newData);
-      rebuildRows(newData);
-    }
-    if (filterChanged && onFilterChanged_) {
-      std::string fstr;
-      switch (filter_) {
-      case Filter::POTA:
-        fstr = "pota";
-        break;
-      case Filter::SOTA:
-        fstr = "sota";
-        break;
-      default:
-        fstr = "all";
-        break;
-      }
-      onFilterChanged_(fstr);
-    }
-    showSetup_ = false;
-    return true;
-  }
-  return false;
-}
+void ONTAPanel::renderModal(SDL_Renderer *renderer) { }
 
 void ONTAPanel::renderBandLegend(SDL_Renderer *renderer, int maxY) {
   int cellH = 14;           // Tiny font target 12px + 2px padding
@@ -950,14 +801,11 @@ void ONTAPanel::renderModeFilter(SDL_Renderer *renderer, int maxY) {
     bool isDimmed = (!activeModeFilter_.empty() && !isSelected);
     Uint8 alpha = isDimmed ? 100 : 255;
 
-    int lx = x_ + 4 + i * cellW;
-    // Just a generic color since there is no modeColor() available here
-    SDL_Color mc = {150, 150, 150, 255}; 
-
-    SDL_Rect box = {lx + 1, midY - boxSz / 2, boxSz, boxSz};
+    SDL_Rect box = {x_ + 4 + i * cellW, midY - boxSz / 2, boxSz, boxSz};
     SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-    SDL_SetRenderDrawColor(renderer, mc.r, mc.g, mc.b, alpha);
+    SDL_SetRenderDrawColor(renderer, themes.accent.r, themes.accent.g, themes.accent.b, alpha);
     SDL_RenderFillRect(renderer, &box);
+
     if (isSelected) {
       SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
       SDL_Rect border = {box.x - 1, box.y - 1, box.w + 2, box.h + 2};
@@ -965,10 +813,45 @@ void ONTAPanel::renderModeFilter(SDL_Renderer *renderer, int maxY) {
     }
     SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
 
-    SDL_Color tc = {mc.r, mc.g, mc.b, alpha};
-    fontMgr_.catalog()->drawText(renderer, mode, lx + boxSz + 1, midY, tc,
-                                 FontStyle::Tiny, false, false, true);
+    SDL_Color tc = themes.text;
+    tc.a = alpha;
+    fontMgr_.catalog()->drawText(
+        renderer, mode, box.x + box.w + 2, midY, tc, FontStyle::Tiny,
+        false, false, true);
   }
+}
+
+void ONTAPanel::renderDistFilter(SDL_Renderer *renderer, int maxY) {
+  int cellH = distFilterH_;
+  int rowY = maxY - cellH;
+  ThemeColors themes = getThemeColors(theme_);
+  auto *cat = fontMgr_.catalog();
+
+  // Background + separator
+  SDL_Rect bg = {x_ + 1, rowY, width_ - 2, cellH};
+  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, 255);
+  SDL_RenderFillRect(renderer, &bg);
+  SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 200);
+  SDL_RenderDrawLine(renderer, x_ + 1, rowY, x_ + width_ - 1, rowY);
+
+  int midY = rowY + cellH / 2;
+  int arrowW = 16;
+  int btnH = cellH - 4;
+  int lx = x_ + 4;
+  int rx = x_ + width_ - 4;
+
+  std::string lbl = (maxDistKm_ == 0) ? "Any Distance" : std::to_string(maxDistKm_) + " km";
+  cat->drawText(renderer, lbl, x_ + width_ / 2, midY, themes.text, FontStyle::Tiny, true, false, true);
+
+  distDecBtn_ = {lx, rowY + 2, arrowW, btnH};
+  RenderUtils::drawRect(renderer, (float)distDecBtn_.x, (float)distDecBtn_.y, (float)distDecBtn_.w, (float)distDecBtn_.h, themes.rowStripe1);
+  RenderUtils::drawRectOutline(renderer, (float)distDecBtn_.x, (float)distDecBtn_.y, (float)distDecBtn_.w, (float)distDecBtn_.h, themes.border);
+  cat->drawText(renderer, "-", distDecBtn_.x + distDecBtn_.w / 2, distDecBtn_.y + distDecBtn_.h / 2, themes.text, FontStyle::Tiny, true, false, true);
+
+  distIncBtn_ = {rx - arrowW, rowY + 2, arrowW, btnH};
+  RenderUtils::drawRect(renderer, (float)distIncBtn_.x, (float)distIncBtn_.y, (float)distIncBtn_.w, (float)distIncBtn_.h, themes.rowStripe1);
+  RenderUtils::drawRectOutline(renderer, (float)distIncBtn_.x, (float)distIncBtn_.y, (float)distIncBtn_.w, (float)distIncBtn_.h, themes.border);
+  cat->drawText(renderer, "+", distIncBtn_.x + distIncBtn_.w / 2, distIncBtn_.y + distIncBtn_.h / 2, themes.text, FontStyle::Tiny, true, false, true);
 }
 
 REGISTER_WIDGET("dx_peditions", "DX Peditions", true, false, {
@@ -981,13 +864,27 @@ REGISTER_WIDGET("on_the_air", "On The Air", true, false, {
       0, 0, 0, 0, deps.fontMgr, *deps.activityProvider, deps.activityStore);
   p->setFilter(deps.appCfg.ontaFilter);
   p->setDeLocation(deps.appCfg.lat, deps.appCfg.lon);
-  p->setMaxDistKm(deps.appCfg.ontaMaxDistKm);
-  p->setOnFilterChanged([&appCfg = deps.appCfg, &cfgMgr = deps.cfgMgr](const std::string &f) {
+  
+  auto updateDist = [p_ptr = p.get(), &appCfg = deps.appCfg]() {
+    if (appCfg.ontaFilter == "pota") {
+      p_ptr->setMaxDistKm(appCfg.potaMaxDistKm);
+    } else if (appCfg.ontaFilter == "sota") {
+      p_ptr->setMaxDistKm(appCfg.sotaMaxDistKm);
+    } else {
+      p_ptr->setMaxDistKm(std::max(appCfg.potaMaxDistKm, appCfg.sotaMaxDistKm));
+    }
+  };
+  updateDist();
+
+  p->setOnFilterChanged([&appCfg = deps.appCfg, &cfgMgr = deps.cfgMgr, updateDist](const std::string &f) {
     appCfg.ontaFilter = f;
+    updateDist();
     cfgMgr.save(appCfg);
   });
+
   p->setOnMaxDistChanged([&appCfg = deps.appCfg, &cfgMgr = deps.cfgMgr](int km) {
-    appCfg.ontaMaxDistKm = km;
+    if (appCfg.ontaFilter == "pota") appCfg.potaMaxDistKm = km;
+    else if (appCfg.ontaFilter == "sota") appCfg.sotaMaxDistKm = km;
     cfgMgr.save(appCfg);
   });
   return p;

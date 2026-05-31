@@ -383,7 +383,7 @@ bool DisplayPower::runDrmDpms(bool on) {
   if (fd < 0) {
     fd = open("/dev/dri/card0", O_RDWR | O_CLOEXEC);
     if (fd < 0) {
-      LOG_E("DisplayPower", "Failed to open /dev/dri/card0: %s",
+      LOG_E("DisplayPower", "Failed to open /dev/dri/card0: {}",
             std::strerror(errno));
       return false;
     }
@@ -457,7 +457,7 @@ bool DisplayPower::runConsoleBlank(bool on) {
   // TIOCL_BLANKSCREEN/TIOCL_UNBLANKSCREEN
   char arg = on ? TIOCL_UNBLANKSCREEN : TIOCL_BLANKSCREEN;
   if (ioctl(fd, TIOCLINUX, &arg) < 0) {
-    LOG_E("DisplayPower", "Console blanking ioctl failed: %s",
+    LOG_E("DisplayPower", "Console blanking ioctl failed: {}",
           std::strerror(errno));
     close(fd);
     return false;

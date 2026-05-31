@@ -408,7 +408,7 @@ void NOAAProvider::fetchDST() {
         event.user.data1 = update;
         SDL_PushEvent(&event);
       } catch (const std::exception &e) {
-        LOG_E("NOAAProvider", "DST parse failed: %s", e.what());
+        LOG_E("NOAAProvider", "DST parse failed: {}", e.what());
       }
     });
   });
@@ -485,7 +485,7 @@ void NOAAProvider::fetchAurora() {
           }
         }
       } catch (const std::exception &e) {
-        LOG_E("NOAAProvider", "Aurora parse failed: %s", e.what());
+        LOG_E("NOAAProvider", "Aurora parse failed: {}", e.what());
       }
     });
   });
@@ -588,7 +588,7 @@ void NOAAProvider::fetchAuroraHistory() {
           }
         }
       } catch (const std::exception &e) {
-        LOG_E("NOAAProvider", "Backfill parse failed: %s", e.what());
+        LOG_E("NOAAProvider", "Backfill parse failed: {}", e.what());
       }
       std::lock_guard<std::mutex> lk(backfill->mu);
       if (--backfill->pending == 0)
@@ -620,7 +620,7 @@ void NOAAProvider::fetchAuroraHistory() {
           }
         }
       } catch (const std::exception &e) {
-        LOG_E("NOAAProvider", "Backfill parse failed: %s", e.what());
+        LOG_E("NOAAProvider", "Backfill parse failed: {}", e.what());
       }
       std::lock_guard<std::mutex> lk(backfill->mu);
       if (--backfill->pending == 0)
@@ -755,7 +755,7 @@ void NOAAProvider::fetchDRAP() {
           SDL_PushEvent(&event);
         }
       } catch (const std::exception &e) {
-        LOG_E("NOAAProvider", "Backfill parse failed: %s", e.what());
+        LOG_E("NOAAProvider", "Backfill parse failed: {}", e.what());
       }
     });
   });

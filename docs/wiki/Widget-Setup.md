@@ -112,7 +112,7 @@ Controls the time window in minutes. Spots older than this value are excluded. D
 ONTA shows operators activating parks ([POTA](Glossary.md#pota--sota)) or summits ([SOTA](Glossary.md#pota--sota)). Clicking a spot plots the path on the map.
 
 - **Filters**: Click the gear icon on the ONTA panel to choose **POTA**, **SOTA**, or **All**.
-- **Distance**: Set a maximum distance filter in the ONTA settings to only see activators within range of your home location.
+- **Distance**: Set a maximum distance filter in the ONTA settings to only see activators within range of your home location. POTA and SOTA modes have independent distance filters.
 - **Legend**: Double-height mode shows a band color legend at the bottom for quick reference.
 
 ---

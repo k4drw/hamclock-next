@@ -105,8 +105,6 @@ public:
 private:
   void rebuildRows(const ActivityData &data);
   static const char *filterLabel(Filter f);
-  void renderSetup(SDL_Renderer *renderer);
-  bool handleSetupClick(int mx, int my);
 
   SDL_Color getRowColor(int index,
                         const SDL_Color &defaultColor) const override;
@@ -118,7 +116,7 @@ private:
 
   Filter filter_ = Filter::ALL;
   Filter pendingFilter_ = Filter::ALL;
-  bool showSetup_ = false;
+  
   SDL_Rect chipRect_ = {0, 0, 0, 0};
   SDL_Rect allBtnRect_ = {0, 0, 0, 0};
   SDL_Rect potaBtnRect_ = {0, 0, 0, 0};
@@ -165,9 +163,11 @@ private:
   void clearSpotCache();
   void renderBandLegend(SDL_Renderer *renderer, int maxY);
   void renderModeFilter(SDL_Renderer *renderer, int maxY);
+  void renderDistFilter(SDL_Renderer *renderer, int maxY);
 
   int legendH_ = 0;
   int modeFilterH_ = 0;
+  int distFilterH_ = 0;
   int activeBandFilter_ = -1;
   std::string activeModeFilter_ = "";
   static constexpr int MAX_VISIBLE_ROWS = 12; // Adjusted for ONTA panel

@@ -52,13 +52,13 @@ void ClublogProvider::fetch() {
 
         if (!entries.empty()) {
           self->store_->update(entries);
-          LOG_I("ClublogProvider", "Loaded %zu most wanted DXCC entities",
+          LOG_I("ClublogProvider", "Loaded {} most wanted DXCC entities",
                 entries.size());
         } else {
           LOG_W("ClublogProvider", "No valid entries parsed from JSON");
         }
       } catch (const std::exception &e) {
-        LOG_E("ClublogProvider", "JSON parse error: %s", e.what());
+        LOG_E("ClublogProvider", "JSON parse error: {}", e.what());
       }
     });
   });

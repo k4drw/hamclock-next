@@ -133,16 +133,24 @@ void MQTTService::sendAutoDiscovery() {
     {"manufacturer", "Ziggy"}
   };
   
-  // Example: SFI Sensor
-  nlohmann::json sfiConfig = {
-    {"name", "Solar Flux Index"},
-    {"state_topic", state_topic},
-    {"value_template", "{{ value_json.sfi }}"},
-    {"unique_id", "hamclock_next_sfi"},
-    {"device", device}
+  // Helper lambda for creating sensor configs
+  auto sendConfig = [&](const std::string& sensor_id, const std::string& name, const std::string& value_key) {
+    nlohmann::json config = {
+      {"name", name},
+      {"state_topic", state_topic},
+      {"value_template", "{{ value_json." + value_key + " }}"},
+      {"unique_id", "hamclock_next_" + sensor_id},
+      {"device", device}
+    };
+    publish("homeassistant/sensor/" + node_id + "/" + sensor_id + "/config", config.dump(), 1, true);
   };
-  
-  publish("homeassistant/sensor/" + node_id + "/sfi/config", sfiConfig.dump(), 1, true);
+
+  sendConfig("sfi", "Solar Flux Index", "sfi");
+  sendConfig("sn", "Sunspot Number", "sn");
+  sendConfig("a_index", "A-Index", "a_index");
+  sendConfig("k_index", "K-Index", "k_index");
+  sendConfig("xray", "X-Ray Flux", "xray");
+  sendConfig("dx_spots", "Live DX Spots", "dx_spots");
 }
 
 void MQTTService::publish(const std::string &topic, const std::string &payload, int qos, bool retain) {

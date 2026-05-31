@@ -25,6 +25,8 @@
 #include "FontCatalog.h"
 #include "PaneContainer.h"
 #include "RenderUtils.h"
+#include "../core/ActivityData.h"
+#include "../core/PrefixManager.h"
 #include "../core/SoundManager.h"
 #include <fmt/core.h>
 
@@ -942,10 +944,43 @@ void MapWidget::renderSpotOverlay(SDL_Renderer *renderer) {
                                        (int)screenPoints.size(), 1.3f, color);
     }
 
+    // Check if this spot correlates to POTA/SOTA
+    bool isPotaSota = false;
+    if (activityStore_) {
+      auto actData = activityStore_->get();
+      if (actData && actData->valid) {
+        for (const auto &actSpot : actData->ontaSpots) {
+          if (actSpot.call == spot.senderCallsign && (actSpot.program == "POTA" || actSpot.program == "SOTA")) {
+            isPotaSota = true;
+            break;
+          }
+        }
+      }
+    }
+
     // Batch Marker (as a small quad)
     SDL_FPoint mPt = latLonToScreen(lat, lon);
     float mSize = 3.0f;
     int mBase = static_cast<int>(markerVerts_.size());
+    
+    if (isPotaSota) {
+      // Draw white border underneath
+      float borderSize = mSize + 1.5f;
+      SDL_Color wColor = {255, 255, 255, 255};
+      markerVerts_.push_back({{mPt.x - borderSize, mPt.y - borderSize}, wColor, {0, 0}});
+      markerVerts_.push_back({{mPt.x + borderSize, mPt.y - borderSize}, wColor, {1, 0}});
+      markerVerts_.push_back({{mPt.x - borderSize, mPt.y + borderSize}, wColor, {0, 1}});
+      markerVerts_.push_back({{mPt.x + borderSize, mPt.y + borderSize}, wColor, {1, 1}});
+      
+      markerIndices_.push_back(mBase + 0);
+      markerIndices_.push_back(mBase + 1);
+      markerIndices_.push_back(mBase + 2);
+      markerIndices_.push_back(mBase + 1);
+      markerIndices_.push_back(mBase + 2);
+      markerIndices_.push_back(mBase + 3);
+      mBase += 4;
+    }
+
     markerVerts_.push_back({{mPt.x - mSize, mPt.y - mSize}, mColor, {0, 0}});
     markerVerts_.push_back({{mPt.x + mSize, mPt.y - mSize}, mColor, {1, 0}});
     markerVerts_.push_back({{mPt.x - mSize, mPt.y + mSize}, mColor, {0, 1}});

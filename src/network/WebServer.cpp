@@ -536,8 +536,10 @@ void WebServer::run() {
         <option value="pota">POTA Only</option>
         <option value="sota">SOTA Only</option>
       </select>
-      <label>Max Distance (km)</label>
-      <input type="number" id="onta-max-dist" min="0" max="20000">
+      <label for="pota-max-dist">POTA Max Distance (km, 0=Any):</label>
+      <input type="number" id="pota-max-dist" min="0" max="20000">
+      <label for="sota-max-dist">SOTA Max Distance (km, 0=Any):</label>
+      <input type="number" id="sota-max-dist" min="0" max="20000">
       <label>K-Index Alert Threshold</label>
       <input type="number" id="k-index-threshold" step="0.1" min="0" max="9">
       <button onclick="saveServices()">Save</button>
@@ -1231,7 +1233,8 @@ void WebServer::run() {
         document.getElementById('gps-enabled-serv').checked = !!c.gpsEnabled;
         document.getElementById('rss-enabled').checked = !!c.rssEnabled;
         document.getElementById('onta-filter').value = c.ontaFilter || 'all';
-        document.getElementById('onta-max-dist').value = c.ontaMaxDistKm || 0;
+        document.getElementById('pota-max-dist').value = c.potaMaxDistKm || 0;
+        document.getElementById('sota-max-dist').value = c.sotaMaxDistKm || 0;
         document.getElementById('k-index-threshold').value = c.kIndexAlertThreshold || 4.0;
         document.getElementById('spots-of-de').checked = !!c.liveSpotsOfDe;
         document.getElementById('spots-use-call').checked = !!c.liveSpotsUseCall;
@@ -1255,7 +1258,8 @@ void WebServer::run() {
         gps_enabled: document.getElementById('gps-enabled-serv').checked ? '1' : '0',
         rss_enabled: document.getElementById('rss-enabled').checked ? '1' : '0',
         onta_filter: document.getElementById('onta-filter').value,
-        onta_max_dist: document.getElementById('onta-max-dist').value,
+        pota_max_dist: document.getElementById('pota-max-dist').value,
+        sota_max_dist: document.getElementById('sota-max-dist').value,
         k_index_threshold: document.getElementById('k-index-threshold').value,
         live_spots_of_de: document.getElementById('spots-of-de').checked ? '1' : '0',
         live_spots_use_call: document.getElementById('spots-use-call').checked ? '1' : '0',

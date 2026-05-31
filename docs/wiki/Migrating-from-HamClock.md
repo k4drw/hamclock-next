@@ -89,7 +89,7 @@ This replaces the need to manually reconfigure everything when switching between
 
 ### On The Air — All / POTA / SOTA Filter
 
-The original On The Air widget showed all POTA and SOTA activations together with no way to separate them. HamClock-Next adds a **filter chip** at the top of the widget to show All activations, POTA only, or SOTA only. The active filter is persisted in configuration (`ontaFilter`).
+The original On The Air widget showed all POTA and SOTA activations together with no way to separate them. HamClock-Next adds a **filter chip** at the top of the widget to show All activations, POTA only, or SOTA only. The active filter is persisted in configuration (`ontaFilter`), and the map now highlights matching POTA/SOTA live spots with a white border. You can also define independent max distance filters for POTA and SOTA spots directly on the widget.
 
 ---
 

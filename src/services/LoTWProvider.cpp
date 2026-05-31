@@ -136,7 +136,7 @@ void LoTWProvider::fetch() {
 
     if (data.empty() || (upperData.find("<EOH>") == std::string::npos && upperData.find("<EOR>") == std::string::npos)) {
       error = "Failed to fetch LoTW data or invalid credentials";
-      LOG_E("LoTWProvider", "%s", error.c_str());
+      LOG_E("LoTWProvider", "{}", error.c_str());
     } else {
       // Valid data received, parse and update existing store
       ADIFStats stats = self->store_ ? self->store_->get() : ADIFStats{};
@@ -303,7 +303,7 @@ void LoTWProvider::fetch() {
       std::strftime(datebuf, sizeof(datebuf), "%Y-%m-%d", tm);
       self->lastSyncDate_ = datebuf;
 
-      LOG_I("LoTWProvider", "Received %zu bytes of LoTW ADIF data with ~%d QSOs",
+      LOG_I("LoTWProvider", "Received {} bytes of LoTW ADIF data with ~{} QSOs",
             data.length(), qsoCount);
     }
 

@@ -627,7 +627,8 @@ void WebServer::registerRoutes(httplib::Server &svr) {
     j["callsignBgColor"] = colorToHex(cfg_->callsignBgColor);
     j["mufRtOpacity"] = cfg_->mufRtOpacity;
     j["logLevel"] = cfg_->logLevel;
-    j["ontaMaxDistKm"] = cfg_->ontaMaxDistKm;
+    j["potaMaxDistKm"] = cfg_->potaMaxDistKm;
+    j["sotaMaxDistKm"] = cfg_->sotaMaxDistKm;
     j["asteroidIcon"] = cfg_->asteroidIcon;
     j["asteroidColor"] = colorToHex(cfg_->asteroidColor);
     j["bigClockDigital"] = cfg_->bigClockDigital;
@@ -1046,8 +1047,10 @@ void WebServer::registerRoutes(httplib::Server &svr) {
     // Misc
     if (req.has_param("muf_opacity"))
       cfg_->mufRtOpacity = (float)StringUtils::safe_stod(req.get_param_value("muf_opacity"));
-    if (req.has_param("onta_max_dist"))
-      cfg_->ontaMaxDistKm = StringUtils::safe_stoi(req.get_param_value("onta_max_dist"));
+    if (req.has_param("pota_max_dist"))
+      cfg_->potaMaxDistKm = StringUtils::safe_stoi(req.get_param_value("pota_max_dist"));
+    if (req.has_param("sota_max_dist"))
+      cfg_->sotaMaxDistKm = StringUtils::safe_stoi(req.get_param_value("sota_max_dist"));
     if (req.has_param("log_level"))
       cfg_->logLevel = req.get_param_value("log_level");
     if (req.has_param("skipped_version"))

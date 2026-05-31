@@ -225,7 +225,8 @@ struct AppConfig {
 
   // Activity panels
   std::string ontaFilter = "all"; // "all", "pota", or "sota"
-  int ontaMaxDistKm = 0;          // 0 = no distance filter
+  int potaMaxDistKm = 0;          // 0 = no distance filter
+  int sotaMaxDistKm = 0;          // 0 = no distance filter
 
   // Asteroid widget
   std::string asteroidIcon = "☄";

@@ -405,7 +405,14 @@ bool ConfigManager::load(AppConfig &config) {
   // Activity panels
   if (json.contains("activity")) {
     config.ontaFilter = json["activity"].value("onta_filter", "all");
-    config.ontaMaxDistKm = json["activity"].value("onta_max_dist_km", 0);
+    // Handle legacy migration from onta_max_dist_km if it exists, otherwise read pota/sota
+    if (json["activity"].contains("onta_max_dist_km")) {
+      config.potaMaxDistKm = json["activity"].value("onta_max_dist_km", 0);
+      config.sotaMaxDistKm = json["activity"].value("onta_max_dist_km", 0);
+    } else {
+      config.potaMaxDistKm = json["activity"].value("pota_max_dist_km", 0);
+      config.sotaMaxDistKm = json["activity"].value("sota_max_dist_km", 0);
+    }
   }
 
   // Calendar notifications
@@ -966,7 +973,8 @@ bool ConfigManager::save(const AppConfig &config) {
   json["rss"]["enabled"] = config.rssEnabled;
   json["rss"]["url"] = config.rssUrl;
   json["activity"]["onta_filter"] = config.ontaFilter;
-  json["activity"]["onta_max_dist_km"] = config.ontaMaxDistKm;
+  json["activity"]["pota_max_dist_km"] = config.potaMaxDistKm;
+  json["activity"]["sota_max_dist_km"] = config.sotaMaxDistKm;
 
   json["calendar"]["notify_minutes"] = config.calendarNotifyMinutes;
   json["calendar"]["allday_notify_hour"] = config.calendarAllDayNotifyHour;
