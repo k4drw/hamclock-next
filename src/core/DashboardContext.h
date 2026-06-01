@@ -218,6 +218,8 @@ struct DashboardContext {
   std::unique_ptr<WidgetSelector> widgetSelector;
   std::vector<std::unique_ptr<PaneContainer>> panes;
   std::unique_ptr<MapWidget> mapArea;
+  
+  std::map<Widget*, SDL_Texture*> glassTextures;
   std::unique_ptr<RSSBanner> rssBanner;
   std::unique_ptr<UpdateOverlay> updateOverlay;
   LayoutManager layout;

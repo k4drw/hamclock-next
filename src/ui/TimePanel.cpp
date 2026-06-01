@@ -706,7 +706,7 @@ void TimePanel::renderEditOverlay(SDL_Renderer *renderer) {
       SDL_RenderDrawRect(renderer, &bgTab);
     } else {
       SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b,
-                             255);
+                             themes.bg.a);
       SDL_RenderFillRect(renderer, &bgTab);
       SDL_SetRenderDrawColor(renderer, themes.textDim.r, themes.textDim.g,
                              themes.textDim.b, 255);
@@ -748,7 +748,7 @@ void TimePanel::renderEditOverlay(SDL_Renderer *renderer) {
     if (editingBgColor_ && i == 0) {
       // "None" cell
       SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b,
-                             255);
+                             themes.bg.a);
       SDL_RenderFillRect(renderer, &swatch);
       SDL_SetRenderDrawColor(renderer, themes.textDim.r, themes.textDim.g,
                              themes.textDim.b, 255);

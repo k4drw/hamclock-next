@@ -2347,7 +2347,9 @@ void MapWidget::renderAuroraOverlay(SDL_Renderer *renderer) {
 
 void MapWidget::renderProjectionSelect(SDL_Renderer *renderer) {
   // Position at top-left of Widget (independent of centered mapRect_)
-  projRect_ = {x_ + 4, y_ + 4, 100, 22};
+  int topOffset = (y_ == 0) ? 148 : 0;
+  int leftOffset = (x_ == 0) ? 139 : 0;
+  projRect_ = {x_ + 4 + leftOffset, y_ + 4 + topOffset, 100, 22};
 
   ThemeColors themes = getThemeColors(theme_);
 
@@ -2378,8 +2380,8 @@ void MapWidget::renderProjectionSelect(SDL_Renderer *renderer) {
 }
 
 void MapWidget::renderRssButton(SDL_Renderer *renderer) {
-  // Draw "RSS" toggle button at top-right of the map area
-  rssRect_ = {x_ + width_ - 48, y_ + 4, 44, 22};
+  int topOffset = (y_ == 0) ? 148 : 0;
+  rssRect_ = {x_ + width_ - 48, y_ + 4 + topOffset, 44, 22};
 
   ThemeColors themes = getThemeColors(theme_);
 
@@ -2447,7 +2449,7 @@ void MapWidget::renderOverlayInfo(SDL_Renderer *renderer) {
   int boxH = textH + padY * 2;
 
   int cx = x_ + width_ / 2;
-  int cy = y_ + 20;  // Top margin
+  int cy = y_ + height_ - 20;  // Bottom margin
 
   SDL_Rect box = {cx - boxW / 2, cy - boxH / 2, boxW, boxH};
 
@@ -2481,7 +2483,7 @@ void MapWidget::renderModal(SDL_Renderer *renderer) {
 void MapWidget::renderAzimuthalMask(SDL_Renderer *renderer) {
   SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
   ThemeColors themes = getThemeColors(theme_);
-  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, 255);
+  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, themes.bg.a);
 
   if (config_.projection == "dual_azimuthal") {
     // Two side-by-side circles

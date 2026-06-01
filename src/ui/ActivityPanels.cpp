@@ -471,6 +471,9 @@ void ONTAPanel::render(SDL_Renderer *renderer) {
       break;
 
     int rowY = curY + static_cast<int>(i) * rowH;
+    if (rowY + rowH > y_ + height_ - legendH_ - modeFilterH_ - distFilterH_)
+      break;
+
     const auto &spot = currentSpots_[i];
     auto &cache = spotCache_[i];
     SDL_Color color = getRowColor(static_cast<int>(i), getThemeColors(theme_).text);
@@ -730,7 +733,7 @@ void ONTAPanel::renderBandLegend(SDL_Renderer *renderer, int maxY) {
 
   // Background for the legend area to prevent spot overlap (fully opaque)
   SDL_Rect legendRect = {x_ + 1, legendY, width_ - 2, legendH};
-  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, 255);
+  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, themes.bg.a);
   SDL_RenderFillRect(renderer, &legendRect);
 
   // Top border/separator line
@@ -784,7 +787,7 @@ void ONTAPanel::renderModeFilter(SDL_Renderer *renderer, int maxY) {
 
   // Background + separator
   SDL_Rect bg = {x_ + 1, rowY, width_ - 2, cellH};
-  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, 255);
+  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, themes.bg.a);
   SDL_RenderFillRect(renderer, &bg);
   SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 200);
   SDL_RenderDrawLine(renderer, x_ + 1, rowY, x_ + width_ - 1, rowY);
@@ -829,7 +832,7 @@ void ONTAPanel::renderDistFilter(SDL_Renderer *renderer, int maxY) {
 
   // Background + separator
   SDL_Rect bg = {x_ + 1, rowY, width_ - 2, cellH};
-  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, 255);
+  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, themes.bg.a);
   SDL_RenderFillRect(renderer, &bg);
   SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 200);
   SDL_RenderDrawLine(renderer, x_ + 1, rowY, x_ + width_ - 1, rowY);

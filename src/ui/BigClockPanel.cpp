@@ -422,7 +422,7 @@ void BigClockPanel::renderModalInternal(SDL_Renderer *renderer) {
     SDL_Rect indR = {r.x + 4, r.y + 5, ind, ind};
     SDL_SetRenderDrawColor(renderer, on ? themes.accent.r : themes.bg.r,
                                      on ? themes.accent.g : themes.bg.g,
-                                     on ? themes.accent.b : themes.bg.b, 255);
+                                     on ? themes.accent.b : themes.bg.b, themes.bg.a);
     SDL_RenderFillRect(renderer, &indR);
     SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 200);
     SDL_RenderDrawRect(renderer, &indR);

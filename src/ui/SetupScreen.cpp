@@ -204,7 +204,7 @@ void SetupScreen::render(SDL_Renderer *renderer) {
   ThemeColors themes = getThemeColors(theme_, colorOverrides_);
 
   // Background Fill (No extra dimming, use theme background)
-  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, 255);
+  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, themes.bg.a);
   SDL_RenderFillRect(renderer, &modalRect_);
   SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
                          themes.border.b, 255);
@@ -490,7 +490,7 @@ void SetupScreen::renderTzModal(SDL_Renderer *renderer) {
   tzModalOkRect_ = {mx + mW - btnW - 20, ry, btnW, btnH};
 
   auto drawBtn = [&](const SDL_Rect &r, const char *lbl, SDL_Color bg) {
-    SDL_SetRenderDrawColor(renderer, bg.r, bg.g, bg.b, 255);
+    SDL_SetRenderDrawColor(renderer, bg.r, bg.g, bg.b, themes.bg.a);
     SDL_RenderFillRect(renderer, &r);
     SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 150);
     SDL_RenderDrawRect(renderer, &r);

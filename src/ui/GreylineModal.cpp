@@ -53,7 +53,7 @@ void GreylineModal::render(SDL_Renderer *renderer) {
   auto *cat = fontMgr_.catalog();
 
   // Background box
-  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, 255);
+  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, themes.bg.a);
   SDL_RenderFillRect(renderer, &dialogRect_);
   SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
   SDL_RenderDrawRect(renderer, &dialogRect_);

@@ -316,7 +316,7 @@ void MarinePanel::renderMenu(SDL_Renderer *renderer,
   auto *cat = fontMgr_.catalog();
 
   // Background
-  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, 255);
+  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, themes.bg.a);
   SDL_RenderFillRect(renderer, &menuRect_);
   SDL_SetRenderDrawColor(renderer, themes.accent.r, themes.accent.g,
                          themes.accent.b, 255);

@@ -70,7 +70,7 @@ void SatelliteSetup::render(SDL_Renderer *renderer) {
 
   // Background box
   SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, 255);
+  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, themes.bg.a);
   SDL_RenderFillRect(renderer, &dialogRect_);
   SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
                          themes.border.b, 255);
@@ -117,7 +117,7 @@ void SatelliteSetup::render(SDL_Renderer *renderer) {
 
   // Buttons
   auto drawBtn = [&](const SDL_Rect &r, const char *label, SDL_Color bg) {
-    SDL_SetRenderDrawColor(renderer, bg.r, bg.g, bg.b, 255);
+    SDL_SetRenderDrawColor(renderer, bg.r, bg.g, bg.b, themes.bg.a);
     SDL_RenderFillRect(renderer, &r);
     SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 150);
     SDL_RenderDrawRect(renderer, &r);

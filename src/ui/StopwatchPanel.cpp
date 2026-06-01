@@ -203,7 +203,7 @@ bool StopwatchPanel::onMouseUp(int mx, int my, Uint16, int) {
 
 void StopwatchPanel::renderSetup(SDL_Renderer *renderer) {
   ThemeColors themes = getThemeColors(theme_);
-  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, 255);
+  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, themes.bg.a);
   SDL_Rect bg = {x_, y_, width_, height_};
   SDL_RenderFillRect(renderer, &bg);
   SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,

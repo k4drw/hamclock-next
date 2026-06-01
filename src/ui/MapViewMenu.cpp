@@ -632,7 +632,7 @@ void MapViewMenu::drawDropdownList(SDL_Renderer *renderer,
   auto *cat = fontMgr_.catalog();
 
   // Background
-  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, 255);
+  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, themes.bg.a);
   SDL_RenderFillRect(renderer, &listRect);
   SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
                          themes.border.b, 255);

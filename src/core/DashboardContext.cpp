@@ -1136,8 +1136,9 @@ DashboardContext::DashboardContext(AppContext &ctx)
   });
 
   // Layout
-  if (FIDELITY_MODE)
-    layout.setFidelityMode(true);
+  if (layout.fidelityMode() != FIDELITY_MODE)
+    layout.setFidelityMode(FIDELITY_MODE);
+  layout.setGlassHudMode(ctx.appCfg.glassHudMode);
   layout.addWidget(Zone::TopBar, timePanel.get(), 2.0f);
   layout.addWidget(Zone::TopBar, panes[0].get(), 1.5f);
   layout.addWidget(Zone::TopBar, panes[1].get(), 1.5f);
@@ -1222,9 +1223,10 @@ DashboardContext::DashboardContext(AppContext &ctx)
   frames = 0;
 
   // Propagate theme and metric to all dashboard widgets
+  std::string startTheme = appCfg.glassHudMode ? "glass" : appCfg.theme;
   for (auto *w : widgets) {
     if (w) {
-      w->setTheme(appCfg.theme);
+      w->setTheme(startTheme);
       w->setMetric(appCfg.useMetric);
       w->setLineAATexture(texMgr.get("line_aa"));
     }
@@ -1914,10 +1916,10 @@ void DashboardContext::update(AppContext &ctx) {
         } else if (sym == SDLK_k) {
           ctx.showActionHighlights = !ctx.showActionHighlights;
           consumed = true;
-        } else if (event.key.keysym.sym == SDLK_o && ctx.dashboard) {
+        } else if (sym == SDLK_o && ctx.dashboard) {
           ctx.dashboard->debugOverlay.toggle();
           consumed = true;
-        } else if (event.key.keysym.sym == SDLK_l) {
+        } else if (sym == SDLK_l) {
           ctx.appCfg.scaleToFullScreen = !ctx.appCfg.scaleToFullScreen;
           ctx.cfgMgr.save(ctx.appCfg);
           SDL_Event ev{};
@@ -1926,7 +1928,21 @@ void DashboardContext::update(AppContext &ctx) {
           SDL_GetWindowSize(ctx.window, &ev.window.data1, &ev.window.data2);
           SDL_PushEvent(&ev);
           consumed = true;
-        } else if (event.key.keysym.sym == SDLK_F11) {
+        } else if (sym == SDLK_h) {
+          ctx.appCfg.glassHudMode = !ctx.appCfg.glassHudMode;
+          ctx.cfgMgr.save(ctx.appCfg);
+          layout.setGlassHudMode(ctx.appCfg.glassHudMode);
+          std::string activeTheme = ctx.appCfg.glassHudMode ? "glass" : ctx.appCfg.theme;
+          for (auto *w : widgets) {
+            w->setTheme(activeTheme);
+          }
+          SDL_Event ev{};
+          ev.type = SDL_WINDOWEVENT;
+          ev.window.event = SDL_WINDOWEVENT_SIZE_CHANGED;
+          SDL_GetWindowSize(ctx.window, &ev.window.data1, &ev.window.data2);
+          SDL_PushEvent(&ev);
+          consumed = true;
+        } else if (sym == SDLK_F11) {
 
           Uint32 flags = SDL_GetWindowFlags(ctx.window);
           if (flags & SDL_WINDOW_FULLSCREEN_DESKTOP)
@@ -2897,6 +2913,14 @@ void DashboardContext::render(AppContext &ctx) {
 
   Widget *activeModal = nullptr;
   bool isFS = (expandedPaneIdx_ >= 0 && panes[expandedPaneIdx_]->getActiveType() == "big_clock");
+  
+  if (ctx.appCfg.glassHudMode && mapArea) {
+    SDL_Rect clip = mapArea->getRect();
+    SDL_RenderSetClipRect(ctx.renderer, &clip);
+    mapArea->render(ctx.renderer);
+    SDL_RenderSetClipRect(ctx.renderer, nullptr);
+  }
+
   for (auto *w : widgets) {
     if (expandedPaneIdx_ >= 0) {
       if (isFS) {
@@ -2908,9 +2932,95 @@ void DashboardContext::render(AppContext &ctx) {
     }
     if (w->isModalActive())
       activeModal = w;
+      
+    if (ctx.appCfg.glassHudMode && w == mapArea.get())
+      continue;
+      
     SDL_Rect clip = w->getRect();
-    SDL_RenderSetClipRect(ctx.renderer, &clip);
-    w->render(ctx.renderer);
+    
+    if (ctx.appCfg.glassHudMode) {
+      int mx, my;
+      SDL_GetMouseState(&mx, &my);
+      if (FIDELITY_MODE) {
+        float pixX = mx * static_cast<float>(ctx.globalDrawW) / ctx.globalWinW;
+        float pixY = my * static_cast<float>(ctx.globalDrawH) / ctx.globalWinH;
+        mx = static_cast<int>(pixX / ctx.layScaleX);
+        my = static_cast<int>(pixY / ctx.layScaleY);
+      } else {
+        mx = static_cast<int>(mx * (800.0f / ctx.globalWinW) - ctx.layLogicalOffX);
+        my = static_cast<int>(my * (480.0f / ctx.globalWinH) - ctx.layLogicalOffY);
+      }
+      bool hovered = (mx >= clip.x && mx < clip.x + clip.w && my >= clip.y && my < clip.y + clip.h);
+      
+      SDL_Texture* target = glassTextures[w];
+      int texW = FIDELITY_MODE ? static_cast<int>(clip.w * ctx.layScaleX) : clip.w;
+      int texH = FIDELITY_MODE ? static_cast<int>(clip.h * ctx.layScaleY) : clip.h;
+      
+      if (target) {
+        int actW, actH;
+        SDL_QueryTexture(target, nullptr, nullptr, &actW, &actH);
+        if (actW != texW || actH != texH) {
+          SDL_DestroyTexture(target);
+          target = nullptr;
+          glassTextures.erase(w);
+        }
+      }
+      
+      if (!target && texW > 0 && texH > 0) {
+        target = SDL_CreateTexture(ctx.renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, texW, texH);
+        if (target) {
+          SDL_SetTextureBlendMode(target, SDL_BLENDMODE_BLEND);
+          glassTextures[w] = target;
+        }
+      }
+      
+      if (target) {
+        SDL_SetRenderTarget(ctx.renderer, target);
+        SDL_SetRenderDrawColor(ctx.renderer, 0, 0, 0, 0);
+        SDL_RenderClear(ctx.renderer);
+        
+        if (FIDELITY_MODE) {
+          SDL_Rect vp = {
+            static_cast<int>(-clip.x * ctx.layScaleX),
+            static_cast<int>(-clip.y * ctx.layScaleY),
+            static_cast<int>(800 * ctx.layScaleX),
+            static_cast<int>(480 * ctx.layScaleY)
+          };
+          SDL_RenderSetViewport(ctx.renderer, &vp);
+          SDL_RenderSetScale(ctx.renderer, ctx.layScaleX, ctx.layScaleY);
+        } else {
+          SDL_Rect vp = { -clip.x, -clip.y, 800, 480 };
+          SDL_RenderSetViewport(ctx.renderer, &vp);
+        }
+        
+        SDL_RenderSetClipRect(ctx.renderer, &clip);
+        SDL_SetRenderDrawBlendMode(ctx.renderer, SDL_BLENDMODE_BLEND);
+        w->render(ctx.renderer);
+        
+        SDL_SetRenderTarget(ctx.renderer, nullptr);
+        SDL_SetTextureAlphaMod(target, hovered ? 255 : 100);
+        
+        if (FIDELITY_MODE) {
+          SDL_RenderSetScale(ctx.renderer, 1.0f, 1.0f);
+          SDL_Rect dstClip = {
+            static_cast<int>(clip.x * ctx.layScaleX),
+            static_cast<int>(clip.y * ctx.layScaleY),
+            texW,
+            texH
+          };
+          SDL_RenderCopy(ctx.renderer, target, nullptr, &dstClip);
+          SDL_RenderSetScale(ctx.renderer, ctx.layScaleX, ctx.layScaleY);
+        } else {
+          SDL_RenderCopy(ctx.renderer, target, nullptr, &clip);
+        }
+      } else {
+        SDL_RenderSetClipRect(ctx.renderer, &clip);
+        w->render(ctx.renderer);
+      }
+    } else {
+      SDL_RenderSetClipRect(ctx.renderer, &clip);
+      w->render(ctx.renderer);
+    }
   }
   SDL_RenderSetClipRect(ctx.renderer, nullptr);
 

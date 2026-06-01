@@ -21,7 +21,7 @@ ThemeColors getThemeColors(const std::string &theme,
     colors.rowStripe1 = {25, 25, 30, 255};
     colors.rowStripe2 = {15, 15, 20, 255};
   } else if (theme == "glass") {
-    colors.bg = {20, 25, 40, 200}; // semi-transparent
+    colors.bg = {20, 25, 40, 100}; // semi-transparent
     colors.border = {100, 100, 150, 150};
     colors.text = {255, 255, 255, 255};
     colors.textDim = {180, 180, 200, 255};

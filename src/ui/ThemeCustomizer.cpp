@@ -125,7 +125,7 @@ void ThemeCustomizer::render(SDL_Renderer *renderer) {
 
   // 3. OK and Cancel Buttons
   auto drawBottomBtn = [&](const SDL_Rect &r, const char *label, SDL_Color bg) {
-    SDL_SetRenderDrawColor(renderer, bg.r, bg.g, bg.b, 255);
+    SDL_SetRenderDrawColor(renderer, bg.r, bg.g, bg.b, themes.bg.a);
     SDL_RenderFillRect(renderer, &r);
     SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 150);
     SDL_RenderDrawRect(renderer, &r);

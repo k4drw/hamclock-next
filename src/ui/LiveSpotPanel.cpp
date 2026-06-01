@@ -172,7 +172,7 @@ void LiveSpotPanel::render(SDL_Renderer *renderer) {
       SDL_SetRenderDrawColor(renderer, bd.color.r, bd.color.g, bd.color.b, 255);
     } else {
       // Dark background for unselected bands
-      SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, 255);
+      SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, themes.bg.a);
     }
     SDL_Rect cellRect = {cx + gap, cy + gap, colW - 2 * gap, cellH - 2 * gap};
     SDL_RenderFillRect(renderer, &cellRect);
@@ -227,7 +227,7 @@ void LiveSpotPanel::render(SDL_Renderer *renderer) {
 void LiveSpotPanel::renderSetup(SDL_Renderer *renderer) {
   ThemeColors themes = getThemeColors(theme_);
   // Background
-  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, 255);
+  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, themes.bg.a);
   SDL_Rect bg = {x_, y_, width_, height_};
   SDL_RenderFillRect(renderer, &bg);
   SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,

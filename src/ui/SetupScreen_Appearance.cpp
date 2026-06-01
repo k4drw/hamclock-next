@@ -237,7 +237,7 @@ void SetupScreen::renderFontModal(SDL_Renderer *renderer) {
   int mx = modalRect_.x + (modalRect_.w - mw) / 2;
   int my = modalRect_.y + (modalRect_.h - mh) / 2;
   fontModalRect_ = {mx, my, mw, mh};
-  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, 255);
+  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, themes.bg.a);
   SDL_RenderFillRect(renderer, &fontModalRect_);
   SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g, themes.border.b, 255);
   SDL_RenderDrawRect(renderer, &fontModalRect_);

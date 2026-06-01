@@ -75,6 +75,7 @@ struct AppConfig {
   bool mapNightLights = true;
   bool useMetric = true;
   bool scaleToFullScreen = false;
+  bool glassHudMode = false;
   std::string projection = "equirectangular"; // or "robinson"
   std::string mapStyle = "nasa";              // "nasa", "topo", "topo_bathy"
   bool showGrid = false;

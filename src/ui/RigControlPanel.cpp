@@ -148,7 +148,7 @@ void RigControlPanel::renderExpanded(SDL_Renderer *renderer) {
     SDL_Color bg = active ? tc.accent : tc.rowStripe1;
     SDL_Color fg = active ? tc.bg : tc.text;
     SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
-    SDL_SetRenderDrawColor(renderer, bg.r, bg.g, bg.b, 255);
+    SDL_SetRenderDrawColor(renderer, bg.r, bg.g, bg.b, bg.a);
     SDL_RenderFillRect(renderer, &r);
     SDL_SetRenderDrawColor(renderer, tc.border.r, tc.border.g, tc.border.b,
                            255);

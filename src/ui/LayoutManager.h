@@ -31,6 +31,7 @@ public:
         entries_.end());
   }
   bool fidelityMode() const { return fidelityMode_; }
+  void setGlassHudMode(bool on) { glassHudMode_ = on; }
 
   void recalculate(int winW, int winH, int offX = 0, int offY = 0) {
     winW_ = winW;
@@ -47,11 +48,11 @@ public:
     // SidePanel: 17% of width, min 160px (always visible)
     int sideW = std::max(160, static_cast<int>(winW * 0.17f));
 
-    // MainStage fills the rest
-    int mainX = sideW;
-    int mainY = topH;
-    int mainW = winW - sideW;
-    int mainH = winH - topH;
+    // MainStage fills the rest (or entire screen in glassHudMode)
+    int mainX = glassHudMode_ ? 0 : sideW;
+    int mainY = glassHudMode_ ? 0 : topH;
+    int mainW = glassHudMode_ ? winW : winW - sideW;
+    int mainH = glassHudMode_ ? winH : winH - topH;
 
     // Sum weights per zone
     float topWeight = 0, sideWeight = 0;
@@ -126,7 +127,7 @@ private:
     };
     static constexpr SDL_Rect kSideSingle = {0, 148, 139, 332}; // full height
     // MainStage
-    static constexpr SDL_Rect kMain = {139, 149, 660, 330};
+    SDL_Rect kMain = glassHudMode_ ? SDL_Rect{0, 0, 800, 480} : SDL_Rect{139, 149, 660, 330};
 
     // Count SidePanel entries to pick single vs split layout
     int nSide = 0;
@@ -167,4 +168,5 @@ private:
   int winW_ = 0;
   int winH_ = 0;
   bool fidelityMode_ = false;
+  bool glassHudMode_ = false;
 };

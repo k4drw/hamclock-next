@@ -825,7 +825,7 @@ void MapWidget::update() {
 void MapWidget::render(SDL_Renderer *renderer) {
   cachedRenderer_ = renderer;
   ThemeColors themes = getThemeColors(theme_);
-  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, 255);
+  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, themes.bg.a);
   SDL_Rect bg = {x_, y_, width_, height_};
   SDL_RenderFillRect(renderer, &bg);
 
@@ -1178,7 +1178,7 @@ void MapWidget::renderDeMenu(SDL_Renderer *renderer) {
   ThemeColors themes = getThemeColors(theme_);
 
   // Background
-  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, 255);
+  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, themes.bg.a);
   SDL_RenderFillRect(renderer, &deMenuRect_);
 
   // Border

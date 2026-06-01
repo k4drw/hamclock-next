@@ -339,7 +339,7 @@ void SatWidget::drawRadio(SDL_Renderer *renderer, int cx, int cy, int r,
   }
 
   if (!filled) {
-    SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, 255);
+    SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, themes.bg.a);
     int inner = std::max(1, r - 2);
     for (int dy = -inner; dy <= inner; ++dy) {
       int dx = static_cast<int>(std::sqrt(inner * inner - dy * dy));

@@ -228,7 +228,7 @@ void CalendarPanel::renderSetup(SDL_Renderer *renderer) {
   auto *cat = fontMgr_.catalog();
 
   // Background
-  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, 255);
+  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, themes.bg.a);
   SDL_Rect bg = {x_, y_, width_, height_};
   SDL_RenderFillRect(renderer, &bg);
   SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,

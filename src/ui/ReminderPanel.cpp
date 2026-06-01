@@ -211,7 +211,7 @@ void ReminderPanel::renderModal(SDL_Renderer *renderer) {
   ThemeColors themes = getThemeColors(theme_);
 
   // Box background + border
-  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, 255);
+  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, themes.bg.a);
   SDL_Rect box = {dx, dy, dW, dH};
   SDL_RenderFillRect(renderer, &box);
   SDL_SetRenderDrawColor(renderer, themes.accent.r, themes.accent.g, themes.accent.b, 255);
@@ -320,7 +320,7 @@ void ReminderPanel::renderSetup(SDL_Renderer *renderer) {
   auto *cat = fontMgr_.catalog();
 
   // Pane background + border
-  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, 255);
+  SDL_SetRenderDrawColor(renderer, themes.bg.r, themes.bg.g, themes.bg.b, themes.bg.a);
   SDL_Rect bg = {x_, y_, width_, height_};
   SDL_RenderFillRect(renderer, &bg);
   SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
