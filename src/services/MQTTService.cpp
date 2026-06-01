@@ -4,6 +4,10 @@
 #include "../core/DashboardContext.h"
 #include "../core/SolarData.h"
 #include "../core/LiveSpotData.h"
+#include "../core/ActivityData.h"
+#include "../core/SpaceWeatherAlertData.h"
+#include "../services/AsteroidProvider.h"
+#include "../core/HamClockState.h"
 #include <SDL.h>
 #include <iostream>
 #include <nlohmann/json.hpp>
@@ -151,6 +155,11 @@ void MQTTService::sendAutoDiscovery() {
   sendConfig("k_index", "K-Index", "k_index");
   sendConfig("xray", "X-Ray Flux", "xray");
   sendConfig("dx_spots", "Live DX Spots", "dx_spots");
+  sendConfig("dx_recent_spot", "Most Recent DX Spot", "dx_recent_spot");
+  sendConfig("pota_sota_count", "POTA/SOTA Live Count", "pota_sota_count");
+  sendConfig("space_wx_alerts", "Space Wx Alerts Count", "space_wx_alerts");
+  sendConfig("asteroid_count", "Asteroids Approaching", "asteroid_count");
+  sendConfig("dx_target_call", "Current DX Target", "dx_target_call");
 }
 
 void MQTTService::publish(const std::string &topic, const std::string &payload, int qos, bool retain) {
@@ -186,11 +195,32 @@ void MQTTService::publishState(struct AppContext& ctx) {
     }
   }
   
-  if (ctx.spotStore) {
-    auto snapshot = ctx.spotStore->snapshot();
+  if (ctx.dxcStore) {
+    auto snapshot = ctx.dxcStore->snapshot();
     if (snapshot) {
       state["dx_spots"] = snapshot->spots.size();
+      if (!snapshot->spots.empty()) {
+        state["dx_recent_spot"] = snapshot->spots.front().txCall;
+      } else {
+        state["dx_recent_spot"] = "";
+      }
     }
+  }
+
+  if (ctx.activityStore) {
+    state["pota_sota_count"] = ctx.activityStore->get()->ontaSpots.size();
+  }
+
+  if (ctx.spaceWxAlertStore) {
+    state["space_wx_alerts"] = ctx.spaceWxAlertStore->get().alerts.size();
+  }
+
+  if (ctx.asteroidProvider) {
+    state["asteroid_count"] = ctx.asteroidProvider->getLatest().asteroids.size();
+  }
+
+  if (ctx.state) {
+    state["dx_target_call"] = ctx.state->dxActive ? (ctx.state->dxCallsign.empty() ? ctx.state->dxGrid : ctx.state->dxCallsign) : "";
   }
   
   std::string state_topic = cfg.mqttBaseTopic + "/state";

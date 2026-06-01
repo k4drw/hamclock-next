@@ -541,8 +541,8 @@ DashboardContext::DashboardContext(AppContext &ctx)
 
 
 
-  asteroidProvider = std::make_shared<AsteroidProvider>(netManager);
-  asteroidProvider->update();
+  appContext_.asteroidProvider = std::make_shared<AsteroidProvider>(netManager);
+  appContext_.asteroidProvider->update();
 
   beaconProvider = std::make_unique<BeaconProvider>();
 
@@ -580,9 +580,9 @@ DashboardContext::DashboardContext(AppContext &ctx)
       std::make_unique<GreylineDXProvider>(ctx.prefixMgr, ctx.greylineDXStore);
   greylineDXProvider->update();
 
-  spaceWxAlertStore = std::make_shared<SpaceWeatherAlertStore>();
+  appContext_.spaceWxAlertStore = std::make_shared<SpaceWeatherAlertStore>();
   spaceWxAlertProvider =
-      std::make_unique<SpaceWeatherAlertProvider>(netManager, spaceWxAlertStore);
+      std::make_unique<SpaceWeatherAlertProvider>(netManager, appContext_.spaceWxAlertStore);
   if (isMasterMode || isWidgetConfigured("spacewx_alerts"))
     spaceWxAlertProvider->fetch();
 
@@ -780,7 +780,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
         ctx.greylineDXStore,
         ctx.auroraMapStore,
         ctx.calendarStore,
-        spaceWxAlertStore,
+        appContext_.spaceWxAlertStore,
         ctx.lotwActivityStore,
         ctx.clublogStore,
         ctx.flareStore,
@@ -792,7 +792,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
         sdoProvider.get(),
         beaconProvider.get(),
         satMgr.get(),
-        asteroidProvider.get(),
+        appContext_.asteroidProvider.get(),
         callbookProvider,
         ionosondeProvider,
         &fccProvider,
@@ -1513,7 +1513,7 @@ void DashboardContext::update(AppContext &ctx) {
 
     // --- Asteroid widget + map pin ---
     if (isMaster || isWidgetActive("asteroid"))
-      asteroidProvider->update();
+      appContext_.asteroidProvider->update();
 
 #ifndef __EMSCRIPTEN__
     if (ctx.updateChecker)
@@ -1630,7 +1630,7 @@ void DashboardContext::update(AppContext &ctx) {
 
     // SpaceWx Alerts
     if ((isMaster || isWidgetActive("spacewx_alerts")) &&
-        (!spaceWxAlertStore->get().valid || spaceWxAlertProvider->isStale(now, 15 * 60 * 1000)) &&
+        (!appContext_.spaceWxAlertStore->get().valid || spaceWxAlertProvider->isStale(now, 15 * 60 * 1000)) &&
         spaceWxAlertProvider->isStale(now, kCooldown)) {
       spaceWxAlertProvider->fetch();
     }
@@ -1651,9 +1651,9 @@ void DashboardContext::update(AppContext &ctx) {
 
     // Asteroid
     if ((isMaster || isWidgetActive("asteroid")) &&
-        asteroidProvider->isStale(now, 24 * 60 * 60 * 1000) &&
-        asteroidProvider->isStale(now, kCooldown)) {
-      asteroidProvider->update();
+        appContext_.asteroidProvider->isStale(now, 24 * 60 * 60 * 1000) &&
+        appContext_.asteroidProvider->isStale(now, kCooldown)) {
+      appContext_.asteroidProvider->update();
     }
 
     // Marine (fetch periodically if widget active)
@@ -2332,8 +2332,8 @@ void DashboardContext::update(AppContext &ctx) {
         case AE_SPACEWX_ALERT_READY: {
           std::unique_ptr<SpaceWxAlertData> update(
               static_cast<SpaceWxAlertData *>(event.user.data1));
-          if (update && ctx.dashboard && ctx.dashboard->spaceWxAlertStore)
-            ctx.dashboard->spaceWxAlertStore->update(*update);
+          if (update && ctx.dashboard && ctx.dashboard->appContext_.spaceWxAlertStore)
+            ctx.dashboard->appContext_.spaceWxAlertStore->update(*update);
           break;
         }
         case AE_REPEATER_DATA_READY: {
@@ -2638,7 +2638,7 @@ void DashboardContext::update(AppContext &ctx) {
   if (sdoWidget)
     sdoWidget->setObserver(appCfg.lat, appCfg.lon);
 
-  mapArea->setAsteroidProvider(asteroidProvider.get());
+  mapArea->setAsteroidProvider(appContext_.asteroidProvider.get());
 
   // Recalculate UI call logic
   if (lastResizeMs && (SDL_GetTicks() - lastResizeMs > 200)) {

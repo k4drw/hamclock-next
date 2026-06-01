@@ -205,7 +205,6 @@ struct DashboardContext {
   std::shared_ptr<QRZProvider> qrzProvider;
 
   // New widget providers
-  std::shared_ptr<SpaceWeatherAlertStore> spaceWxAlertStore;
   std::unique_ptr<SpaceWeatherAlertProvider> spaceWxAlertProvider;
 
   // Services
@@ -358,6 +357,8 @@ struct AppContext {
   std::shared_ptr<GreylineDXStore> greylineDXStore;
   std::shared_ptr<AuroraMapStore> auroraMapStore;
   std::shared_ptr<CalendarStore> calendarStore;
+  std::shared_ptr<AsteroidProvider> asteroidProvider;
+  std::shared_ptr<SpaceWeatherAlertStore> spaceWxAlertStore;
 
   #ifndef __EMSCRIPTEN__
   std::unique_ptr<WebServer> webServer;
