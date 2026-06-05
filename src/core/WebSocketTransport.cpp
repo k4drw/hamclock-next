@@ -14,6 +14,8 @@
 typedef int socklen_t;
 #else
 #include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 #include <netdb.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -46,27 +48,27 @@ bool WebSocketTransport::isConnected() const {
 #ifdef __EMSCRIPTEN__
 // --- Emscripten WebSocket Implementation ---
 
-int WebSocketTransport::onOpen(int eventType, const void *websocketEvent, void *userData) {
+bool WebSocketTransport::onOpen(int eventType, const EmscriptenWebSocketOpenEvent *websocketEvent, void *userData) {
   auto *transport = static_cast<WebSocketTransport*>(userData);
   transport->connected_ = true;
   return EM_TRUE;
 }
 
-int WebSocketTransport::onError(int eventType, const void *websocketEvent, void *userData) {
+bool WebSocketTransport::onError(int eventType, const EmscriptenWebSocketErrorEvent *websocketEvent, void *userData) {
   auto *transport = static_cast<WebSocketTransport*>(userData);
   transport->connected_ = false;
   return EM_TRUE;
 }
 
-int WebSocketTransport::onClose(int eventType, const void *websocketEvent, void *userData) {
+bool WebSocketTransport::onClose(int eventType, const EmscriptenWebSocketCloseEvent *websocketEvent, void *userData) {
   auto *transport = static_cast<WebSocketTransport*>(userData);
   transport->connected_ = false;
   return EM_TRUE;
 }
 
-int WebSocketTransport::onMessage(int eventType, const void *websocketEvent, void *userData) {
+bool WebSocketTransport::onMessage(int eventType, const EmscriptenWebSocketMessageEvent *websocketEvent, void *userData) {
   auto *transport = static_cast<WebSocketTransport*>(userData);
-  const auto *evt = static_cast<const EmscriptenWebSocketMessageEvent*>(websocketEvent);
+  const auto *evt = websocketEvent;
   
   std::lock_guard<std::mutex> lock(transport->emMutex_);
   transport->emRxBuffer_.insert(transport->emRxBuffer_.end(), evt->data, evt->data + evt->numBytes);

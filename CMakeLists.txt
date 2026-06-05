@@ -250,6 +250,8 @@ if(NOT EMSCRIPTEN)
     if(NOT USE_SYSTEM_CURL)
         set(CURL_DISABLE_INSTALL ON CACHE BOOL "Disable curl installation")
         set(BUILD_CURL_EXE OFF CACHE BOOL "Disable curl executable")
+        set(BUILD_TESTING OFF CACHE BOOL "Disable testing" FORCE)
+        set(BUILD_EXAMPLES OFF CACHE BOOL "Disable examples" FORCE)
         set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build static libs" FORCE)
         set(HTTP_ONLY ON CACHE BOOL "Build HTTP-only curl")
         if(WIN32)
@@ -337,6 +339,8 @@ FetchContent_Declare(
     GIT_REPOSITORY https://github.com/LiamBindle/MQTT-C.git
     GIT_TAG        v1.1.6
 )
+set(MQTT_C_EXAMPLES OFF CACHE BOOL "Disable MQTT-C examples" FORCE)
+set(MQTT_C_TESTS OFF CACHE BOOL "Disable MQTT-C tests" FORCE)
 FetchContent_MakeAvailable(mqttc)
 
 
@@ -740,6 +744,7 @@ if(EMSCRIPTEN)
         "-sASSERTIONS=1"
         "-sFETCH=1"
         "-lidbfs.js"
+        "-lwebsocket.js"
         "-sEXPORTED_RUNTIME_METHODS=['callMain','FS']"
         "-sEXPORTED_FUNCTIONS=['_main','_hamclock_after_idbfs']"
         "--shell-file" "${CMAKE_SOURCE_DIR}/packaging/web/shell.html"

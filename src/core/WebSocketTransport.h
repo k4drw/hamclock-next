@@ -5,6 +5,10 @@
 #include <vector>
 #include <mutex>
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten/websocket.h>
+#endif
+
 class WebSocketTransport {
 public:
   WebSocketTransport();
@@ -37,9 +41,9 @@ private:
   std::vector<uint8_t> emRxBuffer_;
   std::mutex emMutex_;
   
-  static int onOpen(int eventType, const void *websocketEvent, void *userData);
-  static int onError(int eventType, const void *websocketEvent, void *userData);
-  static int onClose(int eventType, const void *websocketEvent, void *userData);
-  static int onMessage(int eventType, const void *websocketEvent, void *userData);
+  static bool onOpen(int eventType, const EmscriptenWebSocketOpenEvent *websocketEvent, void *userData);
+  static bool onError(int eventType, const EmscriptenWebSocketErrorEvent *websocketEvent, void *userData);
+  static bool onClose(int eventType, const EmscriptenWebSocketCloseEvent *websocketEvent, void *userData);
+  static bool onMessage(int eventType, const EmscriptenWebSocketMessageEvent *websocketEvent, void *userData);
 #endif
 };
