@@ -238,8 +238,19 @@ void TimePanel::render(SDL_Renderer *renderer) {
     SDL_Color bgColor = themes.bg;
     RenderUtils::drawGear(renderer, gcx, gcy, r, gearColor, bgColor);
 
-    // Pause / Next buttons — stacked above the gear icon (same column)
+    // Help icon
     auto *cat = fontMgr_.catalog();
+    if (cat) {
+      int tw, th;
+      SDL_Texture *helpTex = cat->renderText(renderer, "?", gearColor, FontStyle::SmallRegular, &tw, &th);
+      if (helpTex) {
+        SDL_Rect hd = {helpRect_.x + (helpRect_.w - tw)/2, helpRect_.y + (helpRect_.h - th)/2, tw, th};
+        SDL_RenderCopy(renderer, helpTex, nullptr, &hd);
+        cat->destroyTexture(helpTex);
+      }
+    }
+
+    // Pause / Next buttons — stacked above the gear icon (same column)
     if (cat) {
       int btnSize = gearSize_ + 4;
       int btnGap = 3;
@@ -407,6 +418,7 @@ void TimePanel::onResize(int x, int y, int w, int h) {
   gearSize_ = std::clamp(static_cast<int>(h * 0.10f), 8, 18);
   gearRect_ = {x_ + width_ - gearSize_ - pad, y_ + height_ - gearSize_ - pad,
                gearSize_, gearSize_};
+  helpRect_ = {gearRect_.x - gearSize_ - 8, gearRect_.y, gearSize_, gearSize_};
 
   // Star button: 22×22 in the date row, left side
   int callRowH = h * 50 / 148;
@@ -487,16 +499,25 @@ bool TimePanel::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
   }
 
   // Gear icon click → request setup
+  SDL_Point pt = {mx, my};
   SDL_Rect hit = gearRect_;
   int margin = 5;
   hit.x -= margin;
   hit.y -= margin;
   hit.w += margin * 2;
   hit.h += margin * 2;
-
-  if (!editing_ && mx >= hit.x && mx < hit.x + hit.w && my >= hit.y &&
-      my < hit.y + hit.h) {
+  if (!editing_ && SDL_PointInRect(&pt, &hit)) {
     setupRequested_ = true;
+    return true;
+  }
+
+  SDL_Rect helpHit = helpRect_;
+  helpHit.x -= margin;
+  helpHit.y -= margin;
+  helpHit.w += margin * 2;
+  helpHit.h += margin * 2;
+  if (!editing_ && SDL_PointInRect(&pt, &helpHit)) {
+    helpRequested_ = true;
     return true;
   }
 
@@ -789,7 +810,7 @@ void TimePanel::renderEditOverlay(SDL_Renderer *renderer) {
 }
 
 std::vector<std::string> TimePanel::getActions() const {
-  std::vector<std::string> actions = {"settings", "edit callsign"};
+  std::vector<std::string> actions = {"settings", "help", "edit callsign"};
   if (!editing_) {
     if (presetsRect_.w > 0)
       actions.push_back("presets");
@@ -811,6 +832,9 @@ std::vector<std::string> TimePanel::getActions() const {
 SDL_Rect TimePanel::getActionRect(const std::string &action) const {
   if (action == "settings") {
     return gearRect_;
+  }
+  if (action == "help") {
+    return helpRect_;
   }
   if (action == "edit callsign") {
     int callRowH = height_ * 50 / 148;

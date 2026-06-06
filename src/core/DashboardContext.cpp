@@ -1916,9 +1916,11 @@ void DashboardContext::update(AppContext &ctx) {
         } else if (sym == SDLK_k) {
           ctx.showActionHighlights = !ctx.showActionHighlights;
           consumed = true;
+#ifndef NDEBUG
         } else if (sym == SDLK_o && ctx.dashboard) {
           ctx.dashboard->debugOverlay.toggle();
           consumed = true;
+#endif
         } else if (sym == SDLK_l) {
           ctx.appCfg.scaleToFullScreen = !ctx.appCfg.scaleToFullScreen;
           ctx.cfgMgr.save(ctx.appCfg);
@@ -2635,6 +2637,11 @@ void DashboardContext::update(AppContext &ctx) {
     return; // Next main_tick will switch
   }
 
+  if (timePanel->isHelpRequested()) {
+    timePanel->clearHelpRequest();
+    g_help.visible = !g_help.visible;
+  }
+
   // Sync predictor from standalone SatWidget if in pool
   auto *satWidget =
       dynamic_cast<SatWidget *>(widgetPool["satellite"].get());
@@ -2804,8 +2811,9 @@ static void renderHelpPanel(SDL_Renderer *renderer, FontCatalog &cat) {
   struct KBRow { const char *key; const char *desc; };
   static const KBRow kShortcuts[] = {
     { "K",       "Toggle interactive region highlights (K mode)" },
+    { "L",       "Toggle scale-to-fullscreen layout mode" },
+    { "H",       "Toggle glass HUD mode" },
     { "?",       "Toggle this help panel" },
-    { "O",       "Toggle debug overlay (FPS, CPU, network stats)" },
     { "F11",     "Toggle fullscreen" },
     { "Ctrl+Q",  "Quit HamClock-Next" },
   };
@@ -3147,6 +3155,30 @@ void DashboardContext::render(AppContext &ctx) {
       }
     }
   }
+
+  // Debug overlay
+#ifndef NDEBUG
+  if (debugOverlay.isVisible()) {
+    if (FIDELITY_MODE)
+      SDL_RenderSetScale(ctx.renderer, 1.0f, 1.0f);
+
+    std::vector<WidgetRect> actuals;
+    for (auto *w : widgets) {
+      if (w) {
+        SDL_Rect r = w->getRect();
+        r.x = static_cast<int>(r.x * ctx.layScaleX);
+        r.y = static_cast<int>(r.y * ctx.layScaleY);
+        r.w = static_cast<int>(r.w * ctx.layScaleX);
+        r.h = static_cast<int>(r.h * ctx.layScaleY);
+        actuals.push_back({w->getName(), r});
+      }
+    }
+    debugOverlay.render(ctx.renderer, ctx.globalDrawW, ctx.globalDrawH, actuals);
+
+    if (FIDELITY_MODE)
+      SDL_RenderSetScale(ctx.renderer, ctx.layScaleX, ctx.layScaleY);
+  }
+#endif
 
   // In-app help panel (rendered topmost, above everything else)
   if (g_help.visible) {

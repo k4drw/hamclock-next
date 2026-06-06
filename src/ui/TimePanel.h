@@ -60,6 +60,9 @@ public:
   bool isSetupRequested() const { return setupRequested_; }
   void clearSetupRequest() { setupRequested_ = false; }
 
+  bool isHelpRequested() const { return helpRequested_; }
+  void clearHelpRequest() { helpRequested_ = false; }
+
   // Rotation transport controls
   void setOnPauseRotation(std::function<void()> cb) {
     onPauseRotation_ = std::move(cb);
@@ -168,9 +171,11 @@ private:
   bool updateAvailable_ = false;
   std::string latestVersion_;
   SDL_Rect gearRect_ = {};
+  SDL_Rect helpRect_ = {};
   SDL_Rect versionRect_ = {};
   int gearSize_ = 12;
   bool updateRequested_ = false;
+  bool helpRequested_ = false;
 
   // Presets
   std::unique_ptr<PresetsModal> presetsModal_;
