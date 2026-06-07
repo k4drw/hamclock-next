@@ -26,6 +26,12 @@ struct WxQuiver {
 
 #include <memory>
 
+struct WxFrameData {
+  std::vector<WxSegment> segments;
+  std::vector<WxQuiver> quivers;
+  SDL_Surface *fillSurface = nullptr;
+};
+
 class WxMbProvider : public ProviderBase, public std::enable_shared_from_this<WxMbProvider> {
 public:
   explicit WxMbProvider(NetworkManager &net);
@@ -33,15 +39,11 @@ public:
 
   void update();
 
-  // Copy decoded segments, quivers, and optionally a pressure fill surface.
-  // fillSurface is non-null only when fresh GFS data arrived; caller owns it.
-  // Returns true when new data was available (caller should rebuild GPU
-  // buffers).
-  bool getSegments(std::vector<WxSegment> &segs, std::vector<WxQuiver> &quivers,
-                   SDL_Surface *&fillSurface);
+  // Returns all decoded frames and clears the pending vector.
+  // The caller owns the SDL_Surfaces inside WxFrameData.
+  std::vector<WxFrameData> takeFrames();
 
-  // Force geometry rebuild on next getSegments() (e.g. projection change).
-  // Note: fillSurface will be nullptr on rebuild-only calls (no new GFS data).
+  // Force geometry rebuild on next takeFrames() (e.g. projection change).
   void invalidate() {
     std::lock_guard<std::mutex> lk(mutex_);
     segmentsDirty_ = true;
@@ -61,13 +63,11 @@ private:
                             std::vector<WxQuiver> &quivers,
                             SDL_Surface *&fillSurface);
 
-  static std::string buildNomadsUrl();
+  static std::string buildNomadsUrl(int fhr);
 
   NetworkManager &net_;
 
-  std::vector<WxSegment> segments_;
-  std::vector<WxQuiver> quivers_;
-  SDL_Surface *pendingFillSurface_ = nullptr; // 360x180 RGBA pressure fill
+  std::vector<WxFrameData> pendingFrames_;
   bool segmentsDirty_ = false;
   bool hasData_ = false;
   uint64_t lastUpdateMs_ = 0;

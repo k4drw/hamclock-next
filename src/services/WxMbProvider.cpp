@@ -583,7 +583,8 @@ void WxMbProvider::buildSegments(const GribField &prmsl, const GribField &ugrd,
 
 // GFS cycle URL construction
 
-std::string WxMbProvider::buildNomadsUrl() {
+std::string WxMbProvider::buildNomadsUrl(int fhr) {
+  // Step back 4 hours so we only request a cycle that has been published.
   std::time_t t = std::time(nullptr) - 4 * 3600;
   struct tm gmt{};
 #ifdef _WIN32
@@ -595,12 +596,12 @@ std::string WxMbProvider::buildNomadsUrl() {
   char buf[512];
   std::snprintf(buf, sizeof(buf),
                 "https://nomads.ncep.noaa.gov/cgi-bin/filter_gfs_0p25.pl"
-                "?file=gfs.t%02dz.pgrb2.0p25.f000"
+                "?file=gfs.t%02dz.pgrb2.0p25.f%03d"
                 "&lev_mean_sea_level=on&lev_10_m_above_ground=on"
                 "&var_PRMSL=on&var_UGRD=on&var_VGRD=on"
                 "&leftlon=0&rightlon=359.75&toplat=90&bottomlat=-90"
                 "&dir=%%2Fgfs.%04d%02d%02d%%2F%02d%%2Fatmos",
-                hh, gmt.tm_year + 1900, gmt.tm_mon + 1, gmt.tm_mday, hh);
+                hh, fhr, gmt.tm_year + 1900, gmt.tm_mon + 1, gmt.tm_mday, hh);
   return buf;
 }
 
@@ -608,47 +609,55 @@ std::string WxMbProvider::buildNomadsUrl() {
 
 WxMbProvider::WxMbProvider(NetworkManager &net) : net_(net) {}
 WxMbProvider::~WxMbProvider() {
-  if (pendingFillSurface_)
-    SDL_FreeSurface(pendingFillSurface_);
+  for (auto &f : pendingFrames_) {
+    if (f.fillSurface)
+      SDL_FreeSurface(f.fillSurface);
+  }
 }
 
 void WxMbProvider::update() {
   lastFetchMs_ = SDL_GetTicks();
-  std::string url = buildNomadsUrl();
+  std::string baseCheckUrl = buildNomadsUrl(0);
   {
     std::lock_guard<std::mutex> lk(mutex_);
-    if (url == lastUrl_ || url == fetchingUrl_)
+    if (baseCheckUrl == lastUrl_ || baseCheckUrl == fetchingUrl_)
       return;
-    fetchingUrl_ = url;
+    fetchingUrl_ = baseCheckUrl;
   }
 
-  LOG_I("WxMb", "Fetching GFS WX subset: {}", url);
   std::weak_ptr<WxMbProvider> self = shared_from_this();
-  net_.fetchAsync(
-      url,
-      [self, url](std::string rawData) {
-        auto p = self.lock();
-        if (!p) return;
-        if (rawData.empty()) {
-          LOG_W("WxMb", "GFS GRIB2 fetch returned empty response");
-          std::lock_guard<std::mutex> lk(p->mutex_);
-          p->fetchingUrl_ = "";
-          return;
-        }
-        WorkerService::getInstance().submitTask(
-            [self, url, rawData = std::move(rawData)]() {
-              auto p2 = self.lock();
-              if (!p2) return;
-              std::vector<uint8_t> bytes(rawData.begin(), rawData.end());
 
-              GribField prmsl, ugrd, vgrd;
-              if (!decodeGFS(bytes, prmsl, ugrd, vgrd)) {
-                LOG_W("WxMb", "GRIB2 decode failed");
-                std::lock_guard<std::mutex> lk(p2->mutex_);
-                p2->fetchingUrl_ = "";
-                return;
-              }
+  auto sharedFrames = std::make_shared<std::vector<WxFrameData>>(4);
+  auto completed = std::make_shared<std::atomic<int>>(0);
 
+  for (int i = 0; i < 4; ++i) {
+    int fhr = i * 3;
+    std::string url = buildNomadsUrl(fhr);
+    net_.fetchAsync(
+        url,
+        [self, baseCheckUrl, sharedFrames, completed, i](std::string rawData) {
+          auto p = self.lock();
+          if (!p)
+            return;
+          if (rawData.empty()) {
+            LOG_W("WxMb", "GFS GRIB2 fetch returned empty for frame {}", i);
+            if (completed->fetch_add(1) == 3) {
+              std::lock_guard<std::mutex> lk(p->mutex_);
+              p->fetchingUrl_ = "";
+            }
+            return;
+          }
+          WorkerService::getInstance().submitTask([self, baseCheckUrl,
+                                                   rawData = std::move(rawData),
+                                                   sharedFrames, completed,
+                                                   i]() {
+            auto p2 = self.lock();
+            if (!p2)
+              return;
+            std::vector<uint8_t> bytes(rawData.begin(), rawData.end());
+
+            GribField prmsl, ugrd, vgrd;
+            if (decodeGFS(bytes, prmsl, ugrd, vgrd)) {
               auto minmax =
                   [](const std::vector<float> &v) -> std::pair<float, float> {
                 if (v.empty())
@@ -664,50 +673,48 @@ void WxMbProvider::update() {
               };
 
               auto [pmn, pmx] = minmax(prmsl.values);
-              auto [umn, umx] = minmax(ugrd.values);
-              auto [vmn, vmx] = minmax(vgrd.values);
-              LOG_I("WxMb",
-                    "GFS decoded: {}pt PRMSL [{:.1f},{:.1f}], {}pt UGRD "
-                    "[{:.1f},{:.1f}], {}pt VGRD [{:.1f},{:.1f}]",
-                    (int)prmsl.values.size(), pmn, pmx, (int)ugrd.values.size(),
-                    umn, umx, (int)vgrd.values.size(), vmn, vmx);
-
               std::vector<WxSegment> segs;
               std::vector<WxQuiver> quivers;
               SDL_Surface *fillSurf = nullptr;
-              buildSegments(prmsl, ugrd, vgrd, pmn, pmx, 1024, 512, segs,
-                            quivers, fillSurf);
+              p2->buildSegments(prmsl, ugrd, vgrd, pmn, pmx, 1024, 512, segs,
+                                quivers, fillSurf);
 
+              (*sharedFrames)[i].segments = std::move(segs);
+              (*sharedFrames)[i].quivers = std::move(quivers);
+              (*sharedFrames)[i].fillSurface = fillSurf;
+            } else {
+              LOG_W("WxMb", "GRIB2 decode failed for frame {}", i);
+            }
+
+            if (completed->fetch_add(1) == 3) {
               std::lock_guard<std::mutex> lk(p2->mutex_);
-              p2->segments_ = std::move(segs);
-              p2->quivers_ = std::move(quivers);
-              if (p2->pendingFillSurface_)
-                SDL_FreeSurface(p2->pendingFillSurface_);
-              p2->pendingFillSurface_ = fillSurf;
+              for (auto &f : p2->pendingFrames_) {
+                if (f.fillSurface)
+                  SDL_FreeSurface(f.fillSurface);
+              }
+              p2->pendingFrames_ = *sharedFrames;
               p2->segmentsDirty_ = true;
               p2->hasData_ = true;
-              p2->lastUrl_ = url;
+              p2->lastUrl_ = baseCheckUrl;
               p2->fetchingUrl_ = "";
               p2->lastUpdateMs_ = (uint64_t)SDL_GetTicks();
-            });
-      },
-      0);
+              LOG_I("WxMb", "WxMb animation surfaces ready");
+            }
+          });
+        },
+        0);
+  }
 }
 
-bool WxMbProvider::getSegments(std::vector<WxSegment> &segs,
-                               std::vector<WxQuiver> &quivers,
-                               SDL_Surface *&fillSurface) {
+std::vector<WxFrameData> WxMbProvider::takeFrames() {
   std::lock_guard<std::mutex> lk(mutex_);
   if (!segmentsDirty_) {
-    fillSurface = nullptr;
-    return false;
+    return {};
   }
-  segs = segments_;
-  quivers = quivers_;
-  fillSurface = pendingFillSurface_; // transfer ownership to caller
-  pendingFillSurface_ = nullptr;
+  std::vector<WxFrameData> frames = std::move(pendingFrames_);
+  pendingFrames_.clear();
   segmentsDirty_ = false;
-  return true;
+  return frames;
 }
 
 bool WxMbProvider::hasData() const {

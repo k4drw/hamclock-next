@@ -18,19 +18,19 @@ public:
   // Trigger a fetch if the GFS cycle URL has changed since last fetch.
   void update();
 
-  // Return the most recently decoded surface and clear the pending pointer.
-  // Returns nullptr if no new data since the last call.  Caller owns the
-  // returned SDL_Surface and must SDL_FreeSurface() it when done.
-  SDL_Surface *takeSurface();
+  // Return the most recently decoded surfaces and clear the pending vector.
+  // Returns empty vector if no new data since the last call. Caller owns the
+  // returned SDL_Surfaces and must SDL_FreeSurface() them when done.
+  std::vector<SDL_Surface*> takeSurfaces();
 
   bool hasData() const;
 
 private:
-  static std::string buildUrl();
+  static std::string buildUrl(int fhr);
   static SDL_Surface *decodeGrib(const std::vector<uint8_t> &data);
 
   NetworkManager &net_;
-  SDL_Surface *pendingSurface_ = nullptr;
+  std::vector<SDL_Surface*> pendingSurfaces_;
   bool hasData_ = false;
   std::string lastUrl_;
   std::string fetchingUrl_;

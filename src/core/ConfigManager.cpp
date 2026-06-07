@@ -325,6 +325,7 @@ bool ConfigManager::load(AppConfig &config) {
     if (ap.contains("weather_overlay")) {
       config.weatherOverlay =
           weatherOverlayFromStr(ap.value("weather_overlay", "none"));
+      config.weatherAnimation = ap.value("weather_animation", true);
     }
 
     config.propBand = ap.value("prop_band", "20m");
@@ -796,6 +797,7 @@ bool ConfigManager::save(const AppConfig &config) {
     json["appearance"]["prop_rotation"] = arr;
   }
   json["appearance"]["weather_overlay"] = weatherOverlayToStr(config.weatherOverlay);
+  json["appearance"]["weather_animation"] = config.weatherAnimation;
   json["appearance"]["prop_band"] = config.propBand;
   json["appearance"]["prop_mode"] = config.propMode;
   json["appearance"]["prop_power"] = config.propPower;

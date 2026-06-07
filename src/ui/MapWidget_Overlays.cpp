@@ -1481,21 +1481,45 @@ void MapWidget::renderGribCloudOverlay(SDL_Renderer *renderer) {
   if (!gribCloud_)
     return;
 
-  // Pick up any newly decoded surface and upload to GPU.
-  SDL_Surface *surf = gribCloud_->takeSurface();
-  if (surf) {
-    if (gribCloudFillTex_)
-      MemoryMonitor::getInstance().destroyTexture(gribCloudFillTex_);
-    gribCloudFillTex_ = SDL_CreateTextureFromSurface(renderer, surf);
-    if (gribCloudFillTex_) {
-      MemoryMonitor::getInstance().addVram((int64_t)surf->w * surf->h * 4);
-      SDL_SetTextureBlendMode(gribCloudFillTex_, SDL_BLENDMODE_BLEND);
+  // Pick up any newly decoded surfaces and upload to GPU.
+  std::vector<SDL_Surface *> surfs = gribCloud_->takeSurfaces();
+  if (!surfs.empty()) {
+    for (auto *t : gribCloudFillTexs_) {
+      if (t) MemoryMonitor::getInstance().destroyTexture(t);
     }
-    SDL_FreeSurface(surf);
+    gribCloudFillTexs_.clear();
+    
+    for (auto *surf : surfs) {
+      if (surf) {
+        SDL_Texture *tex = SDL_CreateTextureFromSurface(renderer, surf);
+        if (tex) {
+          MemoryMonitor::getInstance().addVram((int64_t)surf->w * surf->h * 4);
+          SDL_SetTextureBlendMode(tex, SDL_BLENDMODE_BLEND);
+          gribCloudFillTexs_.push_back(tex);
+        }
+        SDL_FreeSurface(surf);
+      } else {
+        gribCloudFillTexs_.push_back(nullptr);
+      }
+    }
   }
 
-  if (!gribCloudFillTex_)
+  if (gribCloudFillTexs_.empty())
     return;
+
+  // Animate: 1 frame per 1000ms
+  int validFrames = 0;
+  for (auto *t : gribCloudFillTexs_) { if (t) validFrames++; }
+  if (validFrames == 0) return;
+
+  int frameIdx = config_.weatherAnimation ? ((SDL_GetTicks() / 1000) % gribCloudFillTexs_.size()) : 0;
+  SDL_Texture *currentTex = gribCloudFillTexs_[frameIdx];
+  if (!currentTex) {
+    // fallback to first valid if current is null
+    for (auto *t : gribCloudFillTexs_) {
+      if (t) { currentTex = t; break; }
+    }
+  }
 
   // Use alpha 140 (approx 55%) for a good balance of "whiteness" and
   // transparency. Note: We use vertex alpha because some drivers ignore
@@ -1514,7 +1538,7 @@ void MapWidget::renderGribCloudOverlay(SDL_Renderer *renderer) {
       v.color.a = targetAlpha;
     }
 
-    SDL_RenderGeometry(renderer, gribCloudFillTex_, mapVerts_.data(),
+    SDL_RenderGeometry(renderer, currentTex, mapVerts_.data(),
                        (int)mapVerts_.size(), mapBaseIndices_.data(),
                        (int)mapBaseIndices_.size());
 
@@ -1523,9 +1547,9 @@ void MapWidget::renderGribCloudOverlay(SDL_Renderer *renderer) {
       v.color = {255, 255, 255, 255};
     }
   } else {
-    SDL_SetTextureColorMod(gribCloudFillTex_, 255, 255, 255);
-    SDL_SetTextureAlphaMod(gribCloudFillTex_, targetAlpha);
-    SDL_RenderCopy(renderer, gribCloudFillTex_, nullptr, &mapRect_);
+    SDL_SetTextureColorMod(currentTex, 255, 255, 255);
+    SDL_SetTextureAlphaMod(currentTex, targetAlpha);
+    SDL_RenderCopy(renderer, currentTex, nullptr, &mapRect_);
   }
 
   SDL_RenderSetClipRect(renderer, nullptr);
@@ -1537,198 +1561,195 @@ void MapWidget::renderWxMbOverlay(SDL_Renderer *renderer) {
   if (!wxmb_)
     return;
 
-  // Poll for new GFS data — rebuild GPU buffers when segments arrive.
-  {
-    SDL_Surface *fillSurface = nullptr;
-    bool zoomChanged = (config_.mapZoom != lastWxZoom_);
-    bool panChanged = (config_.mapPanX != lastWxPanX_ || config_.mapPanY != lastWxPanY_);
+  // Poll for new GFS data — rebuild GPU buffers when frames arrive.
+  std::vector<WxFrameData> newFrames = wxmb_->takeFrames();
+  bool zoomChanged = (config_.mapZoom != lastWxZoom_);
+  bool panChanged = (config_.mapPanX != lastWxPanX_ || config_.mapPanY != lastWxPanY_);
 
-    if (wxmb_->getSegments(wxSegs_, wxQuivers_, fillSurface) || zoomChanged || panChanged || wxVerts_.empty()) {
-      wxVerts_.clear();
-      wxIndices_.clear();
-      
-      lastWxZoom_ = config_.mapZoom;
-      lastWxPanX_ = config_.mapPanX;
-      lastWxPanY_ = config_.mapPanY;
+  if (!newFrames.empty()) {
+    for (auto &rf : wxRawFrames_) {
+        if (rf.fillSurface) SDL_FreeSurface(rf.fillSurface);
+    }
+    wxRawFrames_.clear();
+    for (auto &f : newFrames) {
+      wxRawFrames_.push_back({std::move(f.segments), std::move(f.quivers), f.fillSurface});
+    }
+  }
 
-      if (fillSurface) {
-        if (wxFillTex_) {
-          MemoryMonitor::getInstance().destroyTexture(wxFillTex_);
-          wxFillTex_ = nullptr;
-        }
-        wxFillTex_ = SDL_CreateTextureFromSurface(renderer, fillSurface);
-        if (wxFillTex_) {
-          MemoryMonitor::getInstance().addVram((int64_t)fillSurface->w *
-                                               fillSurface->h * 4);
-          SDL_SetTextureBlendMode(wxFillTex_, SDL_BLENDMODE_BLEND);
-          SDL_SetTextureAlphaMod(wxFillTex_, 200);  // 80% opacity fill
-        }
-        SDL_FreeSurface(fillSurface);
+  // If we have raw frames but no render frames, or projection changed, rebuild.
+  if (!wxRawFrames_.empty() && (wxFrames_.empty() || zoomChanged || panChanged)) {
+    lastWxZoom_ = config_.mapZoom;
+    lastWxPanX_ = config_.mapPanX;
+    lastWxPanY_ = config_.mapPanY;
+
+    for (auto &f : wxFrames_) {
+      if (f.fillTex) MemoryMonitor::getInstance().destroyTexture(f.fillTex);
+    }
+    wxFrames_.clear();
+
+    SDL_Color mainColor = {220, 240, 255, 200};  // cool blue-white isobar
+    SDL_Color glowColor = {0, 30, 60, 120};  // subtle midnight-blue glow
+
+    int numPasses = (config_.projection == "dual_azimuthal") ? 2 : 1;
+    double wxDeLat = state_ ? state_->deLocation.lat : 0.0;
+    double wxDeLon = state_ ? state_->deLocation.lon : 0.0;
+    double wxAntiLat = -wxDeLat;
+    double wxAntiLon = wxDeLon + (wxDeLon >= 0.0 ? -180.0 : 180.0);
+    int wxHalfW = mapRect_.w / 2;
+    float wxHemisR = std::min(wxHalfW, mapRect_.h) * 0.5f;
+
+    auto wxProjectPt = [&](double lat, double lon, int pass) -> SDL_FPoint {
+      if (config_.projection == "dual_azimuthal") {
+        double cLat = (pass == 0) ? wxDeLat : wxAntiLat;
+        double cLon = (pass == 0) ? wxDeLon : wxAntiLon;
+        float cx = (pass == 0) ? (mapRect_.x + wxHalfW * 0.5f)
+                               : (mapRect_.x + wxHalfW + wxHalfW * 0.5f);
+        float cy = mapRect_.y + mapRect_.h * 0.5f;
+        double nx, ny;
+        projectAzimuthal(lat, lon, cLat, cLon, nx, ny);
+        return {cx + (float)nx * wxHemisR, cy - (float)ny * wxHemisR};
       }
+      return latLonToScreen(lat, lon);
+    };
 
-      SDL_Color mainColor = {220, 240, 255, 200};  // cool blue-white isobar
-      SDL_Color glowColor = {0, 30, 60, 120};  // subtle midnight-blue glow
-
-      int numPasses = (config_.projection == "dual_azimuthal") ? 2 : 1;
-      double wxDeLat = state_ ? state_->deLocation.lat : 0.0;
-      double wxDeLon = state_ ? state_->deLocation.lon : 0.0;
-      double wxAntiLat = -wxDeLat;
-      double wxAntiLon = wxDeLon + (wxDeLon >= 0.0 ? -180.0 : 180.0);
-      int wxHalfW = mapRect_.w / 2;
-      float wxHemisR = std::min(wxHalfW, mapRect_.h) * 0.5f;
-
-      auto wxProjectPt = [&](double lat, double lon, int pass) -> SDL_FPoint {
-        if (config_.projection == "dual_azimuthal") {
-          double cLat = (pass == 0) ? wxDeLat : wxAntiLat;
-          double cLon = (pass == 0) ? wxDeLon : wxAntiLon;
-          float cx = (pass == 0) ? (mapRect_.x + wxHalfW * 0.5f)
-                                 : (mapRect_.x + wxHalfW + wxHalfW * 0.5f);
-          float cy = mapRect_.y + mapRect_.h * 0.5f;
-          double nx, ny;
-          projectAzimuthal(lat, lon, cLat, cLon, nx, ny);
-          return {cx + (float)nx * wxHemisR, cy - (float)ny * wxHemisR};
+    for (const auto &raw : wxRawFrames_) {
+      WxFrameRenderData rdata;
+      if (raw.fillSurface) {
+        rdata.fillTex = SDL_CreateTextureFromSurface(renderer, raw.fillSurface);
+        if (rdata.fillTex) {
+          MemoryMonitor::getInstance().addVram((int64_t)raw.fillSurface->w * raw.fillSurface->h * 4);
+          SDL_SetTextureBlendMode(rdata.fillTex, SDL_BLENDMODE_BLEND);
+          SDL_SetTextureAlphaMod(rdata.fillTex, 200);  // 80% opacity fill
         }
-        return latLonToScreen(lat, lon);
-      };
-
+      }
+      
       for (int pass = 0; pass < numPasses; ++pass) {
         float jumpThresh = (config_.projection == "dual_azimuthal")
                                ? wxHemisR * 2.0f
                                : (float)mapRect_.w * 0.5f;
 
-        // --- Isobar contour segments -----------------------------------------
-        for (const auto &seg : wxSegs_) {
+        // --- Isobar contour segments ---
+        for (const auto &seg : raw.segs) {
           SDL_FPoint p1 = wxProjectPt(seg.lat1, seg.lon1, pass);
           SDL_FPoint p2 = wxProjectPt(seg.lat2, seg.lon2, pass);
 
-          // Skip segments that jump across the antimeridian seam or hemisphere
-          // edge.
-          if (std::abs(p1.x - p2.x) > jumpThresh)
-            continue;
+          if (std::abs(p1.x - p2.x) > jumpThresh) continue;
 
           float dx = p2.x - p1.x;
           float dy = p2.y - p1.y;
           float len = std::sqrt(dx * dx + dy * dy);
-          if (len < 0.1f)
-            continue;
+          if (len < 0.1f) continue;
           dx /= len;
           dy /= len;
 
-          // Layer 1: Dark glow (2.0f thick)
+          // Layer 1: Dark glow
           {
             float t = 2.0f * 0.5f;
             float nx = -dy * t, ny = dx * t;
-            int s = (int)wxVerts_.size();
-            wxVerts_.push_back({{p1.x + nx, p1.y + ny}, glowColor, {0, 0}});
-            wxVerts_.push_back({{p1.x - nx, p1.y - ny}, glowColor, {0, 1}});
-            wxVerts_.push_back({{p2.x + nx, p2.y + ny}, glowColor, {0, 0}});
-            wxVerts_.push_back({{p2.x - nx, p2.y - ny}, glowColor, {0, 1}});
-            wxIndices_.insert(wxIndices_.end(),
-                              {s, s + 1, s + 2, s + 2, s + 1, s + 3});
+            int s = (int)rdata.verts.size();
+            rdata.verts.push_back({{p1.x + nx, p1.y + ny}, glowColor, {0, 0}});
+            rdata.verts.push_back({{p1.x - nx, p1.y - ny}, glowColor, {0, 1}});
+            rdata.verts.push_back({{p2.x + nx, p2.y + ny}, glowColor, {0, 0}});
+            rdata.verts.push_back({{p2.x - nx, p2.y - ny}, glowColor, {0, 1}});
+            rdata.indices.insert(rdata.indices.end(), {s, s + 1, s + 2, s + 2, s + 1, s + 3});
           }
-          // Layer 2: Main isobar line (1.2f thick)
+          // Layer 2: Main isobar line
           {
             float t = 1.2f * 0.5f;
             float nx = -dy * t, ny = dx * t;
-            int s = (int)wxVerts_.size();
-            wxVerts_.push_back({{p1.x + nx, p1.y + ny}, mainColor, {0, 0}});
-            wxVerts_.push_back({{p1.x - nx, p1.y - ny}, mainColor, {0, 1}});
-            wxVerts_.push_back({{p2.x + nx, p2.y + ny}, mainColor, {0, 0}});
-            wxVerts_.push_back({{p2.x - nx, p2.y - ny}, mainColor, {0, 1}});
-            wxIndices_.insert(wxIndices_.end(),
-                              {s, s + 1, s + 2, s + 2, s + 1, s + 3});
+            int s = (int)rdata.verts.size();
+            rdata.verts.push_back({{p1.x + nx, p1.y + ny}, mainColor, {0, 0}});
+            rdata.verts.push_back({{p1.x - nx, p1.y - ny}, mainColor, {0, 1}});
+            rdata.verts.push_back({{p2.x + nx, p2.y + ny}, mainColor, {0, 0}});
+            rdata.verts.push_back({{p2.x - nx, p2.y - ny}, mainColor, {0, 1}});
+            rdata.indices.insert(rdata.indices.end(), {s, s + 1, s + 2, s + 2, s + 1, s + 3});
           }
         }
 
-        // --- Wind quiver arrows
-        // -----------------------------------------------
+        // --- Wind quiver arrows ---
         SDL_Color arrowColor = {180, 220, 255, 160};
-        for (const auto &q : wxQuivers_) {
+        for (const auto &q : raw.quivers) {
           float speed = std::sqrt(q.u * q.u + q.v * q.v);
-          if (speed < 0.5f)
-            continue;
+          if (speed < 0.5f) continue;
 
           SDL_FPoint origin = wxProjectPt(q.lat, q.lon, pass);
-
           float arrowLen = std::clamp(speed * 1.5f, 4.0f, 20.0f);
-          float angle =
-              std::atan2(-(q.v), q.u);  // negate v because y increases down
+          float angle = std::atan2(-(q.v), q.u);
           SDL_FPoint tip = {origin.x + std::cos(angle) * arrowLen,
                             origin.y + std::sin(angle) * arrowLen};
 
-          if (std::abs(origin.x - tip.x) > jumpThresh)
-            continue;
+          if (std::abs(origin.x - tip.x) > jumpThresh) continue;
 
           float shaftdx = tip.x - origin.x;
           float shaftdy = tip.y - origin.y;
           float slen = std::sqrt(shaftdx * shaftdx + shaftdy * shaftdy);
-          if (slen < 0.5f)
-            continue;
+          if (slen < 0.5f) continue;
           float sdx = shaftdx / slen, sdy = shaftdy / slen;
 
           // Shaft (1px)
           {
             float t = 0.6f;
             float nx = -sdy * t, ny = sdx * t;
-            int s = (int)wxVerts_.size();
-            wxVerts_.push_back(
-                {{origin.x + nx, origin.y + ny}, arrowColor, {0, 0}});
-            wxVerts_.push_back(
-                {{origin.x - nx, origin.y - ny}, arrowColor, {0, 1}});
-            wxVerts_.push_back({{tip.x + nx, tip.y + ny}, arrowColor, {0, 0}});
-            wxVerts_.push_back({{tip.x - nx, tip.y - ny}, arrowColor, {0, 1}});
-            wxIndices_.insert(wxIndices_.end(),
-                              {s, s + 1, s + 2, s + 2, s + 1, s + 3});
+            int s = (int)rdata.verts.size();
+            rdata.verts.push_back({{origin.x + nx, origin.y + ny}, arrowColor, {0, 0}});
+            rdata.verts.push_back({{origin.x - nx, origin.y - ny}, arrowColor, {0, 1}});
+            rdata.verts.push_back({{tip.x + nx, tip.y + ny}, arrowColor, {0, 0}});
+            rdata.verts.push_back({{tip.x - nx, tip.y - ny}, arrowColor, {0, 1}});
+            rdata.indices.insert(rdata.indices.end(), {s, s + 1, s + 2, s + 2, s + 1, s + 3});
           }
           // Arrowhead barbs
           float headLen = std::max(3.0f, arrowLen * 0.4f);
           for (int sign : {-1, 1}) {
             float ha = angle + 3.14159f + sign * 0.45f;
-            SDL_FPoint barb = {tip.x + std::cos(ha) * headLen,
-                               tip.y + std::sin(ha) * headLen};
+            SDL_FPoint barb = {tip.x + std::cos(ha) * headLen, tip.y + std::sin(ha) * headLen};
             float bdx = barb.x - tip.x, bdy = barb.y - tip.y;
             float bl = std::sqrt(bdx * bdx + bdy * bdy);
-            if (bl < 0.1f)
-              continue;
+            if (bl < 0.1f) continue;
             bdx /= bl;
             bdy /= bl;
             float t = 0.6f;
             float nx = -bdy * t, ny = bdx * t;
-            int s = (int)wxVerts_.size();
-            wxVerts_.push_back({{tip.x + nx, tip.y + ny}, arrowColor, {0, 0}});
-            wxVerts_.push_back({{tip.x - nx, tip.y - ny}, arrowColor, {0, 1}});
-            wxVerts_.push_back(
-                {{barb.x + nx, barb.y + ny}, arrowColor, {0, 0}});
-            wxVerts_.push_back(
-                {{barb.x - nx, barb.y - ny}, arrowColor, {0, 1}});
-            wxIndices_.insert(wxIndices_.end(),
-                              {s, s + 1, s + 2, s + 2, s + 1, s + 3});
+            int s = (int)rdata.verts.size();
+            rdata.verts.push_back({{tip.x + nx, tip.y + ny}, arrowColor, {0, 0}});
+            rdata.verts.push_back({{tip.x - nx, tip.y - ny}, arrowColor, {0, 1}});
+            rdata.verts.push_back({{barb.x + nx, barb.y + ny}, arrowColor, {0, 0}});
+            rdata.verts.push_back({{barb.x - nx, barb.y - ny}, arrowColor, {0, 1}});
+            rdata.indices.insert(rdata.indices.end(), {s, s + 1, s + 2, s + 2, s + 1, s + 3});
           }
         }
       }  // end pass loop
-    }
+      
+      wxFrames_.push_back(std::move(rdata));
+    } // end raw frame loop
   }
+
+  if (wxFrames_.empty())
+    return;
+
+  // Animate: 1 frame per 1000ms if enabled, else show first frame
+  int frameIdx = config_.weatherAnimation ? ((SDL_GetTicks() / 1000) % wxFrames_.size()) : 0;
+  const auto &currentFrame = wxFrames_[frameIdx];
 
   SDL_RenderSetClipRect(renderer, &mapRect_);
 
   // Render pressure fill layer underneath
-  if (wxFillTex_ && config_.propOverlay == PropOverlayType::None) {
+  if (currentFrame.fillTex && config_.propOverlay == PropOverlayType::None) {
     if ((config_.projection != "equirectangular" ||
          std::abs(config_.mapCenterLon) > 0.001) &&
         !mapVerts_.empty()) {
-      SDL_RenderGeometry(renderer, wxFillTex_, mapVerts_.data(),
+      SDL_RenderGeometry(renderer, currentFrame.fillTex, mapVerts_.data(),
                          (int)mapVerts_.size(), mapBaseIndices_.data(),
                          (int)mapBaseIndices_.size());
     } else {
-      SDL_RenderCopy(renderer, wxFillTex_, nullptr, &mapRect_);
+      SDL_RenderCopy(renderer, currentFrame.fillTex, nullptr, &mapRect_);
     }
   }
 
   // Render AA isobar lines and quivers on top
-  if (!wxVerts_.empty()) {
+  if (!currentFrame.verts.empty()) {
     SDL_Texture *lineTex = texMgr_.get(LINE_AA_KEY);
-    SDL_RenderGeometry(renderer, lineTex, wxVerts_.data(), (int)wxVerts_.size(),
-                       wxIndices_.data(), (int)wxIndices_.size());
+    SDL_RenderGeometry(renderer, lineTex, currentFrame.verts.data(), (int)currentFrame.verts.size(),
+                       currentFrame.indices.data(), (int)currentFrame.indices.size());
   }
 
   SDL_RenderSetClipRect(renderer, nullptr);
@@ -1875,7 +1896,7 @@ void MapWidget::renderLegend(SDL_Renderer *renderer) {
 }
 
 void MapWidget::renderWxMbLegend(SDL_Renderer *renderer) {
-  if (config_.weatherOverlay != WeatherOverlayType::WxMb || !wxFillTex_)
+  if (config_.weatherOverlay != WeatherOverlayType::WxMb || wxFrames_.empty())
     return;
 
   // Do not render WX/Pressure legend if a propagation overlay is also active
@@ -1965,7 +1986,7 @@ void MapWidget::renderWxMbLegend(SDL_Renderer *renderer) {
 }
  
 void MapWidget::renderCloudLegend(SDL_Renderer *renderer) {
-  if (config_.weatherOverlay != WeatherOverlayType::CloudsGrib || !gribCloudFillTex_)
+  if (config_.weatherOverlay != WeatherOverlayType::CloudsGrib || gribCloudFillTexs_.empty())
     return;
 
   int legendW = 120; // Compact standard width

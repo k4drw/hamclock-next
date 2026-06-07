@@ -266,12 +266,20 @@ private:
   std::vector<SDL_Vertex> borderVerts_;
   std::vector<int> borderIndices_;
   // WX/Pressure overlay GPU geometry (rebuilt when new GFS data arrives)
-  std::vector<WxSegment> wxSegs_;
-  std::vector<WxQuiver> wxQuivers_;
-  std::vector<SDL_Vertex> wxVerts_;
-  std::vector<int> wxIndices_;
-  SDL_Texture *wxFillTex_ = nullptr;       // pressure fill layer (blue-white-red)
-  SDL_Texture *gribCloudFillTex_ = nullptr; // GFS TCDC cloud fill layer
+  struct WxRawFrame {
+    std::vector<WxSegment> segs;
+    std::vector<WxQuiver> quivers;
+    SDL_Surface *fillSurface = nullptr;
+  };
+  std::vector<WxRawFrame> wxRawFrames_;
+  
+  struct WxFrameRenderData {
+    std::vector<SDL_Vertex> verts;
+    std::vector<int> indices;
+    SDL_Texture *fillTex = nullptr;
+  };
+  std::vector<WxFrameRenderData> wxFrames_;
+  std::vector<SDL_Texture *> gribCloudFillTexs_; // GFS TCDC cloud animation frames
 
   // Buffers for batching spots (dynamic per frame)
   std::vector<SDL_Vertex> spotVerts_;

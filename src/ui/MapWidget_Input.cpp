@@ -310,7 +310,7 @@ bool MapWidget::onMouseWheel(int scrollY) {
     greatCircleDirty_ = true;
     satTrackDirty_ = true;
     asteroidTrackDirty_ = true;
-    wxVerts_.clear();
+    wxFrames_.clear();
     if (wxmb_)
       wxmb_->invalidate();
     return true;
@@ -343,7 +343,7 @@ void MapWidget::onMouseMove(int mx, int my) {
       greatCircleDirty_ = true;
       satTrackDirty_ = true;
       asteroidTrackDirty_ = true;
-      wxVerts_.clear();
+      wxFrames_.clear();
       if (wxmb_)
         wxmb_->invalidate();
       return;

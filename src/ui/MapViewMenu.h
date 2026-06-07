@@ -46,6 +46,7 @@ private:
   std::string gridType_;
   PropOverlayType propOverlay_;
   WeatherOverlayType weatherOverlay_;
+  bool weatherAnimation_;
   std::string propColormap_;
   std::string propBand_;
   std::string propMode_;
@@ -80,7 +81,10 @@ private:
 
   // Rects for dropdown HEADERS
   SDL_Rect projRec_, styleRec_;
-  SDL_Rect gridRec_, overlayRec_, weatherRec_;
+  SDL_Rect gridRec_;
+  SDL_Rect overlayRec_;
+  SDL_Rect weatherRec_;
+  SDL_Rect weatherAnimationRec_;
   SDL_Rect propColormapRec_;
   SDL_Rect beaconsRec_, bordersRec_, centerDeCheckRect_, localPropGaugeRec_, lotwQsosRec_, ontaSpotsRec_;
   SDL_Rect bandRec_, modeRec_, powerRec_; // VOACAP row

@@ -246,7 +246,7 @@ void MapWidget::resetMap() {
   greatCircleDirty_ = true;
   satTrackDirty_ = true;
   asteroidTrackDirty_ = true;
-  wxVerts_.clear();
+  wxFrames_.clear();
   if (wxmb_)
     wxmb_->invalidate();
 }
@@ -285,10 +285,14 @@ MapWidget::~MapWidget() {
   MemoryMonitor::getInstance().destroyTexture(propTexture_);
   MemoryMonitor::getInstance().destroyTexture(auroraTexture_);
   MemoryMonitor::getInstance().destroyTexture(tooltip_.cachedTexture);
-  if (wxFillTex_)
-    MemoryMonitor::getInstance().destroyTexture(wxFillTex_);
-  if (gribCloudFillTex_)
-    MemoryMonitor::getInstance().destroyTexture(gribCloudFillTex_);
+  for (auto &f : wxFrames_) {
+    if (f.fillTex) MemoryMonitor::getInstance().destroyTexture(f.fillTex);
+  }
+  wxFrames_.clear();
+  for (auto *t : gribCloudFillTexs_) {
+    if (t) MemoryMonitor::getInstance().destroyTexture(t);
+  }
+  gribCloudFillTexs_.clear();
 }
 void MapWidget::recalcMapRect() {
   if (config_.projection == "azimuthal") {
@@ -903,8 +907,7 @@ void MapWidget::render(SDL_Renderer *renderer) {
       auroraVerts_.clear();
       propVerts_.clear();
       // Clear WX GPU buffers — will be re-projected on next getSegments() call.
-      wxVerts_.clear();
-      wxIndices_.clear();
+      wxFrames_.clear();
       if (wxmb_)
         wxmb_->invalidate();
     }
@@ -1637,6 +1640,7 @@ void MapWidget::onResize(int x, int y, int w, int h) {
   satTrackDirty_ = true;
   mapVerts_.clear();  // Also force map mesh regen
   auroraVerts_.clear();  // Force aurora mesh regen (positions depend on mapRect_)
+  wxFrames_.clear(); // Rebuild Wx overlay for new geometry
 }
 
 // --- Tooltip Rendering ---

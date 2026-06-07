@@ -28,6 +28,7 @@ void MapViewMenu::show(AppConfig &config, std::function<void()> onApply) {
   gridType_ = config.gridType;
   propOverlay_ = config.propOverlay;
   weatherOverlay_ = config.weatherOverlay;
+  weatherAnimation_ = config.weatherAnimation;
   propBand_ = config.propBand;
   propMode_ = config.propMode;
   propPower_ = config.propPower;
@@ -116,6 +117,9 @@ void MapViewMenu::recalcLayout() {
   int ontaLabelW =
       fontMgr_.getLogicalWidth("POTA/SOTA", cat->ptSize(FontStyle::UI));
   ontaSpotsRec_ = {col1X + 110, y, 20 + 10 + ontaLabelW, 20};
+  int wxAnimLabelW =
+      fontMgr_.getLogicalWidth("Animate Wx", cat->ptSize(FontStyle::UI));
+  weatherAnimationRec_ = {col2X + 10, y, 20 + 10 + wxAnimLabelW, 20};
 
   // Row 5 (VOACAP) - 3 columns
   y += 25;
@@ -326,6 +330,10 @@ void MapViewMenu::render(SDL_Renderer *renderer) {
                     themes.text);
   renderRadioButton(renderer, ontaSpotsRec_, showOntaSpots_, "POTA/SOTA",
                     themes.text);
+  if (weatherOverlay_ != WeatherOverlayType::None) {
+    renderRadioButton(renderer, weatherAnimationRec_, weatherAnimation_, "Animate Wx",
+                      themes.text);
+  }
   renderRadioButton(renderer, centerDeCheckRect_, centerMapOnDe_,
                     "Center on DE", themes.text);
   renderRadioButton(renderer, localPropGaugeRec_, showLocalPropGauge_,
@@ -806,6 +814,10 @@ bool MapViewMenu::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
     showOntaSpots_ = !showOntaSpots_;
     return true;
   }
+  if (weatherOverlay_ != WeatherOverlayType::None && SDL_PointInRect(&pt, &weatherAnimationRec_)) {
+    weatherAnimation_ = !weatherAnimation_;
+    return true;
+  }
   if (SDL_PointInRect(&pt, &bordersRec_)) {
     showBorders_ = !showBorders_;
     return true;
@@ -888,6 +900,7 @@ bool MapViewMenu::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
     config_->gridType = gridType_;
     config_->propOverlay = propOverlay_;
     config_->weatherOverlay = weatherOverlay_;
+    config_->weatherAnimation = weatherAnimation_;
     config_->propBand = propBand_;
     config_->propMode = propMode_;
     config_->propPower = propPower_;

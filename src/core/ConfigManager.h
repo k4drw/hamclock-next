@@ -83,6 +83,7 @@ struct AppConfig {
   PropOverlayType propOverlay = PropOverlayType::None;
   std::vector<PropOverlayType> propRotation;
   WeatherOverlayType weatherOverlay = WeatherOverlayType::None;
+  bool weatherAnimation = true; // Animate GFS weather overlays
   std::string propBand = "20m";
   std::string propMode = "SSB";
   int propPower = 100;      // Watts

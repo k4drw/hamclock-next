@@ -343,7 +343,7 @@ SDL_Surface *GribCloudProvider::decodeGrib(const std::vector<uint8_t> &data) {
 
 // GFS cycle URL construction (same pattern as WxMbProvider)
 
-std::string GribCloudProvider::buildUrl() {
+std::string GribCloudProvider::buildUrl(int fhr) {
   // Step back 4 hours so we only request a cycle that has been published.
   std::time_t t = std::time(nullptr) - 4 * 3600;
   struct tm gmt{};
@@ -356,12 +356,12 @@ std::string GribCloudProvider::buildUrl() {
   char buf[1024];
   std::snprintf(buf, sizeof(buf),
                 "https://nomads.ncep.noaa.gov/cgi-bin/filter_gfs_0p25.pl"
-                "?file=gfs.t%02dz.pgrb2.0p25.f000"
+                "?file=gfs.t%02dz.pgrb2.0p25.f%03d"
                 "&lev_low_cloud_layer=on&lev_middle_cloud_layer=on"
                 "&lev_high_cloud_layer=on&var_LCDC=on&var_MCDC=on&var_HCDC=on"
                 "&leftlon=0&rightlon=359.75&toplat=90&bottomlat=-90"
                 "&dir=%%2Fgfs.%04d%02d%02d%%2F%02d%%2Fatmos",
-                hh, gmt.tm_year + 1900, gmt.tm_mon + 1, gmt.tm_mday, hh);
+                hh, fhr, gmt.tm_year + 1900, gmt.tm_mon + 1, gmt.tm_mday, hh);
   return buf;
 }
 
@@ -370,64 +370,80 @@ std::string GribCloudProvider::buildUrl() {
 GribCloudProvider::GribCloudProvider(NetworkManager &net) : net_(net) {}
 
 GribCloudProvider::~GribCloudProvider() {
-  if (pendingSurface_)
-    SDL_FreeSurface(pendingSurface_);
+  for (auto *s : pendingSurfaces_) {
+    if (s) SDL_FreeSurface(s);
+  }
+  pendingSurfaces_.clear();
 }
 
 void GribCloudProvider::update() {
   lastFetchMs_ = SDL_GetTicks();
-  std::string url = buildUrl();
+  std::string baseCheckUrl = buildUrl(0);
   {
     std::lock_guard<std::mutex> lk(mutex_);
-    if (url == lastUrl_ || url == fetchingUrl_)
+    if (baseCheckUrl == lastUrl_ || baseCheckUrl == fetchingUrl_)
       return;
-    fetchingUrl_ = url;
+    fetchingUrl_ = baseCheckUrl;
   }
 
-  LOG_I("GribCloud", "Fetching GFS Clouds: {}", url);
+  LOG_I("GribCloud", "Fetching GFS Clouds animation cycle...");
   std::weak_ptr<GribCloudProvider> self = shared_from_this();
-  net_.fetchAsync(
-      url,
-      [self, url](std::string rawData) {
-        auto p = self.lock();
-        if (!p)
-          return;
-        if (rawData.empty()) {
-          LOG_W("GribCloud", "GRIB2 fetch returned empty response");
-          std::lock_guard<std::mutex> lk(p->mutex_);
-          p->fetchingUrl_ = "";
-          return;
-        }
-        WorkerService::getInstance().submitTask(
-            [self, url, rawData = std::move(rawData)]() {
-              auto p2 = self.lock();
-              if (!p2)
-                return;
 
-              std::vector<uint8_t> bytes(rawData.begin(), rawData.end());
-              SDL_Surface *surf = decodeGrib(bytes);
+  auto sharedSurfs = std::make_shared<std::vector<SDL_Surface*>>(4, nullptr);
+  auto completed = std::make_shared<std::atomic<int>>(0);
 
-              std::lock_guard<std::mutex> lk(p2->mutex_);
-              p2->fetchingUrl_ = "";
-              if (!surf) {
-                LOG_W("GribCloud", "GRIB2 TCDC decode failed");
-                return;
-              }
-              if (p2->pendingSurface_)
-                SDL_FreeSurface(p2->pendingSurface_);
-              p2->pendingSurface_ = surf;
-              p2->lastUrl_ = url;
-              p2->hasData_ = true;
-              LOG_I("GribCloud", "TCDC surface ready");
-            });
-      });
+  for (int i = 0; i < 4; ++i) {
+    int fhr = i * 3;
+    std::string url = buildUrl(fhr);
+    net_.fetchAsync(
+        url,
+        [self, baseCheckUrl, sharedSurfs, completed, i](std::string rawData) {
+          auto p = self.lock();
+          if (!p)
+            return;
+          if (rawData.empty()) {
+            LOG_W("GribCloud", "GRIB2 fetch returned empty for frame {}", i);
+            if (completed->fetch_add(1) == 3) {
+              std::lock_guard<std::mutex> lk(p->mutex_);
+              p->fetchingUrl_ = "";
+            }
+            return;
+          }
+          WorkerService::getInstance().submitTask(
+              [self, baseCheckUrl, rawData = std::move(rawData), sharedSurfs, completed, i]() {
+                auto p2 = self.lock();
+                if (!p2)
+                  return;
+
+                std::vector<uint8_t> bytes(rawData.begin(), rawData.end());
+                SDL_Surface *surf = decodeGrib(bytes);
+                if (!surf) {
+                  LOG_W("GribCloud", "GRIB2 TCDC decode failed for frame {}", i);
+                }
+                (*sharedSurfs)[i] = surf;
+
+                if (completed->fetch_add(1) == 3) {
+                  std::lock_guard<std::mutex> lk(p2->mutex_);
+                  p2->fetchingUrl_ = "";
+                  
+                  for (auto *s : p2->pendingSurfaces_) {
+                    if (s) SDL_FreeSurface(s);
+                  }
+                  p2->pendingSurfaces_ = *sharedSurfs;
+                  p2->lastUrl_ = baseCheckUrl;
+                  p2->hasData_ = true;
+                  LOG_I("GribCloud", "TCDC animation surfaces ready");
+                }
+              });
+        });
+  }
 }
 
-SDL_Surface *GribCloudProvider::takeSurface() {
+std::vector<SDL_Surface*> GribCloudProvider::takeSurfaces() {
   std::lock_guard<std::mutex> lk(mutex_);
-  SDL_Surface *s = pendingSurface_;
-  pendingSurface_ = nullptr;
-  return s;
+  std::vector<SDL_Surface*> surfs = std::move(pendingSurfaces_);
+  pendingSurfaces_.clear();
+  return surfs;
 }
 
 bool GribCloudProvider::hasData() const {
