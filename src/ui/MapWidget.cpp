@@ -1078,11 +1078,11 @@ void MapWidget::render(SDL_Renderer *renderer) {
   // blit (which overwrites anything drawn before it in those corners).
   renderStarField(renderer);
 
-  renderWxMbOverlay(renderer);
-  renderGribCloudOverlay(renderer);
   renderMufRtOverlay(renderer);
-  renderNightOverlay(renderer);
   renderPropagationOverlay(renderer);
+  renderGribCloudOverlay(renderer);
+  renderWxMbOverlay(renderer);
+  renderNightOverlay(renderer);
   
   // Overlays (clipped to mapRect_)
   SDL_Rect clipRect = mapRect_;

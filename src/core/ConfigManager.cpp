@@ -325,7 +325,7 @@ bool ConfigManager::load(AppConfig &config) {
     if (ap.contains("weather_overlay")) {
       config.weatherOverlay =
           weatherOverlayFromStr(ap.value("weather_overlay", "none"));
-      config.weatherAnimation = ap.value("weather_animation", true);
+      config.weatherAnimation = ap.value("weather_animation", false);
     }
 
     config.propBand = ap.value("prop_band", "20m");

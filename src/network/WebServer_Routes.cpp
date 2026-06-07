@@ -746,6 +746,8 @@ void WebServer::registerRoutes(httplib::Server &svr) {
     if (req.has_param("wx_overlay"))
       cfg_->weatherOverlay =
           wxOverlayFromString(req.get_param_value("wx_overlay"));
+    if (req.has_param("weather_animation"))
+      cfg_->weatherAnimation = req.get_param_value("weather_animation") == "1";
     if (req.has_param("hub_mode")) {
       std::string m = req.get_param_value("hub_mode");
       if (m == "Master")

@@ -341,7 +341,8 @@ void WebServer::run() {
         <option value="wxmb">WX/Pressure</option>
         <option value="clouds_grib">Clouds (GFS)</option>
       </select>
-      <label style="margin-top:10px"><input type="checkbox" id="night-lights"> Show Night Lights</label>
+      <label style="margin-top:10px"><input type="checkbox" id="weather-animation"> Animate Weather</label>
+      <label><input type="checkbox" id="night-lights"> Show Night Lights</label>
       <label><input type="checkbox" id="use-metric"> Use Metric Units</label>
       <label><input type="checkbox" id="scale-full-screen"> Scale to Full Screen</label>
       <label>MUF Real-time Opacity</label>
@@ -909,6 +910,7 @@ void WebServer::run() {
         toggleVoacapFields();
 
         document.getElementById('weather-overlay').value = c.weatherOverlay || 'none';
+        document.getElementById('weather-animation').checked = !!c.weatherAnimation;
         document.getElementById('night-lights').checked = !!c.mapNightLights;
         document.getElementById('use-metric').checked = !!c.useMetric;
         document.getElementById('scale-full-screen').checked = !!c.scaleToFullScreen;
@@ -951,6 +953,7 @@ void WebServer::run() {
       const gridMode = document.getElementById('grid-mode').value;
       const propOverlay = document.getElementById('prop-overlay').value;
       const wxOverlay = document.getElementById('weather-overlay').value;
+      const wxAnim = document.getElementById('weather-animation').checked ? '1' : '0';
       const nl = document.getElementById('night-lights').checked ? '1' : '0';
       const mu = document.getElementById('use-metric').checked ? '1' : '0';
       const dpm = document.getElementById('display-power-method').value;
@@ -963,7 +966,7 @@ void WebServer::run() {
         theme, map_style: mapStyle, projection, show_borders: showBorders,
         show_beacons: showBeacons, show_sattrack: showSatTrack, show_onta_spots: showOntaSpots, show_grid: showGrid, grid_type: gridType,
         center_map_on_de: centerMapOnDe,
-        prop_overlay: propOverlay, wx_overlay: wxOverlay, night_lights: nl, use_metric: mu,
+        prop_overlay: propOverlay, wx_overlay: wxOverlay, weather_animation: wxAnim, night_lights: nl, use_metric: mu,
         scale_full_screen: document.getElementById('scale-full-screen').checked ? '1' : '0',
         display_power_method: dpm, font_path: fontPath,
         prop_band: document.getElementById('prop-band').value,

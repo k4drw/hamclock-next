@@ -259,10 +259,12 @@ void MapWidget::renderNightOverlay(SDL_Renderer *renderer) {
           // Projection-aware texture coordinates for night lights
           float u = static_cast<float>((lon + 180.0) / 360.0);
           float v = static_cast<float>((90.0 - lat) / 180.0);
+          Uint8 shadowAlpha = (Uint8)(nf * 153.0f); // Capped at ~60% opacity so weather overlays remain visible
+          Uint8 lightAlpha = (Uint8)(nf * 255.0f);  // Full opacity for city lights
           shadowVerts_[idx] = {
-              {sx, sy}, {255, 255, 255, (Uint8)(nf * 255)}, {0, 0}};
+              {sx, sy}, {255, 255, 255, shadowAlpha}, {0, 0}};
           lightVerts_[idx] = {
-              {sx, sy}, {255, 255, 255, (Uint8)(nf * 255)}, {u, v}};
+              {sx, sy}, {255, 255, 255, lightAlpha}, {u, v}};
         } else {
           // Boundary Snapping for Robinson/Azimuthal limbs
           if (config_.projection == "robinson") {
@@ -283,8 +285,10 @@ void MapWidget::renderNightOverlay(SDL_Renderer *renderer) {
             float u = static_cast<float>((edgeLon + 180.0) / 360.0);
             float v = static_cast<float>((90.0 - lat) / 180.0);
 
-            shadowVerts_[idx] = {{snapped_sx, sy}, {255, 255, 255, (Uint8)(nf * 255)}, {0, 0}};
-            lightVerts_[idx] = {{snapped_sx, sy}, {255, 255, 255, (Uint8)(nf * 255)}, {u, v}};
+            Uint8 shadowAlpha = (Uint8)(nf * 190.0f);
+            Uint8 lightAlpha = (Uint8)(nf * 255.0f);
+            shadowVerts_[idx] = {{snapped_sx, sy}, {255, 255, 255, shadowAlpha}, {0, 0}};
+            lightVerts_[idx] = {{snapped_sx, sy}, {255, 255, 255, lightAlpha}, {u, v}};
           } else {
             shadowVerts_[idx] = {{sx, sy}, {0, 0, 0, 0}, {0, 0}};
             lightVerts_[idx] = {{sx, sy}, {0, 0, 0, 0}, {0, 0}};
@@ -431,7 +435,7 @@ void MapWidget::renderNightOverlay(SDL_Renderer *renderer) {
     SDL_Texture *nightTex = texMgr_.get(NIGHT_MAP_KEY);
     if (nightTex) {
       SDL_SetTextureColorMod(nightTex, 255, 255, 255);
-      SDL_SetTextureBlendMode(nightTex, SDL_BLENDMODE_BLEND);
+      SDL_SetTextureBlendMode(nightTex, SDL_BLENDMODE_ADD);
       SDL_RenderGeometry(renderer, nightTex, lightVerts_.data(),
                          (int)lightVerts_.size(), nightLightIndices_.data(),
                          (int)nightLightIndices_.size());
@@ -477,7 +481,7 @@ void MapWidget::renderNightOverlay(SDL_Renderer *renderer) {
     SDL_Texture *nightTex = texMgr_.get(NIGHT_MAP_KEY);
     if (nightTex) {
       SDL_SetTextureColorMod(nightTex, 255, 255, 255);
-      SDL_SetTextureBlendMode(nightTex, SDL_BLENDMODE_BLEND);
+      SDL_SetTextureBlendMode(nightTex, SDL_BLENDMODE_ADD);
 
       int tW, tH;
       SDL_QueryTexture(nightTex, nullptr, nullptr, &tW, &tH);
@@ -1763,7 +1767,7 @@ void MapWidget::renderLegend(SDL_Renderer *renderer) {
   int legendH = 12;
   int pad = 6;
   int lx = x_ + width_ - legendW - pad - 18;  // shifted left for text overhang
-  int ly = y_ + height_ - legendH - pad - 22;  // Above RSS button if active
+  int ly = mapRect_.y + mapRect_.h - legendH - pad - 22;
 
   // Labels and Scale
   std::string labelMin, labelMax, title;
@@ -1908,7 +1912,7 @@ void MapWidget::renderWxMbLegend(SDL_Renderer *renderer) {
   int legendH = 12;
   int pad = 6;
   int lx = x_ + width_ - legendW - pad - 18;  // shifted left for text overhang
-  int ly = y_ + height_ - legendH - pad - 22;  // Above RSS button if active
+  int ly = mapRect_.y + mapRect_.h - legendH - pad - 22;
 
   // If a propagation overlay legend is already rendered, move this one up
   if (config_.propOverlay != PropOverlayType::None) {
@@ -1993,7 +1997,7 @@ void MapWidget::renderCloudLegend(SDL_Renderer *renderer) {
   int legendH = 12;
   int pad = 6;
   int lx = x_ + width_ - legendW - pad - 18;
-  int ly = y_ + height_ - legendH - pad - 22;
+  int ly = mapRect_.y + mapRect_.h - legendH - pad - 22;
 
   // Stack above Prop and Wx legends
   if (config_.propOverlay != PropOverlayType::None) {
@@ -2470,7 +2474,12 @@ void MapWidget::renderOverlayInfo(SDL_Renderer *renderer) {
   int boxH = textH + padY * 2;
 
   int cx = x_ + width_ / 2;
-  int cy = y_ + height_ - 20;  // Bottom margin
+  int cy = mapRect_.y + mapRect_.h - 20;  // Align to bottom of map
+
+  // Shift up to clear the local prop gauge if active
+  if (config_.showLocalPropGauge) {
+    cy -= 44;
+  }
 
   SDL_Rect box = {cx - boxW / 2, cy - boxH / 2, boxW, boxH};
 
