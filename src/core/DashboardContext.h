@@ -74,6 +74,7 @@ class FrameCapture;
 class UpdateChecker;
 class BMEProvider;
 class BME280Provider;
+class RemoteEnvProvider;
 class LTR329Provider;
 namespace HamClock { class GPSProvider; }
 
@@ -377,6 +378,7 @@ struct AppContext {
   std::shared_ptr<CPUMonitor> cpuMonitor;
 
   std::unique_ptr<BME280Provider> bmeProvider;
+  std::unique_ptr<RemoteEnvProvider> remoteEnvProvider;
   std::unique_ptr<LTR329Provider> ltr329Provider;
 
   // Setup State

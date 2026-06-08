@@ -492,6 +492,7 @@ void WebServer::registerRoutes(httplib::Server &svr) {
     j["scaleToFullScreen"] = cfg_->scaleToFullScreen;
     j["propOverlay"] = propOverlayToString(cfg_->propOverlay);
     j["weatherOverlay"] = wxOverlayToString(cfg_->weatherOverlay);
+    j["weatherAnimation"] = cfg_->weatherAnimation;
     j["hubMode"] = (cfg_->hubMode == HubMode::Master)
                        ? "Master"
                        : (cfg_->hubMode == HubMode::Client ? "Client" : "Off");
@@ -707,6 +708,18 @@ void WebServer::registerRoutes(httplib::Server &svr) {
 
   svr.Get("/set_config", [this](const httplib::Request &req,
                                 httplib::Response &res) {
+    if (!this->cfg_) {
+      res.status = 503;
+      return;
+    }
+    
+    AppConfig tempCfg;
+    {
+      std::lock_guard<std::mutex> locLk(state_->locationMutex);
+      tempCfg = *(this->cfg_);
+    }
+    AppConfig *cfg_ = &tempCfg; // Shadow this->cfg_
+
     if (req.has_param("call"))
       cfg_->callsign = req.get_param_value("call");
     if (req.has_param("theme"))
@@ -788,6 +801,11 @@ void WebServer::registerRoutes(httplib::Server &svr) {
       cfg_->mqttPassword = req.get_param_value("mqtt_password");
     if (req.has_param("mqtt_base_topic"))
       cfg_->mqttBaseTopic = req.get_param_value("mqtt_base_topic");
+
+    if (req.has_param("env_type"))
+      cfg_->envSensorType = req.get_param_value("env_type");
+    if (req.has_param("env_url"))
+      cfg_->envNetworkUrl = req.get_param_value("env_url");
 
     if (req.has_param("rig_host"))
       cfg_->rigHost = req.get_param_value("rig_host");
@@ -2022,14 +2040,9 @@ void WebServer::registerRoutes(httplib::Server &svr) {
 
   svr.Get("/get_sensors.txt",
           [this](const httplib::Request &, httplib::Response &res) {
-            BME280Provider *bme;
-            {
-              std::lock_guard<std::mutex> lk(dataMutex_);
-              bme = bmeProvider_;
-            }
-            if (!bme || !bme->isAvailable() || !weatherStore_) {
+            if (!weatherStore_ || !weatherStore_->get().valid || weatherStore_->get().description == "Open-Meteo" || weatherStore_->get().description == "NOAA") {
               res.status = 503;
-              res.set_content("BME280 sensor not available\n", "text/plain");
+              res.set_content("Environment sensor not available\n", "text/plain");
               return;
             }
             WeatherData wd = weatherStore_->get();

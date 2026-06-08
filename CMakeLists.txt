@@ -572,6 +572,7 @@ set(HAMCLOCK_SOURCES
     src/services/FlareProvider.cpp
     src/services/RSSProvider.cpp
     src/services/BME280Provider.cpp
+    src/services/RemoteEnvProvider.cpp
     src/services/LTR329Provider.cpp
     src/services/ADIFProvider.cpp
     src/services/ActivityProvider.cpp

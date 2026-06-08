@@ -36,6 +36,7 @@ void populateWidgetDescriptions();
 #include "services/AsteroidProvider.h"
 #include "services/AuroraProvider.h"
 #include "services/BME280Provider.h"
+#include "services/RemoteEnvProvider.h"
 #include "services/LTR329Provider.h"
 #include "services/BandConditionsProvider.h"
 #include "services/BeaconProvider.h"

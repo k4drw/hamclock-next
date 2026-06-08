@@ -30,6 +30,7 @@
 #include "services/AsteroidProvider.h"
 #include "services/AuroraProvider.h"
 #include "services/BME280Provider.h"
+#include "services/RemoteEnvProvider.h"
 #include "services/LTR329Provider.h"
 #include "services/BandConditionsProvider.h"
 #include "services/BeaconProvider.h"
@@ -642,8 +643,13 @@ int main(int argc, char *argv[]) {
   ctx.gpsProvider = std::make_unique<GPSProvider>(ctx.state.get(), ctx.appCfg);
   ctx.gpsProvider->start();
 
-  ctx.bmeProvider = std::make_unique<BME280Provider>(ctx.deWeatherStore);
-  ctx.bmeProvider->start();
+  if (ctx.appCfg.envSensorType == "bme280") {
+    ctx.bmeProvider = std::make_unique<BME280Provider>(ctx.deWeatherStore);
+    ctx.bmeProvider->start();
+  } else if (ctx.appCfg.envSensorType == "network") {
+    ctx.remoteEnvProvider = std::make_unique<RemoteEnvProvider>(*ctx.netManager, ctx.deWeatherStore, ctx.appCfg.envNetworkUrl);
+    ctx.remoteEnvProvider->start();
+  }
 
   ctx.ltr329Provider = std::make_unique<LTR329Provider>();
   ctx.ltr329Provider->start();

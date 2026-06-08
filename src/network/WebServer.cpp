@@ -513,6 +513,17 @@ void WebServer::run() {
       <input type="text" id="mqtt-topic" value="hamclock">
     </div>
     <div class="card">
+      <div class="section-hdr">Environment Sensor</div>
+      <label>Sensor Type</label>
+      <select id="env-type">
+        <option value="none">None</option>
+        <option value="bme280">BME280 (I2C)</option>
+        <option value="network">Network (ESP8266/ESP32)</option>
+      </select>
+      <label>Network Sensor URL</label>
+      <input type="text" id="env-url" placeholder="http://192.168.1.50/env">
+    </div>
+    <div class="card">
       <div class="section-hdr">Live Spots</div>
       <label>Source</label>
       <select id="spot-source">
@@ -1241,6 +1252,8 @@ void WebServer::run() {
         document.getElementById('k-index-threshold').value = c.kIndexAlertThreshold || 4.0;
         document.getElementById('spots-of-de').checked = !!c.liveSpotsOfDe;
         document.getElementById('spots-use-call').checked = !!c.liveSpotsUseCall;
+        document.getElementById('env-type').value = c.envSensorType || 'bme280';
+        document.getElementById('env-url').value = c.envNetworkUrl || 'http://192.168.1.50/env';
       } catch(e) {}
     }
 
@@ -1269,7 +1282,9 @@ void WebServer::run() {
         mqtt_enabled: document.getElementById('mqtt-enabled').checked ? '1' : '0',
         mqtt_broker_uri: document.getElementById('mqtt-broker').value.trim(),
         mqtt_username: document.getElementById('mqtt-user').value.trim(),
-        mqtt_base_topic: document.getElementById('mqtt-topic').value.trim()
+        mqtt_base_topic: document.getElementById('mqtt-topic').value.trim(),
+        env_type: document.getElementById('env-type').value,
+        env_url: document.getElementById('env-url').value.trim()
       });
       const mqttPass = document.getElementById('mqtt-pass').value;
       if (mqttPass) params.set('mqtt_password', mqttPass);

@@ -578,6 +578,13 @@ bool ConfigManager::load(AppConfig &config) {
     config.mqttBaseTopic = mq.value("base_topic", "hamclock");
   }
 
+  // Environment Sensor
+  if (json.contains("env_sensor")) {
+    auto env = json["env_sensor"];
+    config.envSensorType = env.value("type", "bme280");
+    config.envNetworkUrl = env.value("network_url", "http://192.168.1.50/env");
+  }
+
   // Live Spots (Combined RBN, PSK Reporter, WSPR)
   if (json.contains("live_spots")) {
     auto &ls = json["live_spots"];
@@ -950,6 +957,9 @@ bool ConfigManager::save(const AppConfig &config) {
   json["live_spots"]["bands_mask"] = config.liveSpotsBands;
   json["live_spots"]["rbn_host"] = config.rbnHost;
   json["live_spots"]["rbn_port"] = config.rbnPort;
+
+  json["env_sensor"]["type"] = config.envSensorType;
+  json["env_sensor"]["network_url"] = config.envNetworkUrl;
 
   json["aux_clock"]["tz_offset"]  = config.auxClockTzOffset;
   json["aux_clock"]["tz_label"]   = config.auxClockTzLabel;

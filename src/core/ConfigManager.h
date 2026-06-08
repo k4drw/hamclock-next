@@ -137,8 +137,11 @@ struct AppConfig {
   int liveSpotsMaxAge = 30;     // minutes
   uint32_t liveSpotsBands = 0xFFF; // Bitmask of selected bands (lower 12 bits)
   std::string pskrProxyUrl;        // Custom PSK Reporter proxy URL
-  bool rbnEnabled =
-      false; // Kept for backward compat in logic, but mostly internal now
+  bool rbnEnabled = false; // Kept for backward compat in logic, but mostly internal now
+
+  // Environment Sensor
+  std::string envSensorType = "bme280"; // "none", "bme280", "network" (default to bme280 for backwards compat, though main.cpp will fallback if not I2C)
+  std::string envNetworkUrl = "http://192.168.1.50/env";
   std::string rbnHost = "telnet.reversebeacon.net";
   int rbnPort = 7000;
 
