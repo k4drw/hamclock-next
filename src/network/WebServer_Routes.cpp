@@ -718,7 +718,7 @@ void WebServer::registerRoutes(httplib::Server &svr) {
       std::lock_guard<std::mutex> locLk(state_->locationMutex);
       tempCfg = *(this->cfg_);
     }
-    AppConfig *cfg_ = &tempCfg; // Shadow this->cfg_
+    AppConfig *cfg_ = &tempCfg; // Use a local copy to modify fields
 
     if (req.has_param("call"))
       cfg_->callsign = req.get_param_value("call");
@@ -1078,6 +1078,13 @@ void WebServer::registerRoutes(httplib::Server &svr) {
 
     if (cfgMgr_)
       cfgMgr_->save(*cfg_);
+
+    // Push the modified values back into the main application thread's memory
+    {
+      std::lock_guard<std::mutex> locLk(state_->locationMutex);
+      *(this->cfg_) = tempCfg;
+    }
+
     if (reloadFlag_)
       reloadFlag_->store(true, std::memory_order_release);
     res.set_content("ok", "text/plain");
