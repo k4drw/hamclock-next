@@ -53,6 +53,16 @@ void RemoteEnvProvider::worker() {
           wd.humidity = static_cast<int>(std::round(humidity));
           wd.description = "Network Env";
           wd.lastUpdate = std::chrono::system_clock::now();
+          if (j.contains("gasKOhms")) {
+            wd.hasGas = true;
+            wd.gasResistance = j["gasKOhms"].get<float>();
+            if (j.contains("iaq")) {
+              wd.iaq = j["iaq"].get<float>();
+            } else {
+              // Extremely rough faux-IAQ based on resistance if exact algorithm is omitted
+              wd.iaq = std::max(0.0f, 500.0f - (wd.gasResistance / 50.0f)); 
+            }
+          }
 
           store_->update(wd);
 
@@ -61,7 +71,11 @@ void RemoteEnvProvider::worker() {
             LOG_I("EnvNet", "Network environment sensor is now online.");
           }
 
-          LOG_D("EnvNet", "T={:.1f}C P={:.1f}hPa H={}%", tempC, pressHpa, wd.humidity);
+          if (wd.hasGas) {
+            LOG_D("EnvNet", "T={:.1f}C P={:.1f}hPa H={}% IAQ={:.0f}", tempC, pressHpa, wd.humidity, wd.iaq);
+          } else {
+            LOG_D("EnvNet", "T={:.1f}C P={:.1f}hPa H={}%", tempC, pressHpa, wd.humidity);
+          }
         } else {
           LOG_W("EnvNet", "Malformed JSON from network sensor: {}", response);
         }

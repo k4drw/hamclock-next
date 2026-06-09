@@ -39,10 +39,11 @@ private:
 
   std::thread workerThread_;
   std::atomic<bool> running_;
-  std::mutex mutex_;
+  std::recursive_mutex mutex_;
 
   uint32_t lastReconnectAttempt_ = 0;
   uint32_t lastPublishTime_ = 0;
+  bool needAutoDiscovery_ = false;
 
   // Custom pal callbacks
   static ssize_t pal_send(void* context, const void* buf, size_t len);

@@ -57,9 +57,11 @@ bool MQTTService::connect() {
   auto& cfg = ConfigManager::instance().getConfig();
   if (!cfg.mqttEnabled || cfg.mqttBrokerUri.empty()) return false;
   
+  std::lock_guard<std::recursive_mutex> lk(mutex_);
+  
   if (transport_.isConnected()) return true;
   
-  std::cout << "[MQTT] Connecting to " << cfg.mqttBrokerUri << " ..." << std::endl;
+  LOG_D("MQTTService", "Connecting to {}", cfg.mqttBrokerUri);
   if (!transport_.connect(cfg.mqttBrokerUri)) {
     return false;
   }
@@ -80,16 +82,19 @@ bool MQTTService::connect() {
   const char* user = cfg.mqttUsername.empty() ? nullptr : cfg.mqttUsername.c_str();
   const char* pass = cfg.mqttPassword.empty() ? nullptr : cfg.mqttPassword.c_str();
   
-  mqtt_connect(&mqttClient_, "HamClockNext", nullptr, nullptr, 0, user, pass, connect_flags, 400);
+  char clientId[64];
+  snprintf(clientId, sizeof(clientId), "HamClockNext_%u", (uint32_t)SDL_GetTicks());
+  
+  mqtt_connect(&mqttClient_, clientId, nullptr, nullptr, 0, user, pass, connect_flags, 400);
   
   if (mqttClient_.error != MQTT_OK) {
-    std::cerr << "[MQTT] mqtt_connect failed: " << mqtt_error_str(mqttClient_.error) << std::endl;
+    LOG_D("MQTTService", "MQTT Error: {}", mqtt_error_str(mqttClient_.error));
     transport_.disconnect();
     return false;
   }
   
-  std::cout << "[MQTT] Connected!" << std::endl;
-  sendAutoDiscovery();
+  LOG_D("MQTTService", "MQTT Connected! Waiting for CONNACK...");
+  needAutoDiscovery_ = true;
   
   return true;
 }
@@ -111,11 +116,22 @@ void MQTTService::threadLoop() {
       }
     }
     
-    if (transport_.isConnected()) {
-      mqtt_sync(&mqttClient_);
+    {
+      std::lock_guard<std::recursive_mutex> lk(mutex_);
+      if (transport_.isConnected()) {
+        mqtt_sync(&mqttClient_);
       if (mqttClient_.error != MQTT_OK) {
-        std::cerr << "[MQTT] Error: " << mqtt_error_str(mqttClient_.error) << std::endl;
+        LOG_E("MQTTService", "MQTT Error: {}", mqtt_error_str(mqttClient_.error));
         transport_.disconnect();
+      } else if (needAutoDiscovery_) {
+        // mqtt_connect puts a CONNECT packet in the queue. When CONNACK is received, 
+        // mqtt_sync marks it complete and removes/flags it.
+        if (mqtt_mq_find(&mqttClient_.mq, MQTT_CONTROL_CONNECT, nullptr) == nullptr) {
+          LOG_D("MQTTService", "CONNACK received! Sending Auto-Discovery.");
+          needAutoDiscovery_ = false;
+          sendAutoDiscovery();
+        }
+      }
       }
     }
     
@@ -163,7 +179,7 @@ void MQTTService::sendAutoDiscovery() {
 }
 
 void MQTTService::publish(const std::string &topic, const std::string &payload, int qos, bool retain) {
-  std::lock_guard<std::mutex> lock(mutex_);
+  std::lock_guard<std::recursive_mutex> lock(mutex_);
   if (!transport_.isConnected()) return;
   
   uint8_t flags = 0;

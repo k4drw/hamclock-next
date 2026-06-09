@@ -97,7 +97,11 @@ void LocalPanel::update() {
                     wd.humidity);
       lineText_[4] = wBuf;
 
-      std::snprintf(wBuf, sizeof(wBuf), "%.0f hPa", wd.pressure);
+      if (wd.hasGas) {
+        std::snprintf(wBuf, sizeof(wBuf), "%.0f hPa  IAQ: %.0f", wd.pressure, wd.iaq);
+      } else {
+        std::snprintf(wBuf, sizeof(wBuf), "%.0f hPa", wd.pressure);
+      }
       lineText_[5] = wBuf;
     } else {
       lineText_[4] = "";

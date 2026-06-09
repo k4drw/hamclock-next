@@ -14,6 +14,10 @@ struct WeatherData {
   std::string icon; // OWM icon code or similar
   std::string city;
 
+  bool hasGas = false;
+  float gasResistance = 0; // KOhms
+  float iaq = 0;           // Indoor Air Quality score (0-500)
+
   bool valid = false;
   std::chrono::system_clock::time_point lastUpdate;
 };
