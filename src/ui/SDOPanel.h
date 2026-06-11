@@ -94,6 +94,14 @@ private:
       std::make_shared<std::time_t>(0);
   std::shared_ptr<bool> dataReady_ = std::make_shared<bool>(false);
 
+  // Movie state
+  std::vector<SDL_Texture*> movieFrames_;
+  std::shared_ptr<std::vector<SDL_Surface*>> pendingMovieSurfaces_ = 
+      std::make_shared<std::vector<SDL_Surface*>>();
+  int currentFrameIdx_ = 0;
+  uint32_t lastFrameMs_ = 0;
+  std::shared_ptr<bool> fetchingMovie_ = std::make_shared<bool>(false);
+
   // Scaling
   int overlayFontSize_ = 14;
   int menuFontSize_ = 18;

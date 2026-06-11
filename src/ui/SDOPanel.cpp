@@ -37,6 +37,13 @@ SDOPanel::~SDOPanel() {
     SDL_FreeSurface(*pendingSurface_);
     *pendingSurface_ = nullptr;
   }
+  for (auto* s : *pendingMovieSurfaces_) {
+    if (s) SDL_FreeSurface(s);
+  }
+  pendingMovieSurfaces_->clear();
+  for (auto* tex : movieFrames_) {
+    if (tex) SDL_DestroyTexture(tex);
+  }
 }
 
 void SDOPanel::update() {
@@ -48,40 +55,97 @@ void SDOPanel::update() {
     lastFetch_ = now;
     auto mtx = pendingMutex_;
     auto psurf = pendingSurface_;
+    auto pMovieSurfaces = pendingMovieSurfaces_;
     auto rdy = dataReady_;
     auto stm = pendingServerTime_;
     bool pfss = showPfss_;
     std::string cid = currentId_;
 
-    provider_.fetch(cid, pfss,
-                    [mtx, psurf, rdy, stm, cid](const std::string &data,
-                                                std::time_t serverTime) {
-                      WorkerService::getInstance().submitTask([mtx, psurf, rdy,
-                                                               stm, data, cid,
-                                                               serverTime]() {
-                        // Decode and tint in background
-                        SDL_Color tint = {255, 255, 255, 255};
-                        if (cid == "HMIIC") {
-                          tint = {255, 147, 41, 255};
-                        }
+    if (movie_) {
+      if (!*fetchingMovie_) {
+        *fetchingMovie_ = true;
+        imageReady_ = false;
+        
+        for (auto* t : movieFrames_) {
+          if (t) SDL_DestroyTexture(t);
+        }
+        movieFrames_.clear();
+        currentFrameIdx_ = 0;
+        
+        {
+          std::lock_guard<std::mutex> lock(*mtx);
+          for (auto* s : *pMovieSurfaces) {
+            if (s) SDL_FreeSurface(s);
+          }
+          pMovieSurfaces->clear();
+        }
 
-                        SDL_Surface *surf = TextureManager::decodeToSurface(
-                            reinterpret_cast<const unsigned char *>(
-                                data.data()),
-                            static_cast<unsigned int>(data.size()),
-                            "sdo_latest", tint);
+        auto fMovie = fetchingMovie_;
+        SDOProvider *prov = &provider_;
 
-                        if (surf) {
-                          std::lock_guard<std::mutex> lock(*mtx);
-                          if (*psurf) {
-                            SDL_FreeSurface(*psurf);
+        provider_.fetchMovieUrls(cid, pfss, [prov, mtx, pMovieSurfaces, rdy, cid, fMovie](const std::vector<std::string>& urls) {
+          if (urls.empty()) {
+             *fMovie = false;
+             return;
+          }
+          {
+            std::lock_guard<std::mutex> lock(*mtx);
+            pMovieSurfaces->resize(urls.size(), nullptr);
+          }
+          for (size_t i = 0; i < urls.size(); ++i) {
+            std::string url = urls[i];
+            prov->net().fetchAsync(url, [mtx, pMovieSurfaces, rdy, cid, i](std::string data) {
+              WorkerService::getInstance().submitTask([mtx, pMovieSurfaces, rdy, cid, i, data]() {
+                SDL_Color tint = {255, 255, 255, 255};
+                if (cid == "HMIIC") tint = {255, 147, 41, 255};
+                SDL_Surface *surf = TextureManager::decodeToSurface(
+                    reinterpret_cast<const unsigned char*>(data.data()), data.size(), "sdo_latest", tint);
+                if (surf) {
+                  std::lock_guard<std::mutex> lock(*mtx);
+                  if (i < pMovieSurfaces->size()) {
+                    if ((*pMovieSurfaces)[i]) SDL_FreeSurface((*pMovieSurfaces)[i]);
+                    (*pMovieSurfaces)[i] = surf;
+                  } else {
+                    SDL_FreeSurface(surf);
+                  }
+                  *rdy = true;
+                }
+              });
+            }, 3600, false);
+          }
+        });
+      }
+    } else {
+      provider_.fetch(cid, pfss,
+                      [mtx, psurf, rdy, stm, cid](const std::string &data,
+                                                  std::time_t serverTime) {
+                        WorkerService::getInstance().submitTask([mtx, psurf, rdy,
+                                                                 stm, data, cid,
+                                                                 serverTime]() {
+                          // Decode and tint in background
+                          SDL_Color tint = {255, 255, 255, 255};
+                          if (cid == "HMIIC") {
+                            tint = {255, 147, 41, 255};
                           }
-                          *psurf = surf;
-                          *stm = serverTime;
-                          *rdy = true;
-                        }
+
+                          SDL_Surface *surf = TextureManager::decodeToSurface(
+                              reinterpret_cast<const unsigned char *>(
+                                  data.data()),
+                              static_cast<unsigned int>(data.size()),
+                              "sdo_latest", tint);
+
+                          if (surf) {
+                            std::lock_guard<std::mutex> lock(*mtx);
+                            if (*psurf) {
+                              SDL_FreeSurface(*psurf);
+                            }
+                            *psurf = surf;
+                            *stm = serverTime;
+                            *rdy = true;
+                          }
+                        });
                       });
-                    });
+    }
   }
 
   // Handle rotation (every 30 seconds if enabled)
@@ -107,12 +171,34 @@ void SDOPanel::render(SDL_Renderer *renderer) {
   {
     std::lock_guard<std::mutex> lock(*pendingMutex_);
     if (*dataReady_) {
-      if (*pendingSurface_) {
-        texMgr_.loadFromSurface(renderer, "sdo_latest", *pendingSurface_);
-        SDL_FreeSurface(*pendingSurface_);
-        *pendingSurface_ = nullptr;
-        imageServerTime_ = *pendingServerTime_;
-        imageReady_ = true;
+      if (movie_) {
+        bool allReady = true;
+        bool anyUploaded = false;
+        if (movieFrames_.size() != pendingMovieSurfaces_->size()) {
+           movieFrames_.resize(pendingMovieSurfaces_->size(), nullptr);
+        }
+        for (size_t i = 0; i < pendingMovieSurfaces_->size(); ++i) {
+           if ((*pendingMovieSurfaces_)[i]) {
+              if (movieFrames_[i]) SDL_DestroyTexture(movieFrames_[i]);
+              movieFrames_[i] = SDL_CreateTextureFromSurface(renderer, (*pendingMovieSurfaces_)[i]);
+              SDL_FreeSurface((*pendingMovieSurfaces_)[i]);
+              (*pendingMovieSurfaces_)[i] = nullptr;
+              anyUploaded = true;
+           }
+           if (!movieFrames_[i]) allReady = false;
+        }
+        if (anyUploaded && allReady) {
+           *fetchingMovie_ = false;
+           imageReady_ = true;
+        }
+      } else {
+        if (*pendingSurface_) {
+          texMgr_.loadFromSurface(renderer, "sdo_latest", *pendingSurface_);
+          SDL_FreeSurface(*pendingSurface_);
+          *pendingSurface_ = nullptr;
+          imageServerTime_ = *pendingServerTime_;
+          imageReady_ = true;
+        }
       }
       *dataReady_ = false;
     }
@@ -123,7 +209,20 @@ void SDOPanel::render(SDL_Renderer *renderer) {
   renderChrome(renderer);
 
   // 3. Draw Image
-  SDL_Texture *tex = texMgr_.get("sdo_latest");
+  SDL_Texture *tex = nullptr;
+  if (movie_) {
+     if (imageReady_ && !movieFrames_.empty()) {
+        uint32_t now = SDL_GetTicks();
+        if (now - lastFrameMs_ > 250) { // 250ms per frame
+           lastFrameMs_ = now;
+           currentFrameIdx_ = (currentFrameIdx_ + 1) % movieFrames_.size();
+        }
+        tex = movieFrames_[currentFrameIdx_];
+     }
+  } else {
+     tex = texMgr_.get("sdo_latest");
+  }
+
   if (tex && imageReady_) {
     int titleH = height_ / 10;
     int drawSz = std::min(width_, height_ - titleH) - 6;
@@ -137,12 +236,13 @@ void SDOPanel::render(SDL_Renderer *renderer) {
     SDL_RenderFillRect(renderer, &dst);
     SDL_RenderCopy(renderer, tex, nullptr, &dst);
 
-    fontMgr_.catalog()->drawText(renderer, "SDO Solar", x_ + 10, y_ + 5,
+    fontMgr_.catalog()->drawText(renderer, movie_ ? "SDO Movie" : "SDO Solar", x_ + 10, y_ + 5,
                                  themes.accent, FontStyle::MicroBold);
 
     renderOverlays(renderer, themes);
   } else {
-    fontMgr_.catalog()->drawText(renderer, "Loading SUN...", x_ + width_ / 2,
+    std::string text = *fetchingMovie_ ? "Loading Frames..." : "Loading SUN...";
+    fontMgr_.catalog()->drawText(renderer, text.c_str(), x_ + width_ / 2,
                                  y_ + height_ / 2, themes.textDim,
                                  FontStyle::Fast, true);
   }
@@ -273,6 +373,16 @@ void SDOPanel::renderMenu(SDL_Renderer *renderer, const ThemeColors &themes) {
   cat->drawText(renderer, "Magnetic Lines (PFSS)", pfssR.x + 10, pfssR.y + 4,
                 tempPfss_ ? themes.text : themes.textDim, FontStyle::UI);
 
+  // Movie toggle
+  SDL_Rect movR = movieRect_;
+  if (tempMovie_) {
+    SDL_SetRenderDrawColor(renderer, themes.accent.r, themes.accent.g,
+                           themes.accent.b, 80);
+    SDL_RenderFillRect(renderer, &movR);
+  }
+  cat->drawText(renderer, "Animate (24 Frames)", movR.x + 10, movR.y + 4,
+                tempMovie_ ? themes.text : themes.textDim, FontStyle::UI);
+
   // Done / Cancel
   auto drawBtn = [&](const SDL_Rect &r, const char *label, SDL_Color bg) {
     SDL_SetRenderDrawColor(renderer, bg.r, bg.g, bg.b, themes.bg.a);
@@ -326,6 +436,9 @@ void SDOPanel::recalcMenuLayout() {
   curY += itemH_ + 5;
 
   graylineRect_ = {menuRect_.x + 10, curY, mW - 20, itemH_};
+  curY += itemH_ + 5;
+
+  movieRect_ = {menuRect_.x + 10, curY, mW - 20, itemH_};
 
   int btnW = 100;
   int btnH = 34;
@@ -344,6 +457,7 @@ bool SDOPanel::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
         my < okRect_.y + okRect_.h) {
       currentId_ = tempId_;
       rotating_ = tempRotating_;
+      movie_ = tempMovie_;
       saveSettings();
       menuVisible_ = false;
       lastFetch_ = 0; // Trigger reload
@@ -379,6 +493,12 @@ bool SDOPanel::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
       return true;
     }
 
+    if (mx >= movieRect_.x && mx < movieRect_.x + movieRect_.w &&
+        my >= movieRect_.y && my < movieRect_.y + movieRect_.h) {
+      tempMovie_ = !tempMovie_;
+      return true;
+    }
+
     return true; // Click eaten by modal
   }
 
@@ -388,6 +508,8 @@ bool SDOPanel::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
     menuVisible_ = true;
     tempId_ = currentId_;
     tempRotating_ = rotating_;
+    tempPfss_ = showPfss_;
+    tempMovie_ = movie_;
     recalcMenuLayout();
     return true;
   }
@@ -400,6 +522,7 @@ bool SDOPanel::onKeyDown(SDL_Keycode key, Uint16 /*mod*/) {
     if (key == SDLK_RETURN || key == SDLK_KP_ENTER) {
       currentId_ = tempId_;
       rotating_ = tempRotating_;
+      movie_ = tempMovie_;
       saveSettings();
       menuVisible_ = false;
       lastFetch_ = 0;
