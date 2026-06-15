@@ -15,7 +15,7 @@
 // Returns IARU Region 2 sub-band mode label for a given frequency in kHz.
 static const char *modeFromFreq(double khz) {
   // FT8 dial frequencies (±0.6 kHz)
-  static const double ft8f[] = {1840, 3573, 7074, 10136, 14074,
+  static const double ft8f[] = {1840, 3573, 5357, 7074, 10136, 14074,
                                 18100, 21074, 24915, 28074, 50313};
   for (double f : ft8f)
     if (std::abs(khz - f) < 0.6) return "FT8";
@@ -24,7 +24,7 @@ static const char *modeFromFreq(double khz) {
   for (double f : ft4f)
     if (std::abs(khz - f) < 0.6) return "FT4";
   // WSPR dial frequencies (±0.4 kHz)
-  static const double wsprf[] = {1836.6, 3592.6, 7038.6, 10138.7,
+  static const double wsprf[] = {1836.6, 3592.6, 5364.7, 7038.6, 10138.7,
                                   14095.6, 18104.6, 21094.6, 24924.6, 28124.6};
   for (double f : wsprf)
     if (std::abs(khz - f) < 0.4) return "WSPR";
@@ -34,28 +34,30 @@ static const char *modeFromFreq(double khz) {
   if (khz >= 3500  && khz < 3570)  return "CW";
   if (khz >= 3570  && khz < 3600)  return "RTTY";
   if (khz >= 3600  && khz < 4000)  return "SSB";
+  if (khz >= 5330  && khz < 5410)  return "SSB";
   if (khz >= 7000  && khz < 7040)  return "CW";
   if (khz >= 7040  && khz < 7125)  return "RTTY";
   if (khz >= 7125  && khz < 7300)  return "SSB";
   if (khz >= 10100 && khz < 10130) return "CW";
   if (khz >= 10130 && khz < 10150) return "RTTY";
   if (khz >= 14000 && khz < 14070) return "CW";
-  if (khz >= 14070 && khz < 14100) return "RTTY";
-  if (khz >= 14100 && khz < 14350) return "SSB";
+  if (khz >= 14070 && khz < 14150) return "RTTY";
+  if (khz >= 14150 && khz < 14350) return "SSB";
   if (khz >= 18068 && khz < 18095) return "CW";
   if (khz >= 18095 && khz < 18110) return "RTTY";
   if (khz >= 18110 && khz < 18168) return "SSB";
   if (khz >= 21000 && khz < 21070) return "CW";
-  if (khz >= 21070 && khz < 21150) return "RTTY";
-  if (khz >= 21150 && khz < 21450) return "SSB";
+  if (khz >= 21070 && khz < 21200) return "RTTY";
+  if (khz >= 21200 && khz < 21450) return "SSB";
   if (khz >= 24890 && khz < 24915) return "CW";
-  if (khz >= 24915 && khz < 24990) return "SSB";
+  if (khz >= 24915 && khz < 24930) return "RTTY";
+  if (khz >= 24930 && khz < 24990) return "SSB";
   if (khz >= 28000 && khz < 28070) return "CW";
   if (khz >= 28070 && khz < 28300) return "RTTY";
   if (khz >= 29000 && khz < 29200) return "AM";
   if (khz >= 28300 && khz < 29700) return "SSB";
   if (khz >= 50000 && khz < 50100) return "CW";
-  if (khz >= 50100 && khz < 50300) return "SSB";
+  if (khz >= 50100 && khz < 54000) return "SSB";
   return "";
 }
 
