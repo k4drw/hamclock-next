@@ -81,7 +81,11 @@ void NetLoggerPanel::renderNetList(SDL_Renderer* renderer, const ThemeColors& th
             cat->drawText(renderer, nameStr, x_ + 10, cy + 3, themes.text, FontStyle::SmallRegular);
             
             // Freq on second line
-            cat->drawText(renderer, net.frequency, x_ + 10, cy + 20, themes.accent, FontStyle::SmallRegular);
+            std::string freqMode = net.frequency;
+            if (!net.mode.empty()) freqMode += "  " + net.mode;
+            if (width_ > 250 && !net.band.empty()) freqMode += "  " + net.band;
+            
+            cat->drawText(renderer, freqMode, x_ + 10, cy + 20, themes.accent, FontStyle::SmallRegular);
             
             // Users on second line, right aligned
             std::string users = std::to_string(net.subscriberCount) + " chk";

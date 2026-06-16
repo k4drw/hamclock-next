@@ -65,7 +65,7 @@ void NetLoggerProvider::fetch() {
                     data_.lastUpdate = std::time(nullptr);
                     if (store_) store_->update(data_);
                 }
-            });
+            }, 30);
     }
     
     // Fetch Checkins if a net is selected
@@ -91,7 +91,7 @@ void NetLoggerProvider::fetch() {
                         data_.lastUpdate = std::time(nullptr);
                         if (store_) store_->update(data_);
                     }
-                });
+                }, 10);
         }
     }
 }
