@@ -152,6 +152,7 @@ void populateWidgetDescriptions();
 #include "services/SpaceWeatherAlertProvider.h"
 #include "ui/SolarCyclePanel.h"
 #include "services/LaunchProvider.h"
+#include "services/NetLoggerProvider.h"
 #include "core/KIndexHistoryData.h"
 #include "core/SFIHistoryData.h"
 #include "ui/KIndexAlertPanel.h"
@@ -591,6 +592,10 @@ DashboardContext::DashboardContext(AppContext &ctx)
       std::make_unique<SpaceWeatherAlertProvider>(netManager, appContext_.spaceWxAlertStore);
   if (isMasterMode || isWidgetConfigured("spacewx_alerts"))
     spaceWeatherAlertProvider->fetch();
+
+  netLoggerProvider = std::make_unique<NetLoggerProvider>(netManager);
+  if (isMasterMode || isWidgetConfigured("netlogger"))
+    netLoggerProvider->fetch();
 
   santaProvider = std::make_unique<SantaProvider>(santaStore);
   santaProvider->update();
@@ -1636,6 +1641,10 @@ void DashboardContext::update(AppContext &ctx) {
     }
     if ((isMaster || isWidgetActive("history_kp")) && historyProvider->isStale(now, kCooldown)) {
       historyProvider->fetchKp();
+    }
+
+    if (isMaster || isWidgetActive("netlogger")) {
+      netLoggerProvider->fetch();
     }
 
     // SpaceWx Alerts

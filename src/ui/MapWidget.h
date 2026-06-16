@@ -182,6 +182,7 @@ private:
   void renderONTASpots(SDL_Renderer *renderer);
   void renderBeacons(SDL_Renderer *renderer);
   void renderLaunches(SDL_Renderer *renderer);
+  void renderNetLogger(SDL_Renderer *renderer);
   void renderMufRtOverlay(SDL_Renderer *renderer);
   void renderGribCloudOverlay(SDL_Renderer *renderer);
   void renderWxMbOverlay(SDL_Renderer *renderer);

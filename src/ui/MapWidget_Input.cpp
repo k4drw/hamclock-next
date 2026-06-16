@@ -23,6 +23,7 @@
 #include "EmbeddedIcons.h"
 #include "FontCatalog.h"
 #include "PaneContainer.h"
+#include "../core/NetLoggerStore.h"
 #include "RenderUtils.h"
 #include "../core/CountryGrid.h"
 #include <fmt/core.h>
@@ -462,7 +463,26 @@ void MapWidget::onMouseMove(int mx, int my) {
     }
   }
 
-  // 4b. Check ADIF Pins
+  // 4b. Check NetLogger Checkins
+  if (tip.empty()) {
+    auto data = NetLoggerStore::instance()->get();
+    if (data.hasCheckins && !data.checkins.empty()) {
+      for (const auto& c : data.checkins) {
+        if (!c.hasLocation) continue;
+        if (screenDist(c.lat, c.lon) < kHitRadius) {
+          tip = c.callsign;
+          if (!c.firstName.empty()) tip += " - " + c.firstName;
+          
+          std::string loc = c.state;
+          if (!c.grid.empty()) loc += (loc.empty() ? "" : " ") + c.grid;
+          if (!loc.empty()) tip += "\n" + loc;
+          break;
+        }
+      }
+    }
+  }
+
+  // 4c. Check ADIF Pins
   if (tip.empty() && adifStore_) {
     auto stats = adifStore_->get();
     if (stats.valid && !stats.recentQSOs.empty()) {

@@ -19,7 +19,10 @@
 #include "../services/BeaconProvider.h"
 #include "../services/GribCloudProvider.h"
 #include "../services/IonosondeProvider.h"
+#include "../services/MoonProvider.h"
 #include "../services/WxMbProvider.h"
+#include "../services/LaunchProvider.h"
+#include "../core/NetLoggerStore.h"
 #include "EmbeddedIcons.h"
 #include "FontCatalog.h"
 #include "PaneContainer.h"
@@ -1107,6 +1110,7 @@ void MapWidget::render(SDL_Renderer *renderer) {
   renderONTASpots(renderer);
   renderBeacons(renderer);
   renderLaunches(renderer);
+  renderNetLogger(renderer);
 
   SDL_RenderSetClipRect(renderer, nullptr);
 
@@ -1753,3 +1757,21 @@ void MapWidget::onMapImageReady(bool night, std::string &&data) {
   }
 }
 
+void MapWidget::renderNetLogger(SDL_Renderer *renderer) {
+  auto data = NetLoggerStore::instance()->get();
+  if (!data.hasCheckins || data.checkins.empty())
+    return;
+
+  SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+  SDL_SetRenderDrawColor(renderer, 255, 50, 50, 200);
+
+  for (const auto& c : data.checkins) {
+    if (!c.hasLocation) continue;
+    SDL_FPoint p = latLonToScreen(c.lat, c.lon);
+    if (p.x >= mapRect_.x && p.x < mapRect_.x + mapRect_.w &&
+        p.y >= mapRect_.y && p.y < mapRect_.y + mapRect_.h) {
+      SDL_Rect dot = {static_cast<int>(p.x) - 3, static_cast<int>(p.y) - 3, 6, 6};
+      SDL_RenderFillRect(renderer, &dot);
+    }
+  }
+}

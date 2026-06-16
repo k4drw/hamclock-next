@@ -125,6 +125,7 @@ class OpenMeteoForecastProvider;
 
 // New widget providers (forward declarations)
 class SpaceWeatherAlertStore;
+class NetLoggerProvider;
 
 // Providers (shared_ptr)
 class SDOProvider;
@@ -209,6 +210,7 @@ struct DashboardContext {
   std::unique_ptr<GreylineDXProvider> greylineDXProvider;
   std::shared_ptr<WxMbProvider> wxMbProvider;
   std::shared_ptr<QRZProvider> qrzProvider;
+  std::unique_ptr<NetLoggerProvider> netLoggerProvider;
 
   // Services
 #ifndef __EMSCRIPTEN__

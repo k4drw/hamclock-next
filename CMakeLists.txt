@@ -556,6 +556,7 @@ set(HAMCLOCK_SOURCES
     src/core/PrefixManager.cpp
     src/core/CitiesManager.cpp
     src/core/StringUtils.cpp
+    src/core/NetLoggerStore.cpp
     src/core/SoundManager.cpp
     src/core/WorkerService.cpp
     src/core/PropEngine.cpp
@@ -620,6 +621,7 @@ set(HAMCLOCK_SOURCES
     src/services/WinlinkProvider.cpp
     src/services/GreylineDXProvider.cpp
     src/services/SpaceWeatherAlertProvider.cpp
+    src/services/NetLoggerProvider.cpp
     src/ui/ActivityPanels.cpp
     src/ui/ADIFPanel.cpp
     src/ui/AlertsPanel.cpp
@@ -648,6 +650,7 @@ set(HAMCLOCK_SOURCES
     src/ui/GreylineDXFilterPanel.cpp
     src/ui/HeardMePanel.cpp
     src/ui/DXClusterPanel.cpp
+    src/ui/NetLoggerPanel.cpp
     src/ui/BandConditionsPanel.cpp
     src/ui/BeaconPanel.cpp
     src/ui/ContestPanel.cpp
