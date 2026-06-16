@@ -6,8 +6,7 @@
 
 class NetLoggerStore {
 public:
-    static std::shared_ptr<NetLoggerStore> instance();
-    NetLoggerData get() const;
+    std::shared_ptr<const NetLoggerData> get() const;
     void update(const NetLoggerData& data);
     
     void setSelectedNet(const std::string& server, const std::string& net);
@@ -17,5 +16,5 @@ public:
 
 private:
     mutable std::mutex mutex_;
-    NetLoggerData data_;
+    std::shared_ptr<const NetLoggerData> data_ = std::make_shared<NetLoggerData>();
 };

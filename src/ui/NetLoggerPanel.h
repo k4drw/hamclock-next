@@ -2,12 +2,13 @@
 
 #include "Widget.h"
 #include "../core/NetLoggerStore.h"
+#include "../core/NetLoggerStore.h"
 #include "FontManager.h"
 #include <SDL2/SDL.h>
 
 class NetLoggerPanel : public Widget {
 public:
-    NetLoggerPanel(int x, int y, int w, int h, FontManager& fontMgr);
+    NetLoggerPanel(int x, int y, int w, int h, FontManager& fontMgr, std::shared_ptr<NetLoggerStore> store);
     ~NetLoggerPanel() override = default;
 
     void render(SDL_Renderer* renderer) override;
@@ -18,8 +19,9 @@ public:
     void onMouseMove(int mx, int my) override;
     
 
-    NetLoggerData data_;
+    std::shared_ptr<const NetLoggerData> data_;
     FontManager& fontMgr_;
+    std::shared_ptr<NetLoggerStore> store_;
     
     int scrollY_ = 0;
     int maxScroll_ = 0;

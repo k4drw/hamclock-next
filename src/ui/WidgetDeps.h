@@ -54,6 +54,7 @@ class LoTWActivityStore;
 class ClublogStore;
 class FlareDataStore;
 class HeardMeStore;
+class NetLoggerStore;
 
 // Providers / services (non-owning raw pointers)
 class LiveSpotProvider;
@@ -124,6 +125,7 @@ struct WidgetDeps {
   std::shared_ptr<ClublogStore>         clublogStore;
   std::shared_ptr<FlareDataStore>       flareStore;
   std::shared_ptr<HeardMeStore>         heardMeStore;
+  std::shared_ptr<NetLoggerStore>       netLoggerStore;
 
   // Providers / services (non-owning; owned by DashboardContext)
   LiveSpotProvider  *spotProvider      = nullptr;

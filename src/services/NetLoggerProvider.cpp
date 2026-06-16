@@ -8,7 +8,8 @@
 #include <sstream>
 #include <cctype>
 
-NetLoggerProvider::NetLoggerProvider(NetworkManager& net) : net_(net) {}
+NetLoggerProvider::NetLoggerProvider(NetworkManager& net, std::shared_ptr<NetLoggerStore> store) 
+    : net_(net), store_(std::move(store)) {}
 
 NetLoggerProvider::~NetLoggerProvider() {
     alive_->store(false, std::memory_order_release);
@@ -35,7 +36,9 @@ void NetLoggerProvider::fetch() {
     auto now = std::chrono::steady_clock::now();
     
     std::string selServer, selNet;
-    NetLoggerStore::instance()->getSelectedNet(selServer, selNet);
+    if (store_) {
+        store_->getSelectedNet(selServer, selNet);
+    }
     if (data_.selectedServerName != selServer || data_.selectedNetName != selNet) {
         data_.selectedServerName = selServer;
         data_.selectedNetName = selNet;
@@ -60,7 +63,7 @@ void NetLoggerProvider::fetch() {
                 if (!response.empty()) {
                     parseNets(response);
                     data_.lastUpdate = std::time(nullptr);
-                    NetLoggerStore::instance()->update(data_);
+                    if (store_) store_->update(data_);
                 }
             });
     }
@@ -86,7 +89,7 @@ void NetLoggerProvider::fetch() {
                     if (!response.empty()) {
                         parseCheckins(response);
                         data_.lastUpdate = std::time(nullptr);
-                        NetLoggerStore::instance()->update(data_);
+                        if (store_) store_->update(data_);
                     }
                 });
         }

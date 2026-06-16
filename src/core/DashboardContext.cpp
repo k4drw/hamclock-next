@@ -153,6 +153,7 @@ void populateWidgetDescriptions();
 #include "ui/SolarCyclePanel.h"
 #include "services/LaunchProvider.h"
 #include "services/NetLoggerProvider.h"
+#include "core/NetLoggerStore.h"
 #include "core/KIndexHistoryData.h"
 #include "core/SFIHistoryData.h"
 #include "ui/KIndexAlertPanel.h"
@@ -592,8 +593,8 @@ DashboardContext::DashboardContext(AppContext &ctx)
       std::make_unique<SpaceWeatherAlertProvider>(netManager, appContext_.spaceWxAlertStore);
   if (isMasterMode || isWidgetConfigured("spacewx_alerts"))
     spaceWeatherAlertProvider->fetch();
-
-  netLoggerProvider = std::make_unique<NetLoggerProvider>(netManager);
+  ctx.netLoggerStore = std::make_shared<NetLoggerStore>();
+  netLoggerProvider = std::make_unique<NetLoggerProvider>(netManager, ctx.netLoggerStore);
   if (isMasterMode || isWidgetConfigured("netlogger"))
     netLoggerProvider->fetch();
 
@@ -796,6 +797,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
         ctx.clublogStore,
         ctx.flareStore,
         ctx.heardMeStore,
+        ctx.netLoggerStore,
         spotProvider.get(),
         activityProvider.get(),
         drapProvider.get(),
@@ -1117,6 +1119,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
   mapArea->setIonosondeProvider(ionosondeProvider);
   mapArea->setSolarDataStore(ctx.solarStore.get());
   mapArea->setActivityStore(ctx.activityStore);
+  mapArea->setNetLoggerStore(ctx.netLoggerStore);
   mapArea->setLaunchProvider(launchProvider.get());
 
   std::vector<PaneContainer *> panePtrs;

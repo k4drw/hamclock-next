@@ -58,6 +58,7 @@ class RepeaterStore;
 class HurricaneStore;
 class MarineStore;
 class WinlinkStore;
+class NetLoggerStore;
 class DRAPDataStore;
 class XRayHistoryStore;
 class GreylineDXStore;
@@ -357,6 +358,7 @@ struct AppContext {
   std::shared_ptr<HurricaneStore> hurricaneStore;
   std::shared_ptr<MarineStore> marineStore;
   std::shared_ptr<WinlinkStore> winlinkStore;
+  std::shared_ptr<NetLoggerStore> netLoggerStore;
   std::shared_ptr<DRAPDataStore> drapDataStore;
   std::shared_ptr<XRayHistoryStore> xrayHistoryStore;
   std::shared_ptr<KIndexHistoryStore> kIndexHistoryStore;

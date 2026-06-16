@@ -7,10 +7,11 @@
 #include <string>
 
 class NetworkManager;
+class NetLoggerStore;
 
 class NetLoggerProvider {
 public:
-    explicit NetLoggerProvider(NetworkManager& net);
+    explicit NetLoggerProvider(NetworkManager& net, std::shared_ptr<NetLoggerStore> store);
     ~NetLoggerProvider();
     
     void fetch();
@@ -20,6 +21,7 @@ public:
 
 private:
     NetworkManager& net_;
+    std::shared_ptr<NetLoggerStore> store_;
     
     NetLoggerData data_;
     std::shared_ptr<std::atomic<bool>> alive_ = std::make_shared<std::atomic<bool>>(true);

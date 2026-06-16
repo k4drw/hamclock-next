@@ -464,10 +464,10 @@ void MapWidget::onMouseMove(int mx, int my) {
   }
 
   // 4b. Check NetLogger Checkins
-  if (tip.empty()) {
-    auto data = NetLoggerStore::instance()->get();
-    if (data.hasCheckins && !data.checkins.empty()) {
-      for (const auto& c : data.checkins) {
+  if (tip.empty() && netLoggerStore_) {
+    auto data = netLoggerStore_->get();
+    if (data && data->hasCheckins && !data->checkins.empty()) {
+      for (const auto& c : data->checkins) {
         if (!c.hasLocation) continue;
         if (screenDist(c.lat, c.lon) < kHitRadius) {
           tip = c.callsign;

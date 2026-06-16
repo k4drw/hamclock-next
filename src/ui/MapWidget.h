@@ -36,6 +36,7 @@ class SolarDataStore;
 class HeardMeStore;
 class PaneContainer;
 class LaunchProvider;
+class NetLoggerStore;
 
 class MapWidget : public Widget {
 public:
@@ -103,6 +104,10 @@ public:
 
   void setActivityStore(std::shared_ptr<ActivityDataStore> store) {
     activityStore_ = std::move(store);
+  }
+
+  void setNetLoggerStore(std::shared_ptr<NetLoggerStore> store) {
+    netLoggerStore_ = std::move(store);
   }
 
   void setMufRtProvider(MufRtProvider *p) { mufrt_ = p; }
@@ -204,6 +209,7 @@ private:
   std::shared_ptr<DRAPDataStore> drapStore_;
   std::shared_ptr<ADIFStore> adifStore_;
   std::shared_ptr<ActivityDataStore> activityStore_;
+  std::shared_ptr<NetLoggerStore> netLoggerStore_;
   MufRtProvider *mufrt_ = nullptr;
   std::shared_ptr<WxMbProvider> wxmb_;
   std::shared_ptr<GribCloudProvider> gribCloud_;

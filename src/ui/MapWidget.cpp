@@ -1758,14 +1758,15 @@ void MapWidget::onMapImageReady(bool night, std::string &&data) {
 }
 
 void MapWidget::renderNetLogger(SDL_Renderer *renderer) {
-  auto data = NetLoggerStore::instance()->get();
-  if (!data.hasCheckins || data.checkins.empty())
+  if (!netLoggerStore_) return;
+  auto data = netLoggerStore_->get();
+  if (!data || !data->hasCheckins || data->checkins.empty())
     return;
 
   SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
   SDL_SetRenderDrawColor(renderer, 255, 50, 50, 200);
 
-  for (const auto& c : data.checkins) {
+  for (const auto& c : data->checkins) {
     if (!c.hasLocation) continue;
     SDL_FPoint p = latLonToScreen(c.lat, c.lon);
     if (p.x >= mapRect_.x && p.x < mapRect_.x + mapRect_.w &&
