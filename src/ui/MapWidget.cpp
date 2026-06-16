@@ -1106,6 +1106,7 @@ void MapWidget::render(SDL_Renderer *renderer) {
     renderADIFPins(renderer);
   renderONTASpots(renderer);
   renderBeacons(renderer);
+  renderLaunches(renderer);
 
   SDL_RenderSetClipRect(renderer, nullptr);
 

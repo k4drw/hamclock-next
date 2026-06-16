@@ -35,6 +35,7 @@ class IonosondeProvider;
 class SolarDataStore;
 class HeardMeStore;
 class PaneContainer;
+class LaunchProvider;
 
 class MapWidget : public Widget {
 public:
@@ -108,6 +109,7 @@ public:
   void setBeaconProvider(BeaconProvider *p) { beacons_ = p; }
   void setIonosondeProvider(std::shared_ptr<IonosondeProvider> p) { iono_ = std::move(p); }
   void setSolarDataStore(SolarDataStore *s) { solar_ = s; }
+  void setLaunchProvider(LaunchProvider *p) { launchProvider_ = p; }
 
   std::shared_ptr<WxMbProvider> getWxMbProvider() const { return wxmb_; }
 
@@ -179,6 +181,7 @@ private:
   void renderADIFPins(SDL_Renderer *renderer);
   void renderONTASpots(SDL_Renderer *renderer);
   void renderBeacons(SDL_Renderer *renderer);
+  void renderLaunches(SDL_Renderer *renderer);
   void renderMufRtOverlay(SDL_Renderer *renderer);
   void renderGribCloudOverlay(SDL_Renderer *renderer);
   void renderWxMbOverlay(SDL_Renderer *renderer);
@@ -206,6 +209,7 @@ private:
   BeaconProvider *beacons_ = nullptr;
   std::shared_ptr<IonosondeProvider> iono_;
   SolarDataStore *solar_ = nullptr;
+  LaunchProvider *launchProvider_ = nullptr;
   OrbitPredictor *predictor_ = nullptr;
   // Guards WorkerService ground-track tasks: set to false in ~MapWidget() so
   // any in-flight task exits early before touching the dangling predictor_.

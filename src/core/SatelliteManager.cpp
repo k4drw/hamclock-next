@@ -64,6 +64,23 @@ void SatelliteManager::fetch(bool force) {
       },
       86400); // 24 hour cache age
 
+  net_.fetchAsync(
+      TLE_LAST_30_URL,
+      [](std::string response) {
+        if (response.empty()) return;
+        SDL_Event ev;
+        SDL_zero(ev);
+        // We'll use the same event type, but maybe process it differently.
+        // Actually, we can reuse the same event and have parse() merge the data into recentSatellites_.
+        ev.type = HamClock::AE_BASE_EVENT + HamClock::AE_SATELLITE_DATA_READY;
+        auto *satData = new std::string(std::move(response));
+        ev.user.data1 = satData;
+        ev.user.code = 1; // 1 means recent TLEs
+        if (SDL_PushEvent(&ev) < 0)
+          delete satData;
+      },
+      3600); // 1 hour cache age for recent launches
+
   // Also fetch custom SCCs
   const auto &cfg = ConfigManager::instance().getConfig();
   for (int scc : cfg.customSatelliteSCCs) {
@@ -71,8 +88,12 @@ void SatelliteManager::fetch(bool force) {
   }
 }
 
-void SatelliteManager::onDataReady(const std::string &raw) {
-  parse(raw);
+void SatelliteManager::onDataReady(const std::string &raw, int type) {
+  if (type == 1) {
+    parseRecent(raw);
+  } else {
+    parse(raw);
+  }
 }
 
 void SatelliteManager::update() {
@@ -196,9 +217,45 @@ void SatelliteManager::parse(const std::string &raw) {
   }
 }
 
+void SatelliteManager::parseRecent(const std::string &raw) {
+  std::istringstream stream(raw);
+  std::vector<SatelliteTLE> result;
+  std::string line;
+
+  while (std::getline(stream, line)) {
+    std::string name = trim(line);
+    if (name.empty()) continue;
+
+    std::string l1;
+    if (!std::getline(stream, l1)) break;
+    l1 = trim(l1);
+
+    std::string l2;
+    if (!std::getline(stream, l2)) break;
+    l2 = trim(l2);
+
+    if (l1.empty() || l2.empty() || l1[0] != '1' || l2[0] != '2') continue;
+
+    SatelliteTLE tle;
+    tle.name = name;
+    tle.line1 = l1;
+    tle.line2 = l2;
+    if (l1.size() >= 7) {
+      tle.noradId = StringUtils::safe_stoi(l1.substr(2, 5));
+    }
+    result.push_back(std::move(tle));
+  }
+
+  LOG_I("SatelliteManager", "Parsed {} recent satellites (last 30 days)", result.size());
+
+  std::lock_guard<std::mutex> lock(mutex_);
+  recentSatellites_ = std::move(result);
+}
+
 std::vector<SatelliteTLE> SatelliteManager::getSatellites() const {
   std::lock_guard<std::mutex> lock(mutex_);
   std::vector<SatelliteTLE> all = satellites_;
+  all.insert(all.end(), recentSatellites_.begin(), recentSatellites_.end());
   all.insert(all.end(), customSatellites_.begin(), customSatellites_.end());
   return all;
 }
@@ -212,12 +269,13 @@ std::optional<SatelliteTLE>
 SatelliteManager::findByNoradId(int noradId) const {
   std::lock_guard<std::mutex> lock(mutex_);
   for (const auto &sat : satellites_) {
-    if (sat.noradId == noradId)
-      return sat;
+    if (sat.noradId == noradId) return sat;
+  }
+  for (const auto &sat : recentSatellites_) {
+    if (sat.noradId == noradId) return sat;
   }
   for (const auto &sat : customSatellites_) {
-    if (sat.noradId == noradId)
-      return sat;
+    if (sat.noradId == noradId) return sat;
   }
   return std::nullopt;
 }
@@ -237,16 +295,21 @@ SatelliteManager::findByName(const std::string &search) const {
     satLower.resize(sat.name.size());
     std::transform(sat.name.begin(), sat.name.end(), satLower.begin(),
                    [](unsigned char c) { return std::tolower(c); });
-    if (satLower.find(lower) != std::string::npos)
-      return sat;
+    if (satLower.find(lower) != std::string::npos) return sat;
+  }
+  for (const auto &sat : recentSatellites_) {
+    std::string satLower;
+    satLower.resize(sat.name.size());
+    std::transform(sat.name.begin(), sat.name.end(), satLower.begin(),
+                   [](unsigned char c) { return std::tolower(c); });
+    if (satLower.find(lower) != std::string::npos) return sat;
   }
   for (const auto &sat : customSatellites_) {
     std::string satLower;
     satLower.resize(sat.name.size());
     std::transform(sat.name.begin(), sat.name.end(), satLower.begin(),
                    [](unsigned char c) { return std::tolower(c); });
-    if (satLower.find(lower) != std::string::npos)
-      return sat;
+    if (satLower.find(lower) != std::string::npos) return sat;
   }
   return std::nullopt;
 }

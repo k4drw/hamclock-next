@@ -22,6 +22,7 @@ void MapViewMenu::show(AppConfig &config, std::function<void()> onApply) {
   showBeacons_ = config.showBeacons;
   showOntaSpots_ = config.showOntaSpots;
   showBorders_ = config.showBorders;
+  showLaunches_ = config.showLaunches;
   showLocalPropGauge_ = config.showLocalPropGauge;
   showLotwQsos_ = config.showLotwQsos;
   centerMapOnDe_ = config.centerMapOnDe;
@@ -62,7 +63,7 @@ void MapViewMenu::show(AppConfig &config, std::function<void()> onApply) {
 void MapViewMenu::recalcLayout() {
   // Center the menu
   int menuW = 500;
-  int menuH = 480;
+  int menuH = 505;
   menuRect_ = {HamClock::LOGICAL_WIDTH / 2 - menuW / 2,
                HamClock::LOGICAL_HEIGHT / 2 - menuH / 2, menuW, menuH};
 
@@ -120,6 +121,12 @@ void MapViewMenu::recalcLayout() {
   int wxAnimLabelW =
       fontMgr_.getLogicalWidth("Animate Wx", cat->ptSize(FontStyle::UI));
   weatherAnimationRec_ = {col2X + 10, y, 20 + 10 + wxAnimLabelW, 20};
+
+  // Row 4c (Additional toggles 2)
+  y += 25;
+  int launchesLabelW =
+      fontMgr_.getLogicalWidth("Launches", cat->ptSize(FontStyle::UI));
+  launchesRec_ = {col1X + 10, y, 20 + 10 + launchesLabelW, 20};
 
   // Row 5 (VOACAP) - 3 columns
   y += 25;
@@ -329,6 +336,8 @@ void MapViewMenu::render(SDL_Renderer *renderer) {
   renderRadioButton(renderer, lotwQsosRec_, showLotwQsos_, "LOTW QSOs",
                     themes.text);
   renderRadioButton(renderer, ontaSpotsRec_, showOntaSpots_, "POTA/SOTA",
+                    themes.text);
+  renderRadioButton(renderer, launchesRec_, showLaunches_, "Launches",
                     themes.text);
   if (weatherOverlay_ != WeatherOverlayType::None) {
     renderRadioButton(renderer, weatherAnimationRec_, weatherAnimation_, "Animate Wx",
@@ -822,6 +831,10 @@ bool MapViewMenu::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
     showBorders_ = !showBorders_;
     return true;
   }
+  if (SDL_PointInRect(&pt, &launchesRec_)) {
+    showLaunches_ = !showLaunches_;
+    return true;
+  }
   if (SDL_PointInRect(&pt, &lotwQsosRec_)) {
     showLotwQsos_ = !showLotwQsos_;
     return true;
@@ -894,6 +907,7 @@ bool MapViewMenu::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
     config_->showBeacons = showBeacons_;
     config_->showOntaSpots = showOntaSpots_;
     config_->showBorders = showBorders_;
+    config_->showLaunches = showLaunches_;
     config_->showLotwQsos = showLotwQsos_;
     config_->showLocalPropGauge = showLocalPropGauge_;
     config_->centerMapOnDe = centerMapOnDe_;

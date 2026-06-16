@@ -40,6 +40,7 @@ private:
   bool showBeacons_;
   bool showOntaSpots_;
   bool showBorders_;
+  bool showLaunches_;
   bool showLocalPropGauge_;
   bool showLotwQsos_;
   bool centerMapOnDe_;
@@ -86,7 +87,7 @@ private:
   SDL_Rect weatherRec_;
   SDL_Rect weatherAnimationRec_;
   SDL_Rect propColormapRec_;
-  SDL_Rect beaconsRec_, bordersRec_, centerDeCheckRect_, localPropGaugeRec_, lotwQsosRec_, ontaSpotsRec_;
+  SDL_Rect beaconsRec_, bordersRec_, launchesRec_, centerDeCheckRect_, localPropGaugeRec_, lotwQsosRec_, ontaSpotsRec_;
   SDL_Rect bandRec_, modeRec_, powerRec_; // VOACAP row
   SDL_Rect toaRec_, toaUpRec_, toaDnRec_;             // TOA spinner
   SDL_Rect antGainRec_, antGainUpRec_, antGainDnRec_; // Ant Gain spinner

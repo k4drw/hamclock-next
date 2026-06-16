@@ -608,6 +608,7 @@ set(HAMCLOCK_SOURCES
     src/services/RigService.cpp
     src/services/GPSProvider.cpp
     src/services/AsteroidProvider.cpp
+    src/services/LaunchProvider.cpp
     src/core/AsteroidPropagator.cpp
     src/services/RBNProvider.cpp
     src/services/QRZProvider.cpp
@@ -662,6 +663,7 @@ set(HAMCLOCK_SOURCES
     src/ui/SDOPanel.cpp
     src/ui/WeatherPanel.cpp
     src/ui/ClockAuxPanel.cpp
+    src/ui/LaunchPanel.cpp
     src/ui/ENVPanel.cpp
     src/ui/RigControlPanel.cpp
     src/ui/DXInfo.cpp

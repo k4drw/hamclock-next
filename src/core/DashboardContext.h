@@ -63,6 +63,7 @@ class XRayHistoryStore;
 class GreylineDXStore;
 class AuroraMapStore;
 class CalendarStore;
+class LaunchStore;
 
 // Managers / services (AppContext)
 class NetworkManager;
@@ -111,15 +112,19 @@ class WinlinkProvider;
 class GreylineDXProvider;
 namespace HamClock {
 class TropoProvider;
-class MeteorProvider;
 class ReachProvider;
-class LightningProvider;
+class MeteorProvider;
 class SolarStormProvider;
+class LightningProvider;
 }
+
+class SpaceWeatherAlertProvider;
+class AsteroidProvider;
+class LaunchProvider;
+class OpenMeteoForecastProvider;
 
 // New widget providers (forward declarations)
 class SpaceWeatherAlertStore;
-class SpaceWeatherAlertProvider;
 
 // Providers (shared_ptr)
 class SDOProvider;
@@ -128,8 +133,6 @@ class CallbookProvider;
 class DstProvider;
 class MufRtProvider;
 class IonosondeProvider;
-class AsteroidProvider;
-class OpenMeteoForecastProvider;
 class WxMbProvider;
 class QRZProvider;
 
@@ -168,6 +171,10 @@ struct DashboardContext {
   std::unique_ptr<DXClusterProvider> dxcProvider;
   std::unique_ptr<RBNProvider> rbnProvider;
   std::unique_ptr<BandConditionsProvider> bandProvider;
+  std::unique_ptr<SpaceWeatherAlertProvider> spaceWeatherAlertProvider;
+  std::shared_ptr<HamClock::ReachProvider> reachProvider;
+  std::shared_ptr<AsteroidProvider> asteroidProvider;
+  std::shared_ptr<LaunchProvider> launchProvider;
   std::unique_ptr<ContestProvider> contestProvider;
   std::unique_ptr<FlareProvider> flareProvider;
   std::unique_ptr<MoonProvider> moonProvider;
@@ -186,14 +193,12 @@ struct DashboardContext {
   std::shared_ptr<LoTWProvider> lotwProvider;
   std::shared_ptr<MufRtProvider> mufRtProvider;
   std::shared_ptr<IonosondeProvider> ionosondeProvider;
-  std::shared_ptr<HamClock::ReachProvider> reachProvider;
   std::unique_ptr<SantaProvider> santaProvider;
   std::unique_ptr<HamClock::TropoProvider> tropoProvider;
   std::shared_ptr<HamClock::LightningProvider> lightningProvider;
   std::unique_ptr<HamClock::MeteorProvider> meteorProvider;
   std::shared_ptr<HamClock::SolarStormProvider> solarStormProvider;
   std::unique_ptr<SatelliteManager> satMgr;
-  std::shared_ptr<AsteroidProvider> asteroidProvider;
   std::unique_ptr<BeaconProvider> beaconProvider;
   std::unique_ptr<AlertsProvider> alertsProvider;
   std::shared_ptr<OpenMeteoForecastProvider> forecastProvider;
@@ -204,9 +209,6 @@ struct DashboardContext {
   std::unique_ptr<GreylineDXProvider> greylineDXProvider;
   std::shared_ptr<WxMbProvider> wxMbProvider;
   std::shared_ptr<QRZProvider> qrzProvider;
-
-  // New widget providers
-  std::unique_ptr<SpaceWeatherAlertProvider> spaceWxAlertProvider;
 
   // Services
 #ifndef __EMSCRIPTEN__
@@ -360,6 +362,7 @@ struct AppContext {
   std::shared_ptr<GreylineDXStore> greylineDXStore;
   std::shared_ptr<AuroraMapStore> auroraMapStore;
   std::shared_ptr<CalendarStore> calendarStore;
+  std::shared_ptr<LaunchStore> launchStore;
   std::shared_ptr<AsteroidProvider> asteroidProvider;
   std::shared_ptr<SpaceWeatherAlertStore> spaceWxAlertStore;
 

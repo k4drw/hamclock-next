@@ -151,6 +151,7 @@ void populateWidgetDescriptions();
 #include "core/SpaceWeatherAlertData.h"
 #include "services/SpaceWeatherAlertProvider.h"
 #include "ui/SolarCyclePanel.h"
+#include "services/LaunchProvider.h"
 #include "core/KIndexHistoryData.h"
 #include "core/SFIHistoryData.h"
 #include "ui/KIndexAlertPanel.h"
@@ -427,6 +428,10 @@ DashboardContext::DashboardContext(AppContext &ctx)
 #endif
 
   satMgr->fetch();
+
+  launchProvider = std::make_shared<LaunchProvider>(netManager);
+  launchProvider->fetch();
+
 #ifndef __EMSCRIPTEN__
   satMgr->setRotatorService(rotatorService.get());
 #endif
@@ -582,10 +587,10 @@ DashboardContext::DashboardContext(AppContext &ctx)
   greylineDXProvider->update();
 
   appContext_.spaceWxAlertStore = std::make_shared<SpaceWeatherAlertStore>();
-  spaceWxAlertProvider =
+  spaceWeatherAlertProvider =
       std::make_unique<SpaceWeatherAlertProvider>(netManager, appContext_.spaceWxAlertStore);
   if (isMasterMode || isWidgetConfigured("spacewx_alerts"))
-    spaceWxAlertProvider->fetch();
+    spaceWeatherAlertProvider->fetch();
 
   santaProvider = std::make_unique<SantaProvider>(santaStore);
   santaProvider->update();
@@ -804,6 +809,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
 #endif
         marineProvider.get(),
         dxWeatherProvider.get(),
+        launchProvider.get(),
     };
     widgetPool[type] = WidgetRegistry::instance().create(type, deps);
 
@@ -1106,6 +1112,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
   mapArea->setIonosondeProvider(ionosondeProvider);
   mapArea->setSolarDataStore(ctx.solarStore.get());
   mapArea->setActivityStore(ctx.activityStore);
+  mapArea->setLaunchProvider(launchProvider.get());
 
   std::vector<PaneContainer *> panePtrs;
   for (const auto &p : panes)
@@ -1499,7 +1506,7 @@ void DashboardContext::update(AppContext &ctx) {
       historyProvider->fetchKp();
 
     if (isMaster || isWidgetActive("spacewx_alerts"))
-      spaceWxAlertProvider->fetch();
+      spaceWeatherAlertProvider->fetch();
 
     if (dstProvider && (isMaster || isWidgetActive("dst_index")))
       dstProvider->fetch();
@@ -1633,9 +1640,9 @@ void DashboardContext::update(AppContext &ctx) {
 
     // SpaceWx Alerts
     if ((isMaster || isWidgetActive("spacewx_alerts")) &&
-        (!appContext_.spaceWxAlertStore->get().valid || spaceWxAlertProvider->isStale(now, 15 * 60 * 1000)) &&
-        spaceWxAlertProvider->isStale(now, kCooldown)) {
-      spaceWxAlertProvider->fetch();
+        (!appContext_.spaceWxAlertStore->get().valid || spaceWeatherAlertProvider->isStale(now, 15 * 60 * 1000)) &&
+        spaceWeatherAlertProvider->isStale(now, kCooldown)) {
+      spaceWeatherAlertProvider->fetch();
     }
 
     // DST Index
@@ -2136,7 +2143,7 @@ void DashboardContext::update(AppContext &ctx) {
           std::unique_ptr<std::string> raw(
               static_cast<std::string *>(event.user.data1));
           if (raw && ctx.dashboard && ctx.dashboard->satMgr) {
-            ctx.dashboard->satMgr->onDataReady(*raw);
+            ctx.dashboard->satMgr->onDataReady(*raw, event.user.code);
           }
           break;
         }

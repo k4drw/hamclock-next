@@ -70,6 +70,7 @@ class RigService;
 class FccProvider;
 class MarineProvider;
 class WeatherProvider;
+class LaunchProvider;
 
 // ---------------------------------------------------------------------------
 
@@ -139,5 +140,5 @@ struct WidgetDeps {
   RigService        *rigService        = nullptr;  // nullptr in WASM builds
   MarineProvider    *marineProvider    = nullptr;
   WeatherProvider   *dxWeatherProvider = nullptr;
+  LaunchProvider    *launchProvider    = nullptr;
 };
-

@@ -37,8 +37,8 @@ public:
   ~SatelliteManager();
   void fetch(bool force = false);
 
-  // Thread-safe method for receiving data from background threads
-  void onDataReady(const std::string &raw);
+  // Called when TLE string is fetched from celestrak.
+  void onDataReady(const std::string &raw, int type = 0);
 
   // Deprecated: Tracking logic moved to RotatorService
   void update();
@@ -68,10 +68,14 @@ public:
   }
 
 private:
+  // Parse the multi-line TLE response.
   void parse(const std::string &raw);
+  void parseRecent(const std::string &raw);
 
   static constexpr const char *TLE_URL =
       "https://celestrak.org/NORAD/elements/gp.php?GROUP=amateur&FORMAT=tle";
+  static constexpr const char *TLE_LAST_30_URL =
+      "https://celestrak.org/NORAD/elements/gp.php?GROUP=last-30-days&FORMAT=tle";
   static constexpr const char *SCC_URL_TEMPLATE =
       "https://celestrak.org/NORAD/elements/gp.php?CATNR={}&FORMAT=tle";
 
@@ -85,6 +89,7 @@ private:
 
   mutable std::mutex mutex_;
   std::vector<SatelliteTLE> satellites_;       // Global list (amateur)
+  std::vector<SatelliteTLE> recentSatellites_; // Last 30 days
   std::vector<SatelliteTLE> customSatellites_; // Custom SCCs and uploads
   bool dataValid_ = false;
   std::chrono::steady_clock::time_point lastFetch_;

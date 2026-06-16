@@ -21,6 +21,7 @@
 #include "../services/GribCloudProvider.h"
 #include "../services/IonosondeProvider.h"
 #include "../services/WxMbProvider.h"
+#include "../services/LaunchProvider.h"
 #include "EmbeddedIcons.h"
 #include "FontCatalog.h"
 #include "PaneContainer.h"
@@ -1330,6 +1331,127 @@ void MapWidget::renderBeacons(SDL_Renderer *renderer) {
       ThemeColors themes = getThemeColors(theme_);
       renderMarker(renderer, b.lat, b.lon, themes.textDim.r, themes.textDim.g,
                    themes.textDim.b, MarkerShape::Triangle, true);
+    }
+  }
+
+  SDL_RenderSetClipRect(renderer, nullptr);
+}
+
+void MapWidget::renderLaunches(SDL_Renderer *renderer) {
+  if (!launchProvider_ || !config_.showLaunches) return;
+  auto upcoming = launchProvider_->getUpcoming();
+  if (upcoming.empty()) return;
+
+  SDL_RenderSetClipRect(renderer, &mapRect_);
+
+  uint32_t nowT = std::time(nullptr);
+
+  for (const auto& ev : upcoming) {
+    if (!ev.hasLocation) continue;
+    // Only show launches within 24 hours
+    if (ev.windowStart > nowT + 86400 || ev.windowStart < nowT - 3600) continue;
+
+    double dLat = ev.padLat;
+    double dLon = ev.padLon;
+    bool isLaunching = (nowT >= ev.windowStart && nowT < ev.windowStart + 600);
+    
+    if (isLaunching) {
+      int elapsed = nowT - ev.windowStart;
+      // Faster animation: reach ~100 degrees East over 5 minutes
+      // dist = v0*t + 0.5*a*t^2
+      double distDeg = (elapsed * 0.05) + (0.5 * 0.002 * elapsed * elapsed); 
+      dLon += distDeg; // Fly East
+      dLat += distDeg * 0.15; // Fly slightly North
+    }
+
+    SDL_FPoint pt = latLonToScreen(dLat, dLon);
+
+    float angleDeg = 0.0f;
+    if (isLaunching) {
+      int elapsed = nowT - ev.windowStart;
+      angleDeg = std::min(75.0f, elapsed * 0.5f); // Pitch over to 75 degrees East
+    }
+
+    auto rotX = [&](float dx, float dy) {
+      float rad = angleDeg * M_PI / 180.0f;
+      return pt.x + (dx * std::cos(rad) - dy * std::sin(rad));
+    };
+    auto rotY = [&](float dx, float dy) {
+      float rad = angleDeg * M_PI / 180.0f;
+      return pt.y + (dx * std::sin(rad) + dy * std::cos(rad));
+    };
+
+    auto drawRotQuad = [&](float dx, float dy, float w, float h, SDL_Color c) {
+      float x1 = rotX(dx, dy),       y1 = rotY(dx, dy);
+      float x2 = rotX(dx + w, dy),   y2 = rotY(dx + w, dy);
+      float x3 = rotX(dx, dy + h),   y3 = rotY(dx, dy + h);
+      float x4 = rotX(dx + w, dy + h), y4 = rotY(dx + w, dy + h);
+      RenderUtils::drawTriangle(renderer, x1, y1, x2, y2, x3, y3, c);
+      RenderUtils::drawTriangle(renderer, x2, y2, x4, y4, x3, y3, c);
+    };
+
+    auto drawRotTri = [&](float dx1, float dy1, float dx2, float dy2, float dx3, float dy3, SDL_Color c) {
+      RenderUtils::drawTriangle(renderer, rotX(dx1, dy1), rotY(dx1, dy1), rotX(dx2, dy2), rotY(dx2, dy2), rotX(dx3, dy3), rotY(dx3, dy3), c);
+    };
+
+    // Vector Rocket (Scaled down)
+    // Rocket body
+    drawRotQuad(-2, -3, 4, 6, SDL_Color{200, 200, 200, 255});
+    // Nose cone
+    drawRotTri(-2, -3, 2, -3, 0, -7, SDL_Color{255, 50, 50, 255});
+    // Left fin
+    drawRotTri(-2, 0, -2, 3, -4, 4, SDL_Color{255, 50, 50, 255});
+    // Right fin
+    drawRotTri(2, 0, 2, 3, 4, 4, SDL_Color{255, 50, 50, 255});
+    
+    // Flame (animated)
+    if (isLaunching) {
+      // Massive flame during ascent
+      int ticks = SDL_GetTicks();
+      int flameLen = 10 + (ticks % 15);
+      drawRotTri(-2, 3, 2, 3, 0, 3 + flameLen, SDL_Color{255, 100, 0, 255});
+      drawRotTri(-1, 3, 1, 3, 0, 3 + flameLen - 4, SDL_Color{255, 255, 100, 255});
+    } else {
+      // Idle vapor/flame
+      if ((SDL_GetTicks() / 100) % 2 == 0) {
+        drawRotTri(-1, 3, 1, 3, 0, 7, SDL_Color{255, 150, 0, 255});
+      } else {
+        drawRotTri(-1, 3, 1, 3, 0, 5, SDL_Color{255, 200, 0, 255});
+      }
+    }
+    
+    // Draw expanding ring if within 10 minutes
+    if (ev.windowStart > nowT && ev.windowStart - nowT < 600) {
+      uint32_t ticks = SDL_GetTicks();
+      float ringRadius = 5.0f + 15.0f * ((ticks % 2000) / 2000.0f);
+      Uint8 alpha = 255 - static_cast<Uint8>(255.0f * ((ticks % 2000) / 2000.0f));
+      
+      RenderUtils::drawCircle(renderer, pt.x, pt.y, ringRadius, SDL_Color{255, 100, 100, alpha});
+    }
+    
+    // Store tooltips on mouse hover
+    if (std::abs(lastMouseX_ - pt.x) < 15 && std::abs(lastMouseY_ - pt.y) < 15) {
+      int seconds = ev.windowStart - nowT;
+      std::string tminus;
+      if (seconds < 0) {
+        tminus = fmt::format("T+{:02d}:{:02d}:{:02d}", std::abs(seconds) / 3600, (std::abs(seconds) % 3600) / 60, std::abs(seconds) % 60);
+      } else {
+        tminus = fmt::format("T-{:02d}:{:02d}:{:02d}", seconds / 3600, (seconds % 3600) / 60, seconds % 60);
+      }
+      std::string tip = fmt::format("{} - {}", ev.missionName, tminus);
+      tooltip_.visible = true;
+      tooltip_.text = tip;
+      tooltip_.x = pt.x + 10;
+      tooltip_.y = pt.y - 20;
+    }
+    
+    // Voice alert for T-minus 5 minutes
+    if (ev.windowStart > nowT && ev.windowStart - nowT < 300) {
+      // Find the actual element in the provider to set the spoken flag?
+      // For now we just speak if it's within the exact minute to avoid spamming
+      if (ev.windowStart - nowT == 300) {
+         SoundManager::getInstance().speak("Rocket launch upcoming: " + ev.missionName);
+      }
     }
   }
 

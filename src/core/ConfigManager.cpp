@@ -340,6 +340,7 @@ bool ConfigManager::load(AppConfig &config) {
     config.showOntaSpots = ap.value("show_onta_spots", false);
     config.showBorders = ap.value("show_borders", false);
     config.showLocalPropGauge = ap.value("show_local_prop_gauge", false);
+    config.showLaunches = ap.value("show_launches", true);
     config.displayPowerMethod = ap.value("display_power_method", "auto");
     config.logLevel = ap.value("log_level", "warn");
     config.qrzUsername = ap.value("qrz_username", "");
@@ -820,6 +821,7 @@ bool ConfigManager::save(const AppConfig &config) {
   json["appearance"]["show_onta_spots"] = config.showOntaSpots;
   json["appearance"]["show_borders"] = config.showBorders;
   json["appearance"]["show_local_prop_gauge"] = config.showLocalPropGauge;
+  json["appearance"]["show_launches"] = config.showLaunches;
   json["appearance"]["display_power_method"] = config.displayPowerMethod;
   if (config.logLevel != "warn")
     json["appearance"]["log_level"] = config.logLevel;
