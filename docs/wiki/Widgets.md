@@ -34,7 +34,7 @@ To add a widget to a pane, click the **top strip** of the pane to open the widge
 | Widget           | Description                                                                                                   | Data Source              |
 | ---------------- | ------------------------------------------------------------------------------------------------------------- | ------------------------ |
 | **Solar**        | Solar flux index (SFI), sunspot number (SSN), X-ray flux, proton flux, solar wind speed and density, Kp index | NOAA SWPC                |
-| **SDO**          | Live solar imagery from the Solar Dynamics Observatory in selectable wavelengths                              | LMSAL / NASA SDO         |
+| **SDO**          | Live solar imagery and animated historical movie loops from the Solar Dynamics Observatory in selectable wavelengths | LMSAL / NASA SDO         |
 | **Aurora**       | Global aurora forecast map from the NOAA OVATION model                                                        | NOAA SWPC                |
 | **Aurora Graph** | Time-series graph of geomagnetic Kp index and aurora activity                                                 | NOAA SWPC                |
 | **DRAP**         | D-Region Absorption Prediction — HF absorption map showing where ionospheric absorption degrades propagation  | NOAA SWPC                |
@@ -86,6 +86,7 @@ On widgets that show propagation charts (like the VOACAP DE-DX matrix), a white 
 | **Greyline DX**  | DXCC entities currently in the greyline, with a live countdown to the peak propagation moment and a color warning as the window narrows | Internal / Astronomical calculation |
 | **DX Peditions** | Upcoming and active DXpeditions list                                | ng3k.com                          |
 | **On The Air**   | Active POTA and SOTA activations worldwide                | POTA / SOTA APIs                  |
+| **NetLogger**    | Active nets, operating frequencies, and check-ins; click a net to auto-plot all participants onto the global map via Maidenhead grids | NetLogger XML API |
 | **ADIF**         | Displays recent QSOs from a local ADIF log file           | Local file                        |
 | **Callbook**     | Callsign lookup results (name, QTH, grid)                 | Callook / HamDB / QRZ             |
 | **Watchlist**       | Monitor specific callsigns in the DX cluster. Alerts show up even when this tile is hidden. | DX Cluster (filtered)             |
@@ -139,6 +140,7 @@ When the DX Cluster detects an "All-Time New One" (ATNO) — a DXCC entity you h
 | **EME Tool**      | Earth-Moon-Earth (moonbounce) window calculator                                                                                                               | Astronomical calculation    |
 | **Santa Tracker** | Tracks Santa's position on Christmas Eve; activates on Dec 24 only (originally a hidden easter egg in the original HamClock \u2014 now a proper selectable widget) | Internal calculation        |
 | **Asteroid**      | Next 5 close Earth approaches from the Minor Planet Center / JPL                                                                                              | JPL SBDB Close Approach API |
+| **Launch**        | Upcoming orbital rocket launches with dynamic pitch-over trajectory animations and hover-over mission tooltips                                                  | LL2 API                     |
 
 ![Moon widget](images/widgets/moon.png)
 
@@ -173,16 +175,17 @@ When the DX Cluster detects an "All-Time New One" (ATNO) — a DXCC entity you h
 
 ---
 
-## Environment Sensors
+## Environment & Smart Home
 
-These widgets require a BME280 temperature/pressure/humidity sensor connected via I²C (typical on Raspberry Pi setups).
+These widgets display local sensor and smart home data. Some require a BME280 temperature/pressure/humidity sensor connected via I²C or network JSON, or a Tesla gateway on your local network.
 
 | Widget            | Description                                                     | Data Source   |
 | ----------------- | --------------------------------------------------------------- | ------------- |
-| **ENV Temp**      | Local temperature reading from a connected BME280 sensor        | BME280 (I²C)  |
-| **ENV Pressure**  | Barometric pressure from a connected BME280 sensor with trend   | BME280 (I²C)  |
-| **ENV Humidity**  | Relative humidity from a connected BME280 sensor                | BME280 (I²C)  |
-| **ENV Dewpoint**  | Calculated dew point from BME280 temperature and humidity       | BME280 (I²C)  |
+| **ENV Temp**      | Local temperature reading from a connected BME280 sensor        | BME280 (I²C / HTTP) |
+| **ENV Pressure**  | Barometric pressure from a connected BME280 sensor with trend   | BME280 (I²C / HTTP) |
+| **ENV Humidity**  | Relative humidity from a connected BME280 sensor                | BME280 (I²C / HTTP) |
+| **ENV Dewpoint**  | Calculated dew point from BME280 temperature and humidity       | BME280 (I²C / HTTP) |
+| **Powerwall**     | Real-time energy dashboard showing animated bezier flow between Solar, Grid, Home, and Battery nodes | Tesla Local API |
 
 ---
 

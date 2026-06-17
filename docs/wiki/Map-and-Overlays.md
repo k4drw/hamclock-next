@@ -117,6 +117,14 @@ Select the active overlay and configure band/mode/power from the Configuration s
 
 ![VOACAP overlay](images/map_looks/robinson_voacap_dark.png)
 
+## Orbital Objects & Launches
+
+### Satellite Tracks
+If you configure satellites in the `SatPanel` widget, their current position and next orbit path are drawn on the map.
+
+### Rocket Launches
+If the `Launch` widget is active, upcoming orbital rocket launches are plotted on the map. You can toggle the visibility of the active launch trajectory and live pitch-over animations using the "Launches" checkbox in the Map View menu.
+
 ### Propagation Settings
 
 Configure these fields in [Setup & Configuration](Configuration.md):
@@ -173,6 +181,13 @@ Weather overlays can be displayed independently of propagation overlays.
 | Overlay          | Description                                                                                                                                                                                                                                                                              |
 | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **None**         | No weather overlay                                                                                                                                                                                                                                                                       |
+| **Lightning**    | Real-time lightning strikes plotted across the globe. Automatically color-coded by age (white = recent, yellow = medium, red = old). Helps track moving thunderstorm complexes that create static crashes (QRN).                                                                       |
+| **WxMb**         | Global mean sea level pressure (Isobars) and surface wind quivers. Useful for predicting large-scale weather fronts and conditions. When **Animate Wx** is enabled, it fetches 4 forecast frames (+0h, +3h, +6h, +9h) and animates them at 1 FPS.                                    |
+| **CloudsGrib**   | GFS global cloud cover prediction map. When **Animate Wx** is enabled, it seamlessly loops through a 4-frame forecast sequence to visualize atmospheric movement.                                                                                                                        |
+| **Hurricane**    | Plots active tropical storms and hurricane tracks (NOAA/NHC data).                                                                                                                                                                                                                       |
+
+### Weather Animations
+When the "Animate Wx" toggle is checked in the Map View menu, supported weather overlays (`CloudsGrib`, `WxMb`) will asynchronously fetch their predictive forecast frames and smoothly loop through them to show how pressure systems and clouds are moving globally.
 | **Clouds (GFS)** | High-fidelity layered cloud system from NOAA GFS model (GRIB2, 0.25° / 1440x721). Blends Low, Middle, and High altitude data with transparency tuning for realistic depth. Features "Seam Stitching" to ensure gap-free viewing at the Date Line antimeridian in all projections. |
 | **WX/Pressure**  | Surface pressure / weather map contours                                                                                                                                                                                                                                                  |
 
