@@ -154,6 +154,8 @@ void populateWidgetDescriptions();
 #include "services/LaunchProvider.h"
 #include "services/NetLoggerProvider.h"
 #include "core/NetLoggerStore.h"
+#include "services/PowerwallProvider.h"
+#include "core/PowerwallStore.h"
 #include "core/KIndexHistoryData.h"
 #include "core/SFIHistoryData.h"
 #include "ui/KIndexAlertPanel.h"
@@ -598,6 +600,11 @@ DashboardContext::DashboardContext(AppContext &ctx)
   if (isMasterMode || isWidgetConfigured("netlogger"))
     netLoggerProvider->fetch();
 
+  ctx.powerwallStore = std::make_shared<PowerwallStore>();
+  powerwallProvider = std::make_unique<PowerwallProvider>(netManager, ctx.powerwallStore, ctx.appCfg);
+  if (isMasterMode || isWidgetConfigured("powerwall"))
+    powerwallProvider->fetch();
+
   santaProvider = std::make_unique<SantaProvider>(santaStore);
   santaProvider->update();
 
@@ -785,6 +792,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
         ctx.hurricaneStore,
         ctx.marineStore,
         ctx.winlinkStore,
+        ctx.powerwallStore,
         ctx.drapDataStore,
         ctx.xrayHistoryStore,
         kIndexHistoryStore,
@@ -1648,6 +1656,10 @@ void DashboardContext::update(AppContext &ctx) {
 
     if (isMaster || isWidgetActive("netlogger")) {
       netLoggerProvider->fetch();
+    }
+    
+    if (isMaster || isWidgetActive("powerwall")) {
+      powerwallProvider->fetch();
     }
 
     // SpaceWx Alerts

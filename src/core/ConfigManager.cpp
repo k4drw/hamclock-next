@@ -636,6 +636,12 @@ bool ConfigManager::load(AppConfig &config) {
     config.marineStation = m.value("station", "");
     config.marineBuoy = m.value("buoy", "");
   }
+  
+  if (json.contains("powerwall")) {
+    auto pw = json["powerwall"];
+    config.powerwallUrl = pw.value("url", "");
+    config.powerwallPollInterval = pw.value("poll_interval", 30);
+  }
 
   // Power
   if (json.contains("power")) {
@@ -877,6 +883,9 @@ bool ConfigManager::save(const AppConfig &config) {
 
   json["marine"]["station"] = config.marineStation;
   json["marine"]["buoy"] = config.marineBuoy;
+  
+  json["powerwall"]["url"] = config.powerwallUrl;
+  json["powerwall"]["poll_interval"] = config.powerwallPollInterval;
 
   json["rotator"]["host"] = config.rotatorHost;
   json["rotator"]["port"] = config.rotatorPort;

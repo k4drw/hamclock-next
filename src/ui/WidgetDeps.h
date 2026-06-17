@@ -55,6 +55,7 @@ class ClublogStore;
 class FlareDataStore;
 class HeardMeStore;
 class NetLoggerStore;
+class PowerwallStore;
 
 // Providers / services (non-owning raw pointers)
 class LiveSpotProvider;
@@ -113,6 +114,7 @@ struct WidgetDeps {
   std::shared_ptr<HurricaneStore>       hurricaneStore;
   std::shared_ptr<MarineStore>          marineStore;
   std::shared_ptr<WinlinkStore>         winlinkStore;
+  std::shared_ptr<PowerwallStore>       powerwallStore;
   std::shared_ptr<DRAPDataStore>        drapDataStore;
   std::shared_ptr<XRayHistoryStore>     xrayHistoryStore;
   std::shared_ptr<KIndexHistoryStore>   kIndexHistoryStore;

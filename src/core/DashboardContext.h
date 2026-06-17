@@ -65,6 +65,7 @@ class GreylineDXStore;
 class AuroraMapStore;
 class CalendarStore;
 class LaunchStore;
+class PowerwallStore;
 
 // Managers / services (AppContext)
 class NetworkManager;
@@ -106,9 +107,12 @@ class SantaProvider;
 class SatelliteManager;
 class BeaconProvider;
 class AlertsProvider;
+class SatProvider;
+class NetLoggerProvider;
 class RepeaterProvider;
 class HurricaneProvider;
 class MarineProvider;
+class PowerwallProvider;
 class WinlinkProvider;
 class GreylineDXProvider;
 namespace HamClock {
@@ -207,6 +211,7 @@ struct DashboardContext {
   std::unique_ptr<RepeaterProvider> repeaterProvider;
   std::unique_ptr<HurricaneProvider> hurricaneProvider;
   std::unique_ptr<MarineProvider> marineProvider;
+  std::unique_ptr<PowerwallProvider> powerwallProvider;
   std::unique_ptr<WinlinkProvider> winlinkProvider;
   std::unique_ptr<GreylineDXProvider> greylineDXProvider;
   std::shared_ptr<WxMbProvider> wxMbProvider;
@@ -356,7 +361,9 @@ struct AppContext {
   std::shared_ptr<ForecastStore> forecastStore;
   std::shared_ptr<RepeaterStore> repeaterStore;
   std::shared_ptr<HurricaneStore> hurricaneStore;
+  std::shared_ptr<LaunchStore> launchStore;
   std::shared_ptr<MarineStore> marineStore;
+  std::shared_ptr<PowerwallStore> powerwallStore;
   std::shared_ptr<WinlinkStore> winlinkStore;
   std::shared_ptr<NetLoggerStore> netLoggerStore;
   std::shared_ptr<DRAPDataStore> drapDataStore;
@@ -366,7 +373,6 @@ struct AppContext {
   std::shared_ptr<GreylineDXStore> greylineDXStore;
   std::shared_ptr<AuroraMapStore> auroraMapStore;
   std::shared_ptr<CalendarStore> calendarStore;
-  std::shared_ptr<LaunchStore> launchStore;
   std::shared_ptr<AsteroidProvider> asteroidProvider;
   std::shared_ptr<SpaceWeatherAlertStore> spaceWxAlertStore;
 

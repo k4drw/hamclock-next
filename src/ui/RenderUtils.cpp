@@ -59,8 +59,8 @@ void drawCircle(SDL_Renderer *renderer, float x, float y, float radius,
   int segments = static_cast<int>(3.14159f * radius * 1.5f);
   if (segments < 16)
     segments = 16;
-  if (segments > 64)
-    segments = 64;
+  if (segments > 256)
+    segments = 256;
 
   g_circle_vertex_buffer.clear();
   g_circle_vertex_buffer.reserve(segments + 2);
@@ -137,8 +137,8 @@ void drawCircleOutline(SDL_Renderer *renderer, float x, float y, float radius,
   int segments = static_cast<int>(3.14159f * radius * 1.5f);
   if (segments < 16)
     segments = 16;
-  if (segments > 64)
-    segments = 64;
+  if (segments > 256)
+    segments = 256;
 
   SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a);
   for (int i = 0; i < segments; ++i) {
@@ -392,8 +392,8 @@ void drawPie(SDL_Renderer *renderer, float x, float y, float radius,
   while (diff < 0) diff += 2.0f * 3.14159265f;
   
   int segments = static_cast<int>(radius * diff * 0.5f);
-  if (segments < 8) segments = 8;
-  if (segments > 32) segments = 32;
+  if (segments < 16) segments = 16;
+  if (segments > 256) segments = 256;
 
   g_circle_vertex_buffer.clear();
   g_circle_vertex_buffer.reserve(segments + 2);
@@ -443,8 +443,8 @@ void drawArcOutline(SDL_Renderer *renderer, float x, float y, float radius,
   while (diff < 0) diff += 2.0f * 3.14159265f;
 
   int segments = static_cast<int>(radius * diff * 0.5f);
-  if (segments < 8) segments = 8;
-  if (segments > 32) segments = 32;
+  if (segments < 16) segments = 16;
+  if (segments > 256) segments = 256;
 
   g_point_buffer.clear();
   g_point_buffer.reserve(segments + 1);

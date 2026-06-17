@@ -156,6 +156,10 @@ struct AppConfig {
   std::string marineStation;
   std::string marineBuoy;
 
+  // Powerwall Widget settings
+  std::string powerwallUrl = "";
+  int powerwallPollInterval = 30;
+
   // Power / Screen
   bool preventSleep = true; // true to call SDL_DisableScreenSaver()
 

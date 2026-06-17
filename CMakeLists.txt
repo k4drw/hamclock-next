@@ -545,6 +545,7 @@ set(HAMCLOCK_SOURCES
     src/core/EEPROMMigrator.cpp
     src/core/DatabaseManager.cpp
     src/core/OrbitPredictor.cpp
+    src/core/PowerwallStore.cpp
     src/core/DXClusterData.cpp
     src/core/HeardMeStore.cpp
     src/core/DisplayPower.cpp
@@ -618,6 +619,7 @@ set(HAMCLOCK_SOURCES
     src/services/RepeaterProvider.cpp
     src/services/HurricaneProvider.cpp
     src/services/MarineProvider.cpp
+    src/services/PowerwallProvider.cpp
     src/services/WinlinkProvider.cpp
     src/services/GreylineDXProvider.cpp
     src/services/SpaceWeatherAlertProvider.cpp
@@ -638,6 +640,7 @@ set(HAMCLOCK_SOURCES
     src/ui/ForecastPanel.cpp
     src/ui/HurricanePanel.cpp
     src/ui/MarinePanel.cpp
+    src/ui/PowerwallPanel.cpp
     src/ui/RepeaterPanel.cpp
     src/ui/WinlinkPanel.cpp
     src/ui/GreylineDXPanel.cpp
