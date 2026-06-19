@@ -2,13 +2,14 @@
 #include "WidgetRegistry.h"
 #include "../core/Theme.h"
 #include "FontCatalog.h"
-#include "GraphHelper.h"
-#include "GraphHelper.h"
+#include "../core/ConfigManager.h"
+#include "../core/Astronomy.h"
+#include <algorithm>
 
 namespace HamClock {
 
 IonosondePanel::IonosondePanel(int x, int y, int w, int h, FontManager &fontMgr, TextureManager &texMgr)
-    : Widget(x, y, w, h), fontMgr_(fontMgr), texMgr_(texMgr) {}
+    : Widget(x, y, w, h), fontMgr_(fontMgr) { (void)texMgr; }
 
 void IonosondePanel::updateData(const IonosondeData &data) {
   std::lock_guard<std::mutex> lock(mutex_);
@@ -36,40 +37,60 @@ void IonosondePanel::render(SDL_Renderer *renderer) {
     return;
   }
 
-  int curY = y_ + 25;
+  auto config = ConfigManager::instance().getConfig();
+  LatLon de = {config.lat, config.lon};
+
+  auto sortedStations = d.stations;
+  std::sort(sortedStations.begin(), sortedStations.end(), [&de](const IonosondeStation& a, const IonosondeStation& b) {
+    return Astronomy::calculateDistance(de, {a.lat, a.lon}) < Astronomy::calculateDistance(de, {b.lat, b.lon});
+  });
+
+  int numClosest = std::min(2, (int)sortedStations.size());
+  float avgFof2 = 0;
+  for (int i = 0; i < numClosest; ++i) {
+    avgFof2 += sortedStations[i].foF2;
+  }
+  avgFof2 /= numClosest;
+
+  int curY = fontMgr_.catalog()->ptSize(FontStyle::MicroBold) + 10 + y_;
   int pad = 10;
 
   // Overview stats
-  cat->drawText(renderer, "Avg foF2:", x_ + pad, curY, themes.text, FontStyle::Fast);
+  cat->drawText(renderer, numClosest > 1 ? "Avg foF2 (Local):" : "foF2 (Local):", x_ + pad, curY, themes.text, FontStyle::Fast);
+  
+  curY += 15;
   
   SDL_Color idxCol = themes.success; // Green
-  if (d.avgFof2 < 5.0f) idxCol = themes.warning; // Yellow
-  if (d.avgFof2 < 3.0f) idxCol = themes.danger; // Red
+  if (avgFof2 < 5.0f) idxCol = themes.warning; // Yellow
+  if (avgFof2 < 3.0f) idxCol = themes.danger; // Red
   
   char buf[32];
-  std::snprintf(buf, sizeof(buf), "%.1f MHz", d.avgFof2);
-  cat->drawText(renderer, buf, x_ + width_ - pad, curY, idxCol, FontStyle::Fast, false, true);
+  std::snprintf(buf, sizeof(buf), "%.1f MHz", avgFof2);
+  cat->drawText(renderer, buf, x_ + pad, curY, idxCol, FontStyle::Fast);
   
   curY += 22;
   
-  // Highlight best station
-  float maxF = 0;
-  std::string bestName = "";
-  for (const auto& st : d.stations) {
-    if (st.foF2 > maxF) { maxF = (float)st.foF2; bestName = st.name; }
-  }
+  for (int i = 0; i < numClosest; ++i) {
+    const auto& st = sortedStations[i];
+    char nameBuf[128];
+    std::snprintf(nameBuf, sizeof(nameBuf), "%s", st.name.c_str());
+    cat->drawText(renderer, nameBuf, x_ + pad, curY, themes.accent, FontStyle::Micro);
+    curY += 15;
+    
+    std::snprintf(nameBuf, sizeof(nameBuf), "fof2: %.1f MHz", st.foF2);
+    cat->drawText(renderer, nameBuf, x_ + pad, curY, themes.accent, FontStyle::Micro);
+    curY += 15;
 
-  std::string s = "Peak: " + bestName + " (" + std::to_string(maxF).substr(0, 3) + ")";
-  cat->drawText(renderer, s, x_ + pad, curY, themes.accent, FontStyle::Micro);
-  
-  curY += 20;
-
-  // Graph
-  cat->drawText(renderer, "Regional foF2 (MHz)", x_ + pad, curY, themes.textDim, FontStyle::MicroBold);
-  drawGraph(renderer, x_ + pad, curY + 12, width_ - 2*pad, 35, d.stations);
-
-  if (tooltip_.visible) {
-    renderTooltip(renderer, fontMgr_);
+    char distBuf[64];
+    double dist = Astronomy::calculateDistance(de, {st.lat, st.lon});
+    std::string distUnit = "km";
+    if (!useMetric_) {
+      dist *= 0.621371;
+      distUnit = "mi";
+    }
+    std::snprintf(distBuf, sizeof(distBuf), "%.0f %s  hmF2: %.0f km", dist, distUnit.c_str(), st.hmF2.value_or(0.0));
+    cat->drawText(renderer, distBuf, x_ + pad + 10, curY, themes.textDim, FontStyle::Tiny);
+    curY += 17;
   }
 }
 
@@ -78,69 +99,7 @@ void IonosondePanel::onResize(int x, int y, int w, int h) {
 }
 
 void IonosondePanel::onMouseMove(int mx, int my) {
-  std::lock_guard<std::mutex> lock(mutex_);
-  if (!data_.valid || data_.stations.empty()) {
-    tooltip_.visible = false;
-    return;
-  }
-
-  int pad = 10;
-  int curY = y_ + 25 + 22 + 20; // Matches render() graph position
-  int gx = x_ + pad;
-  int gy = curY + 12;
-  int gw = width_ - 2*pad;
-  int gh = 35;
-
-  if (mx < gx || mx > gx + gw || my < gy || my > gy + gh) {
-    tooltip_.visible = false;
-    return;
-  }
-
-  int count = (int)data_.stations.size();
-  int idx = (mx - gx) * (count - 1) / gw;
-  if (idx >= 0 && idx < count) {
-    const auto& st = data_.stations[idx];
-    char buf[128];
-    std::snprintf(buf, sizeof(buf), "%s: %.1f MHz\nhmF2: %.0f km", 
-                 st.name.c_str(), st.foF2, st.hmF2.value_or(0.0));
-    tooltip_.text = buf;
-    tooltip_.x = mx;
-    tooltip_.y = my;
-    tooltip_.visible = true;
-    tooltip_.timestamp = SDL_GetTicks();
-  } else {
-    tooltip_.visible = false;
-  }
-}
-
-void IonosondePanel::drawGraph(SDL_Renderer *renderer, int x, int y, int w, int h, const std::vector<IonosondeStation>& stations) {
-  ThemeColors themes = getThemeColors(theme_);
-
-  if (stations.empty()) {
-    GraphHelper::drawTimeSeries(renderer, nullptr, x, y, w, h, nullptr, 0,
-                                themes.accent, themes.border);
-    return;
-  }
-
-  float maxVal = 10.0f; // Minimum scale up to 10 MHz
-  for(const auto& st : stations) {
-    if(st.foF2 > maxVal) maxVal = (float)st.foF2;
-  }
-  maxVal += 1.0f; // Add a bit of headroom
-
-  SDL_Texture *lineTex = texMgr_.get("line_aa");
-  std::vector<SDL_FPoint> pts;
-  pts.reserve(stations.size());
-
-  int count = (int)stations.size();
-  for (int i = 0; i < count; ++i) {
-    float px = x + (count > 1 ? (i * w) / (float)(count - 1) : w / 2.0f);
-    float py = y + h - ((float)stations[i].foF2 / maxVal) * h;
-    pts.push_back({px, py});
-  }
-
-  GraphHelper::drawTimeSeries(renderer, lineTex, x, y, w, h, pts.data(), count,
-                              themes.accent, themes.border);
+  (void)mx; (void)my;
 }
 
 

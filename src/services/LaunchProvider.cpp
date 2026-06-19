@@ -66,7 +66,11 @@ void LaunchProvider::parse(const std::string& raw) {
                            &tm.tm_hour, &tm.tm_min, &tm.tm_sec) == 6) {
                     tm.tm_year -= 1900;
                     tm.tm_mon -= 1;
+#ifdef _WIN32
+                    ev.windowStart = _mkgmtime(&tm);
+#else
                     ev.windowStart = timegm(&tm);
+#endif
                 }
             }
 

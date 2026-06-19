@@ -25,11 +25,8 @@ public:
 
 private:
   FontManager &fontMgr_;
-  TextureManager &texMgr_;
   IonosondeData data_;
   std::mutex mutex_;
-
-  void drawGraph(SDL_Renderer *renderer, int x, int y, int w, int h, const std::vector<IonosondeStation>& stations);
 };
 
 } // namespace HamClock

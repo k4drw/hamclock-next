@@ -43,15 +43,22 @@ docker run --rm -v "$(pwd)":/work -w /work $IMAGE bash -c "
 "
 
 if [ $? -eq 0 ]; then
+    VERSION=$(cat VERSION | tr -d '[:space:]')
+    SUFFIX=$(cat VERSION_SUFFIX | tr -d '[:space:]')
+    FULL_VERSION="${VERSION}${SUFFIX}"
+
+    mv build-win64/hamclock-next.exe "build-win64/hamclock-next-${FULL_VERSION}.exe"
+    mv build-win64/HamClock-Next-Setup.exe "build-win64/HamClock-Next-Setup-${FULL_VERSION}.exe"
+
     echo "--------------------------------------------------"
     echo "SUCCESS: Windows build finished!"
-    echo "Binary: build-win64/hamclock-next.exe"
-    echo "Installer: build-win64/HamClock-Next-Setup.exe"
+    echo "Binary: build-win64/hamclock-next-${FULL_VERSION}.exe"
+    echo "Installer: build-win64/HamClock-Next-Setup-${FULL_VERSION}.exe"
     echo "--------------------------------------------------"
 
     # Cleanup intermediate artifacts if successful
     echo "Cleaning up intermediate build artifacts (saving disk space)..."
-    find build-win64 -maxdepth 1 -type f ! -name "hamclock-next.exe" ! -name "HamClock-Next-Setup.exe" -delete
+    find build-win64 -maxdepth 1 -type f ! -name "hamclock-next-${FULL_VERSION}.exe" ! -name "HamClock-Next-Setup-${FULL_VERSION}.exe" -delete
     find build-win64 -maxdepth 1 -type d ! -name "build-win64" -exec rm -rf {} + 2>/dev/null
 else
     echo "ERROR: Build failed!"

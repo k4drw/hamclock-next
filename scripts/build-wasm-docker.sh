@@ -37,11 +37,21 @@ docker run --rm \
         emmake make -C $BUILD_DIR hamclock-wasm -j$(nproc)
     "
 
+VERSION=$(cat "$REPO_ROOT/VERSION" | tr -d '[:space:]')
+SUFFIX=$(cat "$REPO_ROOT/VERSION_SUFFIX" | tr -d '[:space:]')
+FULL_VERSION="${VERSION}${SUFFIX}"
+
+for f in "$REPO_ROOT/$BUILD_DIR"/hamclock-wasm.*; do
+    [ -f "$f" ] || continue
+    base=$(basename "$f")
+    mv "$f" "$REPO_ROOT/$BUILD_DIR/${base/hamclock-wasm/hamclock-wasm-${FULL_VERSION}}"
+done
+
 echo ""
 echo "=== WASM build complete (via Docker) ==="
-echo "Output: $REPO_ROOT/$BUILD_DIR/hamclock-wasm.html"
+echo "Output: $REPO_ROOT/$BUILD_DIR/hamclock-wasm-${FULL_VERSION}.html"
 echo ""
 echo "Serve with COOP/COEP headers:"
 echo "  python3 packaging/web/serve.py $BUILD_DIR"
-find "$BUILD_DIR" -maxdepth 1 -type f ! -name "hamclock-wasm*" -delete
+find "$BUILD_DIR" -maxdepth 1 -type f ! -name "hamclock-wasm-${FULL_VERSION}*" -delete
 find "$BUILD_DIR" -maxdepth 1 -type d ! -name "$BUILD_DIR" -exec rm -rf {} + 2>/dev/null
