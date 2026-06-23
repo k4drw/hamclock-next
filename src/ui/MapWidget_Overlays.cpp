@@ -1348,8 +1348,8 @@ void MapWidget::renderLaunches(SDL_Renderer *renderer) {
 
   for (const auto& ev : upcoming) {
     if (!ev.hasLocation) continue;
-    // Only show launches within 24 hours
-    if (ev.windowStart > nowT + 86400 || ev.windowStart < nowT - 3600) continue;
+    // Only show launches within 24 hours in the future, or up to 10 minutes in the past (for the animation)
+    if (ev.windowStart > nowT + 86400 || ev.windowStart < nowT - 600) continue;
 
     double dLat = ev.padLat;
     double dLon = ev.padLon;

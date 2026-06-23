@@ -12,7 +12,14 @@ LaunchPanel::LaunchPanel(int x, int y, int w, int h, FontManager &fontMgr, Launc
 
 void LaunchPanel::update() {
   if (launchProvider_) {
-    upcomingLaunches_ = launchProvider_->getUpcoming();
+    auto allLaunches = launchProvider_->getUpcoming();
+    upcomingLaunches_.clear();
+    uint32_t nowT = std::time(nullptr);
+    for (const auto& ev : allLaunches) {
+      if (static_cast<int>(ev.windowStart - nowT) >= 0) {
+        upcomingLaunches_.push_back(ev);
+      }
+    }
   }
 }
 
@@ -42,12 +49,7 @@ void LaunchPanel::render(SDL_Renderer *renderer) {
     if (ry + rowHeight > y_ + height_ - 5) break;
 
     int seconds = ev.windowStart - nowT;
-    std::string tminus;
-    if (seconds < 0) {
-      tminus = fmt::format("T+{:02d}:{:02d}:{:02d}", std::abs(seconds) / 3600, (std::abs(seconds) % 3600) / 60, std::abs(seconds) % 60);
-    } else {
-      tminus = fmt::format("T-{:02d}:{:02d}:{:02d}", seconds / 3600, (seconds % 3600) / 60, seconds % 60);
-    }
+    std::string tminus = fmt::format("T-{:02d}:{:02d}:{:02d}", seconds / 3600, (seconds % 3600) / 60, seconds % 60);
 
     // Rocket icon simulation
     RenderUtils::drawTriangle(renderer, x_ + 10, ry + 12, x_ + 16, ry + 12, x_ + 13, ry + 6, themes.text);
@@ -59,7 +61,7 @@ void LaunchPanel::render(SDL_Renderer *renderer) {
     cat->drawText(renderer, ev.missionName, x_ + 22, ry + 4, themes.text, FontStyle::Micro);
     SDL_RenderSetClipRect(renderer, nullptr);
     
-    SDL_Color tColor = (seconds > 0 && seconds < 3600) ? themes.warning : themes.textDim;
+    SDL_Color tColor = (seconds < 3600) ? themes.warning : themes.textDim;
     cat->drawText(renderer, tminus, x_ + width_ - 10, ry + 4, tColor, FontStyle::Micro, false, true);
 
     ry += rowHeight;
