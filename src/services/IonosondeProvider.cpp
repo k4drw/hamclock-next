@@ -32,7 +32,7 @@ void IonosondeProvider::update() {
         LOG_E("IonosondeProvider", "Failed to fetch ionosonde data");
       }
     }
-  });
+  }, 600);
 }
 
 void IonosondeProvider::processData(const std::string &body) {
