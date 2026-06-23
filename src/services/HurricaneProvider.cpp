@@ -462,12 +462,13 @@ void HurricaneProvider::fetch(bool force) {
 
                                 self->net_.fetchAsync(kmzUrl, [update, updateMutex, stormId, baseStorm, finalize](std::string kmzData) {
                                     if (!kmzData.empty()) {
-                                        WorkerService::getInstance().submitTask([update, updateMutex, kmzData, stormId, baseStorm, finalize]() mutable {
-                                            parseActiveStormKmz(kmzData, baseStorm);
+                                        WorkerService::getInstance().submitTask([update, updateMutex, kmzData, stormId, baseStorm, finalize]() {
+                                            HurricaneStorm localStorm = baseStorm;
+                                            parseActiveStormKmz(kmzData, localStorm);
                                             
-                                            if (!baseStorm.track.empty()) {
+                                            if (!localStorm.track.empty()) {
                                                 std::lock_guard<std::mutex> lk(*updateMutex);
-                                                update->storms.push_back(std::move(baseStorm));
+                                                update->storms.push_back(std::move(localStorm));
                                             }
                                             finalize();
                                         });
@@ -519,15 +520,16 @@ void HurricaneProvider::fetch(bool force) {
                 HurricaneStorm baseStorm = update->storms[i];
                 self->net_.fetchAsync(kmzUrl, [update, pending, updateMutex, i, stormIdUpper, baseStorm, finalize](std::string kmzData) {
                     if (!kmzData.empty()) {
-                        WorkerService::getInstance().submitTask([update, pending, updateMutex, i, kmzData, stormIdUpper, baseStorm, finalize]() mutable {
-                            parseActiveStormKmz(kmzData, baseStorm);
+                        WorkerService::getInstance().submitTask([update, pending, updateMutex, i, kmzData, stormIdUpper, baseStorm, finalize]() {
+                            HurricaneStorm localStorm = baseStorm;
+                            parseActiveStormKmz(kmzData, localStorm);
                             
-                            size_t trackSize = baseStorm.track.size();
-                            size_t coneSize = baseStorm.cone.size();
+                            size_t trackSize = localStorm.track.size();
+                            size_t coneSize = localStorm.cone.size();
 
                             if (updateMutex) { 
                                 std::lock_guard<std::mutex> lk(*updateMutex); 
-                                update->storms[i] = std::move(baseStorm); 
+                                update->storms[i] = std::move(localStorm); 
                             }
                             
                             LOG_I("HurricaneProvider", "Storm {} loaded {} track pts, {} cone pts",

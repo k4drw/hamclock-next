@@ -68,7 +68,9 @@ public:
     if (SDL_QueryTexture(tex, nullptr, nullptr, &w, &h) == 0) {
 #if defined(__GNUC__) && !defined(__clang__)
 #pragma GCC diagnostic push
+#if __GNUC__ >= 12
 #pragma GCC diagnostic ignored "-Wdangling-pointer"
+#endif
 #endif
       markVramDestroyed(static_cast<int64_t>(w) * h * 4);
 #if defined(__GNUC__) && !defined(__clang__)

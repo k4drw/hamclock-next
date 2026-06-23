@@ -3,7 +3,7 @@
 #include "../core/WorkerService.h"
 #include <SDL.h>
 #include <ctime>
-#include <zlib.h>
+#include <miniz.h>
 
 TropicsGribProvider::TropicsGribProvider(NetworkManager &net) : net_(net) {}
 
