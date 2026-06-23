@@ -11,6 +11,7 @@
 #include "../core/HamClockState.h"
 #include "../core/LiveSpotData.h"
 #include "../core/OrbitPredictor.h"
+#include "../core/HurricaneData.h"
 #include "../network/NetworkManager.h"
 #include "FontManager.h"
 #include "MapViewMenu.h"
@@ -112,6 +113,7 @@ public:
 
   void setMufRtProvider(MufRtProvider *p) { mufrt_ = p; }
   void setBeaconProvider(BeaconProvider *p) { beacons_ = p; }
+  void setHurricaneStore(std::shared_ptr<HurricaneStore> store) { hurricaneStore_ = std::move(store); }
   void setIonosondeProvider(std::shared_ptr<IonosondeProvider> p) { iono_ = std::move(p); }
   void setSolarDataStore(SolarDataStore *s) { solar_ = s; }
   void setLaunchProvider(LaunchProvider *p) { launchProvider_ = p; }
@@ -191,6 +193,7 @@ private:
   void renderMufRtOverlay(SDL_Renderer *renderer);
   void renderGribCloudOverlay(SDL_Renderer *renderer);
   void renderWxMbOverlay(SDL_Renderer *renderer);
+  void renderHurricaneTracks(SDL_Renderer *renderer);
   void renderPropagationOverlay(SDL_Renderer *renderer);
   void updatePropagationOverlay();
   void renderAzimuthalMask(SDL_Renderer *renderer);
@@ -210,6 +213,9 @@ private:
   std::shared_ptr<ADIFStore> adifStore_;
   std::shared_ptr<ActivityDataStore> activityStore_;
   std::shared_ptr<NetLoggerStore> netLoggerStore_;
+  std::shared_ptr<HurricaneStore> hurricaneStore_;
+  uint32_t lastHurricaneRenderTicks_ = 0;
+  float hurricaneAngle_ = 0.0f;
   MufRtProvider *mufrt_ = nullptr;
   std::shared_ptr<WxMbProvider> wxmb_;
   std::shared_ptr<GribCloudProvider> gribCloud_;

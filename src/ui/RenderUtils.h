@@ -36,6 +36,9 @@ void drawTriangleOutline(SDL_Renderer *renderer, float x1, float y1, float x2,
 void drawPolyline(SDL_Renderer *renderer, const SDL_FPoint *points, int count,
                   float thickness, SDL_Color color, bool closed = false);
 
+// Fill a simple polygon using a triangle fan from the centroid.
+void fillPolygon(SDL_Renderer *renderer, const SDL_FPoint *points, int count, SDL_Color color);
+
 // Draw a textured thick line for anti-aliasing.
 void drawThickLineTextured(SDL_Renderer *renderer, SDL_Texture *tex, float x1,
                            float y1, float x2, float y2, float thickness,
@@ -49,6 +52,9 @@ void drawPolylineTextured(SDL_Renderer *renderer, SDL_Texture *tex,
 // Draw a procedural gear icon.
 void drawGear(SDL_Renderer *renderer, float x, float y, float radius,
               SDL_Color color, SDL_Color centerColor);
+
+// Draw a procedural hurricane symbol.
+void drawHurricaneSymbol(SDL_Renderer *renderer, float x, float y, float radius, float angle, SDL_Color color);
 
 // Draw a filled arc (pie slice). angles in degrees, 0 is right, positive is clockwise.
 void drawPie(SDL_Renderer *renderer, float x, float y, float radius,

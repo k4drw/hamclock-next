@@ -6,6 +6,7 @@
 #include "FontCatalog.h"
 #include "RenderUtils.h"
 #include "TextureManager.h"
+#include "../core/WorkerService.h"
 
 #include <algorithm>
 #include <chrono>
@@ -147,17 +148,46 @@ void TimePanel::update() {
 
   Uint32 ticks = SDL_GetTicks();
   if (ticks - lastInfoRotateMs_ >= kInfoRotateMs) {
-    infoRotateIdx_ = (infoRotateIdx_ + 1) % 3;
-    lastInfoRotateMs_ = ticks;
-    infoTexts_[0] = getCpuTemp(useMetric_);
-    infoTexts_[1] = getDiskUsage();
-    infoTexts_[2] = getLocalIP();
+    if (!infoUpdating_.exchange(true, std::memory_order_acquire)) {
+      infoRotateIdx_ = (infoRotateIdx_ + 1) % 3;
+      lastInfoRotateMs_ = ticks;
+      bool useMet = useMetric_;
+      WorkerService::getInstance().submitTask([this, useMet]() {
+          std::string t0 = getCpuTemp(useMet);
+          std::string t1 = getDiskUsage();
+          std::string t2 = getLocalIP();
+          {
+              std::lock_guard<std::mutex> lk(infoMutex_);
+              infoTexts_[0] = std::move(t0);
+              infoTexts_[1] = std::move(t1);
+              infoTexts_[2] = std::move(t2);
+          }
+          infoUpdating_.store(false, std::memory_order_release);
+      });
+    }
   }
   // Seed on first call
-  if (infoTexts_[0].empty()) {
-    infoTexts_[0] = getCpuTemp(useMetric_);
-    infoTexts_[1] = getDiskUsage();
-    infoTexts_[2] = getLocalIP();
+  bool emptyInfo = false;
+  {
+      std::lock_guard<std::mutex> lk(infoMutex_);
+      emptyInfo = infoTexts_[0].empty();
+  }
+  if (emptyInfo) {
+    if (!infoUpdating_.exchange(true, std::memory_order_acquire)) {
+      bool useMet = useMetric_;
+      WorkerService::getInstance().submitTask([this, useMet]() {
+          std::string t0 = getCpuTemp(useMet);
+          std::string t1 = getDiskUsage();
+          std::string t2 = getLocalIP();
+          {
+              std::lock_guard<std::mutex> lk(infoMutex_);
+              infoTexts_[0] = std::move(t0);
+              infoTexts_[1] = std::move(t1);
+              infoTexts_[2] = std::move(t2);
+          }
+          infoUpdating_.store(false, std::memory_order_release);
+      });
+    }
   }
 
   // OTA state from rig (rigctld PTT polling, updated every 2 sec by RigService)
@@ -299,7 +329,11 @@ void TimePanel::render(SDL_Renderer *renderer) {
                     FontStyle::Fast);
 
       // Rotating info (shifted slightly right to give more room for uptime)
-      const std::string &centerText = infoTexts_[infoRotateIdx_];
+      std::string centerText;
+      {
+          std::lock_guard<std::mutex> lk(infoMutex_);
+          centerText = infoTexts_[infoRotateIdx_];
+      }
       TTF_SizeUTF8(infoFont, centerText.c_str(), &tw, &th);
       cat->drawText(renderer, centerText, x_ + (width_ - tw) * 0.58f, infoY,
                     gray, FontStyle::Fast);

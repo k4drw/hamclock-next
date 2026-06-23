@@ -256,6 +256,33 @@ void drawPolyline(SDL_Renderer *renderer, const SDL_FPoint *points, int count,
 #endif
 }
 
+void fillPolygon(SDL_Renderer *renderer, const SDL_FPoint *points, int count, SDL_Color color) {
+  if (count < 3) return;
+
+  std::vector<SDL_Vertex> verts;
+  verts.reserve(count);
+
+  for (int i = 0; i < count; ++i) {
+    SDL_Vertex v;
+    v.position.x = points[i].x;
+    v.position.y = points[i].y;
+    v.color = color;
+    v.tex_coord.x = 0;
+    v.tex_coord.y = 0;
+    verts.push_back(v);
+  }
+
+  std::vector<int> indices;
+  indices.reserve((count - 2) * 3);
+  for (int i = 1; i < count - 1; ++i) {
+    indices.push_back(0);
+    indices.push_back(i);
+    indices.push_back(i + 1);
+  }
+
+  SDL_RenderGeometry(renderer, nullptr, verts.data(), (int)verts.size(), indices.data(), (int)indices.size());
+}
+
 void drawThickLineTextured(SDL_Renderer *renderer, SDL_Texture *tex, float x1,
                            float y1, float x2, float y2, float thickness,
                            SDL_Color color) {
@@ -460,6 +487,35 @@ void drawArcOutline(SDL_Renderer *renderer, float x, float y, float radius,
   SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a);
   drawCircleOutline(renderer, x, y, radius, color);
 #endif
+}
+
+void drawHurricaneSymbol(SDL_Renderer *renderer, float x, float y, float radius, float angle, SDL_Color color) {
+  // Center eye (anti-aliased)
+  int eyeSegments = 24;
+  std::vector<SDL_FPoint> eyePts;
+  for (int i = 0; i <= eyeSegments; ++i) {
+    float t = static_cast<float>(i) / eyeSegments;
+    float a = t * 2.0f * 3.14159265f;
+    eyePts.push_back({x + (radius * 0.35f) * std::cos(a), y + (radius * 0.35f) * std::sin(a)});
+  }
+  drawPolyline(renderer, eyePts.data(), eyePts.size(), radius * 0.15f, color, true);
+  
+  // Two spiraling arms
+  int segments = 12;
+  for (int arm = 0; arm < 2; ++arm) {
+    float baseAngle = angle + arm * 3.14159265f;
+    std::vector<SDL_FPoint> pts;
+    for (int i = 0; i <= segments; ++i) {
+      float t = static_cast<float>(i) / segments;
+      // Arm spirals out from eye
+      float r = radius * 0.35f + t * (radius * 0.65f);
+      // Arm curves
+      float a = baseAngle - t * 3.14159265f * 0.8f;
+      pts.push_back({x + r * std::cos(a), y + r * std::sin(a)});
+    }
+    // Draw arm with smooth line
+    drawPolyline(renderer, pts.data(), pts.size(), radius * 0.25f, color, false);
+  }
 }
 
 } // namespace RenderUtils

@@ -3,6 +3,7 @@
 #include "FontCatalog.h"
 #include "SysInfoPanel.h"
 #include "WidgetRegistry.h"
+#include "../core/WorkerService.h"
 #include "../network/NetworkManager.h"
 
 #include <SDL.h>
@@ -37,38 +38,43 @@ void SysInfoPanel::update() {
 
   // Throttle stats updates to once per second
   if (lastStatsUpdateMs_ == 0 || (now - lastStatsUpdateMs_ >= 1000)) {
-    auto &mem = MemoryMonitor::getInstance();
+    if (!statsUpdating_.exchange(true, std::memory_order_acquire)) {
+      lastStatsUpdateMs_ = now == 0 ? 1 : now;
+      bool useMet = useMetric_;
+      auto mon = monitor_;
+      
+      WorkerService::getInstance().submitTask([this, useMet, mon]() {
+        auto &mem = MemoryMonitor::getInstance();
+        if (mon && mon->isAvailable()) {
+          currentTemp_ = useMet ? mon->getTemperature() : mon->getTemperatureF();
+        } else {
+          currentTemp_ = 0.0f;
+        }
 
-    // Temperature
-    if (monitor_ && monitor_->isAvailable()) {
-      currentTemp_ =
-          useMetric_ ? monitor_->getTemperature() : monitor_->getTemperatureF();
-    } else {
-      currentTemp_ = 0.0f;
+        if (mon) cpuPercent_ = mon->getCpuPercent();
+
+        rssBytes_ = mem.getRSS();
+        totalRam_ = mem.getTotalRAM();
+        vramBytes_ = mem.getVramEstimated();
+        diskPct_ = mem.getDiskUsagePct();
+
+        statsUpdating_.store(false, std::memory_order_release);
+      });
     }
-
-    // CPU utilisation (always call even if temp unavailable — they're
-    // independent)
-    if (monitor_)
-      cpuPercent_ = monitor_->getCpuPercent();
-
-    // Memory stats
-    rssBytes_ = mem.getRSS();
-    totalRam_ = mem.getTotalRAM();
-    vramBytes_ = mem.getVramEstimated();
-    diskPct_ = mem.getDiskUsagePct();
-
-    // Cache stats
-    cacheRamBytes_ = netMgr_.getCacheRamBytes();
-    cacheItemCount_ = netMgr_.getCacheItemCount();
-
-    lastStatsUpdateMs_ = now;
   }
 
+  // Cache stats are very fast atomics, can stay on main thread
+  cacheRamBytes_ = netMgr_.getCacheRamBytes();
+  cacheItemCount_ = netMgr_.getCacheItemCount();
+
   // IP — refresh every 60 seconds
-  if (cachedIP_.empty() || (now - lastIPRefreshMs_ > 60000)) {
-    cachedIP_ = getLocalIP();
-    lastIPRefreshMs_ = now;
+  if (lastIPRefreshMs_ == 0 || (now - lastIPRefreshMs_ > 60000)) {
+    lastIPRefreshMs_ = now == 0 ? 1 : now;
+    WorkerService::getInstance().submitTask([this]() {
+        std::string ip = getLocalIP();
+        std::lock_guard<std::mutex> lk(ipMutex_);
+        cachedIP_ = std::move(ip);
+    });
   }
 }
 
@@ -107,19 +113,22 @@ void SysInfoPanel::render(SDL_Renderer *renderer) {
 
   bool tempAvail = monitor_ && monitor_->isAvailable();
 
+  float temp = currentTemp_.load();
+  float cpu = cpuPercent_.load();
+  
   // Build common strings
   const char *tempUnit = useMetric_ ? "C" : "F";
   float tempC =
-      useMetric_ ? currentTemp_ : (currentTemp_ - 32.0f) * 5.0f / 9.0f;
+      useMetric_ ? temp : (temp - 32.0f) * 5.0f / 9.0f;
   SDL_Color tempColor = tempAvail ? colorForTemp(tempC, themes) : themes.textDim;
-  SDL_Color cpuColor = colorForCpu(cpuPercent_, themes);
+  SDL_Color cpuColor = colorForCpu(cpu, themes);
 
   char tempBuf[32], cpuBuf[32], ramBuf[48], vramBuf[32];
   if (tempAvail)
-    std::snprintf(tempBuf, sizeof(tempBuf), "%.1f°%s", currentTemp_, tempUnit);
+    std::snprintf(tempBuf, sizeof(tempBuf), "%.1f°%s", temp, tempUnit);
   else
     std::snprintf(tempBuf, sizeof(tempBuf), "--°%s", tempUnit);
-  std::snprintf(cpuBuf, sizeof(cpuBuf), "CPU %.0f%%", cpuPercent_);
+  std::snprintf(cpuBuf, sizeof(cpuBuf), "CPU %.0f%%", cpu);
 
   // ---- Minimum layout (h < 70): just temperature -------------------------
   if (height_ < 70) {
@@ -152,8 +161,13 @@ void SysInfoPanel::render(SDL_Renderer *renderer) {
     cat->drawText(renderer, cpuBuf, x_ + halfW + halfW / 2, row1Y, cpuColor,
                   FontStyle::SmallBold, true);
 
+    std::string ip;
+    {
+      std::lock_guard<std::mutex> lk(ipMutex_);
+      ip = cachedIP_;
+    }
     // Row 2: IP
-    cat->drawText(renderer, cachedIP_.c_str(), cx, row2Y, themes.textDim,
+    cat->drawText(renderer, ip.c_str(), cx, row2Y, themes.textDim,
                   FontStyle::Fast, true);
     return;
   }
@@ -174,9 +188,11 @@ void SysInfoPanel::render(SDL_Renderer *renderer) {
   curY += cat->ptSize(FontStyle::SmallBold) + 7;
 
   // Row 2: RAM
-  if (totalRam_ > 0) {
-    float rssM = static_cast<float>(rssBytes_) / (1024.0f * 1024.0f);
-    float totalM = static_cast<float>(totalRam_) / (1024.0f * 1024.0f);
+  size_t totalR = totalRam_.load();
+  size_t rssR = rssBytes_.load();
+  if (totalR > 0) {
+    float rssM = static_cast<float>(rssR) / (1024.0f * 1024.0f);
+    float totalM = static_cast<float>(totalR) / (1024.0f * 1024.0f);
     std::snprintf(ramBuf, sizeof(ramBuf), "RAM %.0f/%.0f MB", rssM, totalM);
   } else {
     std::snprintf(ramBuf, sizeof(ramBuf), "RAM --");
@@ -185,8 +201,9 @@ void SysInfoPanel::render(SDL_Renderer *renderer) {
   curY += cat->ptSize(FontStyle::Fast) + 4;
 
   // Row 3: Est. VRAM
-  if (vramBytes_ >= 0) {
-    float vramM = static_cast<float>(vramBytes_) / (1024.0f * 1024.0f);
+  int64_t vram = vramBytes_.load();
+  if (vram >= 0) {
+    float vramM = static_cast<float>(vram) / (1024.0f * 1024.0f);
     std::snprintf(vramBuf, sizeof(vramBuf), "VRAM ~%.0f MB", vramM);
   } else {
     std::snprintf(vramBuf, sizeof(vramBuf), "VRAM --");
@@ -196,9 +213,10 @@ void SysInfoPanel::render(SDL_Renderer *renderer) {
   curY += cat->ptSize(FontStyle::Fast) + 4;
 
   // Row 4: Disk
-  if (diskPct_ >= 0) {
+  int diskP = diskPct_.load();
+  if (diskP >= 0) {
     char diskBuf[32];
-    std::snprintf(diskBuf, sizeof(diskBuf), "Disk %d%%", diskPct_);
+    std::snprintf(diskBuf, sizeof(diskBuf), "Disk %d%%", diskP);
     cat->drawText(renderer, diskBuf, cx, curY, themes.info, FontStyle::Fast,
                   true);
     curY += cat->ptSize(FontStyle::Fast) + 4;
@@ -216,7 +234,12 @@ void SysInfoPanel::render(SDL_Renderer *renderer) {
   }
 
   // Row 6: IP
-  cat->drawText(renderer, cachedIP_.c_str(), cx, curY, themes.textDim,
+  std::string ip2;
+  {
+      std::lock_guard<std::mutex> lk(ipMutex_);
+      ip2 = cachedIP_;
+  }
+  cat->drawText(renderer, ip2.c_str(), cx, curY, themes.textDim,
                 FontStyle::Fast, true);
   curY += cat->ptSize(FontStyle::Fast) + 4;
 

@@ -1098,6 +1098,7 @@ void MapWidget::render(SDL_Renderer *renderer) {
   renderGridOverlay(renderer);
 
   // Render paths and dynamic markers
+  renderHurricaneTracks(renderer);
   renderGreatCircle(renderer);
 
   renderSatellite(renderer);
@@ -1211,6 +1212,92 @@ static uint32_t drapColor(float mhz, const std::string &variant) {
          (static_cast<uint32_t>(c.b) << 16) |
          (static_cast<uint32_t>(c.g) << 8) |
          static_cast<uint32_t>(c.r);
+}
+
+void MapWidget::renderHurricaneTracks(SDL_Renderer *renderer) {
+    if (!hurricaneStore_) return;
+    
+    auto data = hurricaneStore_->get();
+    if (!data.valid) return;
+
+    SDL_Texture* lineTex = texMgr_.get(LINE_AA_KEY);
+    if (!lineTex) return;
+
+    ThemeColors themes = getThemeColors(theme_);
+
+    for (const auto& storm : data.storms) {
+        bool isInvest = (storm.category == 0 && storm.id.find("invest_") == 0);
+
+        if (!storm.track.empty()) {
+            std::vector<SDL_FPoint> pts;
+            for (const auto& gp : storm.track) {
+                pts.push_back(latLonToScreen(gp.lat, gp.lon));
+            }
+            RenderUtils::drawPolylineTextured(renderer, lineTex, pts.data(), pts.size(), 4.0f, themes.warning);
+        }
+        if (!storm.cone.empty()) {
+            std::vector<SDL_FPoint> pts;
+            for (const auto& gp : storm.cone) {
+                pts.push_back(latLonToScreen(gp.lat, gp.lon));
+            }
+            
+            if (isInvest) {
+                SDL_Color fillCol;
+                if (storm.probability >= 60) fillCol = {255, 0, 0, 80};
+                else if (storm.probability >= 40) fillCol = {255, 165, 0, 80};
+                else fillCol = {255, 255, 0, 80};
+                RenderUtils::fillPolygon(renderer, pts.data(), pts.size(), fillCol);
+                RenderUtils::drawPolylineTextured(renderer, lineTex, pts.data(), pts.size(), 2.0f, fillCol, true);
+            } else {
+                // Draw cone boundary
+                RenderUtils::drawPolylineTextured(renderer, lineTex, pts.data(), pts.size(), 2.0f, themes.accent, true);
+            }
+        }
+
+        if (storm.id == data.selectedStormId && !storm.windRadii.empty()) {
+            // Draw wind radii polygons in semi-transparent white/blue
+            for (const auto& radiiPoly : storm.windRadii) {
+                std::vector<SDL_FPoint> pts;
+                for (const auto& gp : radiiPoly) {
+                    pts.push_back(latLonToScreen(gp.lat, gp.lon));
+                }
+                SDL_Color rCol = {100, 150, 255, 60};
+                RenderUtils::fillPolygon(renderer, pts.data(), pts.size(), rCol);
+                RenderUtils::drawPolylineTextured(renderer, lineTex, pts.data(), pts.size(), 2.0f, {100, 150, 255, 120}, true);
+            }
+        }
+
+        // Draw symbol at the current position (last point in track)
+        if (!storm.track.empty()) {
+            const auto& currentPos = storm.track.back();
+            SDL_FPoint sp = latLonToScreen(currentPos.lat, currentPos.lon);
+            
+            if (isInvest) {
+                // Draw an 'X' for disturbances
+                SDL_Color xCol = themes.danger;
+                if (storm.probability >= 60) xCol = {255, 50, 50, 255};
+                else if (storm.probability >= 40) xCol = {255, 165, 0, 255};
+                else xCol = {255, 255, 0, 255};
+                
+                float hs = 5.0f; // half-size
+                RenderUtils::drawThickLineTextured(renderer, lineTex, sp.x - hs, sp.y - hs, sp.x + hs, sp.y + hs, 3.0f, xCol);
+                RenderUtils::drawThickLineTextured(renderer, lineTex, sp.x - hs, sp.y + hs, sp.x + hs, sp.y - hs, 3.0f, xCol);
+            } else {
+                uint32_t now = SDL_GetTicks();
+                if (lastHurricaneRenderTicks_ == 0) lastHurricaneRenderTicks_ = now;
+                uint32_t dt = now - lastHurricaneRenderTicks_;
+                lastHurricaneRenderTicks_ = now;
+                
+                // Cap delta time to 50ms so that during the 2FPS idle rendering phase, 
+                // the symbol simply slows down its spin rather than teleporting erratically.
+                if (dt > 50) dt = 50;
+                
+                hurricaneAngle_ += dt * 0.002f;
+                
+                RenderUtils::drawHurricaneSymbol(renderer, sp.x, sp.y, 8.0f, hurricaneAngle_, themes.danger);
+            }
+        }
+    }
 }
 
 void MapWidget::updatePropagationOverlay() {

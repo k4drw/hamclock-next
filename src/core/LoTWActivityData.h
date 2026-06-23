@@ -14,9 +14,13 @@ struct LoTWActivityRecord {
 class LoTWActivityStore {
 public:
   void update(std::unordered_map<std::string, std::chrono::system_clock::time_point> activity) {
-    std::lock_guard<std::mutex> lock(mutex_);
-    activity_ = std::move(activity);
-    lastRefresh_ = std::chrono::system_clock::now();
+    std::unordered_map<std::string, std::chrono::system_clock::time_point> old;
+    {
+      std::lock_guard<std::mutex> lock(mutex_);
+      old = std::move(activity_);
+      activity_ = std::move(activity);
+      lastRefresh_ = std::chrono::system_clock::now();
+    }
   }
 
   // Returns last upload timestamp for a callsign, or epoch(0) if not found

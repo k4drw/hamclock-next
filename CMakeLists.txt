@@ -286,6 +286,20 @@ FetchContent_Declare(
     sqlite3_amalgamation
     URL https://www.sqlite.org/2024/sqlite-amalgamation-3470000.zip
 )
+FetchContent_MakeAvailable(sqlite3_amalgamation)
+
+FetchContent_Declare(
+    miniz
+    URL https://github.com/richgel999/miniz/releases/download/3.0.2/miniz-3.0.2.zip
+)
+FetchContent_Populate(miniz)
+
+FetchContent_Declare(
+    tinyxml2
+    URL https://github.com/leethomason/tinyxml2/archive/refs/tags/9.0.0.zip
+)
+FetchContent_Populate(tinyxml2)
+
 
 # 6. JSON
 find_package(nlohmann_json QUIET)
@@ -437,6 +451,19 @@ if(NOT TARGET sqlite3)
     endif()
 endif()
 
+# miniz
+if(NOT TARGET miniz)
+    add_library(miniz STATIC ${miniz_SOURCE_DIR}/miniz.c)
+    target_include_directories(miniz PUBLIC ${miniz_SOURCE_DIR})
+endif()
+
+# tinyxml2
+if(NOT TARGET tinyxml2)
+    add_library(tinyxml2 STATIC ${tinyxml2_SOURCE_DIR}/tinyxml2.cpp)
+    target_include_directories(tinyxml2 PUBLIC ${tinyxml2_SOURCE_DIR})
+    target_compile_definitions(tinyxml2 PUBLIC TINYXML2_EXPORT)
+endif()
+
 
 # SDL Extensions (Now safe to load, as SDL2::SDL2 is defined)
 if(NOT EMSCRIPTEN)
@@ -569,6 +596,7 @@ set(HAMCLOCK_SOURCES
     src/network/NetworkManager.cpp
     src/network/WebServer.cpp
     src/network/WebServer_Routes.cpp
+    src/services/TropicsGribProvider.cpp
     src/services/UpdateChecker.cpp
     src/services/NOAAProvider.cpp
     src/services/FlareProvider.cpp
@@ -775,6 +803,8 @@ if(EMSCRIPTEN)
     # Link non-SDL dependencies (SDL is handled by flags)
     target_link_libraries(hamclock-wasm PRIVATE
         sqlite3
+        miniz
+        tinyxml2
         nlohmann_json::nlohmann_json
         predict_static
         httplib::httplib
@@ -813,6 +843,8 @@ else()
         SDL2_mixer
         libcurl
         sqlite3
+        miniz
+        tinyxml2
         nlohmann_json::nlohmann_json
         predict_static
         Threads::Threads

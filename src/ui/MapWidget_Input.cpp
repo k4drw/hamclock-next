@@ -558,8 +558,30 @@ void MapWidget::onMouseMove(int mx, int my) {
     }
   }
 
+  // 6. Check Hurricanes
+  if (tip.empty() && hurricaneStore_) {
+    auto hdata = hurricaneStore_->get();
+    if (hdata.valid) {
+      for (const auto& storm : hdata.storms) {
+        if (!storm.track.empty()) {
+          const auto& currentPos = storm.track.back();
+          if (screenDist(currentPos.lat, currentPos.lon) < kHitRadius + 4) {
+            bool isInvest = (storm.category == 0 && storm.id.find("invest_") == 0);
+            tip = isInvest ? "Invest " + storm.name : storm.name;
+            if (!storm.movement.empty()) tip += "\n" + storm.movement;
+            if (!storm.advisory.empty()) {
+                std::string adv = storm.advisory;
+                if (adv.length() > 40) adv = adv.substr(0, 37) + "...";
+                tip += "\n" + adv;
+            }
+            break;
+          }
+        }
+      }
+    }
+  }
 
-  // 6. Check asteroid
+  // 7. Check asteroid
   if (tip.empty() && asteroidProvider_ &&
       !state_->selectedAsteroidName.empty() && !cachedAsteroidTrack_.empty()) {
     bool hit = false;

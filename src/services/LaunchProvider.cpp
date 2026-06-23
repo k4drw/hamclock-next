@@ -9,8 +9,8 @@ LaunchProvider::LaunchProvider(NetworkManager& net) : net_(net), lastFetch_(0) {
 
 void LaunchProvider::fetch(bool force) {
     uint32_t now = SDL_GetTicks();
-    // Fetch every 1 hour (3600000 ms)
-    if (!force && lastFetch_ != 0 && (now - lastFetch_ < 3600000)) {
+    // Fetch every 15 minutes (900000 ms)
+    if (!force && lastFetch_ != 0 && (now - lastFetch_ < 900000)) {
         return;
     }
     lastFetch_ = now;
@@ -26,7 +26,7 @@ void LaunchProvider::fetch(bool force) {
         } else {
             LOG_E("LaunchProvider", "Failed to fetch launches: empty response");
         }
-    }, 3600, false);
+    }, 900, false);
 }
 
 void LaunchProvider::parse(const std::string& raw) {

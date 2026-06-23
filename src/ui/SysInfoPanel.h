@@ -7,6 +7,8 @@
 
 #include <memory>
 #include <string>
+#include <atomic>
+#include <mutex>
 
 struct SDL_Renderer;
 
@@ -47,26 +49,28 @@ private:
   bool showCacheStats_;
 
   // Temperature
-  float currentTemp_ = 0.0f;
+  std::atomic<float> currentTemp_{0.0f};
 
   // CPU utilisation (0–100%)
-  float cpuPercent_ = 0.0f;
+  std::atomic<float> cpuPercent_{0.0f};
 
   // Memory
-  size_t rssBytes_ = 0;
-  size_t totalRam_ = 0;
-  int64_t vramBytes_ = 0;
-  int diskPct_ = -1;
+  std::atomic<size_t> rssBytes_{0};
+  std::atomic<size_t> totalRam_{0};
+  std::atomic<int64_t> vramBytes_{0};
+  std::atomic<int> diskPct_{-1};
 
   // Cache stats
   size_t cacheRamBytes_ = 0;
   size_t cacheItemCount_ = 0;
 
   // Throttling for stats (CPU, RAM, Temp)
+  std::atomic<bool> statsUpdating_{false};
   uint32_t lastStatsUpdateMs_ = 0;
 
   // Local IP (refreshed every 60 s)
   std::string cachedIP_;
+  std::mutex ipMutex_;
   uint32_t lastIPRefreshMs_ = 0;
 
   // Helper

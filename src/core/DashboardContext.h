@@ -209,7 +209,7 @@ struct DashboardContext {
   std::unique_ptr<AlertsProvider> alertsProvider;
   std::shared_ptr<OpenMeteoForecastProvider> forecastProvider;
   std::unique_ptr<RepeaterProvider> repeaterProvider;
-  std::unique_ptr<HurricaneProvider> hurricaneProvider;
+  std::shared_ptr<HurricaneProvider> hurricaneProvider;
   std::unique_ptr<MarineProvider> marineProvider;
   std::unique_ptr<PowerwallProvider> powerwallProvider;
   std::unique_ptr<WinlinkProvider> winlinkProvider;

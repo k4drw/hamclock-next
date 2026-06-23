@@ -5,6 +5,11 @@
 #include <string>
 #include <vector>
 
+struct GeoPoint {
+  double lat = 0.0;
+  double lon = 0.0;
+};
+
 struct HurricaneStorm {
   std::string id;           // NHC storm ID, e.g. "al012026"
   std::string name;         // "HELENE"
@@ -17,12 +22,18 @@ struct HurricaneStorm {
   std::string movement;     // e.g. "NNW at 12 mph"
   std::string advisory;     // Short advisory text
   std::string lastUpdate;   // ISO timestamp truncated to 16 chars
+  int probability = -1;     // Formation probability (0-100) for invests
+
+  std::vector<GeoPoint> track; // Forecast track line
+  std::vector<GeoPoint> cone;  // Polygon points for the cone of uncertainty
+  std::vector<std::vector<GeoPoint>> windRadii; // Polygon points for wind field predictions
 };
 
 struct HurricaneData {
   std::vector<HurricaneStorm> storms;
   bool valid = false;
   std::chrono::system_clock::time_point lastUpdate;
+  std::string selectedStormId; // User-selected storm from the UI
 };
 
 class HurricaneStore {

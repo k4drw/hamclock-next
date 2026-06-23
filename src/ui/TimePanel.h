@@ -13,6 +13,8 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <mutex>
+#include <atomic>
 
 class TextureManager;
 
@@ -147,6 +149,12 @@ private:
   std::string currentHM_;
   std::string currentSec_;
   std::string currentDate_;
+  std::string currentUptime_;
+  std::array<std::string, 3> infoTexts_;
+  std::mutex infoMutex_;
+  uint32_t lastInfoRotateMs_ = 0;
+  std::atomic<bool> infoUpdating_{false};
+  int infoRotateIdx_ = 0;
 
   int callFontSize_ = 20;
   int hmFontSize_ = 60;
@@ -184,9 +192,5 @@ private:
   int starW_ = 0, starH_ = 0;
 
   // Info bar state (uptime, rotating center, version)
-  std::string currentUptime_;
-  std::string infoTexts_[3]; // CPU temp, Disk %, Local IP
-  int infoRotateIdx_ = 0;
-  Uint32 lastInfoRotateMs_ = 0;
   int infoFontSize_ = 10;
 };

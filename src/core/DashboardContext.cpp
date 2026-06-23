@@ -572,7 +572,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
   // repeaterProvider->fetch(appCfg.lat, appCfg.lon);
 
   hurricaneProvider =
-      std::make_unique<HurricaneProvider>(netManager, ctx.hurricaneStore);
+      std::make_shared<HurricaneProvider>(netManager, ctx.hurricaneStore);
   if (isMasterMode || isWidgetConfigured("hurricane"))
     hurricaneProvider->fetch();
 
@@ -1117,6 +1117,7 @@ DashboardContext::DashboardContext(AppContext &ctx)
   mapArea->setOnConfigChanged([&ctx] { ctx.cfgMgr.save(ctx.appCfg); });
   mapArea->setSpotStore(spotStore);
   mapArea->setDXClusterStore(dxcStore);
+  mapArea->setHurricaneStore(ctx.hurricaneStore);
   mapArea->setHeardMeStore(ctx.heardMeStore);
   mapArea->setADIFStore(adifStore);
   mapArea->setMufRtProvider(mufRtProvider.get());
@@ -1660,6 +1661,13 @@ void DashboardContext::update(AppContext &ctx) {
     
     if (isMaster || isWidgetActive("powerwall")) {
       powerwallProvider->fetch();
+    }
+
+    // Tropics / Hurricane
+    if ((isMaster || isWidgetActive("hurricane")) &&
+        (!ctx.hurricaneStore->get().valid || hurricaneProvider->isStale(now, 3 * 60 * 60 * 1000)) &&
+        hurricaneProvider->isStale(now, kCooldown)) {
+      hurricaneProvider->fetch();
     }
 
     // SpaceWx Alerts

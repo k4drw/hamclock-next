@@ -5,7 +5,7 @@
 #include "../network/NetworkManager.h"
 #include <memory>
 
-class HurricaneProvider : public ProviderBase {
+class HurricaneProvider : public ProviderBase, public std::enable_shared_from_this<HurricaneProvider> {
 public:
   HurricaneProvider(NetworkManager &net,
                     std::shared_ptr<HurricaneStore> store);

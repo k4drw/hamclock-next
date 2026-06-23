@@ -22,8 +22,10 @@ SDL_Color HurricanePanel::categoryColor(int category) {
     return {255, 220, 0, 255};
   case 1:
     return {255, 255, 80, 255};
+  case 0:
+    return {200, 200, 200, 255}; // Invest
   default:
-    return {180, 180, 255, 255}; // TD or TS
+    return {180, 180, 255, 255}; // TS or TD
   }
 }
 
@@ -57,24 +59,48 @@ void HurricanePanel::render(SDL_Renderer *renderer) {
   }
 
   // Each storm block: name+category | wind | pressure | position
-  int blockH = nameFontSize_ + detailFontSize_ * 2 + 8;
-  int maxBlocks = (height_ - (curY - y_) - pad) / blockH;
-  maxScroll_ = std::max(0, (int)currentData_.storms.size() - maxBlocks);
-  scrollOffset_ = std::min(scrollOffset_, maxScroll_);
   int startIdx = std::max(0, scrollOffset_);
-  int endIdx = std::min((int)currentData_.storms.size(), startIdx + maxBlocks);
+  int renderedCount = 0;
 
-  for (int i = startIdx; i < endIdx; ++i) {
+  for (int i = startIdx; i < (int)currentData_.storms.size(); ++i) {
     const auto &s = currentData_.storms[i];
+    
+    int neededH = nameFontSize_ + detailFontSize_ + 4;
+    if (!s.movement.empty()) neededH += detailFontSize_ + 4;
+    
+    // Check if we have enough room for this block (leaving space for pagination text if needed)
+    int pageTextH = ((int)currentData_.storms.size() > renderedCount + 1) ? detailFontSize_ : 0;
+    if (curY + neededH + pageTextH > y_ + height_ - pad) {
+        break; // Out of space
+    }
+    
+    renderedCount++;
+
     SDL_Color col = categoryColor(s.category);
 
+    // Highlight if selected
+    if (s.id == currentData_.selectedStormId) {
+      SDL_SetRenderDrawColor(renderer, 255, 255, 255, 30);
+      SDL_Rect selRect = {x_ + 2, curY - 2, width_ - 4, neededH - 2};
+      SDL_RenderFillRect(renderer, &selRect);
+    }
+
     // Storm name + category
-    char nameLabel[32];
-    if (s.category >= 1)
+    char nameLabel[64];
+    bool isInvest = (s.category == 0 && s.id.find("invest_") == 0);
+    if (isInvest) {
+      // Name might already have "Invest " from parser, so check to avoid "Invest Invest"
+      if (s.name.find("Invest ") == 0) {
+        std::snprintf(nameLabel, sizeof(nameLabel), "%s", s.name.c_str());
+      } else {
+        std::snprintf(nameLabel, sizeof(nameLabel), "Invest %s", s.name.c_str());
+      }
+    } else if (s.category >= 1) {
       std::snprintf(nameLabel, sizeof(nameLabel), "%s (Cat %d)", s.name.c_str(),
                     s.category);
-    else
+    } else {
       std::snprintf(nameLabel, sizeof(nameLabel), "%s (TS/TD)", s.name.c_str());
+    }
     cat->drawText(renderer, nameLabel, x_ + pad, curY, col, FontStyle::Fast);
 
     curY += nameFontSize_ + 2;
@@ -95,10 +121,12 @@ void HurricanePanel::render(SDL_Renderer *renderer) {
         mv = mv.substr(0, 27) + "~";
       cat->drawText(renderer, mv, x_ + pad, curY, themes.textDim,
                     FontStyle::Micro);
+      curY += detailFontSize_ + 4;
+    } else {
+      curY += 2; // small padding if no movement
     }
-    curY += detailFontSize_ + 4;
 
-    if (i < endIdx - 1) {
+    if (i < (int)currentData_.storms.size() - 1 && curY < y_ + height_ - pad - 10) {
       SDL_SetRenderDrawColor(renderer, themes.border.r, themes.border.g,
                              themes.border.b, 100);
       SDL_RenderDrawLine(renderer, x_ + pad, curY - 2, x_ + width_ - pad,
@@ -106,7 +134,10 @@ void HurricanePanel::render(SDL_Renderer *renderer) {
     }
   }
 
-  if ((int)currentData_.storms.size() > maxBlocks) {
+  // maxScroll_ can be updated during render so mouse wheel works
+  maxScroll_ = std::max(0, (int)currentData_.storms.size() - renderedCount);
+
+  if (startIdx > 0 || startIdx + renderedCount < (int)currentData_.storms.size()) {
     char buf[32];
     std::snprintf(buf, sizeof(buf), "%d/%d", startIdx + 1,
                   (int)currentData_.storms.size());
@@ -126,8 +157,43 @@ void HurricanePanel::onResize(int x, int y, int w, int h) {
 }
 
 bool HurricanePanel::onMouseWheel(int scrollY) {
-  scrollOffset_ = std::clamp(scrollOffset_ - scrollY, 0, maxScroll_);
+  if (scrollY > 0) {
+    scrollOffset_ = std::max(0, scrollOffset_ - 1);
+  } else if (scrollY < 0) {
+    scrollOffset_ = std::min(maxScroll_, scrollOffset_ + 1);
+  }
   return true;
+}
+
+bool HurricanePanel::onMouseUp(int mx, int my, Uint16 mod, int clicks) {
+  if (currentData_.storms.empty()) return false;
+
+  int titleH = 20;
+  int curY = y_ + titleH + 4;
+  int startIdx = std::max(0, scrollOffset_);
+  
+  for (int i = startIdx; i < (int)currentData_.storms.size(); ++i) {
+    const auto &s = currentData_.storms[i];
+    int neededH = nameFontSize_ + detailFontSize_ + 4;
+    if (!s.movement.empty()) neededH += detailFontSize_ + 4;
+
+    if (my >= curY && my < curY + neededH) {
+      // Clicked on this storm!
+      auto data = store_->get();
+      if (data.selectedStormId == s.id) {
+          data.selectedStormId = ""; // Toggle off
+      } else {
+          data.selectedStormId = s.id;
+      }
+      store_->update(data);
+      return true;
+    }
+    
+    curY += neededH;
+    if (curY > y_ + height_) break;
+  }
+  
+  return false;
 }
 
 #include "WidgetRegistry.h"
